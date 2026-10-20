@@ -211,6 +211,66 @@ describe("config export with enterprise license", () => {
     }
   });
 
+  it("normalizes non-canonical password-rule values and falls back to passwordRequireNumber on export (#2036)", async () => {
+    const keys = [
+      "passwordRequireUppercase",
+      "passwordRequireLowercase",
+      "passwordRequireDigit",
+      "passwordRequireNumber",
+      "passwordRequireSpecial",
+    ];
+    const originalRows = await db.select().from(schema.settings);
+    const originals = new Map(
+      originalRows.filter((row) => keys.includes(row.key)).map((row) => [row.key, row.value]),
+    );
+
+    try {
+      await db.delete(schema.settings).where(eq(schema.settings.key, "passwordRequireDigit"));
+      await db
+        .insert(schema.settings)
+        .values({ key: "passwordRequireUppercase", value: "TRUE" })
+        .onConflictDoUpdate({ target: schema.settings.key, set: { value: "TRUE" } });
+      await db
+        .insert(schema.settings)
+        .values({ key: "passwordRequireLowercase", value: "0" })
+        .onConflictDoUpdate({ target: schema.settings.key, set: { value: "0" } });
+      await db
+        .insert(schema.settings)
+        .values({ key: "passwordRequireNumber", value: "false" })
+        .onConflictDoUpdate({ target: schema.settings.key, set: { value: "false" } });
+      await db
+        .insert(schema.settings)
+        .values({ key: "passwordRequireSpecial", value: "1" })
+        .onConflictDoUpdate({ target: schema.settings.key, set: { value: "1" } });
+
+      const res = await licensedApp.app.inject({
+        method: "GET",
+        url: "/api/v1/enterprise/config/export",
+        headers: { authorization: `Bearer ${licensedToken}` },
+      });
+      const body = JSON.parse(res.body);
+
+      expect(res.statusCode, res.body).toBe(200);
+      expect(body.settings.passwordRequireUppercase).toBe("true");
+      expect(body.settings.passwordRequireLowercase).toBe("true");
+      expect(body.settings.passwordRequireDigit).toBe("false");
+      expect(body.settings.passwordRequireNumber).toBeUndefined();
+      expect(body.settings.passwordRequireSpecial).toBe("false");
+    } finally {
+      for (const key of keys) {
+        const original = originals.get(key);
+        if (original === undefined) {
+          await db.delete(schema.settings).where(eq(schema.settings.key, key));
+        } else {
+          await db
+            .insert(schema.settings)
+            .values({ key, value: original })
+            .onConflictDoUpdate({ target: schema.settings.key, set: { value: original } });
+        }
+      }
+    }
+  });
+
   it("exports custom roles with their permissions but omits built-in roles", async () => {
     const suffix = Date.now().toString(36);
     const roleName = `config-export-role-${suffix}`;
@@ -989,6 +1049,95 @@ describe("config import with enterprise license", () => {
             .update(schema.settings)
             .set({ value: original })
             .where(eq(schema.settings.key, key));
+        }
+      }
+    }
+  });
+
+  it("normalizes non-canonical password-rule values on import and deletes stale passwordRequireNumber rows (#2036)", async () => {
+    const keys = [
+      "passwordRequireUppercase",
+      "passwordRequireLowercase",
+      "passwordRequireDigit",
+      "passwordRequireNumber",
+      "passwordRequireSpecial",
+    ];
+    const originalRows = await db.select().from(schema.settings);
+    const originals = new Map(
+      originalRows.filter((row) => keys.includes(row.key)).map((row) => [row.key, row.value]),
+    );
+
+    await db.delete(schema.settings).where(eq(schema.settings.key, "passwordRequireDigit"));
+    await db
+      .insert(schema.settings)
+      .values({ key: "passwordRequireNumber", value: "true" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "true" } });
+
+    try {
+      const dryRunRes = await licensedApp.app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        headers: { authorization: `Bearer ${licensedToken}` },
+        payload: {
+          dryRun: true,
+          config: {
+            configSchemaVersion: 1,
+            settings: {
+              passwordRequireUppercase: "TRUE",
+              passwordRequireLowercase: "false",
+              passwordRequireNumber: "0",
+              passwordRequireSpecial: "1",
+            },
+          },
+        },
+      });
+      expect(dryRunRes.statusCode, dryRunRes.body).toBe(200);
+      expect(JSON.parse(dryRunRes.body).details.settings).toContainEqual({
+        key: "passwordRequireDigit",
+        action: "update",
+      });
+
+      const res = await licensedApp.app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        headers: { authorization: `Bearer ${licensedToken}` },
+        payload: {
+          dryRun: false,
+          config: {
+            configSchemaVersion: 1,
+            settings: {
+              passwordRequireUppercase: "TRUE",
+              passwordRequireLowercase: "false",
+              passwordRequireNumber: "0",
+              passwordRequireSpecial: "1",
+            },
+          },
+        },
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      expect(JSON.parse(res.body)).toMatchObject({
+        applied: true,
+        changes: { settings: 4, roles: 0, teams: 0 },
+      });
+
+      const rows = await db.select().from(schema.settings);
+      const map = new Map(rows.map((r) => [r.key, r.value]));
+      expect(map.get("passwordRequireUppercase")).toBe("true");
+      expect(map.get("passwordRequireLowercase")).toBe("false");
+      expect(map.get("passwordRequireDigit")).toBe("true");
+      expect(map.get("passwordRequireSpecial")).toBe("false");
+      expect(map.has("passwordRequireNumber")).toBe(false);
+    } finally {
+      for (const key of keys) {
+        const original = originals.get(key);
+        if (original === undefined) {
+          await db.delete(schema.settings).where(eq(schema.settings.key, key));
+        } else {
+          await db
+            .insert(schema.settings)
+            .values({ key, value: original })
+            .onConflictDoUpdate({ target: schema.settings.key, set: { value: original } });
         }
       }
     }

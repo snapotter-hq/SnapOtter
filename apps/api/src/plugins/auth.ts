@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from "no
 import { promisify } from "node:util";
 import {
   ANALYTICS_EVENTS,
+  isPasswordRuleEnabled,
   PASSWORD_MAX_CODE_UNITS,
   PASSWORD_MAX_LENGTH,
   type PasswordRule,
@@ -229,10 +230,22 @@ export async function validatePasswordStrength(typed: string): Promise<PasswordR
     await getSettingStrict("passwordMinLength"),
     8,
   );
-  const requireUpper = (await getSettingStrict("passwordRequireUppercase")) ?? "true";
-  const requireLower = (await getSettingStrict("passwordRequireLowercase")) ?? "true";
-  const requireDigit = (await getSettingStrict("passwordRequireDigit")) ?? "true";
-  const requireSpecial = (await getSettingStrict("passwordRequireSpecial")) ?? "false";
+  const requireUpper = isPasswordRuleEnabled(
+    "passwordRequireUppercase",
+    await getSettingStrict("passwordRequireUppercase"),
+  );
+  const requireLower = isPasswordRuleEnabled(
+    "passwordRequireLowercase",
+    await getSettingStrict("passwordRequireLowercase"),
+  );
+  const requireDigit = isPasswordRuleEnabled(
+    "passwordRequireDigit",
+    await getSettingStrict("passwordRequireDigit"),
+  );
+  const requireSpecial = isPasswordRuleEnabled(
+    "passwordRequireSpecial",
+    await getSettingStrict("passwordRequireSpecial"),
+  );
 
   // The rules mean "has an uppercase letter / a lowercase letter / a digit /
   // punctuation, a symbol or a space" in any script, so a Russian or Arabic
@@ -240,12 +253,9 @@ export async function validatePasswordStrength(typed: string): Promise<PasswordR
   // allowlist of those three classes rather than "not a letter or number", which
   // would also pass invisible and control characters (a zero-width space, a tab,
   // NUL) that nobody can see or that the login page can't send.
-  // The three default-on rules are off only when stored as exactly "false",
-  // which is how the Security tab reads them. Anything else a row might hold
-  // ("TRUE", "1", a value an API client wrote before settings were validated in
-  // #618, a hand edit) fails closed instead of showing a switch that's on while
-  // enforcing nothing (#2026). Special defaults off, so it stays on only for
-  // "true", matching its switch.
+  // The three default-on rules are off only when stored as "false", which is
+  // how the Security tab reads them via isPasswordRuleEnabled (#2026, #2036).
+  // Special defaults off and is on only for "true".
   const broken: { rule: PasswordRule; message: string }[] = [];
   // Characters, not UTF-16 code units: an astral character is two units, so four
   // of them used to meet a minimum of 8 (#2057). Code points are what NIST SP
@@ -260,13 +270,13 @@ export async function validatePasswordStrength(typed: string): Promise<PasswordR
       rule: "minLength",
       message: `Password must be at least ${minLength} characters`,
     });
-  if (requireUpper !== "false" && !/\p{Lu}/u.test(password))
+  if (requireUpper && !/\p{Lu}/u.test(password))
     broken.push({ rule: "uppercase", message: "Password must contain an uppercase letter" });
-  if (requireLower !== "false" && !/\p{Ll}/u.test(password))
+  if (requireLower && !/\p{Ll}/u.test(password))
     broken.push({ rule: "lowercase", message: "Password must contain a lowercase letter" });
-  if (requireDigit !== "false" && !/\p{Nd}/u.test(password))
+  if (requireDigit && !/\p{Nd}/u.test(password))
     broken.push({ rule: "digit", message: "Password must contain a digit" });
-  if (requireSpecial === "true" && !/[\p{P}\p{S}\p{Zs}]/u.test(password))
+  if (requireSpecial && !/[\p{P}\p{S}\p{Zs}]/u.test(password))
     broken.push({ rule: "special", message: "Password must contain a special character" });
 
   if (broken.length === 0) return null;

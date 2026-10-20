@@ -447,6 +447,7 @@ describe("generic settings authority", () => {
 
     expect.soft(writeRes.statusCode, writeRes.body).toBe(200);
     expect.soft(await readSetting("passwordRequireDigit")).toBe("false");
+    expect.soft(await readSetting("passwordRequireNumber")).toBeUndefined();
     expect.soft(JSON.parse(listRes.body).settings).not.toHaveProperty("passwordRequireNumber");
     expect.soft(JSON.parse(listRes.body).settings.passwordRequireDigit).toBe("false");
     expect(keyRes.statusCode, keyRes.body).toBe(200);
@@ -454,6 +455,17 @@ describe("generic settings authority", () => {
       key: "passwordRequireDigit",
       value: "false",
     });
+
+    await upsertSetting("passwordRequireNumber", "false");
+    const canonicalWriteRes = await testApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/settings",
+      headers: { authorization: `Bearer ${securityApiKey}` },
+      payload: { passwordRequireDigit: "true" },
+    });
+    expect.soft(canonicalWriteRes.statusCode, canonicalWriteRes.body).toBe(200);
+    expect.soft(await readSetting("passwordRequireDigit")).toBe("true");
+    expect(await readSetting("passwordRequireNumber")).toBeUndefined();
   });
 
   it("reserves legacy identity-provider secrets for full administrators", async () => {

@@ -112,4 +112,51 @@ describe("AdminSecuritySettings save errors", () => {
     const message = await screen.findByText("Failed to save security settings");
     expect(message).toHaveClass("text-destructive");
   });
+
+  it("reads non-canonical stored password-rule values through the shared helper (#2036)", async () => {
+    apiGet.mockResolvedValueOnce({
+      settings: {
+        passwordRequireUppercase: "TRUE",
+        passwordRequireLowercase: "false",
+        passwordRequireDigit: "0",
+        passwordRequireSpecial: "1",
+      },
+    });
+    apiPut.mockResolvedValue({});
+
+    render(<AdminSecuritySettings />);
+    await waitFor(() => expect(apiGet).toHaveBeenCalled());
+
+    const upper = await screen.findByRole("switch", {
+      name: en.settings.security.passwordRequireUppercase,
+    });
+    const lower = screen.getByRole("switch", {
+      name: en.settings.security.passwordRequireLowercase,
+    });
+    const digit = screen.getByRole("switch", {
+      name: en.settings.security.passwordRequireNumber,
+    });
+    const special = screen.getByRole("switch", {
+      name: en.settings.security.passwordRequireSpecial,
+    });
+
+    expect(upper).toHaveAttribute("aria-checked", "true");
+    expect(lower).toHaveAttribute("aria-checked", "false");
+    expect(digit).toHaveAttribute("aria-checked", "true");
+    expect(special).toHaveAttribute("aria-checked", "false");
+
+    fireEvent.click(upper);
+    fireEvent.click(special);
+
+    expect(upper).toHaveAttribute("aria-checked", "false");
+    expect(special).toHaveAttribute("aria-checked", "true");
+
+    fireEvent.click(await screen.findByRole("button", { name: /save/i }));
+    await waitFor(() =>
+      expect(apiPut).toHaveBeenCalledWith("/v1/settings", {
+        passwordRequireUppercase: "false",
+        passwordRequireSpecial: "true",
+      }),
+    );
+  });
 });

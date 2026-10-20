@@ -1315,10 +1315,11 @@ describe("migrate-from-sqlite (a dropped row under force)", () => {
           ('m-oidc', 'm-oidc', NULL, 'user', 'default-team-00000000', false, 'oidc', 'm-sub-2', '2025-01-01T00:00:00Z', '2025-01-01T00:00:00Z'),
           ('m-collided', 'm-collided', 'hash', 'user', 'default-team-00000000', false, 'local', 'm-sub-2', '2025-01-01T00:01:00Z', '2025-01-01T00:01:00Z')
       `);
-      // Drop the last __drizzle_migrations entry as privileged user and re-run runMigrations()
+      // Drop 0011 (and any later migrations) from __drizzle_migrations as
+      // privileged user and re-run runMigrations() so 0011 replays.
       await withPrivileged(async (client) => {
         await client.query(
-          "DELETE FROM drizzle.__drizzle_migrations WHERE id = (SELECT max(id) FROM drizzle.__drizzle_migrations)",
+          "DELETE FROM drizzle.__drizzle_migrations WHERE created_at >= 1791900000000",
         );
       });
       await runMigrations();

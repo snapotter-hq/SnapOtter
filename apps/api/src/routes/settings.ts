@@ -230,6 +230,9 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       } else {
         await db.insert(schema.settings).values({ key, value: storedValue });
       }
+      if (key === "passwordRequireDigit") {
+        await db.delete(schema.settings).where(eq(schema.settings.key, "passwordRequireNumber"));
+      }
     }
 
     if (entries.length > 0) {

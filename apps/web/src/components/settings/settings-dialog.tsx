@@ -1,6 +1,7 @@
 import {
   APP_VERSION,
   CATEGORIES,
+  isPasswordRuleEnabled,
   isValidRoleName,
   isValidUsername,
   normalizeRoleName,
@@ -1342,23 +1343,32 @@ export function AdminSecuritySettings() {
         <button
           type="button"
           role="switch"
-          aria-checked={settings.passwordRequireUppercase !== "false"}
+          aria-checked={isPasswordRuleEnabled(
+            "passwordRequireUppercase",
+            settings.passwordRequireUppercase,
+          )}
           aria-label={t.settings.security.passwordRequireUppercase}
           onClick={() =>
             updateSetting(
               "passwordRequireUppercase",
-              settings.passwordRequireUppercase === "false" ? "true" : "false",
+              isPasswordRuleEnabled("passwordRequireUppercase", settings.passwordRequireUppercase)
+                ? "false"
+                : "true",
             )
           }
           className={cn(
             "w-11 h-6 rounded-full transition-colors relative",
-            settings.passwordRequireUppercase !== "false" ? "bg-primary" : "bg-muted-foreground/30",
+            isPasswordRuleEnabled("passwordRequireUppercase", settings.passwordRequireUppercase)
+              ? "bg-primary"
+              : "bg-muted-foreground/30",
           )}
         >
           <span
             className={cn(
               "block w-4 h-4 rounded-full bg-white absolute top-1 transition-transform",
-              settings.passwordRequireUppercase !== "false" ? "translate-x-6" : "translate-x-1",
+              isPasswordRuleEnabled("passwordRequireUppercase", settings.passwordRequireUppercase)
+                ? "translate-x-6"
+                : "translate-x-1",
             )}
           />
         </button>
@@ -1371,23 +1381,32 @@ export function AdminSecuritySettings() {
         <button
           type="button"
           role="switch"
-          aria-checked={settings.passwordRequireLowercase !== "false"}
+          aria-checked={isPasswordRuleEnabled(
+            "passwordRequireLowercase",
+            settings.passwordRequireLowercase,
+          )}
           aria-label={t.settings.security.passwordRequireLowercase}
           onClick={() =>
             updateSetting(
               "passwordRequireLowercase",
-              settings.passwordRequireLowercase === "false" ? "true" : "false",
+              isPasswordRuleEnabled("passwordRequireLowercase", settings.passwordRequireLowercase)
+                ? "false"
+                : "true",
             )
           }
           className={cn(
             "w-11 h-6 rounded-full transition-colors relative",
-            settings.passwordRequireLowercase !== "false" ? "bg-primary" : "bg-muted-foreground/30",
+            isPasswordRuleEnabled("passwordRequireLowercase", settings.passwordRequireLowercase)
+              ? "bg-primary"
+              : "bg-muted-foreground/30",
           )}
         >
           <span
             className={cn(
               "block w-4 h-4 rounded-full bg-white absolute top-1 transition-transform",
-              settings.passwordRequireLowercase !== "false" ? "translate-x-6" : "translate-x-1",
+              isPasswordRuleEnabled("passwordRequireLowercase", settings.passwordRequireLowercase)
+                ? "translate-x-6"
+                : "translate-x-1",
             )}
           />
         </button>
@@ -1400,23 +1419,32 @@ export function AdminSecuritySettings() {
         <button
           type="button"
           role="switch"
-          aria-checked={settings.passwordRequireDigit !== "false"}
+          aria-checked={isPasswordRuleEnabled(
+            "passwordRequireDigit",
+            settings.passwordRequireDigit,
+          )}
           aria-label={t.settings.security.passwordRequireNumber}
           onClick={() =>
             updateSetting(
               "passwordRequireDigit",
-              settings.passwordRequireDigit === "false" ? "true" : "false",
+              isPasswordRuleEnabled("passwordRequireDigit", settings.passwordRequireDigit)
+                ? "false"
+                : "true",
             )
           }
           className={cn(
             "w-11 h-6 rounded-full transition-colors relative",
-            settings.passwordRequireDigit !== "false" ? "bg-primary" : "bg-muted-foreground/30",
+            isPasswordRuleEnabled("passwordRequireDigit", settings.passwordRequireDigit)
+              ? "bg-primary"
+              : "bg-muted-foreground/30",
           )}
         >
           <span
             className={cn(
               "block w-4 h-4 rounded-full bg-white absolute top-1 transition-transform",
-              settings.passwordRequireDigit !== "false" ? "translate-x-6" : "translate-x-1",
+              isPasswordRuleEnabled("passwordRequireDigit", settings.passwordRequireDigit)
+                ? "translate-x-6"
+                : "translate-x-1",
             )}
           />
         </button>
@@ -1429,23 +1457,32 @@ export function AdminSecuritySettings() {
         <button
           type="button"
           role="switch"
-          aria-checked={settings.passwordRequireSpecial === "true"}
+          aria-checked={isPasswordRuleEnabled(
+            "passwordRequireSpecial",
+            settings.passwordRequireSpecial,
+          )}
           aria-label={t.settings.security.passwordRequireSpecial}
           onClick={() =>
             updateSetting(
               "passwordRequireSpecial",
-              settings.passwordRequireSpecial === "true" ? "false" : "true",
+              isPasswordRuleEnabled("passwordRequireSpecial", settings.passwordRequireSpecial)
+                ? "false"
+                : "true",
             )
           }
           className={cn(
             "w-11 h-6 rounded-full transition-colors relative",
-            settings.passwordRequireSpecial === "true" ? "bg-primary" : "bg-muted-foreground/30",
+            isPasswordRuleEnabled("passwordRequireSpecial", settings.passwordRequireSpecial)
+              ? "bg-primary"
+              : "bg-muted-foreground/30",
           )}
         >
           <span
             className={cn(
               "block w-4 h-4 rounded-full bg-white absolute top-1 transition-transform",
-              settings.passwordRequireSpecial === "true" ? "translate-x-6" : "translate-x-1",
+              isPasswordRuleEnabled("passwordRequireSpecial", settings.passwordRequireSpecial)
+                ? "translate-x-6"
+                : "translate-x-1",
             )}
           />
         </button>

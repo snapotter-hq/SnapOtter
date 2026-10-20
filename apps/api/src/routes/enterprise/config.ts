@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
+  isPasswordRuleSettingKey,
+  normalizePasswordRuleSetting,
   normalizeRoleName,
   ROLE_NAME_MAX_LENGTH,
   ROLE_NAME_MIN_LENGTH,
@@ -137,7 +139,14 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
       const settingsMap = config.settings as Record<string, string>;
       for (const s of allSettings) {
         if (isConfigExportableSetting(s.key)) {
-          settingsMap[s.key] = s.value;
+          settingsMap[s.key] = isPasswordRuleSettingKey(s.key)
+            ? normalizePasswordRuleSetting(s.key, s.value)
+            : s.value;
+        }
+      }
+      for (const s of allSettings) {
+        if (s.key === "passwordRequireNumber" && !("passwordRequireDigit" in settingsMap)) {
+          settingsMap.passwordRequireDigit = normalizePasswordRuleSetting(s.key, s.value);
         }
       }
 
@@ -254,7 +263,10 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
           // redaction placeholder. Preserve the established skip behavior.
           if (policy.redacted) continue;
 
-          const prepared = prepareSetting(requestedKey, value);
+          const normalizedValue = isPasswordRuleSettingKey(requestedKey)
+            ? normalizePasswordRuleSetting(requestedKey, value)
+            : value;
+          const prepared = prepareSetting(requestedKey, normalizedValue);
           if (!prepared.success) {
             return reply.status(400).send({
               error: prepared.error,
@@ -303,7 +315,11 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
         for (const { key } of preparedSettings) {
           settingsToUpdate.push({
             key,
-            action: existingKeys.has(key) ? "update" : "create",
+            action:
+              existingKeys.has(key) ||
+              (key === "passwordRequireDigit" && existingKeys.has("passwordRequireNumber"))
+                ? "update"
+                : "create",
           });
         }
         changes.settings = settingsToUpdate.length;
@@ -368,6 +384,12 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
                 .where(eq(schema.settings.key, key));
             } else {
               await tx.insert(schema.settings).values({ key, value });
+            }
+            if (key === "passwordRequireDigit" && existingKeys.has("passwordRequireNumber")) {
+              await tx
+                .delete(schema.settings)
+                .where(eq(schema.settings.key, "passwordRequireNumber"));
+              existingKeys.delete("passwordRequireNumber");
             }
           }
         }

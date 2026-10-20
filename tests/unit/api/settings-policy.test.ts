@@ -1,3 +1,8 @@
+import {
+  isPasswordRuleEnabled,
+  isPasswordRuleSettingKey,
+  normalizePasswordRuleSetting,
+} from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 import {
   getSettingPolicy,
@@ -106,5 +111,37 @@ describe("settings policy registry", () => {
     for (const [key, policy] of encryptedEntries) {
       expect(policy.redacted, `${key} has encrypted: true without redacted: true`).toBe(true);
     }
+  });
+
+  describe("shared password-rule helpers (#2036)", () => {
+    it.each([
+      "passwordRequireUppercase",
+      "passwordRequireLowercase",
+      "passwordRequireDigit",
+      "passwordRequireNumber",
+    ] as const)("treats default-on rule %s as enabled unless stored as false", (key) => {
+      expect(isPasswordRuleSettingKey(key)).toBe(true);
+      for (const onValue of [undefined, null, "true", "TRUE", "1", "0", "FALSE", "", "yes"]) {
+        expect(isPasswordRuleEnabled(key, onValue)).toBe(true);
+        expect(normalizePasswordRuleSetting(key, onValue)).toBe("true");
+      }
+      expect(isPasswordRuleEnabled(key, "false")).toBe(false);
+      expect(normalizePasswordRuleSetting(key, "false")).toBe("false");
+    });
+
+    it("treats passwordRequireSpecial as enabled only when stored as true", () => {
+      expect(isPasswordRuleSettingKey("passwordRequireSpecial")).toBe(true);
+      expect(isPasswordRuleEnabled("passwordRequireSpecial", "true")).toBe(true);
+      expect(normalizePasswordRuleSetting("passwordRequireSpecial", "true")).toBe("true");
+      for (const offValue of [undefined, null, "false", "TRUE", "1", "0", "", "yes"]) {
+        expect(isPasswordRuleEnabled("passwordRequireSpecial", offValue)).toBe(false);
+        expect(normalizePasswordRuleSetting("passwordRequireSpecial", offValue)).toBe("false");
+      }
+    });
+
+    it("identifies only password-rule boolean setting keys", () => {
+      expect(isPasswordRuleSettingKey("passwordMinLength")).toBe(false);
+      expect(isPasswordRuleSettingKey("defaultTheme")).toBe(false);
+    });
   });
 });
