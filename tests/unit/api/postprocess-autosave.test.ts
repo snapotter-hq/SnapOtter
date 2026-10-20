@@ -27,6 +27,7 @@ const stubs = vi.hoisted(() => ({
   abortDuringProbe: null as AbortController | null,
   abortDuringQuota: null as AbortController | null,
   abortDuringInsert: null as AbortController | null,
+  deleteParentDuringSave: false,
   claimFinalize: true,
 }));
 
@@ -39,6 +40,15 @@ vi.mock("../../../apps/api/src/jobs/cancel.js", () => ({
 
 vi.mock("../../../apps/api/src/db/index.js", () => {
   const tx = {
+    select: () => ({
+      from: () => ({
+        where: () => ({
+          limit: () => ({
+            for: async () => (stubs.parent ? [stubs.parent] : []),
+          }),
+        }),
+      }),
+    }),
     execute: async (query: unknown) => {
       const text = String(query);
       stubs.executedSql.push(text);
@@ -111,6 +121,7 @@ vi.mock("../../../apps/api/src/lib/file-storage.js", () => ({
     if (stubs.saveError) throw stubs.saveError;
     const storedName = `stored-${originalName}`;
     stubs.saved.push(storedName);
+    if (stubs.deleteParentDuringSave) stubs.parent = null;
     stubs.abortDuringSave?.abort();
     return storedName;
   },
@@ -169,6 +180,7 @@ beforeEach(() => {
   stubs.abortDuringProbe = null;
   stubs.abortDuringQuota = null;
   stubs.abortDuringInsert = null;
+  stubs.deleteParentDuringSave = false;
   stubs.claimFinalize = true;
   claimFinalizeMock.mockClear();
   releaseFinalizeMock.mockClear();
@@ -719,5 +731,109 @@ describe("autoSaveToLibrary under a user cancel (#2143)", () => {
       toolId: "compress",
       jobId: "job-1",
     });
+  });
+
+  it("skips the version insert and discards the staged blob when the parent file is deleted during an overwrite save (#2927)", async () => {
+    stubs.deleteParentDuringSave = true;
+
+    await expect(
+      autoSaveToLibrary(opts({ userCancel: new AbortController().signal })),
+    ).resolves.toEqual({});
+
+    expect(stubs.saved).toEqual(["stored-out.pdf"]);
+    expect(stubs.inserted).toEqual([]);
+    expect(stubs.deleted).toEqual(["stored-out.pdf"]);
+    expect(stubs.executedSql).toEqual([
+      "SAVEPOINT autosave_library",
+      "RELEASE SAVEPOINT autosave_library",
+    ]);
+    expect(releaseFinalizeMock).toHaveBeenCalledWith("job-1");
+    expect(loggerMock.warn).not.toHaveBeenCalled();
+    expect(loggerMock.error).not.toHaveBeenCalled();
+    expect(reportErrorMock).not.toHaveBeenCalled();
+  });
+
+  it("still inserts an independent root copy when the source file is deleted during a save-as-new run (#2927)", async () => {
+    stubs.deleteParentDuringSave = true;
+
+    const res = await autoSaveToLibrary(opts({ saveMode: "new" }));
+
+    expect(res.fileId).toBeDefined();
+    expect(stubs.inserted).toHaveLength(1);
+    expect(stubs.inserted[0]).toMatchObject({
+      id: res.fileId,
+      parentId: null,
+      version: 1,
+      storedName: "stored-out.pdf",
+      toolChain: ["resize", "compress"],
+    });
+    expect(stubs.deleted).toEqual([]);
+  });
+
+  it("reports STAGED_DISCARD_FAILED and throws Canceled when parent deletion and cancel or outer abort coincide (#2927)", async () => {
+    stubs.deleteParentDuringSave = true;
+    stubs.deleteError = new Error("injected storage outage");
+
+    await expect(autoSaveToLibrary(opts())).resolves.toEqual({});
+
+    expect(stubs.inserted).toEqual([]);
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      {
+        err: stubs.deleteError,
+        jobId: "job-1",
+        storedName: "stored-out.pdf",
+        fileId: "file-1",
+        toolId: "compress",
+      },
+      "Failed to delete orphaned file after parent file was deleted",
+    );
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+
+    stubs.parent = PARENT;
+    stubs.saved.length = 0;
+    stubs.deleted.length = 0;
+    loggerMock.error.mockReset();
+    reportErrorMock.mockReset();
+    const ac = new AbortController();
+    stubs.abortDuringQuota = ac;
+
+    await expect(autoSaveToLibrary(opts({ userCancel: ac.signal }))).rejects.toThrow("Canceled");
+
+    expect(stubs.inserted).toEqual([]);
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      {
+        err: stubs.deleteError,
+        jobId: "job-1",
+        storedName: "stored-out.pdf",
+        fileId: "file-1",
+        toolId: "compress",
+      },
+      "canceled library auto-save could not remove its blob; it is an orphan",
+    );
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+
+    stubs.parent = PARENT;
+    stubs.abortDuringQuota = null;
+    stubs.deleteError = null;
+    stubs.saved.length = 0;
+    stubs.deleted.length = 0;
+    loggerMock.error.mockReset();
+    loggerMock.warn.mockReset();
+    reportErrorMock.mockReset();
+
+    const { db } = await import("../../../apps/api/src/db/index.js");
+    const staged = await stageAutoSaveToLibrary(opts());
+    await expect(
+      db.transaction(async (tx) => {
+        const res = await staged.commit?.(tx);
+        expect(res).toEqual({});
+        throw new Error("outer completion commit failed");
+      }),
+    ).rejects.toThrow("outer completion commit failed");
+
+    await staged.onAbort?.(new Error("outer completion commit failed"));
+    expect(stubs.deleted).toEqual(["stored-out.pdf"]);
+    expect(loggerMock.warn).not.toHaveBeenCalled();
+    expect(reportErrorMock).not.toHaveBeenCalled();
   });
 });

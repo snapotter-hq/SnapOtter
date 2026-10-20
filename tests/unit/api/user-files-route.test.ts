@@ -15,6 +15,10 @@ const mocks = vi.hoisted(() => ({
   likeSpy: vi.fn(),
   limitSpy: vi.fn(),
   offsetSpy: vi.fn(),
+  executeSpy: vi.fn<(_q: unknown) => Promise<{ rows: unknown[] }>>(() =>
+    Promise.resolve({ rows: [] }),
+  ),
+  deleteWhereSpy: vi.fn(() => Promise.resolve()),
   parentRows: [] as unknown[],
   insertedValues: undefined as Record<string, unknown> | undefined,
   getCachedThumbnail: vi.fn<() => Promise<Buffer | null>>(() => Promise.resolve(null)),
@@ -48,7 +52,9 @@ vi.mock("drizzle-orm", () => ({
     mocks.likeSpy(col, pattern);
     return { op: "like", col, pattern };
   },
-  sql: Object.assign(() => "sql", { join: () => "sql-join" }),
+  sql: Object.assign((strings: TemplateStringsArray) => strings.join("?"), {
+    join: () => "sql-join",
+  }),
 }));
 
 vi.mock("../../../apps/api/src/db/index.js", () => ({
@@ -56,7 +62,7 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
     select: (fields?: unknown) => ({
       from: () => ({
         where: () => {
-          if (fields) {
+          if (fields && typeof fields === "object" && "count" in fields) {
             return Promise.resolve([{ count: 0 }]);
           }
           const orderChain = {
@@ -78,6 +84,15 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
           };
           return orderChain;
         },
+      }),
+    }),
+    execute: (q: unknown) => mocks.executeSpy(q),
+    delete: () => ({
+      where: mocks.deleteWhereSpy,
+    }),
+    update: () => ({
+      set: () => ({
+        where: () => Promise.resolve(),
       }),
     }),
     transaction: async (fn: (tx: unknown) => Promise<unknown>) => {
@@ -141,6 +156,14 @@ vi.mock("../../../apps/api/src/lib/quota.js", () => ({
 vi.mock("../../../apps/api/src/permissions.js", () => ({
   hasEffectivePermission: mocks.hasEffectivePermission,
   requireFileAccess: mocks.requireFileAccess,
+}));
+
+vi.mock("../../../apps/api/src/lib/library-cleanup.js", () => ({
+  deleteLibraryFileStorage: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("../../../apps/api/src/lib/audit.js", () => ({
+  auditFromRequest: () => vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("../../../apps/api/src/lib/file-validation.js", async (importOriginal) => {
@@ -607,6 +630,24 @@ describe("user files route logic", () => {
         const reply2 = makeReply();
         await deleteHandler({ body: {} }, reply2);
         expect(reply2.statusCode).toBe(400);
+      });
+
+      it("seeds the delete CTE from ancestors whose parent row is NULL or missing (#2927)", async () => {
+        mocks.parentRows = [{ id: "orphan-v2", userId: "user-1" }];
+        mocks.executeSpy.mockResolvedValueOnce({
+          rows: [{ id: "orphan-v2", stored_name: "stored-v2.png", size: 256, user_id: "user-1" }],
+        });
+
+        const reply = makeReply();
+        await deleteHandler({ body: { ids: ["orphan-v2"] } }, reply);
+
+        expect(reply.statusCode).toBe(200);
+        expect(reply.payload).toEqual({ deleted: 1 });
+        expect(mocks.executeSpy).toHaveBeenCalledTimes(1);
+        const queryText = String(mocks.executeSpy.mock.calls[0]?.[0] ?? "");
+        expect(queryText).toMatch(
+          /NOT EXISTS\s*\(\s*SELECT 1 FROM user_files p WHERE p\.id = a\.parent_id\s*\)/i,
+        );
       });
     });
 

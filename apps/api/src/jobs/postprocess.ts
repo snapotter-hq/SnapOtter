@@ -361,6 +361,7 @@ export async function stageAutoSaveToLibrary(opts: AutoSaveOpts): Promise<Staged
     let commitOutcome:
       | { kind: "none" }
       | { kind: "saved"; fileId: string }
+      | { kind: "skipped" }
       | { kind: "quota"; error: string }
       | { kind: "error"; err: unknown; error: string } = { kind: "none" };
     let blobCleaned = false;
@@ -383,6 +384,21 @@ export async function stageAutoSaveToLibrary(opts: AutoSaveOpts): Promise<Staged
             await runSql(sql`RELEASE SAVEPOINT autosave_library`);
           }
           return { error: overQuota };
+        }
+
+        if (overwrite) {
+          const [currentParent] = await tx
+            .select({ id: schema.userFiles.id })
+            .from(schema.userFiles)
+            .where(eq(schema.userFiles.id, fileId))
+            .limit(1)
+            .for("no key update");
+          if (!currentParent) {
+            if (runSql) {
+              await runSql(sql`RELEASE SAVEPOINT autosave_library`);
+            }
+            return {};
+          }
         }
 
         await tx.insert(schema.userFiles).values({
@@ -440,6 +456,13 @@ export async function stageAutoSaveToLibrary(opts: AutoSaveOpts): Promise<Staged
             }
             return res;
           }
+          if (!res.fileId) {
+            commitOutcome = { kind: "skipped" };
+            if (opts.userCancel?.aborted) {
+              throw new AutoSaveCanceledError();
+            }
+            return res;
+          }
           commitOutcome = { kind: "saved", fileId: newId };
           return res;
         } catch (err) {
@@ -465,6 +488,14 @@ export async function stageAutoSaveToLibrary(opts: AutoSaveOpts): Promise<Staged
       afterCommit: async (releaseClaim = false) => {
         if (commitOutcome.kind === "saved") {
           return { fileId: commitOutcome.fileId };
+        }
+        if (commitOutcome.kind === "skipped") {
+          if (releaseClaim && finalizeClaimed) {
+            await releaseStagedFinalize(opts);
+            finalizeClaimed = false;
+          }
+          await discardOnce("Failed to delete orphaned file after parent file was deleted");
+          return {};
         }
         if (commitOutcome.kind === "quota") {
           if (releaseClaim && finalizeClaimed) {
@@ -500,6 +531,14 @@ export async function stageAutoSaveToLibrary(opts: AutoSaveOpts): Promise<Staged
         return {};
       },
       onAbort: async (unhandledTxErr?: unknown) => {
+        if (commitOutcome.kind === "skipped") {
+          await discardOnce(
+            opts.userCancel?.aborted
+              ? "canceled library auto-save could not remove its blob; it is an orphan"
+              : "Failed to delete orphaned file after parent file was deleted",
+          );
+          return;
+        }
         if (commitOutcome.kind === "quota") {
           await discardOnce("Failed to delete orphaned file during quota rejection");
           return;

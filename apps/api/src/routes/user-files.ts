@@ -831,7 +831,11 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       ),
       chain(id, stored_name, size, user_id) AS (
         SELECT f.id, f.stored_name, f.size, f.user_id FROM user_files f
-        WHERE f.id IN (SELECT id FROM ancestors WHERE parent_id IS NULL)
+        WHERE f.id IN (
+          SELECT a.id FROM ancestors a
+          WHERE a.parent_id IS NULL
+             OR NOT EXISTS (SELECT 1 FROM user_files p WHERE p.id = a.parent_id)
+        )
         UNION ALL
         SELECT child.id, child.stored_name, child.size, child.user_id
         FROM user_files child

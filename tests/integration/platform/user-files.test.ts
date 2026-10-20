@@ -701,6 +701,92 @@ describe("Bulk delete", () => {
     const result = JSON.parse(res.body);
     expect(result.deleted).toBe(0);
   });
+
+  it("deletes an orphaned version chain whose parent row was already deleted (#2927)", async () => {
+    const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+      { name: "file", filename: "orphan-root.png", contentType: "image/png", content: PNG },
+    ]);
+    const uploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+      body: uploadBody,
+    });
+    expect(uploadRes.statusCode).toBe(201);
+    const v1Id = (JSON.parse(uploadRes.body).files[0] as { id: string }).id;
+
+    const { body: v2Body, contentType: v2Ct } = createMultipartPayload([
+      { name: "file", filename: "v2.png", contentType: "image/png", content: PNG },
+      { name: "parentId", content: v1Id },
+      { name: "toolId", content: "resize" },
+    ]);
+    const v2Res = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/save-result",
+      headers: { "content-type": v2Ct, authorization: `Bearer ${adminToken}` },
+      body: v2Body,
+    });
+    expect(v2Res.statusCode).toBe(201);
+    const v2 = JSON.parse(v2Res.body).file as { id: string; size: number };
+
+    const { body: v3Body, contentType: v3Ct } = createMultipartPayload([
+      { name: "file", filename: "v3.png", contentType: "image/png", content: TINY_PNG },
+      { name: "parentId", content: v2.id },
+      { name: "toolId", content: "compress" },
+    ]);
+    const v3Res = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/save-result",
+      headers: { "content-type": v3Ct, authorization: `Bearer ${adminToken}` },
+      body: v3Body,
+    });
+    expect(v3Res.statusCode).toBe(201);
+    const v3 = JSON.parse(v3Res.body).file as { id: string; size: number };
+
+    // Remove the root parent row directly so v2 -> v3 is an orphaned sub-chain
+    // whose top-most surviving row (v2) has a non-null parent_id pointing at a
+    // deleted row.
+    const [v1Row] = await db
+      .select({ userId: schema.userFiles.userId, storedName: schema.userFiles.storedName })
+      .from(schema.userFiles)
+      .where(eq(schema.userFiles.id, v1Id));
+    await unlink(getStoredFilePath(v1Row.storedName));
+    await db.delete(schema.userFiles).where(eq(schema.userFiles.id, v1Id));
+
+    const [userBefore] = await db
+      .select({ storageUsed: schema.users.storageUsed })
+      .from(schema.users)
+      .where(eq(schema.users.id, v1Row.userId ?? ""));
+
+    const delRes = await app.inject({
+      method: "DELETE",
+      url: "/api/v1/files",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${adminToken}`,
+      },
+      payload: { ids: [v3.id] },
+    });
+    expect(delRes.statusCode).toBe(200);
+    expect(JSON.parse(delRes.body)).toEqual({ deleted: 2 });
+
+    const remaining = await db
+      .select()
+      .from(schema.userFiles)
+      .where(eq(schema.userFiles.id, v2.id));
+    expect(remaining).toEqual([]);
+    const remainingLeaf = await db
+      .select()
+      .from(schema.userFiles)
+      .where(eq(schema.userFiles.id, v3.id));
+    expect(remainingLeaf).toEqual([]);
+
+    const [userAfter] = await db
+      .select({ storageUsed: schema.users.storageUsed })
+      .from(schema.users)
+      .where(eq(schema.users.id, v1Row.userId ?? ""));
+    expect(userAfter.storageUsed).toBe(Math.max(0, userBefore.storageUsed - v2.size - v3.size));
+  });
 });
 
 // ── Save result (versioning) ────────────────────────────────────

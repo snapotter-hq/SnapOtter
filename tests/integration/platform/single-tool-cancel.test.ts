@@ -1139,7 +1139,7 @@ describe("requestCancel through a single-tool alias (#808)", () => {
         jobId,
         userId: owner,
         fileId,
-        saveMode: "overwrite",
+        saveMode: "new",
       });
 
       const row = await terminalRow(jobId);
@@ -1161,6 +1161,59 @@ describe("requestCancel through a single-tool alias (#808)", () => {
             (ctx as { jobId?: string }).jobId === jobId,
         ),
       ).toHaveLength(1);
+    } finally {
+      librarySaveHook.after = null;
+      warnLog.mockRestore();
+    }
+  });
+
+  it("skips the version insert and discards the staged blob when the parent library file is deleted while staging an overwrite save (#2927)", async () => {
+    const owner = await createOwner();
+    const fileId = await createLibraryFile(owner);
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    const hook = { storedName: null as string | null };
+    librarySaveHook.after = async (storedName) => {
+      hook.storedName = storedName;
+      await db.delete(schema.userFiles).where(eq(schema.userFiles.id, fileId));
+    };
+    const warnLog = vi.spyOn(logger, "warn");
+    try {
+      await enqueueSingleRun({
+        mode: "fast",
+        tag: "parent-deleted-before-overwrite-commit",
+        clientJobId,
+        jobId,
+        userId: owner,
+        fileId,
+        saveMode: "overwrite",
+      });
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("completed");
+      expect(row.attempts).toBe(1);
+      expect((await terminalRow(clientJobId)).status).toBe("completed");
+      const result = (row.progress as { result?: { savedFileId?: string; autoSaveError?: string } })
+        ?.result;
+      expect(result?.savedFileId).toBeUndefined();
+      expect(result?.autoSaveError).toBeUndefined();
+
+      const files = await db
+        .select()
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.userId, owner));
+      expect(files).toEqual([]);
+      const [user] = await db.select().from(schema.users).where(eq(schema.users.id, owner));
+      expect(user?.storageUsed).toBe(0);
+      if (!hook.storedName) throw new Error("the library save never staged its blob");
+      await expect(readStoredFile(hook.storedName)).rejects.toMatchObject({ code: "ENOENT" });
+      expect(
+        warnLog.mock.calls.filter(
+          ([ctx, msg]) =>
+            msg === "library auto-save failed; no library copy was made" &&
+            (ctx as { jobId?: string }).jobId === jobId,
+        ),
+      ).toEqual([]);
     } finally {
       librarySaveHook.after = null;
       warnLog.mockRestore();
