@@ -8,7 +8,7 @@ import {
   Upload,
   User,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
@@ -134,6 +134,33 @@ interface RemovalRefineRecord {
   decontaminate: boolean;
 }
 
+interface EffectsErrorRecord {
+  file: File | null;
+  downloadUrl: string;
+  message: string;
+}
+
+function parseMaskDownloadUrl(downloadUrl: string | null): {
+  jobId: string;
+  baseName: string;
+  originalUrl: string;
+} | null {
+  if (!downloadUrl) return null;
+  const match = /\/api\/v1\/download\/([^/?#]+)\/([^/?#]+)$/.exec(downloadUrl);
+  if (!match) return null;
+  const jobId = match[1];
+  const filename = decodeURIComponent(match[2]);
+  if (!jobId || !filename) return null;
+  const stripped = filename.replace(/_mask\.png$|_nobg\.png$/, "");
+  const baseName = stripped || filename.replace(/\.[^.]+$/, "");
+  const origFilename = `${baseName}_original.png`;
+  return {
+    jobId,
+    baseName,
+    originalUrl: appUrl(`/api/v1/download/${jobId}/${encodeURIComponent(origFilename)}`),
+  };
+}
+
 function seedModelState(model: unknown): {
   subject: SubjectType;
   quality: Quality;
@@ -184,19 +211,22 @@ function defaultControlState(settings?: Record<string, unknown>): RemoveBgContro
   };
 }
 
-// Preserves RemoveBgSettings control selections and the recorded removalRefine
-// state when ToolPage swaps its mobile and desktop subtrees across 768px (#2489)
-// while the same files remain loaded in useFileStore.
+// Preserves RemoveBgSettings control selections, the recorded removalRefine
+// state, and any active Phase 2 effectsError when ToolPage swaps its mobile and
+// desktop subtrees across 768px (#2489, #2559) while the same files remain
+// loaded in useFileStore.
 const removeBgSession: {
   files: File[];
   controls: RemoveBgControlState;
   settings: Record<string, unknown>;
   removalRefine: RemovalRefineRecord | null;
+  effectsError: EffectsErrorRecord | null;
 } = {
   files: [],
   controls: defaultControlState(),
   settings: {},
   removalRefine: null,
+  effectsError: null,
 };
 
 function sameFileList(a: File[], b: File[]): boolean {
@@ -208,6 +238,7 @@ function resetRemoveBgSession(files: File[] = []): void {
   removeBgSession.controls = defaultControlState();
   removeBgSession.settings = {};
   removeBgSession.removalRefine = null;
+  removeBgSession.effectsError = null;
 }
 
 useFileStore.subscribe((state) => {
@@ -944,16 +975,6 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     removeBgSession.controls = next;
   };
 
-  // Two-phase state: after Phase 1 (bg removal), store job info for Phase 2 (effects)
-  const [bgJobId, setBgJobId] = useState<string | null>(null);
-  const [bgFilename, setBgFilename] = useState<string | null>(null);
-  const [bgOriginalUrl, setBgOriginalUrl] = useState<string | null>(null);
-
-  // The file a finished removal belongs to, and the file the running one was
-  // started on. The result only counts while that file is the one loaded:
-  // swapping files (during the run or after it) must not leave the download
-  // and effects acting on another file's job (#2107).
-  const [bgResultFile, setBgResultFile] = useState<File | null>(null);
   // The model and refinements the last single-file removal ran with. They are
   // sidecar options that Phase 2 cannot apply, so a change after the result
   // needs a new removal, and the panel says so (#2112, #2488).
@@ -964,11 +985,62 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     removeBgSession.removalRefine = next;
     setRemovalRefineState(next);
   };
+  const [effectsError, setEffectsErrorState] = useState<string | null>(() => {
+    const record = removeBgSession.effectsError;
+    if (!record) return null;
+    const loadedFiles = useFileStore.getState().files;
+    const loaded = loadedFiles.length === 1 ? (loadedFiles[0] ?? null) : null;
+    if (
+      loaded === null ||
+      record.file !== loaded ||
+      processing ||
+      error ||
+      !downloadUrl ||
+      record.downloadUrl !== downloadUrl
+    ) {
+      removeBgSession.effectsError = null;
+      return null;
+    }
+    return record.message;
+  });
+  const downloadUrlRef = useRef(downloadUrl);
+  downloadUrlRef.current = downloadUrl;
+  const setEffectsError = useCallback((next: string | null, options?: { persist?: boolean }) => {
+    const activeDownloadUrl = downloadUrlRef.current;
+    if (next === null || options?.persist === false || !activeDownloadUrl) {
+      removeBgSession.effectsError = null;
+    } else {
+      removeBgSession.effectsError = {
+        file: useFileStore.getState().files[0] ?? null,
+        downloadUrl: activeDownloadUrl,
+        message: next,
+      };
+    }
+    setEffectsErrorState(next);
+  }, []);
   const runFileRef = useRef<File | null>(null);
   const expiredRerunInFlightRef = useRef(false);
   const effectsRunIdRef = useRef(0);
   const [applyingEffects, setApplyingEffects] = useState(false);
-  const [effectsError, setEffectsError] = useState<string | null>(null);
+
+  const initialParsedDownload = !processing ? parseMaskDownloadUrl(downloadUrl) : null;
+
+  // Two-phase state: after Phase 1 (bg removal), store job info for Phase 2 (effects)
+  const [bgJobId, setBgJobId] = useState<string | null>(() => initialParsedDownload?.jobId ?? null);
+  const [bgFilename, setBgFilename] = useState<string | null>(
+    () => initialParsedDownload?.baseName ?? null,
+  );
+  const [bgOriginalUrl, setBgOriginalUrl] = useState<string | null>(
+    () => initialParsedDownload?.originalUrl ?? null,
+  );
+
+  // The file a finished removal belongs to, and the file the running one was
+  // started on. The result only counts while that file is the one loaded:
+  // swapping files (during the run or after it) must not leave the download
+  // and effects acting on another file's job (#2107).
+  const [bgResultFile, setBgResultFile] = useState<File | null>(() =>
+    initialParsedDownload ? (useFileStore.getState().files[0] ?? null) : null,
+  );
 
   useEffect(() => {
     if (files.length > 0) {
@@ -1213,31 +1285,30 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     if (!downloadUrl || processing) return;
     // Anchored on the download route so a deployment base path is tolerated but
     // a batch result's blob: URL is not mistaken for a job.
-    const match = /\/api\/v1\/download\/([^/?#]+)\/([^/?#]+)$/.exec(downloadUrl);
-    if (!match) return;
-    const jobId = match[1];
-    const filename = decodeURIComponent(match[2]);
-    if (jobId && filename) {
-      // The processor writes a finished job back by entry index, so a file
-      // swapped in while it ran can show that job's URL. Only the file the
-      // run started on owns it; after a remount there is no run on record and
-      // the URL is the loaded entry's own.
-      const loaded = useFileStore.getState().files[0] ?? null;
-      const runFile = runFileRef.current;
-      if (runFile && runFile !== loaded) return;
-      setBgResultFile(loaded);
-      setBgJobId(jobId);
-      // A fresh removal settles any "expired, running again" note (#2119).
-      expiredRerunInFlightRef.current = false;
+    const parsed = parseMaskDownloadUrl(downloadUrl);
+    if (!parsed) return;
+    // The processor writes a finished job back by entry index, so a file
+    // swapped in while it ran can show that job's URL. Only the file the
+    // run started on owns it; after a remount there is no run on record and
+    // the URL is the loaded entry's own.
+    const loaded = useFileStore.getState().files[0] ?? null;
+    const runFile = runFileRef.current;
+    if (runFile && runFile !== loaded) return;
+    setBgResultFile(loaded);
+    setBgJobId(parsed.jobId);
+    // A fresh removal settles any "expired, running again" note (#2119), while
+    // a remount on the same cutout preserves its Phase 2 error (#2559).
+    const keepEffectsError =
+      removeBgSession.effectsError !== null &&
+      removeBgSession.effectsError.file === loaded &&
+      removeBgSession.effectsError.downloadUrl === downloadUrl;
+    expiredRerunInFlightRef.current = false;
+    if (!keepEffectsError) {
       setEffectsError(null);
-      // Derive the cached filenames from the mask filename
-      const baseName = filename.replace(/_mask\.png$|_nobg\.png$/, "");
-      setBgFilename(baseName || filename.replace(/\.[^.]+$/, ""));
-      // Build original URL from the job
-      const origFilename = `${baseName || filename.replace(/\.[^.]+$/, "")}_original.png`;
-      setBgOriginalUrl(appUrl(`/api/v1/download/${jobId}/${encodeURIComponent(origFilename)}`));
     }
-  }, [downloadUrl, processing]);
+    setBgFilename(parsed.baseName);
+    setBgOriginalUrl(parsed.originalUrl);
+  }, [downloadUrl, processing, setEffectsError]);
 
   // A removal that failed or was cancelled leaves its own error on screen; the
   // "expired, running again" note would sit beside it saying otherwise (#2119).
@@ -1246,7 +1317,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
       expiredRerunInFlightRef.current = false;
       setEffectsError(null);
     }
-  }, [error]);
+  }, [error, setEffectsError]);
 
   // Undo or a file swap discards the Phase 1 cutout, so any Phase 2 error from
   // it has to clear too, while keeping the 410 expired notice up for the file
@@ -1264,7 +1335,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     }
     expiredRerunInFlightRef.current = false;
     setEffectsError(null);
-  }, [bgRemoved, processing, downloadUrl, files]);
+  }, [bgRemoved, processing, downloadUrl, files, setEffectsError]);
 
   // Phase 2: Apply effects and download
   const handleDownloadWithEffects = async () => {
@@ -1344,7 +1415,9 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
           if (isStaleEffectsRun() || !bgRemovedRef.current) return;
           handleRemoveBg();
           expiredRerunInFlightRef.current = true;
-          setEffectsError(t.toolSettings["remove-background"].effectsExpired);
+          setEffectsError(t.toolSettings["remove-background"].effectsExpired, {
+            persist: false,
+          });
           return;
         }
         throw new Error(

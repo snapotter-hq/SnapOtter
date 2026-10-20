@@ -905,4 +905,108 @@ describe("remove-background effects after the stored cutout expired (#2119)", ()
     expect(deployment.processFiles).not.toHaveBeenCalled();
     expect(screen.queryByText(note())).toBeNull();
   });
+
+  it("preserves a Phase 2 effectsError across a remount and clears it on retry or a new downloadUrl (#2559)", async () => {
+    const first = await applyEffects({ status: 500, body: { error: "disk on fire" } });
+    expect(await screen.findByText("disk on fire")).toBeVisible();
+
+    // Crossing the 768px mobile/desktop breakpoint unmounts and remounts RemoveBgSettings
+    // while the same file and cutout downloadUrl stay loaded.
+    first.unmount();
+    const second = render(<RemoveBgSettings />);
+
+    expect(await screen.findByTestId("remove-background-download-effects")).toBeInTheDocument();
+    expect(screen.getByText("disk on fire")).toBeVisible();
+
+    // Retrying Phase 2 after the remount sends the hydrated jobId/filename and clears the error on 200.
+    const retryFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ downloadUrl: "/api/v1/download/JOB123/pic_effects.webp" }),
+    });
+    vi.stubGlobal("fetch", retryFetch);
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    fireEvent.click(screen.getByTestId("remove-background-download-effects"));
+    await waitFor(() => expect(retryFetch).toHaveBeenCalledTimes(1));
+    expect(JSON.parse(retryFetch.mock.calls[0][1].body.get("settings"))).toMatchObject({
+      jobId: "JOB123",
+      filename: "pic.png",
+      outputFormat: "webp",
+    });
+    await waitFor(() => expect(screen.queryByText("disk on fire")).toBeNull());
+
+    // Another remount after the successful retry keeps the error cleared.
+    second.unmount();
+    render(<RemoveBgSettings />);
+    expect(await screen.findByTestId("remove-background-download-effects")).toBeInTheDocument();
+    expect(screen.queryByText("disk on fire")).toBeNull();
+  });
+
+  it("clears a remount-restored Phase 2 effectsError when a new downloadUrl arrives (#2559)", async () => {
+    const first = await applyEffects({ status: 500, body: { error: "disk on fire" } });
+    expect(await screen.findByText("disk on fire")).toBeVisible();
+
+    first.unmount();
+    const second = render(<RemoveBgSettings />);
+    expect(await screen.findByTestId("remove-background-download-effects")).toBeInTheDocument();
+    expect(screen.getByText("disk on fire")).toBeVisible();
+
+    deployment.downloadUrl = "/api/v1/download/JOB456/pic_mask.png";
+    second.rerender(<RemoveBgSettings />);
+
+    await waitFor(() => expect(screen.queryByText("disk on fire")).toBeNull());
+  });
+
+  it.each([
+    {
+      label: "a new downloadUrl",
+      mutateWhileUnmounted: () => {
+        deployment.downloadUrl = "/api/v1/download/JOB456/pic_mask.png";
+      },
+      assertAfterRemount: async () => {
+        expect(await screen.findByTestId("remove-background-download-effects")).toBeInTheDocument();
+      },
+    },
+    {
+      label: "Undo clearing downloadUrl",
+      mutateWhileUnmounted: () => {
+        deployment.beforeRun = true;
+      },
+      assertAfterRemount: async () => {
+        expect(screen.getByTestId("remove-background-submit")).toBeInTheDocument();
+      },
+    },
+    {
+      label: "a Phase 1 error",
+      mutateWhileUnmounted: () => {
+        deployment.error = "Run interrupted";
+      },
+      assertAfterRemount: async () => {
+        expect(screen.getByText("Run interrupted")).toBeVisible();
+      },
+    },
+  ])(
+    "drops a stored effectsError on remount if $label landed while unmounted (#2559)",
+    async ({ mutateWhileUnmounted, assertAfterRemount }) => {
+      const first = await applyEffects({ status: 500, body: { error: "disk on fire" } });
+      expect(await screen.findByText("disk on fire")).toBeVisible();
+
+      first.unmount();
+      mutateWhileUnmounted();
+      const second = render(<RemoveBgSettings />);
+
+      await assertAfterRemount();
+      expect(screen.queryByText("disk on fire")).toBeNull();
+      second.unmount();
+
+      // Even if the original cutout state is restored afterwards, the stored error was cleared.
+      deployment.beforeRun = false;
+      deployment.error = null;
+      deployment.downloadUrl = "/api/v1/download/JOB123/pic_mask.png";
+      render(<RemoveBgSettings />);
+      expect(await screen.findByTestId("remove-background-download-effects")).toBeInTheDocument();
+      expect(screen.queryByText("disk on fire")).toBeNull();
+    },
+  );
 });

@@ -538,4 +538,63 @@ describe("ToolPage interactive canvases across the 768px breakpoint (#2248)", ()
     });
     expect(screen.queryByTestId("remove-background-refine-stale")).not.toBeInTheDocument();
   });
+
+  it("keeps a Phase 2 effectsError in Remove Background when resizing across 768px (#2559)", async () => {
+    useFeaturesStore.setState({
+      loaded: true,
+      bundles: [
+        {
+          id: "remove_bg",
+          name: "Background Removal",
+          description: "",
+          tools: ["remove-background"],
+          estimatedSize: "300 MB",
+          status: "installed",
+        },
+      ],
+    });
+
+    const baseFetch = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input.toString();
+        if (url.endsWith("/api/v1/tools/image/remove-background/effects")) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ error: "Effects compositing failed" }), { status: 500 }),
+          );
+        }
+        return baseFetch(input, init);
+      }),
+    );
+
+    setMobileViewport(false);
+    renderToolPage("/image/remove-background");
+
+    await act(async () => {
+      useFileStore.getState().setFiles([new File(["img"], "portrait.png", { type: "image/png" })]);
+      useFileStore.getState().updateEntry(0, {
+        status: "completed",
+        processedUrl: "/api/v1/download/job-bg-2559/portrait_mask.png",
+        processedSize: 512,
+      });
+    });
+
+    fireEvent.click(await screen.findByTestId("remove-background-format-webp"));
+    fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+
+    expect(await screen.findByText("Effects compositing failed")).toBeVisible();
+
+    // Resize below 768px (desktop -> mobile) and open the mobile settings sheet.
+    setMobileViewport(true);
+    fireEvent.click(screen.getByRole("button", { name: "Process" }));
+
+    expect(await screen.findByTestId("remove-background-download-effects")).toBeVisible();
+    expect(screen.getByText("Effects compositing failed")).toBeVisible();
+
+    // Resize back above 768px (mobile -> desktop): error remains visible.
+    setMobileViewport(false);
+    expect(screen.getByTestId("remove-background-download-effects")).toBeVisible();
+    expect(screen.getByText("Effects compositing failed")).toBeVisible();
+  });
 });
