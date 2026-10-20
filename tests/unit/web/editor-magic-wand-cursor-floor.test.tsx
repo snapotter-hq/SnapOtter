@@ -1,7 +1,15 @@
 // @vitest-environment jsdom
+import { en } from "@snapotter/shared/i18n/en.js";
 import { act, cleanup, render, renderHook } from "@testing-library/react";
 import type Konva from "konva";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const toastError = vi.hoisted(() => vi.fn());
+
+// By path: a bare "sonner" resolves differently here than in apps/web and mocks nothing (#1235).
+vi.mock("../../../apps/web/node_modules/sonner", () => ({
+  toast: { error: toastError, success: vi.fn() },
+}));
 
 const stageProps = vi.hoisted(() => ({
   onMouseMove: undefined as ((e: Konva.KonvaEventObject<MouseEvent>) => void) | undefined,
@@ -34,8 +42,15 @@ vi.mock("../../../apps/web/node_modules/react-konva", () => ({
   Transformer: () => null,
 }));
 
+const useImageMock = vi.hoisted(() =>
+  vi.fn<(url: string, crossOrigin?: string) => [HTMLImageElement | null, string]>(() => [
+    null,
+    "loading",
+  ]),
+);
+
 vi.mock("../../../apps/web/node_modules/use-image", () => ({
-  default: () => [null, "loading"],
+  default: useImageMock,
 }));
 
 import { EditorCanvas } from "@/components/editor/editor-canvas";
@@ -106,6 +121,9 @@ function stageMouseEvent(stage: Konva.Stage) {
 beforeEach(() => {
   stageProps.onMouseMove = undefined;
   stageProps.onMouseDown = undefined;
+  toastError.mockClear();
+  useImageMock.mockReset();
+  useImageMock.mockImplementation(() => [null, "loading"]);
   globalThis.ResizeObserver = class {
     observe() {}
     unobserve() {}
@@ -193,5 +211,69 @@ describe("editor canvas cursor position flooring (#2431)", () => {
     act(() => stageProps.onMouseMove?.(stageMouseEvent(stage)));
 
     expect(useEditorStore.getState().cursorPosition).toEqual({ x: -1, y: -1 });
+  });
+});
+
+describe("editor canvas cross-origin image loading (#2133)", () => {
+  it("loads both the source image and image objects with crossOrigin 'anonymous'", () => {
+    const layerId = useEditorStore.getState().layers[0]?.id ?? "layer-1";
+    useEditorStore.setState({
+      sourceImageUrl: "https://images.example.test/photo.png",
+      objects: [
+        {
+          id: "img-obj-1",
+          type: "image",
+          layerId,
+          attrs: {
+            src: "https://images.example.test/overlay.png",
+            x: 0,
+            y: 0,
+            width: 50,
+            height: 50,
+            rotation: 0,
+            opacity: 1,
+          },
+        },
+      ],
+    });
+
+    render(<EditorCanvas />);
+
+    expect(useImageMock).toHaveBeenCalledWith("https://images.example.test/photo.png", "anonymous");
+    expect(useImageMock).toHaveBeenCalledWith(
+      "https://images.example.test/overlay.png",
+      "anonymous",
+    );
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("shows a toast when the source image or an image object fails its CORS or network load", () => {
+    useImageMock.mockImplementation(() => [null, "failed"]);
+    const layerId = useEditorStore.getState().layers[0]?.id ?? "layer-1";
+    useEditorStore.setState({
+      sourceImageUrl: "https://images.example.test/blocked-source.png",
+      objects: [
+        {
+          id: "img-obj-blocked",
+          type: "image",
+          layerId,
+          attrs: {
+            src: "https://images.example.test/blocked-overlay.png",
+            x: 0,
+            y: 0,
+            width: 50,
+            height: 50,
+            rotation: 0,
+            opacity: 1,
+          },
+        },
+      ],
+    });
+
+    render(<EditorCanvas />);
+
+    expect(toastError).toHaveBeenCalledWith(en.editor.ui.captureFailure.sourceImageFailed, {
+      id: "editor-source-image-failed",
+    });
   });
 });

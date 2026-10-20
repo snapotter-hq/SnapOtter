@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
 import type { Page } from "@playwright/test";
 import { expect, loadTestImage, selectTool, test } from "./helpers";
 
@@ -10,7 +13,13 @@ import { expect, loadTestImage, selectTool, test } from "./helpers";
 // headers loads untainted so the tool just works.
 
 const FIXTURE = "tests/fixtures/image/valid/test-200x150.png";
+const FIXTURE_BYTES = readFileSync(FIXTURE);
 const CROSS_ORIGIN_URL = "https://images.example.test/photo.png";
+
+function pngSize(file: string): [number, number] {
+  const png = readFileSync(file);
+  return [png.readUInt32BE(16), png.readUInt32BE(20)];
+}
 
 type StageView = {
   Konva?: {
@@ -82,6 +91,123 @@ test.describe("Editor pixel tools: cross-origin source image (issue #1040)", () 
 
     await expect.poll(() => countImageObjects(page), { timeout: 10_000 }).toBe(1);
     expect(pageErrors.filter((m) => m.includes("SecurityError"))).toEqual([]);
+  });
+
+  test("exports a ?url= image and a cross-origin image object from a second origin with CORS headers, and shows a toast without CORS headers (issue #2133)", async ({
+    editorPage: page,
+  }) => {
+    let sendCors = true;
+    const server: Server = createServer((_req, res) => {
+      const headers: Record<string, string | number> = {
+        "Content-Type": "image/png",
+        "Content-Length": FIXTURE_BYTES.length,
+        "Cache-Control": "no-store",
+      };
+      if (sendCors) {
+        headers["Access-Control-Allow-Origin"] = "*";
+      }
+      res.writeHead(200, headers);
+      res.end(FIXTURE_BYTES);
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = (server.address() as AddressInfo).port;
+    const secondOriginBase = `http://127.0.0.1:${port}`;
+
+    try {
+      const pageErrors: string[] = [];
+      page.on("pageerror", (err) => pageErrors.push(`${err.name}: ${err.message}`));
+
+      await page.goto(`/editor?url=${encodeURIComponent(`${secondOriginBase}/source.png`)}`);
+      await waitForSourceImage(page);
+
+      // Export the ?url= source image directly first to verify it doesn't taint the stage.
+      await page.keyboard.press("Control+Shift+s");
+      await expect(page.getByText("Export Image")).toBeVisible();
+      await expect(page.locator("[data-sonner-toast]")).toHaveCount(0);
+      const firstDownloadPromise = page.waitForEvent("download");
+      await page.getByRole("button", { name: "Export", exact: true }).click();
+      const firstDownloadPath = await (await firstDownloadPromise).path();
+      expect(firstDownloadPath).toBeTruthy();
+      expect(pngSize(firstDownloadPath as string)).toEqual([200, 150]);
+
+      // Load a project containing both a cross-origin source image and a cross-origin
+      // image object to verify neither taints the stage before export.
+      const chooserPromise = page.waitForEvent("filechooser");
+      await page.getByRole("button", { name: "Load Project" }).click();
+      const chooser = await chooserPromise;
+      await chooser.setFiles({
+        name: "cross-origin.snapotter",
+        mimeType: "application/json",
+        buffer: Buffer.from(
+          JSON.stringify({
+            version: 1,
+            canvasSize: { width: 200, height: 150 },
+            sourceImageUrl: `${secondOriginBase}/source-2.png`,
+            sourceImageSize: { width: 200, height: 150 },
+            objects: [
+              {
+                id: "overlay-cors",
+                type: "image",
+                layerId: "layer-1",
+                attrs: {
+                  src: `${secondOriginBase}/overlay.png`,
+                  x: 0,
+                  y: 0,
+                  width: 50,
+                  height: 50,
+                  rotation: 0,
+                  opacity: 1,
+                },
+              },
+            ],
+            layers: [
+              {
+                id: "layer-1",
+                name: "Layer 1",
+                visible: true,
+                locked: false,
+                opacity: 1,
+                blendMode: "normal",
+                thumbnail: null,
+              },
+            ],
+          }),
+        ),
+      });
+      await expect(page.getByText("Export Image")).toBeHidden();
+      await waitForSourceImage(page);
+      await expect
+        .poll(
+          () =>
+            page.evaluate(() => {
+              const stage = (window as unknown as StageView).Konva?.stages[0];
+              return Boolean(
+                stage?.find("Image").some((node) => node.id() === "overlay-cors" && node.image()),
+              );
+            }),
+          { timeout: 10_000 },
+        )
+        .toBe(true);
+
+      await page.keyboard.press("Control+Shift+s");
+      await expect(page.getByText("Export Image")).toBeVisible();
+      await expect(page.locator("[data-sonner-toast]")).toHaveCount(0);
+      const downloadPromise = page.waitForEvent("download");
+      await page.getByRole("button", { name: "Export", exact: true }).click();
+      const downloadPath = await (await downloadPromise).path();
+      expect(downloadPath).toBeTruthy();
+      expect(pngSize(downloadPath as string)).toEqual([200, 150]);
+      expect(pageErrors.filter((m) => m.includes("SecurityError"))).toEqual([]);
+
+      // Now serve without Access-Control-Allow-Origin and confirm opening shows the error toast.
+      sendCors = false;
+      await page.goto(`/editor?url=${encodeURIComponent(`${secondOriginBase}/no-cors.png`)}`);
+      await expect(page.locator("[data-sonner-toast]")).toContainText(/couldn't load the image/i, {
+        timeout: 10_000,
+      });
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 });
 
