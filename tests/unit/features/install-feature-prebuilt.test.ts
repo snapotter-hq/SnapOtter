@@ -2568,4 +2568,68 @@ assert open(os.path.join(sp_dir, "testpkg", "__init__.py")).read() == "# v1.0.0"
     );
     expect(pyCheck.status, `stderr: ${pyCheck.stderr}`).toBe(0);
   });
+
+  it("normalizes non-dict or missing-bundles shapes in installed.json and records the install (#3115)", () => {
+    const { tarPath, sha256 } = createTestTar("face-detection");
+    writeManifest("face-detection", tarPath, sha256);
+
+    const installedPath = join(aiDir, "installed.json");
+
+    // Missing installed.json creates a fresh structure without emitting a warning
+    unlinkSync(installedPath);
+    const missingResult = installBundle("face-detection", tarPath);
+    expect(missingResult.status, `stderr: ${missingResult.stderr?.toString()}`).toBe(0);
+    expect(missingResult.stderr?.toString() ?? "").not.toContain("[install] WARNING:");
+    expect(
+      JSON.parse(readFileSync(installedPath, "utf-8")).bundles["face-detection"],
+    ).toMatchObject({
+      version: "1.0.0-test",
+      models: ["testmodel"],
+    });
+
+    for (const malformed of [
+      "{}",
+      '{"bundles": null}',
+      "[]",
+      '{"bundles": []}',
+      '{"version": 1, "bundles": []}',
+      '{"bundles": "not-a-dict"}',
+      '{"bundles": 42}',
+      '"legacy-string"',
+      "123",
+      "true",
+      "null",
+    ]) {
+      writeFileSync(installedPath, malformed, "utf-8");
+      const result = installBundle("face-detection", tarPath);
+      expect(result.status, `shape=${malformed} stderr: ${result.stderr?.toString()}`).toBe(0);
+      const stderr = result.stderr?.toString() ?? "";
+      expect(stderr).toContain(
+        "[install] WARNING: installed.json has invalid structure; starting fresh and overwriting.",
+      );
+      const recorded = JSON.parse(readFileSync(installedPath, "utf-8"));
+      expect(Object.keys(recorded)).toEqual(["bundles"]);
+      expect(recorded.bundles["face-detection"]).toMatchObject({
+        version: "1.0.0-test",
+        models: ["testmodel"],
+      });
+    }
+
+    // Corrupt JSON and invalid UTF-8 bytes also degrade to empty bundles with a warning
+    for (const badBytes of [
+      Buffer.from("{not-valid-json", "utf-8"),
+      Buffer.from([0xff, 0xfe, 0x00]),
+    ]) {
+      writeFileSync(installedPath, badBytes);
+      const result = installBundle("face-detection", tarPath);
+      expect(result.status, `stderr: ${result.stderr?.toString()}`).toBe(0);
+      const stderr = result.stderr?.toString() ?? "";
+      expect(stderr).toContain("[install] WARNING: Could not read installed.json");
+      const recorded = JSON.parse(readFileSync(installedPath, "utf-8"));
+      expect(recorded.bundles["face-detection"]).toMatchObject({
+        version: "1.0.0-test",
+        models: ["testmodel"],
+      });
+    }
+  });
 });

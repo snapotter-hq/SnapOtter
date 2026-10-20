@@ -2032,11 +2032,18 @@ def read_installed(ai_dir: str) -> dict:
         return {"bundles": {}}
     try:
         with open(path, "r") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, OSError) as e:
-        sys.stderr.write(f"[install] WARNING: Could not read installed.json ({e}); starting fresh and overwriting.\n")
-        sys.stderr.flush()
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError) as e:
+        with contextlib.suppress(OSError):
+            sys.stderr.write(f"[install] WARNING: Could not read installed.json ({e}); starting fresh and overwriting.\n")
+            sys.stderr.flush()
         return {"bundles": {}}
+    if not isinstance(data, dict) or not isinstance(data.get("bundles"), dict):
+        with contextlib.suppress(OSError):
+            sys.stderr.write("[install] WARNING: installed.json has invalid structure; starting fresh and overwriting.\n")
+            sys.stderr.flush()
+        return {"bundles": {}}
+    return data
 
 
 def write_installed_atomic(ai_dir: str, data: dict) -> None:
