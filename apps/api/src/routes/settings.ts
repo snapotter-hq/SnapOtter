@@ -211,31 +211,36 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     }
 
     // Pass 2: write all entries now that all have passed validation
-    const now = new Date();
-
-    for (const { key, strValue } of entries) {
-      const storedValue = await encryptIfSensitive(key, strValue);
-
-      // Upsert: insert or update on conflict
-      const [existing] = await db
-        .select()
-        .from(schema.settings)
-        .where(eq(schema.settings.key, key));
-
-      if (existing) {
-        await db
-          .update(schema.settings)
-          .set({ value: storedValue, updatedAt: now })
-          .where(eq(schema.settings.key, key));
-      } else {
-        await db.insert(schema.settings).values({ key, value: storedValue });
-      }
-      if (key === "passwordRequireDigit") {
-        await db.delete(schema.settings).where(eq(schema.settings.key, "passwordRequireNumber"));
-      }
-    }
-
     if (entries.length > 0) {
+      const sortedEntries = [...entries].sort((a, b) =>
+        a.key < b.key ? -1 : a.key > b.key ? 1 : 0,
+      );
+      const preparedWrites: Array<{ key: string; storedValue: string }> = [];
+      for (const { key, strValue } of sortedEntries) {
+        preparedWrites.push({
+          key,
+          storedValue: await encryptIfSensitive(key, strValue),
+        });
+      }
+
+      const now = new Date();
+      await db.transaction(async (tx) => {
+        for (const { key, storedValue } of preparedWrites) {
+          await tx
+            .insert(schema.settings)
+            .values({ key, value: storedValue, updatedAt: now })
+            .onConflictDoUpdate({
+              target: schema.settings.key,
+              set: { value: storedValue, updatedAt: now },
+            });
+          if (key === "passwordRequireDigit") {
+            await tx
+              .delete(schema.settings)
+              .where(eq(schema.settings.key, "passwordRequireNumber"));
+          }
+        }
+      });
+
       await auditFromRequest(request)("SETTINGS_UPDATED", {
         adminId: admin.id,
         username: admin.username,

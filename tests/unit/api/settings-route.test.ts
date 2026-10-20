@@ -532,3 +532,312 @@ describe("settingsRoutes decryption failure handling (#2534)", () => {
     }
   });
 });
+
+describe("settingsRoutes PUT /api/v1/settings transactional upsert (#2502)", () => {
+  it("writes entries in sorted key order via tx.insert(...).onConflictDoUpdate(...) inside db.transaction and deletes passwordRequireNumber via tx.delete", async () => {
+    vi.resetModules();
+    const operations: Array<Record<string, unknown>> = [];
+    const auditCalls: Array<{ event: string; details: Record<string, unknown> }> = [];
+    let transactionCount = 0;
+
+    vi.doMock("drizzle-orm", () => ({
+      and: (...args: unknown[]) => ({ op: "and", args }),
+      eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+    }));
+    vi.doMock("../../../apps/api/src/config.js", () => ({
+      env: {
+        DATA_ENCRYPTION_KEY: "",
+        DATA_ENCRYPTION_KEY_PREVIOUS: "",
+        OIDC_ENABLED: false,
+        SAML_ENABLED: false,
+      },
+    }));
+
+    const txHandle = {
+      insert: (table: unknown) => ({
+        values: (vals: Record<string, unknown>) => ({
+          onConflictDoUpdate: (conflict: Record<string, unknown>) => {
+            operations.push({ op: "upsert", table, vals, conflict });
+            return Promise.resolve();
+          },
+        }),
+      }),
+      delete: (table: unknown) => ({
+        where: (whereArg: unknown) => {
+          operations.push({ op: "delete", table, where: whereArg });
+          return Promise.resolve();
+        },
+      }),
+    };
+
+    vi.doMock("../../../apps/api/src/db/index.js", () => ({
+      db: {
+        transaction: async (cb: (tx: typeof txHandle) => Promise<unknown>) => {
+          transactionCount += 1;
+          return cb(txHandle);
+        },
+      },
+      schema: { settings: { key: "settings.key", value: "settings.value" } },
+    }));
+    vi.doMock("../../../apps/api/src/permissions.js", () => ({
+      requirePermission: () => async () => ({ id: "admin-1", username: "admin", role: "admin" }),
+      getEffectivePermissions: async () => ["settings:read", "settings:write", "security:manage"],
+      isFullEffectiveAdmin: async () => true,
+    }));
+    vi.doMock("../../../apps/api/src/lib/audit.js", () => ({
+      auditFromRequest: () => async (event: string, details: Record<string, unknown>) => {
+        auditCalls.push({ event, details });
+      },
+    }));
+
+    const { settingsRoutes } = await import("../../../apps/api/src/routes/settings.js");
+    const app = Fastify();
+    await settingsRoutes(app);
+    await app.ready();
+
+    try {
+      const res = await app.inject({
+        method: "PUT",
+        url: "/api/v1/settings",
+        payload: {
+          passwordRequireNumber: "false",
+          defaultTheme: "dark",
+          defaultLocale: "de",
+        },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ ok: true, updatedCount: 3 });
+      expect(transactionCount).toBe(1);
+      expect(operations).toEqual([
+        {
+          op: "upsert",
+          table: { key: "settings.key", value: "settings.value" },
+          vals: { key: "defaultLocale", value: "de", updatedAt: expect.any(Date) },
+          conflict: {
+            target: "settings.key",
+            set: { value: "de", updatedAt: expect.any(Date) },
+          },
+        },
+        {
+          op: "upsert",
+          table: { key: "settings.key", value: "settings.value" },
+          vals: { key: "defaultTheme", value: "dark", updatedAt: expect.any(Date) },
+          conflict: {
+            target: "settings.key",
+            set: { value: "dark", updatedAt: expect.any(Date) },
+          },
+        },
+        {
+          op: "upsert",
+          table: { key: "settings.key", value: "settings.value" },
+          vals: { key: "passwordRequireDigit", value: "false", updatedAt: expect.any(Date) },
+          conflict: {
+            target: "settings.key",
+            set: { value: "false", updatedAt: expect.any(Date) },
+          },
+        },
+        {
+          op: "delete",
+          table: { key: "settings.key", value: "settings.value" },
+          where: { op: "eq", col: "settings.key", val: "passwordRequireNumber" },
+        },
+      ]);
+      expect(auditCalls).toEqual([
+        {
+          event: "SETTINGS_UPDATED",
+          details: {
+            adminId: "admin-1",
+            username: "admin",
+            keys: ["passwordRequireDigit", "defaultTheme", "defaultLocale"],
+          },
+        },
+      ]);
+    } finally {
+      await app.close();
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("does not open a transaction or write an audit entry when entries is empty", async () => {
+    vi.resetModules();
+    const transactionSpy = vi.fn();
+    const auditSpy = vi.fn();
+
+    vi.doMock("drizzle-orm", () => ({
+      and: (...args: unknown[]) => ({ op: "and", args }),
+      eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+    }));
+    vi.doMock("../../../apps/api/src/config.js", () => ({
+      env: {
+        DATA_ENCRYPTION_KEY: "",
+        DATA_ENCRYPTION_KEY_PREVIOUS: "",
+        OIDC_ENABLED: false,
+        SAML_ENABLED: false,
+      },
+    }));
+    vi.doMock("../../../apps/api/src/db/index.js", () => ({
+      db: {
+        transaction: transactionSpy,
+      },
+      schema: { settings: { key: "settings.key", value: "settings.value" } },
+    }));
+    vi.doMock("../../../apps/api/src/permissions.js", () => ({
+      requirePermission: () => async () => ({ id: "admin-1", username: "admin", role: "admin" }),
+      getEffectivePermissions: async () => ["settings:read", "settings:write"],
+      isFullEffectiveAdmin: async () => true,
+    }));
+    vi.doMock("../../../apps/api/src/lib/audit.js", () => ({
+      auditFromRequest: () => auditSpy,
+    }));
+
+    const { settingsRoutes } = await import("../../../apps/api/src/routes/settings.js");
+    const app = Fastify();
+    await settingsRoutes(app);
+    await app.ready();
+
+    try {
+      const emptyRes = await app.inject({
+        method: "PUT",
+        url: "/api/v1/settings",
+        payload: {},
+      });
+      expect(emptyRes.statusCode).toBe(200);
+      expect(emptyRes.json()).toEqual({ ok: true, updatedCount: 0 });
+
+      const maskedRes = await app.inject({
+        method: "PUT",
+        url: "/api/v1/settings",
+        payload: { oidc_client_secret: "********" },
+      });
+      expect(maskedRes.statusCode).toBe(200);
+      expect(maskedRes.json()).toEqual({ ok: true, updatedCount: 0 });
+
+      expect(transactionSpy).not.toHaveBeenCalled();
+      expect(auditSpy).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("encrypts sensitive values before opening db.transaction and skips audit log and analytics gate invalidation when the transaction rejects", async () => {
+    vi.resetModules();
+    const events: string[] = [];
+    const auditSpy = vi.fn();
+    const refreshAnalyticsGateSpy = vi.fn().mockResolvedValue(undefined);
+    const publishAnalyticsGateInvalidationSpy = vi.fn().mockResolvedValue(undefined);
+    const keyHex = "a".repeat(64);
+
+    vi.doMock("drizzle-orm", () => ({
+      and: (...args: unknown[]) => ({ op: "and", args }),
+      eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+    }));
+    vi.doMock("../../../apps/api/src/config.js", () => ({
+      env: {
+        DATA_ENCRYPTION_KEY: keyHex,
+        DATA_ENCRYPTION_KEY_PREVIOUS: "",
+        OIDC_ENABLED: false,
+        SAML_ENABLED: false,
+      },
+    }));
+    vi.doMock("../../../apps/api/src/lib/encryption.js", async (importOriginal) => {
+      const actual: Record<string, unknown> = await importOriginal();
+      const realEncrypt = actual.encrypt as (p: string, k: string) => Promise<string>;
+      return {
+        ...actual,
+        encrypt: async (plaintext: string, masterKey: string) => {
+          events.push(`encrypt:${plaintext}`);
+          return realEncrypt(plaintext, masterKey);
+        },
+      };
+    });
+    vi.doMock("../../../apps/api/src/lib/analytics-gate.js", () => ({
+      refreshAnalyticsGate: refreshAnalyticsGateSpy,
+      publishAnalyticsGateInvalidation: publishAnalyticsGateInvalidationSpy,
+    }));
+
+    let shouldFailSecondInsert = true;
+    let insertCallsInTx = 0;
+    const txHandle = {
+      insert: () => ({
+        values: (vals: { key: string; value: string }) => ({
+          onConflictDoUpdate: () => {
+            insertCallsInTx += 1;
+            events.push(`tx.upsert:${vals.key}`);
+            if (shouldFailSecondInsert && insertCallsInTx === 2) {
+              return Promise.reject(new Error("simulated db failure on second key"));
+            }
+            return Promise.resolve();
+          },
+        }),
+      }),
+      delete: () => ({
+        where: () => Promise.resolve(),
+      }),
+    };
+
+    vi.doMock("../../../apps/api/src/db/index.js", () => ({
+      db: {
+        transaction: async (cb: (tx: typeof txHandle) => Promise<unknown>) => {
+          events.push("tx.begin");
+          insertCallsInTx = 0;
+          return cb(txHandle);
+        },
+      },
+      schema: { settings: { key: "settings.key", value: "settings.value" } },
+    }));
+    vi.doMock("../../../apps/api/src/permissions.js", () => ({
+      requirePermission: () => async () => ({ id: "admin-1", username: "admin", role: "admin" }),
+      getEffectivePermissions: async () => ["settings:read", "settings:write"],
+      isFullEffectiveAdmin: async () => true,
+    }));
+    vi.doMock("../../../apps/api/src/lib/audit.js", () => ({
+      auditFromRequest: () => auditSpy,
+    }));
+
+    const { settingsRoutes } = await import("../../../apps/api/src/routes/settings.js");
+    const app = Fastify();
+    await settingsRoutes(app);
+    await app.ready();
+
+    try {
+      const failedRes = await app.inject({
+        method: "PUT",
+        url: "/api/v1/settings",
+        payload: {
+          oidc_client_secret: "new-secret",
+          analyticsEnabled: "false",
+        },
+      });
+      expect(failedRes.statusCode).toBe(500);
+      expect(auditSpy).not.toHaveBeenCalled();
+      expect(refreshAnalyticsGateSpy).not.toHaveBeenCalled();
+      expect(publishAnalyticsGateInvalidationSpy).not.toHaveBeenCalled();
+      expect(events).toEqual([
+        "encrypt:new-secret",
+        "tx.begin",
+        "tx.upsert:analyticsEnabled",
+        "tx.upsert:oidc_client_secret",
+      ]);
+
+      events.length = 0;
+      shouldFailSecondInsert = false;
+      const okRes = await app.inject({
+        method: "PUT",
+        url: "/api/v1/settings",
+        payload: {
+          oidc_client_secret: "new-secret",
+          analyticsEnabled: "false",
+        },
+      });
+      expect(okRes.statusCode).toBe(200);
+      expect(auditSpy).toHaveBeenCalledTimes(1);
+      expect(refreshAnalyticsGateSpy).toHaveBeenCalledTimes(1);
+      expect(publishAnalyticsGateInvalidationSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      await app.close();
+      vi.restoreAllMocks();
+    }
+  });
+});

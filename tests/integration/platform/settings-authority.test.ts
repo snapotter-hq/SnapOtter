@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
@@ -61,6 +61,9 @@ beforeAll(async () => {
   for (const key of [
     ...DEDICATED_OR_SERVER_SETTING_KEYS,
     "defaultTheme",
+    "defaultLocale",
+    "defaultToolView",
+    "rateLimitPerUser",
     "loginAttemptLimit",
     "maxSessionsPerUser",
     "auditRetentionDays",
@@ -139,6 +142,10 @@ afterAll(async () => {
   }
   await testApp.cleanup();
 }, 10_000);
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("generic settings authority", () => {
   it("keeps ordinary settings available to a delegated settings manager", async () => {
@@ -485,5 +492,151 @@ describe("generic settings authority", () => {
     });
     expect.soft(allowed.statusCode, allowed.body).toBe(200);
     expect(await readSetting("oidc_client_secret")).toBe("admin-secret");
+  });
+
+  it("accepts an empty settings object or masked-secret-only payload without opening a transaction (#2502)", async () => {
+    const txSpy = vi.spyOn(db, "transaction");
+
+    const emptyRes = await testApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/settings",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {},
+    });
+    expect(emptyRes.statusCode, emptyRes.body).toBe(200);
+    expect(JSON.parse(emptyRes.body)).toEqual({ ok: true, updatedCount: 0 });
+
+    const maskedRes = await testApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/settings",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { oidc_client_secret: "********" },
+    });
+    expect(maskedRes.statusCode, maskedRes.body).toBe(200);
+    expect(JSON.parse(maskedRes.body)).toEqual({ ok: true, updatedCount: 0 });
+
+    expect(txSpy).not.toHaveBeenCalled();
+  });
+
+  it("rolls back earlier keys, preserves passwordRequireNumber, and skips SETTINGS_UPDATED audit log when a later upsert fails in the same PUT (#2502)", async () => {
+    await upsertSetting("defaultTheme", "system");
+    await db.delete(schema.settings).where(eq(schema.settings.key, "defaultLocale"));
+    await upsertSetting("passwordRequireDigit", "true");
+    await upsertSetting("passwordRequireNumber", "true");
+    await db.delete(schema.settings).where(eq(schema.settings.key, "rateLimitPerUser"));
+
+    const countSettingsUpdatedAudit = async (): Promise<number> => {
+      const rows = await db
+        .select({ id: schema.auditLog.id })
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.action, "SETTINGS_UPDATED"));
+      return rows.length;
+    };
+    const auditBefore = await countSettingsUpdatedAudit();
+
+    type InsertFn = (table: unknown) => { values: (vals: unknown) => unknown };
+    const wrapValues = <T extends { values: (vals: unknown) => unknown }>(builder: T): T =>
+      new Proxy(builder, {
+        get(target, prop) {
+          const value = Reflect.get(target, prop, target);
+          if (prop !== "values") return typeof value === "function" ? value.bind(target) : value;
+          return (vals: { key?: string }) => {
+            if (vals?.key === "rateLimitPerUser") {
+              throw new Error("simulated connection drop on fourth setting write");
+            }
+            return (value as (v: unknown) => unknown).call(target, vals);
+          };
+        },
+      });
+    const wrapInsert = <T extends object>(handle: T): T =>
+      new Proxy(handle, {
+        get(target, prop) {
+          const value = Reflect.get(target, prop, target);
+          if (prop !== "insert") return typeof value === "function" ? value.bind(target) : value;
+          return (table: unknown) => {
+            const builder = (value as InsertFn).call(target, table);
+            return table === schema.settings ? wrapValues(builder) : builder;
+          };
+        },
+      });
+
+    const realInsert = db.insert.bind(db) as InsertFn;
+    vi.spyOn(db, "insert").mockImplementation(((table: unknown) => {
+      const builder = realInsert(table);
+      return table === schema.settings ? wrapValues(builder) : builder;
+    }) as unknown as typeof db.insert);
+
+    const realTransaction = db.transaction.bind(db) as (
+      cb: (tx: object) => Promise<unknown>,
+      config?: unknown,
+    ) => Promise<unknown>;
+    vi.spyOn(db, "transaction").mockImplementation(((
+      cb: (tx: object) => Promise<unknown>,
+      config?: unknown,
+    ) => realTransaction((tx) => cb(wrapInsert(tx)), config)) as unknown as typeof db.transaction);
+
+    const payload = {
+      defaultTheme: "dark",
+      passwordRequireNumber: "false",
+      defaultLocale: "de",
+      rateLimitPerUser: "120",
+    };
+
+    const failed = await testApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/settings",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload,
+    });
+    expect(failed.statusCode).toBe(500);
+
+    vi.restoreAllMocks();
+
+    expect(await readSetting("defaultTheme")).toBe("system");
+    expect(await readSetting("defaultLocale")).toBeUndefined();
+    expect(await readSetting("passwordRequireDigit")).toBe("true");
+    expect(await readSetting("passwordRequireNumber")).toBe("true");
+    expect(await readSetting("rateLimitPerUser")).toBeUndefined();
+    expect(await countSettingsUpdatedAudit()).toBe(auditBefore);
+
+    const retry = await testApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/settings",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload,
+    });
+    expect(retry.statusCode, retry.body).toBe(200);
+    expect(JSON.parse(retry.body)).toEqual({ ok: true, updatedCount: 4 });
+    expect(await readSetting("defaultTheme")).toBe("dark");
+    expect(await readSetting("defaultLocale")).toBe("de");
+    expect(await readSetting("passwordRequireDigit")).toBe("false");
+    expect(await readSetting("passwordRequireNumber")).toBeUndefined();
+    expect(await readSetting("rateLimitPerUser")).toBe("120");
+    expect(await countSettingsUpdatedAudit()).toBe(auditBefore + 1);
+  });
+
+  it("upserts concurrent first-time writes to the same keys without a primary-key collision (#2502)", async () => {
+    await db.delete(schema.settings).where(eq(schema.settings.key, "defaultLocale"));
+    await db.delete(schema.settings).where(eq(schema.settings.key, "defaultToolView"));
+
+    const [first, second] = await Promise.all([
+      testApp.app.inject({
+        method: "PUT",
+        url: "/api/v1/settings",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { defaultToolView: "fullscreen", defaultLocale: "de" },
+      }),
+      testApp.app.inject({
+        method: "PUT",
+        url: "/api/v1/settings",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { defaultToolView: "sidebar", defaultLocale: "fr" },
+      }),
+    ]);
+
+    expect(first.statusCode, first.body).toBe(200);
+    expect(second.statusCode, second.body).toBe(200);
+    expect(["de", "fr"]).toContain(await readSetting("defaultLocale"));
+    expect(["fullscreen", "sidebar"]).toContain(await readSetting("defaultToolView"));
   });
 });
