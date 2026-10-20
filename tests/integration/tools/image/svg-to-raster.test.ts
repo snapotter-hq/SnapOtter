@@ -5,6 +5,7 @@
  * that validates SVG input separately from the standard image validation.
  */
 
+import AdmZip from "adm-zip";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -333,10 +334,14 @@ describe("svg-to-raster", () => {
     expect(json.processedSize).toBeGreaterThan(0);
   });
 
-  it("converts to tiff format", async () => {
+  it("converts to tiff format and preserves 4-channel alpha on transparent SVGs (#3113)", async () => {
+    const transparentSvg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect x="8" y="8" width="12" height="12" fill="#c82828"/></svg>',
+    );
+
     const { body, contentType } = createMultipartPayload([
-      { name: "file", filename: "test.svg", contentType: "image/svg+xml", content: SVG },
-      { name: "settings", content: JSON.stringify({ outputFormat: "tiff" }) },
+      { name: "file", filename: "test.svg", contentType: "image/svg+xml", content: transparentSvg },
+      { name: "settings", content: JSON.stringify({ outputFormat: "tiff", dpi: 72 }) },
     ]);
 
     const res = await app.inject({
@@ -351,6 +356,51 @@ describe("svg-to-raster", () => {
     expect(json.downloadUrl).toBeDefined();
     // TIFF is non-previewable, so previewUrl should exist
     expect(json.previewUrl).toBeDefined();
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: json.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dlRes.statusCode).toBe(200);
+    const meta = await sharp(Buffer.from(dlRes.rawPayload)).metadata();
+    expect(meta.format).toBe("tiff");
+    expect(meta.channels).toBe(4);
+    expect(meta.hasAlpha).toBe(true);
+
+    const { data, info } = await sharp(Buffer.from(dlRes.rawPayload))
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    expect(data[(2 * info.width + 2) * info.channels + 3]).toBe(0);
+    const bodyIdx = (14 * info.width + 14) * info.channels;
+    expect([data[bodyIdx], data[bodyIdx + 1], data[bodyIdx + 2], data[bodyIdx + 3]]).toEqual([
+      200, 40, 40, 255,
+    ]);
+
+    const { body: batchBody, contentType: batchCt } = createMultipartPayload([
+      { name: "file", filename: "a.svg", contentType: "image/svg+xml", content: transparentSvg },
+      { name: "settings", content: JSON.stringify({ outputFormat: "tiff", dpi: 72 }) },
+    ]);
+    const batchRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/svg-to-raster/batch",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": batchCt },
+      body: batchBody,
+    });
+    expect(batchRes.statusCode).toBe(200);
+    const zip = new AdmZip(batchRes.rawPayload);
+    const entry = zip.getEntry("a.tiff");
+    expect(entry).toBeDefined();
+    const batchMeta = await sharp(entry?.getData()).metadata();
+    expect(batchMeta.format).toBe("tiff");
+    expect(batchMeta.channels).toBe(4);
+    expect(batchMeta.hasAlpha).toBe(true);
+    const { data: batchData, info: batchInfo } = await sharp(entry?.getData())
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    expect(batchData[(2 * batchInfo.width + 2) * batchInfo.channels + 3]).toBe(0);
   });
 
   it("converts to gif format", async () => {

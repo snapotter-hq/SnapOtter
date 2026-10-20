@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { extname } from "node:path";
-import type { SharpFormat } from "@snapotter/image-engine";
+import type { Sharp, SharpFormat } from "@snapotter/image-engine";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
@@ -54,6 +54,37 @@ function resolveOutputFormat(
     jxl: { sharpFormat: "png", ext: ".jxl" },
   };
   return map[outputFormat] ?? { sharpFormat: null, ext: originalExt };
+}
+
+function applyTileFormat(
+  pipeline: Sharp,
+  sharpFormat: SharpFormat | null,
+  sourceFormat: string | undefined,
+  quality: number,
+): Sharp {
+  const targetFormat =
+    sharpFormat ?? (sourceFormat === "tiff" || sourceFormat === "gif" ? sourceFormat : null);
+  if (!targetFormat) {
+    return pipeline;
+  }
+  const formatOpts: Record<string, unknown> = {};
+  if (
+    targetFormat === "jpeg" ||
+    targetFormat === "webp" ||
+    targetFormat === "avif" ||
+    targetFormat === "tiff"
+  ) {
+    formatOpts.quality = quality;
+  }
+  if (targetFormat === "avif") {
+    formatOpts.effort = 4;
+  }
+  if (targetFormat === "tiff") {
+    formatOpts.compression = "lzw";
+  } else if (targetFormat === "gif") {
+    formatOpts.reuse = false;
+  }
+  return pipeline.toFormat(targetFormat, formatOpts);
 }
 
 export function registerSplit(app: FastifyInstance) {
@@ -223,17 +254,12 @@ export function registerSplit(app: FastifyInstance) {
 
           if (left >= fullW || top >= fullH || w <= 0 || h <= 0) continue;
 
-          let pipeline = sharp(fileBuffer).extract({ left, top, width: w, height: h });
-          if (sharpFormat) {
-            const formatOpts: Record<string, unknown> = {};
-            if (sharpFormat === "jpeg" || sharpFormat === "webp" || sharpFormat === "avif") {
-              formatOpts.quality = settings.quality;
-            }
-            if (sharpFormat === "avif") {
-              formatOpts.effort = 4;
-            }
-            pipeline = pipeline.toFormat(sharpFormat, formatOpts);
-          }
+          const pipeline = applyTileFormat(
+            sharp(fileBuffer).extract({ left, top, width: w, height: h }),
+            sharpFormat,
+            metadata.format,
+            settings.quality,
+          );
 
           const partBuffer = await pipeline.toBuffer();
           const finalBuffer =
@@ -272,10 +298,12 @@ export function registerSplit(app: FastifyInstance) {
         const settings = _settings as z.infer<typeof settingsSchema>;
         let fullW: number;
         let fullH: number;
+        let sourceFormat: string | undefined;
         try {
           const metadata = await sharp(inputBuffer).metadata();
           fullW = metadata.width ?? 0;
           fullH = metadata.height ?? 0;
+          sourceFormat = metadata.format;
         } catch (err) {
           throw await asInputErrorIfUndecodable(inputBuffer, err);
         }
@@ -333,17 +361,12 @@ export function registerSplit(app: FastifyInstance) {
 
             if (left >= fullW || top >= fullH || w <= 0 || h <= 0) continue;
 
-            let pipeline = sharp(inputBuffer).extract({ left, top, width: w, height: h });
-            if (sharpFormat) {
-              const formatOpts: Record<string, unknown> = {};
-              if (sharpFormat === "jpeg" || sharpFormat === "webp" || sharpFormat === "avif") {
-                formatOpts.quality = settings.quality;
-              }
-              if (sharpFormat === "avif") {
-                formatOpts.effort = 4;
-              }
-              pipeline = pipeline.toFormat(sharpFormat, formatOpts);
-            }
+            const pipeline = applyTileFormat(
+              sharp(inputBuffer).extract({ left, top, width: w, height: h }),
+              sharpFormat,
+              sourceFormat,
+              settings.quality,
+            );
 
             let partBuffer: Buffer;
             try {

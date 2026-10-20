@@ -1,7 +1,14 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import multipart from "@fastify/multipart";
 import { COMPRESS_PRESETS, PYTHON_SIDECAR_TOOLS, TOOLS } from "@snapotter/shared";
-import type { FastifyInstance } from "fastify";
+import AdmZip from "adm-zip";
+import Fastify, { type FastifyInstance } from "fastify";
 import sharp from "sharp";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+import { env } from "../../../apps/api/src/config.js";
+import { getObjectBuffer } from "../../../apps/api/src/lib/object-storage.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerColorAdjustments } from "../../../apps/api/src/routes/tools/adjust-colors.js";
 import { registerBeautify } from "../../../apps/api/src/routes/tools/beautify.js";
@@ -26,7 +33,9 @@ import { registerRotate } from "../../../apps/api/src/routes/tools/rotate.js";
 import { registerRoundedCrop } from "../../../apps/api/src/routes/tools/rounded-crop.js";
 import { registerSharpening } from "../../../apps/api/src/routes/tools/sharpening.js";
 import { registerSmartCrop } from "../../../apps/api/src/routes/tools/smart-crop.js";
+import { registerSplit } from "../../../apps/api/src/routes/tools/split.js";
 import { registerStripMetadata } from "../../../apps/api/src/routes/tools/strip-metadata.js";
+import { registerSvgToRaster } from "../../../apps/api/src/routes/tools/svg-to-raster.js";
 import { registerTextOverlay } from "../../../apps/api/src/routes/tools/text-overlay.js";
 import { registerVectorize } from "../../../apps/api/src/routes/tools/vectorize.js";
 import { registerVignette } from "../../../apps/api/src/routes/tools/vignette.js";
@@ -83,6 +92,7 @@ beforeAll(() => {
   registerRoundedCrop(app);
   registerSharpening(app);
   registerSmartCrop(app);
+  registerSplit(app);
   registerStripMetadata(app);
   registerTextOverlay(app);
   registerVectorize(app);
@@ -665,8 +675,226 @@ describe("transparency survives the container it arrived in (#1187)", () => {
       expect(webpToTiffMeta.hasAlpha).toBe(true);
       expect(await alphaAt(webpToTiff.buffer, 5, 5)).toBe(0);
       expect(await alphaAt(webpToTiff.buffer, 40, 40)).toBe(255);
+
+      const splitConfig = getToolConfig("split");
+      if (!splitConfig) throw new Error("split must be registered");
+      const [splitOriginalOut, splitPngOut] = await Promise.all([
+        splitConfig.process(
+          tiff,
+          splitConfig.settingsSchema.parse({ columns: 2, rows: 2, outputFormat: "original" }),
+          "corner.tiff",
+        ),
+        splitConfig.process(
+          png,
+          splitConfig.settingsSchema.parse({ columns: 2, rows: 2, outputFormat: "png" }),
+          "corner.png",
+        ),
+      ]);
+
+      const pngZip = new AdmZip(splitPngOut.buffer);
+      const zip = new AdmZip(splitOriginalOut.buffer);
+      const entries = zip.getEntries();
+      expect(entries.map((e) => e.entryName).sort()).toEqual([
+        "corner_r1_c1.tiff",
+        "corner_r1_c2.tiff",
+        "corner_r2_c1.tiff",
+        "corner_r2_c2.tiff",
+      ]);
+      const topLeft = zip.getEntry("corner_r1_c1.tiff")?.getData();
+      const bottomRight = zip.getEntry("corner_r2_c2.tiff")?.getData();
+      const pngTopLeft = pngZip.getEntry("corner_r1_c1.png")?.getData();
+      if (!topLeft || !bottomRight || !pngTopLeft) throw new Error("missing split tile");
+
+      const tlMeta = await sharp(topLeft).metadata();
+      expect(tlMeta.format, `split original (${compression}) format`).toBe("tiff");
+      expect(tlMeta.depth, `split original (${compression}) depth`).toBe("uchar");
+      expect(tlMeta.channels, `split original (${compression}) channels`).toBe(4);
+      expect(tlMeta.hasAlpha, `split original (${compression}) hasAlpha`).toBe(true);
+      expect(await alphaAt(topLeft, 5, 5), `split original (${compression}) corner alpha`).toBe(0);
+      expect(await alphaAt(topLeft, 25, 25), `split original (${compression}) body alpha`).toBe(
+        255,
+      );
+      expect(await alphaAt(bottomRight, 5, 5), `split original (${compression}) r2c2 alpha`).toBe(
+        255,
+      );
+      expect(worstChannelDiff(await decode(topLeft), await decode(pngTopLeft))).toBeLessThanOrEqual(
+        2,
+      );
     },
   );
+
+  it("preserves 4-channel alpha on svg-to-raster and split HTTP routes (#3113)", async () => {
+    const prevWorkspace = env.WORKSPACE_PATH;
+    const tempWorkspace = mkdtempSync(join(tmpdir(), "snapotter-3113-"));
+    env.WORKSPACE_PATH = tempWorkspace;
+
+    const fastify = Fastify();
+    await fastify.register(multipart);
+    registerSvgToRaster(fastify);
+    registerSplit(fastify);
+    await fastify.ready();
+
+    const buildMultipart = (
+      filename: string,
+      contentType: string,
+      fileBuf: Buffer,
+      settings: Record<string, unknown>,
+    ) => {
+      const boundary = "----snapotter3113";
+      const payload = Buffer.concat([
+        Buffer.from(
+          `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${contentType}\r\n\r\n`,
+        ),
+        fileBuf,
+        Buffer.from(
+          `\r\n--${boundary}\r\nContent-Disposition: form-data; name="settings"\r\n\r\n${JSON.stringify(settings)}\r\n--${boundary}--\r\n`,
+        ),
+      ]);
+      return {
+        payload,
+        headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
+      };
+    };
+
+    try {
+      const svg = Buffer.from(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect x="8" y="8" width="12" height="12" fill="#c82828"/></svg>',
+      );
+
+      const url = "/api/v1/tools/image/svg-to-raster";
+      const res = await fastify.inject({
+        method: "POST",
+        url,
+        ...buildMultipart("badge.svg", "image/svg+xml", svg, { outputFormat: "tiff", dpi: 72 }),
+      });
+      expect(res.statusCode, url).toBe(200);
+      const body = res.json() as { jobId: string; previewUrl?: string };
+      expect(body.previewUrl).toBe(`/api/v1/download/${body.jobId}/preview.webp`);
+
+      const tiffOut = await getObjectBuffer(`outputs/${body.jobId}/badge.tiff`);
+      const meta = await sharp(tiffOut).metadata();
+      expect(meta.format, `${url} format`).toBe("tiff");
+      expect(meta.channels, `${url} channels`).toBe(4);
+      expect(meta.hasAlpha, `${url} hasAlpha`).toBe(true);
+      expect(await alphaAt(tiffOut, 2, 2), `${url} transparent corner`).toBe(0);
+      expect(await alphaAt(tiffOut, 14, 14), `${url} opaque rect`).toBe(255);
+      const { data, info } = await sharp(tiffOut)
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      const i = (14 * info.width + 14) * info.channels;
+      expect([data[i], data[i + 1], data[i + 2], data[i + 3]]).toEqual([200, 40, 40, 255]);
+
+      const previewOut = await getObjectBuffer(`outputs/${body.jobId}/preview.webp`);
+      const previewMeta = await sharp(previewOut).metadata();
+      expect(previewMeta.format).toBe("webp");
+      expect(previewMeta.hasAlpha).toBe(true);
+      expect(await alphaAt(previewOut, 2, 2)).toBe(0);
+
+      const opaqueRes = await fastify.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/svg-to-raster",
+        ...buildMultipart("badge.svg", "image/svg+xml", svg, {
+          outputFormat: "tiff",
+          dpi: 72,
+          backgroundColor: "#ffffff",
+        }),
+      });
+      expect(opaqueRes.statusCode).toBe(200);
+      const opaqueTiff = await getObjectBuffer(
+        `outputs/${(opaqueRes.json() as { jobId: string }).jobId}/badge.tiff`,
+      );
+      const opaqueMeta = await sharp(opaqueTiff).metadata();
+      expect(opaqueMeta.format).toBe("tiff");
+      expect(opaqueMeta.channels).toBe(3);
+      expect(opaqueMeta.hasAlpha).toBe(false);
+      const { data: opaqueData, info: opaqueInfo } = await sharp(opaqueTiff)
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      const opaqueCorner = (2 * opaqueInfo.width + 2) * opaqueInfo.channels;
+      expect([
+        opaqueData[opaqueCorner],
+        opaqueData[opaqueCorner + 1],
+        opaqueData[opaqueCorner + 2],
+      ]).toEqual([255, 255, 255]);
+      const opaqueBody = (14 * opaqueInfo.width + 14) * opaqueInfo.channels;
+      expect([
+        opaqueData[opaqueBody],
+        opaqueData[opaqueBody + 1],
+        opaqueData[opaqueBody + 2],
+      ]).toEqual([200, 40, 40]);
+
+      const gif = await transparentCorner();
+      const png = await sharp(gif).png().toBuffer();
+      const rgbaTiff = await sharp(png).tiff({ compression: "lzw" }).toBuffer();
+
+      const splitTiffRes = await fastify.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/split",
+        ...buildMultipart("corner.tiff", "image/tiff", rgbaTiff, {
+          columns: 2,
+          rows: 2,
+          outputFormat: "original",
+        }),
+      });
+      expect(splitTiffRes.statusCode).toBe(200);
+      const splitTiffZip = new AdmZip(splitTiffRes.rawPayload);
+      const tile1 = splitTiffZip.getEntry("corner_r1_c1.tiff")?.getData();
+      const tile4 = splitTiffZip.getEntry("corner_r2_c2.tiff")?.getData();
+      if (!tile1 || !tile4) throw new Error("missing HTTP split TIFF tiles");
+      const tile1Meta = await sharp(tile1).metadata();
+      expect(tile1Meta.format).toBe("tiff");
+      expect(tile1Meta.channels).toBe(4);
+      expect(tile1Meta.hasAlpha).toBe(true);
+      expect(await alphaAt(tile1, 5, 5)).toBe(0);
+      expect(await alphaAt(tile1, 25, 25)).toBe(255);
+      expect(await alphaAt(tile4, 5, 5)).toBe(255);
+
+      // extract() crops existing pixels without introducing non-palette colors,
+      // so the spy verifies that both HTTP and worker split paths pass
+      // reuse: false when re-encoding GIF tiles under outputFormat: "original".
+      const toFormatSpy = vi.spyOn(sharp.prototype, "toFormat");
+      try {
+        const splitGifRes = await fastify.inject({
+          method: "POST",
+          url: "/api/v1/tools/image/split",
+          ...buildMultipart("corner.gif", "image/gif", gif, {
+            columns: 2,
+            rows: 1,
+            outputFormat: "original",
+          }),
+        });
+        expect(splitGifRes.statusCode).toBe(200);
+        expect(toFormatSpy).toHaveBeenCalledWith("gif", { reuse: false });
+        const splitGifZip = new AdmZip(splitGifRes.rawPayload);
+        const gifTile = splitGifZip.getEntry("corner_r1_c1.gif")?.getData();
+        if (!gifTile) throw new Error("missing HTTP split GIF tile");
+        expect(await alphaAt(gifTile, 5, 5)).toBe(0);
+        expect(await alphaAt(gifTile, 25, 25)).toBe(255);
+
+        const splitConfig = getToolConfig("split");
+        if (!splitConfig) throw new Error("split must be registered");
+        toFormatSpy.mockClear();
+        const workerGifOut = await splitConfig.process(
+          gif,
+          splitConfig.settingsSchema.parse({ columns: 2, rows: 1, outputFormat: "original" }),
+          "corner.gif",
+        );
+        expect(toFormatSpy).toHaveBeenCalledWith("gif", { reuse: false });
+        const workerGifZip = new AdmZip(workerGifOut.buffer);
+        const workerGifTile = workerGifZip.getEntry("corner_r1_c1.gif")?.getData();
+        if (!workerGifTile) throw new Error("missing worker split GIF tile");
+        expect(await alphaAt(workerGifTile, 5, 5)).toBe(0);
+        expect(await alphaAt(workerGifTile, 25, 25)).toBe(255);
+      } finally {
+        toFormatSpy.mockRestore();
+      }
+    } finally {
+      await fastify.close();
+      env.WORKSPACE_PATH = prevWorkspace;
+      rmSync(tempWorkspace, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("the container guard covers the image catalogue (#1190)", () => {

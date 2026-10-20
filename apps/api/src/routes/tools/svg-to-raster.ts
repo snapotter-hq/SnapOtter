@@ -85,7 +85,7 @@ async function convertSvg(
       ext = "avif";
       break;
     case "tiff":
-      buffer = await image.tiff({ quality: settings.quality }).toBuffer();
+      buffer = await image.tiff({ compression: "lzw", quality: settings.quality }).toBuffer();
       ext = "tiff";
       break;
     case "gif":

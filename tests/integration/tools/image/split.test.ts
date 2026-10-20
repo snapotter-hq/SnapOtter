@@ -1796,4 +1796,108 @@ describe("Split", () => {
       expect(entry.entryName).toMatch(/\.webp$/);
     }
   });
+
+  it("preserves 4-channel alpha when splitting a transparent LZW/Deflate TIFF on single-file and batch routes (#3113)", async () => {
+    const size = 20;
+    const raw = Buffer.alloc(size * size * 4);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const i = (y * size + x) * 4;
+        raw[i] = 200;
+        raw[i + 1] = 40;
+        raw[i + 2] = 40;
+        raw[i + 3] = x < 8 && y < 8 ? 0 : 255;
+      }
+    }
+
+    for (const compression of ["lzw", "deflate"] as const) {
+      const rgbaTiff = await sharp(raw, { raw: { width: size, height: size, channels: 4 } })
+        .tiff({ compression })
+        .toBuffer();
+
+      const { body, contentType } = createMultipartPayload([
+        {
+          name: "file",
+          filename: `alpha-${compression}.tiff`,
+          contentType: "image/tiff",
+          content: rgbaTiff,
+        },
+        {
+          name: "settings",
+          content: JSON.stringify({ columns: 2, rows: 2, outputFormat: "original" }),
+        },
+      ]);
+
+      const singleRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/split",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      });
+      expect(singleRes.statusCode).toBe(200);
+      const singleZip = new AdmZip(singleRes.rawPayload);
+      const topLeft = singleZip.getEntry(`alpha-${compression}_r1_c1.tiff`)?.getData();
+      const bottomRight = singleZip.getEntry(`alpha-${compression}_r2_c2.tiff`)?.getData();
+      expect(topLeft).toBeDefined();
+      expect(bottomRight).toBeDefined();
+
+      const tlMeta = await sharp(topLeft).metadata();
+      expect(tlMeta.format).toBe("tiff");
+      expect(tlMeta.channels).toBe(4);
+      expect(tlMeta.hasAlpha).toBe(true);
+      const { data: tlData, info: tlInfo } = await sharp(topLeft)
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      const cornerIdx = (2 * tlInfo.width + 2) * tlInfo.channels;
+      expect([
+        tlData[cornerIdx],
+        tlData[cornerIdx + 1],
+        tlData[cornerIdx + 2],
+        tlData[cornerIdx + 3],
+      ]).toEqual([200, 40, 40, 0]);
+      const innerIdx = (9 * tlInfo.width + 9) * tlInfo.channels;
+      expect([
+        tlData[innerIdx],
+        tlData[innerIdx + 1],
+        tlData[innerIdx + 2],
+        tlData[innerIdx + 3],
+      ]).toEqual([200, 40, 40, 255]);
+
+      const batchRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/split/batch",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      });
+      expect(batchRes.statusCode).toBe(200);
+      const outerZip = new AdmZip(batchRes.rawPayload);
+      const innerZipEntry = outerZip.getEntry(`alpha-${compression}_split.zip`);
+      expect(innerZipEntry).toBeDefined();
+      const innerZip = new AdmZip(innerZipEntry?.getData());
+      const batchTopLeft = innerZip.getEntry(`alpha-${compression}_r1_c1.tiff`)?.getData();
+      expect(batchTopLeft).toBeDefined();
+      const batchTlMeta = await sharp(batchTopLeft).metadata();
+      expect(batchTlMeta.format).toBe("tiff");
+      expect(batchTlMeta.channels).toBe(4);
+      expect(batchTlMeta.hasAlpha).toBe(true);
+      const { data: batchTlData, info: batchTlInfo } = await sharp(batchTopLeft)
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      const batchCornerIdx = (2 * batchTlInfo.width + 2) * batchTlInfo.channels;
+      expect([
+        batchTlData[batchCornerIdx],
+        batchTlData[batchCornerIdx + 1],
+        batchTlData[batchCornerIdx + 2],
+        batchTlData[batchCornerIdx + 3],
+      ]).toEqual([200, 40, 40, 0]);
+    }
+  });
 });
