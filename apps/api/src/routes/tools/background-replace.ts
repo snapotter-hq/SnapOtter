@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { removeBackground } from "@snapotter/ai";
-import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
+import { getBundleForTool, HEX_COLOR_PATTERN, TOOL_BUNDLE_MAP } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -31,17 +31,33 @@ import { receiveUpload } from "../../lib/upload-stream.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
 
-const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+const hexColor = z
+  .string()
+  .trim()
+  .regex(HEX_COLOR_PATTERN, "Use a hex color such as #FF5500 or #F50");
 
-const settingsSchema = z.object({
-  backgroundType: z.enum(["color", "gradient"]).default("color"),
-  color: z.string().regex(HEX_RE).default("#ffffff"),
-  gradientColor1: z.string().regex(HEX_RE).optional(),
-  gradientColor2: z.string().regex(HEX_RE).optional(),
-  gradientAngle: z.number().int().min(0).max(360).default(180),
-  feather: z.number().int().min(0).max(20).default(0),
-  format: z.enum(["png", "webp"]).default("png"),
-});
+const settingsSchema = z
+  .object({
+    backgroundType: z.enum(["color", "gradient"]).default("color"),
+    color: hexColor.default("#ffffff"),
+    gradientColor1: hexColor.optional(),
+    gradientColor2: hexColor.optional(),
+    gradientAngle: z.number().int().min(0).max(360).default(180),
+    feather: z.number().int().min(0).max(20).default(0),
+    format: z.enum(["png", "webp"]).default("png"),
+  })
+  .superRefine((s, ctx) => {
+    if (s.backgroundType !== "gradient") return;
+    for (const key of ["gradientColor1", "gradientColor2"] as const) {
+      if (s[key] === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `A gradient background needs ${key}`,
+        });
+      }
+    }
+  });
 
 /**
  * Soften the alpha edges of a subject PNG by blurring its alpha channel.
@@ -105,13 +121,16 @@ registerAiJobHandler("background-replace", async (input, data, ctx) => {
 
       let composited: Buffer;
       if (s.backgroundType === "gradient") {
+        if (!s.gradientColor1 || !s.gradientColor2) {
+          throw new Error("A gradient background needs two colors");
+        }
         const meta = await sharp(subject).metadata();
         if (!meta.width || !meta.height) throw new Error("Cannot read subject dimensions");
         const gradBg = await createGradientBackground(
           meta.width,
           meta.height,
-          s.gradientColor1 ?? "#ffffff",
-          s.gradientColor2 ?? "#000000",
+          s.gradientColor1,
+          s.gradientColor2,
           s.gradientAngle,
         );
         composited = await sharp(gradBg)

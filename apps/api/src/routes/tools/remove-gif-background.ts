@@ -7,6 +7,7 @@ import { removeBackgroundAnimated } from "@snapotter/ai";
 import {
   BG_REMOVAL_MODELS,
   getBundleForTool,
+  HEX_COLOR_PATTERN,
   isSafeMessageError,
   isToolInputError,
   TOOL_BUNDLE_MAP,
@@ -41,13 +42,45 @@ import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
-const settingsSchema = z.object({
+const hexColor = z
+  .string()
+  .trim()
+  .regex(HEX_COLOR_PATTERN, "Use a hex color such as #FF5500 or #F50");
+
+/** A color or gradient background has to say which colors, or it comes back with a default (#2282). */
+function requireBackgroundColors(
+  s: {
+    backgroundType?: string;
+    backgroundColor?: string;
+    gradientColor1?: string;
+    gradientColor2?: string;
+  },
+  ctx: z.RefinementCtx,
+) {
+  const needs: Array<"backgroundColor" | "gradientColor1" | "gradientColor2"> =
+    s.backgroundType === "color"
+      ? ["backgroundColor"]
+      : s.backgroundType === "gradient"
+        ? ["gradientColor1", "gradientColor2"]
+        : [];
+  for (const key of needs) {
+    if (s[key] === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [key],
+        message: `A ${s.backgroundType} background needs ${key}`,
+      });
+    }
+  }
+}
+
+const settingsShape = z.object({
   model: z.enum(BG_REMOVAL_MODELS).optional(),
   outputFormat: z.enum(["webp", "gif", "apng"]).optional(),
   backgroundType: z.enum(["transparent", "color", "gradient", "blur", "image"]).optional(),
-  backgroundColor: z.string().optional(),
-  gradientColor1: z.string().optional(),
-  gradientColor2: z.string().optional(),
+  backgroundColor: hexColor.optional(),
+  gradientColor1: hexColor.optional(),
+  gradientColor2: hexColor.optional(),
   gradientAngle: z.number().optional(),
   blurIntensity: z.number().min(0).max(100).optional(),
   shadowEnabled: z.boolean().optional(),
@@ -56,9 +89,13 @@ const settingsSchema = z.object({
   decontaminate: z.boolean().optional(),
 });
 
+const settingsSchema = settingsShape.superRefine(requireBackgroundColors);
+
 // The worker also receives the staged background-image storage key (never
 // persisted to the audit row — passed via dbSettings redaction on enqueue).
-const jobSettingsSchema = settingsSchema.extend({ bgImageKey: z.string().optional() });
+const jobSettingsSchema = settingsShape
+  .extend({ bgImageKey: z.string().optional() })
+  .superRefine(requireBackgroundColors);
 
 type Settings = z.infer<typeof settingsSchema>;
 
@@ -350,7 +387,7 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
       "Animated background removal failed",
       (s) => (s as Settings)?.outputFormat ?? "webp",
       async (inputBuffer, settings, filename, ctx) => {
-        const s = settings as Settings;
+        const s = settingsSchema.parse(settings);
         const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
         const needsCleanup = !ctx?.scratchDir;
         if (needsCleanup) await mkdir(scratchDir, { recursive: true });

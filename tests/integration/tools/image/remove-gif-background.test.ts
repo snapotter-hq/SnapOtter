@@ -118,6 +118,17 @@ describe("Remove GIF Background (#496)", () => {
     expect(JSON.parse(res.body).error).toMatch(/background image/i);
   });
 
+  it.each([
+    ["a color that isn't hex", { backgroundType: "color", backgroundColor: "red" }],
+    ["a color background without a color", { backgroundType: "color" }],
+    ["a gradient missing a stop", { backgroundType: "gradient", gradientColor1: "#000000" }],
+  ])("answers 400 for %s (#2282)", async (_label, settings) => {
+    setInstalled(["background-removal"]);
+    const res = await post(GIF, "a.gif", "image/gif", settings);
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/invalid settings/i);
+  });
+
   it("rejects an unknown model name instead of swapping in a default (#1337)", async () => {
     setInstalled(["background-removal"]);
     const res = await post(GIF, "a.gif", "image/gif", { model: "birefnet-hr-mating" });

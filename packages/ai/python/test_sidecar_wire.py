@@ -88,5 +88,32 @@ for script_file in AI_ENTRYPOINT_SCRIPTS:
 import gif_remove_bg  # noqa: E402
 assert gif_remove_bg._is_oom(MemoryError()) is True, "gif_remove_bg._is_oom must recognize bare MemoryError()"
 assert gif_remove_bg._is_oom(RuntimeError("MemoryError")) is True
+assert gif_remove_bg._hex_to_rgba("#F50") == (255, 85, 0, 255)
+assert gif_remove_bg._hex_to_rgba("ff5500") == (255, 85, 0, 255)
+assert gif_remove_bg._hex_to_rgba(" #f50 ") == (255, 85, 0, 255)
+for bad_hex in ("red", "", None, "#FF", "#FF00", "#FF00000", "#FF000080", "#GGGGGG"):
+    try:
+        gif_remove_bg._hex_to_rgba(bad_hex)
+        raise AssertionError(f"gif_remove_bg._hex_to_rgba({bad_hex!r}) did not raise")
+    except ValueError:
+        pass
+
+for bad_grad in ({}, {"gradientColor1": "#000"}, {"gradientColor2": "#fff"}, {"gradientColor1": "red", "gradientColor2": "#fff"}):
+    try:
+        gif_remove_bg._gradient(10, 10, bad_grad)
+        raise AssertionError(f"gif_remove_bg._gradient(10, 10, {bad_grad!r}) did not raise")
+    except ValueError:
+        pass
+
+for bad_effect in (
+    {"backgroundType": "color"},
+    {"backgroundType": "color", "backgroundColor": "red"},
+    {"backgroundType": "gradient", "gradientColor1": "#000"},
+):
+    try:
+        gif_remove_bg._apply_effect(None, None, bad_effect, None)
+        raise AssertionError(f"gif_remove_bg._apply_effect(..., {bad_effect!r}) did not raise")
+    except ValueError:
+        pass
 
 print("WIRE OK")

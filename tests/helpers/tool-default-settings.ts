@@ -54,8 +54,13 @@ export const TOOL_SETTINGS_OVERRIDES: Record<string, unknown> = {
  * (`format-matrix-generated`) continue to send Phase 1-valid defaults (#2978).
  */
 export const PAIRWISE_SETTINGS_OVERRIDES: Record<string, Record<string, unknown>> = {
-  // Colors the pairwise lane needs to reach the color and gradient background types (#2075).
+  // Colors the pairwise lane needs to reach the color and gradient background types (#2075, #2282).
   "remove-background": {
+    backgroundColor: "#ffffff",
+    gradientColor1: "#000000",
+    gradientColor2: "#ffffff",
+  },
+  "remove-gif-background": {
     backgroundColor: "#ffffff",
     gradientColor1: "#000000",
     gradientColor2: "#ffffff",

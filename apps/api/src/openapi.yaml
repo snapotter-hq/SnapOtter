@@ -3811,9 +3811,9 @@ paths:
                     - `model` (string, optional) - AI model name (one of: u2net, isnet-general-use, bria-rmbg, birefnet-general-lite, birefnet-portrait, birefnet-general, birefnet-matting, birefnet-hr-matting)
                     - `outputFormat` (string, optional) - One of: webp, apng, gif
                     - `backgroundType` (string, optional) - One of: transparent, color, gradient, blur, image
-                    - `backgroundColor` (string, optional) - Hex color for the color background
-                    - `gradientColor1` (string, optional) - First gradient color
-                    - `gradientColor2` (string, optional) - Second gradient color
+                    - `backgroundColor` (string, required when backgroundType is "color") - Hex color (`#RRGGBB` or `#RGB`, `#` optional)
+                    - `gradientColor1` (string, required when backgroundType is "gradient") - First gradient hex color
+                    - `gradientColor2` (string, required when backgroundType is "gradient") - Second gradient hex color
                     - `gradientAngle` (number, optional) - Gradient angle in degrees
                     - `blurIntensity` (number 0-100, optional) - Blur strength for the blur background
                     - `shadowEnabled` (boolean, optional) - Enable drop shadow
@@ -12746,9 +12746,9 @@ paths:
                   description: |
                     JSON string with options:
                     - `backgroundType` (string, default "color") - One of: color, gradient
-                    - `color` (string, default "#ffffff") - Background hex color (when backgroundType is color)
-                    - `gradientColor1` (string, optional) - First gradient hex color
-                    - `gradientColor2` (string, optional) - Second gradient hex color
+                    - `color` (string, default "#ffffff") - Background hex color (`#RRGGBB` or `#RGB`, `#` optional; used when backgroundType is "color")
+                    - `gradientColor1` (string, required when backgroundType is "gradient") - First gradient hex color
+                    - `gradientColor2` (string, required when backgroundType is "gradient") - Second gradient hex color
                     - `gradientAngle` (integer 0-360, default 180) - Gradient angle in degrees
                     - `feather` (integer 0-20, default 0) - Edge feathering radius
                     - `format` (string, default "png") - One of: png, webp

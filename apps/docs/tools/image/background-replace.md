@@ -17,9 +17,9 @@ Accepts multipart form data with an image file and a JSON `settings` field.
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | backgroundType | string | No | `"color"` | Background mode: `color` or `gradient` |
-| color | string | No | `"#ffffff"` | Background hex color (when backgroundType is `color`) |
-| gradientColor1 | string | No | - | First gradient hex color |
-| gradientColor2 | string | No | - | Second gradient hex color |
+| color | string | No | `"#ffffff"` | Hex color for a solid background: `#RRGGBB` or `#RGB` (the `#` is optional) |
+| gradientColor1 | string | Required when `backgroundType` is `gradient` | - | First gradient color, hex like `color` |
+| gradientColor2 | string | Required when `backgroundType` is `gradient` | - | Second gradient color, hex like `color` |
 | gradientAngle | integer | No | `180` | Gradient angle in degrees (0-360) |
 | feather | integer | No | `0` | Edge feathering radius (0-20) |
 | format | string | No | `"png"` | Output format: `png` or `webp` |

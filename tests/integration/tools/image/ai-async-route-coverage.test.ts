@@ -207,6 +207,14 @@ describe("custom async AI image routes", () => {
     expect(JSON.parse(invalidColor.body)).toMatchObject({ error: "Invalid settings" });
     expect(mocks.enqueueToolJob).not.toHaveBeenCalled();
 
+    const missingGradientStops = await postMultipart("/api/v1/tools/image/background-replace", [
+      { name: "file", filename: "subject.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ backgroundType: "gradient" }) },
+    ]);
+    expect(missingGradientStops.statusCode).toBe(400);
+    expect(JSON.parse(missingGradientStops.body)).toMatchObject({ error: "Invalid settings" });
+    expect(mocks.enqueueToolJob).not.toHaveBeenCalled();
+
     const res = await postMultipart("/api/v1/tools/image/background-replace", [
       { name: "file", filename: "subject.png", contentType: "image/png", content: PNG },
       {

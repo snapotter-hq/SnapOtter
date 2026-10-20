@@ -9,7 +9,10 @@ the same matte behaviour.
 import io
 import json
 import os
+import re
 import sys
+
+_HEX_COLOR_RE = re.compile(r"^#?(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 
 MAX_REMBG_PX = int(os.environ.get("MAX_REMBG_PX", "2048"))
 _OOM_MARKERS = (
@@ -77,30 +80,45 @@ def _scale_target(size):
     return (max(1, round(w * scale)), max(1, round(h * scale)))
 
 
-def _hex_to_rgba(value, default=(255, 255, 255, 255)):
-    if not value:
-        return default
-    s = str(value).lstrip("#")
-    try:
-        if len(s) == 3:
-            s = "".join(c * 2 for c in s)
-        if len(s) == 6:
-            return (int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16), 255)
-        if len(s) == 8:
-            return (int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16), int(s[6:8], 16))
-    except ValueError:
-        pass
-    return default
+def _hex_to_rgba(value):
+    if not isinstance(value, str):
+        raise ValueError(f"Not a hex color: {value}")
+    s = value.strip()
+    if not _HEX_COLOR_RE.fullmatch(s):
+        raise ValueError(f"Not a hex color: {value}")
+    if s.startswith("#"):
+        s = s[1:]
+    if len(s) == 3:
+        s = "".join(c * 2 for c in s)
+    return (int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16), 255)
+
+
+def _validate_bg_colors(settings):
+    bg_type = settings.get("backgroundType", "transparent")
+    if bg_type == "color":
+        bg_color = settings.get("backgroundColor")
+        if not bg_color:
+            raise ValueError("A color background needs a color")
+        return _hex_to_rgba(bg_color), None
+    if bg_type == "gradient":
+        c1_raw = settings.get("gradientColor1")
+        c2_raw = settings.get("gradientColor2")
+        if not c1_raw or not c2_raw:
+            raise ValueError("A gradient background needs two colors")
+        return _hex_to_rgba(c1_raw), _hex_to_rgba(c2_raw)
+    return None, None
 
 
 def _gradient(w, h, settings):
+    _, c2_rgba = _validate_bg_colors({**settings, "backgroundType": "gradient"})
+    c1_rgba = _hex_to_rgba(settings["gradientColor1"])
     import math
 
     import numpy as np
     from PIL import Image
 
-    c1 = np.array(_hex_to_rgba(settings.get("gradientColor1", "#000000")), dtype=np.float32)
-    c2 = np.array(_hex_to_rgba(settings.get("gradientColor2", "#ffffff")), dtype=np.float32)
+    c1 = np.array(c1_rgba, dtype=np.float32)
+    c2 = np.array(c2_rgba, dtype=np.float32)
     angle = math.radians(float(settings.get("gradientAngle", 0)) % 360.0)
     yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
     proj = xx * math.cos(angle) + yy * math.sin(angle)
@@ -142,12 +160,13 @@ def _apply_shadow(base, cutout, settings):
 
 
 def _apply_effect(cutout, original, settings, bg_img):
+    c1_rgba, _ = _validate_bg_colors(settings)
     from PIL import Image, ImageFilter
 
     bg_type = settings.get("backgroundType", "transparent")
     w, h = cutout.size
     if bg_type == "color":
-        base = Image.new("RGBA", (w, h), _hex_to_rgba(settings.get("backgroundColor", "#ffffff")))
+        base = Image.new("RGBA", (w, h), c1_rgba)
     elif bg_type == "gradient":
         base = _gradient(w, h, settings)
     elif bg_type == "blur":
@@ -269,6 +288,7 @@ def main():
 
     canceled = False
     try:
+        _validate_bg_colors(settings)
         from PIL import Image
 
         from gpu import onnx_providers
