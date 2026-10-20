@@ -545,7 +545,10 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     xhr.onload = () => {
       // 202 = async: the progress subscription drives completion via SSE.
       if (xhr.status === 202) abandonedJob.onAccepted();
-      if (abandoned) {
+      // Once the stream has settled the run (landed the result, failed, or
+      // stalled) or unmount abandoned it, a late sync answer must not touch the
+      // panel, report a second malformed response, or clear a retry's flag (#1940).
+      if (settled) {
         stopProgress();
         return;
       }
@@ -602,12 +605,12 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     };
     xhr.onerror = () => {
       stopProgress();
-      if (abandoned) return;
+      if (settled) return;
       failRun(t.errors.network, "upload_error");
     };
     xhr.ontimeout = () => {
       stopProgress();
-      if (abandoned) return;
+      if (settled) return;
       failRun(sp.timeout, "timeout");
     };
     xhr.open("POST", appUrl("/api/v1/tools/pdf/sign-pdf"));

@@ -1052,6 +1052,105 @@ describe("sign-pdf tells its own failures apart from a bad response", () => {
     expect(vi.mocked(captureHandledError)).toHaveBeenCalledOnce();
   });
 
+  // #1940: the opposite order. Once the stream has landed a good result, a
+  // malformed sync 200 behind it must neither put "Invalid response" beside
+  // the download link nor report a second answer for a settled run.
+  it("ignores a malformed sync 200 after the result landed on the stream", async () => {
+    renderPanel();
+    const xhr = await apply();
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({
+          type: "single",
+          phase: "complete",
+          result: { downloadUrl: DOWNLOAD_URL },
+        }),
+      });
+    });
+
+    act(() => {
+      xhr.status = 200;
+      xhr.responseText = "<html>not json</html>";
+      xhr.onload?.();
+    });
+
+    expect(screen.getByRole("link", { name: /download signed pdf/i })).toHaveAttribute(
+      "href",
+      DOWNLOAD_URL,
+    );
+    expect(screen.queryByText(en.errors.invalidResponse)).not.toBeInTheDocument();
+    expect(entry().status).toBe("completed");
+    expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+    expect(entry().error).toBeNull();
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "a non-2xx answer",
+      (xhr: FakeXhr) => {
+        xhr.status = 504;
+        xhr.responseText = "<html>504 Gateway Time-out</html>";
+        xhr.onload?.();
+      },
+      en.errors.processingFailedWithStatus.replace("{status}", "504"),
+    ],
+    ["a network error", (xhr: FakeXhr) => xhr.onerror?.(), en.errors.network],
+    ["a timeout", (xhr: FakeXhr) => xhr.ontimeout?.(), en.toolSettings["sign-pdf"].timeout],
+  ])(
+    "ignores %s after the result landed on the stream",
+    async (_label, fireLateFailure, unexpectedMessage) => {
+      renderPanel();
+      const xhr = await apply();
+      act(() => {
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({
+            type: "single",
+            phase: "complete",
+            result: { downloadUrl: DOWNLOAD_URL },
+          }),
+        });
+      });
+
+      act(() => fireLateFailure(xhr));
+
+      expect(screen.getByRole("link", { name: /download signed pdf/i })).toHaveAttribute(
+        "href",
+        DOWNLOAD_URL,
+      );
+      expect(screen.queryByText(unexpectedMessage)).not.toBeInTheDocument();
+      expect(entry().status).toBe("completed");
+      expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+      expect(entry().error).toBeNull();
+    },
+  );
+
+  it("leaves a retry running when a stream-completed run's 200 arrives late", async () => {
+    renderPanel(fakeCanvas(), true);
+    const first = await apply();
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({
+          type: "single",
+          phase: "complete",
+          result: { downloadUrl: DOWNLOAD_URL },
+        }),
+      });
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /✕ delete/i }));
+    fireEvent.click(screen.getByRole("button", { name: /apply & download/i }));
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    expect(useFileStore.getState().processing).toBe(true);
+
+    first.respond(200, { downloadUrl: DOWNLOAD_URL });
+
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(screen.getByRole("button", { name: /signing/i })).toBeDisabled();
+    expect(entry().processedUrl).toBeNull();
+  });
+
   it.each([
     ["a JSON null body", null],
     ["a JSON string body", "ok"],
@@ -1173,6 +1272,25 @@ describe("sign-pdf reports a malformed result", () => {
 
     expect(entry().processedUrl).toBe(DOWNLOAD_URL);
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+
+  it("reports once when both the streamed frame and a queued 200 are malformed", async () => {
+    renderPanel();
+    const xhr = await apply();
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
+      });
+    });
+
+    act(() => {
+      xhr.status = 200;
+      xhr.responseText = "<html>not json</html>";
+      xhr.onload?.();
+    });
+
+    expect(screen.getByText(en.errors.invalidResponse)).toBeInTheDocument();
+    expectReported("Tool result has no download URL", undefined);
   });
 });
 
