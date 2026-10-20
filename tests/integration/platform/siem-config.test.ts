@@ -41,7 +41,7 @@ describe("SIEM config without enterprise license", () => {
       url: "/api/v1/enterprise/siem/config",
       headers: { authorization: `Bearer ${adminToken}` },
       payload: {
-        webhookUrl: "https://siem.example.com/input",
+        webhookUrl: "https://example.com/siem/input",
         enabled: true,
         flushIntervalSeconds: 30,
       },
@@ -56,7 +56,7 @@ describe("SIEM config without enterprise license", () => {
       method: "PUT",
       url: "/api/v1/enterprise/siem/config",
       payload: {
-        webhookUrl: "https://siem.example.com/input",
+        webhookUrl: "https://example.com/siem/input",
         enabled: true,
         flushIntervalSeconds: 30,
       },
@@ -135,7 +135,7 @@ describe("SIEM config with enterprise license", () => {
       url: "/api/v1/enterprise/siem/config",
       headers: { authorization: `Bearer ${entAdminToken}` },
       payload: {
-        webhookUrl: "https://siem.example.com/input",
+        webhookUrl: "https://example.com/siem/input",
         authHeader: "Splunk secret-token",
         flushIntervalSeconds: 60,
         enabled: true,
@@ -162,13 +162,42 @@ describe("SIEM config with enterprise license", () => {
     expect(body.error).toContain("Invalid");
   });
 
+  it("PUT rejects loopback, private IP, and non-HTTP(S) webhookUrl (#2555)", async () => {
+    const { readSiemConfig } = await import("../../../apps/api/src/routes/enterprise/siem.js");
+    const before = await readSiemConfig();
+
+    for (const [webhookUrl, expectedDetail] of [
+      ["http://127.0.0.1:8080/siem", "private or reserved IP"],
+      ["http://10.0.0.1/siem", "private or reserved IP"],
+      ["http://[::1]:8080/siem", "private or reserved IP"],
+      ["ftp://example.com/siem", "Only HTTP and HTTPS URLs are supported"],
+    ] as const) {
+      const res = await enterpriseApp.app.inject({
+        method: "PUT",
+        url: "/api/v1/enterprise/siem/config",
+        headers: { authorization: `Bearer ${entAdminToken}` },
+        payload: {
+          webhookUrl,
+          flushIntervalSeconds: 30,
+          enabled: true,
+        },
+      });
+      expect(res.statusCode).toBe(400);
+      const body = JSON.parse(res.body);
+      expect(body.error).toBe("SIEM webhook URL must resolve to a public HTTP(S) destination");
+      expect(body.details).toContain(expectedDetail);
+    }
+
+    expect(await readSiemConfig()).toEqual(before);
+  });
+
   it("PUT rejects flushIntervalSeconds below 10", async () => {
     const res = await enterpriseApp.app.inject({
       method: "PUT",
       url: "/api/v1/enterprise/siem/config",
       headers: { authorization: `Bearer ${entAdminToken}` },
       payload: {
-        webhookUrl: "https://siem.example.com/input",
+        webhookUrl: "https://example.com/siem/input",
         flushIntervalSeconds: 5,
         enabled: true,
       },
@@ -184,7 +213,7 @@ describe("SIEM config with enterprise license", () => {
       url: "/api/v1/enterprise/siem/config",
       headers: { authorization: `Bearer ${entAdminToken}` },
       payload: {
-        webhookUrl: "https://siem.example.com/input",
+        webhookUrl: "https://example.com/siem/input",
         flushIntervalSeconds: 7200,
         enabled: true,
       },
@@ -200,7 +229,7 @@ describe("SIEM config with enterprise license", () => {
       url: "/api/v1/enterprise/siem/config",
       headers: { authorization: `Bearer ${userToken}` },
       payload: {
-        webhookUrl: "https://siem.example.com/input",
+        webhookUrl: "https://example.com/siem/input",
         flushIntervalSeconds: 30,
         enabled: true,
       },
@@ -214,7 +243,7 @@ describe("SIEM config with enterprise license", () => {
       url: "/api/v1/enterprise/siem/config",
       headers: { authorization: `Bearer ${entAdminToken}` },
       payload: {
-        webhookUrl: "https://siem.corp.example.com/events",
+        webhookUrl: "https://example.com/siem/corp/events",
         authHeader: "Bearer my-secret-key",
         flushIntervalSeconds: 120,
         enabled: true,
@@ -228,7 +257,7 @@ describe("SIEM config with enterprise license", () => {
     });
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
-    expect(body.webhookUrl).toBe("https://siem.corp.example.com/events");
+    expect(body.webhookUrl).toBe("https://example.com/siem/corp/events");
     expect(body.flushIntervalSeconds).toBe(120);
     expect(body.enabled).toBe(true);
   });
@@ -239,7 +268,7 @@ describe("SIEM config with enterprise license", () => {
       url: "/api/v1/enterprise/siem/config",
       headers: { authorization: `Bearer ${entAdminToken}` },
       payload: {
-        webhookUrl: "https://siem.example.com/input",
+        webhookUrl: "https://example.com/siem/input",
         authHeader: "Splunk super-secret-value",
         flushIntervalSeconds: 30,
         enabled: true,
@@ -265,7 +294,7 @@ describe("SIEM config with enterprise license", () => {
       url: "/api/v1/enterprise/siem/config",
       headers: { authorization: `Bearer ${entAdminToken}` },
       payload: {
-        webhookUrl: "https://siem.example.com/input",
+        webhookUrl: "https://example.com/siem/input",
         authHeader: "Splunk super-secret-value",
         flushIntervalSeconds: 30,
         enabled: true,
@@ -286,14 +315,14 @@ describe("SIEM config with enterprise license", () => {
       headers: { authorization: `Bearer ${entAdminToken}` },
       payload: {
         ...masked,
-        webhookUrl: "https://siem.example.com/updated-input",
+        webhookUrl: "https://example.com/siem/updated-input",
         flushIntervalSeconds: 90,
       },
     });
     expect(updateRes.statusCode).toBe(200);
 
     const saved = await readSiemConfig();
-    expect(saved?.webhookUrl).toBe("https://siem.example.com/updated-input");
+    expect(saved?.webhookUrl).toBe("https://example.com/siem/updated-input");
     expect(saved?.flushIntervalSeconds).toBe(90);
     expect(saved?.authHeader).toBe("Splunk super-secret-value");
 
@@ -304,7 +333,7 @@ describe("SIEM config with enterprise license", () => {
       headers: { authorization: `Bearer ${entAdminToken}` },
       payload: {
         ...masked,
-        webhookUrl: "https://siem.example.com/updated-input",
+        webhookUrl: "https://example.com/siem/updated-input",
         authHeader: "",
       },
     });
@@ -321,7 +350,7 @@ describe("SIEM config with enterprise license", () => {
       url: "/api/v1/enterprise/siem/config",
       headers: { authorization: `Bearer ${entAdminToken}` },
       payload: {
-        webhookUrl: "https://siem.example.com/fresh",
+        webhookUrl: "https://example.com/siem/fresh",
         authHeader: "***",
         flushIntervalSeconds: 30,
         enabled: true,
@@ -343,7 +372,7 @@ describe("SIEM config with enterprise license", () => {
       url: "/api/v1/enterprise/siem/config",
       headers: { authorization: `Bearer ${entAdminToken}` },
       payload: {
-        webhookUrl: "https://siem.example.com/recovered",
+        webhookUrl: "https://example.com/siem/recovered",
         authHeader: "***",
         flushIntervalSeconds: 30,
         enabled: true,
@@ -355,7 +384,9 @@ describe("SIEM config with enterprise license", () => {
     // Non-string authHeader or array JSON in stored row also falls back to empty string
     await db
       .update(schema.settings)
-      .set({ value: JSON.stringify({ webhookUrl: "https://siem.example.com/x", authHeader: 123 }) })
+      .set({
+        value: JSON.stringify({ webhookUrl: "https://example.com/siem/x", authHeader: 123 }),
+      })
       .where(eq(schema.settings.key, "siem_config"));
 
     const nonStringRes = await enterpriseApp.app.inject({
@@ -363,7 +394,7 @@ describe("SIEM config with enterprise license", () => {
       url: "/api/v1/enterprise/siem/config",
       headers: { authorization: `Bearer ${entAdminToken}` },
       payload: {
-        webhookUrl: "https://siem.example.com/non-string",
+        webhookUrl: "https://example.com/siem/non-string",
         authHeader: "***",
         flushIntervalSeconds: 30,
         enabled: true,

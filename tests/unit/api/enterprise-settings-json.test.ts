@@ -196,6 +196,63 @@ describe("enterprise settings JSON resilience (#2554)", () => {
     });
   });
 
+  describe("PUT /api/v1/enterprise/siem/config", () => {
+    it("validates webhookUrl with validateFetchUrl on PUT and returns 400 when rejected (#2555)", async () => {
+      isEnterpriseFeatureEnabledMock.mockResolvedValue(true);
+      requirePermissionMock.mockResolvedValue({ id: "admin-1", username: "admin" });
+
+      const { registerSiemRoutes } = await import(
+        "../../../apps/api/src/routes/enterprise/siem.js"
+      );
+      const app = Fastify();
+      await registerSiemRoutes(app);
+
+      validateFetchUrlMock.mockRejectedValueOnce(
+        new Error("URL resolves to a private or reserved IP address"),
+      );
+
+      const loopbackRes = await app.inject({
+        method: "PUT",
+        url: "/api/v1/enterprise/siem/config",
+        payload: {
+          webhookUrl: "http://127.0.0.1:8080/siem",
+          flushIntervalSeconds: 30,
+          enabled: true,
+        },
+      });
+      expect(loopbackRes.statusCode).toBe(400);
+      expect(loopbackRes.json()).toEqual({
+        error: "SIEM webhook URL must resolve to a public HTTP(S) destination",
+        details: "URL resolves to a private or reserved IP address",
+      });
+      expect(validateFetchUrlMock).toHaveBeenCalledWith("http://127.0.0.1:8080/siem");
+      expect(selectMock).not.toHaveBeenCalled();
+      expect(insertMock).not.toHaveBeenCalled();
+      expect(updateMock).not.toHaveBeenCalled();
+      expect(auditFnMock).not.toHaveBeenCalled();
+
+      validateFetchUrlMock.mockRejectedValueOnce("Only HTTP and HTTPS URLs are supported");
+
+      const schemeRes = await app.inject({
+        method: "PUT",
+        url: "/api/v1/enterprise/siem/config",
+        payload: {
+          webhookUrl: "ftp://example.com/siem",
+          flushIntervalSeconds: 30,
+          enabled: true,
+        },
+      });
+      expect(schemeRes.statusCode).toBe(400);
+      expect(schemeRes.json()).toEqual({
+        error: "SIEM webhook URL must resolve to a public HTTP(S) destination",
+        details: "Only HTTP and HTTPS URLs are supported",
+      });
+      expect(validateFetchUrlMock).toHaveBeenCalledWith("ftp://example.com/siem");
+
+      await app.close();
+    });
+  });
+
   describe("webhook_destinations readDestinations()", () => {
     it("logs a warning and returns [] on GET, POST, PUT, DELETE, and test ping when stored webhook_destinations is malformed JSON", async () => {
       isEnterpriseFeatureEnabledMock.mockResolvedValue(true);

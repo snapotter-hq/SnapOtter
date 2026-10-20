@@ -7,6 +7,7 @@ import { auditFromRequest } from "../../lib/audit.js";
 import { encrypt, isEncrypted } from "../../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
 import { logger } from "../../lib/logger.js";
+import { validateFetchUrl } from "../../lib/ssrf.js";
 import { requirePermission } from "../../permissions.js";
 
 const configSchema = z.object({
@@ -31,6 +32,19 @@ function parseSiemConfig(raw: string): SiemConfig | null {
   } catch (err) {
     logger.warn({ err, key: SETTINGS_KEY }, "siem: failed to parse stored siem_config JSON");
     return null;
+  }
+}
+
+async function validateSiemWebhookUrl(url: string, reply: FastifyReply): Promise<boolean> {
+  try {
+    await validateFetchUrl(url);
+    return true;
+  } catch (err) {
+    reply.status(400).send({
+      error: "SIEM webhook URL must resolve to a public HTTP(S) destination",
+      details: err instanceof Error ? err.message : String(err),
+    });
+    return false;
   }
 }
 
@@ -95,6 +109,7 @@ export async function registerSiemRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const config = { ...parsed.data };
+      if (!(await validateSiemWebhookUrl(config.webhookUrl, reply))) return;
 
       const [existing] = await db
         .select()
