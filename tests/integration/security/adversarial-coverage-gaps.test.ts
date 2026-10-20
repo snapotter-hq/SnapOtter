@@ -250,20 +250,28 @@ describe("Concurrent response content integrity -- download verification", () =>
 // ###########################################################################
 describe("Memory stress -- 50 sequential large-file uploads", () => {
   it("processes stress-large.jpg 50 times sequentially without memory blowup or degradation", async () => {
+    const req = buildToolRequest(
+      "resize",
+      STRESS_LARGE,
+      "mem-stress.jpg",
+      { width: 200 },
+      "image/jpeg",
+    );
+
+    // Warm up the 12MP decode + auto-orient + resize path so one-time
+    // libvips threadpool arena and operation-cache allocations are settled
+    // before measuring steady-state retention across the 50 sequential uploads.
+    for (let i = 0; i < 3; i++) {
+      const warmupRes = await app.inject(req);
+      expect(warmupRes.statusCode).toBe(200);
+    }
+
     const memBefore = process.memoryUsage();
     const responseTimes: number[] = [];
 
     for (let i = 0; i < 50; i++) {
       const start = Date.now();
-      const res = await postTool("resize", [
-        {
-          name: "file",
-          filename: `mem-stress-${i}.jpg`,
-          content: STRESS_LARGE,
-          contentType: "image/jpeg",
-        },
-        { name: "settings", content: JSON.stringify({ width: 200 }) },
-      ]);
+      const res = await app.inject(req);
       const elapsed = Date.now() - start;
       responseTimes.push(elapsed);
 
@@ -278,8 +286,8 @@ describe("Memory stress -- 50 sequential large-file uploads", () => {
     // All 50 completed successfully (verified in the loop above)
 
     // Memory growth check: RSS should not grow by more than 500MB
-    // (50 * 6.7MB = 335MB raw data, but Sharp streams so actual growth
-    // should be much less if buffers are properly released)
+    // (50 * 6.4MB = 320MB raw data, so steady-state growth should stay
+    // well below that if buffers are released after each request)
     const rssGrowthMB = (memAfter.rss - memBefore.rss) / (1024 * 1024);
     expect(rssGrowthMB).toBeLessThan(500);
 
@@ -287,7 +295,7 @@ describe("Memory stress -- 50 sequential large-file uploads", () => {
     // take more than 5x the average of the first 10
     const firstTenAvg = responseTimes.slice(0, 10).reduce((a, b) => a + b, 0) / 10;
     const lastTenAvg = responseTimes.slice(40, 50).reduce((a, b) => a + b, 0) / 10;
-    // Allow generous margin -- the key is no exponential blowup
+    // Allow generous margin; the key is no exponential blowup
     expect(lastTenAvg).toBeLessThan(firstTenAvg * 5);
 
     // Server still responsive
