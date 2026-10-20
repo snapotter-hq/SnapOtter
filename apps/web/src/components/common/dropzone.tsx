@@ -97,6 +97,8 @@ interface DropzoneProps {
   acceptDescription?: string;
   /** Offer a "Take photo" button on touch devices (image-accepting tools). */
   cameraCapture?: boolean;
+  /** Attach a document-level paste listener while mounted. Defaults to true. */
+  enablePaste?: boolean;
 }
 
 // Browsers may not map certain formats (HEIC, JXL, RAW, etc.) to image/* in file pickers.
@@ -116,6 +118,7 @@ export function Dropzone({
   fileFilter,
   acceptDescription,
   cameraCapture = false,
+  enablePaste = true,
 }: DropzoneProps) {
   const { t } = useTranslation();
   // When no explicit filter is given, accept any file: the file picker still
@@ -223,6 +226,7 @@ export function Dropzone({
   }, [checkFile, onFiles, unsupportedMessage]);
 
   useEffect(() => {
+    if (!enablePaste) return;
     const handlePaste = (e: ClipboardEvent) => {
       const clip = e.clipboardData;
       if (!clip) return;
@@ -249,7 +253,7 @@ export function Dropzone({
     };
     document.addEventListener("paste", handlePaste);
     return () => document.removeEventListener("paste", handlePaste);
-  }, [onFiles, checkFile]);
+  }, [enablePaste, onFiles, checkFile]);
 
   const hasMultipleFiles = currentFiles.length > 1;
 

@@ -316,3 +316,66 @@ describe("ToolPage unsupported file paste and drop (#2305)", () => {
     expect(useFileStore.getState().files).toEqual([initialPng]);
   });
 });
+
+describe("ToolPage file paste intake (#2841)", () => {
+  it("loads a single copy when pasting a file onto an empty multi-file tool page (#2841)", async () => {
+    await act(async () => {
+      renderToolPage("/pdf/merge-pdf");
+    });
+
+    const firstPdf = new File(["%PDF-1.4"], "first.pdf", { type: "application/pdf" });
+    const firstPaste = makePasteEvent({ files: [firstPdf] });
+    act(() => {
+      document.dispatchEvent(firstPaste);
+    });
+
+    expect(firstPaste.defaultPrevented).toBe(true);
+    expect(useFileStore.getState().files).toEqual([firstPdf]);
+    expect(useFileStore.getState().entries).toHaveLength(1);
+
+    const secondPdf = new File(["%PDF-1.4"], "second.pdf", { type: "application/pdf" });
+    const secondPaste = makePasteEvent({ files: [secondPdf] });
+    act(() => {
+      document.dispatchEvent(secondPaste);
+    });
+
+    expect(secondPaste.defaultPrevented).toBe(true);
+    expect(useFileStore.getState().files).toEqual([firstPdf, secondPdf]);
+    expect(useFileStore.getState().entries).toHaveLength(2);
+  });
+
+  it("loads a single copy when pasting onto an empty mobile multi-file tool page (#2841)", async () => {
+    vi.spyOn(window, "innerWidth", "get").mockReturnValue(375);
+    await act(async () => {
+      renderToolPage("/pdf/merge-pdf");
+    });
+
+    const pdf = new File(["%PDF-1.4"], "mobile.pdf", { type: "application/pdf" });
+    const paste = makePasteEvent({ files: [pdf] });
+    act(() => {
+      document.dispatchEvent(paste);
+    });
+
+    expect(paste.defaultPrevented).toBe(true);
+    expect(useFileStore.getState().files).toEqual([pdf]);
+    expect(useFileStore.getState().entries).toHaveLength(1);
+  });
+
+  it("creates one entry without revoking a duplicate blob URL when pasting onto an empty single-file tool page (#2841)", async () => {
+    const revokeSpy = vi.spyOn(URL, "revokeObjectURL");
+    await act(async () => {
+      renderToolPage("/image/resize");
+    });
+
+    const png = new File(["png-bytes"], "photo.png", { type: "image/png" });
+    const paste = makePasteEvent({ files: [png] });
+    act(() => {
+      document.dispatchEvent(paste);
+    });
+
+    expect(paste.defaultPrevented).toBe(true);
+    expect(useFileStore.getState().files).toEqual([png]);
+    expect(useFileStore.getState().originalBlobUrl).toBe("blob:original-input-1");
+    expect(revokeSpy).not.toHaveBeenCalled();
+  });
+});

@@ -550,6 +550,27 @@ describe("Dropzone", () => {
       expect(onFiles).not.toHaveBeenCalled();
     });
 
+    it("does not attach a document paste listener when enablePaste is false, and attaches when toggled to true (#2841)", () => {
+      const onFiles = vi.fn();
+      const { rerender } = render(<Dropzone onFiles={onFiles} enablePaste={false} />);
+
+      const disabledEvent = pasteViaItems([makeFile("a.png", "image/png")]);
+      expect(onFiles).not.toHaveBeenCalled();
+      expect(disabledEvent.defaultPrevented).toBe(false);
+
+      const file = makeFile("b.png", "image/png");
+      rerender(<Dropzone onFiles={onFiles} enablePaste />);
+      const enabledEvent = pasteViaItems([file]);
+      expect(onFiles).toHaveBeenCalledTimes(1);
+      expect(onFiles).toHaveBeenCalledWith([file]);
+      expect(enabledEvent.defaultPrevented).toBe(true);
+
+      rerender(<Dropzone onFiles={onFiles} enablePaste={false} />);
+      const reDisabledEvent = pasteViaItems([makeFile("c.png", "image/png")]);
+      expect(onFiles).toHaveBeenCalledTimes(1);
+      expect(reDisabledEvent.defaultPrevented).toBe(false);
+    });
+
     it("handles paste where getAsFile returns null", () => {
       const onFiles = vi.fn();
       render(<Dropzone onFiles={onFiles} />);

@@ -15,6 +15,7 @@ interface ToolDropzoneProps {
   accept?: string;
   fileFilter?: (file: File) => boolean;
   multiple?: boolean;
+  enablePaste?: boolean;
   onFiles: (files: File[]) => void;
   onUrlImport?: (file: File) => void;
 }
@@ -26,6 +27,7 @@ export function ToolDropzone({
   accept,
   fileFilter,
   multiple,
+  enablePaste = false,
   onFiles,
   onUrlImport,
 }: ToolDropzoneProps) {
@@ -72,6 +74,7 @@ export function ToolDropzone({
         fileFilter={fileFilter}
         acceptDescription={formatsDisplay ?? undefined}
         cameraCapture={toolAcceptsCameraPhotos(tool.acceptedInputs)}
+        enablePaste={enablePaste}
       />
 
       {/* Import from library */}

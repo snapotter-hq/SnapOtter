@@ -766,8 +766,12 @@ function ToolPageContent({
         if (filtered.length > 0) {
           e.preventDefault();
           if (!allowIntake()) return;
-          if (isMultiFileTool) addFiles(filtered);
-          else setFiles(filtered);
+          if (isMultiFileTool) {
+            addFiles(filtered);
+          } else {
+            setEraserSliderInitPos(null);
+            setFiles(filtered);
+          }
         } else {
           showUnsupportedFileType(t.dropzone.unsupportedFileType);
         }
@@ -1153,6 +1157,7 @@ function ToolPageContent({
             currentFiles={files}
             fileFilter={toolFileFilter}
             acceptDescription={toolAcceptDescription}
+            enablePaste={false}
           />
         );
       const ResultsPanel = registryEntry.ResultsPanel;
@@ -1400,6 +1405,7 @@ function ToolPageContent({
         currentFiles={files}
         fileFilter={toolFileFilter}
         acceptDescription={toolAcceptDescription}
+        enablePaste={false}
       />
     );
   }
