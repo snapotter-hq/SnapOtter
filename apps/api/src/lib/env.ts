@@ -248,6 +248,27 @@ const envSchema = z
           message: "OIDC_ISSUER_URL is required when OIDC_ENABLED=true",
           path: ["OIDC_ISSUER_URL"],
         });
+      } else {
+        // A scheme-less value with a port ("keycloak.lan:8080/realms/x") parses
+        // with protocol "keycloak.lan:" and an empty host, so require both an
+        // http(s) protocol and a host (#1912). Plain http stays allowed for LAN
+        // and dev setups (#1879 warns at boot).
+        let validIssuerUrl = false;
+        try {
+          const url = new URL(data.OIDC_ISSUER_URL.trim());
+          validIssuerUrl =
+            (url.protocol === "http:" || url.protocol === "https:") && url.host.length > 0;
+        } catch {
+          validIssuerUrl = false;
+        }
+        if (!validIssuerUrl) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message:
+              "OIDC_ISSUER_URL must be an http(s) URL such as https://auth.example.com/realms/myrealm",
+            path: ["OIDC_ISSUER_URL"],
+          });
+        }
       }
       if (!data.OIDC_CLIENT_ID) {
         ctx.addIssue({

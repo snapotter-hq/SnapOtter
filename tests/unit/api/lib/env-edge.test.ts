@@ -57,6 +57,57 @@ describe("loadEnv edge validation", () => {
     );
   });
 
+  it.each([
+    "keycloak.lan:8080/realms/x",
+    "localhost:8080/realms/x",
+    "keycloak.lan/realms/x",
+    "ftp://idp/x",
+    "file:///etc/passwd",
+    "javascript:alert(1)",
+    "http://",
+    "https://",
+    "   ",
+  ])("rejects enabled OIDC when OIDC_ISSUER_URL is %j (#1912)", (issuerUrl) => {
+    expectLoadEnvError(
+      {
+        OIDC_ENABLED: "true",
+        OIDC_ISSUER_URL: issuerUrl,
+        OIDC_CLIENT_ID: "client",
+        OIDC_CLIENT_SECRET: "secret",
+        EXTERNAL_URL: "http://snapotter.lan:1349",
+      },
+      "OIDC_ISSUER_URL must be an http(s) URL such as https://auth.example.com/realms/myrealm",
+    );
+  });
+
+  it.each([
+    "https://auth.example.com/realms/myrealm",
+    "http://keycloak.lan:8080/realms/x",
+    "HTTP://Keycloak.lan:8080/realms/x",
+    " https://auth.example.com/realms/myrealm\n",
+  ])("accepts enabled OIDC when OIDC_ISSUER_URL is %j (#1912)", (issuerUrl) => {
+    restoreEnv();
+    const env = loadEnv({
+      ...process.env,
+      OIDC_ENABLED: "true",
+      OIDC_ISSUER_URL: issuerUrl,
+      OIDC_CLIENT_ID: "client",
+      OIDC_CLIENT_SECRET: "secret",
+      EXTERNAL_URL: "http://snapotter.lan:1349",
+    });
+    expect(env.OIDC_ISSUER_URL).toBe(issuerUrl);
+  });
+
+  it("leaves OIDC_ISSUER_URL unchecked when OIDC_ENABLED is false (#1912)", () => {
+    restoreEnv();
+    const env = loadEnv({
+      ...process.env,
+      OIDC_ENABLED: "false",
+      OIDC_ISSUER_URL: "keycloak.lan:8080/realms/x",
+    });
+    expect(env.OIDC_ISSUER_URL).toBe("keycloak.lan:8080/realms/x");
+  });
+
   it("rejects enabled SAML without IdP settings and external URL", () => {
     expectLoadEnvError(
       {
