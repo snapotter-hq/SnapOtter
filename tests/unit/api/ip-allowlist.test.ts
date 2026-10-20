@@ -353,6 +353,10 @@ describe("IP allowlist", () => {
         getSettingStrictMock.mockResolvedValueOnce("{corrupt-json");
         messageHandler?.();
         await vi.waitFor(() => expect(logErrorSpy).toHaveBeenCalledTimes(2));
+        expect(logErrorSpy).toHaveBeenLastCalledWith(
+          { err: expect.any(SyntaxError), key: "ipAllowlist" },
+          "Failed to refresh IP allowlist from settings; keeping cached allowlist",
+        );
 
         expect(redisSetMock).toHaveBeenCalledTimes(1);
         const blockedAfterBadJson = await app.inject({
@@ -366,6 +370,10 @@ describe("IP allowlist", () => {
         getSettingStrictMock.mockResolvedValueOnce("{}");
         messageHandler?.();
         await vi.waitFor(() => expect(logErrorSpy).toHaveBeenCalledTimes(3));
+        expect(logErrorSpy).toHaveBeenLastCalledWith(
+          { err: expect.any(SyntaxError), key: "ipAllowlist" },
+          "Failed to refresh IP allowlist from settings; keeping cached allowlist",
+        );
 
         expect(redisSetMock).toHaveBeenCalledTimes(1);
         const blockedAfterNonArray = await app.inject({
@@ -477,12 +485,17 @@ describe("IP allowlist", () => {
         "../../../apps/api/src/plugins/ip-allowlist.js"
       );
       const app = Fastify();
+      const logWarnSpy = vi.spyOn(app.log, "warn");
       try {
         await registerIsolated(app);
         app.post("/api/auth/login", async () => ({ ok: true }));
 
         expect(redisGetMock).toHaveBeenCalledWith("ip:allowlist");
         expect(redisSetMock).not.toHaveBeenCalled();
+        expect(logWarnSpy).toHaveBeenCalledWith(
+          { err: expect.any(Error), key: "ipAllowlist" },
+          "Failed to load IP allowlist from settings; using Redis cached allowlist",
+        );
 
         const blocked = await app.inject({
           method: "POST",
@@ -546,12 +559,17 @@ describe("IP allowlist", () => {
         "../../../apps/api/src/plugins/ip-allowlist.js"
       );
       const app = Fastify();
+      const logErrorSpy = vi.spyOn(app.log, "error");
       try {
         await registerIsolated(app);
         app.get("/api/v1/health", async () => ({ status: "ok" }));
         app.post("/api/auth/login", async () => ({ ok: true }));
 
         expect(redisSetMock).not.toHaveBeenCalled();
+        expect(logErrorSpy).toHaveBeenCalledWith(
+          { err: expect.any(Error), key: "ipAllowlist" },
+          "Failed to load IP allowlist from settings and no usable Redis cache is available; failing closed",
+        );
 
         // Exempt health probe still passes
         const health = await app.inject({
@@ -595,14 +613,15 @@ describe("IP allowlist", () => {
       }
     });
 
-    it("fails closed when the startup DB read fails and Redis throws or holds an empty array (#2541)", async () => {
-      for (const redisBehavior of ["throw", "empty-array"] as const) {
+    it("fails closed when the startup DB read fails and Redis throws, holds an empty array, or holds corrupt JSON (#2541, #3038)", async () => {
+      for (const redisBehavior of ["throw", "empty-array", "corrupt-json"] as const) {
         vi.resetModules();
         vi.doMock("../../../apps/api/src/lib/enterprise-feature.js", () => ({
           isEnterpriseFeatureEnabled: async () => true,
         }));
         vi.doMock("../../../apps/api/src/lib/settings-helpers.js", () => ({
           getSettingStrict: async () => {
+            if (redisBehavior === "corrupt-json") return "{corrupt-db";
             throw new Error("db unreachable at boot");
           },
           getSettingString: async (_key: string, defaultValue = "") => defaultValue,
@@ -611,6 +630,7 @@ describe("IP allowlist", () => {
           sharedRedis: () => ({
             get: async () => {
               if (redisBehavior === "throw") throw new Error("redis unreachable");
+              if (redisBehavior === "corrupt-json") return "{}";
               return "[]";
             },
             set: async () => "OK",
@@ -630,10 +650,15 @@ describe("IP allowlist", () => {
           "../../../apps/api/src/plugins/ip-allowlist.js"
         );
         const app = Fastify();
+        const logErrorSpy = vi.spyOn(app.log, "error");
         try {
           await registerIsolated(app);
           app.post("/api/auth/login", async () => ({ ok: true }));
 
+          expect(logErrorSpy).toHaveBeenCalledWith(
+            { err: expect.any(Error), key: "ipAllowlist" },
+            "Failed to load IP allowlist from settings and no usable Redis cache is available; failing closed",
+          );
           const blocked = await app.inject({
             method: "POST",
             url: "/api/auth/login",

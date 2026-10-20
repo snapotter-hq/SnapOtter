@@ -443,4 +443,103 @@ describe("enterprise settings JSON resilience (#2554)", () => {
       await app.close();
     });
   });
+
+  describe("GET /api/v1/enterprise/ip-allowlist (#3038)", () => {
+    it("logs a warning and returns empty cidrs when stored ipAllowlist is malformed JSON", async () => {
+      isEnterpriseFeatureEnabledMock.mockResolvedValue(true);
+      requirePermissionMock.mockResolvedValue({ id: "admin-1", username: "admin" });
+      mockSelectRow("{corrupt");
+
+      const { registerIpAllowlistRoutes } = await import(
+        "../../../apps/api/src/routes/enterprise/ip-allowlist.js"
+      );
+      const app = Fastify();
+      await registerIpAllowlistRoutes(app);
+
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/v1/enterprise/ip-allowlist",
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ cidrs: [] });
+      expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+      expect(loggerMock.warn).toHaveBeenCalledWith(
+        { err: expect.any(SyntaxError), key: "ipAllowlist" },
+        "ip-allowlist: failed to parse stored ipAllowlist JSON",
+      );
+
+      await app.close();
+    });
+
+    it("logs a warning and returns empty cidrs when stored ipAllowlist is non-array JSON or contains invalid CIDR entries", async () => {
+      isEnterpriseFeatureEnabledMock.mockResolvedValue(true);
+      requirePermissionMock.mockResolvedValue({ id: "admin-1", username: "admin" });
+
+      const { registerIpAllowlistRoutes } = await import(
+        "../../../apps/api/src/routes/enterprise/ip-allowlist.js"
+      );
+      const app = Fastify();
+      await registerIpAllowlistRoutes(app);
+
+      for (const raw of [
+        "{}",
+        "null",
+        "123",
+        '"str"',
+        "[null]",
+        "[42]",
+        "[true]",
+        "[{}]",
+        '["not-a-cidr"]',
+        '["10.0.0.0/8","not-a-cidr"]',
+      ]) {
+        loggerMock.warn.mockClear();
+        mockSelectRow(raw);
+
+        const res = await app.inject({
+          method: "GET",
+          url: "/api/v1/enterprise/ip-allowlist",
+        });
+
+        expect(res.statusCode, raw).toBe(200);
+        expect(res.json(), raw).toEqual({ cidrs: [] });
+        expect(loggerMock.warn, raw).toHaveBeenCalledTimes(1);
+        expect(loggerMock.warn, raw).toHaveBeenCalledWith(
+          { key: "ipAllowlist" },
+          "ip-allowlist: stored ipAllowlist is not a JSON array of valid CIDR strings",
+        );
+      }
+
+      loggerMock.warn.mockClear();
+      mockSelectRow("");
+      const emptyRes = await app.inject({
+        method: "GET",
+        url: "/api/v1/enterprise/ip-allowlist",
+      });
+      expect(emptyRes.statusCode).toBe(200);
+      expect(emptyRes.json()).toEqual({ cidrs: [] });
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+
+      mockSelectRow(undefined);
+      const missingRes = await app.inject({
+        method: "GET",
+        url: "/api/v1/enterprise/ip-allowlist",
+      });
+      expect(missingRes.statusCode).toBe(200);
+      expect(missingRes.json()).toEqual({ cidrs: [] });
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+
+      mockSelectRow(JSON.stringify(["10.0.0.0/8", "2001:db8::/32"]));
+      const validRes = await app.inject({
+        method: "GET",
+        url: "/api/v1/enterprise/ip-allowlist",
+      });
+      expect(validRes.statusCode).toBe(200);
+      expect(validRes.json()).toEqual({ cidrs: ["10.0.0.0/8", "2001:db8::/32"] });
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+
+      await app.close();
+    });
+  });
 });

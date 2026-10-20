@@ -133,7 +133,7 @@ export async function registerIpAllowlist(app: FastifyInstance): Promise<void> {
     } catch (err) {
       if (hasLoadedAllowlist) {
         app.log.error(
-          { err },
+          { err, key: "ipAllowlist" },
           "Failed to refresh IP allowlist from settings; keeping cached allowlist",
         );
         return;
@@ -148,7 +148,7 @@ export async function registerIpAllowlist(app: FastifyInstance): Promise<void> {
             cachedBlockList = buildBlockList(cached);
             hasLoadedAllowlist = true;
             app.log.warn(
-              { err },
+              { err, key: "ipAllowlist" },
               "Failed to load IP allowlist from settings; using Redis cached allowlist",
             );
             return;
@@ -161,7 +161,7 @@ export async function registerIpAllowlist(app: FastifyInstance): Promise<void> {
       cachedCidrs = [];
       cachedBlockList = new BlockList();
       app.log.error(
-        { err },
+        { err, key: "ipAllowlist" },
         "Failed to load IP allowlist from settings and no usable Redis cache is available; failing closed",
       );
       return;

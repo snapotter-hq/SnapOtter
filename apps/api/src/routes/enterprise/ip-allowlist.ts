@@ -10,10 +10,37 @@ import { z } from "zod";
 import { db, schema } from "../../db/index.js";
 import { auditFromRequest } from "../../lib/audit.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
+import { logger } from "../../lib/logger.js";
 import { requirePermission } from "../../permissions.js";
 import { isValidCidr, publishAllowlistRefresh } from "../../plugins/ip-allowlist.js";
 
 const SETTINGS_KEY = "ipAllowlist";
+
+function parseIpAllowlist(raw: string): string[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    logger.warn(
+      { err, key: SETTINGS_KEY },
+      "ip-allowlist: failed to parse stored ipAllowlist JSON",
+    );
+    return [];
+  }
+
+  if (
+    !Array.isArray(parsed) ||
+    !parsed.every((entry): entry is string => typeof entry === "string" && isValidCidr(entry))
+  ) {
+    logger.warn(
+      { key: SETTINGS_KEY },
+      "ip-allowlist: stored ipAllowlist is not a JSON array of valid CIDR strings",
+    );
+    return [];
+  }
+
+  return parsed;
+}
 
 const updateSchema = z.object({
   cidrs: z.array(z.string().min(1).max(45)).max(1000),
@@ -40,7 +67,7 @@ export async function registerIpAllowlistRoutes(app: FastifyInstance): Promise<v
         .from(schema.settings)
         .where(eq(schema.settings.key, SETTINGS_KEY));
 
-      const cidrs = row ? (JSON.parse(row.value) as string[]) : [];
+      const cidrs = row && row.value !== "" ? parseIpAllowlist(row.value) : [];
       return reply.send({ cidrs });
     },
   );
