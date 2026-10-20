@@ -5536,6 +5536,7 @@ export const nl: TranslationKeys = {
     download: "Downloaden",
     details: {
       previewFailedRetry: "Voorbeeld genereren mislukt. Probeer het opnieuw.",
+      loadFailed: "Dit bestand kon niet worden geladen.",
     },
   },
   dropzone: {

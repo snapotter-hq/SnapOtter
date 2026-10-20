@@ -5527,6 +5527,7 @@ export const es: TranslationKeys = {
     download: "Descargar",
     details: {
       previewFailedRetry: "Error al generar la vista previa. Inténtalo de nuevo.",
+      loadFailed: "No se pudo cargar este archivo.",
     },
   },
   dropzone: {

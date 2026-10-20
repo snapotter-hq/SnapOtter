@@ -5431,6 +5431,7 @@ export const th: TranslationKeys = {
     download: "ดาวน์โหลด",
     details: {
       previewFailedRetry: "สร้างตัวอย่างไม่สำเร็จ ลองอีกครั้ง",
+      loadFailed: "โหลดไฟล์นี้ไม่สำเร็จ",
     },
   },
   dropzone: {

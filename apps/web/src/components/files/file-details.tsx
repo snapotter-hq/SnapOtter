@@ -1,5 +1,5 @@
 import { TOOLS } from "@snapotter/shared";
-import { FileImage, FileText, ImageIcon, Music, Play, Video } from "lucide-react";
+import { FileImage, FileText, ImageIcon, Music, Play, RefreshCw, Video } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useTranslation } from "@/contexts/i18n-context";
@@ -29,6 +29,7 @@ function AuthImage({ src, alt, className }: { src: string; alt: string; classNam
 
   useEffect(() => {
     let revoked = false;
+    setFailed(false);
     fetch(src, { headers: formatHeaders() })
       .then((res) => {
         if (!res.ok) throw new Error();
@@ -66,7 +67,7 @@ function AuthImage({ src, alt, className }: { src: string; alt: string; classNam
     );
   }
 
-  return <img src={blobUrl} alt={alt} className={className} />;
+  return <img src={blobUrl} alt={alt} className={className} onError={() => setFailed(true)} />;
 }
 
 const NATIVE_VIDEO = new Set(["mp4", "webm", "ogg", "ogv", "m4v"]);
@@ -102,6 +103,8 @@ export function FilePreview({
 }) {
   const { t } = useTranslation();
   const [mediaSrc, setMediaSrc] = useState<string | null>(null);
+  const [mediaError, setMediaError] = useState(false);
+  const [mediaRetry, setMediaRetry] = useState(0);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   // Set when generating a preview failed; `encoder` names what the server's
@@ -116,8 +119,13 @@ export function FilePreview({
   const isPdf = mimeType === "application/pdf";
   const isOfficeDoc = OFFICE_MIMES.has(mimeType);
 
+  const handleRetryMedia = useCallback(() => {
+    setMediaRetry((n) => n + 1);
+  }, []);
+
   // Fetch native-playable media or PDF directly from the download endpoint.
   // Also resets server-side preview state when the file changes.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mediaRetry triggers a fresh download attempt
   useEffect(() => {
     // Reset server-side preview state on every file change
     previewRequest.current += 1;
@@ -127,41 +135,51 @@ export function FilePreview({
     });
     setPreviewLoading(false);
     setPreviewError(null);
+    setMediaError(false);
 
-    if (isPdf) {
-      let revoked = false;
-      fetch(getFileDownloadUrl(fileId), { headers: formatHeaders() })
-        .then((res) => res.blob())
-        .then((blob) => {
-          if (!revoked) setMediaSrc(URL.createObjectURL(blob));
-        })
-        .catch(() => {});
+    if (!isPdf && !nativePlayable) {
       return () => {
-        revoked = true;
-        setMediaSrc((prev) => {
+        previewRequest.current += 1;
+        setPreviewSrc((prev) => {
           if (prev) URL.revokeObjectURL(prev);
           return null;
         });
       };
     }
 
-    if (!isMedia || !nativePlayable) return;
     let revoked = false;
-    const url = getFileDownloadUrl(fileId);
-    fetch(url, { headers: formatHeaders() })
-      .then((res) => res.blob())
+    const controller = new AbortController();
+    fetch(getFileDownloadUrl(fileId), {
+      headers: formatHeaders(),
+      signal: controller.signal,
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.blob();
+      })
       .then((blob) => {
         if (!revoked) setMediaSrc(URL.createObjectURL(blob));
       })
-      .catch(() => {});
+      .catch((err) => {
+        if (revoked || controller.signal.aborted) return;
+        console.error(`[file-preview] failed to load file ${fileId}`, err);
+        setMediaError(true);
+      });
     return () => {
       revoked = true;
+      controller.abort();
+      previewRequest.current += 1;
+      setMediaError(false);
       setMediaSrc((prev) => {
         if (prev) URL.revokeObjectURL(prev);
         return null;
       });
+      setPreviewSrc((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
     };
-  }, [isMedia, nativePlayable, isPdf, fileId]);
+  }, [nativePlayable, isPdf, fileId, mediaRetry]);
 
   const handleGeneratePreview = useCallback(() => {
     const request = ++previewRequest.current;
@@ -178,10 +196,16 @@ export function FilePreview({
         return res.blob();
       })
       .then((blob) => {
-        if (current()) setPreviewSrc(URL.createObjectURL(blob));
+        if (!current()) return;
+        setPreviewSrc((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return URL.createObjectURL(blob);
+        });
       })
-      .catch(() => {
-        if (current()) setPreviewError({ encoder });
+      .catch((err) => {
+        if (!current()) return;
+        console.error(`[file-preview] failed to generate preview for file ${fileId}`, err);
+        setPreviewError({ encoder });
       })
       .finally(() => {
         if (current()) setPreviewLoading(false);
@@ -194,9 +218,32 @@ export function FilePreview({
 
   // PDF files -- render inline in iframe
   if (isPdf) {
-    return mediaSrc ? (
-      <iframe src={mediaSrc} className="w-full h-48 rounded-lg border border-border" title={name} />
-    ) : (
+    if (mediaSrc) {
+      return (
+        <iframe
+          src={mediaSrc}
+          className="w-full h-48 rounded-lg border border-border"
+          title={name}
+        />
+      );
+    }
+    if (mediaError) {
+      return (
+        <div className="w-full h-48 rounded-lg bg-muted flex flex-col items-center justify-center gap-2">
+          <FileText className="h-8 w-8 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">{t.files.details.loadFailed}</span>
+          <button
+            type="button"
+            onClick={handleRetryMedia}
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            {t.common.retry}
+          </button>
+        </div>
+      );
+    }
+    return (
       <div className="w-full h-48 rounded-lg bg-muted flex items-center justify-center">
         <div className="h-4 w-4 border-2 border-muted-foreground/30 border-t-transparent rounded-full animate-spin" />
       </div>
@@ -248,11 +295,30 @@ export function FilePreview({
   if (mimeType.startsWith("video/")) {
     // Native-playable: fetch and render directly
     if (nativePlayable) {
-      return mediaSrc ? (
-        <video src={mediaSrc} controls className="w-full rounded-lg max-h-48 bg-black">
-          <track kind="captions" />
-        </video>
-      ) : (
+      if (mediaSrc) {
+        return (
+          <video src={mediaSrc} controls className="w-full rounded-lg max-h-48 bg-black">
+            <track kind="captions" />
+          </video>
+        );
+      }
+      if (mediaError) {
+        return (
+          <div className="w-full h-32 rounded-lg bg-muted flex flex-col items-center justify-center gap-2">
+            <Video className="h-8 w-8 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">{t.files.details.loadFailed}</span>
+            <button
+              type="button"
+              onClick={handleRetryMedia}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              {t.common.retry}
+            </button>
+          </div>
+        );
+      }
+      return (
         <div className="w-full h-32 rounded-lg bg-muted flex items-center justify-center">
           <Video className="h-8 w-8 text-muted-foreground animate-pulse" />
         </div>
@@ -301,11 +367,30 @@ export function FilePreview({
   if (mimeType.startsWith("audio/")) {
     // Native-playable: fetch and render directly
     if (nativePlayable) {
-      return mediaSrc ? (
-        <Suspense fallback={<div className="w-full h-24 rounded-lg bg-muted animate-pulse" />}>
-          <WaveformPlayer src={mediaSrc} className="w-full" />
-        </Suspense>
-      ) : (
+      if (mediaSrc) {
+        return (
+          <Suspense fallback={<div className="w-full h-24 rounded-lg bg-muted animate-pulse" />}>
+            <WaveformPlayer src={mediaSrc} className="w-full" />
+          </Suspense>
+        );
+      }
+      if (mediaError) {
+        return (
+          <div className="w-full h-24 rounded-lg bg-muted flex flex-col items-center justify-center gap-2">
+            <Music className="h-8 w-8 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">{t.files.details.loadFailed}</span>
+            <button
+              type="button"
+              onClick={handleRetryMedia}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              {t.common.retry}
+            </button>
+          </div>
+        );
+      }
+      return (
         <div className="w-full h-24 rounded-lg bg-muted flex items-center justify-center">
           <Music className="h-8 w-8 text-muted-foreground animate-pulse" />
         </div>

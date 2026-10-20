@@ -5526,6 +5526,7 @@ export const uk: TranslationKeys = {
     download: "Завантажити",
     details: {
       previewFailedRetry: "Не вдалося створити попередній перегляд. Спробуйте ще раз.",
+      loadFailed: "Не вдалося завантажити цей файл.",
     },
   },
   dropzone: {

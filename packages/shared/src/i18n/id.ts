@@ -5515,6 +5515,7 @@ export const id: TranslationKeys = {
     download: "Unduh",
     details: {
       previewFailedRetry: "Pembuatan pratinjau gagal. Coba lagi.",
+      loadFailed: "Gagal memuat file ini.",
     },
   },
   dropzone: {

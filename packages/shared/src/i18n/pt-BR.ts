@@ -5532,6 +5532,7 @@ export const ptBR: TranslationKeys = {
     download: "Baixar",
     details: {
       previewFailedRetry: "Falha ao gerar a pré-visualização. Tente novamente.",
+      loadFailed: "Não foi possível carregar este arquivo.",
     },
   },
   dropzone: {

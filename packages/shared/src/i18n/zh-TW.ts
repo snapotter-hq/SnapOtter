@@ -5208,6 +5208,7 @@ export const zhTW: TranslationKeys = {
     download: "下載",
     details: {
       previewFailedRetry: "預覽產生失敗。請重試。",
+      loadFailed: "無法載入此檔案。",
     },
   },
   dropzone: {

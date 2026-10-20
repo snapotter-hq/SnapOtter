@@ -5208,6 +5208,7 @@ export const zhCN: TranslationKeys = {
     download: "下载",
     details: {
       previewFailedRetry: "预览生成失败。请重试。",
+      loadFailed: "无法加载此文件。",
     },
   },
   dropzone: {

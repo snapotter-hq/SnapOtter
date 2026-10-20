@@ -5534,6 +5534,7 @@ export const pl: TranslationKeys = {
     download: "Pobierz",
     details: {
       previewFailedRetry: "Generowanie podglądu nie powiodło się. Spróbuj ponownie.",
+      loadFailed: "Nie udało się wczytać tego pliku.",
     },
   },
   dropzone: {

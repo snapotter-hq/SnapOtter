@@ -5533,6 +5533,7 @@ export const it: TranslationKeys = {
     download: "Scarica",
     details: {
       previewFailedRetry: "Generazione dell'anteprima non riuscita. Riprova.",
+      loadFailed: "Impossibile caricare questo file.",
     },
   },
   dropzone: {

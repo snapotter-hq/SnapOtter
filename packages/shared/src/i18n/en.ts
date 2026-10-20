@@ -5442,6 +5442,7 @@ export const en = {
     download: "Download",
     details: {
       previewFailedRetry: "Preview generation failed. Try again.",
+      loadFailed: "Couldn't load this file.",
     },
   },
   dropzone: {

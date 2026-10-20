@@ -5513,6 +5513,7 @@ export const sv: TranslationKeys = {
     download: "Ladda ner",
     details: {
       previewFailedRetry: "Förhandsvisningen kunde inte skapas. Försök igen.",
+      loadFailed: "Kunde inte läsa in den här filen.",
     },
   },
   dropzone: {

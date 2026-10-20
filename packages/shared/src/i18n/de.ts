@@ -5558,6 +5558,7 @@ export const de: TranslationKeys = {
     download: "Herunterladen",
     details: {
       previewFailedRetry: "Vorschauerzeugung fehlgeschlagen. Erneut versuchen.",
+      loadFailed: "Diese Datei konnte nicht geladen werden.",
     },
   },
   dropzone: {

@@ -105,6 +105,24 @@ describe("NonNativePreview source fetch (#1286)", () => {
     expect(screen.getByRole("button", { name: en.common.retry })).toBeTruthy();
   });
 
+  it("does not call the preview endpoint and offers Retry when the source fetch rejects with a network error", async () => {
+    vi.mocked(captureHandledError).mockClear();
+    const networkError = new TypeError("Failed to fetch");
+    const fetchMock = stubFetch(() => Promise.reject(networkError));
+
+    await generate();
+
+    expect(previewCalls(fetchMock)).toHaveLength(0);
+    expect(screen.getByText(en.toolPage.previewFailed)).toBeTruthy();
+    expect(screen.queryByText(en.toolPage.resultExpired)).toBeNull();
+    expect(screen.getByRole("button", { name: en.common.retry })).toBeTruthy();
+    expect(captureHandledError).toHaveBeenCalledTimes(1);
+    const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+    expect(error.message).toBe("Media preview request failed");
+    expect((error as Error).cause).toBe(networkError);
+    expect(tags).toEqual({ error_class: "operational" });
+  });
+
   // Only the source fetch's 404 means the result is gone. The preview
   // endpoint's own 404 is a different fault and keeps Retry.
   it("keeps the generic failure and Retry on a 404 from the preview request", async () => {

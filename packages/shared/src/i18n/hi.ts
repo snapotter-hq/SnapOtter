@@ -5297,6 +5297,7 @@ export const hi: TranslationKeys = {
     download: "डाउनलोड",
     details: {
       previewFailedRetry: "प्रीव्यू बनाना विफल रहा। पुनः प्रयास करें।",
+      loadFailed: "यह फ़ाइल लोड नहीं हो सकी।",
     },
   },
   dropzone: {

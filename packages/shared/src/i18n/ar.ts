@@ -5468,6 +5468,7 @@ export const ar: TranslationKeys = {
     download: "تنزيل",
     details: {
       previewFailedRetry: "فشل إنشاء المعاينة. حاول مرة أخرى.",
+      loadFailed: "تعذّر تحميل هذا الملف.",
     },
   },
   dropzone: {

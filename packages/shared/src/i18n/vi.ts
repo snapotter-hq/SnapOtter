@@ -5501,6 +5501,7 @@ export const vi: TranslationKeys = {
     download: "Tải xuống",
     details: {
       previewFailedRetry: "Tạo xem trước thất bại. Hãy thử lại.",
+      loadFailed: "Không thể tải tệp này.",
     },
   },
   dropzone: {

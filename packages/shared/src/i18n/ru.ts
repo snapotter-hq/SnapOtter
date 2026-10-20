@@ -5527,6 +5527,7 @@ export const ru: TranslationKeys = {
     download: "Скачать",
     details: {
       previewFailedRetry: "Не удалось сгенерировать предпросмотр. Попробуйте снова.",
+      loadFailed: "Не удалось загрузить этот файл.",
     },
   },
   dropzone: {

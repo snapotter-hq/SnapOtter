@@ -5524,6 +5524,7 @@ export const tr: TranslationKeys = {
     download: "İndir",
     details: {
       previewFailedRetry: "Önizleme oluşturulamadı. Tekrar deneyin.",
+      loadFailed: "Bu dosya yüklenemedi.",
     },
   },
   dropzone: {

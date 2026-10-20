@@ -5466,6 +5466,7 @@ export const ja: TranslationKeys = {
     download: "ダウンロード",
     details: {
       previewFailedRetry: "プレビューの生成に失敗しました。もう一度お試しください。",
+      loadFailed: "このファイルを読み込めませんでした。",
     },
   },
   dropzone: {
