@@ -198,6 +198,11 @@ describe("object-storage S3 dispatch (STORAGE_MODE=s3)", () => {
       });
       await expect(fresh.deletePrefix("outputs/job-init")).rejects.toBe(configBug);
       expect((configBug as TypeError & { statusCode?: number }).statusCode).toBe(500);
+
+      const deleteLoadBug = new Error("Failed to load S3 storage for deleteObject");
+      s3.load.mockRejectedValueOnce(deleteLoadBug);
+      await expect(fresh.deleteObject("uploads/job-init/file.bin")).rejects.toBe(deleteLoadBug);
+      expect((deleteLoadBug as Error & { statusCode?: number }).statusCode).toBe(500);
     });
 
     it("answers 503 storage-unavailable when getS3 fails with a connectivity or S3 error", async () => {
@@ -238,6 +243,15 @@ describe("object-storage S3 dispatch (STORAGE_MODE=s3)", () => {
 
       s3.load.mockRejectedValueOnce(netCause);
       await expect(fresh.deletePrefix("outputs/job-init")).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause: netCause,
+      });
+
+      s3.load.mockRejectedValueOnce(netCause);
+      await expect(fresh.deleteObject("uploads/job-init/file.bin")).rejects.toMatchObject({
         isSafeMessage: true,
         kind: "operational",
         code: "storage-unavailable",
@@ -491,13 +505,66 @@ describe("object-storage S3 dispatch (STORAGE_MODE=s3)", () => {
     expect(s3.deleteObject).toHaveBeenCalledWith("uploads/job-del/gone.bin");
   });
 
-  it("propagates a rejection when the S3 backend refuses deleteObject (#976)", async () => {
-    const denied = Object.assign(new Error("Access Denied"), {
-      name: "AccessDenied",
-      $metadata: { httpStatusCode: 403 },
+  describe("a failed S3 object delete (#976, #2835)", () => {
+    it.each([
+      [
+        "S3 refusing access",
+        Object.assign(new Error("Access Denied"), {
+          name: "AccessDenied",
+          $metadata: { httpStatusCode: 403 },
+        }),
+      ],
+      [
+        "S3 throttling the delete",
+        Object.assign(new Error("Please reduce your request rate."), {
+          name: "SlowDown",
+          $metadata: { httpStatusCode: 503 },
+        }),
+      ],
+      [
+        "S3 reporting a missing bucket",
+        Object.assign(new Error("The specified bucket does not exist"), {
+          name: "NoSuchBucket",
+          $metadata: { httpStatusCode: 404 },
+        }),
+      ],
+      [
+        "S3 resetting the connection",
+        Object.assign(new Error("socket hang up"), {
+          name: "TimeoutError",
+          code: "ECONNRESET",
+          $metadata: { attempts: 3 },
+        }),
+      ],
+      [
+        "the endpoint unreachable",
+        Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), { code: "ECONNREFUSED" }),
+      ],
+    ])("answers 503 storage-unavailable for %s", async (_case, cause) => {
+      s3.deleteObject.mockRejectedValueOnce(cause);
+      await expect(deleteObject("uploads/job-del/denied.bin")).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause,
+      });
     });
-    s3.deleteObject.mockRejectedValueOnce(denied);
-    await expect(deleteObject("uploads/job-del/denied.bin")).rejects.toBe(denied);
+
+    it("stamps 500 on an unexpected non-S3 error during deleteObject", async () => {
+      const bug = new TypeError("unexpected failure");
+      s3.deleteObject.mockRejectedValueOnce(bug);
+      await expect(deleteObject("uploads/job-del/denied.bin")).rejects.toBe(bug);
+      expect((bug as TypeError & { statusCode?: number }).statusCode).toBe(500);
+    });
+
+    it("rejects an invalid key in deleteObject before calling S3 and without stamping 500", async () => {
+      const err = await deleteObject("uploads/../etc/passwd").catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(Error);
+      expect((err as Error).message).toMatch(/Invalid object key/);
+      expect((err as { statusCode?: unknown }).statusCode).toBeUndefined();
+      expect(s3.deleteObject).not.toHaveBeenCalled();
+    });
   });
 
   it("routes deletePrefix to the S3 backend with the exact prefix", async () => {

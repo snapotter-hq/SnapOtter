@@ -7,6 +7,7 @@ import { Readable } from "node:stream";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import {
+  assertLocalCapacity,
   computeWorkspaceUsedBytes,
   copyObjectToFile,
   copyReadableToFile,
@@ -1246,6 +1247,157 @@ describe("object-storage missing-key + robustness paths", () => {
 
   it("silently ignores deleting an object that is not present", async () => {
     await expect(deleteObject(`outputs/absent-${process.pid}/none.bin`)).resolves.toBeUndefined();
+  });
+
+  it("rejects deleteObject for an invalid key without stamping 500", async () => {
+    const err = await deleteObject("outputs/../../etc/passwd").catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toMatch(/invalid object key/i);
+    expect((err as { statusCode?: unknown }).statusCode).toBeUndefined();
+  });
+
+  it.skipIf(isRoot)(
+    "classifies a local permission fault in deleteObject as a 503 storage-not-writable SafeError and keeps workspaceSizeCache intact (#2835)",
+    async () => {
+      const originalWorkspace = env.WORKSPACE_PATH;
+      const originalMaxGb = env.MAX_WORKSPACE_SIZE_GB;
+      const capRoot = mkdtempSync(join(tmpdir(), "snapotter-del-perm-"));
+      const stuckDir = join(capRoot, "uploads", "job-1");
+      await mkdir(stuckDir, { recursive: true });
+      await writeFile(join(stuckDir, "a.bin"), Buffer.alloc(2 * 1024 * 1024));
+      (env as { WORKSPACE_PATH: string }).WORKSPACE_PATH = capRoot;
+      (env as { MAX_WORKSPACE_SIZE_GB: number }).MAX_WORKSPACE_SIZE_GB = 0.001;
+      const nowSpy = vi.spyOn(Date, "now").mockReturnValue(9_000_000_000_000);
+      try {
+        // Warm workspaceSizeCache with the 2 MiB over-cap total.
+        await expect(assertLocalCapacity()).rejects.toMatchObject({
+          statusCode: 503,
+          code: "workspace-cap",
+        });
+
+        await chmod(stuckDir, 0o500);
+        await expect(deleteObject("uploads/job-1/a.bin")).rejects.toMatchObject({
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-not-writable",
+          statusCode: 503,
+          cause: expect.objectContaining({
+            code: expect.stringMatching(/^(EACCES|EPERM)$/),
+          }),
+        });
+        await chmod(stuckDir, 0o755);
+        expect(existsSync(join(stuckDir, "a.bin"))).toBe(true);
+
+        // Remove the file behind the store's back: if deleteObject had cleared
+        // workspaceSizeCache despite failing, assertLocalCapacity would recompute 0
+        // and resolve instead of serving the still-warm cached over-cap total.
+        rmSync(join(stuckDir, "a.bin"), { force: true });
+        await expect(assertLocalCapacity()).rejects.toMatchObject({
+          statusCode: 503,
+          code: "workspace-cap",
+        });
+      } finally {
+        nowSpy.mockRestore();
+        (env as { WORKSPACE_PATH: string }).WORKSPACE_PATH = originalWorkspace;
+        (env as { MAX_WORKSPACE_SIZE_GB: number }).MAX_WORKSPACE_SIZE_GB = originalMaxGb;
+        await chmod(stuckDir, 0o755).catch(() => {});
+        rmSync(capRoot, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it("classifies non-ENOENT unlink faults in deleteObject via localWriteFault and preserves workspaceSizeCache regardless of UID (#2835)", async () => {
+    const erofs = Object.assign(new Error("EROFS: read-only file system, unlink"), {
+      code: "EROFS",
+      syscall: "unlink",
+    });
+    const eio = Object.assign(new Error("EIO: i/o error, unlink"), {
+      code: "EIO",
+      syscall: "unlink",
+    });
+    const enoent = Object.assign(new Error("ENOENT: no such file or directory, unlink"), {
+      code: "ENOENT",
+      syscall: "unlink",
+    });
+    const unexpectedBug = new TypeError("unexpected unlink failure");
+    let unlinkErr: unknown = erofs;
+
+    const capRoot = mkdtempSync(join(tmpdir(), "snapotter-del-mock-"));
+    const jobDir = join(capRoot, "uploads", "job-1");
+    await mkdir(jobDir, { recursive: true });
+    await writeFile(join(jobDir, "a.bin"), Buffer.alloc(2 * 1024 * 1024));
+
+    vi.resetModules();
+    vi.doMock("node:fs/promises", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:fs/promises")>();
+      return {
+        ...actual,
+        unlink: async () => {
+          throw unlinkErr;
+        },
+      };
+    });
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(9_100_000_000_000);
+    try {
+      const isolatedConfig = await import("../../../apps/api/src/config.js");
+      const originalWorkspace = isolatedConfig.env.WORKSPACE_PATH;
+      const originalMaxGb = isolatedConfig.env.MAX_WORKSPACE_SIZE_GB;
+      (isolatedConfig.env as { WORKSPACE_PATH: string }).WORKSPACE_PATH = capRoot;
+      (isolatedConfig.env as { MAX_WORKSPACE_SIZE_GB: number }).MAX_WORKSPACE_SIZE_GB = 0.001;
+      try {
+        const isolatedStorage = await import("../../../apps/api/src/lib/object-storage.js");
+        await expect(isolatedStorage.assertLocalCapacity()).rejects.toMatchObject({
+          statusCode: 503,
+          code: "workspace-cap",
+        });
+
+        await expect(isolatedStorage.deleteObject("uploads/job-1/a.bin")).rejects.toMatchObject({
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-not-writable",
+          statusCode: 503,
+          cause: erofs,
+        });
+
+        // Remove the file out-of-band: the failed EROFS delete must NOT have
+        // cleared workspaceSizeCache, so assertLocalCapacity still trips.
+        rmSync(join(jobDir, "a.bin"), { force: true });
+        await expect(isolatedStorage.assertLocalCapacity()).rejects.toMatchObject({
+          statusCode: 503,
+          code: "workspace-cap",
+        });
+
+        unlinkErr = eio;
+        await expect(isolatedStorage.deleteObject("uploads/job-1/a.bin")).rejects.toMatchObject({
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-write-failed",
+          statusCode: 503,
+          cause: eio,
+        });
+
+        unlinkErr = unexpectedBug;
+        await expect(isolatedStorage.deleteObject("uploads/job-1/a.bin")).rejects.toBe(
+          unexpectedBug,
+        );
+        expect((unexpectedBug as TypeError & { statusCode?: number }).statusCode).toBe(500);
+
+        // An ENOENT (file already absent) resolves quietly AND invalidates
+        // workspaceSizeCache so the next capacity check sees the freed space.
+        unlinkErr = enoent;
+        await expect(isolatedStorage.deleteObject("uploads/job-1/a.bin")).resolves.toBeUndefined();
+        await expect(isolatedStorage.assertLocalCapacity()).resolves.toBeUndefined();
+      } finally {
+        (isolatedConfig.env as { WORKSPACE_PATH: string }).WORKSPACE_PATH = originalWorkspace;
+        (isolatedConfig.env as { MAX_WORKSPACE_SIZE_GB: number }).MAX_WORKSPACE_SIZE_GB =
+          originalMaxGb;
+      }
+    } finally {
+      nowSpy.mockRestore();
+      vi.doUnmock("node:fs/promises");
+      vi.resetModules();
+      rmSync(capRoot, { recursive: true, force: true });
+    }
   });
 
   it("skips a workspace entry that is a file where a job directory was expected", async () => {

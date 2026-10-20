@@ -720,11 +720,22 @@ export async function objectExists(key: string): Promise<boolean> {
 export async function deleteObject(key: string): Promise<void> {
   assertValidKey(key);
   if (isS3Enabled()) {
-    const s3 = await getS3();
-    await s3.deleteGenericObject(key);
+    try {
+      const s3 = await getS3();
+      await s3.deleteGenericObject(key);
+    } catch (err) {
+      throw s3WriteFault(err);
+    }
     return;
   }
-  await unlink(localPath(key)).catch(() => {});
+  const p = localPath(key);
+  try {
+    await unlink(p);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException | null)?.code !== "ENOENT") {
+      throw localWriteFault(err);
+    }
+  }
   // A delete is the one write that frees space; a cached total that outlives
   // it would keep refusing the retry the cap message just asked for (#1161).
   workspaceSizeCache = null;
