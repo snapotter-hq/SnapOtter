@@ -29,6 +29,7 @@ import tarfile
 import time
 import urllib.error
 import urllib.request
+import zipfile
 from datetime import datetime, timezone
 
 DOWNLOAD_CHUNK_BYTES = 4 * 1024 * 1024
@@ -1567,21 +1568,25 @@ def discard_placed_distributions(sp_dir: str, plan: list) -> None:
     present at the staged version never entered the plan, so a rollback cannot
     delete a version that was there before this install and is still correct.
     """
-    placed_dist_infos = {item["dist_info"] for item in plan}
+    placed_dist_infos = {item["dist_info"] for item in plan if item.get("dist_info")}
     shared = paths_claimed_by_others(sp_dir, placed_dist_infos)
     for item in plan:
         for rel in item["files"]:
             if rel in shared:
                 continue
             target = os.path.join(sp_dir, rel)
-            try:
-                if os.path.isdir(target) and not os.path.islink(target):
-                    shutil.rmtree(target, ignore_errors=True)
-                else:
+            if os.path.isdir(target) and not os.path.islink(target):
+                shutil.rmtree(target)
+            elif os.path.exists(target) or os.path.islink(target):
+                with contextlib.suppress(FileNotFoundError):
                     os.unlink(target)
-            except OSError:
-                pass
+            _discard_stale_bytecode(sp_dir, rel)
             _prune_empty_parents(sp_dir, rel)
+        dist_info = item.get("dist_info") or ""
+        if dist_info:
+            leftover = os.path.join(sp_dir, dist_info)
+            if os.path.isdir(leftover):
+                shutil.rmtree(leftover)
 
 
 def rollback_reconciliation(sp_dir: str, plan: list, quarantine_dir: str) -> None:
@@ -1637,6 +1642,65 @@ def abandon_merge(sp_dir, plan, quarantine_dir, marker_path, bundle_id) -> None:
 
 # -- Fixups (NCCL wheel) --
 
+def _wheel_dist_identity(wheel_path: str) -> tuple:
+    """Return (canonical_name, version) for a .whl file."""
+    filename = os.path.basename(wheel_path)
+    stem = filename[: -len(".whl")] if filename.endswith(".whl") else filename
+    parts = stem.split("-")
+    fallback_name = canonical_dist_name(parts[0]) if parts and parts[0] else ""
+    fallback_version = parts[1] if len(parts) > 1 else ""
+    try:
+        if zipfile.is_zipfile(wheel_path):
+            with zipfile.ZipFile(wheel_path, "r") as zf:
+                for member in zf.namelist():
+                    top = member.split("/", 1)[0]
+                    if top.endswith(DIST_INFO_SUFFIX):
+                        name, sep, version = top[: -len(DIST_INFO_SUFFIX)].rpartition("-")
+                        if sep and name:
+                            return (canonical_dist_name(name), version)
+    except (OSError, zipfile.BadZipFile):
+        pass
+    return (fallback_name, fallback_version)
+
+
+def _wheel_member_files(wheel_path: str) -> list:
+    """Return safe relative file paths inside a .whl zip archive."""
+    members = []
+    try:
+        if zipfile.is_zipfile(wheel_path):
+            with zipfile.ZipFile(wheel_path, "r") as zf:
+                for info in zf.infolist():
+                    if info.is_dir():
+                        continue
+                    rel = info.filename.strip().replace("\\", "/")
+                    if not rel or rel.startswith("/") or ".." in rel.split("/"):
+                        continue
+                    members.append(rel)
+    except (OSError, zipfile.BadZipFile):
+        pass
+    return members
+
+
+def _collect_installed_dist_files(sp_dir: str, dist_info: str) -> list:
+    """Return relative file paths owned by dist_info in sp_dir, including any
+    unrecorded metadata files (such as INSTALLER or REQUESTED) inside dist_info."""
+    files = [
+        rel
+        for rel in distribution_files(sp_dir, dist_info)
+        if os.path.exists(os.path.join(sp_dir, rel)) or os.path.islink(os.path.join(sp_dir, rel))
+    ]
+    seen = set(files)
+    dist_info_root = os.path.join(sp_dir, dist_info)
+    if os.path.isdir(dist_info_root):
+        for root, _dirs, entries in os.walk(dist_info_root):
+            for entry in sorted(entries):
+                rel = os.path.relpath(os.path.join(root, entry), sp_dir).replace("\\", "/")
+                if rel not in seen:
+                    seen.add(rel)
+                    files.append(rel)
+    return files
+
+
 def apply_fixups(
     staging_dir: str,
     venv_path: str,
@@ -1645,14 +1709,135 @@ def apply_fixups(
     quarantine_dir: str = "",
     venv_writing_marker: str = "",
     bundle_id: str = "",
-) -> None:
+) -> str:
     """Install any wheels from fixups/ directory (local only, no network)."""
     fixups_dir = os.path.join(staging_dir, "fixups")
     if not os.path.isdir(fixups_dir):
-        return
+        return site_packages_dir
     plan = reconciliation_plan if reconciliation_plan is not None else []
+    if not quarantine_dir and venv_path:
+        quarantine_dir = os.path.join(venv_path, ".superseded")
+    baseline_dist_infos = None
+    baseline_top_entries = None
+    recorded_fixup_dist_infos = set()
+    superseded_by_name = {}
+    pre_absent_wheel_files = {}
+    sync_failed = [False]
+
+    def _sync_fixup_plan() -> None:
+        if (
+            not site_packages_dir
+            or not os.path.isdir(site_packages_dir)
+            or baseline_dist_infos is None
+        ):
+            return
+        try:
+            current_dists = list_distributions(site_packages_dir)
+        except OSError as e:
+            sync_failed[0] = True
+            sys.stderr.write(
+                f"[install] could not inspect site-packages after fixup ({e}); "
+                f"the AI environment will be reseeded on next restart\n"
+            )
+            sys.stderr.flush()
+            return
+        plan_by_name = {item["name"]: item for item in plan}
+        for name in sorted(current_dists):
+            for version, dist_info in sorted(current_dists[name]):
+                if dist_info in baseline_dist_infos or dist_info in recorded_fixup_dist_infos:
+                    continue
+                files = _collect_installed_dist_files(site_packages_dir, dist_info)
+                replaces = {rel.split("/")[0] for rel in files} | {dist_info}
+                recorded_fixup_dist_infos.add(dist_info)
+                if name in plan_by_name:
+                    existing_item = plan_by_name[name]
+                    old_dist_info = existing_item.get("dist_info") or ""
+                    if old_dist_info and old_dist_info != dist_info:
+                        old_di_path = os.path.join(site_packages_dir, old_dist_info)
+                        if os.path.isdir(old_di_path):
+                            shutil.rmtree(old_di_path)
+                    merged_files = list(
+                        dict.fromkeys(
+                            [
+                                rel
+                                for rel in existing_item["files"]
+                                if os.path.exists(os.path.join(site_packages_dir, rel))
+                                or os.path.islink(os.path.join(site_packages_dir, rel))
+                            ]
+                            + files
+                        )
+                    )
+                    existing_item["version"] = version
+                    existing_item["dist_info"] = dist_info
+                    existing_item["files"] = merged_files
+                    existing_item["replaces"] = set(existing_item.get("replaces", set())) | replaces
+                else:
+                    item = {
+                        "name": name,
+                        "version": version,
+                        "dist_info": dist_info,
+                        "files": files,
+                        "replaces": replaces,
+                        "superseded": superseded_by_name.pop(name, []),
+                    }
+                    plan.append(item)
+                    plan_by_name[name] = item
+        for canon_name, candidate_rels in sorted(pre_absent_wheel_files.items()):
+            existing_rels = [
+                rel
+                for rel in candidate_rels
+                if os.path.exists(os.path.join(site_packages_dir, rel))
+                or os.path.islink(os.path.join(site_packages_dir, rel))
+            ]
+            if not existing_rels:
+                continue
+            if canon_name in plan_by_name:
+                existing_item = plan_by_name[canon_name]
+                existing_item["files"] = list(
+                    dict.fromkeys(existing_item["files"] + existing_rels)
+                )
+                existing_item["replaces"] = set(existing_item.get("replaces", set())) | {
+                    rel.split("/")[0] for rel in existing_rels if rel
+                }
+            else:
+                item = {
+                    "name": canon_name,
+                    "version": "",
+                    "dist_info": "",
+                    "files": existing_rels,
+                    "replaces": {rel.split("/")[0] for rel in existing_rels if rel},
+                    "superseded": superseded_by_name.pop(canon_name, []),
+                }
+                plan.append(item)
+                plan_by_name[canon_name] = item
+        if baseline_top_entries is not None:
+            try:
+                current_top = set(os.listdir(site_packages_dir)) - baseline_top_entries
+            except OSError as e:
+                sync_failed[0] = True
+                sys.stderr.write(
+                    f"[install] could not inspect site-packages after fixup ({e}); "
+                    f"the AI environment will be reseeded on next restart\n"
+                )
+                sys.stderr.flush()
+                return
+            covered_top = {
+                rel.split("/")[0] for item in plan for rel in item["files"] if rel
+            } | {item["dist_info"] for item in plan if item.get("dist_info")}
+            for top in sorted(current_top - covered_top):
+                plan.append(
+                    {
+                        "name": f"__fixup_unrecorded_{top}",
+                        "version": "",
+                        "dist_info": top if top.endswith(DIST_INFO_SUFFIX) else "",
+                        "files": [top],
+                        "replaces": {top},
+                        "superseded": [],
+                    }
+                )
 
     def _abort(message: str) -> None:
+        _sync_fixup_plan()
         shutil.rmtree(staging_dir, ignore_errors=True)
         had_rollback_work = bool(
             site_packages_dir
@@ -1662,7 +1847,10 @@ def apply_fixups(
             site_packages_dir, plan, quarantine_dir,
             venv_writing_marker, bundle_id,
         )
-        if venv_writing_marker and not had_rollback_work:
+        if sync_failed[0] and venv_writing_marker:
+            with contextlib.suppress(OSError):
+                mark_venv_writing(venv_writing_marker, bundle_id)
+        elif venv_writing_marker and not had_rollback_work:
             with contextlib.suppress(OSError):
                 clear_venv_writing(venv_writing_marker)
         fail(message)
@@ -1674,22 +1862,125 @@ def apply_fixups(
         )
     except OSError as e:
         _abort(f"Failed to read bundle fixups directory: {e}")
-        return
+        return site_packages_dir
     if not wheels:
-        return
+        return site_packages_dir
     python_path = os.path.join(venv_path, "bin", "python3")
     if not os.path.exists(python_path):
         _abort(
             f"Failed to install bundle fixups: the AI environment's Python interpreter "
             f"at {python_path} does not exist. Recreate the AI environment and retry."
         )
-        return
+        return site_packages_dir
+    if not site_packages_dir:
+        if get_site_packages_dir is _default_get_site_packages_dir:
+            site_packages_dir, sp_err = _probe_site_packages_dir(venv_path)
+        else:
+            site_packages_dir = get_site_packages_dir(venv_path)
+            sp_err = ""
+        if not site_packages_dir:
+            _abort(
+                sp_err
+                or f"The AI environment at {venv_path} has no usable site-packages directory. "
+                f"Recreate the AI environment and retry."
+            )
+            return ""
     if venv_writing_marker:
         try:
             mark_venv_writing(venv_writing_marker, bundle_id)
         except OSError as e:
             _abort(f"Failed to record venv write marker before installing fixups: {e}")
-            return
+            return site_packages_dir
+    if site_packages_dir and os.path.isdir(site_packages_dir):
+        try:
+            if not plan and quarantine_dir:
+                shutil.rmtree(quarantine_dir, ignore_errors=True)
+            pre_fixup_dists = list_distributions(site_packages_dir)
+            plan_by_name = {item["name"]: item for item in plan}
+            wheel_versions_by_name = {}
+            wheel_members_by_name = {}
+            for wheel in wheels:
+                wheel_path = os.path.join(fixups_dir, wheel)
+                canon_name, wheel_version = _wheel_dist_identity(wheel_path)
+                if canon_name:
+                    wheel_versions_by_name.setdefault(canon_name, []).append(wheel_version)
+                    for rel in _wheel_member_files(wheel_path):
+                        wheel_members_by_name.setdefault(canon_name, []).append(rel)
+            quarantine_plan = []
+            for canon_name, versions in sorted(wheel_versions_by_name.items()):
+                if canon_name in plan_by_name:
+                    existing_item = plan_by_name[canon_name]
+                    prior_superseded = existing_item.get("superseded") or []
+                    if prior_superseded and quarantine_dir:
+                        quarantine_plan.append(
+                            {
+                                "name": canon_name,
+                                "version": existing_item.get("version") or "",
+                                "dist_info": existing_item.get("dist_info") or "",
+                                "files": [],
+                                "replaces": {
+                                    rel.split("/")[0]
+                                    for _v, d in prior_superseded
+                                    for rel in distribution_files(site_packages_dir, d)
+                                    if rel
+                                },
+                                "superseded": prior_superseded,
+                            }
+                        )
+                    staged_di = existing_item.get("dist_info") or ""
+                    if staged_di:
+                        staged_di_path = os.path.join(site_packages_dir, staged_di)
+                        if os.path.isdir(staged_di_path):
+                            shutil.rmtree(staged_di_path)
+                    continue
+                non_empty_versions = {v for v in versions if v}
+                existing = pre_fixup_dists.get(canon_name, [])
+                superseded = [
+                    copy
+                    for copy in existing
+                    if not non_empty_versions
+                    or len(non_empty_versions) > 1
+                    or copy[0] not in non_empty_versions
+                ]
+                if not superseded:
+                    continue
+                superseded_by_name[canon_name] = superseded
+                target_version = versions[-1]
+                if quarantine_dir:
+                    quarantine_plan.append(
+                        {
+                            "name": canon_name,
+                            "version": target_version,
+                            "dist_info": f"{canon_name}-{target_version}{DIST_INFO_SUFFIX}",
+                            "files": [],
+                            "replaces": {
+                                rel.split("/")[0]
+                                for _v, d in superseded
+                                for rel in distribution_files(site_packages_dir, d)
+                                if rel
+                            },
+                            "superseded": superseded,
+                        }
+                    )
+            if quarantine_plan and quarantine_dir:
+                supersede_distributions(site_packages_dir, quarantine_plan, quarantine_dir)
+            for canon_name, member_rels in wheel_members_by_name.items():
+                pre_absent_wheel_files[canon_name] = [
+                    rel
+                    for rel in dict.fromkeys(member_rels)
+                    if not os.path.exists(os.path.join(site_packages_dir, rel))
+                    and not os.path.islink(os.path.join(site_packages_dir, rel))
+                ]
+            post_quarantine_dists = list_distributions(site_packages_dir)
+            baseline_dist_infos = {
+                dist_info
+                for copies in post_quarantine_dists.values()
+                for _ver, dist_info in copies
+            }
+            baseline_top_entries = set(os.listdir(site_packages_dir))
+        except OSError as e:
+            _abort(f"Failed to prepare bundle fixups: {e}")
+            return site_packages_dir
     for wheel in wheels:
         pkg_name = wheel.split("-")[0]
         try:
@@ -1703,14 +1994,14 @@ def apply_fixups(
                 f"Timed out while installing fixup wheel '{pkg_name}'. "
                 f"Please retry the install."
             )
-            return
+            return site_packages_dir
         except OSError as e:
             _abort(
                 f"Failed to install fixup wheel '{pkg_name}': the AI environment's Python "
                 f"interpreter at {python_path} could not be run ({e}). "
                 f"Recreate the AI environment and retry."
             )
-            return
+            return site_packages_dir
         if proc.returncode != 0:
             detail = (
                 (proc.stderr or "").strip()
@@ -1718,13 +2009,18 @@ def apply_fixups(
                 or f"pip exited with status {proc.returncode}"
             )
             _abort(f"Failed to install fixup wheel '{pkg_name}': {detail}")
-            return
+            return site_packages_dir
+        _sync_fixup_plan()
+        if sync_failed[0]:
+            _abort("Failed to inspect site-packages after installing bundle fixups.")
+            return site_packages_dir
     if venv_writing_marker:
         try:
             clear_venv_writing(venv_writing_marker)
         except OSError as e:
             _abort(f"Failed to clear venv write marker after installing fixups: {e}")
-            return
+            return site_packages_dir
+    return site_packages_dir
 
 
 # -- installed.json management --
@@ -2019,14 +2315,17 @@ def _install() -> None:
 
     # -- Apply fixups --
     emit_progress(93, "Finalizing...")
-    apply_fixups(
-        staging_dir,
-        venv_path,
-        site_packages_dir,
-        reconciliation_plan,
-        quarantine_dir,
-        venv_writing_marker,
-        bundle_id,
+    site_packages_dir = (
+        apply_fixups(
+            staging_dir,
+            venv_path,
+            site_packages_dir,
+            reconciliation_plan,
+            quarantine_dir,
+            venv_writing_marker,
+            bundle_id,
+        )
+        or site_packages_dir
     )
 
     # -- Verify the bundle actually imports --

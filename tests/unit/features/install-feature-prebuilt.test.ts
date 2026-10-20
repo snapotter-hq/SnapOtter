@@ -1747,4 +1747,645 @@ mod.subprocess.run = real_run
     );
     expect(pyCheck.status, `stderr: ${pyCheck.stderr}`).toBe(0);
   });
+
+  it("rolls back pip-installed fixup wheels and restores superseded fixup versions when a later fixup or smoke import fails (#2581)", () => {
+    const pyCheck = spawnSync(
+      "python3",
+      [
+        "-c",
+        `
+import hashlib, importlib.util, json, os, shutil, subprocess, sys, tarfile, tempfile, zipfile
+
+spec = importlib.util.spec_from_file_location("inst", ${JSON.stringify(scriptPath)})
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+def build_wheel(wheel_path, dist_name, version, files):
+    dist_info = f"{dist_name}-{version}.dist-info"
+    recorded = []
+    with zipfile.ZipFile(wheel_path, "w") as zf:
+        for rel, content in files.items():
+            zf.writestr(rel, content)
+            recorded.append(rel)
+        for meta_name, meta_body in [
+            ("METADATA", f"Metadata-Version: 2.1\\nName: {dist_name}\\nVersion: {version}\\n"),
+            ("WHEEL", "Wheel-Version: 1.0\\nGenerator: test\\nRoot-Is-Purelib: true\\nTag: py3-none-any\\n"),
+        ]:
+            rel = f"{dist_info}/{meta_name}"
+            zf.writestr(rel, meta_body)
+            recorded.append(rel)
+        record_rel = f"{dist_info}/RECORD"
+        recorded.append(record_rel)
+        zf.writestr(record_rel, "".join(f"{r},,0\\n" for r in recorded))
+
+def seed_dist(sp_dir, dist_name, version, files):
+    dist_info = os.path.join(sp_dir, f"{dist_name}-{version}.dist-info")
+    os.makedirs(dist_info, exist_ok=True)
+    recorded = []
+    for rel, content in files.items():
+        full = os.path.join(sp_dir, rel)
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        with open(full, "w") as f:
+            f.write(content)
+        recorded.append(rel)
+    with open(os.path.join(dist_info, "METADATA"), "w") as f:
+        f.write(f"Name: {dist_name}\\nVersion: {version}\\n")
+    recorded.append(f"{dist_name}-{version}.dist-info/METADATA")
+    recorded.append(f"{dist_name}-{version}.dist-info/RECORD")
+    with open(os.path.join(dist_info, "RECORD"), "w") as f:
+        f.write("".join(f"{r},,\\n" for r in recorded))
+    # Unrecorded pip metadata file (like INSTALLER / REQUESTED)
+    with open(os.path.join(dist_info, "INSTALLER"), "w") as f:
+        f.write("pip\\n")
+
+def seed_pip_module(sp_dir):
+    """Seed a hermetic pip module in site-packages that unpacks .whl archives the way pip does
+    (including removing any prior version in site-packages before unpacking and writing INSTALLER/REQUESTED)."""
+    pip_Main = """import os, re, shutil, sys, zipfile
+
+def norm(name):
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+args = sys.argv[1:]
+if not args or args[0] != "install":
+    sys.exit(2)
+find_links = ""
+pkg_arg = ""
+for a in args[1:]:
+    if a.startswith("--find-links="):
+        find_links = a.split("=", 1)[1]
+    elif not a.startswith("-"):
+        pkg_arg = a
+
+sp_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+target_norm = norm(pkg_arg)
+matches = sorted(
+    f for f in os.listdir(find_links)
+    if f.endswith(".whl") and not f.startswith(".") and norm(f.split("-")[0]) == target_norm
+)
+if not matches:
+    print(f"ERROR: Could not find a version that satisfies the requirement {pkg_arg}", file=sys.stderr)
+    sys.exit(1)
+
+whl_name = matches[-1]
+whl_path = os.path.join(find_links, whl_name)
+if not zipfile.is_zipfile(whl_path):
+    print(f"ERROR: Wheel {whl_name} is invalid", file=sys.stderr)
+    sys.exit(1)
+
+with zipfile.ZipFile(whl_path, "r") as zf:
+    dist_infos = {m.split("/")[0] for m in zf.namelist() if m.split("/")[0].endswith(".dist-info")}
+    whl_dist_info = sorted(dist_infos)[0]
+    whl_ver = whl_dist_info[:-len(".dist-info")].rpartition("-")[2]
+
+    # Real pip install <pkg_name> (without --upgrade) treats ANY existing version in sp_dir as satisfied!
+    for entry in list(os.listdir(sp_dir)):
+        if not entry.endswith(".dist-info"):
+            continue
+        ename, sep, ever = entry[:-len(".dist-info")].rpartition("-")
+        if not sep or norm(ename) != target_norm:
+            continue
+        print(f"Requirement already satisfied: {pkg_arg} in {sp_dir} ({ever})")
+        sys.exit(0)
+
+    zf.extractall(sp_dir)
+    di_dir = os.path.join(sp_dir, whl_dist_info)
+    os.makedirs(di_dir, exist_ok=True)
+    with open(os.path.join(di_dir, "INSTALLER"), "w") as f:
+        print("pip", file=f)
+    with open(os.path.join(di_dir, "REQUESTED"), "w") as f:
+        f.write("")
+"""
+    seed_dist(sp_dir, "pip", "24.0", {"pip/__init__.py": "# pip\\n", "pip/__main__.py": pip_Main})
+
+def make_bundle_tar(tmp_dir, name, has_sp=True, fixup_wheels=()):
+    build_dir = os.path.join(tmp_dir, f"build-{name}")
+    os.makedirs(os.path.join(build_dir, "models", "testmodel"), exist_ok=True)
+    with open(os.path.join(build_dir, "models", "testmodel", "weights.bin"), "w") as f:
+        f.write("weights")
+    if has_sp:
+        seed_dist(
+            os.path.join(build_dir, "site-packages"),
+            "testpkg",
+            "1.0.0",
+            {"testpkg/__init__.py": "# v1.0.0\\n"},
+        )
+    if fixup_wheels:
+        fixups_dir = os.path.join(build_dir, "fixups")
+        os.makedirs(fixups_dir, exist_ok=True)
+        for whl_Spec in fixup_wheels:
+            whl_file = os.path.join(fixups_dir, whl_Spec["filename"])
+            if whl_Spec.get("corrupt"):
+                with open(whl_file, "w") as f:
+                    f.write("corrupt-wheel-bytes")
+            else:
+                build_wheel(whl_file, whl_Spec["dist_name"], whl_Spec["version"], whl_Spec["files"])
+    with open(os.path.join(build_dir, "bundle.json"), "w") as f:
+        json.dump({
+            "bundleId": "face-detection",
+            "version": "1.0.0-test",
+            "arch": "amd64-gpu",
+            "imageVersion": "2.0.0",
+            "pythonVersion": f"{sys.version_info.major}.{sys.version_info.minor}",
+            "models": ["testmodel"],
+        }, f)
+    tar_path = os.path.join(tmp_dir, f"{name}.tar.gz")
+    with tarfile.open(tar_path, "w:gz") as tf:
+        tf.add(build_dir, arcname=".")
+    shutil.rmtree(build_dir)
+    sha = hashlib.sha256(open(tar_path, "rb").read()).hexdigest()
+    return tar_path, sha
+
+def reset_env():
+    for entry in os.listdir(${JSON.stringify(sitePackagesDir)}):
+        p = os.path.join(${JSON.stringify(sitePackagesDir)}, entry)
+        if os.path.isdir(p) and not os.path.islink(p):
+            shutil.rmtree(p)
+        else:
+            os.unlink(p)
+    seed_pip_module(${JSON.stringify(sitePackagesDir)})
+    seed_dist(${JSON.stringify(sitePackagesDir)}, "testpkg", "0.9.0", {"testpkg/__init__.py": "# v0.9.0\\n"})
+    seed_dist(
+        ${JSON.stringify(sitePackagesDir)},
+        "upgraded_fixup",
+        "1.0.0",
+        {"upgraded_fixup/__init__.py": "# v1.0.0\\n", "upgraded_fixup/old_only.py": "# old\\n"},
+    )
+    seed_dist(
+        ${JSON.stringify(sitePackagesDir)},
+        "same_fixup",
+        "1.0.0",
+        {"same_fixup/__init__.py": "# keep-1.0.0\\n"},
+    )
+
+def assert_env_restored():
+    sp = ${JSON.stringify(sitePackagesDir)}
+    assert open(os.path.join(sp, "testpkg", "__init__.py")).read() == "# v0.9.0\\n"
+    assert os.path.isdir(os.path.join(sp, "testpkg-0.9.0.dist-info"))
+    assert not os.path.exists(os.path.join(sp, "testpkg-1.0.0.dist-info"))
+    assert not os.path.exists(os.path.join(sp, "extra_pkg"))
+    assert not os.path.exists(os.path.join(sp, "extra_pkg-1.0.0.dist-info"))
+    assert open(os.path.join(sp, "upgraded_fixup", "__init__.py")).read() == "# v1.0.0\\n"
+    assert open(os.path.join(sp, "upgraded_fixup", "old_only.py")).read() == "# old\\n"
+    assert not os.path.exists(os.path.join(sp, "upgraded_fixup", "new_only.py"))
+    assert os.path.isdir(os.path.join(sp, "upgraded_fixup-1.0.0.dist-info"))
+    assert not os.path.exists(os.path.join(sp, "upgraded_fixup-2.0.0.dist-info"))
+    assert open(os.path.join(sp, "same_fixup", "__init__.py")).read() == "# keep-1.0.0\\n"
+    assert os.path.isdir(os.path.join(sp, "same_fixup-1.0.0.dist-info"))
+    assert not os.path.exists(os.path.join(${JSON.stringify(venvDir)}, ".superseded"))
+    assert not os.path.exists(os.path.join(${JSON.stringify(aiDir)}, "staging-face-detection"))
+    assert not os.path.exists(os.path.join(${JSON.stringify(aiDir)}, "venv.writing"))
+    assert not os.path.exists(os.path.join(${JSON.stringify(modelsDir)}, "testmodel", "weights.bin"))
+
+errors = []
+def fake_fail(msg):
+    errors.append(msg)
+    raise SystemExit(1)
+mod.fail = fake_fail
+mod.emit_progress = lambda p, s: None
+
+# Case 1: apply_fixups succeeds (installing new wheel, upgrading existing wheel, and no-op on same-version wheel),
+#         smoke_imports imports the new modules (generating .pyc) and then fails on a missing module -> all rolled back!
+reset_env()
+tar1, sha1 = make_bundle_tar(
+    ${JSON.stringify(tempDir)},
+    "case1-smoke-fail",
+    has_sp=True,
+    fixup_wheels=[
+        {
+            "filename": "extra_pkg-1.0.0-py3-none-any.whl",
+            "dist_name": "extra_pkg",
+            "version": "1.0.0",
+            "files": {"extra_pkg/__init__.py": "VAL = 1\\n"},
+        },
+        {
+            "filename": "same_fixup-1.0.0-py3-none-any.whl",
+            "dist_name": "same_fixup",
+            "version": "1.0.0",
+            "files": {"same_fixup/__init__.py": "# keep-1.0.0\\n"},
+        },
+        {
+            "filename": "upgraded_fixup-2.0.0-py3-none-any.whl",
+            "dist_name": "upgraded_fixup",
+            "version": "2.0.0",
+            "files": {"upgraded_fixup/__init__.py": "# v2.0.0\\n", "upgraded_fixup/new_only.py": "# new\\n"},
+        },
+    ],
+)
+with open(${JSON.stringify(manifestPath)}, "w") as f:
+    json.dump({
+        "manifestVersion": 2,
+        "imageVersion": "2.0.0",
+        "pythonVersion": "3.12",
+        "basePackages": [],
+        "bundles": {
+            "face-detection": {
+                "name": "Face Detection",
+                "archives": {
+                    "amd64-gpu": {"file": tar1, "sha256": sha1, "compressedSize": 100, "extractedSize": 200},
+                    "arm64-cpu": {"file": tar1, "sha256": sha1, "compressedSize": 100, "extractedSize": 200},
+                },
+                "models": [],
+                "smokeImports": ["testpkg", "extra_pkg", "upgraded_fixup", "nonexistent_module_zzz"],
+            }
+        }
+    }, f)
+
+os.environ["PYTHON_VENV_PATH"] = ${JSON.stringify(venvDir)}
+os.environ["SNAPOTTER_BUNDLE_LOCAL_PATH"] = tar1
+sys.argv = ["install_feature.py", "face-detection", ${JSON.stringify(manifestPath)}, ${JSON.stringify(modelsDir)}]
+
+try:
+    mod._install()
+    assert False, "expected SystemExit on smoke failure"
+except SystemExit:
+    pass
+assert "verification failed" in errors[-1].lower(), errors[-1]
+assert_env_restored()
+
+# Case 2: Multiple wheels in fixups/ where the first wheel succeeds and a later wheel fails -> first wheel rolled back!
+reset_env()
+tar2, sha2 = make_bundle_tar(
+    ${JSON.stringify(tempDir)},
+    "case2-second-wheel-fails",
+    has_sp=True,
+    fixup_wheels=[
+        {
+            "filename": "a_extra_pkg-1.0.0-py3-none-any.whl",
+            "dist_name": "extra_pkg",
+            "version": "1.0.0",
+            "files": {"extra_pkg/__init__.py": "VAL = 1\\n"},
+        },
+        {
+            "filename": "m_upgraded_fixup-2.0.0-py3-none-any.whl",
+            "dist_name": "upgraded_fixup",
+            "version": "2.0.0",
+            "files": {"upgraded_fixup/__init__.py": "# v2.0.0\\n", "upgraded_fixup/new_only.py": "# new\\n"},
+        },
+        {
+            "filename": "z_broken-1.0.0-py3-none-any.whl",
+            "corrupt": True,
+        },
+    ],
+)
+with open(${JSON.stringify(manifestPath)}, "w") as f:
+    json.dump({
+        "manifestVersion": 2,
+        "imageVersion": "2.0.0",
+        "pythonVersion": "3.12",
+        "basePackages": [],
+        "bundles": {
+            "face-detection": {
+                "name": "Face Detection",
+                "archives": {
+                    "amd64-gpu": {"file": tar2, "sha256": sha2, "compressedSize": 100, "extractedSize": 200},
+                    "arm64-cpu": {"file": tar2, "sha256": sha2, "compressedSize": 100, "extractedSize": 200},
+                },
+                "models": [],
+                "smokeImports": ["testpkg"],
+            }
+        }
+    }, f)
+os.environ["SNAPOTTER_BUNDLE_LOCAL_PATH"] = tar2
+try:
+    mod._install()
+    assert False, "expected SystemExit on corrupt second fixup wheel"
+except SystemExit:
+    pass
+assert "Failed to install fixup wheel 'z_broken'" in errors[-1], errors[-1]
+assert_env_restored()
+
+# Case 3: Fixups-only bundle (has_staging_sp is False) rolls back fixup wheels when smoke_imports fails!
+reset_env()
+tar3, sha3 = make_bundle_tar(
+    ${JSON.stringify(tempDir)},
+    "case3-no-staging-sp",
+    has_sp=False,
+    fixup_wheels=[
+        {
+            "filename": "extra_pkg-1.0.0-py3-none-any.whl",
+            "dist_name": "extra_pkg",
+            "version": "1.0.0",
+            "files": {"extra_pkg/__init__.py": "VAL = 1\\n"},
+        },
+        {
+            "filename": "upgraded_fixup-2.0.0-py3-none-any.whl",
+            "dist_name": "upgraded_fixup",
+            "version": "2.0.0",
+            "files": {"upgraded_fixup/__init__.py": "# v2.0.0\\n", "upgraded_fixup/new_only.py": "# new\\n"},
+        },
+    ],
+)
+with open(${JSON.stringify(manifestPath)}, "w") as f:
+    json.dump({
+        "manifestVersion": 2,
+        "imageVersion": "2.0.0",
+        "pythonVersion": "3.12",
+        "basePackages": [],
+        "bundles": {
+            "face-detection": {
+                "name": "Face Detection",
+                "archives": {
+                    "amd64-gpu": {"file": tar3, "sha256": sha3, "compressedSize": 100, "extractedSize": 200},
+                    "arm64-cpu": {"file": tar3, "sha256": sha3, "compressedSize": 100, "extractedSize": 200},
+                },
+                "models": [],
+                "smokeImports": ["extra_pkg", "nonexistent_module_zzz"],
+            }
+        }
+    }, f)
+os.environ["SNAPOTTER_BUNDLE_LOCAL_PATH"] = tar3
+try:
+    mod._install()
+    assert False, "expected SystemExit on fixups-only smoke failure"
+except SystemExit:
+    pass
+assert "verification failed" in errors[-1].lower(), errors[-1]
+assert_env_restored()
+
+# Case 4: Fixup wheel upgrading a package also present in staging_sp, partial unrecorded top-level writes,
+#         failed site-packages resolution on fixups-only bundle, and OSError during fixup quarantine preparation.
+reset_env()
+tar4, sha4 = make_bundle_tar(
+    ${JSON.stringify(tempDir)},
+    "case4-same-pkg-and-partial",
+    has_sp=True,
+    fixup_wheels=[
+        {
+            "filename": "testpkg-2.0.0-py3-none-any.whl",
+            "dist_name": "testpkg",
+            "version": "2.0.0",
+            "files": {"testpkg/__init__.py": "# v2.0.0\\n", "testpkg/v2_extra.py": "# v2\\n"},
+        },
+    ],
+)
+with open(${JSON.stringify(manifestPath)}, "w") as f:
+    json.dump({
+        "manifestVersion": 2,
+        "imageVersion": "2.0.0",
+        "pythonVersion": "3.12",
+        "basePackages": [],
+        "bundles": {
+            "face-detection": {
+                "name": "Face Detection",
+                "archives": {
+                    "amd64-gpu": {"file": tar4, "sha256": sha4, "compressedSize": 100, "extractedSize": 200},
+                    "arm64-cpu": {"file": tar4, "sha256": sha4, "compressedSize": 100, "extractedSize": 200},
+                },
+                "models": [],
+                "smokeImports": ["testpkg", "nonexistent_module_zzz"],
+            }
+        }
+    }, f)
+os.environ["SNAPOTTER_BUNDLE_LOCAL_PATH"] = tar4
+try:
+    mod._install()
+    assert False, "expected SystemExit on Case 4 smoke failure"
+except SystemExit:
+    pass
+assert_env_restored()
+assert not os.path.exists(os.path.join(${JSON.stringify(sitePackagesDir)}, "testpkg", "v2_extra.py"))
+assert not os.path.exists(os.path.join(${JSON.stringify(sitePackagesDir)}, "testpkg-2.0.0.dist-info"))
+
+# Unrecorded top-level directory written by a failing pip call is also cleaned up on abort
+with tempfile.TemporaryDirectory() as d4:
+    staging4 = os.path.join(d4, "staging")
+    os.makedirs(os.path.join(staging4, "fixups"), exist_ok=True)
+    # Zip without .dist-info exercises _wheel_dist_identity fallback
+    whl_no_di = os.path.join(staging4, "fixups", "partial_pkg-1.0.0-py3-none-any.whl")
+    with zipfile.ZipFile(whl_no_di, "w") as zf:
+        zf.writestr("partial_pkg/__init__.py", "x = 1\\n")
+    plan4 = []
+    quarantine4 = os.path.join(${JSON.stringify(venvDir)}, ".superseded")
+    marker4 = os.path.join(${JSON.stringify(aiDir)}, "venv.writing")
+    real_run4 = mod.subprocess.run
+    def partial_pip_fail(cmd, *a, **kw):
+        os.makedirs(os.path.join(${JSON.stringify(sitePackagesDir)}, "partial_pkg"), exist_ok=True)
+        with open(os.path.join(${JSON.stringify(sitePackagesDir)}, "partial_pkg", "orphan.py"), "w") as f:
+            f.write("orphan\\n")
+        class R:
+            returncode = 1
+            stdout = ""
+            stderr = "unpacked half then failed"
+        return R()
+    mod.subprocess.run = partial_pip_fail
+    try:
+        mod.apply_fixups(staging4, ${JSON.stringify(venvDir)}, ${JSON.stringify(sitePackagesDir)}, plan4, quarantine4, marker4, "face-detection")
+        assert False, "expected SystemExit"
+    except SystemExit:
+        pass
+    finally:
+        mod.subprocess.run = real_run4
+    assert not os.path.exists(os.path.join(${JSON.stringify(sitePackagesDir)}, "partial_pkg"))
+
+# OSError during supersede_distributions in apply_fixups aborts and rolls back
+with tempfile.TemporaryDirectory() as d5:
+    staging5 = os.path.join(d5, "staging")
+    os.makedirs(os.path.join(staging5, "fixups"), exist_ok=True)
+    build_wheel(
+        os.path.join(staging5, "fixups", "upgraded_fixup-2.0.0-py3-none-any.whl"),
+        "upgraded_fixup",
+        "2.0.0",
+        {"upgraded_fixup/__init__.py": "# v2\\n"},
+    )
+    real_sup = mod.supersede_distributions
+    def fail_sup(*a, **kw):
+        raise OSError("disk error quarantining fixup")
+    mod.supersede_distributions = fail_sup
+    try:
+        mod.apply_fixups(staging5, ${JSON.stringify(venvDir)}, "", [], "", os.path.join(${JSON.stringify(aiDir)}, "venv.writing"), "face-detection")
+        assert False, "expected SystemExit"
+    except SystemExit:
+        pass
+    finally:
+        mod.supersede_distributions = real_sup
+    assert "Failed to prepare bundle fixups: disk error quarantining fixup" in errors[-1], errors[-1]
+    assert_env_restored()
+
+# Unresolvable site_packages_dir in apply_fixups when called with site_packages_dir="" aborts cleanly
+with tempfile.TemporaryDirectory() as d6:
+    staging6 = os.path.join(d6, "staging")
+    os.makedirs(os.path.join(staging6, "fixups"), exist_ok=True)
+    with open(os.path.join(staging6, "fixups", "extra_pkg-1.0.0-py3-none-any.whl"), "w") as f:
+        f.write("wheel")
+    real_get_sp = mod.get_site_packages_dir
+    mod.get_site_packages_dir = lambda v: ""
+    try:
+        mod.apply_fixups(staging6, ${JSON.stringify(venvDir)}, "", [], "", os.path.join(${JSON.stringify(aiDir)}, "venv.writing"), "face-detection")
+        assert False, "expected SystemExit"
+    except SystemExit:
+        pass
+    finally:
+        mod.get_site_packages_dir = real_get_sp
+    assert "no usable site-packages directory" in errors[-1], errors[-1]
+
+# Corrupt fixup wheel targeting an already-installed package quarantines 1.0.0 via filename fallback and restores it on pip failure
+reset_env()
+tar_corrupt_upgrade, sha_corrupt_upgrade = make_bundle_tar(
+    ${JSON.stringify(tempDir)},
+    "case5-corrupt-upgrade",
+    has_sp=False,
+    fixup_wheels=[
+        {
+            "filename": "upgraded_fixup-2.0.0-py3-none-any.whl",
+            "corrupt": True,
+        },
+    ],
+)
+with open(${JSON.stringify(manifestPath)}, "w") as f:
+    json.dump({
+        "manifestVersion": 2,
+        "imageVersion": "2.0.0",
+        "pythonVersion": "3.12",
+        "basePackages": [],
+        "bundles": {
+            "face-detection": {
+                "name": "Face Detection",
+                "archives": {
+                    "amd64-gpu": {"file": tar_corrupt_upgrade, "sha256": sha_corrupt_upgrade, "compressedSize": 100, "extractedSize": 200},
+                    "arm64-cpu": {"file": tar_corrupt_upgrade, "sha256": sha_corrupt_upgrade, "compressedSize": 100, "extractedSize": 200},
+                },
+                "models": [],
+            }
+        }
+    }, f)
+os.environ["SNAPOTTER_BUNDLE_LOCAL_PATH"] = tar_corrupt_upgrade
+try:
+    mod._install()
+    assert False, "expected SystemExit on corrupt upgrade wheel"
+except SystemExit:
+    pass
+assert "Failed to install fixup wheel 'upgraded_fixup'" in errors[-1], errors[-1]
+assert_env_restored()
+
+# Partial wheel extraction into an existing shared namespace directory (nvidia/nccl alongside nvidia/cublas) is rolled back
+reset_env()
+seed_dist(${JSON.stringify(sitePackagesDir)}, "nvidia_cublas_cu12", "12.1.0", {"nvidia/cublas/__init__.py": "# cublas\\n"})
+with tempfile.TemporaryDirectory() as d7:
+    staging7 = os.path.join(d7, "staging")
+    os.makedirs(os.path.join(staging7, "fixups"), exist_ok=True)
+    build_wheel(
+        os.path.join(staging7, "fixups", "nvidia_nccl_cu12-2.21.5-py3-none-any.whl"),
+        "nvidia_nccl_cu12",
+        "2.21.5",
+        {"nvidia/nccl/__init__.py": "# nccl\\n", "nvidia/nccl/lib/libnccl.so.2": "elf"},
+    )
+    plan7 = []
+    quarantine7 = os.path.join(${JSON.stringify(venvDir)}, ".superseded")
+    marker7 = os.path.join(${JSON.stringify(aiDir)}, "venv.writing")
+    real_run7 = mod.subprocess.run
+    def partial_ns_pip_fail(cmd, *a, **kw):
+        # Unpack nvidia/nccl/* into existing nvidia/ namespace dir, then fail before writing .dist-info
+        nccl_lib = os.path.join(${JSON.stringify(sitePackagesDir)}, "nvidia", "nccl", "lib")
+        os.makedirs(nccl_lib, exist_ok=True)
+        with open(os.path.join(${JSON.stringify(sitePackagesDir)}, "nvidia", "nccl", "__init__.py"), "w") as f:
+            f.write("# nccl\\n")
+        with open(os.path.join(nccl_lib, "libnccl.so.2"), "w") as f:
+            f.write("elf")
+        class R:
+            returncode = 1
+            stdout = ""
+            stderr = "ENOSPC mid-wheel unpack"
+        return R()
+    mod.subprocess.run = partial_ns_pip_fail
+    try:
+        mod.apply_fixups(staging7, ${JSON.stringify(venvDir)}, ${JSON.stringify(sitePackagesDir)}, plan7, quarantine7, marker7, "face-detection")
+        assert False, "expected SystemExit"
+    except SystemExit:
+        pass
+    finally:
+        mod.subprocess.run = real_run7
+    assert os.path.exists(os.path.join(${JSON.stringify(sitePackagesDir)}, "nvidia", "cublas", "__init__.py"))
+    assert not os.path.exists(os.path.join(${JSON.stringify(sitePackagesDir)}, "nvidia", "nccl"))
+    assert not os.path.exists(marker7)
+
+# OSError during _sync_fixup_plan leaves venv.writing on disk
+with tempfile.TemporaryDirectory() as d8:
+    staging8 = os.path.join(d8, "staging")
+    os.makedirs(os.path.join(staging8, "fixups"), exist_ok=True)
+    with open(os.path.join(staging8, "fixups", "extra_pkg-1.0.0-py3-none-any.whl"), "w") as f:
+        f.write("wheel")
+    marker8 = os.path.join(${JSON.stringify(aiDir)}, "venv.writing")
+    real_run8 = mod.subprocess.run
+    real_list_dists8 = mod.list_distributions
+    list_calls8 = [0]
+    def fail_post_pip_list_dists(sp):
+        list_calls8[0] += 1
+        if list_calls8[0] >= 3:
+            raise OSError("EIO reading site-packages after pip")
+        return real_list_dists8(sp)
+    class OkR8:
+        returncode = 0
+        stdout = "ok"
+        stderr = ""
+    mod.subprocess.run = lambda *a, **kw: OkR8()
+    mod.list_distributions = fail_post_pip_list_dists
+    try:
+        mod.apply_fixups(staging8, ${JSON.stringify(venvDir)}, ${JSON.stringify(sitePackagesDir)}, [], "", marker8, "face-detection")
+        assert False, "expected SystemExit"
+    except SystemExit:
+        pass
+    finally:
+        mod.subprocess.run = real_run8
+        mod.list_distributions = real_list_dists8
+    assert os.path.exists(marker8), "venv.writing must remain on disk when _sync_fixup_plan fails"
+    os.unlink(marker8)
+
+# Happy-path install with fixup wheels completes cleanly, removes .superseded, and records bundle in installed.json
+reset_env()
+tar_ok, sha_ok = make_bundle_tar(
+    ${JSON.stringify(tempDir)},
+    "case6-happy-path",
+    has_sp=True,
+    fixup_wheels=[
+        {
+            "filename": "extra_pkg-1.0.0-py3-none-any.whl",
+            "dist_name": "extra_pkg",
+            "version": "1.0.0",
+            "files": {"extra_pkg/__init__.py": "VAL = 1\\n"},
+        },
+        {
+            "filename": "upgraded_fixup-2.0.0-py3-none-any.whl",
+            "dist_name": "upgraded_fixup",
+            "version": "2.0.0",
+            "files": {"upgraded_fixup/__init__.py": "# v2.0.0\\n", "upgraded_fixup/new_only.py": "# new\\n"},
+        },
+    ],
+)
+with open(${JSON.stringify(manifestPath)}, "w") as f:
+    json.dump({
+        "manifestVersion": 2,
+        "imageVersion": "2.0.0",
+        "pythonVersion": "3.12",
+        "basePackages": [],
+        "bundles": {
+            "face-detection": {
+                "name": "Face Detection",
+                "archives": {
+                    "amd64-gpu": {"file": tar_ok, "sha256": sha_ok, "compressedSize": 100, "extractedSize": 200},
+                    "arm64-cpu": {"file": tar_ok, "sha256": sha_ok, "compressedSize": 100, "extractedSize": 200},
+                },
+                "models": [],
+                "smokeImports": ["testpkg", "extra_pkg", "upgraded_fixup"],
+            }
+        }
+    }, f)
+os.environ["SNAPOTTER_BUNDLE_LOCAL_PATH"] = tar_ok
+mod._install()
+sp = ${JSON.stringify(sitePackagesDir)}
+assert open(os.path.join(sp, "testpkg", "__init__.py")).read() == "# v1.0.0\\n"
+assert open(os.path.join(sp, "extra_pkg", "__init__.py")).read() == "VAL = 1\\n"
+assert open(os.path.join(sp, "upgraded_fixup", "__init__.py")).read() == "# v2.0.0\\n"
+assert os.path.exists(os.path.join(sp, "upgraded_fixup", "new_only.py"))
+assert not os.path.exists(os.path.join(sp, "upgraded_fixup", "old_only.py"))
+assert os.path.isdir(os.path.join(sp, "upgraded_fixup-2.0.0.dist-info"))
+assert not os.path.exists(os.path.join(sp, "upgraded_fixup-1.0.0.dist-info"))
+assert not os.path.exists(os.path.join(${JSON.stringify(venvDir)}, ".superseded"))
+assert not os.path.exists(os.path.join(${JSON.stringify(aiDir)}, "venv.writing"))
+`,
+      ],
+      { encoding: "utf-8" },
+    );
+    expect(pyCheck.status, `stderr: ${pyCheck.stderr}`).toBe(0);
+  });
 });
