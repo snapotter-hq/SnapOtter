@@ -32,14 +32,29 @@ export function NavigatorPanel() {
 
   // Load the source image for the thumbnail
   useEffect(() => {
+    setImageEl(null);
     if (!sourceImageUrl) {
-      setImageEl(null);
       return;
     }
+    let cancelled = false;
     const img = new Image();
     img.crossOrigin = "anonymous";
-    img.onload = () => setImageEl(img);
+    img.onload = () => {
+      if (!cancelled) {
+        setImageEl(img);
+      }
+    };
+    img.onerror = () => {
+      if (!cancelled) {
+        setImageEl(null);
+      }
+    };
     img.src = sourceImageUrl;
+    return () => {
+      cancelled = true;
+      img.onload = null;
+      img.onerror = null;
+    };
   }, [sourceImageUrl]);
 
   // Calculate thumbnail dimensions
@@ -54,10 +69,15 @@ export function NavigatorPanel() {
   // Draw the thumbnail (throttled)
   const drawThumbnail = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !imageEl) return;
+    if (!canvas) return;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    if (!imageEl) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      return;
+    }
 
     canvas.width = thumbnailDims.width;
     canvas.height = thumbnailDims.height;
@@ -80,6 +100,11 @@ export function NavigatorPanel() {
   useEffect(() => {
     if (throttleTimerRef.current) {
       clearTimeout(throttleTimerRef.current);
+      throttleTimerRef.current = null;
+    }
+    if (!imageEl) {
+      drawThumbnail();
+      return;
     }
     throttleTimerRef.current = setTimeout(() => {
       drawThumbnail();
@@ -88,9 +113,10 @@ export function NavigatorPanel() {
     return () => {
       if (throttleTimerRef.current) {
         clearTimeout(throttleTimerRef.current);
+        throttleTimerRef.current = null;
       }
     };
-  }, [drawThumbnail, historyVersion]);
+  }, [drawThumbnail, historyVersion, imageEl]);
 
   // Calculate the viewport rectangle on the thumbnail
   // The viewport rectangle represents what is currently visible in the editor canvas
