@@ -52,6 +52,7 @@ vi.mock("@/components/editor/common/rulers", () => ({
   VerticalRuler: () => null,
 }));
 
+import { WelcomeScreen } from "@/components/editor/common/welcome-screen";
 import { captureHandledError } from "@/lib/analytics";
 import { EditorPage } from "@/pages/editor-page";
 import { useEditorStore } from "@/stores/editor-store";
@@ -199,6 +200,30 @@ async function openFileViaMenu(file: File) {
   });
   await act(async () => {
     await input.onchange?.(new Event("change") as unknown as Event);
+  });
+}
+
+async function openFileViaWelcomeButton(file: File) {
+  fireEvent.click(screen.getByRole("button", { name: en.editor.welcome.openImageButton }));
+  const input = createdInputs[createdInputs.length - 1];
+  expect(input).toBeDefined();
+  Object.defineProperty(input, "files", {
+    value: [file],
+    configurable: true,
+  });
+  await act(async () => {
+    await input.onchange?.(new Event("change") as unknown as Event);
+  });
+  return input;
+}
+
+async function dropFileOnWelcomeScreen(file: File) {
+  const dropZone = screen.getByRole("region", { name: en.a11y.imageDropZone });
+  fireEvent.dragOver(dropZone);
+  await act(async () => {
+    fireEvent.drop(dropZone, {
+      dataTransfer: { files: [file] },
+    });
   });
 }
 
@@ -1141,6 +1166,236 @@ describe("EditorPage Open Image server decode (#2530)", () => {
 
     await waitFor(() => {
       expect(toastError).toHaveBeenCalledWith(en.editor.ui.autosaveRecovery.saveFailed);
+    });
+  });
+
+  describe("WelcomeScreen file intake (#2552)", () => {
+    it.each(["psd", "tga", "exr", "hdr"] as const)(
+      "accepts .%s in the welcome Open Image file picker and decodes it via the server",
+      async (ext) => {
+        const store = new Map<string, string>([["snapotter-token", "tok-welcome-open"]]);
+        vi.stubGlobal("localStorage", {
+          getItem: (k: string) => store.get(k) ?? null,
+          setItem: (k: string, v: string) => store.set(k, v),
+          removeItem: (k: string) => store.delete(k),
+          clear: () => store.clear(),
+        });
+
+        const fetchCalls: Array<{ url: string; headers?: Headers }> = [];
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(async (url: string, init?: RequestInit) => {
+            fetchCalls.push({ url, headers: init?.headers as Headers | undefined });
+            if (url.includes("/tools/image/convert")) {
+              return {
+                ok: true,
+                status: 200,
+                json: async () => ({ downloadUrl: `/api/v1/download/job-welcome-${ext}/out.png` }),
+              };
+            }
+            return {
+              ok: true,
+              status: 200,
+              blob: async () => new Blob(["png-bytes"], { type: "image/png" }),
+            };
+          }),
+        );
+
+        renderEditor();
+        const input = await openFileViaWelcomeButton(
+          new File(["raw"], `welcome.${ext}`, { type: "application/octet-stream" }),
+        );
+        expect(input.accept).toContain(`.${ext}`);
+
+        await waitFor(() => expect(loadImageSpy).toHaveBeenCalledWith("blob:opened-1", 320, 240));
+        expect(toastError).not.toHaveBeenCalled();
+        expect(fetchCalls).toHaveLength(2);
+        expect(fetchCalls[0].headers?.get("Authorization")).toBe("Bearer tok-welcome-open");
+        expect(fetchCalls[1].headers?.get("Authorization")).toBe("Bearer tok-welcome-open");
+      },
+    );
+
+    it.each(["psd", "tga", "exr", "hdr"] as const)(
+      "decodes a dropped .%s file via the server including 202 SSE progress",
+      async (ext) => {
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(async (url: string) => {
+            if (url.includes("/tools/image/convert")) {
+              return {
+                ok: true,
+                status: 202,
+                json: async () => ({ jobId: `job-drop-${ext}`, async: true }),
+              };
+            }
+            return {
+              ok: true,
+              status: 200,
+              blob: async () => new Blob(["png-bytes"], { type: "image/png" }),
+            };
+          }),
+        );
+
+        renderEditor();
+        await dropFileOnWelcomeScreen(new File(["raw"], `dropped.${ext}`, { type: "" }));
+
+        await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+        const es = FakeEventSource.instances[0];
+        expect(es.url).toBe(`/api/v1/jobs/job-drop-${ext}/progress`);
+
+        await act(async () => {
+          es.onmessage?.({
+            data: JSON.stringify({
+              type: "single",
+              phase: "complete",
+              result: { downloadUrl: `/api/v1/download/job-drop-${ext}/dropped.png` },
+            }),
+          });
+        });
+
+        await waitFor(() => expect(loadImageSpy).toHaveBeenCalledWith("blob:opened-1", 320, 240));
+        expect(toastError).not.toHaveBeenCalled();
+      },
+    );
+
+    it("surfaces a server error toast when a dropped .psd fails server conversion", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({
+          ok: false,
+          status: 422,
+          json: async () => ({
+            error: "Unsupported PSD color mode",
+            details: "Lab color is not supported",
+          }),
+        })),
+      );
+
+      renderEditor();
+      await dropFileOnWelcomeScreen(new File(["bad-psd"], "lab.psd"));
+
+      await waitFor(() =>
+        expect(toastError).toHaveBeenCalledWith(
+          "Unsupported PSD color mode: Lab color is not supported",
+        ),
+      );
+      expect(captureHandledError).toHaveBeenCalledTimes(1);
+      expect(loadImageSpy).not.toHaveBeenCalled();
+    });
+
+    it("revokes the blob URL and toasts sourceImageFailed when a corrupt image is chosen via the welcome Open Image button", async () => {
+      FakeImage.shouldFail = true;
+
+      renderEditor();
+      await openFileViaWelcomeButton(new File(["corrupt"], "corrupt.png", { type: "image/png" }));
+
+      await waitFor(() =>
+        expect(toastError).toHaveBeenCalledWith(SOURCE_IMAGE_FAILED, {
+          id: "editor-source-image-failed",
+        }),
+      );
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:opened-1");
+      expect(captureHandledError).not.toHaveBeenCalled();
+      expect(loadImageSpy).not.toHaveBeenCalled();
+    });
+
+    it("revokes the blob URL and toasts sourceImageFailed when a corrupt image is dropped on the welcome screen", async () => {
+      FakeImage.shouldFail = true;
+
+      renderEditor();
+      await dropFileOnWelcomeScreen(new File(["corrupt"], "corrupt.png", { type: "" }));
+
+      await waitFor(() =>
+        expect(toastError).toHaveBeenCalledWith(SOURCE_IMAGE_FAILED, {
+          id: "editor-source-image-failed",
+        }),
+      );
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:opened-1");
+      expect(captureHandledError).not.toHaveBeenCalled();
+      expect(loadImageSpy).not.toHaveBeenCalled();
+    });
+
+    it("revokes the blob URL and toasts sourceImageFailed when a standalone WelcomeScreen fails to decode an image", async () => {
+      FakeImage.shouldFail = true;
+
+      render(<WelcomeScreen />);
+      await dropFileOnWelcomeScreen(new File(["corrupt"], "standalone.png", { type: "image/png" }));
+
+      await waitFor(() =>
+        expect(toastError).toHaveBeenCalledWith(SOURCE_IMAGE_FAILED, {
+          id: "editor-source-image-failed",
+        }),
+      );
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:opened-1");
+      expect(loadImageSpy).not.toHaveBeenCalled();
+    });
+
+    it("loads a valid image in standalone WelcomeScreen, handles dragLeave and empty drops, and revokes superseded blob URLs", async () => {
+      FakeImage.manual = true;
+      const { unmount } = render(<WelcomeScreen />);
+      const dropZone = screen.getByRole("region", { name: en.a11y.imageDropZone });
+
+      fireEvent.dragOver(dropZone);
+      fireEvent.dragLeave(dropZone);
+      fireEvent.drop(dropZone, { dataTransfer: { files: [] } });
+      expect(loadImageSpy).not.toHaveBeenCalled();
+
+      // First slow file dropped on standalone WelcomeScreen
+      await dropFileOnWelcomeScreen(new File(["png-1"], "first.png", { type: "" }));
+      expect(FakeImage.instances).toHaveLength(1);
+      const firstImg = FakeImage.instances[0];
+
+      // Second file chosen via the Open Image button supersedes the first
+      await openFileViaWelcomeButton(new File(["png-2"], "second.png", { type: "image/png" }));
+      expect(FakeImage.instances).toHaveLength(2);
+      const secondImg = FakeImage.instances[1];
+
+      act(() => {
+        secondImg.onload?.();
+      });
+      expect(loadImageSpy).toHaveBeenCalledTimes(1);
+      expect(loadImageSpy).toHaveBeenCalledWith("blob:opened-2", 320, 240);
+
+      // Earlier image finishes decoding after being superseded: revokes its blob URL without overwriting
+      act(() => {
+        firstImg.onload?.();
+      });
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:opened-1");
+      expect(loadImageSpy).toHaveBeenCalledTimes(1);
+
+      unmount();
+      expect(toastError).not.toHaveBeenCalled();
+    });
+
+    it("cancels an in-flight WelcomeScreen 202 decode when another file is dropped or New Document is created before it finishes", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({
+          ok: true,
+          status: 202,
+          json: async () => ({ jobId: "job-welcome-superseded", async: true }),
+        })),
+      );
+
+      renderEditor();
+      await dropFileOnWelcomeScreen(new File(["psd"], "slow.psd"));
+      await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+      const firstStream = FakeEventSource.instances[0];
+      expect(firstStream.readyState).toBe(FakeEventSource.OPEN);
+
+      // Dropping another .psd closes the first stream and starts a second
+      await dropFileOnWelcomeScreen(new File(["psd"], "second.psd"));
+      expect(firstStream.readyState).toBe(2);
+      await waitFor(() => expect(FakeEventSource.instances).toHaveLength(2));
+      const secondStream = FakeEventSource.instances[1];
+      expect(secondStream.readyState).toBe(FakeEventSource.OPEN);
+
+      // Creating a New Document from the welcome screen closes the second stream and loads the blank canvas
+      fireEvent.click(screen.getByRole("button", { name: en.editor.welcome.newDocumentButton }));
+      fireEvent.click(screen.getByRole("button", { name: en.common.create }));
+      expect(secondStream.readyState).toBe(2);
+      expect(loadImageSpy).toHaveBeenCalledWith("data:image/png;base64,REBAKED", 1920, 1080);
+      expect(toastError).not.toHaveBeenCalled();
     });
   });
 });

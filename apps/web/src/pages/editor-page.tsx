@@ -168,13 +168,8 @@ export function EditorPage() {
     return () => document.removeEventListener("paste", handlePaste);
   }, [handlePaste]);
 
-  const handleOpenImage = useCallback(() => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*,.avif,.psd,.tga,.exr,.hdr";
-    input.onchange = async () => {
-      const file = input.files?.[0];
-      if (!file) return;
+  const handleOpenFile = useCallback(
+    async (file: File) => {
       const runId = ++openRunRef.current;
       stopOpenRef.current();
       cancelPendingRebakes();
@@ -417,9 +412,21 @@ export function EditorPage() {
       }
       stopOpenRef.current = () => {};
       loadBlobImage(file, runId);
+    },
+    [loadBlobImage, t],
+  );
+
+  const handleOpenImage = useCallback(() => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*,.avif,.psd,.tga,.exr,.hdr";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      await handleOpenFile(file);
     };
     input.click();
-  }, [loadBlobImage, t]);
+  }, [handleOpenFile]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -507,7 +514,7 @@ export function EditorPage() {
             onCanvasResize={() => setShowCanvasResize(true)}
             onImageResize={() => setShowImageResize(true)}
           />
-          {!sourceImageUrl && <WelcomeScreen />}
+          {!sourceImageUrl && <WelcomeScreen onOpenFile={handleOpenFile} />}
         </div>
         <EditorRightPanel />
       </div>
