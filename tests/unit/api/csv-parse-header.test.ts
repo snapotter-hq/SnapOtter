@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { parseCsvWithHeader } from "../../../apps/api/src/lib/csv-parse.js";
 
 /**
@@ -75,7 +75,7 @@ describe("parseCsvWithHeader", () => {
   });
 
   it("strips the BOM and leading blank lines to preserve Papa's deduplication logic (#2268)", () => {
-    const { data, meta } = parseCsvWithHeader("﻿\n\n\ra,a,x\r\n1,2,3");
+    const { data, meta } = parseCsvWithHeader("\uFEFF\n\n\ra,a,x\r\n1,2,3");
 
     expect(meta.fields).toEqual(["a", "a_1", "x"]);
     expect(JSON.stringify(data[0])).toBe('{"a":"1","a_1":"2","x":"3"}');
@@ -133,5 +133,25 @@ describe("parseCsvWithHeader", () => {
     const { errors } = parseCsvWithHeader('a,b\r\n"unterminated,1');
 
     expect(errors.length).toBeGreaterThan(0);
+  });
+
+  it("suppresses Papa's console.warn when renaming duplicate headers and restores console.warn (#2229)", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const { meta } = parseCsvWithHeader("a,a\r\n1,2");
+      expect(meta.renamedHeaders).toEqual({ a_1: "a" });
+      expect(warnSpy).not.toHaveBeenCalled();
+      expect(console.warn).toBe(warnSpy);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("strips interleaved leading BOMs and blank lines before deduplicating headers (#2229)", () => {
+    const { data, meta } = parseCsvWithHeader("\r\n\uFEFF\r\n__proto__,__proto__,x\r\n1,2,3");
+
+    expect(meta.fields).toEqual(["__proto__", "__proto___1", "x"]);
+    expect(meta.renamedHeaders).toEqual({ __proto___1: "__proto__" });
+    expect(JSON.stringify(data[0])).toBe('{"__proto__":"1","__proto___1":"2","x":"3"}');
   });
 });

@@ -22,19 +22,33 @@ const SENTINEL_PREFIX = "\u0000";
  * Papa renames a duplicated header to `name_1`, `name_2`, ... skipping names a real
  * column has. The `__proto__` copies get the same treatment here (`__proto__`, then
  * `__proto___1`, ...), done by hand because Papa checks its candidates against the
- * raw header names, not against what the sentinel restores to.
+ * raw header names, not against what the sentinel restores to. Callers that validate
+ * user uploads should pass the result to `csvParseFailure`, which inspects
+ * `meta.renamedHeaders` and `meta.fields` to reject duplicate headers.
  */
 export function parseCsvWithHeader(text: string): ParseResult<Record<string, unknown>> {
   // Papa renames duplicate headers on the very first row before applying skipEmptyLines.
   // A leading completely blank line becomes the "header" it deduplicates, bypassing the
-  // real header row. We strip the BOM and leading blank lines so Papa sees the real header first.
-  const cleanedText = text.replace(/^﻿/, "").replace(/^[\r\n]+/, "");
+  // real header row. We strip any leading BOMs and blank lines so Papa sees the real header first.
+  const cleanedText = text.replace(/^[\uFEFF\r\n]+/, "");
 
-  const parsed = Papa.parse<Record<string, unknown>>(cleanedText, {
-    header: true,
-    skipEmptyLines: true,
-    transformHeader: (header) => SENTINELS.get(header) ?? header,
-  });
+  // Papa logs a raw console.warn("Duplicate headers found and renamed.") on duplicate
+  // headers, bypassing the structured logger. Suppress only that advisory during parse.
+  const prevWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    if (args[0] === "Duplicate headers found and renamed.") return;
+    prevWarn.apply(console, args);
+  };
+  let parsed: ParseResult<Record<string, unknown>>;
+  try {
+    parsed = Papa.parse<Record<string, unknown>>(cleanedText, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: (header) => SENTINELS.get(header) ?? header,
+    });
+  } finally {
+    console.warn = prevWarn;
+  }
 
   const sentinelFields = parsed.meta.fields ?? [];
   const taken = new Set(sentinelFields.filter((field) => !field.startsWith(SENTINEL_PREFIX)));
@@ -130,18 +144,37 @@ export function parseCsvWithHeader(text: string): ParseResult<Record<string, unk
  * The delimiter is left to Papa's auto-detection rather than forced, because TSV
  * input relies on it.
  */
+function duplicateHeadersMessage(names: string[]): string {
+  const labels = [
+    ...new Set(names.map((name) => name.replace(/\s+/g, " ").trim().slice(0, 24) || "(empty)")),
+  ];
+  const shown = labels.slice(0, 6);
+  const rest = labels.length - shown.length;
+  const list = shown.join(", ") + (rest > 0 ? `, and ${rest} more` : "");
+  return `The file has duplicate column headers: ${list}`;
+}
+
 export function csvParseFailure(parsed: Pick<ParseResult<unknown>, "data" | "errors" | "meta">) {
   const rows = parsed.data as unknown[];
   const fields = parsed.meta.fields;
   if (rows.length === 0 && !fields?.length) return "The file has no rows";
 
   if (fields) {
-    const uniqueFields = new Set(fields);
-    if (
-      uniqueFields.size !== fields.length ||
-      (parsed.meta as { renamedHeaders?: unknown }).renamedHeaders
-    ) {
-      return "The file has duplicate column headers";
+    const duplicates = new Set<string>();
+    const seen = new Set<string>();
+    for (const field of fields) {
+      if (seen.has(field)) duplicates.add(field);
+      else seen.add(field);
+    }
+    const renamed = (parsed.meta as { renamedHeaders?: Record<string, string> | null })
+      .renamedHeaders;
+    if (renamed && typeof renamed === "object") {
+      for (const [, original] of Object.entries(renamed)) {
+        if (typeof original === "string") duplicates.add(original);
+      }
+    }
+    if (duplicates.size > 0) {
+      return duplicateHeadersMessage([...duplicates]);
     }
   }
 

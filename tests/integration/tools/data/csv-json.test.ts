@@ -163,6 +163,18 @@ describe("csv-json (pure JS, no skipIf)", () => {
     expect(res.statusCode).toBe(400);
   }, 30_000);
 
+  it("refuses a CSV with duplicate column headers and names the duplicate (#2229)", async () => {
+    const res = await runTool("dup.csv", Buffer.from("a,a\r\n1,2"));
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/duplicate column headers: a/i);
+  }, 30_000);
+
+  it("refuses a CSV with duplicate __proto__ column headers (#2229)", async () => {
+    const res = await runTool("dup-proto.csv", Buffer.from("__proto__,__proto__\r\n1,2"));
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/duplicate column headers: __proto__/i);
+  }, 30_000);
+
   it("keeps a __proto__ column in JSON-to-CSV (#2062)", async () => {
     const res = await runTool("proto.json", Buffer.from('[{"__proto__": {"a": 1}, "x": 1}]'));
     expect(res.statusCode).toBe(200);

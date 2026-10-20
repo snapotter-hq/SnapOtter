@@ -370,6 +370,89 @@ describe("merge-csvs (pure JS, no skipIf)", () => {
     expect(parsed.error).toMatch(/CSV parse failed in broken\.csv/i);
   }, 30_000);
 
+  it("refuses a CSV with duplicate column headers instead of rewriting the merged header (#2229)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "a.csv",
+        contentType: "text/csv",
+        content: Buffer.from("a,a\r\n1,2"),
+      },
+      {
+        name: "file",
+        filename: "b.csv",
+        contentType: "text/csv",
+        content: Buffer.from("a,a\r\n3,4"),
+      },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/files/merge-csvs",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/duplicate column headers: a/i);
+  }, 30_000);
+
+  it("refuses CSVs whose duplicate-named columns sit in a different order (#2229)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "a.csv",
+        contentType: "text/csv",
+        content: Buffer.from("a,a,a_1\r\n1,2,3"),
+      },
+      {
+        name: "file",
+        filename: "b.csv",
+        contentType: "text/csv",
+        content: Buffer.from("a_1,a,a\r\n3,4,5"),
+      },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/files/merge-csvs",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/duplicate column headers: a/i);
+  }, 30_000);
+
+  it("refuses a later file with duplicate column headers and names the file (#2229)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "a.csv",
+        contentType: "text/csv",
+        content: Buffer.from("a,a_1\r\n1,2"),
+      },
+      {
+        name: "file",
+        filename: "b.csv",
+        contentType: "text/csv",
+        content: Buffer.from("a,a\r\n3,4"),
+      },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/files/merge-csvs",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(
+      /CSV parse failed in b\.csv:.*duplicate column headers: a/i,
+    );
+  }, 30_000);
+
   it("rejects a single file with 400", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "tiny-a.csv", contentType: "text/csv", content: CSV_A },
