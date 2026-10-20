@@ -151,4 +151,57 @@ describe("GIF target-size compression (#1183)", () => {
     // A binary search over 1..100 takes several encodes before it settles.
     expect(encodes.n).toBeGreaterThan(3);
   });
+
+  it("encodes LZW TIFF once per size step and preserves 4-channel alpha (#2607)", async () => {
+    const size = 32;
+    const raw = Buffer.alloc(size * size * 4);
+    let seed = 7654321;
+    for (let i = 0; i < raw.length; i += 4) {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      raw[i] = seed & 0xff;
+      raw[i + 1] = (seed >> 8) & 0xff;
+      raw[i + 2] = (seed >> 16) & 0xff;
+      raw[i + 3] = i < size * 4 * 4 ? 0 : 255;
+    }
+    const tiff = await sharp(raw, { raw: { width: size, height: size, channels: 4 } })
+      .tiff({ compression: "lzw" })
+      .toBuffer();
+
+    const low = await sharp(tiff).toFormat("tiff", { compression: "lzw", quality: 1 }).toBuffer();
+    const high = await sharp(tiff)
+      .toFormat("tiff", { compression: "lzw", quality: 100 })
+      .toBuffer();
+    expect(low.equals(high)).toBe(true);
+
+    encodes.n = 0;
+    const fitResult = await compressDetailed(sharp(tiff), {
+      targetSizeBytes: tiff.length * 2,
+      format: "tiff",
+    });
+    expect(encodes.n).toBe(1);
+    expect(fitResult.resizedTo).toBeUndefined();
+    const fitBuf = fitResult.buffer as Buffer;
+    const fitMeta = await sharp(fitBuf).metadata();
+    expect(fitMeta.format).toBe("tiff");
+    expect(fitMeta.channels).toBe(4);
+    expect(fitMeta.hasAlpha).toBe(true);
+
+    encodes.n = 0;
+    const scaledResult = await compressDetailed(sharp(tiff), {
+      targetSizeBytes: tiff.length - 1,
+      format: "tiff",
+    });
+    expect(encodes.n).toBe(2);
+    expect(scaledResult.resizedTo).toEqual({ width: 24, height: 24 });
+    const scaledMeta = await sharp(scaledResult.buffer as Buffer).metadata();
+    expect(scaledMeta.channels).toBe(4);
+    expect(scaledMeta.hasAlpha).toBe(true);
+
+    encodes.n = 0;
+    await expect(
+      compressDetailed(sharp(tiff), { targetSizeBytes: 64, format: "tiff" }),
+    ).rejects.toBeInstanceOf(ToolInputError);
+    expect(encodes.n).toBeGreaterThan(0);
+    expect(encodes.n).toBeLessThanOrEqual(9);
+  });
 });

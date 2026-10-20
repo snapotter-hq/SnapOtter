@@ -18,6 +18,7 @@ function formatOpts(format: SharpFormat, quality: number): Record<string, unknow
   const opts: Record<string, unknown> = { quality };
   if (format === "avif") opts.effort = 4;
   if (format === "gif") opts.reuse = false;
+  if (format === "tiff") opts.compression = "lzw";
   return opts;
 }
 
@@ -67,7 +68,10 @@ export async function compressDetailed(
   const outputFormat = explicitFormat ?? detectedFormat;
 
   if (targetSizeBytes !== undefined) {
-    const inputBuffer = await image.toBuffer();
+    const inputBuffer = await (metadata.format === "tiff"
+      ? image.tiff({ compression: "lzw" })
+      : image
+    ).toBuffer();
     return compressToTargetSize(inputBuffer, outputFormat, targetSizeBytes, animated);
   }
 
@@ -92,10 +96,9 @@ async function findBestQuality(
   targetBytes: number,
   animated: boolean,
 ): Promise<CompressionCandidate | null> {
-  // Sharp's GIF encoder has no quality setting, so every step of the search
-  // below would encode the same bytes. On an animation that is a full
-  // re-encode of every frame, up to seven times per size step (#1183).
-  if (format === "gif") {
+  // Sharp's GIF and LZW TIFF encoders have no quality setting, so every step of
+  // the search below would encode the same bytes (#1183, #2607).
+  if (format === "gif" || format === "tiff") {
     let pipeline = openSource(inputBuffer, animated);
     if (resize) pipeline = pipeline.resize(resize.width, resize.height);
     const buffer = await pipeline.toFormat(format, formatOpts(format, 100)).toBuffer();

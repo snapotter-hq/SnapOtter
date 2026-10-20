@@ -113,6 +113,13 @@ export async function processImage(
     const formatOptions: Record<string, unknown> = {};
     if (sharpFormat === "gif") {
       formatOptions.reuse = false;
+    } else if (sharpFormat === "tiff") {
+      formatOptions.compression = "lzw";
+      // vips_recomb and 3-channel vips_convolve leave the pipeline in 32-bit
+      // float (0..255), which LZW tiffsave writes as a float scRGB TIFF unless
+      // cast back to 8-bit uchar first (#2607). keepMetadata() forwards any
+      // ICC/XMP metadata that the first hop intentionally kept.
+      image = sharp(await image.png().toBuffer()).keepMetadata();
     }
     image = image.toFormat(sharpFormat as SharpFormat, formatOptions);
   }

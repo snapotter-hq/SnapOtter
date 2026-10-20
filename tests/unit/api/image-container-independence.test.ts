@@ -570,6 +570,7 @@ describe("transparency survives the container it arrived in (#1187)", () => {
         ["image-enhancement", {}],
         ["adjust-colors", { brightness: 10, effect: "sepia" }],
         ["color-blindness", {}],
+        ["convert", { format: "tiff" }],
         ["sharpening", {}],
         ["sharpening", { method: "high-pass", strength: 50, kernelSize: 3 }],
         ["pixelate", { blockSize: 4 }],
@@ -630,6 +631,40 @@ describe("transparency survives the container it arrived in (#1187)", () => {
           `${toolId} (${compression}) opaque matches PNG output`,
         ).toBeLessThanOrEqual(2);
       }
+
+      const compressConfig = getToolConfig("compress");
+      if (!compressConfig) throw new Error("compress must be registered");
+      for (const compressSettings of [{}, { mode: "targetSize", targetSizeKb: 50 }]) {
+        const compressOut = await compressConfig.process(
+          tiff,
+          compressConfig.settingsSchema.parse(compressSettings),
+          "corner.tiff",
+        );
+        expect(compressOut.contentType).toBe("image/tiff");
+        const compressMeta = await sharp(compressOut.buffer).metadata();
+        expect(compressMeta.format).toBe("tiff");
+        expect(compressMeta.depth).toBe("uchar");
+        expect(compressMeta.channels).toBe(4);
+        expect(compressMeta.hasAlpha).toBe(true);
+        expect(await alphaAt(compressOut.buffer, 5, 5)).toBe(0);
+        expect(await alphaAt(compressOut.buffer, 40, 40)).toBe(255);
+        expect(worstChannelDiff(await decode(compressOut.buffer), await decode(tiff))).toBe(0);
+      }
+
+      const convertConfig = getToolConfig("convert");
+      if (!convertConfig) throw new Error("convert must be registered");
+      const webp = await sharp(png).webp({ lossless: true }).toBuffer();
+      const webpToTiff = await convertConfig.process(
+        webp,
+        convertConfig.settingsSchema.parse({ format: "tiff" }),
+        "corner.webp",
+      );
+      const webpToTiffMeta = await sharp(webpToTiff.buffer).metadata();
+      expect(webpToTiffMeta.format).toBe("tiff");
+      expect(webpToTiffMeta.channels).toBe(4);
+      expect(webpToTiffMeta.hasAlpha).toBe(true);
+      expect(await alphaAt(webpToTiff.buffer, 5, 5)).toBe(0);
+      expect(await alphaAt(webpToTiff.buffer, 40, 40)).toBe(255);
     },
   );
 });

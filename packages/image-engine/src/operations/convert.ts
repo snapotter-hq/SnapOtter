@@ -32,6 +32,8 @@ export async function convert(image: Sharp, options: ConvertOptions): Promise<Sh
   }
   if (sharpFormat === "gif") {
     formatOptions.reuse = false;
+  } else if (sharpFormat === "tiff") {
+    formatOptions.compression = "lzw";
   }
 
   return image.toFormat(sharpFormat, formatOptions);
