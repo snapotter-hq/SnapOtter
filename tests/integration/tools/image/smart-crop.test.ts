@@ -390,15 +390,13 @@ describe("Smart Crop", () => {
     expect(result.error).toMatch(/invalid settings/i);
   });
 
-  // Sharp throws a bare Error for these, which used to reach the worker as a
-  // server fault instead of a 400 (#2064).
+  // Sharp throws a bare Error or allocates unbounded memory for these, which
+  // used to reach the worker as a server fault instead of a 400 (#2064, #2203).
   it.each([
     ["a width past Sharp's own limit", { width: 100_000_001, height: 10 }],
-    ["a targetSize past the ceiling", { mode: "trim", padToSquare: true, targetSize: 20_000 }],
-    [
-      "a padded pair over Sharp's input pixel limit",
-      { width: 16_383, height: 16_383, padding: 10 },
-    ],
+    ["a targetSize past the square ceiling", { mode: "trim", padToSquare: true, targetSize: 8193 }],
+    ["an unpadded pair over the 64 MP output pixel limit", { width: 8192, height: 8193 }],
+    ["a padded pair over the 64 MP pixel limit", { width: 8000, height: 8000, padding: 10 }],
   ])("answers 400 for %s", async (_label, settings) => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },

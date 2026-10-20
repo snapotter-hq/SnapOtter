@@ -230,6 +230,52 @@ describe("smart-crop sidecar-free processing", () => {
     }
   });
 
+  it("fails a subject crop whose cover stretch exceeds the 64 MP pixel limit as rejected input, not a server fault", async () => {
+    // 1000 x 100 cropped to 10 x 4000 passes the schema (40,000 output pixels),
+    // but Sharp stretches the input to 40000 x 4000 (160 MP) before cropping (#2203).
+    const errorSpy = vi.spyOn(logger, "error");
+    try {
+      const strip = await sharp({
+        create: { width: 1000, height: 100, channels: 3, background: "#336699" },
+      })
+        .png()
+        .toBuffer();
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "strip.png", contentType: "image/png", content: strip },
+        {
+          name: "settings",
+          content: JSON.stringify({ mode: "subject", width: 10, height: 4000 }),
+        },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/smart-crop",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
+
+      expect(res.statusCode).toBe(202);
+      const { jobId } = JSON.parse(res.body) as { jobId: string };
+      await expect(waitForJob("ai", jobId, 20_000)).rejects.toThrow(/40000 x 4000/);
+
+      const [row] = await db
+        .select({ status: schema.jobs.status, error: schema.jobs.error })
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, jobId));
+      expect(row?.status).toBe("failed");
+      expect(row?.error).toMatchObject({
+        httpStatus: 400,
+        message: expect.stringContaining("40000 x 4000"),
+      });
+      const errorLogsForJob = errorSpy.mock.calls.filter(
+        ([bindings]) => (bindings as { jobId?: unknown } | undefined)?.jobId === jobId,
+      );
+      expect(errorLogsForJob).toEqual([]);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
   it("rejects malformed JSON and invalid setting ranges before enqueueing", async () => {
     const malformed = await postSmartCrop("{bad json");
     expect(malformed.statusCode).toBe(400);

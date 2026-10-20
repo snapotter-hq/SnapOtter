@@ -1,4 +1,5 @@
 import { detectFaces } from "@snapotter/ai";
+import { MAX_RESIZE_OUTPUT_PIXELS } from "@snapotter/image-engine";
 import {
   MAX_RESIZE_OUTPUT_DIMENSION,
   SMART_CROP_FACE_PRESETS,
@@ -11,12 +12,12 @@ import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/ima
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
-// Sharp re-reads the buffers this tool hands between its own steps, and refuses one
-// over its default input limit (0x3FFF x 0x3FFF) with a bare Error that reaches the
-// worker as a server fault. Refuse the request instead (#2064).
-const MAX_STEP_PIXELS = 0x3fff * 0x3fff;
+// Cap outputs and intermediate buffers at the same 64 MP limit as resize (#2064, #2203).
+const MAX_STEP_PIXELS = MAX_RESIZE_OUTPUT_PIXELS;
+const MAX_TRIM_SQUARE_SIDE = Math.floor(Math.sqrt(MAX_STEP_PIXELS));
 
 const dimension = z.number().int().positive().max(MAX_RESIZE_OUTPUT_DIMENSION);
+const squareDimension = z.number().int().positive().max(MAX_TRIM_SQUARE_SIDE);
 
 // processTrim slices this into three hex pairs, so anything else used to reach
 // Sharp as NaN (a bare Error) or as the wrong colour with a 200 (#2201).
@@ -43,17 +44,28 @@ const settingsSchema = z
     threshold: z.number().int().min(0).max(255).default(30),
     padToSquare: z.boolean().default(false),
     padColor: hexColor.default("#ffffff"),
-    targetSize: dimension.optional(),
+    targetSize: squareDimension.optional(),
     quality: z.number().int().min(1).max(100).optional(),
   })
   .superRefine((s, ctx) => {
-    // With no padding the pair is already inside the per-field ceiling, so only a
-    // padded subject resize (also the no-face fallback of face mode) makes an
-    // intermediate bigger than the output. Trim ignores width and height.
-    if (s.mode === "trim" || s.padding === 0) return;
+    // Trim ignores width and height. Skip the pair check when a single side already
+    // failed its own ceiling so the caller gets one error instead of two.
+    if (s.mode === "trim") return;
+    const outW = s.width ?? 1080;
+    const outH = s.height ?? 1080;
+    if (outW > MAX_RESIZE_OUTPUT_DIMENSION || outH > MAX_RESIZE_OUTPUT_DIMENSION) return;
+    if (outW * outH > MAX_STEP_PIXELS) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["width"],
+        message: `Crop size ${outW} x ${outH} is over the ${MAX_STEP_PIXELS} pixel limit`,
+      });
+      return;
+    }
+    if (s.padding === 0) return;
     const scale = 1 + s.padding / 100;
-    const w = Math.round((s.width ?? 1080) * scale);
-    const h = Math.round((s.height ?? 1080) * scale);
+    const w = Math.round(outW * scale);
+    const h = Math.round(outH * scale);
     if (w * h > MAX_STEP_PIXELS) {
       ctx.addIssue({
         code: "custom",
@@ -107,19 +119,35 @@ async function processSubject(
   const h = settings.height ?? 1080;
   const strategy =
     settings.strategy === "entropy" ? sharp.strategy.entropy : sharp.strategy.attention;
+  const scale = settings.padding > 0 ? 1 + settings.padding / 100 : 1;
+  const resizeW = Math.round(w * scale);
+  const resizeH = Math.round(h * scale);
+
+  // Sharp stretches the source to cover the target box and holds that whole
+  // intermediate in memory before attention or entropy picks the crop window.
+  // When the input and target aspect ratios badly mismatch, even a small output
+  // can produce a cover intermediate over the 64 MP limit (#2203).
+  const { width: srcW, height: srcH } = await sharp(inputBuffer).metadata();
+  if (!srcW || !srcH) {
+    throw new ToolInputError("Cannot determine image dimensions for smart crop");
+  }
+  const coverScale = Math.max(resizeW / srcW, resizeH / srcH);
+  const coverW = Math.round(srcW * coverScale);
+  const coverH = Math.round(srcH * coverScale);
+  if (coverW * coverH > MAX_STEP_PIXELS) {
+    throw new ToolInputError(
+      `Covering ${resizeW} x ${resizeH} from a ${srcW} x ${srcH} image scales it to ${coverW} x ${coverH}, over the ${MAX_STEP_PIXELS} pixel limit`,
+    );
+  }
 
   if (settings.padding > 0) {
-    const scale = 1 + settings.padding / 100;
-    const oversizeW = Math.round(w * scale);
-    const oversizeH = Math.round(h * scale);
-
     const oversize = await sharp(inputBuffer)
-      .resize(oversizeW, oversizeH, { fit: "cover", position: strategy })
+      .resize(resizeW, resizeH, { fit: "cover", position: strategy })
       .png()
       .toBuffer();
 
-    const extractLeft = Math.round((oversizeW - w) / 2);
-    const extractTop = Math.round((oversizeH - h) / 2);
+    const extractLeft = Math.round((resizeW - w) / 2);
+    const extractTop = Math.round((resizeH - h) / 2);
 
     return sharp(oversize)
       .extract({ left: extractLeft, top: extractTop, width: w, height: h })
@@ -211,11 +239,12 @@ async function processTrim(
     const w = trimmed.info.width;
     const h = trimmed.info.height;
     const target = settings.targetSize || Math.max(w, h);
-    // The padded square is re-read below; one past Sharp's input limit would throw a
-    // bare Error. Only reachable without a targetSize, since that is capped by the schema.
+    // The padded square is re-read below; one past the 64 MP limit would allocate
+    // an oversized intermediate. Only reachable without a targetSize, since that is
+    // capped by the schema.
     if (target * target > MAX_STEP_PIXELS) {
       throw new ToolInputError(
-        `The trimmed image is too large to pad to a square (${target} x ${target} pixels). Set targetSize to ${MAX_RESIZE_OUTPUT_DIMENSION} or less.`,
+        `The trimmed image is too large to pad to a square (${target} x ${target} pixels). Set targetSize to ${MAX_TRIM_SQUARE_SIDE} or less.`,
       );
     }
     const padR = Math.round(Number.parseInt(settings.padColor.slice(1, 3), 16));
