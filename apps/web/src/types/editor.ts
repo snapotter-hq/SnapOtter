@@ -384,6 +384,7 @@ export interface EditorState {
   cropState: CropState | null;
   isCropping: boolean;
   cropApplying: boolean;
+  rebaking: boolean;
 
   // Adjustments & Filters
   adjustments: AdjustmentValues;

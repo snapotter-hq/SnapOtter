@@ -315,6 +315,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const canvasSize = useEditorStore((s) => s.canvasSize);
   const markClean = useEditorStore((s) => s.markClean);
+  const rebaking = useEditorStore((s) => s.rebaking);
 
   const [settings, setSettings] = useState<ExportSettings>({
     format: "png",
@@ -493,7 +494,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   // the outcome is known (#2174): it used to fire on the click, so a canvas the
   // browser couldn't encode or a server error still counted as an export.
   const handleExport = useCallback(() => {
-    if (exportingRef.current) return;
+    if (exportingRef.current || rebaking) return;
     let reported = false;
     const report = (status: "completed" | "failed", reason?: ExportFailureReason) => {
       if (reported) return;
@@ -790,10 +791,20 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
         });
     });
     if (failure) report("failed", failure);
-  }, [settings, canvasSize, markClean, reportEmptyExport, guardCapture, handleUnexpectedError, t]);
+  }, [
+    settings,
+    canvasSize,
+    markClean,
+    rebaking,
+    reportEmptyExport,
+    guardCapture,
+    handleUnexpectedError,
+    t,
+  ]);
 
   // Copy a transparent PNG at the requested size through the Konva stage.
   const handleCopyToClipboard = useCallback(async () => {
+    if (rebaking) return;
     const stage = editorStageRefHolder.current;
     if (!stage) return;
 
@@ -826,10 +837,11 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     // surfaced on the button instead of thrown.
     setCopyStatus((await copyImageToClipboard(blobPromise)) ? "copied" : "failed");
     later(() => setCopyStatus("idle"), 2000, "copyStatus");
-  }, [settings, canvasSize, later, guardCapture, reportEmptyExport]);
+  }, [settings, canvasSize, later, guardCapture, reportEmptyExport, rebaking]);
 
   // Project save (.snapotter file)
   const handleSaveProject = useCallback(async () => {
+    if (rebaking) return;
     try {
       const state = useEditorStore.getState();
       const projectData = {
@@ -854,7 +866,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
       console.error("Save project failed:", err);
       handleUnexpectedError(err);
     }
-  }, [markClean, handleUnexpectedError]);
+  }, [markClean, handleUnexpectedError, rebaking]);
 
   // Project load (.snapotter file)
   const handleLoadProject = useCallback(() => {
@@ -948,6 +960,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             cropState: null,
             isCropping: false,
             cropApplying: false,
+            rebaking: false,
             editingTextId: null,
             selectedObjectIds: [],
             clipboard: null,
@@ -1186,7 +1199,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             <button
               type="button"
               onClick={handleExport}
-              disabled={exporting}
+              disabled={exporting || rebaking}
               className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium bg-primary text-primary-foreground rounded hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
@@ -1195,7 +1208,8 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             <button
               type="button"
               onClick={handleCopyToClipboard}
-              className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-muted text-foreground rounded hover:bg-muted/80 transition-colors"
+              disabled={rebaking}
+              className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-muted text-foreground rounded hover:bg-muted/80 transition-colors disabled:opacity-50"
             >
               {copyStatus === "copied" ? <Check size={14} /> : <ClipboardCopy size={14} />}
               {copyStatus === "copied"
@@ -1211,7 +1225,8 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             <button
               type="button"
               onClick={handleSaveProject}
-              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              disabled={rebaking}
+              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
             >
               <FileDown size={12} />
               {t.editor.ui.exportDialog.saveProject}
@@ -2208,6 +2223,7 @@ export function restoreAutosave(data: AutosaveData): void {
     cropState: null,
     isCropping: false,
     cropApplying: false,
+    rebaking: false,
     editingTextId: null,
     selectedObjectIds: [],
     clipboard: null,
@@ -2313,7 +2329,7 @@ export function useAutosave(): {
     if (!sourceImageUrl) return;
 
     const timer = setInterval(() => {
-      if (isDirty) {
+      if (isDirty && !useEditorStore.getState().rebaking) {
         if (typeof requestIdleCallback === "function") {
           requestIdleCallback(() => void saveEditorState());
         } else {

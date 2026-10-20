@@ -81,16 +81,22 @@ export function EditorPage() {
   const { recoveryData, dismissRecovery, restoreRecovery } = useAutosave();
 
   const handleManualSave = useCallback(() => {
+    if (useEditorStore.getState().rebaking) return;
     void saveEditorState({
       manual: true,
       errorMessage: t.editor.ui.autosaveRecovery.saveFailed,
     });
   }, [t.editor.ui.autosaveRecovery.saveFailed]);
 
+  const handleOpenExport = useCallback(() => {
+    if (useEditorStore.getState().rebaking) return;
+    setShowExport(true);
+  }, []);
+
   // Issue #10: Shortcuts belong at page level, not canvas level
   useEditorShortcuts({
     onSave: handleManualSave,
-    onExport: () => setShowExport(true),
+    onExport: handleOpenExport,
     onFillDialog: () => setFillDialogOpen(true),
   });
 
@@ -473,7 +479,7 @@ export function EditorPage() {
       <EditorMenuBar
         onNewDocument={() => setShowNewDocument(true)}
         onOpenImage={handleOpenImage}
-        onExport={() => setShowExport(true)}
+        onExport={handleOpenExport}
         onSave={handleManualSave}
         onCanvasResize={() => setShowCanvasResize(true)}
         onImageResize={() => setShowImageResize(true)}

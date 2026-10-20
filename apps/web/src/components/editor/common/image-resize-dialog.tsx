@@ -12,6 +12,7 @@ export function ImageResizeDialog({ open, onClose }: { open: boolean; onClose: (
   const { t } = useTranslation();
   const canvasSize = useEditorStore((s) => s.canvasSize);
   const resizeImage = useEditorStore((s) => s.resizeImage);
+  const rebaking = useEditorStore((s) => s.rebaking);
 
   const [width, setWidth] = useState(canvasSize.width);
   const [height, setHeight] = useState(canvasSize.height);
@@ -51,6 +52,7 @@ export function ImageResizeDialog({ open, onClose }: { open: boolean; onClose: (
   );
 
   const handleApply = useCallback(async () => {
+    if (applying || rebaking) return;
     setApplying(true);
     try {
       const applied = await resizeImage(width, height);
@@ -65,7 +67,7 @@ export function ImageResizeDialog({ open, onClose }: { open: boolean; onClose: (
     } finally {
       setApplying(false);
     }
-  }, [width, height, resizeImage, onClose, t]);
+  }, [applying, rebaking, width, height, resizeImage, onClose, t]);
 
   const pctWidth = canvasSize.width > 0 ? ((width / canvasSize.width) * 100).toFixed(1) : "100.0";
   const pctHeight =
@@ -174,7 +176,7 @@ export function ImageResizeDialog({ open, onClose }: { open: boolean; onClose: (
           <button
             type="button"
             onClick={() => void handleApply()}
-            disabled={applying}
+            disabled={applying || rebaking}
             className={cn(
               "h-8 rounded bg-primary px-3 text-sm text-primary-foreground",
               "hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed",

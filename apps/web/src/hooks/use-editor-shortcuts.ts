@@ -379,6 +379,7 @@ export function useEditorShortcuts(callbacks?: {
     "mod+s",
     (e) => {
       e.preventDefault();
+      if (useEditorStore.getState().rebaking) return;
       callbacks?.onSave?.();
     },
     { preventDefault: true },
@@ -396,6 +397,7 @@ export function useEditorShortcuts(callbacks?: {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "s") {
         e.preventDefault();
         e.stopPropagation();
+        if (useEditorStore.getState().rebaking) return;
         onExportRef.current?.();
       }
     };
@@ -713,7 +715,7 @@ export function useEditorShortcuts(callbacks?: {
       e.preventDefault();
       if (polygonalLassoRefHolder.current?.close()) return;
       const state = useEditorStore.getState();
-      if (state.isCropping && state.cropState) {
+      if (state.isCropping && state.cropState && !state.rebaking) {
         runEditorAction(state.applyCrop(), actionFailedMessage);
       }
     },

@@ -84,6 +84,19 @@ let rebakesCommitted = 0;
 // dropped if the document changed or was being replaced before they ran.
 let externalDocumentVersion = 0;
 let committingRebake = false;
+const activeDecodes = new Set<() => void>();
+const decodeFailures = new WeakSet<object>();
+let activeCropCancel: (() => void) | null = null;
+
+function rejectDecode(err: unknown): Error {
+  const error = err instanceof Error ? err : new Error(String(err));
+  decodeFailures.add(error);
+  return error;
+}
+
+function isDecodeFailure(err: unknown): boolean {
+  return typeof err === "object" && err !== null && decodeFailures.has(err);
+}
 
 function isStillInCropTool(state: EditorState): boolean {
   return state.isCropping || (state.isSpaceHeld && state.previousTool === "crop");
@@ -92,11 +105,17 @@ function isStillInCropTool(state: EditorState): boolean {
 export function cancelPendingRebakes(): void {
   externalDocumentVersion++;
   rebakeTail = null;
+  activeCropCancel = null;
+  for (const cancel of activeDecodes) {
+    cancel();
+  }
+  activeDecodes.clear();
   const state = useEditorStore.getState();
-  if (state.cropApplying) {
+  if (state.cropApplying || state.rebaking) {
     useEditorStore.setState({
+      rebaking: false,
       cropApplying: false,
-      ...(isStillInCropTool(state) ? {} : { cropState: null }),
+      ...(state.cropApplying && !isStillInCropTool(state) ? { cropState: null } : {}),
     });
   }
 }
@@ -164,10 +183,12 @@ function renderSourceBitmap(
   height: number,
   draw: (ctx: CanvasRenderingContext2D, img: HTMLImageElement) => void,
 ): Promise<string> {
-  decodesStarted++;
   if (!(width >= 1) || !(height >= 1)) {
-    return Promise.reject(new Error("Nothing to draw: the canvas would have no pixels"));
+    return Promise.reject(
+      rejectDecode(new Error("Nothing to draw: the canvas would have no pixels")),
+    );
   }
+  decodesStarted++;
   return new Promise((resolve, reject) => {
     const img = new Image();
     // Same as the `?url=` loader in editor-page.tsx: without it a cross-origin photo
@@ -176,25 +197,36 @@ function renderSourceBitmap(
     // Rebakes share a queue, so an image that never fires load or error (a hung
     // `?url=` fetch) would block every later rotate, flip, crop and canvas resize
     // until the page reloads. Blob and data URLs settle at once; this bounds the rest.
+    const cancel = () => {
+      clearTimeout(timer);
+      activeDecodes.delete(cancel);
+      img.onload = null;
+      img.onerror = null;
+      reject(rejectDecode(new Error("Rebake cancelled")));
+    };
     const timer = setTimeout(() => {
+      activeDecodes.delete(cancel);
       img.onload = null;
       img.onerror = null;
       // Stop the request too, or a hung fetch keeps running for a result nobody awaits.
       img.src = "";
-      reject(new Error("Timed out reloading the source image"));
+      reject(rejectDecode(new Error("Timed out reloading the source image")));
     }, SOURCE_RELOAD_TIMEOUT_MS);
     img.onerror = () => {
       clearTimeout(timer);
-      reject(new Error("Could not reload the source image"));
+      activeDecodes.delete(cancel);
+      reject(rejectDecode(new Error("Could not reload the source image")));
     };
     img.onload = () => {
       clearTimeout(timer);
+      activeDecodes.delete(cancel);
       try {
         resolve(drawToCanvasDataUrl(width, height, (ctx) => draw(ctx, img)));
       } catch (err) {
-        reject(err instanceof Error ? err : new Error(String(err)));
+        reject(rejectDecode(err));
       }
     };
+    activeDecodes.add(cancel);
     img.src = url;
   });
 }
@@ -297,17 +329,33 @@ let rebakeTail: Promise<void> | null = null;
 function enqueueRebake<T>(job: (versionAtCall: number) => Promise<T>): Promise<T> {
   const versionAtCall = externalDocumentVersion;
   const decodesBefore = decodesStarted;
-  const run = rebakeTail ? rebakeTail.then(() => job(versionAtCall)) : job(versionAtCall);
+  const run = (rebakeTail ? rebakeTail.then(() => job(versionAtCall)) : job(versionAtCall)).catch(
+    (err: unknown) => {
+      if (externalDocumentVersion !== versionAtCall && isDecodeFailure(err)) {
+        return false as T;
+      }
+      throw err;
+    },
+  );
   if (!rebakeTail && decodesStarted === decodesBefore) return run;
-  const tail = run.then(
+  let tail!: Promise<void>;
+  const settled = run.finally(() => {
+    if (rebakeTail === tail) {
+      rebakeTail = null;
+      if (useEditorStore.getState().rebaking) {
+        useEditorStore.setState({ rebaking: false });
+      }
+    }
+  });
+  tail = settled.then(
     () => undefined,
     () => undefined,
   );
   rebakeTail = tail;
-  void tail.then(() => {
-    if (rebakeTail === tail) rebakeTail = null;
-  });
-  return run.finally(() => undefined);
+  if (!useEditorStore.getState().rebaking) {
+    useEditorStore.setState({ rebaking: true });
+  }
+  return settled;
 }
 
 // Extended store state with additional fields/methods not yet in the shared interface
@@ -517,6 +565,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
       cropState: null,
       isCropping: false,
       cropApplying: false,
+      rebaking: false,
 
       // --- Adjustments ---
       adjustments: { ...DEFAULT_ADJUSTMENTS },
@@ -651,6 +700,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
           cropState: null,
           isCropping: false,
           cropApplying: false,
+          rebaking: false,
           adjustments: { ...DEFAULT_ADJUSTMENTS },
           filters: DEFAULT_FILTERS.map((f) => ({
             ...f,
@@ -1605,8 +1655,12 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
       },
 
       // Crop
-      setCropState: (state) =>
-        set({ cropState: state, isCropping: state !== null, cropApplying: false }),
+      setCropState: (state) => {
+        if (state === null && get().cropApplying) {
+          activeCropCancel?.();
+        }
+        set({ cropState: state, isCropping: state !== null, cropApplying: false });
+      },
 
       applyCrop: () => {
         // The box is in the coordinates of the canvas it was drawn on. If a rotate,
@@ -1636,7 +1690,25 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
             // retried or cancelled.
             let newSourceUrl: string | null = null;
             if (sourceImageUrl) {
-              newSourceUrl = await rebakeSourceCrop(sourceImageUrl, cropState, canvasSize);
+              try {
+                const promise = rebakeSourceCrop(sourceImageUrl, cropState, canvasSize);
+                const latestCancel = [...activeDecodes].at(-1) ?? null;
+                activeCropCancel = latestCancel;
+                newSourceUrl = await promise;
+              } catch (err) {
+                if (
+                  isDecodeFailure(err) &&
+                  (externalDocumentVersion !== versionAtCall ||
+                    get().sourceImageUrl !== sourceImageUrl ||
+                    get().canvasSize !== canvasSize ||
+                    get().cropState !== cropState)
+                ) {
+                  return false;
+                }
+                throw err;
+              } finally {
+                activeCropCancel = null;
+              }
               // Dropped when the image changed underneath, or when the crop box it was
               // built from is gone or replaced (cancelled or redrawn).
               if (

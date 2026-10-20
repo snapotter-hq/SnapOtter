@@ -34,6 +34,7 @@ function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
  * that fails, such as a canvas tainted by a cross-origin image.
  */
 export async function copyMergedToClipboard(failedMessage: string): Promise<void> {
+  if (useEditorStore.getState().rebaking) return;
   const stage = editorStageRefHolder.current;
   if (!stage) return;
   const { canvasSize } = useEditorStore.getState();

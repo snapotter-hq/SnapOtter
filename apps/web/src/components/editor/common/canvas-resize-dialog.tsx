@@ -36,6 +36,7 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
   const { t } = useTranslation();
   const canvasSize = useEditorStore((s) => s.canvasSize);
   const resizeCanvas = useEditorStore((s) => s.resizeCanvas);
+  const rebaking = useEditorStore((s) => s.rebaking);
 
   const [width, setWidth] = useState(canvasSize.width);
   const [height, setHeight] = useState(canvasSize.height);
@@ -70,6 +71,7 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
   }, [open, canvasSize]);
 
   const handleApply = useCallback(async () => {
+    if (applying || rebaking) return;
     setApplying(true);
     try {
       const applied = await resizeCanvas(width, height, anchor, fill);
@@ -86,7 +88,7 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
     } finally {
       setApplying(false);
     }
-  }, [width, height, anchor, fill, resizeCanvas, onClose, t]);
+  }, [applying, rebaking, width, height, anchor, fill, resizeCanvas, onClose, t]);
 
   if (!open) return null;
 
@@ -236,7 +238,7 @@ export function CanvasResizeDialog({ open, onClose }: { open: boolean; onClose: 
           <button
             type="button"
             onClick={() => void handleApply()}
-            disabled={applying}
+            disabled={applying || rebaking}
             className={cn(
               "h-8 rounded bg-primary px-3 text-sm text-primary-foreground",
               "hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed",

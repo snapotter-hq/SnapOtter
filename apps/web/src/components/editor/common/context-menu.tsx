@@ -91,6 +91,7 @@ export function ContextMenu({
   const clipboard = useEditorStore((s) => s.clipboard);
   const setSelection = useEditorStore((s) => s.setSelection);
   const canvasSize = useEditorStore((s) => s.canvasSize);
+  const rebaking = useEditorStore((s) => s.rebaking);
 
   // Close on click outside or Escape
   useEffect(() => {
@@ -244,6 +245,7 @@ export function ContextMenu({
       id: "canvasSize",
       label: t.editor.menu.image.canvasSize,
       icon: Maximize,
+      disabled: rebaking,
       action: () => {
         onCanvasResize?.();
         onClose();
@@ -253,6 +255,7 @@ export function ContextMenu({
       id: "imageSize",
       label: t.editor.menu.image.imageSize,
       icon: ImageIcon,
+      disabled: rebaking,
       action: () => {
         onImageResize?.();
         onClose();

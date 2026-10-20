@@ -15,6 +15,7 @@ export function CropOptions() {
   const cropState = useEditorStore((s) => s.cropState);
   const setCropState = useEditorStore((s) => s.setCropState);
   const applyCrop = useEditorStore((s) => s.applyCrop);
+  const rebaking = useEditorStore((s) => s.rebaking);
   const [selectedRatio, setSelectedRatio] = useState("free");
 
   const handleAspectChange = useCallback(
@@ -69,8 +70,9 @@ export function CropOptions() {
   }, [cropState, setCropState]);
 
   const handleApply = useCallback(() => {
+    if (rebaking) return;
     runEditorAction(applyCrop(), t.common.somethingWentWrong);
-  }, [applyCrop, t]);
+  }, [applyCrop, rebaking, t]);
 
   const handleCancel = useCallback(() => {
     setCropState(null);
@@ -152,11 +154,12 @@ export function CropOptions() {
       <button
         type="button"
         onClick={handleApply}
+        disabled={rebaking}
         title={t.editor.options.crop.applyTitle}
         aria-label={t.a11y.applyCrop}
         className={cn(
           "flex h-7 items-center gap-1 rounded bg-primary px-2.5 text-xs text-primary-foreground",
-          "hover:bg-primary/90 transition-colors",
+          "hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
         )}
       >
         <Check className="h-3.5 w-3.5" />

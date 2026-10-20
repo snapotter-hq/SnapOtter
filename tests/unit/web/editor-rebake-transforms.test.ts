@@ -13,7 +13,9 @@ vi.mock("zustand/middleware", async (importOriginal) => {
 });
 
 import { restoreAutosave } from "@/components/editor/common/export-dialog";
+import { runEditorAction } from "@/lib/editor-action";
 import {
+  cancelPendingRebakes,
   jumpEditorToHistoryState,
   redoEditor,
   undoEditor,
@@ -803,5 +805,143 @@ describe("with no source image there is no bitmap to rebuild", () => {
     });
     await expect(s().trimCanvas()).resolves.toBe(false);
     expect(raster.draws).toHaveLength(0);
+  });
+});
+
+describe("rebaking flag and cancellation on document replacement (#2115)", () => {
+  it("sets rebaking while a decode is in flight and clears it when the queue drains", async () => {
+    const raster = stubRaster({ manual: true });
+    expect(s().rebaking).toBe(false);
+
+    const first = s().rotateCanvas(90);
+    expect(s().rebaking).toBe(true);
+
+    const second = s().flipCanvasHorizontal();
+    expect(s().rebaking).toBe(true);
+
+    await flush();
+    raster.release();
+    await expect(first).resolves.toBe(true);
+    // Second decode is now in flight, so rebaking stays true.
+    expect(s().rebaking).toBe(true);
+
+    await flush();
+    raster.release();
+    await expect(second).resolves.toBe(true);
+    expect(s().rebaking).toBe(false);
+  });
+
+  it("clears rebaking when a rebake rejects", async () => {
+    const raster = stubRaster({ manual: true, loadFails: true });
+    const pending = s().rotateCanvas(90);
+    expect(s().rebaking).toBe(true);
+
+    await flush();
+    raster.release();
+    await expect(pending).rejects.toThrow();
+    expect(s().rebaking).toBe(false);
+  });
+
+  it("resets rebaking immediately when the image is replaced or closed", async () => {
+    const raster = stubRaster({ manual: true });
+    const pending = s().rotateCanvas(90);
+    expect(s().rebaking).toBe(true);
+
+    s().loadImage("blob:other", 640, 480);
+    expect(s().rebaking).toBe(false);
+
+    raster.release();
+    await expect(pending).resolves.toBe(false);
+    expect(s().rebaking).toBe(false);
+  });
+
+  it("cancels a hung decode immediately when another image is loaded, and a rotate on the new image runs without waiting", async () => {
+    vi.useFakeTimers();
+    try {
+      const raster = stubRaster({ manual: true });
+      const hungRotate = s().rotateCanvas(90);
+      expect(s().rebaking).toBe(true);
+
+      s().loadImage("blob:other", 640, 480);
+      expect(s().rebaking).toBe(false);
+      // Resolves to false immediately without advancing the 30s timer.
+      await expect(hungRotate).resolves.toBe(false);
+
+      // A rotate on the new image starts immediately, keeps rebaking true while decoding,
+      // and commits without waiting for the old decode's 30s timeout.
+      const nextRotate = s().rotateCanvas(90);
+      expect(s().rebaking).toBe(true);
+      expect(raster.sources).toEqual(["blob:test", "blob:other"]);
+      raster.release();
+      await expect(nextRotate).resolves.toBe(true);
+      expect(s().canvasSize).toEqual({ width: 480, height: 640 });
+      expect(s().rebaking).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(ACTIONS)(
+    "%s: ends quietly without rejecting when cancelled by replacing the image",
+    async (_name, run) => {
+      stubRaster({ manual: true });
+      const pending = run();
+      expect(s().rebaking).toBe(true);
+      await flush();
+
+      s().loadImage("blob:other", 640, 480);
+      expect(s().rebaking).toBe(false);
+
+      await expect(pending).resolves.toBe(false);
+      expect(s().sourceImageUrl).toBe("blob:other");
+      expect(s().canvasSize).toEqual({ width: 640, height: 480 });
+    },
+  );
+
+  it("does not log or toast when a rebake is cancelled by File > Close or cancelPendingRebakes", async () => {
+    stubRaster({ manual: true });
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const pending = s().rotateCanvas(90);
+    runEditorAction(pending, "Something went wrong");
+    await flush();
+
+    cancelPendingRebakes();
+    expect(s().rebaking).toBe(false);
+
+    await expect(pending).resolves.toBe(false);
+    await flush();
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
+  it("crop: cancelling an in-flight hung crop aborts the decode and clears rebaking immediately", async () => {
+    vi.useFakeTimers();
+    try {
+      stubRaster({ manual: true });
+      s().setCropState(CROP);
+      const pending = s().applyCrop();
+      expect(s().rebaking).toBe(true);
+
+      s().setCropState(null);
+      await expect(pending).resolves.toBe(false);
+      expect(s().cropState).toBeNull();
+      expect(s().rebaking).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("crop: ends quietly when the decode fails after the crop box was redrawn", async () => {
+    const raster = stubRaster({ manual: true, toDataURLThrows: true });
+    s().setCropState(CROP);
+    const pending = s().applyCrop();
+    await flush();
+
+    const redrawn = { ...CROP, width: 200 };
+    s().setCropState(redrawn);
+    raster.release();
+    await expect(pending).resolves.toBe(false);
+    expect(s().cropState).toEqual(redrawn);
+    expect(s().cropApplying).toBe(false);
+    expect(s().rebaking).toBe(false);
   });
 });

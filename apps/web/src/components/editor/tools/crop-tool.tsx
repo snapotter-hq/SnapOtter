@@ -96,6 +96,7 @@ export function useCropTool(): CropToolApi {
   );
 
   const applyCrop = useCallback(() => {
+    if (useEditorStore.getState().rebaking) return;
     runEditorAction(applyCropAction(), t.common.somethingWentWrong);
   }, [applyCropAction, t]);
 

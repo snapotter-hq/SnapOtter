@@ -50,6 +50,7 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
   const modIsMeta = hotkeysModIsMeta();
   const hint = (keys: string) => formatShortcut(keys, modIsMeta);
   const sourceImageUrl = useEditorStore((s) => s.sourceImageUrl);
+  const rebaking = useEditorStore((s) => s.rebaking);
   const layers = useEditorStore((s) => s.layers);
   const activeLayerId = useEditorStore((s) => s.activeLayerId);
   const rulersVisible = useEditorStore((s) => s.rulersVisible);
@@ -122,6 +123,7 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
           label: m.file.save,
           shortcut: hint("mod+S"),
           action: callbacks.onSave,
+          disabled: rebaking,
           dividerAfter: true,
         },
         {
@@ -130,11 +132,13 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
           // mod+shift+e is Flatten All; export listens on mod+shift+s.
           shortcut: hint("mod+Shift+S"),
           action: callbacks.onExport,
+          disabled: rebaking,
         },
         {
           id: "quick-export-as-png",
           label: m.file.quickExportPng,
           action: callbacks.onExport,
+          disabled: rebaking,
         },
         {
           id: "close",
@@ -172,6 +176,7 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
           label: m.edit.copyMerged,
           shortcut: hint("mod+Shift+C"),
           action: () => void copyMergedToClipboard(t.editor.ui.exportDialog.copyFailed),
+          disabled: rebaking,
         },
         { id: "paste", label: m.edit.paste, shortcut: hint("mod+V"), action: pasteObjects },
         {
@@ -206,11 +211,13 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
               id: "flip-horizontal",
               label: m.edit.transform.flipHorizontal,
               action: flipCanvasHorizontal,
+              disabled: rebaking,
             },
             {
               id: "flip-vertical",
               label: m.edit.transform.flipVertical,
               action: flipCanvasVertical,
+              disabled: rebaking,
             },
           ],
         },
@@ -224,34 +231,54 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
           id: "image-size",
           label: m.image.imageSize,
           action: callbacks.onImageResize,
+          disabled: rebaking,
           dividerAfter: true,
         },
         {
           id: "canvas-size",
           label: m.image.canvasSize,
           action: callbacks.onCanvasResize,
+          disabled: rebaking,
         },
         {
           id: "image-rotation",
           label: m.image.rotation.label,
+          disabled: rebaking,
           submenu: [
-            { id: "90-cw", label: m.image.rotation.cw90, action: () => rotateCanvas(90) },
-            { id: "90-ccw", label: m.image.rotation.ccw90, action: () => rotateCanvas(270) },
-            { id: "180", label: m.image.rotation.r180, action: () => rotateCanvas(180) },
+            {
+              id: "90-cw",
+              label: m.image.rotation.cw90,
+              action: () => rotateCanvas(90),
+              disabled: rebaking,
+            },
+            {
+              id: "90-ccw",
+              label: m.image.rotation.ccw90,
+              action: () => rotateCanvas(270),
+              disabled: rebaking,
+            },
+            {
+              id: "180",
+              label: m.image.rotation.r180,
+              action: () => rotateCanvas(180),
+              disabled: rebaking,
+            },
             {
               id: "flip-horizontal",
               label: m.image.rotation.flipHorizontal,
               action: flipCanvasHorizontal,
+              disabled: rebaking,
             },
             {
               id: "flip-vertical",
               label: m.image.rotation.flipVertical,
               action: flipCanvasVertical,
+              disabled: rebaking,
             },
           ],
           dividerAfter: true,
         },
-        { id: "trim", label: m.image.trim, action: trimCanvas },
+        { id: "trim", label: m.image.trim, action: trimCanvas, disabled: rebaking },
         {
           id: "adjustments",
           label: m.image.adjustments.label,

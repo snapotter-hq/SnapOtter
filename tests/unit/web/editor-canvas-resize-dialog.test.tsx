@@ -34,9 +34,15 @@ vi.stubGlobal("localStorage", {
   clear: () => storage.clear(),
 });
 
+import { MemoryRouter } from "react-router";
 import { CanvasResizeDialog } from "@/components/editor/common/canvas-resize-dialog";
+import { ContextMenu } from "@/components/editor/common/context-menu";
+import { ExportDialog } from "@/components/editor/common/export-dialog";
 import { ImageResizeDialog } from "@/components/editor/common/image-resize-dialog";
+import { EditorMenuBar } from "@/components/editor/editor-menu-bar";
+import { CropOptions } from "@/components/editor/options/crop-options";
 import { I18nProvider } from "@/contexts/i18n-context";
+import { useEditorShortcuts } from "@/hooks/use-editor-shortcuts";
 import { captureHandledError } from "@/lib/analytics";
 import { useEditorStore } from "@/stores/editor-store";
 
@@ -68,7 +74,12 @@ beforeEach(() => {
   resizeCanvas.mockResolvedValue(true);
   resizeImage.mockReset();
   resizeImage.mockResolvedValue(true);
-  useEditorStore.setState({ resizeCanvas, resizeImage, canvasSize: { width: 800, height: 600 } });
+  useEditorStore.setState({
+    resizeCanvas,
+    resizeImage,
+    canvasSize: { width: 800, height: 600 },
+    rebaking: false,
+  });
 });
 
 afterEach(() => {
@@ -176,5 +187,132 @@ describe("Canvas Size dialog background color (#2068)", () => {
 
     apply();
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  });
+
+  it("disables Apply in CanvasResizeDialog, ImageResizeDialog, CropOptions and ExportDialog while rebaking (#2115)", () => {
+    useEditorStore.setState({
+      rebaking: true,
+      cropState: { x: 10, y: 10, width: 100, height: 100, aspectRatio: null },
+    });
+    const onClose = vi.fn();
+    const { unmount } = render(
+      <I18nProvider>
+        <CanvasResizeDialog open={true} onClose={onClose} />
+        <CropOptions />
+      </I18nProvider>,
+    );
+    const applyButtons = screen.getAllByRole("button", { name: /apply/i });
+    expect(applyButtons).toHaveLength(2);
+    for (const btn of applyButtons) {
+      expect(btn).toBeDisabled();
+    }
+    unmount();
+
+    const { unmount: unmountImg } = render(
+      <I18nProvider>
+        <ImageResizeDialog open={true} onClose={onClose} />
+      </I18nProvider>,
+    );
+    expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
+    unmountImg();
+
+    render(
+      <I18nProvider>
+        <ExportDialog onClose={onClose} />
+      </I18nProvider>,
+    );
+    expect(screen.getByRole("button", { name: /export/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /copy/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /save project/i })).toBeDisabled();
+  });
+
+  it("disables rebake, save and export menu items while rebaking, keeping New, Open and Close enabled (#2115)", () => {
+    useEditorStore.setState({ sourceImageUrl: "blob:test" });
+    useEditorStore.setState({ rebaking: true });
+    const noop = vi.fn();
+    render(
+      <MemoryRouter>
+        <I18nProvider>
+          <EditorMenuBar
+            onNewDocument={noop}
+            onOpenImage={noop}
+            onExport={noop}
+            onSave={noop}
+            onCanvasResize={noop}
+            onImageResize={noop}
+          />
+          <ContextMenu
+            position={{ x: 20, y: 20 }}
+            menuType="canvas"
+            onClose={noop}
+            onCanvasResize={noop}
+            onImageResize={noop}
+          />
+        </I18nProvider>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByTestId("menu-file"));
+    expect(screen.getByTestId("menu-item-new")).toBeEnabled();
+    expect(screen.getByTestId("menu-item-open")).toBeEnabled();
+    expect(screen.getByTestId("menu-item-close")).toBeEnabled();
+    expect(screen.getByTestId("menu-item-save")).toBeDisabled();
+    expect(screen.getByTestId("menu-item-export-as")).toBeDisabled();
+    expect(screen.getByTestId("menu-item-quick-export-as-png")).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId("menu-edit"));
+    expect(screen.getByTestId("menu-item-copy-merged")).toBeDisabled();
+    fireEvent.mouseEnter(screen.getByTestId("menu-item-transform"));
+    expect(screen.getByTestId("menu-item-flip-horizontal")).toBeDisabled();
+    expect(screen.getByTestId("menu-item-flip-vertical")).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId("menu-image"));
+    expect(screen.getByTestId("menu-item-image-size")).toBeDisabled();
+    expect(screen.getByTestId("menu-item-canvas-size")).toBeDisabled();
+    expect(screen.getByTestId("menu-item-trim")).toBeDisabled();
+    fireEvent.mouseEnter(screen.getByTestId("menu-item-image-rotation"));
+    expect(screen.getByTestId("menu-item-90-cw")).toBeDisabled();
+    expect(screen.getByTestId("menu-item-90-ccw")).toBeDisabled();
+    expect(screen.getByTestId("menu-item-180")).toBeDisabled();
+    expect(screen.getByTestId("menu-item-flip-horizontal")).toBeDisabled();
+    expect(screen.getByTestId("menu-item-flip-vertical")).toBeDisabled();
+
+    // Context menu Canvas Size and Image Size buttons are also disabled.
+    const canvasSizeBtns = screen.getAllByRole("button", { name: /canvas size/i });
+    const imageSizeBtns = screen.getAllByRole("button", { name: /image size/i });
+    for (const btn of [...canvasSizeBtns, ...imageSizeBtns]) {
+      expect(btn).toBeDisabled();
+    }
+  });
+
+  it("ignores Save, Export and Enter-to-crop shortcuts while rebaking (#2115)", () => {
+    const onSave = vi.fn();
+    const onExport = vi.fn();
+    const applyCrop = vi.fn(async () => true);
+    useEditorStore.setState({
+      rebaking: true,
+      isCropping: true,
+      cropState: { x: 10, y: 10, width: 100, height: 100, aspectRatio: null },
+      applyCrop,
+    });
+    function ShortcutHost() {
+      useEditorShortcuts({ onSave, onExport });
+      return null;
+    }
+    render(
+      <I18nProvider>
+        <ShortcutHost />
+      </I18nProvider>,
+    );
+
+    fireEvent.keyDown(document.body, { key: "Enter", code: "Enter" });
+    fireEvent.keyDown(document.body, { key: "s", code: "KeyS", ctrlKey: true });
+    fireEvent.keyDown(document.body, { key: "s", code: "KeyS", metaKey: true });
+    fireEvent.keyDown(document, { key: "S", code: "KeyS", ctrlKey: true, shiftKey: true });
+    fireEvent.keyDown(document, { key: "S", code: "KeyS", metaKey: true, shiftKey: true });
+
+    expect(applyCrop).not.toHaveBeenCalled();
+    expect(onSave).not.toHaveBeenCalled();
+    expect(onExport).not.toHaveBeenCalled();
   });
 });
