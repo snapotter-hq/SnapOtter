@@ -264,6 +264,144 @@ describe("a result built from an image that has since changed is dropped", () =>
     expect(s().cropState).toEqual(redrawn);
   });
 
+  it("crop: switching tools while the bitmap is being built still commits the crop (#2114)", async () => {
+    const raster = stubRaster({ manual: true });
+    s().setTool("crop");
+    s().setCropState(CROP);
+    const pending = s().applyCrop();
+    expect(s().cropApplying).toBe(true);
+    await flush();
+    s().setTool("move");
+    expect(s().activeTool).toBe("move");
+    expect(s().isCropping).toBe(false);
+    expect(s().cropState).toEqual(CROP);
+    expect(s().cropApplying).toBe(true);
+
+    raster.release();
+    await expect(pending).resolves.toBe(true);
+    expect(s().canvasSize).toEqual({ width: 300, height: 200 });
+    expect(s().sourceImageUrl).toBe("data:image/png;base64,REBAKED1");
+    expect(s().cropState).toBeNull();
+    expect(s().isCropping).toBe(false);
+    expect(s().cropApplying).toBe(false);
+  });
+
+  it("crop: a failed crop after switching tools cleans up its cropState (#2114)", async () => {
+    const raster = stubRaster({ manual: true, loadFails: true });
+    s().setTool("crop");
+    s().setCropState(CROP);
+    const pending = s().applyCrop();
+    await flush();
+    s().setTool("move");
+    expect(s().cropState).toEqual(CROP);
+    expect(s().cropApplying).toBe(true);
+
+    raster.release();
+    await expect(pending).rejects.toThrow();
+    expect(s().cropState).toBeNull();
+    expect(s().isCropping).toBe(false);
+    expect(s().cropApplying).toBe(false);
+  });
+
+  it("crop: a dropped crop after switching tools cleans up its cropState (#2114)", async () => {
+    const raster = stubRaster({ manual: true });
+    const rotating = s().rotateCanvas(90);
+    s().setTool("crop");
+    s().setCropState(CROP);
+    const cropping = s().applyCrop();
+    s().setTool("move");
+    expect(s().cropState).toEqual(CROP);
+
+    raster.release();
+    await expect(Promise.all([rotating, cropping])).resolves.toEqual([true, false]);
+    expect(s().canvasSize).toEqual({ width: 600, height: 800 });
+    expect(s().cropState).toBeNull();
+    expect(s().cropApplying).toBe(false);
+  });
+
+  it("crop: File > Close while a crop is queued after switching tools resets cropApplying and cropState (#2114)", async () => {
+    const raster = stubRaster({ manual: true });
+    const rotating = s().rotateCanvas(90);
+    s().setTool("crop");
+    s().setCropState(CROP);
+    const cropping = s().applyCrop();
+    s().setTool("move");
+    await flush();
+
+    useEditorStore.setState({
+      sourceImageUrl: null,
+      sourceImageSize: null,
+      objects: [],
+      selectedObjectIds: [],
+    });
+    expect(s().cropApplying).toBe(false);
+    expect(s().cropState).toBeNull();
+
+    raster.release();
+    await expect(Promise.all([rotating, cropping])).resolves.toEqual([false, false]);
+  });
+
+  it("crop: a duplicate applyCrop call while already applying is ignored (#2114)", async () => {
+    const raster = stubRaster({ manual: true, loadFails: true });
+    s().setTool("crop");
+    s().setCropState(CROP);
+    const first = s().applyCrop();
+    const second = s().applyCrop();
+    await flush();
+
+    raster.release();
+    await expect(first).rejects.toThrow();
+    await expect(second).resolves.toBe(false);
+    expect(raster.sources).toEqual(["blob:test"]);
+    expect(s().cropState).toEqual(CROP);
+    expect(s().cropApplying).toBe(false);
+  });
+
+  it("crop: redrawing and re-applying while the first crop decodes still commits after switching tools (#2114)", async () => {
+    const raster = stubRaster({ manual: true });
+    s().setTool("crop");
+    s().setCropState(CROP);
+    const first = s().applyCrop();
+    await flush();
+
+    const redrawn = { ...CROP, width: 200 };
+    s().setCropState(redrawn);
+    const second = s().applyCrop();
+    s().setTool("move");
+
+    raster.release();
+    await expect(first).resolves.toBe(false);
+    expect(s().cropState).toEqual(redrawn);
+    expect(s().cropApplying).toBe(true);
+
+    await flush();
+    raster.release();
+    await expect(second).resolves.toBe(true);
+    expect(s().canvasSize).toEqual({ width: 200, height: 200 });
+    expect(s().cropState).toBeNull();
+    expect(s().cropApplying).toBe(false);
+  });
+
+  it("crop: holding Space for temporary hand tool during a failed crop preserves cropState (#2114)", async () => {
+    const raster = stubRaster({ manual: true, loadFails: true });
+    s().setTool("crop");
+    s().setCropState(CROP);
+    const pending = s().applyCrop();
+    await flush();
+
+    useEditorStore.setState({ isSpaceHeld: true });
+    s().setTool("hand");
+
+    raster.release();
+    await expect(pending).rejects.toThrow();
+    expect(s().cropState).toEqual(CROP);
+    expect(s().cropApplying).toBe(false);
+
+    useEditorStore.setState({ isSpaceHeld: false });
+    s().setTool("crop");
+    expect(s().cropState).toEqual(CROP);
+  });
+
   it("rotate: File > Close cleared the image while it decoded, and drops rebakes queued behind it", async () => {
     const raster = stubRaster({ manual: true });
     const rotating = s().rotateCanvas(90);

@@ -383,6 +383,7 @@ export interface EditorState {
   // Crop
   cropState: CropState | null;
   isCropping: boolean;
+  cropApplying: boolean;
 
   // Adjustments & Filters
   adjustments: AdjustmentValues;

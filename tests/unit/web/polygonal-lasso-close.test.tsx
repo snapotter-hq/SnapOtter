@@ -289,4 +289,27 @@ describe("polygonal lasso close gestures (#1059)", () => {
     expect(useEditorStore.getState().selection).toBeNull();
     expect(useEditorStore.getState().selectedObjectIds).toEqual([]);
   });
+
+  it("clears an in-flight cropState on Escape even after switching away from the crop tool (#2114)", () => {
+    const cropState = { x: 0, y: 0, width: 4, height: 4, aspectRatio: null };
+    useEditorStore.setState(
+      {
+        ...INITIAL_STATE,
+        activeTool: "move",
+        isCropping: false,
+        cropApplying: true,
+        cropState,
+      },
+      true,
+    );
+    renderHook(() => useEditorShortcuts());
+    polygonalLassoRefHolder.current = { close: () => false, cancel: () => false };
+
+    act(() => {
+      fireEvent.keyDown(document.body, { key: "Escape", code: "Escape" });
+    });
+
+    expect(useEditorStore.getState().cropState).toBeNull();
+    expect(useEditorStore.getState().cropApplying).toBe(false);
+  });
 });

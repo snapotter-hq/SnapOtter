@@ -85,9 +85,20 @@ let rebakesCommitted = 0;
 let externalDocumentVersion = 0;
 let committingRebake = false;
 
+function isStillInCropTool(state: EditorState): boolean {
+  return state.isCropping || (state.isSpaceHeld && state.previousTool === "crop");
+}
+
 export function cancelPendingRebakes(): void {
   externalDocumentVersion++;
   rebakeTail = null;
+  const state = useEditorStore.getState();
+  if (state.cropApplying) {
+    useEditorStore.setState({
+      cropApplying: false,
+      ...(isStillInCropTool(state) ? {} : { cropState: null }),
+    });
+  }
 }
 
 function runInRebakeCommit(apply: () => void): void {
@@ -505,6 +516,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
       // --- Crop ---
       cropState: null,
       isCropping: false,
+      cropApplying: false,
 
       // --- Adjustments ---
       adjustments: { ...DEFAULT_ADJUSTMENTS },
@@ -582,7 +594,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
       // ===== ACTIONS =====
 
       setTool: (tool) => {
-        const { activeTool, canvasSize, cropState } = get();
+        const { activeTool, canvasSize, cropState, cropApplying } = get();
         if (tool !== activeTool) {
           // Which editor tools users actually engage (brush/shape/adjust/...);
           // the single chokepoint, so UI clicks and keyboard shortcuts both count.
@@ -590,7 +602,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
             track(ANALYTICS_EVENTS.EDITOR_TOOL_USED, { editor_tool: tool }),
           );
         }
-        const leavingCrop = activeTool === "crop" && tool !== "crop";
+        const leavingCrop = activeTool === "crop" && tool !== "crop" && !cropApplying;
         const enteringCrop = tool === "crop" && activeTool !== "crop";
         set({
           activeTool: tool,
@@ -638,6 +650,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
           selection: null,
           cropState: null,
           isCropping: false,
+          cropApplying: false,
           adjustments: { ...DEFAULT_ADJUSTMENTS },
           filters: DEFAULT_FILTERS.map((f) => ({
             ...f,
@@ -1592,7 +1605,8 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
       },
 
       // Crop
-      setCropState: (state) => set({ cropState: state, isCropping: state !== null }),
+      setCropState: (state) =>
+        set({ cropState: state, isCropping: state !== null, cropApplying: false }),
 
       applyCrop: () => {
         // The box is in the coordinates of the canvas it was drawn on. If a rotate,
@@ -1601,64 +1615,82 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
         // the box up for the user to redraw, rather than cut a region they never framed.
         const {
           cropState: cropAtCall,
+          cropApplying,
           canvasSize: canvasAtCall,
           sourceImageUrl: sourceAtCall,
         } = get();
+        if (!cropAtCall || cropApplying) {
+          return enqueueRebake(async () => false);
+        }
+        set({ cropApplying: true });
         return enqueueRebake(async (versionAtCall) => {
-          if (externalDocumentVersion !== versionAtCall) return false;
-          const { cropState, canvasSize, sourceImageUrl } = get();
-          if (!cropState || cropState !== cropAtCall) return false;
-          if (canvasSize !== canvasAtCall || sourceImageUrl !== sourceAtCall) return false;
+          let committed = false;
+          try {
+            if (externalDocumentVersion !== versionAtCall) return false;
+            const { cropState, canvasSize, sourceImageUrl } = get();
+            if (!cropState || cropState !== cropAtCall) return false;
+            if (canvasSize !== canvasAtCall || sourceImageUrl !== sourceAtCall) return false;
 
-          // Crop the source image first, then commit size, bitmap and objects together
-          // (see rotateCanvas). The crop box stays up until then, so a failed crop can be
-          // retried or cancelled.
-          let newSourceUrl: string | null = null;
-          if (sourceImageUrl) {
-            newSourceUrl = await rebakeSourceCrop(sourceImageUrl, cropState, canvasSize);
-            // Dropped when the image changed underneath, or when the crop box it was
-            // built from is gone or replaced (cancelled, redrawn, or the tool switched).
-            if (
-              externalDocumentVersion !== versionAtCall ||
-              get().sourceImageUrl !== sourceImageUrl ||
-              get().canvasSize !== canvasSize ||
-              get().cropState !== cropState
-            ) {
-              return false;
+            // Crop the source image first, then commit size, bitmap and objects together
+            // (see rotateCanvas). The crop box stays up until then, so a failed crop can be
+            // retried or cancelled.
+            let newSourceUrl: string | null = null;
+            if (sourceImageUrl) {
+              newSourceUrl = await rebakeSourceCrop(sourceImageUrl, cropState, canvasSize);
+              // Dropped when the image changed underneath, or when the crop box it was
+              // built from is gone or replaced (cancelled or redrawn).
+              if (
+                externalDocumentVersion !== versionAtCall ||
+                get().sourceImageUrl !== sourceImageUrl ||
+                get().canvasSize !== canvasSize ||
+                get().cropState !== cropState
+              ) {
+                return false;
+              }
+            }
+            const { objects } = get();
+            committed = commitRebake(() =>
+              set({
+                canvasSize: { width: cropState.width, height: cropState.height },
+                sourceImageSize: { width: cropState.width, height: cropState.height },
+                ...(newSourceUrl ? { sourceImageUrl: newSourceUrl } : {}),
+                objects: objects.map((obj) => {
+                  const attrs = { ...obj.attrs };
+                  if (hasPointsArray(obj)) {
+                    const pts = [...(attrs as { points: number[] }).points];
+                    for (let i = 0; i < pts.length; i += 2) {
+                      pts[i] -= cropState.x;
+                      pts[i + 1] -= cropState.y;
+                    }
+                    (attrs as { points: number[] }).points = pts;
+                  } else {
+                    if ("x" in attrs) {
+                      (attrs as { x: number }).x -= cropState.x;
+                    }
+                    if ("y" in attrs) {
+                      (attrs as { y: number }).y -= cropState.y;
+                    }
+                  }
+                  return { ...obj, attrs } as CanvasObject;
+                }),
+                cropState: null,
+                isCropping: false,
+                cropApplying: false,
+                isDirty: true,
+                lastAction: { id: "crop" },
+                _historyVersion: get()._historyVersion + 1,
+              }),
+            );
+            return committed;
+          } finally {
+            const current = get();
+            if (!committed && current.cropState === cropAtCall) {
+              set({
+                cropApplying: false,
+                ...(isStillInCropTool(current) ? {} : { cropState: null }),
+              });
             }
           }
-          const { objects } = get();
-          return commitRebake(() =>
-            set({
-              canvasSize: { width: cropState.width, height: cropState.height },
-              sourceImageSize: { width: cropState.width, height: cropState.height },
-              ...(newSourceUrl ? { sourceImageUrl: newSourceUrl } : {}),
-              objects: objects.map((obj) => {
-                const attrs = { ...obj.attrs };
-                if (hasPointsArray(obj)) {
-                  const pts = [...(attrs as { points: number[] }).points];
-                  for (let i = 0; i < pts.length; i += 2) {
-                    pts[i] -= cropState.x;
-                    pts[i + 1] -= cropState.y;
-                  }
-                  (attrs as { points: number[] }).points = pts;
-                } else {
-                  if ("x" in attrs) {
-                    (attrs as { x: number }).x -= cropState.x;
-                  }
-                  if ("y" in attrs) {
-                    (attrs as { y: number }).y -= cropState.y;
-                  }
-                }
-                return { ...obj, attrs } as CanvasObject;
-              }),
-              cropState: null,
-              isCropping: false,
-              isDirty: true,
-              lastAction: { id: "crop" },
-              _historyVersion: get()._historyVersion + 1,
-            }),
-          );
         });
       },
 

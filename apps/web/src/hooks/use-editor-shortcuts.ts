@@ -727,7 +727,7 @@ export function useEditorShortcuts(callbacks?: {
       e.preventDefault();
       if (polygonalLassoRefHolder.current?.cancel()) return;
       const state = useEditorStore.getState();
-      if (state.isCropping) {
+      if (state.isCropping || state.cropState) {
         state.setCropState(null);
       }
       state.setSelectedObjects([]);
