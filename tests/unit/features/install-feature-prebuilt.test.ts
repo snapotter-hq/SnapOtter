@@ -408,6 +408,194 @@ describe("onnxruntime flavor reconciliation (#490)", () => {
     expect(existsSync(join(sitePackagesDir, "onnxruntime-1.20.1.dist-info"))).toBe(false);
     expect(existsSync(join(sitePackagesDir, "onnxruntime_gpu-1.20.1.dist-info"))).toBe(true);
   });
+
+  it("rolls back to the pre-existing CPU onnxruntime build when a GPU bundle install fails verification (#2612)", () => {
+    linkVenvPython();
+    const cpu = createOnnxTar("cpu-bundle", "cpu");
+    writeManifest("cpu-bundle", cpu.tarPath, cpu.sha256, { models: [] });
+    let result = installBundle("cpu-bundle", cpu.tarPath);
+    expect(result.status, `stderr: ${result.stderr?.toString()}`).toBe(0);
+
+    // Add RECORD and INSTALLER to the installed CPU dist-info to match pip's layout
+    writeFileSync(
+      join(sitePackagesDir, "onnxruntime-1.20.1.dist-info", "RECORD"),
+      [
+        "onnxruntime/__init__.py,,",
+        "onnxruntime/capi/onnxruntime_pybind11_state.so,,",
+        "onnxruntime-1.20.1.dist-info/METADATA,,",
+        "onnxruntime-1.20.1.dist-info/RECORD,,",
+        "",
+      ].join("\n"),
+    );
+    writeFileSync(join(sitePackagesDir, "onnxruntime-1.20.1.dist-info", "INSTALLER"), "pip\n");
+
+    const gpu = createOnnxTar("gpu-bundle", "gpu");
+    writeManifest("gpu-bundle", gpu.tarPath, gpu.sha256, {
+      models: [],
+      smokeImports: ["snapotter_not_a_real_module_zzz"],
+    });
+    result = installBundle("gpu-bundle", gpu.tarPath);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr?.toString() ?? "").toMatch(/verification failed/i);
+
+    // CPU onnxruntime package files and dist-info are restored; GPU files and dist-info are gone
+    expect(existsSync(cudaLib())).toBe(false);
+    expect(readFileSync(join(sitePackagesDir, "onnxruntime", "__init__.py"), "utf-8")).toBe("cpu");
+    expect(readFileSync(coreLib(), "utf-8")).toBe("cpu");
+    expect(existsSync(join(sitePackagesDir, "onnxruntime-1.20.1.dist-info", "METADATA"))).toBe(
+      true,
+    );
+    expect(existsSync(join(sitePackagesDir, "onnxruntime-1.20.1.dist-info", "RECORD"))).toBe(true);
+    expect(
+      readFileSync(join(sitePackagesDir, "onnxruntime-1.20.1.dist-info", "INSTALLER"), "utf-8"),
+    ).toBe("pip\n");
+    expect(existsSync(join(sitePackagesDir, "onnxruntime_gpu-1.20.1.dist-info"))).toBe(false);
+    expect(existsSync(join(venvDir, ".superseded"))).toBe(false);
+    expect(existsSync(join(aiDir, "venv.writing"))).toBe(false);
+
+    const installed = JSON.parse(readFileSync(join(aiDir, "installed.json"), "utf-8"));
+    expect(installed.bundles["cpu-bundle"]).toBeDefined();
+    expect(installed.bundles["gpu-bundle"]).toBeUndefined();
+
+    // Also rolls back CPU onnxruntime when a GPU bundle fails in apply_fixups or during model move
+    const buildFixupFail = join(tempDir, "build-gpu-fixup-fail");
+    mkdirSync(join(buildFixupFail, "site-packages", "onnxruntime", "capi"), { recursive: true });
+    mkdirSync(join(buildFixupFail, "site-packages", "onnxruntime_gpu-1.20.1.dist-info"), {
+      recursive: true,
+    });
+    mkdirSync(join(buildFixupFail, "fixups"), { recursive: true });
+    mkdirSync(join(buildFixupFail, "models", "gpumodel"), { recursive: true });
+    writeFileSync(join(buildFixupFail, "site-packages", "onnxruntime", "__init__.py"), "gpu");
+    writeFileSync(
+      join(buildFixupFail, "site-packages", "onnxruntime", "capi", "onnxruntime_pybind11_state.so"),
+      "gpu",
+    );
+    writeFileSync(
+      join(
+        buildFixupFail,
+        "site-packages",
+        "onnxruntime",
+        "capi",
+        "libonnxruntime_providers_cuda.so",
+      ),
+      "cuda",
+    );
+    writeFileSync(
+      join(buildFixupFail, "site-packages", "onnxruntime_gpu-1.20.1.dist-info", "METADATA"),
+      "Name: onnxruntime-gpu\nVersion: 1.20.1\n",
+    );
+    writeFileSync(
+      join(buildFixupFail, "site-packages", "onnxruntime_gpu-1.20.1.dist-info", "RECORD"),
+      [
+        "onnxruntime/__init__.py,,",
+        "onnxruntime/capi/onnxruntime_pybind11_state.so,,",
+        "onnxruntime/capi/libonnxruntime_providers_cuda.so,,",
+        "onnxruntime_gpu-1.20.1.dist-info/METADATA,,",
+        "onnxruntime_gpu-1.20.1.dist-info/RECORD,,",
+        "",
+      ].join("\n"),
+    );
+    writeFileSync(join(buildFixupFail, "fixups", "broken-1.0.0-py3-none-any.whl"), "not-a-wheel");
+    writeFileSync(join(buildFixupFail, "models", "gpumodel", "weights.bin"), "gpu-weights");
+    writeFileSync(
+      join(buildFixupFail, "bundle.json"),
+      JSON.stringify({
+        bundleId: "gpu-bundle",
+        version: "1.0.0-test",
+        arch: "amd64-gpu",
+        imageVersion: "2.0.0",
+        pythonVersion: "3.12",
+        models: ["gpumodel"],
+      }),
+    );
+    const gpuFixupTar = join(tempDir, "gpu-fixup-fail.tar.gz");
+    execFileSync("tar", ["czf", gpuFixupTar, "-C", buildFixupFail, "."]);
+    rmSync(buildFixupFail, { recursive: true, force: true });
+    const gpuFixupSha = createHash("sha256").update(readFileSync(gpuFixupTar)).digest("hex");
+    writeManifest("gpu-bundle", gpuFixupTar, gpuFixupSha, { models: [] });
+
+    result = installBundle("gpu-bundle", gpuFixupTar);
+    expect(result.status).not.toBe(0);
+    expect(existsSync(cudaLib())).toBe(false);
+    expect(readFileSync(join(sitePackagesDir, "onnxruntime", "__init__.py"), "utf-8")).toBe("cpu");
+    expect(readFileSync(coreLib(), "utf-8")).toBe("cpu");
+    expect(existsSync(join(sitePackagesDir, "onnxruntime-1.20.1.dist-info", "RECORD"))).toBe(true);
+    expect(existsSync(join(sitePackagesDir, "onnxruntime_gpu-1.20.1.dist-info"))).toBe(false);
+    expect(existsSync(join(modelsDir, "gpumodel", "weights.bin"))).toBe(false);
+    expect(existsSync(join(venvDir, ".superseded"))).toBe(false);
+
+    // Also rolls back to the pre-existing CPU onnxruntime when the GPU bundle triggers
+    // the CUDA smoke fallback remediation and the fallback pip install or second smoke check fails
+    const pyCheck = spawnSync(
+      "python3",
+      [
+        "-c",
+        `
+import importlib.util, json, os, sys
+
+spec = importlib.util.spec_from_file_location("inst", ${JSON.stringify(scriptPath)})
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+errors = []
+def fake_fail(msg):
+    errors.append(msg)
+    raise SystemExit(1)
+mod.fail = fake_fail
+mod.emit_progress = lambda p, s: None
+
+with open(${JSON.stringify(manifestPath)}, "r") as f:
+    manifest = json.load(f)
+manifest["bundles"]["gpu-bundle"]["archives"]["amd64-gpu"]["file"] = ${JSON.stringify(gpu.tarPath)}
+manifest["bundles"]["gpu-bundle"]["archives"]["amd64-gpu"]["sha256"] = ${JSON.stringify(gpu.sha256)}
+manifest["bundles"]["gpu-bundle"]["archives"]["arm64-cpu"]["file"] = ${JSON.stringify(gpu.tarPath)}
+manifest["bundles"]["gpu-bundle"]["archives"]["arm64-cpu"]["sha256"] = ${JSON.stringify(gpu.sha256)}
+manifest["bundles"]["gpu-bundle"]["smokeImports"] = ["onnxruntime", "rembg"]
+with open(${JSON.stringify(manifestPath)}, "w") as f:
+    json.dump(manifest, f)
+
+os.environ["PYTHON_VENV_PATH"] = ${JSON.stringify(venvDir)}
+os.environ["SNAPOTTER_BUNDLE_LOCAL_PATH"] = ${JSON.stringify(gpu.tarPath)}
+sys.argv = ["install_feature.py", "gpu-bundle", ${JSON.stringify(manifestPath)}, ${JSON.stringify(modelsDir)}]
+
+class FakeProc:
+    def __init__(self, rc, stdout="", stderr=""):
+        self.returncode = rc
+        self.stdout = stdout
+        self.stderr = stderr
+
+real_run = mod.subprocess.run
+def fake_run(cmd, *a, **kw):
+    if "-c" in cmd and "import onnxruntime" in cmd[-1]:
+        return FakeProc(1, "", "ImportError: libcudart.so.12: cannot open shared object file")
+    if "pip" in cmd and "onnxruntime==1.20.1" in cmd:
+        return FakeProc(1, "", "ERROR: Could not find a version that satisfies the requirement onnxruntime==1.20.1")
+    return real_run(cmd, *a, **kw)
+
+mod.subprocess.run = fake_run
+try:
+    mod._install()
+    assert False, "expected SystemExit"
+except SystemExit:
+    pass
+finally:
+    mod.subprocess.run = real_run
+
+assert "Fallback onnxruntime==1.20.1 installation failed" in errors[-1], errors[-1]
+sp = ${JSON.stringify(sitePackagesDir)}
+assert not os.path.exists(os.path.join(sp, "onnxruntime", "capi", "libonnxruntime_providers_cuda.so"))
+assert open(os.path.join(sp, "onnxruntime", "__init__.py")).read() == "cpu"
+assert open(os.path.join(sp, "onnxruntime", "capi", "onnxruntime_pybind11_state.so")).read() == "cpu"
+assert os.path.isdir(os.path.join(sp, "onnxruntime-1.20.1.dist-info"))
+assert not os.path.exists(os.path.join(sp, "onnxruntime_gpu-1.20.1.dist-info"))
+assert not os.path.exists(os.path.join(${JSON.stringify(venvDir)}, ".superseded"))
+assert not os.path.exists(os.path.join(${JSON.stringify(aiDir)}, "venv.writing"))
+`,
+      ],
+      { encoding: "utf-8" },
+    );
+    expect(pyCheck.status, `stderr: ${pyCheck.stderr}`).toBe(0);
+  });
 });
 
 describe("OpenCV orphan delta reconciliation and disk precheck (#1248, #1030)", () => {

@@ -174,3 +174,37 @@ def test_staging_with_both_flavors_ships_gpu_metadata_only(tmp_path):
     assert (venv_sp / "onnxruntime" / "capi" / CUDA_PROVIDER_LIB).exists()
     assert cpu_dist_infos(venv_sp) == []
     assert gpu_dist_infos(venv_sp) == ["onnxruntime_gpu-1.20.1.dist-info"]
+
+
+def test_incoming_gpu_bundle_quarantines_cpu_build_for_rollback(tmp_path):
+    """When quarantine_dir is provided, displacing CPU onnxruntime quarantines
+    both its package files and dist-info so a failed GPU bundle install rolls
+    back to the working CPU build (#2612)."""
+    installer = load_installer()
+    staging = tmp_path / "staging"
+    venv_sp = tmp_path / "venv-sp"
+    quarantine = tmp_path / "venv" / ".superseded"
+    staging.mkdir()
+    venv_sp.mkdir()
+    make_onnxruntime(venv_sp, "cpu")
+    make_onnxruntime(staging, "gpu")
+
+    installer.reconcile_onnxruntime(str(staging), str(venv_sp), str(quarantine))
+    plan = installer.plan_reconciliation(str(staging), str(venv_sp))
+    installer.supersede_distributions(str(venv_sp), plan, str(quarantine))
+    installer.move_tree(str(staging), str(venv_sp))
+
+    assert (quarantine / "onnxruntime" / "1.20.1" / "onnxruntime-1.20.1.dist-info" / "METADATA").exists()
+    assert (venv_sp / "onnxruntime" / "capi" / CUDA_PROVIDER_LIB).exists()
+    assert gpu_dist_infos(venv_sp) == ["onnxruntime_gpu-1.20.1.dist-info"]
+    assert cpu_dist_infos(venv_sp) == []
+
+    installer.rollback_reconciliation(str(venv_sp), plan, str(quarantine))
+
+    assert not (venv_sp / "onnxruntime" / "capi" / CUDA_PROVIDER_LIB).exists()
+    assert (venv_sp / "onnxruntime" / "__init__.py").read_text() == "cpu"
+    assert (venv_sp / "onnxruntime" / "capi" / "onnxruntime_pybind11_state.so").read_text() == "cpu"
+    assert cpu_dist_infos(venv_sp) == ["onnxruntime-1.20.1.dist-info"]
+    assert gpu_dist_infos(venv_sp) == []
+    assert not quarantine.exists()
+

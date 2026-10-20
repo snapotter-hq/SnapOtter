@@ -1021,9 +1021,15 @@ def move_tree(src: str, dst: str, progress_cb=None, copy_activity_cb=None) -> No
             progress_cb()
     # Remove whatever remains of src (emptied by renames, or copied originals).
     shutil.rmtree(src, ignore_errors=True)
+    if dst:
+        _displaced_onnx_dist_infos.pop(os.path.abspath(dst), None)
 
 
 # -- ONNX Runtime flavor reconciliation (GPU wins) --
+
+# Keyed by os.path.abspath(site_packages_dir) -> [(version, dist_info, meta_files_or_None)]
+_displaced_onnx_dist_infos: dict = {}
+
 
 def _onnx_dist_infos(sp_dir: str) -> tuple:
     """Return (cpu, gpu) lists of onnxruntime dist-info directory names.
@@ -1041,7 +1047,34 @@ def _onnx_dist_infos(sp_dir: str) -> tuple:
     return (cpu, gpu)
 
 
-def reconcile_onnxruntime(staging_sp: str, site_packages_dir: str) -> None:
+def _onnx_owned_files(sp_dir: str, dist_info: str) -> list:
+    """Relative paths owned by an onnxruntime or onnxruntime-gpu dist-info.
+
+    Reads RECORD when present; falls back to walking onnxruntime/ (and its
+    .libs directories) only when RECORD is absent, so synthetic test trees
+    that lay out METADATA without RECORD still quarantine and roll back.
+    """
+    dist_info_dir = os.path.join(sp_dir, dist_info)
+    if not os.path.isdir(dist_info_dir):
+        return []
+    recorded = distribution_files(sp_dir, dist_info)
+    if recorded or os.path.exists(os.path.join(dist_info_dir, "RECORD")):
+        return recorded
+    paths = []
+    for top in ("onnxruntime", "onnxruntime.libs", "onnxruntime_gpu.libs"):
+        top_dir = os.path.join(sp_dir, top)
+        if not os.path.isdir(top_dir):
+            continue
+        for root, _dirs, files in os.walk(top_dir):
+            for name in sorted(files):
+                rel = os.path.relpath(os.path.join(root, name), sp_dir).replace("\\", "/")
+                paths.append(rel)
+    return paths
+
+
+def reconcile_onnxruntime(
+    staging_sp: str, site_packages_dir: str, quarantine_dir: str = ""
+) -> None:
     """Never let a bundle downgrade the venv's ONNX Runtime from GPU to CPU.
 
     `onnxruntime` (CPU) and `onnxruntime-gpu` unpack into the SAME package
@@ -1055,6 +1088,8 @@ def reconcile_onnxruntime(staging_sp: str, site_packages_dir: str) -> None:
     """
     staging_cpu, staging_gpu = _onnx_dist_infos(staging_sp)
     venv_cpu, venv_gpu = _onnx_dist_infos(site_packages_dir)
+    if site_packages_dir:
+        _displaced_onnx_dist_infos.pop(os.path.abspath(site_packages_dir), None)
 
     if staging_cpu and (venv_gpu or staging_gpu):
         # Incoming CPU flavor while a GPU build exists: drop the CPU metadata,
@@ -1077,9 +1112,64 @@ def reconcile_onnxruntime(staging_sp: str, site_packages_dir: str) -> None:
         # Incoming GPU flavor over a CPU install: the GPU files win the merge;
         # clear the venv's stale CPU metadata so pip reflects reality. This also
         # makes reinstalling any GPU bundle repair a venv clobbered before this
-        # guard existed.
-        for name in venv_cpu:
-            shutil.rmtree(os.path.join(site_packages_dir, name), ignore_errors=True)
+        # guard existed. When quarantine_dir is given, hold the displaced CPU
+        # package and its dist-info in quarantine so a failed install rolls
+        # back to the working CPU build (#2612).
+        if quarantine_dir:
+            gpu_dist_info = sorted(staging_gpu)[-1]
+            _, sep, gpu_version = gpu_dist_info[: -len(DIST_INFO_SUFFIX)].rpartition("-")
+            if not sep or not gpu_version:
+                gpu_version = gpu_dist_info
+            staged_files = [
+                rel
+                for rel in _onnx_owned_files(staging_sp, gpu_dist_info)
+                if os.path.exists(os.path.join(staging_sp, rel))
+            ]
+            replaces = {rel.split("/")[0] for rel in staged_files}
+            if os.path.isdir(os.path.join(staging_sp, "onnxruntime")):
+                replaces.update(("onnxruntime", "onnxruntime.libs"))
+            superseded = []
+            for dist_info in venv_cpu + venv_gpu:
+                _, v_sep, ver = dist_info[: -len(DIST_INFO_SUFFIX)].rpartition("-")
+                superseded.append((ver if (v_sep and ver) else dist_info, dist_info))
+            _supersede_distributions_impl(
+                site_packages_dir,
+                [
+                    {
+                        "name": "onnxruntime-gpu",
+                        "version": gpu_version,
+                        "dist_info": gpu_dist_info,
+                        "files": staged_files,
+                        "replaces": replaces,
+                        "superseded": superseded,
+                    }
+                ],
+                quarantine_dir,
+                log_replacements=False,
+            )
+            if site_packages_dir:
+                _displaced_onnx_dist_infos[os.path.abspath(site_packages_dir)] = [
+                    (ver, di, None) for ver, di in superseded
+                ]
+        else:
+            saved = []
+            for name in venv_cpu:
+                _, sep, version = name[: -len(DIST_INFO_SUFFIX)].rpartition("-")
+                if not sep or not version:
+                    version = name
+                di_root = os.path.join(site_packages_dir, name)
+                meta_files = {}
+                if os.path.isdir(di_root):
+                    for root, _dirs, files in os.walk(di_root):
+                        for fname in files:
+                            full = os.path.join(root, fname)
+                            rel = os.path.relpath(full, site_packages_dir).replace("\\", "/")
+                            with open(full, "rb") as f:
+                                meta_files[rel] = f.read()
+                saved.append((version, name, meta_files))
+                shutil.rmtree(di_root, ignore_errors=True)
+            if saved and site_packages_dir:
+                _displaced_onnx_dist_infos[os.path.abspath(site_packages_dir)] = saved
         sys.stderr.write(
             "[install] replacing the CPU build of onnxruntime with the GPU build; "
             "removed its stale metadata\n"
@@ -1302,48 +1392,95 @@ def plan_reconciliation(staging_sp: str, sp_dir: str) -> list:
     """
     staged = list_distributions(staging_sp)
     installed = list_distributions(sp_dir)
+    displaced_onnx = (
+        _displaced_onnx_dist_infos.get(os.path.abspath(sp_dir), [])
+        if sp_dir
+        else []
+    )
     plan = []
     for name in sorted(staged):
         version, dist_info = sorted(staged[name])[-1]
         existing = installed.get(name, [])
         superseded = [copy for copy in existing if copy[0] != version]
+        if name == "onnxruntime-gpu":
+            if installed.get("onnxruntime") or displaced_onnx:
+                superseded = list(existing)
+            seen_di = {di for _v, di in superseded}
+            for ver, di in installed.get("onnxruntime", []):
+                if di not in seen_di:
+                    superseded.append((ver, di))
+                    seen_di.add(di)
+            for ver, di, _meta in displaced_onnx:
+                if di not in seen_di:
+                    superseded.append((ver, di))
+                    seen_di.add(di)
         if existing and not superseded:
             continue
         # RECORD describes the wheel, not the archive. A bundle's copy of
         # setuptools lists `_distutils_hack/` and `distutils-precedence.pth`
         # while carrying neither, so trusting RECORD alone would clear ground
         # that nothing is going to cover. Keep only what is really staged.
+        raw_files = (
+            _onnx_owned_files(staging_sp, dist_info)
+            if name in ("onnxruntime", "onnxruntime-gpu")
+            else distribution_files(staging_sp, dist_info)
+        )
         files = [
             rel
-            for rel in distribution_files(staging_sp, dist_info)
+            for rel in raw_files
             if os.path.exists(os.path.join(staging_sp, rel))
         ]
+        replaces = {rel.split("/")[0] for rel in files}
+        if name == "onnxruntime-gpu" and os.path.isdir(os.path.join(staging_sp, "onnxruntime")):
+            replaces.update(("onnxruntime", "onnxruntime.libs"))
         plan.append(
             {
                 "name": name,
                 "version": version,
                 "dist_info": dist_info,
                 "files": files,
-                "replaces": {rel.split("/")[0] for rel in files},
+                "replaces": replaces,
                 "superseded": superseded,
             }
         )
     return plan
 
 
-def supersede_distributions(sp_dir: str, plan: list, quarantine_dir: str) -> int:
-    """Uninstall every superseded version, holding its files for a rollback.
-
-    Files move to `quarantine_dir/<name>/<version>/` rather than being deleted
-    outright, so a failed verification can put the venv back exactly as it was
-    instead of leaving it half-way between two bundles.
-    """
+def _supersede_distributions_impl(
+    sp_dir: str,
+    plan: list,
+    quarantine_dir: str,
+    log_replacements: bool = True,
+) -> int:
     removed = 0
+    displaced_by_di = {}
+    if sp_dir:
+        for ver, di, meta in _displaced_onnx_dist_infos.pop(os.path.abspath(sp_dir), []):
+            displaced_by_di[di] = (ver, meta)
     superseded_dist_infos = {info for item in plan for _v, info in item["superseded"]}
-    shared = paths_claimed_by_others(sp_dir, superseded_dist_infos)
+    for di, (_ver, meta) in displaced_by_di.items():
+        if di in superseded_dist_infos and meta:
+            for rel, content in meta.items():
+                target = os.path.join(sp_dir, rel)
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                with open(target, "wb") as f:
+                    f.write(content)
+    placed_dist_infos = {item["dist_info"] for item in plan if item.get("dist_info")}
+    shared = paths_claimed_by_others(sp_dir, superseded_dist_infos | placed_dist_infos)
     for item in plan:
         for version, dist_info in item["superseded"]:
-            destination = os.path.join(quarantine_dir, item["name"], version)
+            dist_name, sep, _ = dist_info[: -len(DIST_INFO_SUFFIX)].rpartition("-")
+            quarantine_name = (
+                canonical_dist_name(dist_name) if (sep and dist_name) else item["name"]
+            )
+            destination = os.path.join(quarantine_dir, quarantine_name, version)
+            if (
+                dist_info in displaced_by_di
+                and displaced_by_di[dist_info][1] is None
+                and not os.path.exists(os.path.join(sp_dir, dist_info))
+            ):
+                removed += 1
+                continue
             # Only clear ground the incoming copy is going to cover. A bundle
             # archive is not always a complete wheel: upscale-enhance carries
             # setuptools 74.1.3 as `setuptools/` and its dist-info, without the
@@ -1353,7 +1490,12 @@ def supersede_distributions(sp_dir: str, plan: list, quarantine_dir: str) -> int
             # stopped importing, because nothing was going to write those files
             # back. Anything the incoming copy does not carry stays put.
             replaces = item["replaces"] | {dist_info}
-            for rel in distribution_files(sp_dir, dist_info):
+            owned_files = (
+                _onnx_owned_files(sp_dir, dist_info)
+                if quarantine_name in ("onnxruntime", "onnxruntime-gpu")
+                else distribution_files(sp_dir, dist_info)
+            )
+            for rel in owned_files:
                 if rel in shared or rel.split("/")[0] not in replaces:
                     continue
                 if _relocate(sp_dir, destination, rel):
@@ -1370,13 +1512,26 @@ def supersede_distributions(sp_dir: str, plan: list, quarantine_dir: str) -> int
                         _relocate(sp_dir, destination, rel)
                 shutil.rmtree(leftover, ignore_errors=True)
             removed += 1
-            sys.stderr.write(
-                f"[install] replacing {item['name']} {version} with {item['version']}: "
-                f"removed the superseded version so only one stays in the venv\n"
-            )
-    if removed:
+            if log_replacements:
+                sys.stderr.write(
+                    f"[install] replacing {quarantine_name} {version} with {item['version']}: "
+                    f"removed the superseded version so only one stays in the venv\n"
+                )
+    if removed and log_replacements:
         sys.stderr.flush()
     return removed
+
+
+def supersede_distributions(sp_dir: str, plan: list, quarantine_dir: str) -> int:
+    """Uninstall every superseded version, holding its files for a rollback.
+
+    Files move to `quarantine_dir/<name>/<version>/` rather than being deleted
+    outright, so a failed verification can put the venv back exactly as it was
+    instead of leaving it half-way between two bundles.
+    """
+    return _supersede_distributions_impl(
+        sp_dir, plan, quarantine_dir, log_replacements=True
+    )
 
 
 REMEDIATION_BACKUP_DIRNAME = ".remediation"
@@ -1542,15 +1697,17 @@ def _format_proc_failure(proc, tool_name: str = "pip") -> str:
 
 def restore_superseded(sp_dir: str, quarantine_dir: str) -> None:
     """Put every quarantined version back where it came from."""
+    if sp_dir:
+        _displaced_onnx_dist_infos.pop(os.path.abspath(sp_dir), None)
     if not os.path.isdir(quarantine_dir):
         return
-    for name in os.listdir(quarantine_dir):
+    for name in sorted(os.listdir(quarantine_dir)):
         if name == REMEDIATION_BACKUP_DIRNAME:
             continue
         holder = os.path.join(quarantine_dir, name)
         if not os.path.isdir(holder):
             continue
-        for version in os.listdir(holder):
+        for version in sorted(os.listdir(holder)):
             version_root = os.path.join(holder, version)
             if not os.path.isdir(version_root):
                 continue
@@ -2303,7 +2460,7 @@ def _install() -> None:
             # it. Running it first also means that when the CPU build is dropped
             # from staging, the general pass never sees it and so never uninstalls
             # the GPU build the venv is keeping (#490).
-            reconcile_onnxruntime(staging_sp, site_packages_dir)
+            reconcile_onnxruntime(staging_sp, site_packages_dir, quarantine_dir)
             reconcile_opencv(staging_sp, site_packages_dir)
             reconciliation_plan = plan_reconciliation(staging_sp, site_packages_dir)
             supersede_distributions(site_packages_dir, reconciliation_plan, quarantine_dir)
