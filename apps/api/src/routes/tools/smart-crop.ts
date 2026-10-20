@@ -87,21 +87,13 @@ function clampRegion(
   imgW: number,
   imgH: number,
 ) {
-  const w = Math.min(cropW, imgW);
-  const h = Math.min(cropH, imgH);
-  let l = left;
-  let t = top;
-
-  if (l < 0) l = 0;
-  if (t < 0) t = 0;
-  if (l + w > imgW) l = imgW - w;
-  if (t + h > imgH) t = imgH - h;
-
+  const width = Math.min(imgW, Math.round(cropW));
+  const height = Math.min(imgH, Math.round(cropH));
   return {
-    left: Math.round(Math.max(0, l)),
-    top: Math.round(Math.max(0, t)),
-    width: Math.round(w),
-    height: Math.round(h),
+    left: Math.min(Math.max(0, Math.round(left)), imgW - width),
+    top: Math.min(Math.max(0, Math.round(top)), imgH - height),
+    width,
+    height,
   };
 }
 

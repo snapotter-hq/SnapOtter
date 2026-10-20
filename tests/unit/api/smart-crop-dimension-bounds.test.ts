@@ -4,7 +4,9 @@
  * pixel limit either throws in Sharp or allocates hundreds of MB to several GB
  * in the API worker (#2064, #2203). The schema caps output and padded pairs at
  * MAX_RESIZE_OUTPUT_PIXELS (64 MP), and processSubject refuses a cover
- * intermediate whose aspect-ratio stretch exceeds that limit.
+ * intermediate whose aspect-ratio stretch exceeds that limit. Face mode's
+ * clampRegion also rounds crop dimensions before clamping offsets so half-pixel
+ * crops at the right or bottom edge never overrun the image by 1 px (#2200).
  */
 
 import { MAX_RESIZE_OUTPUT_PIXELS } from "@snapotter/image-engine";
@@ -231,5 +233,115 @@ describe("smart-crop subject: cover intermediate pixel limit (#2203)", () => {
     const out = await config.process(input, settings, "strip.png", ctx);
     const meta = await sharp(out.buffer).metadata();
     expect([meta.width, meta.height]).toEqual([100, 100]);
+  });
+});
+
+describe("smart-crop face: clampRegion half-pixel rounding at image edges (#2200)", () => {
+  const ctx = {} as ToolProcessCtx;
+
+  async function canvasWithWindow(
+    width: number,
+    height: number,
+    window: { left: number; top: number; width: number; height: number },
+  ) {
+    const patch = await sharp({
+      create: {
+        width: window.width,
+        height: window.height,
+        channels: 3,
+        background: "#cc2200",
+      },
+    })
+      .png()
+      .toBuffer();
+    return sharp({ create: { width, height, channels: 3, background: "#336699" } })
+      .composite([{ input: patch, left: window.left, top: window.top }])
+      .png()
+      .toBuffer();
+  }
+
+  async function topLeftPixel(buffer: Buffer) {
+    const { data } = await sharp(buffer)
+      .extract({ left: 0, top: 0, width: 1, height: 1 })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    return [data[0], data[1], data[2]];
+  }
+
+  it("does not overrun the bottom edge by 1 px when cropH ends in .5", async () => {
+    // 4032 x 3024 with head-shoulders (multiplier 2.8) on a 756 px tall face at the bottom
+    // gives cropH = 2116.8 -> clamped by cropW <= 4032 at aspect 1920/1005 to cropH = 2110.5.
+    // Rounding top (913.5 -> 914) and height (2110.5 -> 2111) separately reaches row 3025.
+    mocks.detectFaces.mockResolvedValueOnce({
+      facesDetected: 1,
+      faces: [{ x: 1714, y: 2268, w: 605, h: 756 }],
+    });
+    const input = await canvasWithWindow(4032, 3024, {
+      left: 0,
+      top: 913,
+      width: 4032,
+      height: 2111,
+    });
+    const settings = schema.safeParse({ mode: "face", width: 1920, height: 1005 }).data;
+    const out = await config.process(input, settings, "photo.png", ctx);
+    const meta = await sharp(out.buffer).metadata();
+    expect([meta.width, meta.height]).toEqual([1920, 1005]);
+    const [r, g, b] = await topLeftPixel(out.buffer);
+    expect(r).toBeGreaterThan(180);
+    expect(g).toBeLessThan(60);
+    expect(b).toBeLessThan(30);
+  });
+
+  it("does not overrun the right edge by 1 px when cropW ends in .5", async () => {
+    // Portrait mirror: a 1586 px tall face near the right edge of a 3024 x 4032 image
+    // clamps cropH to 4032 and sets cropW = 4032 * (1005 / 1920) = 2110.5, so rounding
+    // left (913.5 -> 914) and width (2110.5 -> 2111) separately reaches col 3025.
+    mocks.detectFaces.mockResolvedValueOnce({
+      facesDetected: 1,
+      faces: [{ x: 2419, y: 1219, w: 605, h: 1586 }],
+    });
+    const input = await canvasWithWindow(3024, 4032, {
+      left: 913,
+      top: 0,
+      width: 2111,
+      height: 4032,
+    });
+    const settings = schema.safeParse({ mode: "face", width: 1005, height: 1920 }).data;
+    const out = await config.process(input, settings, "portrait.png", ctx);
+    const meta = await sharp(out.buffer).metadata();
+    expect([meta.width, meta.height]).toEqual([1005, 1920]);
+    const [r, g, b] = await topLeftPixel(out.buffer);
+    expect(r).toBeGreaterThan(180);
+    expect(g).toBeLessThan(60);
+    expect(b).toBeLessThan(30);
+  });
+
+  it("does not overrun either edge when an unclamped corner crop ends in .5 on both axes", async () => {
+    // 400 x 400 with upper-body (multiplier 4.5) on a 55 x 55 face near the bottom-right corner
+    // gives cropW = cropH = 247.5 (< 400, so neither side is clamped to the full image).
+    // Rounding left/top (152.5 -> 153) and width/height (247.5 -> 248) separately reaches 401.
+    mocks.detectFaces.mockResolvedValueOnce({
+      facesDetected: 1,
+      faces: [{ x: 300, y: 300, w: 55, h: 55 }],
+    });
+    const input = await canvasWithWindow(400, 400, {
+      left: 152,
+      top: 152,
+      width: 248,
+      height: 248,
+    });
+    const settings = schema.safeParse({
+      mode: "face",
+      facePreset: "upper-body",
+      width: 100,
+      height: 100,
+    }).data;
+    const out = await config.process(input, settings, "corner.png", ctx);
+    const meta = await sharp(out.buffer).metadata();
+    expect([meta.width, meta.height]).toEqual([100, 100]);
+    const [r, g, b] = await topLeftPixel(out.buffer);
+    expect(r).toBeGreaterThan(180);
+    expect(g).toBeLessThan(60);
+    expect(b).toBeLessThan(30);
   });
 });
