@@ -209,7 +209,7 @@ export function LayersPanel() {
           onClick={addLayer}
           className="flex items-center justify-center h-7 w-7 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
           title={format(t.editor.panels.layers.newLayerTitle, {
-            shortcut: formatShortcut("mod+shift+n", hotkeysModIsMeta()),
+            shortcut: formatShortcut("mod+alt+shift+n", hotkeysModIsMeta()),
           })}
           aria-label={t.a11y.addLayer}
           data-testid="add-layer-btn"

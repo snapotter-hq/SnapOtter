@@ -196,7 +196,7 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
         {
           id: "free-transform",
           label: m.edit.freeTransform,
-          shortcut: hint("mod+T"),
+          shortcut: hint("mod+Alt+T"),
           action: () => setTool("transform"),
           dividerAfter: true,
         },
@@ -299,7 +299,7 @@ function useMenuDefinitions(callbacks: MenuBarCallbacks): MenuDef[] {
         {
           id: "new-layer",
           label: m.layer.newLayer,
-          shortcut: hint("mod+Shift+N"),
+          shortcut: hint("mod+Alt+Shift+N"),
           action: addLayer,
         },
         {

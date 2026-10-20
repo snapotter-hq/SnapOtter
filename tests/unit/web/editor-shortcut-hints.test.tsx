@@ -89,13 +89,13 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("editor shortcut hints (#1820)", () => {
+describe("editor shortcut hints (#1820, #1963)", () => {
   it("names Cmd on a Mac, where the editor's handlers want Cmd", async () => {
     onDevice("MacIntel", SAFARI_MAC);
     expect(await renderHints()).toEqual({
       undo: "Undo (⌘Z)",
       redo: "Redo (⌘⇧Z)",
-      newLayer: "New Layer (⌘⇧N)",
+      newLayer: "New Layer (⌘⌥⇧N)",
       paste: "Or paste from clipboard (⌘V)",
     });
   });
@@ -105,7 +105,7 @@ describe("editor shortcut hints (#1820)", () => {
     expect(await renderHints()).toEqual({
       undo: "Undo (Ctrl+Z)",
       redo: "Redo (Ctrl+Shift+Z)",
-      newLayer: "New Layer (Ctrl+Shift+N)",
+      newLayer: "New Layer (Ctrl+Alt+Shift+N)",
       paste: "Or paste from clipboard (Ctrl+V)",
     });
   });
@@ -118,7 +118,7 @@ describe("editor shortcut hints (#1820)", () => {
     expect(await renderHints()).toEqual({
       undo: "Undo (Ctrl+Z)",
       redo: "Redo (Ctrl+Shift+Z)",
-      newLayer: "New Layer (Ctrl+Shift+N)",
+      newLayer: "New Layer (Ctrl+Alt+Shift+N)",
       paste: "Or paste from clipboard (⌘V)",
     });
   });

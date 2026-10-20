@@ -73,7 +73,7 @@ const TOOL_GROUPS: ToolGroup[] = [
   {
     tools: [
       { tool: "move", icon: MousePointer2, shortcut: "V" },
-      { tool: "transform", icon: Maximize2, shortcut: "mod+t" },
+      { tool: "transform", icon: Maximize2, shortcut: "mod+alt+t" },
     ],
   },
   {

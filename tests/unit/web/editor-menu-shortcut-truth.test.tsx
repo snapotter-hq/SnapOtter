@@ -42,6 +42,8 @@ import { useEditorStore } from "@/stores/editor-store";
 
 const CHROME_WINDOWS =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
+const SAFARI_MAC =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15";
 
 const INITIAL_STATE = useEditorStore.getState();
 
@@ -133,6 +135,84 @@ describe("editor menu bar hints name keys that run the command (#1943)", () => {
     onWindows();
     renderMenuBar();
     expect(menuHints("select").get("all")).toBe("Ctrl+A");
+  });
+
+  it("shows tab-safe shortcuts on Free Transform and New Layer (#1963)", () => {
+    onWindows();
+    renderMenuBar();
+    expect(menuHints("edit").get("free-transform")).toBe("Ctrl+Alt+T");
+    expect(menuHints("layer").get("new-layer")).toBe("Ctrl+Alt+Shift+N");
+  });
+
+  it("runs Free Transform on both Ctrl+Alt+T and Ctrl+T, and New Layer on both Ctrl+Alt+Shift+N and Ctrl+Shift+N (#1963)", () => {
+    onWindows();
+    renderHook(() => useEditorShortcuts());
+
+    useEditorStore.getState().setTool("move");
+    fireEvent.keyDown(document, { key: "t", code: "KeyT", ctrlKey: true, altKey: true });
+    expect(useEditorStore.getState().activeTool).toBe("transform");
+
+    useEditorStore.getState().setTool("move");
+    fireEvent.keyDown(document, { key: "t", code: "KeyT", ctrlKey: true });
+    expect(useEditorStore.getState().activeTool).toBe("transform");
+
+    const initialLayers = useEditorStore.getState().layers.length;
+    fireEvent.keyDown(document, {
+      key: "N",
+      code: "KeyN",
+      ctrlKey: true,
+      altKey: true,
+      shiftKey: true,
+    });
+    expect(useEditorStore.getState().layers).toHaveLength(initialLayers + 1);
+    expect(useEditorStore.getState().activeTool).toBe("transform");
+
+    fireEvent.keyDown(document, { key: "N", code: "KeyN", ctrlKey: true, shiftKey: true });
+    expect(useEditorStore.getState().layers).toHaveLength(initialLayers + 2);
+    expect(useEditorStore.getState().activeTool).toBe("transform");
+
+    // Input focus suppresses both the tab-safe and PWA chords
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    input.focus();
+    try {
+      useEditorStore.getState().setTool("move");
+      fireEvent.keyDown(input, { key: "t", code: "KeyT", ctrlKey: true, altKey: true });
+      fireEvent.keyDown(input, { key: "t", code: "KeyT", ctrlKey: true });
+      expect(useEditorStore.getState().activeTool).toBe("move");
+
+      fireEvent.keyDown(input, {
+        key: "N",
+        code: "KeyN",
+        ctrlKey: true,
+        altKey: true,
+        shiftKey: true,
+      });
+      fireEvent.keyDown(input, { key: "N", code: "KeyN", ctrlKey: true, shiftKey: true });
+      expect(useEditorStore.getState().layers).toHaveLength(initialLayers + 2);
+    } finally {
+      input.remove();
+    }
+  });
+
+  it("matches Cmd+Option+T and Cmd+Option+Shift+N on a Mac even when Option mutates e.key (#1963)", () => {
+    vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue(SAFARI_MAC);
+    renderHook(() => useEditorShortcuts());
+
+    useEditorStore.getState().setTool("move");
+    fireEvent.keyDown(document, { key: "†", code: "KeyT", metaKey: true, altKey: true });
+    expect(useEditorStore.getState().activeTool).toBe("transform");
+
+    const initialLayers = useEditorStore.getState().layers.length;
+    fireEvent.keyDown(document, {
+      key: "˜",
+      code: "KeyN",
+      metaKey: true,
+      altKey: true,
+      shiftKey: true,
+    });
+    expect(useEditorStore.getState().layers).toHaveLength(initialLayers + 1);
   });
 
   it.each([

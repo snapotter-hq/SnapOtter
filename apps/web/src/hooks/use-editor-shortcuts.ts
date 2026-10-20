@@ -507,9 +507,9 @@ export function useEditorShortcuts(callbacks?: {
     { preventDefault: true },
   );
 
-  // Ctrl+T / Cmd+T - Free transform
+  // Ctrl+Alt+T / Cmd+Option+T (plus Ctrl+T / Cmd+T in an installed PWA) - Free transform
   useHotkeys(
-    "mod+t",
+    "mod+alt+t,mod+t",
     (e) => {
       if (isInputFocused()) return;
       e.preventDefault();
@@ -530,9 +530,9 @@ export function useEditorShortcuts(callbacks?: {
     { preventDefault: true },
   );
 
-  // Ctrl+Shift+N / Cmd+Shift+N - New layer
+  // Ctrl+Alt+Shift+N / Cmd+Option+Shift+N (plus Ctrl+Shift+N / Cmd+Shift+N in an installed PWA) - New layer
   useHotkeys(
-    "mod+shift+n",
+    "mod+alt+shift+n,mod+shift+n",
     (e) => {
       if (isInputFocused()) return;
       e.preventDefault();

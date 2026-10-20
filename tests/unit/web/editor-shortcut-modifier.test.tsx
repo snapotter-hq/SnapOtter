@@ -167,11 +167,11 @@ describe("editor context menu shortcut hints (#1935)", () => {
   });
 });
 
-describe("editor toolbar Transform tooltip (#1935)", () => {
+describe("editor toolbar Transform tooltip (#1935, #1963)", () => {
   it.each([
-    ["MacIntel", SAFARI_MAC, "⌘T"],
-    ["Win32", CHROME_WINDOWS, "Ctrl+T"],
-    ["iPad", SAFARI_IPAD_MOBILE, "Ctrl+T"],
+    ["MacIntel", SAFARI_MAC, "⌘⌥T"],
+    ["Win32", CHROME_WINDOWS, "Ctrl+Alt+T"],
+    ["iPad", SAFARI_IPAD_MOBILE, "Ctrl+Alt+T"],
   ])("on %s", (platform, userAgent, shortcut) => {
     onDevice(platform, userAgent);
     expect(transformTitle()).toBe(`${en.editor.menu.edit.freeTransform} (${shortcut})`);
@@ -213,14 +213,24 @@ describe("editor menu bar modifier (#1935)", () => {
   });
 
   it.each([
-    // No menu row carries Alt since #1943 dropped the unbound Image Size and
-    // Canvas Size hints; search-shortcut-hint.test.tsx covers Alt formatting.
-    ["Win32", CHROME_WINDOWS, "Ctrl+A", "Ctrl+D", "Ctrl+Shift+I", "Ctrl+=", "Ctrl+-"],
-    ["MacIntel", SAFARI_MAC, "⌘A", "⌘D", "⌘⇧I", "⌘=", "⌘-"],
-  ])("on %s formats Shift and punctuation keys", async (platform, userAgent, ...expected) => {
+    [
+      "Win32",
+      CHROME_WINDOWS,
+      "Ctrl+Alt+T",
+      "Ctrl+Alt+Shift+N",
+      "Ctrl+A",
+      "Ctrl+D",
+      "Ctrl+Shift+I",
+      "Ctrl+=",
+      "Ctrl+-",
+    ],
+    ["MacIntel", SAFARI_MAC, "⌘⌥T", "⌘⌥⇧N", "⌘A", "⌘D", "⌘⇧I", "⌘=", "⌘-"],
+  ])("on %s formats Alt, Shift, and punctuation keys", async (platform, userAgent, ...expected) => {
     onDevice(platform, userAgent);
     const shown: (string | null | undefined)[] = [];
     for (const [menu, item] of [
+      ["edit", "free-transform"],
+      ["layer", "new-layer"],
       ["select", "all"],
       ["select", "deselect"],
       ["select", "inverse"],
