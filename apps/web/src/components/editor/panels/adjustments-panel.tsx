@@ -2,7 +2,11 @@
 
 import { Wand2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { hasCurvesAdjustments, hasLevelsAdjustments } from "@/components/editor/adjustment-lut";
+import {
+  curveLut,
+  hasCurvesAdjustments,
+  hasLevelsAdjustments,
+} from "@/components/editor/adjustment-lut";
 import { SliderRow } from "@/components/editor/common/slider-row";
 import { HistogramPanel } from "@/components/editor/panels/histogram-panel";
 import { useDocumentHistogram } from "@/components/editor/panels/use-document-histogram";
@@ -203,94 +207,6 @@ const CURVE_PRESET_IDS = Object.keys(CURVE_PRESETS) as CurvePresetId[];
 
 // "Custom" is not a preset: it marks hand-edited points and stays a stable id.
 type CurvePresetSelection = CurvePresetId | "Custom";
-
-// ---------------------------------------------------------------------------
-// Cubic spline interpolation for curves
-// ---------------------------------------------------------------------------
-
-function cubicSplineInterpolate(points: CurvePoint[]): number[] {
-  const lut = new Array(256).fill(0);
-  if (points.length < 2) {
-    for (let i = 0; i < 256; i++) lut[i] = i;
-    return lut;
-  }
-
-  const sorted = [...points].sort((a, b) => a.x - b.x);
-  const n = sorted.length;
-
-  if (n === 2) {
-    // Linear interpolation
-    const [p0, p1] = sorted;
-    const dx = p1.x - p0.x;
-    for (let i = 0; i < 256; i++) {
-      if (i <= p0.x) {
-        lut[i] = Math.round(p0.y);
-      } else if (i >= p1.x) {
-        lut[i] = Math.round(p1.y);
-      } else {
-        const t = (i - p0.x) / dx;
-        lut[i] = Math.round(p0.y + t * (p1.y - p0.y));
-      }
-      lut[i] = Math.max(0, Math.min(255, lut[i]));
-    }
-    return lut;
-  }
-
-  // Natural cubic spline
-  const xs = sorted.map((p) => p.x);
-  const ys = sorted.map((p) => p.y);
-  const h: number[] = [];
-  const alpha: number[] = [0];
-
-  for (let i = 0; i < n - 1; i++) {
-    h[i] = xs[i + 1] - xs[i];
-  }
-
-  for (let i = 1; i < n - 1; i++) {
-    alpha[i] = (3 / h[i]) * (ys[i + 1] - ys[i]) - (3 / h[i - 1]) * (ys[i] - ys[i - 1]);
-  }
-
-  const c = new Array(n).fill(0);
-  const l = new Array(n).fill(1);
-  const mu = new Array(n).fill(0);
-  const z = new Array(n).fill(0);
-
-  for (let i = 1; i < n - 1; i++) {
-    l[i] = 2 * (xs[i + 1] - xs[i - 1]) - h[i - 1] * mu[i - 1];
-    mu[i] = h[i] / l[i];
-    z[i] = (alpha[i] - h[i - 1] * z[i - 1]) / l[i];
-  }
-
-  const b = new Array(n).fill(0);
-  const d = new Array(n).fill(0);
-
-  for (let j = n - 2; j >= 0; j--) {
-    c[j] = z[j] - mu[j] * c[j + 1];
-    b[j] = (ys[j + 1] - ys[j]) / h[j] - (h[j] * (c[j + 1] + 2 * c[j])) / 3;
-    d[j] = (c[j + 1] - c[j]) / (3 * h[j]);
-  }
-
-  for (let i = 0; i < 256; i++) {
-    if (i <= xs[0]) {
-      lut[i] = Math.round(ys[0]);
-    } else if (i >= xs[n - 1]) {
-      lut[i] = Math.round(ys[n - 1]);
-    } else {
-      let seg = 0;
-      for (let j = 0; j < n - 1; j++) {
-        if (i >= xs[j] && i <= xs[j + 1]) {
-          seg = j;
-          break;
-        }
-      }
-      const dx = i - xs[seg];
-      lut[i] = Math.round(ys[seg] + b[seg] * dx + c[seg] * dx * dx + d[seg] * dx * dx * dx);
-    }
-    lut[i] = Math.max(0, Math.min(255, lut[i]));
-  }
-
-  return lut;
-}
 
 // ---------------------------------------------------------------------------
 // Section Header component
@@ -612,7 +528,7 @@ function CurvesSection() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const currentPoints = curves[channel];
 
-  const lut = useMemo(() => cubicSplineInterpolate(currentPoints), [currentPoints]);
+  const lut = useMemo(() => curveLut(currentPoints), [currentPoints]);
 
   // Draw the curves graph
   useEffect(() => {
@@ -726,13 +642,15 @@ function CurvesSection() {
       if (idx >= 0) {
         setDraggingIndex(idx);
       } else {
-        // Add new point
-        const newPoints = [...currentPoints, pos].sort((a, b) => a.x - b.x);
+        // Add new point (replacing any existing point at the same x so the list
+        // matches the deduplicated curve stored by setStoreCurves).
+        const newPoints = [...currentPoints.filter((p) => p.x !== pos.x), pos].sort(
+          (a, b) => a.x - b.x,
+        );
         setStoreCurves(channel, newPoints);
         setPreset("Custom");
-        // Find and start dragging the new point
-        const newIdx = newPoints.findIndex((p) => p.x === pos.x && p.y === pos.y);
-        setDraggingIndex(newIdx);
+        const newIdx = newPoints.findIndex((p) => p.x === pos.x);
+        setDraggingIndex(newIdx !== -1 ? newIdx : null);
       }
     },
     [getCanvasPos, findNearPoint, currentPoints, channel, setStoreCurves],
@@ -740,14 +658,19 @@ function CurvesSection() {
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (draggingIndex === null) return;
+      if (draggingIndex === null || draggingIndex < 0 || draggingIndex >= currentPoints.length) {
+        return;
+      }
       const pos = getCanvasPos(e);
+      const minX = draggingIndex > 0 ? currentPoints[draggingIndex - 1].x + 1 : 0;
+      const maxX =
+        draggingIndex < currentPoints.length - 1 ? currentPoints[draggingIndex + 1].x - 1 : 255;
 
       const pts = [...currentPoints];
-      pts[draggingIndex] = pos;
-      pts.sort((a, b) => a.x - b.x);
-      const newIndex = pts.findIndex((p) => p.x === pos.x && p.y === pos.y);
-      if (newIndex !== -1) setDraggingIndex(newIndex);
+      pts[draggingIndex] = {
+        x: Math.max(minX, Math.min(maxX, pos.x)),
+        y: pos.y,
+      };
       setStoreCurves(channel, pts);
     },
     [draggingIndex, getCanvasPos, channel, currentPoints, setStoreCurves],
