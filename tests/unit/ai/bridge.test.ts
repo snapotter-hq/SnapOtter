@@ -2547,6 +2547,82 @@ describe("bridge - extractPythonError via dispatcher responses", () => {
     await expect(promise).rejects.toThrow("RuntimeError: model not found");
   });
 
+  it("extracts error from JSON stderr in dispatcher response when stdout is empty (issue #3096)", async () => {
+    const mock = await setupReadyDispatcher();
+
+    const promise = runPythonWithProgress("install_feature.py", []);
+    await new Promise((r) => setTimeout(r, 10));
+
+    mock.stderr.emit(
+      "data",
+      Buffer.from(
+        `${JSON.stringify({
+          error: "Custom sidecar error",
+          errorInfo: {
+            type: "RuntimeError",
+            frames: [{ file: "install_feature.py", line: 64, func: "fail" }],
+          },
+        })}\n`,
+      ),
+    );
+
+    const line = mock.stdinWrites.join("").split("\n").filter(Boolean)[0];
+    const id = JSON.parse(line).id;
+
+    mock.stdout.emit("data", Buffer.from(`${JSON.stringify({ id, exitCode: 1, stdout: "" })}\n`));
+
+    const err = (await promise.catch((e: unknown) => e)) as Error & {
+      isSafeMessage?: unknown;
+      kind?: string;
+      pythonType?: string;
+      pythonFrames?: Array<{ file: string; line: number; func: string }>;
+    };
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toBe("Custom sidecar error");
+    expect(err.isSafeMessage).toBe(true);
+    expect(err.kind).toBe("bug");
+    expect(err.pythonType).toBe("RuntimeError");
+    expect(err.pythonFrames).toEqual([{ file: "install_feature.py", line: 64, func: "fail" }]);
+  });
+
+  it("preserves unrecognized JSON and malformed-JSON stderr lines without polluting stderr with {info} or {warning} (issue #3096)", async () => {
+    const mock = await setupReadyDispatcher();
+
+    const { setAiLogger } = await import("../../../packages/ai/src/log.js");
+    const sink = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    setAiLogger(sink);
+    onTestFinished(() => setAiLogger(null));
+
+    const promise = runPythonWithProgress("test.py", []);
+    await new Promise((r) => setTimeout(r, 10));
+
+    mock.stderr.emit(
+      "data",
+      Buffer.from(
+        '{"info": "cached"}\n{"warning": "low vram"}\n[model] Loading weights...\n{"status": "loading"}\n{malformed json\nnull\n',
+      ),
+    );
+
+    const line = mock.stdinWrites.join("").split("\n").filter(Boolean)[0];
+    const id = JSON.parse(line).id;
+
+    mock.stdout.emit(
+      "data",
+      Buffer.from(`${JSON.stringify({ id, exitCode: 0, stdout: '{"ok": true}' })}\n`),
+    );
+
+    const result = await promise;
+    expect(result.stdout).toBe('{"ok": true}');
+    expect(result.stderr).toBe(
+      '[model] Loading weights...\n{"status": "loading"}\n{malformed json\nnull',
+    );
+    expect(sink.info.mock.calls.map((call) => call[0])).toEqual([
+      "[python] cached",
+      "[python] [model] Loading weights...",
+    ]);
+    expect(sink.warn.mock.calls.map((call) => call[0])).toEqual(["[python] low vram"]);
+  });
+
   it("uses generic exit code message when dispatcher stderr and stdout are both empty", async () => {
     const mock = await setupReadyDispatcher();
 
@@ -2784,6 +2860,103 @@ describe("bridge - dispatcher stderr partial buffering", () => {
     const id = JSON.parse(line).id;
     mock.stdout.emit("data", Buffer.from(`${JSON.stringify({ id, exitCode: 0, stdout: "{}" })}\n`));
     await promise;
+  });
+
+  it("flushes trailing un-newlined stderrBuf on dispatcher close (issue #3096)", async () => {
+    const mockDisp = createMockProcess();
+    const mockPerReq = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return mockDisp.process;
+      return mockPerReq.process;
+    });
+
+    const { setAiLogger } = await import("../../../packages/ai/src/log.js");
+    const sink = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    setAiLogger(sink);
+    onTestFinished(() => setAiLogger(null));
+
+    const initPromise = initDispatcher();
+    mockDisp.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+    await initPromise;
+
+    const promise = runPythonWithProgress("test.py", []);
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Emit a trailing diagnostic without a newline right before the dispatcher exits
+    mockDisp.stderr.emit("data", Buffer.from('{"warning": "final warning before exit"}'));
+    mockDisp.emitEvent("close", 1, null);
+
+    await new Promise((r) => setTimeout(r, 10));
+    mockPerReq.stdout.emit("data", Buffer.from('{"ok": true}\n'));
+    mockPerReq.emitEvent("close", 0, null);
+    await promise;
+
+    expect(sink.warn.mock.calls.map((call) => call[0])).toContain(
+      "[python] final warning before exit",
+    );
+  });
+
+  it("does not mark a closing child ready when flushing an un-newlined ready frame on close (issue #3096)", async () => {
+    const { getDispatcherStatus } = await import("../../../packages/ai/src/bridge.js");
+    const mockDisp = createMockProcess();
+    const mockPerReq = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return mockDisp.process;
+      return mockPerReq.process;
+    });
+
+    const promise = runPythonWithProgress("test.py", []);
+
+    // Dispatcher emits partial ready frame without newline and crashes before completing startup
+    mockDisp.stderr.emit("data", Buffer.from('{"ready": true, "gpu": true}'));
+    mockDisp.emitEvent("close", 1, null);
+
+    await new Promise((r) => setTimeout(r, 10));
+    mockPerReq.stdout.emit("data", Buffer.from('{"ok": true}\n'));
+    mockPerReq.emitEvent("close", 0, null);
+    await promise;
+
+    const status = getDispatcherStatus();
+    expect(status.ready).toBe(false);
+    expect(status.gpu).toBe(false);
+    expect(status.consecutiveCrashes).toBe(1);
+  });
+
+  it("does not invoke onProgress for an un-newlined progress frame when the dispatcher closes mid-request (issue #3096)", async () => {
+    const mockDisp = createMockProcess();
+    const mockPerReq = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return mockDisp.process;
+      return mockPerReq.process;
+    });
+
+    const initPromise = initDispatcher();
+    mockDisp.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+    await initPromise;
+
+    const onProgress = vi.fn();
+    const promise = runPythonWithProgress("test.py", [], { onProgress });
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Un-newlined progress frame buffered right before the dispatcher crashes
+    mockDisp.stderr.emit("data", Buffer.from('{"progress": 90, "stage": "Crashing"}'));
+    mockDisp.emitEvent("close", 1, null);
+
+    await new Promise((r) => setTimeout(r, 10));
+    mockPerReq.stdout.emit("data", Buffer.from('{"ok": true}\n'));
+    mockPerReq.emitEvent("close", 0, null);
+    await promise;
+
+    expect(onProgress).not.toHaveBeenCalled();
   });
 });
 

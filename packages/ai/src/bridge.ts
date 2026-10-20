@@ -433,21 +433,17 @@ export class PythonDispatcher {
       let stderrBuf = "";
       let stdoutBuf = "";
 
-      proc.stderr?.on("data", (chunk: Buffer) => {
-        stderrBuf += chunk.toString();
-        const lines = stderrBuf.split("\n");
-        stderrBuf = lines.pop() ?? "";
+      const handleStderrLine = (line: string) => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
 
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-
+        if (trimmed.startsWith("{")) {
           try {
             const parsed = JSON.parse(trimmed);
 
             // Readiness signal. Ignore it from a superseded child so a stale
             // process can't mark a not-yet-ready replacement as ready.
-            if (parsed.ready === true) {
+            if (parsed?.ready === true) {
               if (this.child === proc) {
                 this.childReady = true;
                 this.gpuAvail = parsed.gpu === true;
@@ -456,38 +452,48 @@ export class PythonDispatcher {
                 this.crashes = 0;
                 aiLog.info(`[bridge] Python dispatcher ready (GPU: ${parsed.gpu === true})`);
               }
-              continue;
+              return;
             }
 
             // Progress event - route to the currently active request
-            if (typeof parsed.progress === "number" && typeof parsed.stage === "string") {
+            if (typeof parsed?.progress === "number" && typeof parsed?.stage === "string") {
               // Progress goes to this child's pending requests (only one
               // should be active at a time since Python processes synchronously)
               for (const req of this.pending.values()) {
                 if (req.generation === gen) req.onProgress?.(parsed.progress, parsed.stage);
               }
-              continue;
+              return;
             }
 
             // Diagnostic notices are forwarded so they reach docker logs
             // instead of being silently dropped for matching neither shape.
-            if (typeof parsed.info === "string") {
+            if (typeof parsed?.info === "string") {
               aiLog.info(`[python] ${parsed.info}`);
-              continue;
+              return;
             }
-            if (typeof parsed.warning === "string") {
+            if (typeof parsed?.warning === "string") {
               aiLog.warn(`[python] ${parsed.warning}`);
+              return;
             }
           } catch {
-            // Not JSON - forward diagnostic messages to Node.js logger,
-            // collect the rest as error output for pending requests.
-            if (trimmed.startsWith("[")) {
-              aiLog.info(`[python] ${trimmed}`);
-            }
-            for (const req of this.pending.values()) {
-              if (req.generation === gen) req.stderrLines.push(trimmed);
-            }
+            // Malformed JSON object - collect as regular stderr.
           }
+        } else if (trimmed.startsWith("[")) {
+          // Forward diagnostic messages to Node.js logger and collect as regular stderr.
+          aiLog.info(`[python] ${trimmed}`);
+        }
+        for (const req of this.pending.values()) {
+          if (req.generation === gen) req.stderrLines.push(trimmed);
+        }
+      };
+
+      proc.stderr?.on("data", (chunk: Buffer) => {
+        stderrBuf += chunk.toString();
+        const lines = stderrBuf.split("\n");
+        stderrBuf = lines.pop() ?? "";
+
+        for (const line of lines) {
+          handleStderrLine(line);
         }
       });
 
@@ -548,6 +554,10 @@ export class PythonDispatcher {
       });
 
       proc.on("close", (code) => {
+        if (this.child === proc) {
+          this.child = null;
+          this.childReady = false;
+        }
         this.rejectPendingForGeneration(
           gen,
           new SafeError("Python dispatcher exited unexpectedly", {
@@ -555,12 +565,12 @@ export class PythonDispatcher {
             code: "dispatcher-exit",
           }),
         );
+        if (stderrBuf.trim()) {
+          handleStderrLine(stderrBuf);
+          stderrBuf = "";
+        }
         if (code !== 0 && !this.stoppedChildren.has(proc)) {
           this.recordCrash();
-        }
-        if (this.child === proc) {
-          this.child = null;
-          this.childReady = false;
         }
       });
 
