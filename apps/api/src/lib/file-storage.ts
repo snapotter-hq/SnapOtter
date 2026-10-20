@@ -6,7 +6,7 @@ import type { S3StorageModule } from "@snapotter/enterprise";
 import { CAMERA_RAW_INPUTS, SafeError } from "@snapotter/shared";
 import { env } from "../config.js";
 import { logger } from "./logger.js";
-import { s3WriteFault } from "./object-storage.js";
+import { normalizeOperationalWriteError, s3WriteFault } from "./object-storage.js";
 
 const MIN_FREE_BYTES = 100 * 1024 * 1024;
 let statfsFailureLogged = false;
@@ -25,13 +25,12 @@ async function assertDiskSpace(dir: string): Promise<void> {
     }
     return;
   }
-  const freeBytes = stats.bfree * stats.bsize;
+  const freeBytes = stats.bavail * stats.bsize;
   if (freeBytes < MIN_FREE_BYTES) {
-    // ENOSPC here is synthesized from the free-space floor check, not a syscall errno.
     throw new SafeError("Insufficient disk space", {
       kind: "operational",
-      code: "ENOSPC",
-      statusCode: 507,
+      code: "disk-free-floor",
+      statusCode: 503,
     });
   }
 }
@@ -169,17 +168,7 @@ async function removePartialWrite(
 }
 
 function storageWriteError(e: unknown): unknown {
-  const code = (e as NodeJS.ErrnoException | null)?.code;
-  if (code === "EACCES" || code === "EPERM" || code === "EROFS") {
-    // The path and errno stay on `cause` for the logs; the message is shown to users.
-    return new SafeError("Storage directory is not writable", {
-      kind: "operational",
-      code,
-      statusCode: 503,
-      cause: e,
-    });
-  }
-  return e;
+  return normalizeOperationalWriteError(e);
 }
 
 export async function saveFile(buffer: Buffer, originalName: string): Promise<string> {

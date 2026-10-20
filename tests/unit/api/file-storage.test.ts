@@ -38,11 +38,13 @@ vi.mock("../../../apps/api/src/config.js", () => ({
 // passed), recording where it wrote. unlink can fail with EBUSY.
 const diskState = vi.hoisted(() => ({
   lowDisk: false,
+  statfsOverride: null as { bfree: number; bavail: number; bsize: number } | null,
   failStatfsWith: "",
   failMkdirWith: "",
   failOpenWith: "",
   failReadFileWith: "",
   failWriteMidway: false as boolean | string,
+  failCloseWith: "",
   failRenameWith: "",
   failUnlink: false as boolean | string,
   partialPath: "",
@@ -55,7 +57,10 @@ vi.mock("node:fs/promises", async (importOriginal) => {
     ...actual,
     statfs: (path: string) => {
       if (diskState.failStatfsWith) return Promise.reject(errno(diskState.failStatfsWith));
-      return diskState.lowDisk ? Promise.resolve({ bfree: 0, bsize: 4096 }) : actual.statfs(path);
+      if (diskState.statfsOverride) return Promise.resolve(diskState.statfsOverride);
+      return diskState.lowDisk
+        ? Promise.resolve({ bfree: 0, bavail: 0, bsize: 4096 })
+        : actual.statfs(path);
     },
     mkdir: async (...args: Parameters<typeof actual.mkdir>) => {
       if (diskState.failMkdirWith) throw errno(diskState.failMkdirWith);
@@ -79,6 +84,17 @@ vi.mock("node:fs/promises", async (importOriginal) => {
             diskState.partialPath = String(path);
             await write(data.subarray(0, Math.floor(data.length / 2)));
             throw errno(writeCode);
+          },
+        });
+      }
+      if (forWriting && diskState.failCloseWith) {
+        const closeCode = diskState.failCloseWith;
+        const close = handle.close.bind(handle);
+        Object.assign(handle, {
+          close: async () => {
+            diskState.partialPath = String(path);
+            await close();
+            throw errno(closeCode);
           },
         });
       }
@@ -122,11 +138,13 @@ beforeEach(async () => {
 
 afterEach(async () => {
   diskState.lowDisk = false;
+  diskState.statfsOverride = null;
   diskState.failStatfsWith = "";
   diskState.failMkdirWith = "";
   diskState.failOpenWith = "";
   diskState.failReadFileWith = "";
   diskState.failWriteMidway = false;
+  diskState.failCloseWith = "";
   diskState.failRenameWith = "";
   diskState.failUnlink = false;
   diskState.partialPath = "";
@@ -144,6 +162,10 @@ type StorageError = Error & {
   code?: string;
   statusCode?: number;
 };
+
+const NOT_WRITABLE_MSG =
+  "The server can't write to its storage: it's read-only or not allowed to write there.";
+const FULL_MSG = "The server's storage is full.";
 
 describe("saveFile", () => {
   it("saves buffer and returns UUID-based filename with correct extension", async () => {
@@ -528,10 +550,10 @@ describe("storage not writable (EACCES)", () => {
         (e: unknown) => e,
       )) as StorageError | null;
       expect(err).toBeInstanceOf(Error);
-      expect(err?.message).toBe("Storage directory is not writable");
+      expect(err?.message).toBe(NOT_WRITABLE_MSG);
       expect(err?.isSafeMessage).toBe(true);
       expect(err?.kind).toBe("operational");
-      expect(err?.code).toBe("EACCES");
+      expect(err?.code).toBe("storage-not-writable");
       expect(err?.statusCode).toBe(503);
       expect(err?.cause).toMatchObject({ code: "EACCES" });
     } finally {
@@ -541,7 +563,7 @@ describe("storage not writable (EACCES)", () => {
   });
 
   it.each(["EACCES", "EPERM", "EROFS"] as const)(
-    "ensureStorageDir maps %s from mkdir to a 503 SafeError with cause (#1634)",
+    "ensureStorageDir maps %s from mkdir to a 503 SafeError with cause (#1634, #2839)",
     async (code) => {
       diskState.failMkdirWith = code;
       const { ensureStorageDir } = await importModule();
@@ -550,17 +572,36 @@ describe("storage not writable (EACCES)", () => {
         (e: unknown) => e,
       )) as (StorageError & { cause?: unknown }) | null;
       expect(err).toBeInstanceOf(Error);
-      expect(err?.message).toBe("Storage directory is not writable");
+      expect(err?.message).toBe(NOT_WRITABLE_MSG);
       expect(err?.isSafeMessage).toBe(true);
       expect(err?.kind).toBe("operational");
-      expect(err?.code).toBe(code);
+      expect(err?.code).toBe("storage-not-writable");
+      expect(err?.statusCode).toBe(503);
+      expect(err?.cause).toMatchObject({ code });
+    },
+  );
+
+  it.each(["ENOSPC", "EDQUOT"] as const)(
+    "ensureStorageDir maps %s from mkdir to a 503 storage-full SafeError with cause (#2839)",
+    async (code) => {
+      diskState.failMkdirWith = code;
+      const { ensureStorageDir } = await importModule();
+      const err = (await ensureStorageDir().then(
+        () => null,
+        (e: unknown) => e,
+      )) as (StorageError & { cause?: unknown }) | null;
+      expect(err).toBeInstanceOf(Error);
+      expect(err?.message).toBe(FULL_MSG);
+      expect(err?.isSafeMessage).toBe(true);
+      expect(err?.kind).toBe("operational");
+      expect(err?.code).toBe("storage-full");
       expect(err?.statusCode).toBe(503);
       expect(err?.cause).toMatchObject({ code });
     },
   );
 
   it.each(["EACCES", "EPERM", "EROFS"] as const)(
-    "saveFile maps %s on open to a 503 SafeError with cause (#1634)",
+    "saveFile maps %s on open to a 503 SafeError with cause (#1634, #2839)",
     async (code) => {
       diskState.failOpenWith = code;
       const { saveFile } = await importModule();
@@ -569,17 +610,36 @@ describe("storage not writable (EACCES)", () => {
         (e: unknown) => e,
       )) as (StorageError & { cause?: unknown }) | null;
       expect(err).toBeInstanceOf(Error);
-      expect(err?.message).toBe("Storage directory is not writable");
+      expect(err?.message).toBe(NOT_WRITABLE_MSG);
       expect(err?.isSafeMessage).toBe(true);
       expect(err?.kind).toBe("operational");
-      expect(err?.code).toBe(code);
+      expect(err?.code).toBe("storage-not-writable");
+      expect(err?.statusCode).toBe(503);
+      expect(err?.cause).toMatchObject({ code });
+    },
+  );
+
+  it.each(["ENOSPC", "EDQUOT"] as const)(
+    "saveFile maps %s on open to a 503 storage-full SafeError with cause (#2839)",
+    async (code) => {
+      diskState.failOpenWith = code;
+      const { saveFile } = await importModule();
+      const err = (await saveFile(Buffer.from("x"), "a.png").then(
+        () => null,
+        (e: unknown) => e,
+      )) as (StorageError & { cause?: unknown }) | null;
+      expect(err).toBeInstanceOf(Error);
+      expect(err?.message).toBe(FULL_MSG);
+      expect(err?.isSafeMessage).toBe(true);
+      expect(err?.kind).toBe("operational");
+      expect(err?.code).toBe("storage-full");
       expect(err?.statusCode).toBe(503);
       expect(err?.cause).toMatchObject({ code });
     },
   );
 
   it.each(["EACCES", "EPERM", "EROFS"] as const)(
-    "saveThumbnail maps %s from mkdir (.thumbs) to a 503 SafeError with cause (#1634)",
+    "saveThumbnail maps %s from mkdir (.thumbs) to a 503 SafeError with cause (#1634, #2839)",
     async (code) => {
       diskState.failMkdirWith = code;
       const { saveThumbnail } = await importModule();
@@ -588,17 +648,36 @@ describe("storage not writable (EACCES)", () => {
         (e: unknown) => e,
       )) as (StorageError & { cause?: unknown }) | null;
       expect(err).toBeInstanceOf(Error);
-      expect(err?.message).toBe("Storage directory is not writable");
+      expect(err?.message).toBe(NOT_WRITABLE_MSG);
       expect(err?.isSafeMessage).toBe(true);
       expect(err?.kind).toBe("operational");
-      expect(err?.code).toBe(code);
+      expect(err?.code).toBe("storage-not-writable");
+      expect(err?.statusCode).toBe(503);
+      expect(err?.cause).toMatchObject({ code });
+    },
+  );
+
+  it.each(["ENOSPC", "EDQUOT"] as const)(
+    "saveThumbnail maps %s from mkdir (.thumbs) to a 503 storage-full SafeError with cause (#2839)",
+    async (code) => {
+      diskState.failMkdirWith = code;
+      const { saveThumbnail } = await importModule();
+      const err = (await saveThumbnail("pic.png", Buffer.from("t")).then(
+        () => null,
+        (e: unknown) => e,
+      )) as (StorageError & { cause?: unknown }) | null;
+      expect(err).toBeInstanceOf(Error);
+      expect(err?.message).toBe(FULL_MSG);
+      expect(err?.isSafeMessage).toBe(true);
+      expect(err?.kind).toBe("operational");
+      expect(err?.code).toBe("storage-full");
       expect(err?.statusCode).toBe(503);
       expect(err?.cause).toMatchObject({ code });
     },
   );
 
   it.each(["EACCES", "EPERM", "EROFS"] as const)(
-    "deleteStoredFile and deleteThumbnail map %s from unlink to a 503 SafeError with cause (#1634)",
+    "deleteStoredFile and deleteThumbnail map %s from unlink to a 503 SafeError with cause (#1634, #2839)",
     async (code) => {
       diskState.failUnlink = code;
       const { deleteStoredFile, deleteThumbnail } = await importModule();
@@ -608,10 +687,31 @@ describe("storage not writable (EACCES)", () => {
           (e: unknown) => e,
         )) as (StorageError & { cause?: unknown }) | null;
         expect(err).toBeInstanceOf(Error);
-        expect(err?.message).toBe("Storage directory is not writable");
+        expect(err?.message).toBe(NOT_WRITABLE_MSG);
         expect(err?.isSafeMessage).toBe(true);
         expect(err?.kind).toBe("operational");
-        expect(err?.code).toBe(code);
+        expect(err?.code).toBe("storage-not-writable");
+        expect(err?.statusCode).toBe(503);
+        expect(err?.cause).toMatchObject({ code });
+      }
+    },
+  );
+
+  it.each(["ENOSPC", "EDQUOT"] as const)(
+    "deleteStoredFile and deleteThumbnail map %s from unlink to a 503 storage-full SafeError with cause (#2839)",
+    async (code) => {
+      diskState.failUnlink = code;
+      const { deleteStoredFile, deleteThumbnail } = await importModule();
+      for (const fn of [() => deleteStoredFile("pic.png"), () => deleteThumbnail("pic.png")]) {
+        const err = (await fn().then(
+          () => null,
+          (e: unknown) => e,
+        )) as (StorageError & { cause?: unknown }) | null;
+        expect(err).toBeInstanceOf(Error);
+        expect(err?.message).toBe(FULL_MSG);
+        expect(err?.isSafeMessage).toBe(true);
+        expect(err?.kind).toBe("operational");
+        expect(err?.code).toBe("storage-full");
         expect(err?.statusCode).toBe(503);
         expect(err?.cause).toMatchObject({ code });
       }
@@ -643,8 +743,9 @@ describe("storage not writable (EACCES)", () => {
         (e: unknown) => e,
       )) as StorageError | null;
       expect(err).toBeInstanceOf(Error);
-      expect(err?.message).toBe("Storage directory is not writable");
+      expect(err?.message).toBe(NOT_WRITABLE_MSG);
       expect(err?.isSafeMessage).toBe(true);
+      expect(err?.code).toBe("storage-not-writable");
       expect(err?.statusCode).toBe(503);
       // Nothing was created, so there's no orphan to report (#1472).
       expect(logError).not.toHaveBeenCalled();
@@ -665,7 +766,8 @@ describe("storage not writable (EACCES)", () => {
         () => null,
         (e: unknown) => e,
       )) as StorageError | null;
-      expect(err?.message).toBe("Storage directory is not writable");
+      expect(err?.message).toBe(NOT_WRITABLE_MSG);
+      expect(err?.code).toBe("storage-not-writable");
       expect(err?.statusCode).toBe(503);
       expect(logError).not.toHaveBeenCalled();
     } finally {
@@ -686,11 +788,12 @@ describe("storage not writable (EACCES)", () => {
           (e: unknown) => e,
         )) as StorageError | null;
         expect(err).toBeInstanceOf(Error);
-        expect(err?.message).toBe("Storage directory is not writable");
+        expect(err?.message).toBe(NOT_WRITABLE_MSG);
         expect(err?.isSafeMessage).toBe(true);
         expect(err?.kind).toBe("operational");
-        expect(err?.code).toBe("EACCES");
+        expect(err?.code).toBe("storage-not-writable");
         expect(err?.statusCode).toBe(503);
+        expect(err?.cause).toMatchObject({ code: "EACCES" });
       } finally {
         await chmod(testDir, 0o755).catch(() => {});
       }
@@ -710,7 +813,8 @@ describe("storage not writable (EACCES)", () => {
           () => null,
           (e: unknown) => e,
         )) as StorageError | null;
-        expect(err?.message).toBe("Storage directory is not writable");
+        expect(err?.message).toBe(NOT_WRITABLE_MSG);
+        expect(err?.code).toBe("storage-not-writable");
         expect(err?.statusCode).toBe(503);
       } finally {
         await chmod(thumbDir, 0o755).catch(() => {});
@@ -729,11 +833,12 @@ describe("storage not writable (EACCES)", () => {
           (e: unknown) => e,
         )) as StorageError | null;
         expect(err).toBeInstanceOf(Error);
-        expect(err?.message).toBe("Storage directory is not writable");
+        expect(err?.message).toBe(NOT_WRITABLE_MSG);
         expect(err?.isSafeMessage).toBe(true);
         expect(err?.kind).toBe("operational");
-        expect(err?.code).toBe("EACCES");
+        expect(err?.code).toBe("storage-not-writable");
         expect(err?.statusCode).toBe(503);
+        expect(err?.cause).toMatchObject({ code: "EACCES" });
       } finally {
         await chmod(testDir, 0o755).catch(() => {});
       }
@@ -755,11 +860,12 @@ describe("storage not writable (EACCES)", () => {
           (e: unknown) => e,
         )) as StorageError | null;
         expect(err).toBeInstanceOf(Error);
-        expect(err?.message).toBe("Storage directory is not writable");
+        expect(err?.message).toBe(NOT_WRITABLE_MSG);
         expect(err?.isSafeMessage).toBe(true);
         expect(err?.kind).toBe("operational");
-        expect(err?.code).toBe("EACCES");
+        expect(err?.code).toBe("storage-not-writable");
         expect(err?.statusCode).toBe(503);
+        expect(err?.cause).toMatchObject({ code: "EACCES" });
         expect(logError).not.toHaveBeenCalled();
       } finally {
         await chmod(thumbDir, 0o755).catch(() => {});
@@ -769,7 +875,7 @@ describe("storage not writable (EACCES)", () => {
 });
 
 describe("disk space floor", () => {
-  it("saveFile throws a SafeError with statusCode 507 when free space is below the floor", async () => {
+  it("saveFile throws a SafeError with statusCode 503 and code disk-free-floor when free space is below the floor (#2839)", async () => {
     const { saveFile } = await importModule();
     diskState.lowDisk = true;
     const err = (await saveFile(Buffer.from("x"), "a.png").then(
@@ -780,8 +886,56 @@ describe("disk space floor", () => {
     expect(err?.message).toBe("Insufficient disk space");
     expect(err?.isSafeMessage).toBe(true);
     expect(err?.kind).toBe("operational");
-    expect(err?.code).toBe("ENOSPC");
-    expect(err?.statusCode).toBe(507);
+    expect(err?.code).toBe("disk-free-floor");
+    expect(err?.statusCode).toBe(503);
+  });
+
+  it("checks non-root available blocks (bavail) rather than total free blocks (bfree) (#2839)", async () => {
+    const { saveFile } = await importModule();
+    // bfree is 200 MiB (>= 100 MiB floor), but bavail is 0 (ext4 root-reserved blocks).
+    diskState.statfsOverride = {
+      bfree: (200 * 1024 * 1024) / 4096,
+      bavail: 0,
+      bsize: 4096,
+    };
+    const err = (await saveFile(Buffer.from("x"), "a.png").then(
+      () => null,
+      (e: unknown) => e,
+    )) as StorageError | null;
+    expect(err).toBeInstanceOf(Error);
+    expect(err?.message).toBe("Insufficient disk space");
+    expect(err?.isSafeMessage).toBe(true);
+    expect(err?.kind).toBe("operational");
+    expect(err?.code).toBe("disk-free-floor");
+    expect(err?.statusCode).toBe(503);
+  });
+
+  it("enforces the exact 100 MiB boundary on bavail * bsize (#2839)", async () => {
+    const { saveFile } = await importModule();
+    const minBlocks = (100 * 1024 * 1024) / 4096;
+
+    // One 4 KiB block below 100 MiB rejects and writes nothing.
+    diskState.statfsOverride = {
+      bfree: minBlocks * 2,
+      bavail: minBlocks - 1,
+      bsize: 4096,
+    };
+    const err = (await saveFile(Buffer.from("x"), "a.png").then(
+      () => null,
+      (e: unknown) => e,
+    )) as StorageError | null;
+    expect(err?.code).toBe("disk-free-floor");
+    expect(err?.statusCode).toBe(503);
+    expect(await readdir(testDir)).toEqual([]);
+
+    // Exactly 100 MiB available succeeds.
+    diskState.statfsOverride = {
+      bfree: minBlocks * 2,
+      bavail: minBlocks,
+      bsize: 4096,
+    };
+    const saved = await saveFile(Buffer.from("ok"), "a.png");
+    expect((await readFile(join(testDir, saved))).toString()).toBe("ok");
   });
 
   it("logs a warning once and allows writes when statfs fails (#1634)", async () => {
@@ -814,26 +968,8 @@ describe("saveFile after a failed write", () => {
     return (await readdir(testDir)).filter((name) => name !== ".thumbs");
   }
 
-  it("removes the partly written file and rethrows the write error", async () => {
-    const { saveFile } = await importModule();
-    diskState.failWriteMidway = true;
-
-    const err = (await saveFile(Buffer.alloc(4096, 7), "photo.png").then(
-      () => null,
-      (e: unknown) => e,
-    )) as StorageError | null;
-
-    expect(err?.code).toBe("ENOSPC");
-    expect(err?.isSafeMessage).toBeUndefined();
-    expect(err?.statusCode).toBeUndefined();
-    // The half-write really happened in the storage root, and is gone.
-    expect(dirname(diskState.partialPath)).toBe(testDir);
-    expect(existsSync(diskState.partialPath)).toBe(false);
-    expect(await storedFiles()).toEqual([]);
-  });
-
-  it.each(["EACCES", "EPERM", "EROFS"] as const)(
-    "removes the partly written file and maps %s mid-write to a 503 SafeError with cause (#1634)",
+  it.each(["ENOSPC", "EDQUOT"] as const)(
+    "removes the partly written file and maps %s mid-write to a 503 storage-full SafeError with cause (#2839)",
     async (code) => {
       const { saveFile } = await importModule();
       diskState.failWriteMidway = code;
@@ -843,10 +979,74 @@ describe("saveFile after a failed write", () => {
         (e: unknown) => e,
       )) as (StorageError & { cause?: unknown }) | null;
 
-      expect(err?.message).toBe("Storage directory is not writable");
+      expect(err?.message).toBe(FULL_MSG);
       expect(err?.isSafeMessage).toBe(true);
       expect(err?.kind).toBe("operational");
-      expect(err?.code).toBe(code);
+      expect(err?.code).toBe("storage-full");
+      expect(err?.statusCode).toBe(503);
+      expect(err?.cause).toMatchObject({ code });
+      // The half-write really happened in the storage root, and is gone.
+      expect(dirname(diskState.partialPath)).toBe(testDir);
+      expect(existsSync(diskState.partialPath)).toBe(false);
+      expect(await storedFiles()).toEqual([]);
+    },
+  );
+
+  it.each(["ENOSPC", "EDQUOT"] as const)(
+    "removes the written file and maps %s on close to a 503 storage-full SafeError with cause (#2839)",
+    async (code) => {
+      const { saveFile } = await importModule();
+      diskState.failCloseWith = code;
+
+      const err = (await saveFile(Buffer.alloc(4096, 7), "photo.png").then(
+        () => null,
+        (e: unknown) => e,
+      )) as (StorageError & { cause?: unknown }) | null;
+
+      expect(err?.message).toBe(FULL_MSG);
+      expect(err?.isSafeMessage).toBe(true);
+      expect(err?.kind).toBe("operational");
+      expect(err?.code).toBe("storage-full");
+      expect(err?.statusCode).toBe(503);
+      expect(err?.cause).toMatchObject({ code });
+      expect(dirname(diskState.partialPath)).toBe(testDir);
+      expect(existsSync(diskState.partialPath)).toBe(false);
+      expect(await storedFiles()).toEqual([]);
+    },
+  );
+
+  it("removes the partly written file and rethrows an unclassified write error untouched", async () => {
+    const { saveFile } = await importModule();
+    diskState.failWriteMidway = "EIO";
+
+    const err = (await saveFile(Buffer.alloc(4096, 7), "photo.png").then(
+      () => null,
+      (e: unknown) => e,
+    )) as StorageError | null;
+
+    expect(err?.code).toBe("EIO");
+    expect(err?.isSafeMessage).toBeUndefined();
+    expect(err?.statusCode).toBeUndefined();
+    expect(dirname(diskState.partialPath)).toBe(testDir);
+    expect(existsSync(diskState.partialPath)).toBe(false);
+    expect(await storedFiles()).toEqual([]);
+  });
+
+  it.each(["EACCES", "EPERM", "EROFS"] as const)(
+    "removes the partly written file and maps %s mid-write to a 503 SafeError with cause (#1634, #2839)",
+    async (code) => {
+      const { saveFile } = await importModule();
+      diskState.failWriteMidway = code;
+
+      const err = (await saveFile(Buffer.alloc(4096, 7), "photo.png").then(
+        () => null,
+        (e: unknown) => e,
+      )) as (StorageError & { cause?: unknown }) | null;
+
+      expect(err?.message).toBe(NOT_WRITABLE_MSG);
+      expect(err?.isSafeMessage).toBe(true);
+      expect(err?.kind).toBe("operational");
+      expect(err?.code).toBe("storage-not-writable");
       expect(err?.statusCode).toBe(503);
       expect(err?.cause).toMatchObject({ code });
       expect(existsSync(diskState.partialPath)).toBe(false);
@@ -867,17 +1067,17 @@ describe("saveFile after a failed write", () => {
       (e: unknown) => e,
     )) as (StorageError & { cause?: unknown }) | null;
 
-    expect(err?.message).toBe("Storage directory is not writable");
+    expect(err?.message).toBe(NOT_WRITABLE_MSG);
     expect(err?.isSafeMessage).toBe(true);
     expect(err?.kind).toBe("operational");
-    expect(err?.code).toBe("EROFS");
+    expect(err?.code).toBe("storage-not-writable");
     expect(err?.statusCode).toBe(503);
     expect(err?.cause).toMatchObject({ code: "EROFS" });
     expect(logError).not.toHaveBeenCalled();
     expect(await storedFiles()).toEqual([]);
   });
 
-  it("logs the file it couldn't remove, and still throws the write error", async () => {
+  it("logs the file it couldn't remove, and still throws the classified write error", async () => {
     const { logger } = await import("../../../apps/api/src/lib/logger.js");
     const logError = vi.spyOn(logger, "error").mockImplementation(() => {});
     const { saveFile } = await importModule();
@@ -887,9 +1087,14 @@ describe("saveFile after a failed write", () => {
     const err = (await saveFile(Buffer.alloc(4096, 7), "photo.png").then(
       () => null,
       (e: unknown) => e,
-    )) as StorageError | null;
+    )) as (StorageError & { cause?: unknown }) | null;
 
-    expect(err?.code).toBe("ENOSPC");
+    expect(err?.message).toBe(FULL_MSG);
+    expect(err?.isSafeMessage).toBe(true);
+    expect(err?.kind).toBe("operational");
+    expect(err?.code).toBe("storage-full");
+    expect(err?.statusCode).toBe(503);
+    expect(err?.cause).toMatchObject({ code: "ENOSPC" });
     const [leftover, ...rest] = await storedFiles();
     expect(rest).toEqual([]);
     expect(diskState.partialPath).toBe(join(testDir, leftover));
@@ -914,22 +1119,55 @@ describe("saveThumbnail after a failed write (#1633)", () => {
     return existsSync(dir) ? readdir(dir) : [];
   }
 
-  it("removes the partly written temp file, leaves getCachedThumbnail null, and rethrows", async () => {
-    const { saveThumbnail, getCachedThumbnail } = await importModule();
-    diskState.failWriteMidway = true;
+  it.each(["ENOSPC", "EDQUOT"] as const)(
+    "removes the partly written temp file, leaves getCachedThumbnail null, and maps %s mid-write to a 503 storage-full SafeError with cause (#2839)",
+    async (code) => {
+      const { saveThumbnail, getCachedThumbnail } = await importModule();
+      diskState.failWriteMidway = code;
 
-    const err = (await saveThumbnail("photo.png", Buffer.alloc(4096, 7)).then(
-      () => null,
-      (e: unknown) => e,
-    )) as StorageError | null;
+      const err = (await saveThumbnail("photo.png", Buffer.alloc(4096, 7)).then(
+        () => null,
+        (e: unknown) => e,
+      )) as (StorageError & { cause?: unknown }) | null;
 
-    expect(err?.code).toBe("ENOSPC");
-    expect(dirname(diskState.partialPath)).toBe(join(testDir, ".thumbs"));
-    expect(diskState.partialPath).not.toBe(join(testDir, ".thumbs", "photo.png.thumb.jpg"));
-    expect(existsSync(diskState.partialPath)).toBe(false);
-    expect(await thumbFiles()).toEqual([]);
-    expect(await getCachedThumbnail("photo.png")).toBeNull();
-  });
+      expect(err?.message).toBe(FULL_MSG);
+      expect(err?.isSafeMessage).toBe(true);
+      expect(err?.kind).toBe("operational");
+      expect(err?.code).toBe("storage-full");
+      expect(err?.statusCode).toBe(503);
+      expect(err?.cause).toMatchObject({ code });
+      expect(dirname(diskState.partialPath)).toBe(join(testDir, ".thumbs"));
+      expect(diskState.partialPath).not.toBe(join(testDir, ".thumbs", "photo.png.thumb.jpg"));
+      expect(existsSync(diskState.partialPath)).toBe(false);
+      expect(await thumbFiles()).toEqual([]);
+      expect(await getCachedThumbnail("photo.png")).toBeNull();
+    },
+  );
+
+  it.each(["ENOSPC", "EDQUOT"] as const)(
+    "removes the temp file, preserves an existing thumbnail, and maps %s on close to a 503 storage-full SafeError with cause (#2839)",
+    async (code) => {
+      const { saveThumbnail, getCachedThumbnail } = await importModule();
+      await saveThumbnail("photo.png", Buffer.from("intact-thumb"));
+      diskState.failCloseWith = code;
+
+      const err = (await saveThumbnail("photo.png", Buffer.alloc(4096, 7)).then(
+        () => null,
+        (e: unknown) => e,
+      )) as (StorageError & { cause?: unknown }) | null;
+
+      expect(err?.message).toBe(FULL_MSG);
+      expect(err?.isSafeMessage).toBe(true);
+      expect(err?.kind).toBe("operational");
+      expect(err?.code).toBe("storage-full");
+      expect(err?.statusCode).toBe(503);
+      expect(err?.cause).toMatchObject({ code });
+      expect(dirname(diskState.partialPath)).toBe(join(testDir, ".thumbs"));
+      expect(existsSync(diskState.partialPath)).toBe(false);
+      expect(await thumbFiles()).toEqual(["photo.png.thumb.jpg"]);
+      expect((await getCachedThumbnail("photo.png"))?.toString()).toBe("intact-thumb");
+    },
+  );
 
   it("replaces an existing cached thumbnail without leaving temp files behind", async () => {
     const { saveThumbnail, getCachedThumbnail } = await importModule();
@@ -948,9 +1186,11 @@ describe("saveThumbnail after a failed write (#1633)", () => {
     const err = (await saveThumbnail("photo.png", Buffer.alloc(4096, 7)).then(
       () => null,
       (e: unknown) => e,
-    )) as StorageError | null;
+    )) as (StorageError & { cause?: unknown }) | null;
 
-    expect(err?.code).toBe("ENOSPC");
+    expect(err?.code).toBe("storage-full");
+    expect(err?.statusCode).toBe(503);
+    expect(err?.cause).toMatchObject({ code: "ENOSPC" });
     expect(await thumbFiles()).toEqual(["photo.png.thumb.jpg"]);
     expect((await getCachedThumbnail("photo.png"))?.toString()).toBe("intact-thumb");
   });
@@ -972,7 +1212,7 @@ describe("saveThumbnail after a failed write (#1633)", () => {
   });
 
   it.each(["EACCES", "EPERM", "EROFS"] as const)(
-    "removes the temp file and maps %s on rename to a 503 SafeError with cause (#1634)",
+    "removes the temp file and maps %s on rename to a 503 SafeError with cause (#1634, #2839)",
     async (code) => {
       const { saveThumbnail, getCachedThumbnail } = await importModule();
       diskState.failRenameWith = code;
@@ -982,10 +1222,32 @@ describe("saveThumbnail after a failed write (#1633)", () => {
         (e: unknown) => e,
       )) as (StorageError & { cause?: unknown }) | null;
 
-      expect(err?.message).toBe("Storage directory is not writable");
+      expect(err?.message).toBe(NOT_WRITABLE_MSG);
       expect(err?.isSafeMessage).toBe(true);
       expect(err?.kind).toBe("operational");
-      expect(err?.code).toBe(code);
+      expect(err?.code).toBe("storage-not-writable");
+      expect(err?.statusCode).toBe(503);
+      expect(err?.cause).toMatchObject({ code });
+      expect(await thumbFiles()).toEqual([]);
+      expect(await getCachedThumbnail("photo.png")).toBeNull();
+    },
+  );
+
+  it.each(["ENOSPC", "EDQUOT"] as const)(
+    "removes the temp file and maps %s on rename to a 503 storage-full SafeError with cause (#2839)",
+    async (code) => {
+      const { saveThumbnail, getCachedThumbnail } = await importModule();
+      diskState.failRenameWith = code;
+
+      const err = (await saveThumbnail("photo.png", Buffer.from("thumb-bytes")).then(
+        () => null,
+        (e: unknown) => e,
+      )) as (StorageError & { cause?: unknown }) | null;
+
+      expect(err?.message).toBe(FULL_MSG);
+      expect(err?.isSafeMessage).toBe(true);
+      expect(err?.kind).toBe("operational");
+      expect(err?.code).toBe("storage-full");
       expect(err?.statusCode).toBe(503);
       expect(err?.cause).toMatchObject({ code });
       expect(await thumbFiles()).toEqual([]);
@@ -1007,10 +1269,36 @@ describe("saveThumbnail after a failed write (#1633)", () => {
         (e: unknown) => e,
       )) as (StorageError & { cause?: unknown }) | null;
 
-      expect(err?.message).toBe("Storage directory is not writable");
+      expect(err?.message).toBe(NOT_WRITABLE_MSG);
       expect(err?.isSafeMessage).toBe(true);
       expect(err?.kind).toBe("operational");
-      expect(err?.code).toBe(code);
+      expect(err?.code).toBe("storage-not-writable");
+      expect(err?.statusCode).toBe(503);
+      expect(err?.cause).toMatchObject({ code });
+      expect(logError).not.toHaveBeenCalled();
+      expect(await thumbFiles()).toEqual([]);
+      expect(await getCachedThumbnail("photo.png")).toBeNull();
+    },
+  );
+
+  it.each(["ENOSPC", "EDQUOT"] as const)(
+    "cleans up nothing, and logs nothing, when the temp file open fails with %s (#2839)",
+    async (code) => {
+      const { logger } = await import("../../../apps/api/src/lib/logger.js");
+      const logError = vi.spyOn(logger, "error").mockImplementation(() => {});
+      const { saveThumbnail, getCachedThumbnail } = await importModule();
+      diskState.failOpenWith = code;
+      diskState.failUnlink = true;
+
+      const err = (await saveThumbnail("photo.png", Buffer.alloc(16)).then(
+        () => null,
+        (e: unknown) => e,
+      )) as (StorageError & { cause?: unknown }) | null;
+
+      expect(err?.message).toBe(FULL_MSG);
+      expect(err?.isSafeMessage).toBe(true);
+      expect(err?.kind).toBe("operational");
+      expect(err?.code).toBe("storage-full");
       expect(err?.statusCode).toBe(503);
       expect(err?.cause).toMatchObject({ code });
       expect(logError).not.toHaveBeenCalled();
@@ -1029,9 +1317,14 @@ describe("saveThumbnail after a failed write (#1633)", () => {
     const err = (await saveThumbnail("photo.png", Buffer.alloc(4096, 7)).then(
       () => null,
       (e: unknown) => e,
-    )) as StorageError | null;
+    )) as (StorageError & { cause?: unknown }) | null;
 
-    expect(err?.code).toBe("ENOSPC");
+    expect(err?.message).toBe(FULL_MSG);
+    expect(err?.isSafeMessage).toBe(true);
+    expect(err?.kind).toBe("operational");
+    expect(err?.code).toBe("storage-full");
+    expect(err?.statusCode).toBe(503);
+    expect(err?.cause).toMatchObject({ code: "ENOSPC" });
     expect(await getCachedThumbnail("photo.png")).toBeNull();
     const [leftover, ...rest] = await thumbFiles();
     expect(rest).toEqual([]);
