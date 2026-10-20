@@ -22,6 +22,8 @@ const s3Mocks = vi.hoisted(() => ({
   configure: vi.fn(),
   putObject: vi.fn(),
   putThumbnail: vi.fn(),
+  deleteObject: vi.fn(),
+  deleteThumbnail: vi.fn(),
 }));
 
 vi.mock("@snapotter/enterprise", () => ({
@@ -127,11 +129,17 @@ beforeEach(async () => {
   s3Mocks.putObject.mockResolvedValue(undefined);
   s3Mocks.putThumbnail.mockReset();
   s3Mocks.putThumbnail.mockResolvedValue(undefined);
+  s3Mocks.deleteObject.mockReset();
+  s3Mocks.deleteObject.mockResolvedValue(undefined);
+  s3Mocks.deleteThumbnail.mockReset();
+  s3Mocks.deleteThumbnail.mockResolvedValue(undefined);
   s3Mocks.load.mockReset();
   s3Mocks.load.mockResolvedValue({
     configureS3: s3Mocks.configure,
     putObject: s3Mocks.putObject,
     putThumbnail: s3Mocks.putThumbnail,
+    deleteObject: s3Mocks.deleteObject,
+    deleteThumbnail: s3Mocks.deleteThumbnail,
   });
   vi.resetModules();
 });
@@ -1422,5 +1430,157 @@ describe("saveFile in S3 mode (#1643)", () => {
 
     await expect(saveFile(Buffer.from("x"), "photo.png")).rejects.toBe(bug);
     expect((bug as TypeError & { statusCode?: number }).statusCode).toBe(500);
+  });
+});
+
+describe("deleteStoredFile and deleteThumbnail in S3 mode (#2647)", () => {
+  const UNAVAILABLE_MSG = "The server's storage service is unavailable.";
+
+  beforeEach(() => {
+    config.STORAGE_MODE = "s3";
+  });
+
+  it("delegates deleteStoredFile to s3.deleteObject and deleteThumbnail to s3.deleteThumbnail", async () => {
+    const { deleteStoredFile, deleteThumbnail } = await importModule();
+    await deleteStoredFile("photo.png");
+    await deleteThumbnail("photo.png");
+    expect(s3Mocks.deleteObject).toHaveBeenCalledWith("photo.png");
+    expect(s3Mocks.deleteThumbnail).toHaveBeenCalledWith("photo.png");
+  });
+
+  it.each([
+    [
+      "S3 refusing access",
+      Object.assign(new Error("Access Denied"), {
+        name: "AccessDenied",
+        $metadata: { httpStatusCode: 403 },
+      }),
+    ],
+    [
+      "S3 throttling the delete",
+      Object.assign(new Error("Please reduce your request rate."), {
+        name: "SlowDown",
+        $metadata: { httpStatusCode: 503 },
+      }),
+    ],
+    [
+      "S3 reporting a missing bucket",
+      Object.assign(new Error("The specified bucket does not exist"), {
+        name: "NoSuchBucket",
+        $metadata: { httpStatusCode: 404 },
+      }),
+    ],
+    [
+      "S3 resetting the connection",
+      Object.assign(new Error("socket hang up"), {
+        name: "TimeoutError",
+        code: "ECONNRESET",
+        $metadata: { attempts: 3 },
+      }),
+    ],
+    [
+      "an S3 request timing out without $metadata",
+      Object.assign(new Error("Request timed out"), {
+        name: "TimeoutError",
+      }),
+    ],
+    [
+      "the S3 endpoint unreachable",
+      Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), { code: "ECONNREFUSED" }),
+    ],
+  ])(
+    "deleteStoredFile and deleteThumbnail classify %s as a 503 storage-unavailable SafeError",
+    async (_case, cause) => {
+      const { deleteStoredFile, deleteThumbnail } = await importModule();
+
+      s3Mocks.deleteObject.mockRejectedValueOnce(cause);
+      await expect(deleteStoredFile("photo.png")).rejects.toMatchObject({
+        message: UNAVAILABLE_MSG,
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause,
+      });
+
+      s3Mocks.deleteThumbnail.mockRejectedValueOnce(cause);
+      await expect(deleteThumbnail("photo.png")).rejects.toMatchObject({
+        message: UNAVAILABLE_MSG,
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause,
+      });
+    },
+  );
+
+  it("classifies a getS3() initialization failure through s3WriteFault in deleteStoredFile and deleteThumbnail", async () => {
+    const netCause = Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), {
+      code: "ECONNREFUSED",
+    });
+    const { deleteStoredFile, deleteThumbnail } = await importModule();
+
+    s3Mocks.load.mockRejectedValueOnce(netCause);
+    await expect(deleteStoredFile("photo.png")).rejects.toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      code: "storage-unavailable",
+      statusCode: 503,
+      cause: netCause,
+    });
+
+    s3Mocks.load.mockRejectedValueOnce(netCause);
+    await expect(deleteThumbnail("photo.png")).rejects.toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      code: "storage-unavailable",
+      statusCode: 503,
+      cause: netCause,
+    });
+
+    const fileInitBug = new TypeError("Invalid S3 configuration for deleteStoredFile");
+    s3Mocks.load.mockRejectedValueOnce(fileInitBug);
+    await expect(deleteStoredFile("photo.png")).rejects.toBe(fileInitBug);
+    expect((fileInitBug as TypeError & { statusCode?: number }).statusCode).toBe(500);
+
+    const thumbInitBug = new TypeError("Invalid S3 configuration for deleteThumbnail");
+    s3Mocks.load.mockRejectedValueOnce(thumbInitBug);
+    await expect(deleteThumbnail("photo.png")).rejects.toBe(thumbInitBug);
+    expect((thumbInitBug as TypeError & { statusCode?: number }).statusCode).toBe(500);
+  });
+
+  it("stamps 500 on an unexpected non-S3 error during deleteStoredFile or deleteThumbnail", async () => {
+    const { deleteStoredFile, deleteThumbnail } = await importModule();
+
+    const fileBug = new TypeError("unexpected deleteObject failure");
+    s3Mocks.deleteObject.mockRejectedValueOnce(fileBug);
+    await expect(deleteStoredFile("photo.png")).rejects.toBe(fileBug);
+    expect((fileBug as TypeError & { statusCode?: number }).statusCode).toBe(500);
+
+    const thumbBug = new TypeError("unexpected deleteThumbnail failure");
+    s3Mocks.deleteThumbnail.mockRejectedValueOnce(thumbBug);
+    await expect(deleteThumbnail("photo.png")).rejects.toBe(thumbBug);
+    expect((thumbBug as TypeError & { statusCode?: number }).statusCode).toBe(500);
+  });
+
+  it("rejects traversal stored names with 400 INVALID_STORED_NAME before calling S3", async () => {
+    const { deleteStoredFile, deleteThumbnail } = await importModule();
+
+    await expect(deleteStoredFile("../escape.png")).rejects.toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      code: "INVALID_STORED_NAME",
+      statusCode: 400,
+    });
+    await expect(deleteThumbnail("../escape.png")).rejects.toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      code: "INVALID_STORED_NAME",
+      statusCode: 400,
+    });
+    expect(s3Mocks.load).not.toHaveBeenCalled();
+    expect(s3Mocks.deleteObject).not.toHaveBeenCalled();
+    expect(s3Mocks.deleteThumbnail).not.toHaveBeenCalled();
   });
 });

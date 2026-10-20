@@ -33,7 +33,10 @@ import { friendlyError } from "../lib/errors.js";
 import { getStoredFilePath, isStorageServiceFault, streamStoredFile } from "../lib/file-storage.js";
 import { logger } from "../lib/logger.js";
 import { mp4TimescaleArgs } from "../lib/media-tool.js";
-import { STORAGE_UNAVAILABLE_MESSAGE } from "../lib/object-storage.js";
+import {
+  normalizeOperationalWriteError,
+  STORAGE_UNAVAILABLE_MESSAGE,
+} from "../lib/object-storage.js";
 import { hasEffectivePermission, requirePermission } from "../permissions.js";
 import { requireAuth } from "../plugins/auth.js";
 
@@ -104,7 +107,11 @@ export async function deletePreview(fileId: string): Promise<void> {
   // a real failure. It reaches the caller, which fails the delete before any
   // row goes, the same as a stored file that can't be removed (#1455).
   for (const ext of [".mp4", ".mp3", ".pdf"]) {
-    await rm(previewPath(fileId, ext), { force: true });
+    try {
+      await rm(previewPath(fileId, ext), { force: true });
+    } catch (err) {
+      throw normalizeOperationalWriteError(err);
+    }
   }
 }
 

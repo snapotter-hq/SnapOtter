@@ -1,9 +1,29 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, rm, utimes, writeFile } from "node:fs/promises";
+import { chmod, mkdir, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const fsState = vi.hoisted(() => ({
+  failRmWith: "",
+  failRmSuffix: "",
+}));
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  const errno = (code: string) => Object.assign(new Error(`${code}: simulated`), { code });
+  return {
+    ...actual,
+    rm: async (...args: Parameters<typeof actual.rm>) => {
+      const target = String(args[0]);
+      if (fsState.failRmWith && (!fsState.failRmSuffix || target.endsWith(fsState.failRmSuffix))) {
+        throw errno(fsState.failRmWith);
+      }
+      return actual.rm(...args);
+    },
+  };
+});
 
 const config = vi.hoisted(() => ({
   FILES_STORAGE_PATH: "",
@@ -45,10 +65,16 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  fsState.failRmWith = "";
+  fsState.failRmSuffix = "";
   await rm(testDir, { recursive: true, force: true });
 });
 
-describe("deletePreview (#1320)", () => {
+const NOT_WRITABLE_MSG =
+  "The server can't write to its storage: it's read-only or not allowed to write there.";
+const FULL_MSG = "The server's storage is full.";
+
+describe("deletePreview (#1320, #2647)", () => {
   it("unlinks .mp4, .mp3, and .pdf preview files for the file id", async () => {
     const { deletePreview } = await import("../../../apps/api/src/routes/file-preview.js");
     const fileId = "test-file-123";
@@ -77,6 +103,96 @@ describe("deletePreview (#1320)", () => {
   it("is idempotent when preview files do not exist", async () => {
     const { deletePreview } = await import("../../../apps/api/src/routes/file-preview.js");
     await expect(deletePreview("nonexistent-file-id")).resolves.toBeUndefined();
+  });
+
+  const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
+  it.skipIf(isRoot)(
+    "throws a 503 storage-not-writable SafeError when .previews is read-only (#2647)",
+    async () => {
+      const { deletePreview } = await import("../../../apps/api/src/routes/file-preview.js");
+      const cachedPdf = join(previewDir, "locked-file.pdf");
+      await writeFile(cachedPdf, "pdf-preview");
+      await chmod(previewDir, 0o555);
+      try {
+        await expect(deletePreview("locked-file")).rejects.toMatchObject({
+          message: NOT_WRITABLE_MSG,
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-not-writable",
+          statusCode: 503,
+          cause: expect.objectContaining({
+            code: expect.stringMatching(/^(EACCES|EPERM)$/),
+          }),
+        });
+      } finally {
+        await chmod(previewDir, 0o755).catch(() => {});
+      }
+      expect(existsSync(cachedPdf)).toBe(true);
+    },
+  );
+
+  it.each(["EACCES", "EPERM", "EROFS"] as const)(
+    "maps %s from rm to a 503 storage-not-writable SafeError with cause (#2647)",
+    async (code) => {
+      fsState.failRmWith = code;
+      const { deletePreview } = await import("../../../apps/api/src/routes/file-preview.js");
+      await expect(deletePreview("file-123")).rejects.toMatchObject({
+        message: NOT_WRITABLE_MSG,
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-not-writable",
+        statusCode: 503,
+        cause: expect.objectContaining({ code }),
+      });
+    },
+  );
+
+  it.each(["ENOSPC", "EDQUOT"] as const)(
+    "maps %s from rm to a 503 storage-full SafeError with cause (#2647)",
+    async (code) => {
+      fsState.failRmWith = code;
+      const { deletePreview } = await import("../../../apps/api/src/routes/file-preview.js");
+      await expect(deletePreview("file-123")).rejects.toMatchObject({
+        message: FULL_MSG,
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-full",
+        statusCode: 503,
+        cause: expect.objectContaining({ code }),
+      });
+    },
+  );
+
+  it("rethrows non-operational rm errors untouched (#2647)", async () => {
+    fsState.failRmWith = "EBUSY";
+    const { deletePreview } = await import("../../../apps/api/src/routes/file-preview.js");
+    const err = (await deletePreview("file-123").then(
+      () => null,
+      (e: unknown) => e,
+    )) as { code?: string; isSafeMessage?: unknown; statusCode?: number } | null;
+    expect(err?.code).toBe("EBUSY");
+    expect(err?.isSafeMessage).toBeUndefined();
+    expect(err?.statusCode).toBeUndefined();
+  });
+
+  it("classifications apply when a later extension (.pdf) in the preview loop fails (#2647)", async () => {
+    const { deletePreview } = await import("../../../apps/api/src/routes/file-preview.js");
+    const fileId = "partial-preview-123";
+    await writeFile(join(previewDir, `${fileId}.mp4`), "video-data");
+    await writeFile(join(previewDir, `${fileId}.pdf`), "pdf-data");
+    fsState.failRmWith = "EPERM";
+    fsState.failRmSuffix = ".pdf";
+
+    await expect(deletePreview(fileId)).rejects.toMatchObject({
+      message: NOT_WRITABLE_MSG,
+      isSafeMessage: true,
+      kind: "operational",
+      code: "storage-not-writable",
+      statusCode: 503,
+      cause: expect.objectContaining({ code: "EPERM" }),
+    });
+    expect(existsSync(join(previewDir, `${fileId}.mp4`))).toBe(false);
+    expect(existsSync(join(previewDir, `${fileId}.pdf`))).toBe(true);
   });
 });
 

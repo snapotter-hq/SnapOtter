@@ -255,8 +255,12 @@ export async function streamStoredFile(storedName: string): Promise<Readable> {
 export async function deleteStoredFile(storedName: string): Promise<void> {
   assertSafeStoredName(storedName);
   if (isS3Enabled()) {
-    const s3 = await getS3();
-    await s3.deleteObject(storedName);
+    try {
+      const s3 = await getS3();
+      await s3.deleteObject(storedName);
+    } catch (err) {
+      throw s3WriteFault(err);
+    }
     return;
   }
   await unlinkStored(join(env.FILES_STORAGE_PATH, storedName));
@@ -354,8 +358,12 @@ export async function saveThumbnail(storedName: string, buffer: Buffer): Promise
 export async function deleteThumbnail(storedName: string): Promise<void> {
   assertSafeStoredName(storedName);
   if (isS3Enabled()) {
-    const s3 = await getS3();
-    await s3.deleteThumbnail(storedName);
+    try {
+      const s3 = await getS3();
+      await s3.deleteThumbnail(storedName);
+    } catch (err) {
+      throw s3WriteFault(err);
+    }
     return;
   }
   await unlinkStored(thumbPath(storedName));

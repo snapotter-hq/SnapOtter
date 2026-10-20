@@ -19,6 +19,9 @@ const deleteMock = vi.hoisted(() => vi.fn());
 const updateMock = vi.hoisted(() => vi.fn());
 const transactionMock = vi.hoisted(() => vi.fn());
 const deletePrefixMock = vi.hoisted(() => vi.fn());
+const deleteStoredFileMock = vi.hoisted(() => vi.fn());
+const deleteThumbnailMock = vi.hoisted(() => vi.fn());
+const deletePreviewMock = vi.hoisted(() => vi.fn());
 const requestCancelMock = vi.hoisted(() => vi.fn());
 const loggerWarnMock = vi.hoisted(() => vi.fn());
 const queueAddMock = vi.hoisted(() => vi.fn());
@@ -58,6 +61,9 @@ async function buildApp(): Promise<FastifyInstance> {
   updateMock.mockReset();
   transactionMock.mockReset();
   deletePrefixMock.mockReset();
+  deleteStoredFileMock.mockReset();
+  deleteThumbnailMock.mockReset();
+  deletePreviewMock.mockReset();
   requestCancelMock.mockReset();
   requestCancelMock.mockResolvedValue(true);
   loggerWarnMock.mockReset();
@@ -76,6 +82,9 @@ async function buildApp(): Promise<FastifyInstance> {
     fn({ select: selectMock, delete: deleteMock }),
   );
   deletePrefixMock.mockResolvedValue(undefined);
+  deleteStoredFileMock.mockResolvedValue(undefined);
+  deleteThumbnailMock.mockResolvedValue(undefined);
+  deletePreviewMock.mockResolvedValue(undefined);
   auditMock.mockImplementation(() => vi.fn(() => Promise.resolve()));
   // Set after the resets above, otherwise buildApp() would wipe it and the route
   // would bail at `if (!user) return`, answering 200 with an empty body.
@@ -154,11 +163,11 @@ async function buildApp(): Promise<FastifyInstance> {
     LastAdminError: class LastAdminError extends Error {},
   }));
   vi.doMock("../../../apps/api/src/lib/file-storage.js", () => ({
-    deleteStoredFile: vi.fn(),
-    deleteThumbnail: vi.fn(),
+    deleteStoredFile: deleteStoredFileMock,
+    deleteThumbnail: deleteThumbnailMock,
   }));
   vi.doMock("../../../apps/api/src/routes/file-preview.js", () => ({
-    deletePreview: vi.fn(),
+    deletePreview: deletePreviewMock,
   }));
   vi.doMock("../../../apps/api/src/lib/object-storage.js", () => ({
     deletePrefix: deletePrefixMock,
@@ -502,4 +511,37 @@ describe("GDPR export route authority", () => {
     expect(deletePrefixMock).toHaveBeenCalledWith("uploads/job-2/");
     expect(deletePrefixMock).toHaveBeenCalledWith("outputs/job-2/");
   });
+
+  it.each(["deleteStoredFile", "deleteThumbnail", "deletePreview"] as const)(
+    "aborts user purge with 503 before deleting user_files, jobs, or users rows when %s fails (#2647)",
+    async (failingStep) => {
+      app = await buildApp();
+      selectResults = [
+        [{ id: "user-9", role: "user", team: "team-1", legalHold: false }],
+        [{ legalHold: false }],
+        [{ id: "file-1", storedName: "abc.png" }],
+      ];
+      canManageTargetRoleMock.mockResolvedValue(true);
+      const storageErr = Object.assign(new Error("The server's storage service is unavailable."), {
+        statusCode: 503,
+        code: "storage-unavailable",
+      });
+      if (failingStep === "deleteStoredFile")
+        deleteStoredFileMock.mockRejectedValueOnce(storageErr);
+      if (failingStep === "deleteThumbnail") deleteThumbnailMock.mockRejectedValueOnce(storageErr);
+      if (failingStep === "deletePreview") deletePreviewMock.mockRejectedValueOnce(storageErr);
+
+      const res = await app.inject({
+        method: "DELETE",
+        url: "/api/v1/enterprise/users/user-9/purge",
+        payload: { confirm: true },
+      });
+
+      expect(res.statusCode).toBe(503);
+      expect(deleteMock).not.toHaveBeenCalled();
+      expect(deletePrefixMock).not.toHaveBeenCalled();
+      expect(updateMock).not.toHaveBeenCalled();
+      expect(auditMock).not.toHaveBeenCalled();
+    },
+  );
 });
