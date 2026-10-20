@@ -35,6 +35,48 @@ describe("chart-maker numbers written the way a spreadsheet shows them (#1198)",
     expect(values('k,v\na,"1,234.5"\nb,"4.400"\n')).toEqual([1234.5, 4.4]);
   });
 
+  it("keeps a headerless first row whose value uses a comma decimal (#2971)", () => {
+    expect(parse('Apples,"1,5"\nBananas,"2,5"\nCherries,"3,5"\n')).toEqual([
+      { label: "Apples", value: 1.5 },
+      { label: "Bananas", value: 2.5 },
+      { label: "Cherries", value: 3.5 },
+    ]);
+    expect(values("Apples;1,5\nBananas;2\nCherries;3,5\n")).toEqual([1.5, 2, 3.5]);
+    expect(values('Apples,"1.234,5"\nBananas,"4.400"\n')).toEqual([1234.5, 4400]);
+    expect(values('Apples,"1,5"\nBananas,2\n')).toEqual([1.5, 2]);
+    expect(values('"1,5"\n"2,5"\n')).toEqual([1.5, 2.5]);
+    expect(values('EMEA,"2.025,5"\nAPAC,n/a\nAMER,"1.800,5"\n')).toEqual([2025.5, 1800.5]);
+    expect(parse('EMEA,"4.400,5","-2,1"\nAPAC,"3.600,5","1,4"\nAMER,"2.800,5","0,8"\n')).toEqual([
+      { label: "EMEA", value: 4400.5 },
+      { label: "APAC", value: 3600.5 },
+      { label: "AMER", value: 2800.5 },
+    ]);
+    expect(parse('EMEA,2024,2025,"1,5"\nAPAC,2024,2025,"2,5"\n')).toEqual([
+      { label: "EMEA", value: 1.5 },
+      { label: "APAC", value: 2.5 },
+    ]);
+    expect(parse('"1,5",2024,2025\n"2,5",2024,2025\n')).toEqual([
+      { label: "1,5", value: 2025 },
+      { label: "2,5", value: 2025 },
+    ]);
+
+    const skippedHeader = { unreadable: 0 };
+    expect(
+      parseInput(Buffer.from('item,price\nApples,"1,5"\nBananas,"2,5"\n'), skippedHeader).map(
+        (p) => p.value,
+      ),
+    ).toEqual([1.5, 2.5]);
+    expect(skippedHeader.unreadable).toBe(0);
+
+    const skippedFirstRow = { unreadable: 0 };
+    expect(
+      parseInput(Buffer.from('Apples,n/a\nBananas,"2,5"\nCherries,"3,5"\n'), skippedFirstRow).map(
+        (p) => p.value,
+      ),
+    ).toEqual([2.5, 3.5]);
+    expect(skippedFirstRow.unreadable).toBe(1);
+  });
+
   it("reads a column of three-digit groups as thousands", () => {
     expect(values('k,v\na,"1,200"\nb,"2,400"\n')).toEqual([1200, 2400]);
     expect(values("k,v\na,1 200\nb,2 400\nc,1'000'000\n")).toEqual([1200, 2400, 1000000]);

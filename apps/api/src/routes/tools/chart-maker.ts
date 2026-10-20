@@ -339,10 +339,11 @@ function labelShape(cell: string): string | null {
 function isHeaderRow(rows: string[][]): boolean {
   if (rows.length <= 1) return false;
   const row = rows[0];
-  if (row.every((cell) => numericCell(cell) === null)) {
+  const all = detectColumns(rows);
+  if (row.every((cell, col) => numericCell(cell, all.decimals[col]) === null)) {
     const rest = rows.slice(1);
     const { labelCol, valueCol } = detectColumns(rest, row.length);
-    if (valueCol < 0 || detectColumns(rows).valueCol !== valueCol) return true;
+    if (valueCol < 0 || all.valueCol !== valueCol) return true;
     if (MISSING_VALUE_CELL.test(toCell(row[valueCol]).trim())) return false;
     if (labelCol < 0) return true;
     const firstShape = labelShape(toCell(row[labelCol]));
@@ -353,10 +354,11 @@ function isHeaderRow(rows: string[][]): boolean {
     }
     return matching <= rest.length * NUMERIC_MAJORITY;
   }
-  if (row.length < 3 || numericCell(row[0]) !== null) return false;
+  if (row.length < 3 || numericCell(row[0], all.decimals[0]) !== null) return false;
   let years = 0;
-  for (const cell of row) {
-    if (numericCell(cell) === null) continue;
+  for (let col = 0; col < row.length; col++) {
+    const cell = row[col];
+    if (numericCell(cell, all.decimals[col]) === null) continue;
     if (!YEAR_HEADER.test(cell.trim())) return false;
     years += 1;
   }
