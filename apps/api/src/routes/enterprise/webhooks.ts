@@ -17,6 +17,7 @@ import { auditFromRequest } from "../../lib/audit.js";
 import { decryptSettingWithRotation, encrypt, isEncrypted } from "../../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
 import { reportError } from "../../lib/error-report.js";
+import { logger } from "../../lib/logger.js";
 import { validateFetchUrl } from "../../lib/ssrf.js";
 import { deliverWebhook } from "../../lib/webhook-delivery.js";
 import { requirePermission } from "../../permissions.js";
@@ -47,11 +48,23 @@ async function readDestinationsWithRaw(): Promise<{
   if (!row) return { destinations: [], rawJson: null };
 
   try {
+    const parsed: unknown = JSON.parse(row.value);
+    if (!Array.isArray(parsed)) {
+      logger.warn(
+        { key: SETTINGS_KEY },
+        "webhooks: stored webhook_destinations is not a JSON array",
+      );
+      return { destinations: [], rawJson: null };
+    }
     return {
-      destinations: JSON.parse(row.value) as WebhookDestination[],
+      destinations: parsed as WebhookDestination[],
       rawJson: row.value,
     };
-  } catch {
+  } catch (err) {
+    logger.warn(
+      { err, key: SETTINGS_KEY },
+      "webhooks: failed to parse stored webhook_destinations JSON",
+    );
     return { destinations: [], rawJson: null };
   }
 }

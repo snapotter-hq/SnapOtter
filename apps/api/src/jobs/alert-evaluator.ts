@@ -45,8 +45,20 @@ export async function evaluateAlerts(): Promise<void> {
     type: string;
   }[];
   try {
-    destinations = JSON.parse(destJson);
-  } catch {
+    const parsed: unknown = JSON.parse(destJson);
+    if (!Array.isArray(parsed)) {
+      logger.warn(
+        { key: "webhook_destinations" },
+        "alert-evaluator: stored webhook_destinations is not a JSON array",
+      );
+      return;
+    }
+    destinations = parsed as typeof destinations;
+  } catch (err) {
+    logger.warn(
+      { err, key: "webhook_destinations" },
+      "alert-evaluator: failed to parse stored webhook_destinations JSON",
+    );
     return;
   }
 

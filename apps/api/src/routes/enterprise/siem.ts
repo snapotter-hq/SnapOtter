@@ -55,7 +55,8 @@ export async function registerSiemRoutes(app: FastifyInstance): Promise<void> {
         .from(schema.settings)
         .where(eq(schema.settings.key, SETTINGS_KEY));
 
-      if (!row) {
+      const config = row ? parseSiemConfig(row.value) : null;
+      if (!config) {
         return reply.send({
           webhookUrl: "",
           authHeader: "",
@@ -64,7 +65,6 @@ export async function registerSiemRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      const config = JSON.parse(row.value) as SiemConfig;
       return reply.send({
         ...config,
         authHeader: config.authHeader ? "***" : "",

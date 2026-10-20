@@ -372,4 +372,64 @@ describe("SIEM config with enterprise license", () => {
     expect(nonStringRes.statusCode).toBe(200);
     expect((await readSiemConfig())?.authHeader).toBe("");
   });
+
+  it("GET logs a warning and returns default disabled config when siem_config row is corrupt or non-object JSON (#2554)", async () => {
+    const { logger } = await import("../../../apps/api/src/lib/logger.js");
+    const warnSpy = vi.spyOn(logger, "warn");
+
+    try {
+      await db
+        .insert(schema.settings)
+        .values({ key: "siem_config", value: "{corrupt" })
+        .onConflictDoUpdate({
+          target: schema.settings.key,
+          set: { value: "{corrupt", updatedAt: new Date() },
+        });
+
+      const corruptRes = await enterpriseApp.app.inject({
+        method: "GET",
+        url: "/api/v1/enterprise/siem/config",
+        headers: { authorization: `Bearer ${entAdminToken}` },
+      });
+      expect(corruptRes.statusCode).toBe(200);
+      expect(JSON.parse(corruptRes.body)).toEqual({
+        webhookUrl: "",
+        authHeader: "",
+        flushIntervalSeconds: 30,
+        enabled: false,
+      });
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ err: expect.any(SyntaxError), key: "siem_config" }),
+        "siem: failed to parse stored siem_config JSON",
+      );
+
+      for (const nonObject of ["null", "[]", "42"]) {
+        warnSpy.mockClear();
+        await db
+          .update(schema.settings)
+          .set({ value: nonObject, updatedAt: new Date() })
+          .where(eq(schema.settings.key, "siem_config"));
+
+        const nonObjRes = await enterpriseApp.app.inject({
+          method: "GET",
+          url: "/api/v1/enterprise/siem/config",
+          headers: { authorization: `Bearer ${entAdminToken}` },
+        });
+        expect(nonObjRes.statusCode).toBe(200);
+        expect(JSON.parse(nonObjRes.body)).toEqual({
+          webhookUrl: "",
+          authHeader: "",
+          flushIntervalSeconds: 30,
+          enabled: false,
+        });
+        expect(warnSpy).toHaveBeenCalledWith(
+          { key: "siem_config" },
+          "siem: stored siem_config is not a JSON object",
+        );
+      }
+    } finally {
+      warnSpy.mockRestore();
+      await db.delete(schema.settings).where(eq(schema.settings.key, "siem_config"));
+    }
+  });
 });

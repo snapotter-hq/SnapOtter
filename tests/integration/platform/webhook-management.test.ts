@@ -538,5 +538,89 @@ describe("webhook management", () => {
         await db.delete(schema.settings).where(eq(schema.settings.key, "siem_config"));
       }
     });
+
+    it("logs a warning and falls back to [] when webhook_destinations row is corrupt or non-array JSON (#2554)", async () => {
+      const { logger } = await import("../../../apps/api/src/lib/logger.js");
+      const warnSpy = vi.spyOn(logger, "warn");
+
+      try {
+        await db
+          .insert(schema.settings)
+          .values({ key: "webhook_destinations", value: "{corrupt" })
+          .onConflictDoUpdate({
+            target: schema.settings.key,
+            set: { value: "{corrupt", updatedAt: new Date() },
+          });
+
+        const getRes = await testApp.app.inject({
+          method: "GET",
+          url: "/api/v1/enterprise/webhooks",
+          headers: { authorization: `Bearer ${adminToken}` },
+        });
+        expect(getRes.statusCode).toBe(200);
+        expect(JSON.parse(getRes.body)).toEqual({ destinations: [] });
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ err: expect.any(SyntaxError), key: "webhook_destinations" }),
+          "webhooks: failed to parse stored webhook_destinations JSON",
+        );
+
+        warnSpy.mockClear();
+        const postRes = await testApp.app.inject({
+          method: "POST",
+          url: "/api/v1/enterprise/webhooks",
+          headers: { authorization: `Bearer ${adminToken}` },
+          payload: {
+            name: "Recovered Hook",
+            url: "https://example.com/recovered",
+            type: "alerts",
+          },
+        });
+        expect(postRes.statusCode).toBe(201);
+        expect(JSON.parse(postRes.body)).toEqual({ ok: true, index: 0 });
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ err: expect.any(SyntaxError), key: "webhook_destinations" }),
+          "webhooks: failed to parse stored webhook_destinations JSON",
+        );
+
+        const afterPostGetRes = await testApp.app.inject({
+          method: "GET",
+          url: "/api/v1/enterprise/webhooks",
+          headers: { authorization: `Bearer ${adminToken}` },
+        });
+        expect(afterPostGetRes.statusCode).toBe(200);
+        expect(JSON.parse(afterPostGetRes.body)).toEqual({
+          destinations: [
+            expect.objectContaining({
+              name: "Recovered Hook",
+              url: "https://example.com/recovered",
+              type: "alerts",
+            }),
+          ],
+        });
+
+        for (const nonArray of ["{}", "null", "42"]) {
+          warnSpy.mockClear();
+          await db
+            .update(schema.settings)
+            .set({ value: nonArray, updatedAt: new Date() })
+            .where(eq(schema.settings.key, "webhook_destinations"));
+
+          const nonArrRes = await testApp.app.inject({
+            method: "GET",
+            url: "/api/v1/enterprise/webhooks",
+            headers: { authorization: `Bearer ${adminToken}` },
+          });
+          expect(nonArrRes.statusCode).toBe(200);
+          expect(JSON.parse(nonArrRes.body)).toEqual({ destinations: [] });
+          expect(warnSpy).toHaveBeenCalledWith(
+            { key: "webhook_destinations" },
+            "webhooks: stored webhook_destinations is not a JSON array",
+          );
+        }
+      } finally {
+        warnSpy.mockRestore();
+        await db.delete(schema.settings).where(eq(schema.settings.key, "webhook_destinations"));
+      }
+    });
   });
 });

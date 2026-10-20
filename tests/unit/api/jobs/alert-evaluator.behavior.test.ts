@@ -133,14 +133,37 @@ describe("alert evaluator behavior", () => {
     expect(deliverWebhookMock).not.toHaveBeenCalled();
   });
 
-  it("returns early when webhook destination settings are invalid JSON", async () => {
+  it("returns early and logs a warning when webhook destination settings are invalid JSON (#2554)", async () => {
     const { evaluateAlerts } = await loadAlertEvaluator();
     getSettingStringMock.mockResolvedValueOnce("{invalid");
 
     await evaluateAlerts();
 
+    expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      { err: expect.any(SyntaxError), key: "webhook_destinations" },
+      "alert-evaluator: failed to parse stored webhook_destinations JSON",
+    );
     expect(statfsMock).not.toHaveBeenCalled();
     expect(deliverWebhookMock).not.toHaveBeenCalled();
+  });
+
+  it("returns early and logs a warning when webhook_destinations JSON is not an array (#2554)", async () => {
+    const { evaluateAlerts } = await loadAlertEvaluator();
+    for (const nonArray of ["{}", "null", "42", '"string"']) {
+      loggerMock.warn.mockClear();
+      getSettingStringMock.mockResolvedValueOnce(nonArray);
+
+      await expect(evaluateAlerts()).resolves.toBeUndefined();
+
+      expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+      expect(loggerMock.warn).toHaveBeenCalledWith(
+        { key: "webhook_destinations" },
+        "alert-evaluator: stored webhook_destinations is not a JSON array",
+      );
+      expect(statfsMock).not.toHaveBeenCalled();
+      expect(deliverWebhookMock).not.toHaveBeenCalled();
+    }
   });
 
   it("returns early when no enabled alert destinations are configured", async () => {

@@ -693,12 +693,32 @@ describe("alert-evaluator.ts mutation coverage", () => {
       expect(isFeatureEnabledMock).toHaveBeenCalledWith("admin_alerts");
     });
 
-    it("returns early on invalid webhook_destinations JSON", async () => {
+    it("returns early and logs a warning on invalid webhook_destinations JSON (#2554)", async () => {
       const { evaluateAlerts } = await loadAlertEvaluator();
       getSettingStringMock.mockResolvedValueOnce("{not json");
 
       await evaluateAlerts();
 
+      expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+      expect(loggerMock.warn).toHaveBeenCalledWith(
+        { err: expect.any(SyntaxError), key: "webhook_destinations" },
+        "alert-evaluator: failed to parse stored webhook_destinations JSON",
+      );
+      expect(statfsMock).not.toHaveBeenCalled();
+      expect(deliverWebhookMock).not.toHaveBeenCalled();
+    });
+
+    it("returns early and logs a warning when webhook_destinations JSON is not an array (#2554)", async () => {
+      const { evaluateAlerts } = await loadAlertEvaluator();
+      getSettingStringMock.mockResolvedValueOnce('{"enabled":true,"type":"alerts"}');
+
+      await evaluateAlerts();
+
+      expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+      expect(loggerMock.warn).toHaveBeenCalledWith(
+        { key: "webhook_destinations" },
+        "alert-evaluator: stored webhook_destinations is not a JSON array",
+      );
       expect(statfsMock).not.toHaveBeenCalled();
       expect(deliverWebhookMock).not.toHaveBeenCalled();
     });
