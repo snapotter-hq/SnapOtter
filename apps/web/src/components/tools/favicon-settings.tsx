@@ -46,6 +46,7 @@ export function FaviconSettings() {
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const processingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     return () => {
@@ -54,17 +55,6 @@ export function FaviconSettings() {
     };
   }, []);
 
-  // An abort fires neither onload nor onerror, so a run the unmount cuts off has to
-  // be ended here, or `processing` stays set for good (#2304).
-  useSettleOnUnmount(
-    () => xhrRef.current !== null,
-    () => {
-      const xhr = xhrRef.current;
-      xhrRef.current = null;
-      xhr?.abort();
-    },
-  );
-
   const stopTimers = () => {
     if (elapsedRef.current) clearInterval(elapsedRef.current);
     if (processingTimerRef.current) clearInterval(processingTimerRef.current);
@@ -72,7 +62,23 @@ export function FaviconSettings() {
     processingTimerRef.current = null;
   };
 
+  // An abort fires neither onload nor onerror, so a run the unmount cuts off has to
+  // be ended here, or `processing` stays set for good (#2304).
+  useSettleOnUnmount(
+    () => xhrRef.current !== null,
+    () => {
+      unsubscribeRef.current?.();
+      unsubscribeRef.current = null;
+      stopTimers();
+      const xhr = xhrRef.current;
+      xhrRef.current = null;
+      xhr?.abort();
+    },
+  );
+
   const cleanup = () => {
+    unsubscribeRef.current?.();
+    unsubscribeRef.current = null;
     stopTimers();
     xhrRef.current = null;
     setBusy(false);
@@ -94,6 +100,10 @@ export function FaviconSettings() {
 
     const { entries: startEntries, selectedIndex: capturedIndex } = useFileStore.getState();
     const capturedEntryId = startEntries[capturedIndex]?.id ?? startEntries[0]?.id;
+
+    unsubscribeRef.current?.();
+    xhrRef.current?.abort();
+    stopTimers();
 
     // The request is made, and the ref set, before the store flag goes up: a throw
     // between the two would leave `processing` set with nothing for the unmount to
@@ -130,123 +140,164 @@ export function FaviconSettings() {
       setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
     });
 
-    const startTime = Date.now();
-    elapsedRef.current = setInterval(() => {
-      setProgress((prev) => ({ ...prev, elapsed: Math.floor((Date.now() - startTime) / 1000) }));
-    }, 1000);
-
-    const formData = new FormData();
-    for (const file of files) {
-      formData.append("file", file);
-    }
-
-    // Build settings
-    const settings: Record<string, unknown> = {
-      padding,
-      radius,
-      themeColor,
-    };
-    if (bgMode === "color") {
-      settings.background = bgColor;
-    }
-    if (selectedSizes.size < ALL_SIZES.length) {
-      settings.sizes = Array.from(selectedSizes);
-    }
-    formData.append("settings", JSON.stringify(settings));
-
-    xhr.responseType = "blob";
-    xhr.timeout = 300_000;
-
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) {
-        const uploadPercent = (event.loaded / event.total) * 40;
-        setProgress((prev) =>
-          prev.phase === "uploading" ? { ...prev, percent: uploadPercent } : prev,
-        );
-      }
-    };
-
-    xhr.upload.onload = () => {
-      setProgress((prev) => ({ ...prev, phase: "processing", percent: 40 }));
-      const step = (95 - 40) / 90;
-      processingTimerRef.current = setInterval(() => {
-        setProgress((prev) => {
-          if (prev.phase !== "processing") return prev;
-          return { ...prev, percent: Math.min(95, prev.percent + step) };
-        });
-      }, 500);
-    };
-
-    xhr.onload = () => {
-      if (xhrRef.current !== xhr) return;
-      stopTimers();
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const blob = xhr.response as Blob;
-          const url = URL.createObjectURL(blob);
-          try {
-            if (capturedEntryId) {
-              useFileStore.getState().updateEntryById(capturedEntryId, {
-                processedUrl: url,
-                processedFilename: "favicons.zip",
-                status: "completed",
-              });
-            }
-            setDownloadUrl(url);
-            setProgress((prev) => ({ ...prev, phase: "complete", percent: 100 }));
-          } catch (err) {
-            setError(t.errors.jobTrackingFailed);
-            throw err;
-          }
-        } finally {
-          cleanup();
+    let storeReset = false;
+    const unsubscribe = useFileStore.subscribe((state) => {
+      if (!state.processing || state.entries.length === 0) {
+        storeReset = true;
+        if (xhrRef.current === xhr) xhrRef.current = null;
+        if (unsubscribeRef.current === unsubscribe) unsubscribeRef.current = null;
+        unsubscribe();
+        stopTimers();
+        setBusy(false);
+        if (state.processing) {
+          setProcessing(false);
         }
-        return;
+        xhr.abort();
+      }
+    });
+    unsubscribeRef.current = unsubscribe;
+
+    const endSubscription = () => {
+      if (unsubscribeRef.current === unsubscribe) {
+        unsubscribeRef.current = null;
+      }
+      unsubscribe();
+    };
+
+    try {
+      const startTime = Date.now();
+      elapsedRef.current = setInterval(() => {
+        setProgress((prev) => ({ ...prev, elapsed: Math.floor((Date.now() - startTime) / 1000) }));
+      }, 1000);
+
+      const formData = new FormData();
+      for (const file of files) {
+        formData.append("file", file);
       }
 
-      void (async () => {
-        try {
-          let body: unknown = null;
-          try {
-            const text = xhr.response instanceof Blob ? await xhr.response.text() : "";
-            body = JSON.parse(text);
-          } catch {
-            body = null;
-          }
-          if (xhrRef.current !== xhr) return;
-          setError(
-            failedAnswerMessage(
-              t,
-              body,
-              xhr.status,
-              format(t.toolSettings.favicon.generationFailed, { status: xhr.status }),
-            ),
+      // Build settings
+      const settings: Record<string, unknown> = {
+        padding,
+        radius,
+        themeColor,
+      };
+      if (bgMode === "color") {
+        settings.background = bgColor;
+      }
+      if (selectedSizes.size < ALL_SIZES.length) {
+        settings.sizes = Array.from(selectedSizes);
+      }
+      formData.append("settings", JSON.stringify(settings));
+
+      xhr.responseType = "blob";
+      xhr.timeout = 300_000;
+
+      xhr.upload.onprogress = (event) => {
+        if (xhrRef.current !== xhr || storeReset) return;
+        if (event.lengthComputable) {
+          const uploadPercent = (event.loaded / event.total) * 40;
+          setProgress((prev) =>
+            prev.phase === "uploading" ? { ...prev, percent: uploadPercent } : prev,
           );
-        } finally {
-          if (xhrRef.current === xhr) {
+        }
+      };
+
+      xhr.upload.onload = () => {
+        if (xhrRef.current !== xhr || storeReset) return;
+        setProgress((prev) => ({ ...prev, phase: "processing", percent: 40 }));
+        const step = (95 - 40) / 90;
+        processingTimerRef.current = setInterval(() => {
+          setProgress((prev) => {
+            if (prev.phase !== "processing") return prev;
+            return { ...prev, percent: Math.min(95, prev.percent + step) };
+          });
+        }, 500);
+      };
+
+      xhr.onload = () => {
+        if (xhrRef.current !== xhr || storeReset) {
+          endSubscription();
+          return;
+        }
+        stopTimers();
+        if (xhr.status >= 200 && xhr.status < 300) {
+          endSubscription();
+          try {
+            const blob = xhr.response as Blob;
+            const url = URL.createObjectURL(blob);
+            try {
+              if (capturedEntryId) {
+                useFileStore.getState().updateEntryById(capturedEntryId, {
+                  processedUrl: url,
+                  processedFilename: "favicons.zip",
+                  status: "completed",
+                });
+              }
+              setDownloadUrl(url);
+              setProgress((prev) => ({ ...prev, phase: "complete", percent: 100 }));
+            } catch (err) {
+              setError(t.errors.jobTrackingFailed);
+              throw err;
+            }
+          } finally {
             cleanup();
           }
+          return;
         }
-      })();
-    };
 
-    xhr.onerror = () => {
-      if (xhrRef.current !== xhr) return;
-      setError(t.toolSettings.favicon.networkError);
+        void (async () => {
+          try {
+            let body: unknown = null;
+            try {
+              const text = xhr.response instanceof Blob ? await xhr.response.text() : "";
+              body = JSON.parse(text);
+            } catch {
+              body = null;
+            }
+            endSubscription();
+            if (xhrRef.current !== xhr || storeReset) return;
+            setError(
+              failedAnswerMessage(
+                t,
+                body,
+                xhr.status,
+                format(t.toolSettings.favicon.generationFailed, { status: xhr.status }),
+              ),
+            );
+          } finally {
+            if (xhrRef.current === xhr && !storeReset) {
+              cleanup();
+            }
+          }
+        })();
+      };
+
+      xhr.onerror = () => {
+        endSubscription();
+        if (xhrRef.current !== xhr || storeReset) return;
+        setError(t.toolSettings.favicon.networkError);
+        cleanup();
+      };
+
+      xhr.ontimeout = () => {
+        endSubscription();
+        if (xhrRef.current !== xhr || storeReset) return;
+        setError(t.toolSettings.favicon.timeout);
+        cleanup();
+      };
+
+      xhr.open("POST", appUrl("/api/v1/tools/image/favicon"));
+      formatHeaders().forEach((value, key) => {
+        xhr.setRequestHeader(key, value);
+      });
+      xhr.send(formData);
+    } catch (err) {
+      endSubscription();
+      if (!storeReset) {
+        setError(err instanceof Error ? err.message : t.toolSettings.favicon.networkError);
+      }
       cleanup();
-    };
-
-    xhr.ontimeout = () => {
-      if (xhrRef.current !== xhr) return;
-      setError(t.toolSettings.favicon.timeout);
-      cleanup();
-    };
-
-    xhr.open("POST", appUrl("/api/v1/tools/image/favicon"));
-    formatHeaders().forEach((value, key) => {
-      xhr.setRequestHeader(key, value);
-    });
-    xhr.send(formData);
+    }
   }, [
     files,
     setProcessing,

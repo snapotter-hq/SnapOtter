@@ -355,6 +355,157 @@ describe("stitch panel late XHR after reset (#2636)", () => {
   });
 });
 
+describe("favicon and image-to-pdf panel late XHR after reset (#3071)", () => {
+  it("favicon: aborts in-flight XHR, clears busy state, and ignores late 200, 500, error, or timeout when useFileStore resets while mounted", async () => {
+    for (const outcome of ["200", "500", "error", "timeout"] as const) {
+      FakeXhr.instances = [];
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("one.png")]);
+      const { unmount } = render(<FaviconSettings />);
+      fireEvent.click(screen.getByTestId("favicon-submit"));
+      const xhr = FakeXhr.instances[0];
+      expect(screen.queryByTestId("favicon-submit")).toBeNull();
+
+      act(() => {
+        useFileStore.getState().reset();
+        useFileStore.getState().setFiles([image("next.png")]);
+        useFileStore.getState().setProcessing(true);
+      });
+
+      expect(xhr.aborted).toBe(true);
+      expect(screen.getByTestId("favicon-submit")).toBeInTheDocument();
+
+      await act(async () => {
+        if (outcome === "200") {
+          xhr.status = 200;
+          xhr.response = new Blob(["zip"]);
+          xhr.onload?.();
+        } else if (outcome === "500") {
+          xhr.status = 500;
+          xhr.response = new Blob([JSON.stringify({ error: "Server error" })]);
+          xhr.onload?.();
+        } else if (outcome === "error") {
+          xhr.onerror?.();
+        } else {
+          xhr.ontimeout?.();
+        }
+      });
+
+      expect(useFileStore.getState().processing).toBe(true);
+      expect(useFileStore.getState().processedUrl).toBeNull();
+      expect(useFileStore.getState().error).toBeNull();
+      expect(screen.queryByTestId("favicon-download")).toBeNull();
+      unmount();
+    }
+  });
+
+  it("favicon: ignores a non-2xx blob body when useFileStore resets while Blob.text() is pending", async () => {
+    render(<FaviconSettings />);
+    fireEvent.click(screen.getByTestId("favicon-submit"));
+    const xhr = FakeXhr.instances[0];
+
+    act(() => {
+      xhr.status = 500;
+      xhr.response = new Blob([JSON.stringify({ error: "Stale server error" })]);
+      xhr.onload?.();
+    });
+    act(() => {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("next.png")]);
+      useFileStore.getState().setProcessing(true);
+    });
+
+    await act(async () => {});
+
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().error).toBeNull();
+    expect(screen.getByTestId("favicon-submit")).toBeInTheDocument();
+  });
+
+  it("image-to-pdf: aborts in-flight XHR, clears busy state, and ignores late 200, 500, error, or timeout when useFileStore resets while mounted", () => {
+    for (const outcome of ["200", "500", "error", "timeout"] as const) {
+      FakeXhr.instances = [];
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("one.png")]);
+      const { unmount } = render(<ImageToPdfSettings />);
+      fireEvent.click(screen.getByTestId("image-to-pdf-submit"));
+      const xhr = FakeXhr.instances[0];
+      expect(screen.queryByTestId("image-to-pdf-submit")).toBeNull();
+
+      act(() => {
+        useFileStore.getState().reset();
+        useFileStore.getState().setFiles([image("next.png")]);
+        useFileStore.getState().setProcessing(true);
+      });
+
+      expect(xhr.aborted).toBe(true);
+      expect(screen.getByTestId("image-to-pdf-submit")).toBeInTheDocument();
+
+      act(() => {
+        if (outcome === "200") {
+          xhr.status = 200;
+          xhr.responseText = JSON.stringify({
+            downloadUrl: "/api/v1/download/job-1/document.pdf",
+            compression: { targetMet: true, jpegQuality: 85, targetRequested: 100 },
+          });
+          xhr.onload?.();
+        } else if (outcome === "500") {
+          xhr.status = 500;
+          xhr.responseText = JSON.stringify({ error: "Server error" });
+          xhr.onload?.();
+        } else if (outcome === "error") {
+          xhr.onerror?.();
+        } else {
+          xhr.ontimeout?.();
+        }
+      });
+
+      expect(useFileStore.getState().processing).toBe(true);
+      expect(useFileStore.getState().processedUrl).toBeNull();
+      expect(useFileStore.getState().error).toBeNull();
+      expect(screen.queryByTestId("image-to-pdf-download")).toBeNull();
+      expect(screen.queryByTestId("image-to-pdf-compression-result")).toBeNull();
+      unmount();
+    }
+  });
+
+  it("clears processing and aborts when the last file is removed via removeFile mid-run or xhr.send throws synchronously", () => {
+    for (const [Panel, submitId] of [
+      [FaviconSettings, "favicon-submit"],
+      [ImageToPdfSettings, "image-to-pdf-submit"],
+    ] as const) {
+      FakeXhr.instances = [];
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("only.png")]);
+      const { unmount } = render(<Panel />);
+      fireEvent.click(screen.getByTestId(submitId));
+      const xhr = FakeXhr.instances[0];
+      expect(useFileStore.getState().processing).toBe(true);
+
+      act(() => {
+        useFileStore.getState().removeFile(0);
+      });
+
+      expect(xhr.aborted).toBe(true);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByTestId(submitId)).toBeDisabled();
+
+      // Synchronous throw from xhr.send clears processing and busy and records the error.
+      act(() => {
+        useFileStore.getState().setFiles([image("retry.png")]);
+      });
+      vi.spyOn(FakeXhr.prototype, "send").mockImplementationOnce(() => {
+        throw new Error("send boom");
+      });
+      fireEvent.click(screen.getByTestId(submitId));
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().error).toBe("send boom");
+      expect(screen.getByTestId(submitId)).toBeInTheDocument();
+      unmount();
+    }
+  });
+});
+
 describe("info panel (#2304)", () => {
   it("clears processing and says the run was cut off when it unmounts mid-fetch", () => {
     const { unmount } = render(<InfoSettings />);

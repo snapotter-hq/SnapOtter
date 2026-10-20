@@ -152,6 +152,7 @@ export function ImageToPdfSettings() {
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const processingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     return () => {
@@ -160,18 +161,31 @@ export function ImageToPdfSettings() {
     };
   }, []);
 
-  // An abort fires neither onload nor onerror, so a run the unmount cuts off has to
-  // be ended here, or `processing` stays set for good (#2304).
-  useSettleOnUnmount(
-    () => xhrRef.current !== null,
-    () => xhrRef.current?.abort(),
-  );
-
-  const cleanup = () => {
+  const stopTimers = () => {
     if (elapsedRef.current) clearInterval(elapsedRef.current);
     if (processingTimerRef.current) clearInterval(processingTimerRef.current);
     elapsedRef.current = null;
     processingTimerRef.current = null;
+  };
+
+  // An abort fires neither onload nor onerror, so a run the unmount cuts off has to
+  // be ended here, or `processing` stays set for good (#2304).
+  useSettleOnUnmount(
+    () => xhrRef.current !== null,
+    () => {
+      unsubscribeRef.current?.();
+      unsubscribeRef.current = null;
+      stopTimers();
+      const xhr = xhrRef.current;
+      xhrRef.current = null;
+      xhr?.abort();
+    },
+  );
+
+  const cleanup = () => {
+    unsubscribeRef.current?.();
+    unsubscribeRef.current = null;
+    stopTimers();
     xhrRef.current = null;
     setBusy(false);
     setProcessing(false);
@@ -183,6 +197,10 @@ export function ImageToPdfSettings() {
 
     const { entries: startEntries, selectedIndex: capturedIndex } = useFileStore.getState();
     const capturedEntryId = startEntries[capturedIndex]?.id ?? startEntries[0]?.id;
+
+    unsubscribeRef.current?.();
+    xhrRef.current?.abort();
+    stopTimers();
 
     // The request is made, and the ref set, before the store flag goes up: a throw
     // between the two would leave `processing` set with nothing for the unmount to
@@ -212,127 +230,170 @@ export function ImageToPdfSettings() {
       setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
     });
 
-    const startTime = Date.now();
-    elapsedRef.current = setInterval(() => {
-      setProgress((prev) => ({ ...prev, elapsed: Math.floor((Date.now() - startTime) / 1000) }));
-    }, 1000);
-
-    const formData = new FormData();
-    for (const file of files) {
-      formData.append("file", file);
-    }
-    const settings: Record<string, unknown> = { pageSize, orientation, margin, collate };
-    if (targetSizeValue.trim() !== "") {
-      const numVal = Number.parseFloat(targetSizeValue);
-      if (!Number.isNaN(numVal) && numVal > 0) {
-        settings.targetSize = { value: numVal, unit: targetSizeUnit };
+    let storeReset = false;
+    const unsubscribe = useFileStore.subscribe((state) => {
+      if (!state.processing || state.entries.length === 0) {
+        storeReset = true;
+        if (xhrRef.current === xhr) xhrRef.current = null;
+        if (unsubscribeRef.current === unsubscribe) unsubscribeRef.current = null;
+        unsubscribe();
+        stopTimers();
+        setBusy(false);
+        if (state.processing) {
+          setProcessing(false);
+        }
+        xhr.abort();
       }
-    }
-    formData.append("settings", JSON.stringify(settings));
+    });
+    unsubscribeRef.current = unsubscribe;
 
-    xhr.timeout = 300_000;
-
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) {
-        const uploadPercent = (event.loaded / event.total) * 40;
-        setProgress((prev) =>
-          prev.phase === "uploading" ? { ...prev, percent: uploadPercent } : prev,
-        );
+    const endSubscription = () => {
+      if (unsubscribeRef.current === unsubscribe) {
+        unsubscribeRef.current = null;
       }
+      unsubscribe();
     };
 
-    xhr.upload.onload = () => {
-      setProgress((prev) => ({ ...prev, phase: "processing", percent: 40 }));
-      const step = (95 - 40) / 90;
-      processingTimerRef.current = setInterval(() => {
-        setProgress((prev) => {
-          if (prev.phase !== "processing") return prev;
-          return { ...prev, percent: Math.min(95, prev.percent + step) };
-        });
-      }, 500);
-    };
+    try {
+      const startTime = Date.now();
+      elapsedRef.current = setInterval(() => {
+        setProgress((prev) => ({ ...prev, elapsed: Math.floor((Date.now() - startTime) / 1000) }));
+      }, 1000);
 
-    xhr.onload = () => {
-      try {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          let result: {
-            downloadUrl?: unknown;
-            compression?: { targetMet: boolean; jpegQuality: number; targetRequested: number };
-          } | null = null;
-          try {
-            result = resolveServerUrls(JSON.parse(xhr.responseText));
-          } catch {
-            setError(t.toolSettings["image-to-pdf"].parseResponseFailed);
-          }
-          if (result) {
-            const url =
-              typeof result.downloadUrl === "string" && result.downloadUrl
-                ? result.downloadUrl
-                : null;
-            if (!url) {
+      const formData = new FormData();
+      for (const file of files) {
+        formData.append("file", file);
+      }
+      const settings: Record<string, unknown> = { pageSize, orientation, margin, collate };
+      if (targetSizeValue.trim() !== "") {
+        const numVal = Number.parseFloat(targetSizeValue);
+        if (!Number.isNaN(numVal) && numVal > 0) {
+          settings.targetSize = { value: numVal, unit: targetSizeUnit };
+        }
+      }
+      formData.append("settings", JSON.stringify(settings));
+
+      xhr.timeout = 300_000;
+
+      xhr.upload.onprogress = (event) => {
+        if (xhrRef.current !== xhr || storeReset) return;
+        if (event.lengthComputable) {
+          const uploadPercent = (event.loaded / event.total) * 40;
+          setProgress((prev) =>
+            prev.phase === "uploading" ? { ...prev, percent: uploadPercent } : prev,
+          );
+        }
+      };
+
+      xhr.upload.onload = () => {
+        if (xhrRef.current !== xhr || storeReset) return;
+        setProgress((prev) => ({ ...prev, phase: "processing", percent: 40 }));
+        const step = (95 - 40) / 90;
+        processingTimerRef.current = setInterval(() => {
+          setProgress((prev) => {
+            if (prev.phase !== "processing") return prev;
+            return { ...prev, percent: Math.min(95, prev.percent + step) };
+          });
+        }, 500);
+      };
+
+      xhr.onload = () => {
+        endSubscription();
+        if (xhrRef.current !== xhr || storeReset) return;
+        stopTimers();
+        try {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            let result: {
+              downloadUrl?: unknown;
+              compression?: { targetMet: boolean; jpegQuality: number; targetRequested: number };
+            } | null = null;
+            try {
+              result = resolveServerUrls(JSON.parse(xhr.responseText));
+            } catch {
               setError(t.toolSettings["image-to-pdf"].parseResponseFailed);
-            } else {
-              try {
-                if (capturedEntryId) {
-                  useFileStore.getState().updateEntryById(capturedEntryId, {
-                    processedUrl: url,
-                    processedFilename: pdfResultFilenameFrom(url),
-                    status: "completed",
-                  });
+            }
+            if (result) {
+              const url =
+                typeof result.downloadUrl === "string" && result.downloadUrl
+                  ? result.downloadUrl
+                  : null;
+              if (!url) {
+                setError(t.toolSettings["image-to-pdf"].parseResponseFailed);
+              } else {
+                try {
+                  if (capturedEntryId) {
+                    useFileStore.getState().updateEntryById(capturedEntryId, {
+                      processedUrl: url,
+                      processedFilename: pdfResultFilenameFrom(url),
+                      status: "completed",
+                    });
+                  }
+                  setDownloadUrl(url);
+                  setCompressionResult(result.compression ?? null);
+                  setProgress((prev) => ({ ...prev, phase: "complete", percent: 100 }));
+                } catch (err) {
+                  setError(t.errors.jobTrackingFailed);
+                  throw err;
                 }
-                setDownloadUrl(url);
-                setCompressionResult(result.compression ?? null);
-                setProgress((prev) => ({ ...prev, phase: "complete", percent: 100 }));
-              } catch (err) {
-                setError(t.errors.jobTrackingFailed);
-                throw err;
               }
             }
+          } else {
+            try {
+              const body = JSON.parse(xhr.responseText);
+              setError(
+                failedAnswerMessage(
+                  t,
+                  body,
+                  xhr.status,
+                  format(t.errors.failedWithStatus, { status: xhr.status }),
+                ),
+              );
+            } catch {
+              setError(
+                failedAnswerMessage(
+                  t,
+                  null,
+                  xhr.status,
+                  format(t.toolSettings["image-to-pdf"].creationFailedWithStatus, {
+                    status: xhr.status,
+                  }),
+                ),
+              );
+            }
           }
-        } else {
-          try {
-            const body = JSON.parse(xhr.responseText);
-            setError(
-              failedAnswerMessage(
-                t,
-                body,
-                xhr.status,
-                format(t.errors.failedWithStatus, { status: xhr.status }),
-              ),
-            );
-          } catch {
-            setError(
-              failedAnswerMessage(
-                t,
-                null,
-                xhr.status,
-                format(t.toolSettings["image-to-pdf"].creationFailedWithStatus, {
-                  status: xhr.status,
-                }),
-              ),
-            );
-          }
+        } finally {
+          cleanup();
         }
-      } finally {
+      };
+
+      xhr.onerror = () => {
+        endSubscription();
+        if (xhrRef.current !== xhr || storeReset) return;
+        setError(t.toolSettings["image-to-pdf"].networkErrorCreation);
         cleanup();
+      };
+
+      xhr.ontimeout = () => {
+        endSubscription();
+        if (xhrRef.current !== xhr || storeReset) return;
+        setError(t.toolSettings["image-to-pdf"].requestTimedOut);
+        cleanup();
+      };
+
+      xhr.open("POST", appUrl("/api/v1/tools/image/image-to-pdf"));
+      formatHeaders().forEach((value, key) => {
+        xhr.setRequestHeader(key, value);
+      });
+      xhr.send(formData);
+    } catch (err) {
+      endSubscription();
+      if (!storeReset) {
+        setError(
+          err instanceof Error ? err.message : t.toolSettings["image-to-pdf"].networkErrorCreation,
+        );
       }
-    };
-
-    xhr.onerror = () => {
-      setError(t.toolSettings["image-to-pdf"].networkErrorCreation);
       cleanup();
-    };
-
-    xhr.ontimeout = () => {
-      setError(t.toolSettings["image-to-pdf"].requestTimedOut);
-      cleanup();
-    };
-
-    xhr.open("POST", appUrl("/api/v1/tools/image/image-to-pdf"));
-    formatHeaders().forEach((value, key) => {
-      xhr.setRequestHeader(key, value);
-    });
-    xhr.send(formData);
+    }
   }, [
     files,
     pageSize,
