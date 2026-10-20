@@ -1705,10 +1705,91 @@ describe("batch children and finalize", () => {
       );
       const parentRow = await terminalRow(parentId);
       expect(parentRow.status).toBe("completed");
+      expect(parentRow.error).toEqual({
+        message: "1 file(s) failed",
+        details: [{ filename: "b.png", error: "boom" }],
+      });
+      const parentFrame = await terminalFrame(parentId);
+      expect(parentFrame.errors).toEqual([{ filename: "b.png", error: "boom" }]);
       const zipKey = (parentRow.outputRefs ?? [])[0];
       const entries = new AdmZip(await getObjectBuffer(zipKey)).getEntries();
       expect(entries.map((e) => e.entryName)).toEqual(["a_wt-echo.png"]);
       expect(entries[0].getData().toString("utf8")).toBe("aaa");
+    } finally {
+      batchProgressMock.failRecordOutcomeForParentId = null;
+    }
+  }, 30_000);
+
+  it("retains per-file errors and sharedFailureReason when all children fail and Redis outcome writes failed (#2629)", async () => {
+    const parentId = `bparent-allfail-${randomUUID()}`;
+    const boom0Id = `${parentId}-f0`;
+    const boom1Id = `${parentId}-f1`;
+    const boom0Ref = await seedInput(boom0Id, "a.png", Buffer.from("aaa"));
+    const boom1Ref = await seedInput(boom1Id, "b.png", Buffer.from("bbb"));
+
+    batchProgressMock.failRecordOutcomeForParentId = parentId;
+    try {
+      for (const [id, ref, filename] of [
+        [boom0Id, boom0Ref, "a.png"],
+        [boom1Id, boom1Ref, "b.png"],
+      ] as const) {
+        await db.insert(schema.jobs).values({
+          id,
+          type: "batch-child",
+          toolId: "wt-boom",
+          pool: "image",
+          status: "queued",
+          inputRefs: [ref],
+        });
+        await getQueue("image").add(
+          "wt-boom",
+          toolJob({
+            jobId: id,
+            toolId: "wt-boom",
+            kind: "batch-child",
+            parentId,
+            totalFiles: 2,
+            inputRefs: [ref],
+            filename,
+          }),
+          { jobId: id, attempts: 1 },
+        );
+      }
+
+      expect((await terminalRow(boom0Id)).status).toBe("failed");
+      expect((await terminalRow(boom1Id)).status).toBe("failed");
+
+      batchProgressMock.failRecordOutcomeForParentId = null;
+      await enqueueToolJob(
+        toolJob({
+          jobId: parentId,
+          toolId: "wt-boom",
+          kind: "batch-finalize",
+          pool: "system",
+          totalFiles: 2,
+          settings: { flowChildCount: 2, fileIndexMap: [0, 1] },
+          filename: "",
+        }),
+      );
+
+      const parentRow = await terminalRow(parentId);
+      expect(parentRow.status).toBe("failed");
+      expect(parentRow.error).toEqual({
+        message: "boom",
+        details: [
+          { filename: "a.png", error: "boom" },
+          { filename: "b.png", error: "boom" },
+          { filename: "", error: "boom" },
+        ],
+      });
+
+      const parentFrame = await terminalFrame(parentId);
+      expect(parentFrame.status).toBe("failed");
+      expect(parentFrame.errors).toEqual([
+        { filename: "a.png", error: "boom" },
+        { filename: "b.png", error: "boom" },
+        { filename: "", error: "boom" },
+      ]);
     } finally {
       batchProgressMock.failRecordOutcomeForParentId = null;
     }

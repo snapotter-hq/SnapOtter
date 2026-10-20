@@ -62,7 +62,7 @@ import {
 import { allFailedFault, type BatchFault } from "../lib/engine-unavailable.js";
 import { resolveConcurrency } from "../lib/env.js";
 import { classifyError, reportError, safeFormatTag } from "../lib/error-report.js";
-import { friendlyError, sharedFailureReason } from "../lib/errors.js";
+import { friendlyError, sharedFailureReason, stripInternalPaths } from "../lib/errors.js";
 import { createUniqueNamer } from "../lib/filename.js";
 import { logger } from "../lib/logger.js";
 import { jobDuration, jobsTotal } from "../lib/metrics.js";
@@ -1965,6 +1965,15 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
 
   const counters = await readBatchCounters(data.jobId);
   const failedFiles = Math.max(0, totalFiles - successEntries.length);
+  const allErrors = resolveBatchErrors(
+    counters.errors,
+    manifest,
+    totalFiles,
+    flowChildCount,
+    fileIndexMap,
+    settings.preFailureFaults,
+  );
+  const batchErrors = allErrors.slice(0, 100);
 
   // A canceled child row is durable proof a user cancel landed (#809):
   // every writer of that status traces back to a user cancel somewhere in
@@ -1981,7 +1990,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       totalFiles,
       completedFiles: totalFiles,
       failedFiles,
-      errors: [{ filename: "", error: "Canceled" }, ...counters.errors],
+      errors: [{ filename: "", error: "Canceled" }, ...batchErrors],
     });
     return {
       outputRefs: [],
@@ -2012,13 +2021,15 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       ? fault.details
         ? `${fault.error}: ${fault.details}`
         : fault.error
-      : sharedFailureReason(counters.errors);
+      : allErrors.length >= failedFiles
+        ? sharedFailureReason(allErrors)
+        : null;
     const applied = await failBatchJob({
       jobId: data.jobId,
       totalFiles,
       completedFiles: totalFiles,
       failedFiles,
-      errors: shared ? [...counters.errors, { filename: "", error: shared }] : counters.errors,
+      errors: shared ? [...batchErrors, { filename: "", error: shared }] : batchErrors,
       message: fault?.error ?? shared ?? "All files failed processing",
       ...(fault && { code: fault.code }),
       ...(fault?.details && { details: fault.details }),
@@ -2079,7 +2090,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       totalFiles,
       completedFiles: totalFiles,
       failedFiles,
-      errors: [...counters.errors, { filename: "", error: packagingError }],
+      errors: [...batchErrors, { filename: "", error: packagingError }],
       message: packagingError,
       code: packagingCode,
     })
@@ -2115,7 +2126,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       totalFiles,
       completedFiles: totalFiles,
       failedFiles,
-      errors: counters.errors,
+      errors: batchErrors,
       outputRefs: [zipKey],
       bytesOut: zipSize,
       result,
@@ -2126,7 +2137,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       totalFiles,
       completedFiles: totalFiles,
       failedFiles,
-      errors: counters.errors,
+      errors: batchErrors,
       outputRefs: [zipKey],
       bytesOut: zipSize,
       result,
@@ -2145,6 +2156,97 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       zip: { key: zipKey, filename: zipFilename, size: zipSize, fileResults, fileNotes },
     },
   };
+}
+
+/**
+ * Reconcile the Redis outcome errors with the durable child manifest and any
+ * upload-time preFailureFaults (#2629). When `recordChildOutcome` missed a
+ * write (#836, #2620) or the 1-hour Redis counter TTL expired on a long batch,
+ * `counterErrors` has fewer entries than `expectedFailed`; backfilling from
+ * the durable rows and pre-failure faults keeps per-file errors and
+ * `sharedFailureReason` intact.
+ */
+function resolveBatchErrors(
+  counterErrors: Array<{ filename: string; error: string }>,
+  manifest: Array<{ index: number; filename: string; outputRef?: string; error?: string }>,
+  totalFiles: number,
+  flowChildCount: number,
+  fileIndexMap: number[] | null,
+  preFailureFaults: unknown,
+): Array<{ filename: string; error: string }> {
+  const manifestErrors = manifest
+    .filter((m) => !m.outputRef)
+    .map((m) => ({
+      filename: m.filename,
+      error: stripInternalPaths(m.error ?? "Processing failed"),
+    }));
+  const preFailedCount = Math.max(0, totalFiles - flowChildCount);
+  const expectedFailed = preFailedCount + manifestErrors.length;
+  if (expectedFailed <= 100 && counterErrors.length >= expectedFailed) {
+    return counterErrors;
+  }
+
+  const preFaults = Array.isArray(preFailureFaults)
+    ? (preFailureFaults as Array<BatchFault & { filename?: string }>)
+    : [];
+  const flowUploadSet = fileIndexMap ? new Set(fileIndexMap) : null;
+  const preFailedUploadIndices: number[] = [];
+  if (flowUploadSet) {
+    for (let i = 0; i < totalFiles; i++) {
+      if (!flowUploadSet.has(i)) preFailedUploadIndices.push(i);
+    }
+  }
+  const remainingPreErrors: Array<{ filename: string; error: string }> = [];
+  for (let k = 0; k < Math.min(preFailedCount, preFaults.length); k++) {
+    const pf = preFaults[k];
+    const fallbackIdx = preFailedUploadIndices[k] ?? k;
+    const filename =
+      typeof pf?.filename === "string" && pf.filename.length > 0
+        ? pf.filename
+        : `file-${fallbackIdx}`;
+    remainingPreErrors.push({
+      filename,
+      error: stripInternalPaths(pf?.error ?? "Processing failed"),
+    });
+  }
+
+  const remainingManifest = [...manifestErrors];
+  let unaccountedPreCount = Math.max(0, preFailedCount - remainingPreErrors.length);
+  for (const ce of counterErrors) {
+    const exactPreIdx = remainingPreErrors.findIndex(
+      (p) => p.filename === ce.filename && p.error === ce.error,
+    );
+    if (exactPreIdx !== -1) {
+      remainingPreErrors.splice(exactPreIdx, 1);
+      continue;
+    }
+    const exactManifestIdx = remainingManifest.findIndex(
+      (m) => m.filename === ce.filename && m.error === ce.error,
+    );
+    if (exactManifestIdx !== -1) {
+      remainingManifest.splice(exactManifestIdx, 1);
+      continue;
+    }
+    const preIdx = remainingPreErrors.findIndex(
+      (p) => p.error === ce.error && /^file-\d+$/.test(p.filename),
+    );
+    if (preIdx !== -1) {
+      remainingPreErrors.splice(preIdx, 1);
+      continue;
+    }
+    if (unaccountedPreCount > 0) {
+      unaccountedPreCount--;
+      continue;
+    }
+    const fallbackManifestIdx = remainingManifest.findIndex(
+      (m) => m.error === ce.error && /^file-\d+$/.test(m.filename),
+    );
+    if (fallbackManifestIdx !== -1) {
+      remainingManifest.splice(fallbackManifestIdx, 1);
+    }
+  }
+
+  return [...counterErrors, ...remainingPreErrors, ...remainingManifest];
 }
 
 // ── Worker pool management ─────────────────────────────────────

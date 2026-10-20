@@ -95,6 +95,8 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
 
   vi.doMock("../../../../apps/api/src/lib/errors.js", () => ({
     friendlyError: vi.fn((message: string) => message),
+    sharedFailureReason: vi.fn(() => null),
+    stripInternalPaths: vi.fn((message: string) => message),
   }));
 
   vi.doMock("../../../../apps/api/src/lib/logger.js", () => ({
@@ -1691,5 +1693,503 @@ describe("isTimeoutAbortError (#2294)", () => {
   ])("does not treat %s as an abort shape", async (_label, err) => {
     const { isTimeoutAbortError } = await loadWorker();
     expect(isTimeoutAbortError(err)).toBe(false);
+  });
+});
+
+describe("processBatchFinalize durable error recovery (#2629)", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  async function setupSystemProcessor(opts: {
+    rowsById: Record<string, Record<string, unknown> | undefined>;
+    counterErrors?: Array<{ filename: string; error: string }>;
+  }) {
+    const failBatchJobMock = vi.fn().mockResolvedValue(true);
+    const completeBatchJobMock = vi.fn().mockResolvedValue(undefined);
+    const cancelBatchJobMock = vi.fn().mockResolvedValue(undefined);
+    const readBatchCountersMock = vi.fn().mockResolvedValue({
+      done: 0,
+      failed: (opts.counterErrors ?? []).length,
+      errors: opts.counterErrors ?? [],
+    });
+
+    const actualErrors = await vi.importActual<
+      typeof import("../../../../apps/api/src/lib/errors.js")
+    >("../../../../apps/api/src/lib/errors.js");
+    const actualEngineUnavailable = await vi.importActual<
+      typeof import("../../../../apps/api/src/lib/engine-unavailable.js")
+    >("../../../../apps/api/src/lib/engine-unavailable.js");
+
+    const workerMod = await loadWorker("", () => {
+      vi.doMock("../../../../apps/api/src/db/index.js", () => ({
+        db: {
+          select: vi.fn(() => ({
+            from: vi.fn(() => ({
+              where: vi.fn(async (cond: { val?: string }) => {
+                const row = cond?.val ? opts.rowsById[cond.val] : undefined;
+                return row ? [row] : [];
+              }),
+            })),
+          })),
+        },
+        schema: { jobs: { id: "jobs.id" } },
+      }));
+      vi.doMock("../../../../apps/api/src/lib/errors.js", () => ({
+        friendlyError: vi.fn(actualErrors.friendlyError),
+        sharedFailureReason: vi.fn(actualErrors.sharedFailureReason),
+        stripInternalPaths: vi.fn(actualErrors.stripInternalPaths),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/engine-unavailable.js", () => ({
+        allFailedFault: vi.fn(actualEngineUnavailable.allFailedFault),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/batch-progress.js", () => ({
+        isBatchCanceled: vi.fn(async () => false),
+        readBatchCounters: readBatchCountersMock,
+        recordChildOutcome: vi.fn(),
+      }));
+      vi.doMock("../../../../apps/api/src/routes/progress.js", () => ({
+        cancelBatchJob: cancelBatchJobMock,
+        cancelSingleJobGuarded: vi.fn(),
+        completeBatchJob: completeBatchJobMock,
+        failBatchJob: failBatchJobMock,
+        failSingleJobGuarded: vi.fn(),
+        publishEphemeral: vi.fn(),
+        updateSingleFileProgress: vi.fn(),
+        updateSingleFileProgressAtomically: vi.fn(),
+      }));
+      vi.doMock("@snapotter/media-engine", () => ({
+        HW_ACCEL_FAMILIES: [],
+        hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+        softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+        binaryOverrideWarning: vi.fn(),
+        checkBinaryOverrides: vi.fn(() => []),
+        probeFailureLevel: vi.fn(() => "warn"),
+      }));
+    });
+
+    const { Worker } = await import("bullmq");
+    workerMod.startWorkers();
+    const workerCalls = (Worker as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    const systemCall = workerCalls.find(([queue]) => String(queue).endsWith("system"));
+    if (!systemCall) throw new Error("system pool worker not registered");
+    const processor = systemCall[1] as (job: unknown) => Promise<unknown>;
+
+    return {
+      processor,
+      failBatchJobMock,
+      completeBatchJobMock,
+      cancelBatchJobMock,
+      readBatchCountersMock,
+    };
+  }
+
+  it("recovers per-file errors and sharedFailureReason from durable child rows when Redis counters are empty", async () => {
+    const { processor, failBatchJobMock } = await setupSystemProcessor({
+      rowsById: {
+        "batch-1-f0": {
+          id: "batch-1-f0",
+          status: "failed",
+          inputRefs: ["uploads/batch-1-f0/a.png"],
+          error: { message: "Image width exceeds limit" },
+        },
+        "batch-1-f1": {
+          id: "batch-1-f1",
+          status: "failed",
+          inputRefs: ["uploads/batch-1-f1/b.png"],
+          error: { message: "Image width exceeds limit" },
+        },
+      },
+      counterErrors: [],
+    });
+
+    await processor({
+      id: "batch-1",
+      name: "batch-finalize",
+      data: {
+        kind: "batch-finalize",
+        jobId: "batch-1",
+        toolId: "resize",
+        userId: null,
+        pool: "system",
+        totalFiles: 2,
+        inputRefs: [],
+        filename: "",
+        settings: { flowChildCount: 2, fileIndexMap: [0, 1] },
+      },
+    });
+
+    expect(failBatchJobMock).toHaveBeenCalledWith({
+      jobId: "batch-1",
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 2,
+      message: "Image width exceeds limit",
+      errors: [
+        { filename: "a.png", error: "Image width exceeds limit" },
+        { filename: "b.png", error: "Image width exceeds limit" },
+        { filename: "", error: "Image width exceeds limit" },
+      ],
+    });
+  });
+
+  it("does not report a false sharedFailureReason when Redis counters missed a differently failed child", async () => {
+    const { processor, failBatchJobMock } = await setupSystemProcessor({
+      rowsById: {
+        "batch-2-f0": {
+          id: "batch-2-f0",
+          status: "failed",
+          inputRefs: ["uploads/batch-2-f0/a.png"],
+          error: { message: "Reason A" },
+        },
+        "batch-2-f1": {
+          id: "batch-2-f1",
+          status: "failed",
+          inputRefs: ["uploads/batch-2-f1/b.png"],
+          error: { message: "Reason B" },
+        },
+      },
+      counterErrors: [{ filename: "a.png", error: "Reason A" }],
+    });
+
+    await processor({
+      id: "batch-2",
+      name: "batch-finalize",
+      data: {
+        kind: "batch-finalize",
+        jobId: "batch-2",
+        toolId: "resize",
+        userId: null,
+        pool: "system",
+        totalFiles: 2,
+        inputRefs: [],
+        filename: "",
+        settings: { flowChildCount: 2, fileIndexMap: [0, 1] },
+      },
+    });
+
+    expect(failBatchJobMock).toHaveBeenCalledWith({
+      jobId: "batch-2",
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 2,
+      message: "All files failed processing",
+      errors: [
+        { filename: "a.png", error: "Reason A" },
+        { filename: "b.png", error: "Reason B" },
+      ],
+    });
+  });
+
+  it("backfills expired upload-time preFailureFaults alongside durable child failures", async () => {
+    const { processor, failBatchJobMock } = await setupSystemProcessor({
+      rowsById: {
+        "batch-3-f0": {
+          id: "batch-3-f0",
+          status: "failed",
+          inputRefs: ["uploads/batch-3-f0/a.png"],
+          error: { message: "File is empty" },
+        },
+      },
+      counterErrors: [],
+    });
+
+    await processor({
+      id: "batch-3",
+      name: "batch-finalize",
+      data: {
+        kind: "batch-finalize",
+        jobId: "batch-3",
+        toolId: "resize",
+        userId: null,
+        pool: "system",
+        totalFiles: 2,
+        inputRefs: [],
+        filename: "",
+        settings: {
+          flowChildCount: 1,
+          fileIndexMap: [0],
+          preFailureFaults: [{ error: "File is empty" }],
+        },
+      },
+    });
+
+    expect(failBatchJobMock).toHaveBeenCalledWith({
+      jobId: "batch-3",
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 2,
+      message: "File is empty",
+      errors: [
+        { filename: "file-1", error: "File is empty" },
+        { filename: "a.png", error: "File is empty" },
+        { filename: "", error: "File is empty" },
+      ],
+    });
+  });
+
+  it("deduplicates partial counterErrors across pre-failures and pipeline-finalize rows and caps persisted errors at 100", async () => {
+    // 1. Pre-failure recorded in counterErrors with real filename while flow child missed its write
+    const { processor: p1, failBatchJobMock: fail1 } = await setupSystemProcessor({
+      rowsById: {
+        "batch-dedup-f0": {
+          id: "batch-dedup-f0",
+          status: "failed",
+          inputRefs: [],
+          error: { message: "Step 1: kaboom" },
+        },
+        "batch-dedup-f1": {
+          id: "batch-dedup-f1",
+          status: "failed",
+          inputRefs: [],
+          error: { message: "Step 1: other" },
+        },
+      },
+      counterErrors: [
+        { filename: "empty.png", error: "File is empty" },
+        { filename: "first.png", error: "Step 1: kaboom" },
+      ],
+    });
+
+    await p1({
+      id: "batch-dedup",
+      name: "batch-finalize",
+      data: {
+        kind: "batch-finalize",
+        jobId: "batch-dedup",
+        toolId: "pipeline-batch",
+        userId: null,
+        pool: "system",
+        totalFiles: 3,
+        inputRefs: [],
+        filename: "",
+        settings: {
+          flowChildCount: 2,
+          fileIndexMap: [1, 2],
+          preFailureFaults: [{ error: "File is empty" }],
+        },
+      },
+    });
+
+    expect(fail1).toHaveBeenCalledWith({
+      jobId: "batch-dedup",
+      totalFiles: 3,
+      completedFiles: 3,
+      failedFiles: 3,
+      message: "All files failed processing",
+      errors: [
+        { filename: "empty.png", error: "File is empty" },
+        { filename: "first.png", error: "Step 1: kaboom" },
+        { filename: "file-1", error: "Step 1: other" },
+      ],
+    });
+
+    // 2. 101 failed children: 100 in counterErrors with Reason A, 101st in DB with Reason B
+    const rows101: Record<string, Record<string, unknown>> = {};
+    const counter100: Array<{ filename: string; error: string }> = [];
+    for (let i = 0; i < 101; i++) {
+      const error = i < 100 ? "Reason A" : "Reason B";
+      rows101[`batch-101-f${i}`] = {
+        id: `batch-101-f${i}`,
+        status: "failed",
+        inputRefs: [`uploads/batch-101-f${i}/f${i}.png`],
+        error: { message: error },
+      };
+      if (i < 100) {
+        counter100.push({ filename: `f${i}.png`, error });
+      }
+    }
+    const { processor: p2, failBatchJobMock: fail2 } = await setupSystemProcessor({
+      rowsById: rows101,
+      counterErrors: counter100,
+    });
+
+    await p2({
+      id: "batch-101",
+      name: "batch-finalize",
+      data: {
+        kind: "batch-finalize",
+        jobId: "batch-101",
+        toolId: "resize",
+        userId: null,
+        pool: "system",
+        totalFiles: 101,
+        inputRefs: [],
+        filename: "",
+        settings: { flowChildCount: 101 },
+      },
+    });
+
+    expect(fail2).toHaveBeenCalledWith({
+      jobId: "batch-101",
+      totalFiles: 101,
+      completedFiles: 101,
+      failedFiles: 101,
+      message: "All files failed processing",
+      errors: counter100,
+    });
+  });
+
+  it("retains per-file errors on partial failure, cancel, and packaging failure when Redis counters are empty", async () => {
+    const { Readable } = await import("node:stream");
+    const objectStorage = await import("../../../../apps/api/src/lib/object-storage.js");
+    (objectStorage as unknown as { getObjectStream: ReturnType<typeof vi.fn> }).getObjectStream =
+      vi.fn(async () => Readable.from(Buffer.from("ok")));
+    objectStorageMocks.putObject.mockResolvedValue(undefined);
+    objectStorageMocks.putObjectStream.mockResolvedValue(42);
+
+    const { processor, completeBatchJobMock, cancelBatchJobMock, failBatchJobMock } =
+      await setupSystemProcessor({
+        rowsById: {
+          "batch-partial-f0": {
+            id: "batch-partial-f0",
+            status: "completed",
+            inputRefs: ["uploads/batch-partial-f0/a.png"],
+            outputRefs: ["outputs/batch-partial-f0/a.png"],
+          },
+          "batch-partial-f1": {
+            id: "batch-partial-f1",
+            status: "failed",
+            inputRefs: ["uploads/batch-partial-f1/b.png"],
+            error: { message: "corrupt at /data/workspace/uploads/b.png" },
+          },
+          "batch-partial-cancel-f0": {
+            id: "batch-partial-cancel-f0",
+            status: "completed",
+            inputRefs: ["uploads/batch-partial-cancel-f0/a.png"],
+            outputRefs: ["outputs/batch-partial-cancel-f0/a.png"],
+          },
+          "batch-partial-cancel-f1": {
+            id: "batch-partial-cancel-f1",
+            status: "canceled",
+            inputRefs: ["uploads/batch-partial-cancel-f1/d.png"],
+            error: { message: "Canceled" },
+          },
+          "batch-cancel-f0": {
+            id: "batch-cancel-f0",
+            status: "canceled",
+            inputRefs: ["uploads/batch-cancel-f0/c.png"],
+            error: { message: "Canceled" },
+          },
+        },
+        counterErrors: [],
+      });
+
+    // All-canceled batch with empty Redis counters
+    await processor({
+      id: "batch-cancel",
+      name: "batch-finalize",
+      data: {
+        kind: "batch-finalize",
+        jobId: "batch-cancel",
+        toolId: "resize",
+        userId: null,
+        pool: "system",
+        totalFiles: 1,
+        inputRefs: [],
+        filename: "",
+        settings: { flowChildCount: 1, fileIndexMap: [0] },
+      },
+    });
+    expect(cancelBatchJobMock).toHaveBeenCalledWith({
+      jobId: "batch-cancel",
+      totalFiles: 1,
+      completedFiles: 1,
+      failedFiles: 1,
+      errors: [
+        { filename: "", error: "Canceled" },
+        { filename: "c.png", error: "Canceled" },
+      ],
+    });
+
+    // Partially succeeded batch with empty Redis counters
+    await processor({
+      id: "batch-partial",
+      name: "batch-finalize",
+      data: {
+        kind: "batch-finalize",
+        jobId: "batch-partial",
+        toolId: "resize",
+        userId: null,
+        pool: "system",
+        totalFiles: 2,
+        inputRefs: [],
+        filename: "",
+        settings: { flowChildCount: 2, fileIndexMap: [0, 1] },
+      },
+    });
+    expect(completeBatchJobMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobId: "batch-partial",
+        totalFiles: 2,
+        completedFiles: 2,
+        failedFiles: 1,
+        errors: [{ filename: "b.png", error: "corrupt at [internal]" }],
+      }),
+    );
+
+    // Partially canceled batch with empty Redis counters
+    cancelBatchJobMock.mockClear();
+    await processor({
+      id: "batch-partial-cancel",
+      name: "batch-finalize",
+      data: {
+        kind: "batch-finalize",
+        jobId: "batch-partial-cancel",
+        toolId: "resize",
+        userId: null,
+        pool: "system",
+        totalFiles: 2,
+        inputRefs: [],
+        filename: "",
+        settings: { flowChildCount: 2, fileIndexMap: [0, 1] },
+      },
+    });
+    expect(cancelBatchJobMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobId: "batch-partial-cancel",
+        totalFiles: 2,
+        completedFiles: 2,
+        failedFiles: 1,
+        errors: [{ filename: "d.png", error: "Canceled" }],
+      }),
+    );
+
+    // Packaging failure on a partially succeeded batch with empty Redis counters
+    completeBatchJobMock.mockClear();
+    objectStorageMocks.putObject.mockRejectedValueOnce(new Error("disk write failed"));
+    await expect(
+      processor({
+        id: "batch-partial",
+        name: "batch-finalize",
+        data: {
+          kind: "batch-finalize",
+          jobId: "batch-partial",
+          toolId: "resize",
+          userId: null,
+          pool: "system",
+          totalFiles: 2,
+          inputRefs: [],
+          filename: "",
+          settings: { flowChildCount: 2, fileIndexMap: [0, 1] },
+        },
+      }),
+    ).rejects.toThrow("disk write failed");
+    expect(completeBatchJobMock).not.toHaveBeenCalled();
+    expect(failBatchJobMock).toHaveBeenCalledWith({
+      jobId: "batch-partial",
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 1,
+      message: "Failed to package batch results",
+      code: undefined,
+      errors: [
+        { filename: "b.png", error: "corrupt at [internal]" },
+        { filename: "", error: "Failed to package batch results" },
+      ],
+    });
   });
 });
