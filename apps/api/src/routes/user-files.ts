@@ -100,6 +100,12 @@ export function unverifiedMime(claimedMime: string): string {
   return claimedMime.startsWith("image/") ? "application/octet-stream" : claimedMime;
 }
 
+export function thumbnailContentType(mimeType: string): "image/webp" | "image/png" | "image/jpeg" {
+  if (mimeType.startsWith("video/")) return "image/webp";
+  if (mimeType === "application/pdf") return "image/png";
+  return "image/jpeg";
+}
+
 /**
  * The width/height to store for a validated image, or null if they weren't
  * actually measured.
@@ -645,6 +651,8 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(404).send({ error: "File not found" });
       }
 
+      const contentType = thumbnailContentType(file.mimeType);
+
       // Serve from disk cache if available
       let cached: Buffer | null;
       try {
@@ -655,7 +663,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       }
       if (cached) {
         return reply
-          .header("Content-Type", "image/jpeg")
+          .header("Content-Type", contentType)
           .header("Cache-Control", "public, max-age=86400, immutable")
           .send(cached);
       }
@@ -690,7 +698,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           }
           cacheThumbnail(poster);
           return reply
-            .header("Content-Type", "image/webp")
+            .header("Content-Type", contentType)
             .header("Cache-Control", "public, max-age=86400, immutable")
             .send(poster);
         }
@@ -703,7 +711,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           }
           cacheThumbnail(page);
           return reply
-            .header("Content-Type", "image/png")
+            .header("Content-Type", contentType)
             .header("Cache-Control", "public, max-age=86400, immutable")
             .send(page);
         }
@@ -744,7 +752,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
         cacheThumbnail(thumbnail);
 
         return reply
-          .header("Content-Type", "image/jpeg")
+          .header("Content-Type", contentType)
           .header("Cache-Control", "public, max-age=86400, immutable")
           .send(thumbnail);
       } catch (err) {

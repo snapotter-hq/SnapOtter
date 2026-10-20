@@ -158,6 +158,7 @@ import {
   extToMime,
   measuredDimensions,
   serializeFile,
+  thumbnailContentType,
   unverifiedMime,
   userFileRoutes,
 } from "../../../apps/api/src/routes/user-files.js";
@@ -180,6 +181,25 @@ describe("user files route logic", () => {
       expect(unverifiedMime("audio/mpeg")).toBe("audio/mpeg");
       expect(unverifiedMime("text/plain")).toBe("text/plain");
       expect(unverifiedMime("application/octet-stream")).toBe("application/octet-stream");
+    });
+  });
+
+  describe("thumbnailContentType (#2824)", () => {
+    it("returns image/webp for video/* MIME types", () => {
+      expect(thumbnailContentType("video/mp4")).toBe("image/webp");
+      expect(thumbnailContentType("video/webm")).toBe("image/webp");
+      expect(thumbnailContentType("video/quicktime")).toBe("image/webp");
+    });
+
+    it("returns image/png for application/pdf", () => {
+      expect(thumbnailContentType("application/pdf")).toBe("image/png");
+    });
+
+    it("returns image/jpeg for image/* and other MIME types", () => {
+      expect(thumbnailContentType("image/png")).toBe("image/jpeg");
+      expect(thumbnailContentType("image/jpeg")).toBe("image/jpeg");
+      expect(thumbnailContentType("image/webp")).toBe("image/jpeg");
+      expect(thumbnailContentType("application/octet-stream")).toBe("image/jpeg");
     });
   });
 
@@ -999,6 +1019,59 @@ describe("user files route logic", () => {
           { fileId: row.id, storedName: row.storedName },
           "library thumbnail: stored blob missing",
         );
+      });
+
+      it("preserves Content-Type on cached thumbnail hits for video, PDF, and image files (#2824)", async () => {
+        const cases = [
+          {
+            label: "image",
+            row: makeFileRow({
+              id: "file-cached-img",
+              storedName: "stored-cached-img.png",
+              mimeType: "image/png",
+            }),
+            cached: Buffer.from([0xff, 0xd8, 0xff, 0xe0]),
+            expectedType: "image/jpeg",
+          },
+          {
+            label: "video",
+            row: makeFileRow({
+              id: "file-cached-vid",
+              storedName: "stored-cached-vid.mp4",
+              mimeType: "video/mp4",
+            }),
+            cached: Buffer.from("RIFF\x10\x00\x00\x00WEBPVP8 "),
+            expectedType: "image/webp",
+          },
+          {
+            label: "pdf",
+            row: makeFileRow({
+              id: "file-cached-pdf",
+              storedName: "stored-cached-pdf.pdf",
+              mimeType: "application/pdf",
+            }),
+            cached: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+            expectedType: "image/png",
+          },
+        ];
+
+        for (const c of cases) {
+          mocks.parentRows = [c.row];
+          mocks.getCachedThumbnail.mockResolvedValueOnce(c.cached);
+          mocks.readStoredFile.mockClear();
+
+          const reply = makeReply();
+          await thumbnailHandler(
+            { params: { id: c.row.id }, log: { warn: vi.fn(), error: vi.fn() } },
+            reply,
+          );
+
+          expect(reply.statusCode, c.label).toBe(200);
+          expect(reply.headers["content-type"], c.label).toBe(c.expectedType);
+          expect(reply.headers["cache-control"], c.label).toBe("public, max-age=86400, immutable");
+          expect(reply.payload, c.label).toBe(c.cached);
+          expect(mocks.readStoredFile, c.label).not.toHaveBeenCalled();
+        }
       });
     });
 

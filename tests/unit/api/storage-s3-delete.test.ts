@@ -33,6 +33,7 @@ const {
   deleteThumbnail,
   getObject,
   getThumbnail,
+  putThumbnail,
 } = await import("../../../packages/enterprise/src/storage-s3.js");
 
 configureS3({
@@ -144,6 +145,55 @@ describe("getThumbnail (#976)", () => {
       },
     });
     await expect(getThumbnail("a.png")).rejects.toThrow("read ECONNRESET");
+  });
+});
+
+describe("putThumbnail (#2824)", () => {
+  it("sets ContentType from WebP, PNG, or JPEG magic bytes", async () => {
+    send.mockResolvedValue({});
+    const webp = Buffer.from("RIFF\x10\x00\x00\x00WEBPVP8 ");
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const jpg = Buffer.from([0xff, 0xd8, 0xff, 0xe0]);
+
+    await putThumbnail("vid.mp4", webp);
+    expect(send.mock.calls[0]?.[0]?.input).toEqual({
+      Bucket: "b",
+      Key: "thumbs/vid.mp4.thumb.jpg",
+      Body: webp,
+      ContentType: "image/webp",
+    });
+
+    await putThumbnail("doc.pdf", png);
+    expect(send.mock.calls[1]?.[0]?.input).toEqual({
+      Bucket: "b",
+      Key: "thumbs/doc.pdf.thumb.jpg",
+      Body: png,
+      ContentType: "image/png",
+    });
+
+    await putThumbnail("pic.png", jpg);
+    expect(send.mock.calls[2]?.[0]?.input).toEqual({
+      Bucket: "b",
+      Key: "thumbs/pic.png.thumb.jpg",
+      Body: jpg,
+      ContentType: "image/jpeg",
+    });
+  });
+
+  it("falls back to image/jpeg for non-WebP RIFF, short buffers, or unknown headers", async () => {
+    send.mockResolvedValue({});
+    const aviRiff = Buffer.from("RIFF\x10\x00\x00\x00AVI LIST");
+    const shortRiff = Buffer.from("RIFF\x04\x00\x00\x00WEB");
+    const shortPng = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a]);
+
+    await putThumbnail("clip.avi", aviRiff);
+    expect(send.mock.calls[0]?.[0]?.input?.ContentType).toBe("image/jpeg");
+
+    await putThumbnail("short.webp", shortRiff);
+    expect(send.mock.calls[1]?.[0]?.input?.ContentType).toBe("image/jpeg");
+
+    await putThumbnail("short.png", shortPng);
+    expect(send.mock.calls[2]?.[0]?.input?.ContentType).toBe("image/jpeg");
   });
 });
 

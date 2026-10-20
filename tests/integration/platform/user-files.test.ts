@@ -50,7 +50,7 @@ import {
 
 const PNG = readFixture(fixtures.image.base.png200);
 const JPG = readFixture(fixtures.image.base.jpg100);
-const _WEBP = readFixture(fixtures.image.base.webp50);
+const WEBP = readFixture(fixtures.image.base.webp50);
 const TINY_PNG = readFixture(fixtures.image.edge.px1);
 // BMP is a CLI_DECODED_FORMATS member (see file-validation.ts): validateImageBuffer()
 // intentionally returns {valid: true, width: 0, height: 0} for it without decoding,
@@ -457,6 +457,66 @@ describe("Thumbnail generation", () => {
     expect(meta.format).toBe("jpeg");
     // Should be constrained to 300px width max
     expect(meta.width).toBeLessThanOrEqual(300);
+  });
+
+  it("preserves Content-Type on cached PDF and video thumbnails (#2824)", async () => {
+    const pdf = readFixture(fixtures.document.pdf3);
+    const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+      { name: "file", filename: "cached-thumb.pdf", contentType: "application/pdf", content: pdf },
+    ]);
+
+    const uploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+      body: uploadBody,
+    });
+    expect(uploadRes.statusCode).toBe(201);
+    const pdfFileId = (JSON.parse(uploadRes.body).files[0] as { id: string }).id;
+    const [pdfRow] = await db
+      .select({ storedName: schema.userFiles.storedName })
+      .from(schema.userFiles)
+      .where(eq(schema.userFiles.id, pdfFileId));
+
+    const { saveThumbnail } = await import("../../../apps/api/src/lib/file-storage.js");
+    await saveThumbnail(pdfRow.storedName, TINY_PNG);
+
+    const cachedPdfRes = await app.inject({
+      method: "GET",
+      url: `/api/v1/files/${pdfFileId}/thumbnail`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(cachedPdfRes.statusCode).toBe(200);
+    expect(cachedPdfRes.headers["content-type"]).toBe("image/png");
+    expect(Buffer.compare(cachedPdfRes.rawPayload, TINY_PNG)).toBe(0);
+
+    const mp4 = readFixture(fixtures.video.tiny("mp4"));
+    const { body: vidBody, contentType: vidCt } = createMultipartPayload([
+      { name: "file", filename: "cached-thumb.mp4", contentType: "video/mp4", content: mp4 },
+    ]);
+    const vidUploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": vidCt, authorization: `Bearer ${adminToken}` },
+      body: vidBody,
+    });
+    expect(vidUploadRes.statusCode).toBe(201);
+    const vidFileId = (JSON.parse(vidUploadRes.body).files[0] as { id: string }).id;
+    const [vidRow] = await db
+      .select({ storedName: schema.userFiles.storedName })
+      .from(schema.userFiles)
+      .where(eq(schema.userFiles.id, vidFileId));
+
+    await saveThumbnail(vidRow.storedName, WEBP);
+
+    const cachedVidRes = await app.inject({
+      method: "GET",
+      url: `/api/v1/files/${vidFileId}/thumbnail`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(cachedVidRes.statusCode).toBe(200);
+    expect(cachedVidRes.headers["content-type"]).toBe("image/webp");
+    expect(Buffer.compare(cachedVidRes.rawPayload, WEBP)).toBe(0);
   });
 
   it("returns 404 for non-existent file thumbnail", async () => {

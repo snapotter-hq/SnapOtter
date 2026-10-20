@@ -21,6 +21,7 @@ const s3Mocks = vi.hoisted(() => ({
   load: vi.fn<() => Promise<unknown>>(),
   configure: vi.fn(),
   putObject: vi.fn(),
+  putThumbnail: vi.fn(),
 }));
 
 vi.mock("@snapotter/enterprise", () => ({
@@ -103,10 +104,13 @@ beforeEach(async () => {
   s3Mocks.configure.mockReset();
   s3Mocks.putObject.mockReset();
   s3Mocks.putObject.mockResolvedValue(undefined);
+  s3Mocks.putThumbnail.mockReset();
+  s3Mocks.putThumbnail.mockResolvedValue(undefined);
   s3Mocks.load.mockReset();
   s3Mocks.load.mockResolvedValue({
     configureS3: s3Mocks.configure,
     putObject: s3Mocks.putObject,
+    putThumbnail: s3Mocks.putThumbnail,
   });
   vi.resetModules();
 });
@@ -445,6 +449,14 @@ describe("thumbnail functions", () => {
   it("deleteThumbnail does not throw for non-existent", async () => {
     const { deleteThumbnail } = await importModule();
     await expect(deleteThumbnail("ghost.png")).resolves.toBeUndefined();
+  });
+
+  it("saveThumbnail delegates to s3.putThumbnail when STORAGE_MODE is s3", async () => {
+    config.STORAGE_MODE = "s3";
+    const { saveThumbnail } = await importModule();
+    const buf = Buffer.from("RIFF\x10\x00\x00\x00WEBPVP8 ");
+    await saveThumbnail("video.mp4", buf);
+    expect(s3Mocks.putThumbnail).toHaveBeenCalledWith("video.mp4", buf);
   });
 });
 
