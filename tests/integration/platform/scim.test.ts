@@ -233,6 +233,69 @@ describe("SCIM 2.0 provisioning", () => {
           .where(eq(schema.settings.key, "scim_token_hash"));
       }
     });
+
+    it("returns 401 SCIM not configured when scim_token_hash is absent or empty", async () => {
+      await db.delete(schema.settings).where(eq(schema.settings.key, "scim_token_hash"));
+      try {
+        const absentRes = await testApp.app.inject({
+          method: "GET",
+          url: "/api/v1/scim/v2/Users",
+          headers: { authorization: `Bearer ${SCIM_TOKEN}` },
+        });
+
+        expect(absentRes.statusCode).toBe(401);
+        expect(JSON.parse(absentRes.body)).toEqual({
+          schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+          status: 401,
+          detail: "SCIM not configured",
+        });
+
+        await db.insert(schema.settings).values({ key: "scim_token_hash", value: "" });
+        const emptyRes = await testApp.app.inject({
+          method: "GET",
+          url: "/api/v1/scim/v2/Users",
+          headers: { authorization: `Bearer ${SCIM_TOKEN}` },
+        });
+
+        expect(emptyRes.statusCode).toBe(401);
+        expect(JSON.parse(emptyRes.body)).toEqual({
+          schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+          status: 401,
+          detail: "SCIM not configured",
+        });
+      } finally {
+        const currentHash = await hashPassword(SCIM_TOKEN);
+        await db
+          .insert(schema.settings)
+          .values({ key: "scim_token_hash", value: currentHash })
+          .onConflictDoUpdate({
+            target: schema.settings.key,
+            set: { value: currentHash },
+          });
+      }
+    });
+
+    it("returns 500 SCIM error instead of 401 when reading scim_token_hash throws (#2915)", async () => {
+      const selectSpy = vi.spyOn(db, "select").mockImplementationOnce(() => {
+        throw new Error("connection terminated unexpectedly");
+      });
+      try {
+        const res = await testApp.app.inject({
+          method: "GET",
+          url: "/api/v1/scim/v2/Users",
+          headers: { authorization: `Bearer ${SCIM_TOKEN}` },
+        });
+
+        expect(res.statusCode).toBe(500);
+        expect(JSON.parse(res.body)).toEqual({
+          schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+          status: 500,
+          detail: "Internal server error",
+        });
+      } finally {
+        selectSpy.mockRestore();
+      }
+    });
   });
 
   // ── Enterprise gate ────────────────────────────────────────────

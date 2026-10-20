@@ -10,6 +10,7 @@ vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
 });
 
 import { env } from "../../../apps/api/src/config.js";
+import { db } from "../../../apps/api/src/db/index.js";
 import { readFilePart } from "../../../apps/api/src/lib/multipart-parts.js";
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
 import { registerUpload } from "../../../apps/api/src/plugins/upload.js";
@@ -397,6 +398,44 @@ describe("an unhandled error on a SCIM route (#2230)", () => {
       expect(JSON.parse(res.body)).toEqual({ error: "Internal server error" });
       expect(reportError).toHaveBeenCalledTimes(1);
     } finally {
+      await app.close();
+    }
+  });
+
+  it("answers a SCIM 500 envelope instead of 401 when reading scim_token_hash fails (#2915)", async () => {
+    const fault = new Error("connection terminated unexpectedly");
+    const selectSpy = vi.spyOn(db, "select").mockImplementationOnce(() => {
+      throw fault;
+    });
+    const app = Fastify({ logger: false });
+    registerErrorHandler(app);
+    await registerScimRoutes(app);
+    await app.ready();
+    try {
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/v1/scim/v2/Users",
+        headers: { authorization: `Bearer so_scim_v2_${"a".repeat(64)}` },
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(JSON.parse(res.body)).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 500,
+        detail: "Internal server error",
+      });
+      expect(reportError).toHaveBeenCalledTimes(1);
+      expect(reportError).toHaveBeenCalledWith(
+        fault,
+        expect.objectContaining({
+          source: "http",
+          route: "/api/v1/scim/v2/Users",
+          method: "GET",
+          statusCode: 500,
+        }),
+      );
+    } finally {
+      selectSpy.mockRestore();
       await app.close();
     }
   });

@@ -10,7 +10,7 @@ import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
 import { stripInternalPaths } from "../../lib/errors.js";
 import { assertNotLastAdmin, LastAdminError } from "../../lib/last-admin.js";
 import { isUniqueViolation, uniqueViolationConstraint } from "../../lib/pg-errors.js";
-import { getSettingString, upsertSetting } from "../../lib/settings-helpers.js";
+import { getSettingStrict, upsertSetting } from "../../lib/settings-helpers.js";
 import { userLimitReached } from "../../lib/user-limit.js";
 import { isDisabledRole, requireFullAdmin } from "../../permissions.js";
 import { hashPassword, verifyPassword } from "../../plugins/auth.js";
@@ -317,7 +317,7 @@ async function scimAuth(request: FastifyRequest, reply: FastifyReply): Promise<b
     return false;
   }
 
-  const tokenHash = await getSettingString("scim_token_hash", "");
+  const tokenHash = await getSettingStrict("scim_token_hash");
   if (!tokenHash) {
     reply.status(401).send(scimError(401, "SCIM not configured"));
     return false;
