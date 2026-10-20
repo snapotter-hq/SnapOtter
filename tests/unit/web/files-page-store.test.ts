@@ -248,6 +248,71 @@ describe("useFilesPageStore", () => {
     expect(useFilesPageStore.getState().checkedIds.size).toBe(3);
   });
 
+  it("toggleCheckAll ticks visible files and preserves hidden ticks when sizes happen to match", () => {
+    const visible = [
+      {
+        id: "f2",
+        originalName: "otter.png",
+        mimeType: "image/png",
+        size: 200,
+        width: 20,
+        height: 20,
+        version: 1,
+        toolChain: [],
+        createdAt: "",
+      },
+    ];
+    useFilesPageStore.setState({ files: visible, checkedIds: new Set(["f1"]) });
+
+    useFilesPageStore.getState().toggleCheckAll();
+    expect(useFilesPageStore.getState().checkedIds).toEqual(new Set(["f1", "f2"]));
+
+    useFilesPageStore.getState().toggleCheckAll();
+    expect(useFilesPageStore.getState().checkedIds).toEqual(new Set(["f1"]));
+  });
+
+  it("toggleCheckAll completes partial visible selection while preserving hidden ticks", () => {
+    const visible = [
+      {
+        id: "f2",
+        originalName: "otter.png",
+        mimeType: "image/png",
+        size: 200,
+        width: 20,
+        height: 20,
+        version: 1,
+        toolChain: [],
+        createdAt: "",
+      },
+      {
+        id: "f3",
+        originalName: "seal.png",
+        mimeType: "image/png",
+        size: 300,
+        width: 30,
+        height: 30,
+        version: 1,
+        toolChain: [],
+        createdAt: "",
+      },
+    ];
+    // checkedIds.size (2) === visible.length (2), with one hidden and one visible ticked.
+    useFilesPageStore.setState({ files: visible, checkedIds: new Set(["f1", "f2"]) });
+
+    useFilesPageStore.getState().toggleCheckAll();
+    expect(useFilesPageStore.getState().checkedIds).toEqual(new Set(["f1", "f2", "f3"]));
+
+    useFilesPageStore.getState().toggleCheckAll();
+    expect(useFilesPageStore.getState().checkedIds).toEqual(new Set(["f1"]));
+  });
+
+  it("toggleCheckAll is a no-op when the visible file list is empty", () => {
+    useFilesPageStore.setState({ files: [], checkedIds: new Set(["f1", "f2"]) });
+
+    useFilesPageStore.getState().toggleCheckAll();
+    expect(useFilesPageStore.getState().checkedIds).toEqual(new Set(["f1", "f2"]));
+  });
+
   // -- fetchFiles -----------------------------------------------------------
 
   it("fetchFiles loads files from API", async () => {
@@ -292,7 +357,24 @@ describe("useFilesPageStore", () => {
     expect(mockApiListFiles).toHaveBeenCalledWith({ search: undefined, limit: 200 });
   });
 
-  it("fetchFiles sets error on API failure", async () => {
+  it("fetchFiles sets error and clears stale files and checkedIds on API failure", async () => {
+    const staleFile = {
+      id: "f1",
+      originalName: "beaver.png",
+      mimeType: "image/png",
+      size: 100,
+      width: 10,
+      height: 10,
+      version: 1,
+      toolChain: [],
+      createdAt: "",
+    };
+    useFilesPageStore.setState({
+      files: [staleFile],
+      total: 1,
+      selectedFileId: "f1",
+      checkedIds: new Set(["f1"]),
+    });
     mockApiListFiles.mockRejectedValueOnce(new Error("Network error"));
 
     await useFilesPageStore.getState().fetchFiles();
@@ -300,6 +382,10 @@ describe("useFilesPageStore", () => {
     const s = useFilesPageStore.getState();
     expect(s.error).toBe("Network error");
     expect(s.loading).toBe(false);
+    expect(s.files).toEqual([]);
+    expect(s.total).toBe(0);
+    expect(s.selectedFileId).toBeNull();
+    expect(s.checkedIds.size).toBe(0);
   });
 
   it("fetchFiles sets generic error for non-Error throws", async () => {

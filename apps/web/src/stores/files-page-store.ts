@@ -40,7 +40,14 @@ export const useFilesPageStore = create<FilesPageState>((set, get) => ({
       const result = await apiListFiles({ search: searchQuery || undefined, limit: 200 });
       set({ files: result.files, total: result.total, loading: false });
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : "Failed to load files", loading: false });
+      set({
+        files: [],
+        total: 0,
+        selectedFileId: null,
+        checkedIds: new Set(),
+        error: err instanceof Error ? err.message : "Failed to load files",
+        loading: false,
+      });
     }
   },
 
@@ -96,9 +103,14 @@ export const useFilesPageStore = create<FilesPageState>((set, get) => ({
   },
   toggleCheckAll: () => {
     const { files, checkedIds } = get();
-    set({
-      checkedIds: checkedIds.size === files.length ? new Set() : new Set(files.map((f) => f.id)),
-    });
+    if (files.length === 0) return;
+    const next = new Set(checkedIds);
+    if (files.every((f) => checkedIds.has(f.id))) {
+      for (const f of files) next.delete(f.id);
+    } else {
+      for (const f of files) next.add(f.id);
+    }
+    set({ checkedIds: next });
   },
   setSearchQuery: (q) => set({ searchQuery: q }),
   setActiveTab: (tab) => set({ activeTab: tab }),

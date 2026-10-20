@@ -96,7 +96,7 @@ export function FileList({ filterMimePrefix, onFileActivate }: FileListProps) {
     [files, filterMimePrefix, selectFile],
   );
 
-  const allChecked = files.length > 0 && checkedIds.size === files.length;
+  const allChecked = files.length > 0 && files.every((f) => checkedIds.has(f.id));
   const someChecked = checkedIds.size > 0;
   const hasFileItems = !loading && !error && files.length > 0;
   const listClassName =
