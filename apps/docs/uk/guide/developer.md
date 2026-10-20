@@ -1,8 +1,8 @@
 ---
 description: "Локальне налаштування розробки, команди, конвенції коду та як додати новий інструмент до SnapOtter."
-i18n_source_hash: 6068cbd7915e
+i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: 7ec8c8273d54
+i18n_output_hash: 77f58b989cd8
 i18n_hash_version: 2
 ---
 
@@ -222,7 +222,7 @@ gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapsh
 На Mac ви також можете оновити еталони `darwin` локально для швидшої ітерації:
 
 ```bash
-pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
 ```
 
 У будь-якому разі відкрийте кожен новий або змінений PNG перед комітом: еталон фіксує те, що відмалювалося, зламане чи ні.

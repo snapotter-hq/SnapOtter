@@ -1,8 +1,8 @@
 ---
 description: "Configuración del entorno de desarrollo local, comandos, convenciones de código y cómo añadir una nueva herramienta a SnapOtter."
-i18n_source_hash: 6068cbd7915e
+i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: b5ac66a3584f
+i18n_output_hash: da0c06167904
 i18n_hash_version: 2
 ---
 
@@ -222,7 +222,7 @@ Cada job por sistema operativo sube un artefacto `visual-baselines-linux-<run-id
 En un Mac, también puedes actualizar localmente las baselines de `darwin` para iterar más rápido:
 
 ```bash
-pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
 ```
 
 En cualquier caso, abre cada PNG nuevo o modificado antes de hacer commit: una baseline guarda lo que se renderizó, esté roto o no.

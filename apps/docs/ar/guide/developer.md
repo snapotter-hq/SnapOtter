@@ -1,8 +1,8 @@
 ---
 description: "إعداد بيئة التطوير المحلية، والأوامر، وأعراف الكود، وكيفية إضافة أداة جديدة إلى SnapOtter."
-i18n_source_hash: 6068cbd7915e
+i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: a116deb7651c
+i18n_output_hash: 250c45c22132
 i18n_hash_version: 2
 ---
 
@@ -222,7 +222,7 @@ gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapsh
 على جهاز Mac، يمكنك أيضًا تحديث الصور المرجعية لـ `darwin` محليًا لتكرار أسرع:
 
 ```bash
-pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
 ```
 
 وفي كل الأحوال، افتح كل ملف PNG جديد أو معدّل قبل إنشاء commit له: فالصورة المرجعية تسجّل ما عُرض كما هو، معطوبًا كان أم لا.

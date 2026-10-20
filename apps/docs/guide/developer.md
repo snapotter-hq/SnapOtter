@@ -218,7 +218,7 @@ Each OS leg uploads a `visual-baselines-linux-<run-id>-<attempt>` or `visual-bas
 On a Mac, you can also refresh the `darwin` baselines locally for faster iteration:
 
 ```bash
-pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
 ```
 
 Either way, open every new or changed PNG before you commit it: a baseline records whatever rendered, broken or not.

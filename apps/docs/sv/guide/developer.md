@@ -1,8 +1,8 @@
 ---
 description: "Lokal utvecklingskonfiguration, kommandon, kodkonventioner och hur du lägger till ett nytt verktyg i SnapOtter."
-i18n_source_hash: 6068cbd7915e
+i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: 169efb8a4f10
+i18n_output_hash: ecd9b94ee474
 i18n_hash_version: 2
 ---
 
@@ -222,7 +222,7 @@ Varje OS-jobb laddar upp en `visual-baselines-linux-<run-id>-<attempt>`- eller `
 På en Mac kan du även uppdatera `darwin`-baslinjerna lokalt för snabbare iteration:
 
 ```bash
-pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
 ```
 
 Öppna i vilket fall varje ny eller ändrad PNG innan du committar den: en baslinje sparar det som renderades, trasigt eller inte.

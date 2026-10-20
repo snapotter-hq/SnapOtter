@@ -1,8 +1,8 @@
 ---
 description: "Lokalna konfiguracja środowiska developerskiego, komendy, konwencje kodu oraz jak dodać nowe narzędzie do SnapOtter."
-i18n_source_hash: 6068cbd7915e
+i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: 51efc9165801
+i18n_output_hash: 615011f88c94
 i18n_hash_version: 2
 ---
 
@@ -222,7 +222,7 @@ Każdy przebieg systemu operacyjnego wysyła artefakt `visual-baselines-linux-<r
 Na Macu możesz też odświeżyć wzorce `darwin` lokalnie, aby szybciej iterować:
 
 ```bash
-pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
 ```
 
 Tak czy inaczej, otwórz każdy nowy lub zmieniony plik PNG przed zatwierdzeniem: wzorzec zapisuje to, co zostało wyrenderowane, zepsute czy nie.

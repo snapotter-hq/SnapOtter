@@ -1,8 +1,8 @@
 ---
 description: "ローカル開発環境のセットアップ、コマンド、コード規約、そして SnapOtter に新しいツールを追加する方法。"
-i18n_source_hash: 6068cbd7915e
+i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: 98f74c0a249f
+i18n_output_hash: a91e6fdbef95
 i18n_hash_version: 2
 ---
 
@@ -222,7 +222,7 @@ gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapsh
 Mac では、手元で素早く確認したい場合に `darwin` のベースラインをローカルで更新することもできます：
 
 ```bash
-pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
 ```
 
 いずれの場合も、コミットする前に新規または変更された PNG をすべて開いて確認してください。ベースラインは、壊れていてもいなくても、描画された内容をそのまま記録します。

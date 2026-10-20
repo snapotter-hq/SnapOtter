@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter में स्थानीय विकास सेटअप, कमांड, कोड परंपराएँ, और एक नया टूल कैसे जोड़ें।"
-i18n_source_hash: 6068cbd7915e
+i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: 7fa7f6ddfa88
+i18n_output_hash: 11914c4e8f89
 i18n_hash_version: 2
 ---
 
@@ -222,7 +222,7 @@ gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapsh
 Mac पर तेज़ बदलावों के लिए आप `darwin` बेसलाइन को लोकल रूप से भी रीफ़्रेश कर सकते हैं:
 
 ```bash
-pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
 ```
 
 हर हाल में, कमिट करने से पहले हर नया या बदला हुआ PNG खोलकर देखें: बेसलाइन वही दर्ज करती है जो रेंडर हुआ, चाहे वह टूटा हो या नहीं।

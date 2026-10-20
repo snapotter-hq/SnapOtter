@@ -1,8 +1,8 @@
 ---
 description: "SnapOtter 的本機開發環境設定、指令、程式碼慣例，以及如何新增工具。"
-i18n_source_hash: 6068cbd7915e
+i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: 1924ab1e014c
+i18n_output_hash: 6846f141e196
 i18n_hash_version: 2
 ---
 
@@ -222,7 +222,7 @@ gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapsh
 在 Mac 上，你也可以在本機更新 `darwin` 基準圖以加快迭代速度：
 
 ```bash
-pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
 ```
 
 無論如何，提交前都要打開每一張新增或變更的 PNG：基準圖會原樣記錄渲染出的內容，不論是否有問題。

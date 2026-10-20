@@ -1,8 +1,8 @@
 ---
 description: "Yerel geliştirme kurulumu, komutlar, kod kuralları ve SnapOtter'a yeni bir araç ekleme."
-i18n_source_hash: 6068cbd7915e
+i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: aa782420ba00
+i18n_output_hash: 91b3d7cf7c1e
 i18n_hash_version: 2
 ---
 
@@ -222,7 +222,7 @@ Her işletim sistemi işi bir `visual-baselines-linux-<run-id>-<attempt>` veya `
 Mac kullanıyorsanız daha hızlı deneme yapmak için `darwin` referanslarını yerel olarak da yenileyebilirsiniz:
 
 ```bash
-pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
 ```
 
 Her durumda, commit etmeden önce her yeni veya değişmiş PNG'yi açın: referans, bozuk olsun olmasın, ne oluşturulduysa onu kaydeder.

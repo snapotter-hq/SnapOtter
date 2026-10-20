@@ -1,8 +1,8 @@
 ---
 description: "การตั้งค่าสภาพแวดล้อมการพัฒนาในเครื่อง คำสั่ง แนวทางการเขียนโค้ด และวิธีเพิ่มเครื่องมือใหม่ใน SnapOtter"
-i18n_source_hash: 6068cbd7915e
+i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: 710633f5b0bd
+i18n_output_hash: 2ff1146f7814
 i18n_hash_version: 2
 ---
 
@@ -222,7 +222,7 @@ gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapsh
 บน Mac คุณสามารถรีเฟรช baseline ของ `darwin` บนเครื่องได้ด้วยเพื่อความรวดเร็วในการพัฒนา:
 
 ```bash
-pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
 ```
 
 ไม่ว่ากรณีใด ให้เปิดดู PNG ที่เพิ่มหรือเปลี่ยนทุกไฟล์ก่อน commit เพราะ baseline จะบันทึกสิ่งที่เรนเดอร์ออกมาไม่ว่าจะเสียหรือไม่

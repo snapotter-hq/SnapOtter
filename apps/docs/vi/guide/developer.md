@@ -1,8 +1,8 @@
 ---
 description: "Thiết lập môi trường phát triển cục bộ, lệnh, quy ước mã, và cách thêm một công cụ mới vào SnapOtter."
-i18n_source_hash: 6068cbd7915e
+i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: 37b697f534e2
+i18n_output_hash: 6bf304cb83fd
 i18n_hash_version: 2
 ---
 
@@ -222,7 +222,7 @@ Mỗi nhánh hệ điều hành sẽ tải lên gói kết quả `visual-baselin
 Trên Mac, bạn cũng có thể cập nhật ảnh chuẩn `darwin` cục bộ để thử nghiệm nhanh hơn:
 
 ```bash
-pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
 ```
 
 Dù thế nào, hãy mở từng PNG mới hoặc đã thay đổi trước khi commit: ảnh chuẩn ghi lại mọi thứ đã được hiển thị, dù hỏng hay không.

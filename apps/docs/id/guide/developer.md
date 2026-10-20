@@ -1,8 +1,8 @@
 ---
 description: "Penyiapan pengembangan lokal, perintah, konvensi kode, dan cara menambahkan tool baru ke SnapOtter."
-i18n_source_hash: 6068cbd7915e
+i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: c03859da628c
+i18n_output_hash: c882d2cdecd9
 i18n_hash_version: 2
 ---
 
@@ -222,7 +222,7 @@ Setiap job OS mengunggah artefak `visual-baselines-linux-<run-id>-<attempt>` ata
 Di Mac, Anda juga dapat memperbarui baseline `darwin` secara lokal untuk iterasi yang lebih cepat:
 
 ```bash
-pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
 ```
 
 Apa pun kasusnya, buka setiap PNG baru atau yang berubah sebelum Anda meng-commit-nya: baseline merekam apa pun yang dirender, rusak atau tidak.

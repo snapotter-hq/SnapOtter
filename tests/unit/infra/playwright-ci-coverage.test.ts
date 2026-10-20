@@ -269,9 +269,22 @@ describe("nightly visual comparison (#1507)", () => {
     expect(summary?.run).not.toContain("opens a PR with the regenerated PNGs");
   });
 
-  it("links the summary to the new-tool refresh steps in the developer guide (#1862, #2484)", () => {
+  it("links the summary to the new-tool refresh steps in the developer guide (#1862, #2484, #2494)", () => {
     const summary = steps.find((step) => step.run?.includes("GITHUB_STEP_SUMMARY"));
     const anchor = "_5-visual-baselines";
+    const updateWorkflow = load(
+      readFileSync(path.join(root, ".github/workflows/update-visual-baselines.yml"), "utf8"),
+    ) as Workflow;
+    const regenerateRun =
+      updateWorkflow.jobs?.["update-baselines"]?.steps?.find((s) => s.id === "regenerate")?.run ??
+      "";
+    const expectedLocalCmd = regenerateRun
+      .trim()
+      .replace('"--update-snapshots=$UPDATE_SNAPSHOTS"', "--update-snapshots=changed");
+    expect(expectedLocalCmd).toBe(
+      "pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed",
+    );
+    const unscopedLocalCmd = "pnpm playwright test --project=";
     expect(summary?.run).toContain(`docs.snapotter.com/guide/developer#${anchor}`);
     // A renamed heading would leave the link pointing at nothing.
     const guide = readFileSync(path.join(root, "apps/docs/guide/developer.md"), "utf8");
@@ -284,6 +297,8 @@ describe("nightly visual comparison (#1507)", () => {
     expect(section).toContain("visual-baselines-darwin-");
     expect(section).toContain("chore/visual-baselines-linux-");
     expect(section).toContain("chore/visual-baselines-darwin-");
+    expect(section).toContain(expectedLocalCmd);
+    expect(section).not.toContain(unscopedLocalCmd);
     expect(section).not.toContain("Linux baselines come from CI");
     expect(section).not.toContain("If you aren't on a Mac");
 
@@ -294,6 +309,7 @@ describe("nightly visual comparison (#1507)", () => {
     expect(localeCodes).toHaveLength(20);
     for (const locale of localeCodes) {
       const localized = readFileSync(path.join(docsRoot, locale, "guide/developer.md"), "utf8");
+      expect(localized, locale).toContain(`{#${anchor}}`);
       const localizedSection = localized.split(`{#${anchor}}`)[1]?.split("\n## ")[0] ?? "";
       expect(localizedSection, locale).toContain("update-visual-baselines.yml");
       expect(localizedSection, locale).toContain("ubuntu-latest");
@@ -302,6 +318,8 @@ describe("nightly visual comparison (#1507)", () => {
       expect(localizedSection, locale).toContain("visual-baselines-darwin-");
       expect(localizedSection, locale).toContain("chore/visual-baselines-linux-");
       expect(localizedSection, locale).toContain("chore/visual-baselines-darwin-");
+      expect(localizedSection, locale).toContain(expectedLocalCmd);
+      expect(localizedSection, locale).not.toContain(unscopedLocalCmd);
     }
   });
 

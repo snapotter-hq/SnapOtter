@@ -1,8 +1,8 @@
 ---
 description: "本地开发环境搭建、命令、代码约定，以及如何为 SnapOtter 添加新工具。"
-i18n_source_hash: 6068cbd7915e
+i18n_source_hash: e04bd8b67465
 i18n_provenance: machine
-i18n_output_hash: 829ebf09d6ae
+i18n_output_hash: 4973f06e3a93
 i18n_hash_version: 2
 ---
 
@@ -222,7 +222,7 @@ gh workflow run update-visual-baselines.yml --ref <your-branch> -f update_snapsh
 在 Mac 上，你也可以在本地刷新 `darwin` 基线以加快调试迭代：
 
 ```bash
-pnpm playwright test --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
+pnpm playwright test tests/e2e/gui-visual-desktop.spec.ts tests/e2e/gui-visual-tools.spec.ts tests/e2e/device-visual.spec.ts --project=chromium-visual --project=mobile-chromium --project=tablet-chromium --update-snapshots=changed
 ```
 
 无论哪种情况，提交前都要打开每一张新增或改动的 PNG：基线会原样记录渲染出的内容，不管它是否有问题。
