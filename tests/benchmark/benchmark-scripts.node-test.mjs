@@ -148,3 +148,32 @@ test("benchmark results are run-scoped and never overwrite an existing JSONL fil
     assert.match(source, /Refusing to overwrite benchmark results/);
   }
 });
+
+test("bench-ai.sh targets the batch endpoint for multi-file remove-background and Phase 1 settings for single-file calls", () => {
+  const source = readFileSync(new URL("bench-ai.sh", import.meta.url), "utf8");
+  const allowedPhase1Keys = new Set(["model", "edgeRefine", "decontaminate"]);
+
+  const allSingleInvocations = [...source.matchAll(/bench_ai_tool\s+"image\/remove-background"/g)];
+  const singleCalls = [
+    ...source.matchAll(
+      /bench_ai_tool\s+"image\/remove-background"\s+"[^"]+"\s+"[^"]+"\s+'([^']*)'/g,
+    ),
+  ];
+  assert.ok(singleCalls.length >= 3);
+  assert.equal(singleCalls.length, allSingleInvocations.length);
+  for (const [, raw] of singleCalls) {
+    const parsed = raw ? JSON.parse(raw) : {};
+    for (const key of Object.keys(parsed)) {
+      assert.equal(allowedPhase1Keys.has(key), true, `unexpected Phase 1 key: ${key}`);
+    }
+  }
+
+  const tier3Start = source.indexOf("=== TIER 3: AI Batch Processing ===");
+  const sustainedStart = source.indexOf("=== Sustained AI Load");
+  assert.ok(tier3Start >= 0);
+  assert.ok(sustainedStart > tier3Start);
+  const batchSection = source.slice(tier3Start, sustainedStart);
+  assert.match(batchSection, /\/api\/v1\/tools\/image\/remove-background\/batch"/);
+  assert.doesNotMatch(batchSection, /\/api\/v1\/tools\/image\/remove-background"/);
+  assert.match(batchSection, /"application\/zip"\s+"\$batch_size"/);
+});

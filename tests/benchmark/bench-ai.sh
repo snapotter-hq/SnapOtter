@@ -127,8 +127,8 @@ fi
 for run in 1 2 3; do
   log "--- AI Run $run of 3 ---"
 
-  bench_ai_tool "image/remove-background" "portrait-r${run}" "$P" '{"backgroundType":"transparent"}'
-  bench_ai_tool "image/remove-background" "isolated-r${run}" "$ISO" '{"backgroundType":"color","backgroundColor":"#0000FF"}'
+  bench_ai_tool "image/remove-background" "portrait-r${run}" "$P" '{}'
+  bench_ai_tool "image/remove-background" "isolated-r${run}" "$ISO" '{"model":"u2net","edgeRefine":1}'
 
   bench_ai_tool "image/upscale" "2x-small-r${run}" "$J" '{"scale":2}'
   bench_ai_tool "image/upscale" "2x-large-r${run}" "$P" '{"scale":2}'
@@ -167,7 +167,7 @@ for batch_size in 3 5; do
   artifact_file=$(mktemp)
   cid="$BENCH_CONTAINER_ID"
 
-  curl_args=(-s -X POST "${BASE_URL}/api/v1/tools/image/remove-background" -H "Authorization: Bearer ${TOKEN}")
+  curl_args=(-s -X POST "${BASE_URL}/api/v1/tools/image/remove-background/batch" -H "Authorization: Bearer ${TOKEN}")
   for i in $(seq 1 "$batch_size"); do
     curl_args+=(-F "file=@${P}")
   done
@@ -177,7 +177,7 @@ for batch_size in 3 5; do
   result=$(curl --max-time 600 "${curl_args[@]}" 2>/dev/null) || result=$'000\t0.000\tapplication/octet-stream'
   IFS=$'\t' read -r http_code time_s response_mime <<< "$result"
   resolve_benchmark_response "$BASE_URL" "$TOKEN" "$http_code" "$response_mime" \
-    "$admission_file" "$artifact_file" "$time_s" 600000 || true
+    "$admission_file" "$artifact_file" "$time_s" 600000 "application/zip" "$batch_size" || true
   pass="$BENCH_PASS"
   time_s="$BENCH_COMPLETION_LATENCY_S"
   output_size="$BENCH_OUTPUT_SIZE"
@@ -196,7 +196,7 @@ mem_start=$(docker_mem_mb "$cid" 2>/dev/null || echo "0")
 vram_start=$(gpu_vram_mb)
 
 for i in $(seq 1 10); do
-  bench_ai_tool "image/remove-background" "sustained-${i}" "$P" '{"backgroundType":"transparent"}'
+  bench_ai_tool "image/remove-background" "sustained-${i}" "$P" '{}'
 done
 
 mem_end=$(docker_mem_mb "$cid" 2>/dev/null || echo "0")

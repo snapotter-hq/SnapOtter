@@ -354,6 +354,44 @@ describe("remove-background Phase 1 settings validation (#2281)", () => {
     expect(phase1SettingsSchema.safeParse(verifyAiSettings).success).toBe(true);
   });
 
+  it("bench-ai.sh passes Phase 1 settings to single-file remove-background and posts batch runs to /batch (#2976)", async () => {
+    const benchAi = readFileSync(path.join(REPO_ROOT, "tests/benchmark/bench-ai.sh"), "utf8");
+
+    const allSingleInvocations = [
+      ...benchAi.matchAll(/bench_ai_tool\s+"image\/remove-background"/g),
+    ];
+    const singleMatches = [
+      ...benchAi.matchAll(
+        /bench_ai_tool\s+"image\/remove-background"\s+"([^"]+)"\s+"[^"]+"\s+'([^']*)'/g,
+      ),
+    ];
+    expect(singleMatches.length).toBeGreaterThanOrEqual(3);
+    expect(singleMatches.length).toBe(allSingleInvocations.length);
+    for (const match of singleMatches) {
+      const rawSettings = match[2];
+      const parsed = (rawSettings ? JSON.parse(rawSettings) : {}) as Record<string, unknown>;
+      expect(phase1SettingsSchema.safeParse(parsed).success).toBe(true);
+      const res = await callPhase1Route(parsed);
+      expect(res.statusCode).toBe(202);
+    }
+
+    const tier3Start = benchAi.indexOf("=== TIER 3: AI Batch Processing ===");
+    const sustainedStart = benchAi.indexOf("=== Sustained AI Load");
+    expect(tier3Start).toBeGreaterThanOrEqual(0);
+    expect(sustainedStart).toBeGreaterThan(tier3Start);
+    const batchBlock = benchAi.slice(tier3Start, sustainedStart);
+    expect(batchBlock).toMatch(/\/api\/v1\/tools\/image\/remove-background\/batch"/);
+    expect(batchBlock).not.toMatch(/\/api\/v1\/tools\/image\/remove-background"/);
+    expect(batchBlock).toMatch(/"application\/zip"\s+"\$batch_size"/);
+
+    const batchSettingsMatches = [...batchBlock.matchAll(/-F\s+'settings=(\{[^']*\})'/g)];
+    expect(batchSettingsMatches.length).toBeGreaterThan(0);
+    for (const match of batchSettingsMatches) {
+      const parsed = JSON.parse(match[1]) as Record<string, unknown>;
+      expect(accepts(parsed)).toBe(true);
+    }
+  });
+
   it("pins Phase 1 and Phase 2 settings in openapi.yaml and apps/docs/api/rest.md (#2975)", () => {
     const openapi = load(
       readFileSync(path.join(REPO_ROOT, "apps/api/src/openapi.yaml"), "utf8"),
