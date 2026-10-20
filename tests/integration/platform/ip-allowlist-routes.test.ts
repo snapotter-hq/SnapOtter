@@ -252,4 +252,90 @@ describe("IP allowlist with enterprise license", () => {
       });
     }
   });
+
+  it("keeps an active allowlist armed and preserves Redis ip:allowlist when refresh encounters corrupt JSON or a DB error (#2541)", async () => {
+    const { db: activeDb, schema: activeSchema } = await import(
+      "../../../apps/api/src/db/index.js"
+    );
+    const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js");
+    const { publishAllowlistRefresh } = await import(
+      "../../../apps/api/src/plugins/ip-allowlist.js"
+    );
+    const redis = sharedRedis();
+
+    const putRes = await enterpriseApp.app.inject({
+      method: "PUT",
+      url: "/api/v1/enterprise/ip-allowlist",
+      headers: { authorization: `Bearer ${entAdminToken}` },
+      payload: { cidrs: ["127.0.0.0/8"] },
+    });
+    expect(putRes.statusCode).toBe(200);
+
+    try {
+      await vi.waitFor(async () => {
+        expect(await redis.get("ip:allowlist")).toBe(JSON.stringify(["127.0.0.0/8"]));
+        const blocked = await enterpriseApp.app.inject({
+          method: "POST",
+          url: "/api/auth/login",
+          remoteAddress: "203.0.113.5",
+          payload: { username: "ipallowlistuser", password: "TestPass1" },
+        });
+        expect(blocked.statusCode).toBe(403);
+      });
+
+      const logErrorSpy = vi.spyOn(enterpriseApp.app.log, "error");
+      try {
+        // 1. Fault the DB read during a pub/sub refresh while the DB row is still valid
+        const selectSpy = vi.spyOn(activeDb, "select").mockImplementationOnce(() => {
+          throw new Error("simulated database failure");
+        });
+        try {
+          await publishAllowlistRefresh();
+          await vi.waitFor(() => {
+            expect(selectSpy).toHaveBeenCalled();
+            expect(logErrorSpy).toHaveBeenCalledTimes(1);
+          });
+        } finally {
+          selectSpy.mockRestore();
+        }
+
+        expect(await redis.get("ip:allowlist")).toBe(JSON.stringify(["127.0.0.0/8"]));
+        const blockedAfterDbFault = await enterpriseApp.app.inject({
+          method: "POST",
+          url: "/api/auth/login",
+          remoteAddress: "203.0.113.5",
+          payload: { username: "ipallowlistuser", password: "TestPass1" },
+        });
+        expect(blockedAfterDbFault.statusCode).toBe(403);
+
+        // 2. Corrupt the stored JSON row and publish a refresh event
+        await activeDb
+          .update(activeSchema.settings)
+          .set({ value: "{corrupt-json" })
+          .where(eq(activeSchema.settings.key, "ipAllowlist"));
+        await publishAllowlistRefresh();
+        await vi.waitFor(() => {
+          expect(logErrorSpy).toHaveBeenCalledTimes(2);
+        });
+
+        expect(await redis.get("ip:allowlist")).toBe(JSON.stringify(["127.0.0.0/8"]));
+        const blockedAfterCorrupt = await enterpriseApp.app.inject({
+          method: "POST",
+          url: "/api/auth/login",
+          remoteAddress: "203.0.113.5",
+          payload: { username: "ipallowlistuser", password: "TestPass1" },
+        });
+        expect(blockedAfterCorrupt.statusCode).toBe(403);
+      } finally {
+        logErrorSpy.mockRestore();
+      }
+    } finally {
+      await enterpriseApp.app.inject({
+        method: "PUT",
+        url: "/api/v1/enterprise/ip-allowlist",
+        headers: { authorization: `Bearer ${entAdminToken}` },
+        payload: { cidrs: [] },
+      });
+    }
+  });
 });

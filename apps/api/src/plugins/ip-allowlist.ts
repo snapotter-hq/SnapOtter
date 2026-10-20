@@ -96,6 +96,17 @@ export { EXEMPT_PATHS, isExemptPath };
 const ALLOWLIST_KEY = "ip:allowlist";
 const ALLOWLIST_CHANNEL = "ip:allowlist:refresh";
 
+function parseAllowlistJson(raw: string): string[] {
+  const parsed: unknown = JSON.parse(raw);
+  if (
+    !Array.isArray(parsed) ||
+    !parsed.every((entry): entry is string => typeof entry === "string" && isValidCidr(entry))
+  ) {
+    throw new SyntaxError("ipAllowlist must be a JSON array of valid CIDR strings");
+  }
+  return parsed;
+}
+
 export async function registerIpAllowlist(app: FastifyInstance): Promise<void> {
   // Only run if enterprise feature is enabled
   const isEnabled = await isEnterpriseFeatureEnabled("ip_allowlist", "boot");
@@ -103,14 +114,10 @@ export async function registerIpAllowlist(app: FastifyInstance): Promise<void> {
 
   // Load allowlist from settings table
   async function loadAllowlist(): Promise<string[]> {
-    const { getSettingString } = await import("../lib/settings-helpers.js");
-    const raw = await getSettingString("ipAllowlist", "");
-    if (!raw) return [];
-    try {
-      return JSON.parse(raw) as string[];
-    } catch {
-      return [];
-    }
+    const { getSettingStrict } = await import("../lib/settings-helpers.js");
+    const raw = await getSettingStrict("ipAllowlist");
+    if (raw === undefined || raw === "") return [];
+    return parseAllowlistJson(raw);
   }
 
   // Cache in-process
@@ -119,13 +126,58 @@ export async function registerIpAllowlist(app: FastifyInstance): Promise<void> {
 
   let cachedBlockList: BlockList | null = null;
   let cachedCidrs: string[] = [];
+  let hasLoadedAllowlist = false;
 
   async function refreshAllowlist(): Promise<void> {
-    const cidrs = await loadAllowlist();
+    let cidrs: string[];
+    try {
+      cidrs = await loadAllowlist();
+    } catch (err) {
+      if (hasLoadedAllowlist) {
+        app.log.error(
+          { err },
+          "Failed to refresh IP allowlist from settings; keeping cached allowlist",
+        );
+        return;
+      }
+
+      try {
+        const cachedRaw = await redis.get?.(ALLOWLIST_KEY);
+        if (cachedRaw) {
+          const cached = parseAllowlistJson(cachedRaw);
+          if (cached.length > 0) {
+            cachedCidrs = cached;
+            cachedBlockList = buildBlockList(cached);
+            hasLoadedAllowlist = true;
+            app.log.warn(
+              { err },
+              "Failed to load IP allowlist from settings; using Redis cached allowlist",
+            );
+            return;
+          }
+        }
+      } catch (redisErr) {
+        app.log.warn({ err: redisErr }, "Failed to read IP allowlist fallback from Redis");
+      }
+
+      cachedCidrs = [];
+      cachedBlockList = new BlockList();
+      app.log.error(
+        { err },
+        "Failed to load IP allowlist from settings and no usable Redis cache is available; failing closed",
+      );
+      return;
+    }
+
     cachedCidrs = cidrs;
     cachedBlockList = buildBlockList(cidrs);
+    hasLoadedAllowlist = true;
     // Mirror into Redis so other instances can bootstrap faster
-    await redis.set(ALLOWLIST_KEY, JSON.stringify(cidrs));
+    try {
+      await redis.set(ALLOWLIST_KEY, JSON.stringify(cidrs));
+    } catch (err) {
+      app.log.warn({ err }, "Failed to cache IP allowlist in Redis");
+    }
   }
 
   // Initial load
@@ -133,9 +185,18 @@ export async function registerIpAllowlist(app: FastifyInstance): Promise<void> {
 
   // Subscribe to refresh events from other instances
   const sub = redis.duplicate();
-  await sub.subscribe(ALLOWLIST_CHANNEL);
+  sub.on("error", (err) => {
+    app.log.warn({ err }, "IP allowlist Redis subscriber error");
+  });
+  try {
+    await sub.subscribe(ALLOWLIST_CHANNEL);
+  } catch (err) {
+    app.log.warn({ err }, "Failed to subscribe to IP allowlist refresh channel");
+  }
   sub.on("message", async () => {
-    refreshAllowlist().catch(() => {});
+    refreshAllowlist().catch((err) => {
+      app.log.error({ err }, "Unexpected error refreshing IP allowlist");
+    });
   });
 
   // Clean up subscriber on shutdown
@@ -150,7 +211,7 @@ export async function registerIpAllowlist(app: FastifyInstance): Promise<void> {
 
   // Hook -- runs before auth, before routes
   app.addHook("onRequest", async (request: FastifyRequest, reply: FastifyReply) => {
-    if (!cachedBlockList || cachedCidrs.length === 0) return; // No allowlist = allow all
+    if (!cachedBlockList) return; // No allowlist = allow all
     if (isExemptPath(request.url)) return;
 
     const ip = request.ip;
@@ -159,7 +220,9 @@ export async function registerIpAllowlist(app: FastifyInstance): Promise<void> {
     }
   });
 
-  app.log.info(`IP allowlist active (${cachedCidrs.length} entries)`);
+  if (hasLoadedAllowlist) {
+    app.log.info(`IP allowlist active (${cachedCidrs.length} entries)`);
+  }
 }
 
 /**
