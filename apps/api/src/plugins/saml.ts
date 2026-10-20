@@ -19,6 +19,7 @@ import {
 import { authAttempts } from "../lib/metrics.js";
 import { makeRedisSamlCacheProvider } from "../lib/saml-cache.js";
 import { isSecureRequest } from "../lib/secure-cookie.js";
+import { evictExcessUserSessions, readMaxSessionsPerUser } from "../lib/session-cookie.js";
 import { createSessionToken } from "./auth.js";
 import type { ExternalMfaOutcome, MfaPolicy } from "./mfa.js";
 
@@ -323,13 +324,17 @@ export async function registerSaml(app: FastifyInstance): Promise<void> {
       }
 
       // Create session (same pattern as OIDC)
+      const maxSessions = await readMaxSessionsPerUser();
       const token = createSessionToken();
       const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
 
-      await db.insert(schema.sessions).values({
-        id: token,
-        userId: resolvedUser.id,
-        expiresAt,
+      await db.transaction(async (tx) => {
+        await tx.insert(schema.sessions).values({
+          id: token,
+          userId: resolvedUser.id,
+          expiresAt,
+        });
+        await evictExcessUserSessions(tx, resolvedUser.id, maxSessions);
       });
 
       authAttempts.inc({ method: "saml", result: "success" });

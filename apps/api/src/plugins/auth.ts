@@ -11,7 +11,7 @@ import {
   USERNAME_MIN_LENGTH,
   USERNAME_PATTERN,
 } from "@snapotter/shared";
-import { and, asc, eq, ne } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { env } from "../config.js";
@@ -31,7 +31,11 @@ import {
 } from "../lib/login-throttle.js";
 import { authAttempts } from "../lib/metrics.js";
 import { normalizePassword, passwordCandidates } from "../lib/password-form.js";
-import { setSessionCookie } from "../lib/session-cookie.js";
+import {
+  evictExcessUserSessions,
+  readMaxSessionsPerUser,
+  setSessionCookie,
+} from "../lib/session-cookie.js";
 import {
   getSettingNumber,
   getSettingStrict,
@@ -890,11 +894,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       // Read before inserting the session so a failed settings query aborts
       // with 500 instead of persisting an un-evicted session row (#2517).
-      const maxSessions = parseNumericSettingValue(
-        "maxSessionsPerUser",
-        await getSettingStrict("maxSessionsPerUser"),
-        0,
-      );
+      const maxSessions = await readMaxSessionsPerUser();
 
       // Create session
       const token = createSessionToken();
@@ -933,21 +933,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
             expiresAt,
           });
 
-          // ── Concurrent session limit (FIFO eviction) ──────────────
-          if (maxSessions > 0) {
-            const sessions = await tx
-              .select({ id: schema.sessions.id, createdAt: schema.sessions.createdAt })
-              .from(schema.sessions)
-              .where(eq(schema.sessions.userId, user.id))
-              .orderBy(asc(schema.sessions.createdAt));
-
-            if (sessions.length > maxSessions) {
-              const toDelete = sessions.slice(0, sessions.length - maxSessions);
-              for (const s of toDelete) {
-                await tx.delete(schema.sessions).where(eq(schema.sessions.id, s.id));
-              }
-            }
-          }
+          await evictExcessUserSessions(tx, user.id, maxSessions);
 
           return "ok";
         },

@@ -12,7 +12,11 @@ import { decrypt, encrypt, isEncrypted } from "../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { reportError } from "../lib/error-report.js";
 import { logger } from "../lib/logger.js";
-import { setSessionCookie } from "../lib/session-cookie.js";
+import {
+  evictExcessUserSessions,
+  readMaxSessionsPerUser,
+  setSessionCookie,
+} from "../lib/session-cookie.js";
 import { clearUserMfa } from "../lib/user-mfa.js";
 import {
   canManageTargetRole,
@@ -775,6 +779,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       let dbUser: typeof schema.users.$inferSelect | undefined;
       let secretBase32: string | null = null;
       let claimedStep: ClaimedTotpStep | null = null;
+      let maxSessions = 0;
       let verified = false;
       let recoveryUsed = false;
       let recoveryRace = false;
@@ -844,6 +849,11 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
             code: "MFA_NOT_CONFIGURED",
           });
         }
+
+        // Read before consuming a recovery code or TOTP step so a failed
+        // settings query restores the challenge without burning one-time
+        // credentials (#2540).
+        maxSessions = await readMaxSessionsPerUser();
 
         // Try recovery code first so a user can still sign in when the stored
         // TOTP secret cannot be decrypted (#2034).
@@ -963,6 +973,8 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
             expiresAt,
           });
 
+          await evictExcessUserSessions(tx, verifiedUser.id, maxSessions);
+
           return { status: "success" as const, role: lockedUser.role };
         });
       } catch (err) {
@@ -1075,6 +1087,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       let dbUser: typeof schema.users.$inferSelect | undefined;
       let secretBase32: string | null = null;
       let claimedStep: ClaimedTotpStep | null = null;
+      let maxSessions = 0;
 
       try {
         [dbUser] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
@@ -1148,6 +1161,8 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
             code: "MFA_ALREADY_ENABLED",
           });
         }
+
+        maxSessions = await readMaxSessionsPerUser();
 
         secretBase32 = await decryptSecret(userId, dbUser.totpSecret);
         if (!secretBase32) {
@@ -1247,6 +1262,8 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
             userId: verifiedUser.id,
             expiresAt,
           });
+
+          await evictExcessUserSessions(tx, verifiedUser.id, maxSessions);
 
           return { status: "success" as const, role: lockedUser.role };
         });

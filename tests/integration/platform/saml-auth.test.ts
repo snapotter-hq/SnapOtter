@@ -12,7 +12,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { inspect } from "node:util";
-import { DrizzleQueryError, eq, sql } from "drizzle-orm";
+import { asc, DrizzleQueryError, eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
@@ -758,6 +758,124 @@ describe("SAML callback", () => {
       getMfaPolicyMock.mockReset();
       getMfaPolicyMock.mockResolvedValue({});
       mfaOutcomeMock.mockReturnValue("proceed");
+    }
+  });
+
+  it("evicts the oldest sessions on POST /api/auth/saml/callback when maxSessionsPerUser is exceeded and rolls back on settings or eviction failure (#2540)", async () => {
+    const email = `saml-maxsess-${randomUUID().slice(0, 8)}@example.com`;
+    samlMock.validatePostResponseAsync.mockResolvedValue({ profile: { nameID: email, email } });
+    mfaOutcomeMock.mockReturnValue("proceed");
+
+    await db
+      .insert(schema.settings)
+      .values({ key: "maxSessionsPerUser", value: "2" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "2" } });
+
+    try {
+      const r1 = await postCallback();
+      expect(r1.statusCode).toBe(302);
+      const t1 = String(r1.headers["set-cookie"] ?? "").match(/snapotter-session=([^;]+)/)?.[1];
+      expect(t1).toBeTruthy();
+
+      const [user] = await db.select().from(schema.users).where(eq(schema.users.externalId, email));
+      expect(user).toBeDefined();
+      const userId = user?.id as string;
+
+      // Backdate t1 so ordering between t1 and t2 is deterministic even within one millisecond tick.
+      await db
+        .update(schema.sessions)
+        .set({ createdAt: new Date(Date.now() - 60_000) })
+        .where(eq(schema.sessions.id, t1 as string));
+
+      const r2 = await postCallback();
+      expect(r2.statusCode).toBe(302);
+      const t2 = String(r2.headers["set-cookie"] ?? "").match(/snapotter-session=([^;]+)/)?.[1];
+      expect(t2).toBeTruthy();
+
+      // 1. Failing the maxSessionsPerUser read aborts with 500 and creates no session.
+      const originalSelect = db.select.bind(db);
+      const selectSpy = vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+        const selection = args[0] as Record<string, unknown> | undefined;
+        // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+        const builder = (originalSelect as any)(...args);
+        if (selection && "value" in selection) {
+          const origFrom = builder.from.bind(builder);
+          builder.from = (...fromArgs: unknown[]) => {
+            const query = origFrom(...fromArgs);
+            const origWhere = query.where.bind(query);
+            query.where = (...whereArgs: unknown[]) => {
+              const filtered = origWhere(...whereArgs);
+              if (filtered.toSQL().params.includes("maxSessionsPerUser")) {
+                throw new Error("simulated settings store failure for maxSessionsPerUser");
+              }
+              return filtered;
+            };
+            return query;
+          };
+        }
+        return builder;
+      });
+      try {
+        const failReadRes = await postCallback();
+        expect(failReadRes.statusCode).toBe(500);
+        expect(String(failReadRes.headers["set-cookie"] ?? "")).not.toContain("snapotter-session=");
+      } finally {
+        selectSpy.mockRestore();
+      }
+
+      // 2. Failing FIFO eviction inside the transaction rolls back the inserted session.
+      const realTransaction = db.transaction.bind(db) as (
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) => Promise<unknown>;
+      const txSpy = vi.spyOn(db, "transaction").mockImplementationOnce(((
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) =>
+        realTransaction((tx) => {
+          const failingTx = new Proxy(tx, {
+            get(target, prop, receiver) {
+              if (prop === "delete") {
+                return () => {
+                  throw new Error("simulated FIFO eviction delete failure");
+                };
+              }
+              return Reflect.get(target, prop, receiver);
+            },
+          });
+          return cb(failingTx);
+        }, config)) as unknown as typeof db.transaction);
+      try {
+        const failEvictRes = await postCallback();
+        expect(failEvictRes.statusCode).toBe(500);
+        expect(String(failEvictRes.headers["set-cookie"] ?? "")).not.toContain(
+          "snapotter-session=",
+        );
+      } finally {
+        txSpy.mockRestore();
+      }
+
+      const midSessions = await db
+        .select({ id: schema.sessions.id })
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, userId))
+        .orderBy(asc(schema.sessions.createdAt));
+      expect(midSessions.map((r) => r.id)).toEqual([t1, t2]);
+
+      // 3. Third SAML login succeeds and evicts t1 (oldest).
+      const r3 = await postCallback();
+      expect(r3.statusCode).toBe(302);
+      const t3 = String(r3.headers["set-cookie"] ?? "").match(/snapotter-session=([^;]+)/)?.[1];
+      expect(t3).toBeTruthy();
+
+      const remaining = await db
+        .select({ id: schema.sessions.id })
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, userId))
+        .orderBy(asc(schema.sessions.createdAt));
+      expect(remaining.map((r) => r.id)).toEqual([t2, t3]);
+    } finally {
+      await db.delete(schema.settings).where(eq(schema.settings.key, "maxSessionsPerUser"));
     }
   });
 });

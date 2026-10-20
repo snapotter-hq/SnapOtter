@@ -24,6 +24,7 @@ import {
   oidcTokenExchangeFaultCode,
 } from "../lib/oidc-faults.js";
 import { isSecureRequest } from "../lib/secure-cookie.js";
+import { evictExcessUserSessions, readMaxSessionsPerUser } from "../lib/session-cookie.js";
 import { createSessionToken } from "./auth.js";
 import type { ExternalMfaOutcome, MfaPolicy } from "./mfa.js";
 
@@ -568,14 +569,18 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
       }
 
       // 5. Create session
+      const maxSessions = await readMaxSessionsPerUser();
       const token = createSessionToken();
       const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
 
-      await db.insert(schema.sessions).values({
-        id: token,
-        userId: resolvedUser.id,
-        expiresAt,
-        idToken,
+      await db.transaction(async (tx) => {
+        await tx.insert(schema.sessions).values({
+          id: token,
+          userId: resolvedUser.id,
+          expiresAt,
+          idToken,
+        });
+        await evictExcessUserSessions(tx, resolvedUser.id, maxSessions);
       });
 
       authAttempts.inc({ method: "oidc", result: "success" });

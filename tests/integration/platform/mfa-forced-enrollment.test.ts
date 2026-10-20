@@ -15,7 +15,7 @@
  * enterprise mock, since the mock is per-file all-or-nothing.
  */
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import * as OTPAuth from "otpauth";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -500,5 +500,142 @@ describe("POST /api/auth/login MFA policy read failure (#815)", () => {
     } finally {
       selectSpy.mockRestore();
     }
+  });
+});
+
+describe("POST /api/auth/mfa/enroll-complete maxSessionsPerUser enforcement (#2540)", () => {
+  afterEach(async () => {
+    await db.delete(schema.settings).where(eq(schema.settings.key, "maxSessionsPerUser"));
+  });
+
+  function breakMaxSessionsRead() {
+    const originalSelect = db.select.bind(db);
+    return vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+      const selection = args[0] as Record<string, unknown> | undefined;
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+      const builder = (originalSelect as any)(...args);
+      if (selection && "value" in selection) {
+        const origFrom = builder.from.bind(builder);
+        builder.from = (...fromArgs: unknown[]) => {
+          const query = origFrom(...fromArgs);
+          const origWhere = query.where.bind(query);
+          query.where = (...whereArgs: unknown[]) => {
+            const filtered = origWhere(...whereArgs);
+            if (filtered.toSQL().params.includes("maxSessionsPerUser")) {
+              throw new Error("simulated settings store failure for maxSessionsPerUser");
+            }
+            return filtered;
+          };
+          return query;
+        };
+      }
+      return builder;
+    });
+  }
+
+  it("evicts the oldest session when forced enrollment completes past maxSessionsPerUser, and restores the challenge on settings or eviction failure", async () => {
+    const { username, password, userId } = await createUnenrolledUser();
+    // createUnenrolledUser already created 1 session via createUserAndLogin; seed an older one so count = 2.
+    const t0 = randomUUID();
+    await db.insert(schema.sessions).values({
+      id: t0,
+      userId,
+      createdAt: new Date(Date.now() - 60_000),
+      expiresAt: new Date(Date.now() + 3_600_000),
+    });
+    const sessionsBefore = await db
+      .select({ id: schema.sessions.id })
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, userId))
+      .orderBy(asc(schema.sessions.createdAt));
+    expect(sessionsBefore).toHaveLength(2);
+    expect(sessionsBefore[0].id).toBe(t0);
+
+    await setMfaPolicy("required");
+    await db
+      .insert(schema.settings)
+      .values({ key: "maxSessionsPerUser", value: "2" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "2" } });
+
+    const loginRes = await login(username, password);
+    expect(loginRes.statusCode).toBe(200);
+    const { enrollmentToken, uri } = JSON.parse(loginRes.body) as {
+      enrollmentToken: string;
+      uri: string;
+    };
+
+    const remainingMs = OTPAuth.TOTP.remaining({ period: 30 });
+    if (remainingMs < 5_000) {
+      await new Promise((r) => setTimeout(r, remainingMs + 50));
+    }
+    const code = generateTotpCode(uri);
+
+    // 1. If reading maxSessionsPerUser fails, enroll-complete fails closed with 500
+    // and keeps the enrollment challenge and TOTP step available for retry.
+    const selectSpy = breakMaxSessionsRead();
+    try {
+      const failReadRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/enroll-complete",
+        payload: { enrollmentToken, code },
+      });
+      expect(failReadRes.statusCode).toBe(500);
+    } finally {
+      selectSpy.mockRestore();
+    }
+    expect(await sharedRedis().get(`mfa:enroll:${enrollmentToken}`)).toBeTruthy();
+
+    // 2. If FIFO eviction fails inside the transaction, both totpEnabled and the
+    // new session roll back, and the enrollment challenge + TOTP step are restored.
+    const realTransaction = db.transaction.bind(db) as (
+      cb: (tx: object) => Promise<unknown>,
+      config?: unknown,
+    ) => Promise<unknown>;
+    const txSpy = vi.spyOn(db, "transaction").mockImplementationOnce(((
+      cb: (tx: object) => Promise<unknown>,
+      config?: unknown,
+    ) =>
+      realTransaction((tx) => {
+        const failingTx = new Proxy(tx, {
+          get(target, prop, receiver) {
+            if (prop === "delete") {
+              return () => {
+                throw new Error("simulated FIFO eviction delete failure");
+              };
+            }
+            return Reflect.get(target, prop, receiver);
+          },
+        });
+        return cb(failingTx);
+      }, config)) as unknown as typeof db.transaction);
+    try {
+      const failEvictRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/enroll-complete",
+        payload: { enrollmentToken, code },
+      });
+      expect(failEvictRes.statusCode).toBe(500);
+    } finally {
+      txSpy.mockRestore();
+    }
+    const [midUser] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
+    expect(midUser.totpEnabled).toBe(false);
+    expect(await sharedRedis().get(`mfa:enroll:${enrollmentToken}`)).toBeTruthy();
+
+    // 3. Normal retry succeeds, activates MFA, and evicts the oldest session (t0).
+    const completeRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll-complete",
+      payload: { enrollmentToken, code },
+    });
+    expect(completeRes.statusCode).toBe(200);
+    const { token: newToken } = JSON.parse(completeRes.body) as { token: string };
+
+    const remaining = await db
+      .select({ id: schema.sessions.id })
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, userId))
+      .orderBy(asc(schema.sessions.createdAt));
+    expect(remaining.map((r) => r.id)).toEqual([sessionsBefore[1].id, newToken]);
   });
 });

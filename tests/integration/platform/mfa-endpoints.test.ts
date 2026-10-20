@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import * as OTPAuth from "otpauth";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -1560,5 +1560,164 @@ describe("PUT /api/v1/settings mfaPolicy (licensed)", () => {
       payload: { mfaPolicy: "admins_only" },
     });
     expect(res.statusCode).toBe(200);
+  });
+});
+
+describe("POST /api/auth/mfa/complete maxSessionsPerUser enforcement (#2540)", () => {
+  afterEach(async () => {
+    await db.delete(schema.settings).where(eq(schema.settings.key, "maxSessionsPerUser"));
+  });
+
+  function breakMaxSessionsRead() {
+    const originalSelect = db.select.bind(db);
+    return vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+      const selection = args[0] as Record<string, unknown> | undefined;
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+      const builder = (originalSelect as any)(...args);
+      if (selection && "value" in selection) {
+        const origFrom = builder.from.bind(builder);
+        builder.from = (...fromArgs: unknown[]) => {
+          const query = origFrom(...fromArgs);
+          const origWhere = query.where.bind(query);
+          query.where = (...whereArgs: unknown[]) => {
+            const filtered = origWhere(...whereArgs);
+            if (filtered.toSQL().params.includes("maxSessionsPerUser")) {
+              throw new Error("simulated settings store failure for maxSessionsPerUser");
+            }
+            return filtered;
+          };
+          return query;
+        };
+      }
+      return builder;
+    });
+  }
+
+  it("evicts the oldest sessions when completing MFA exceeds maxSessionsPerUser, and fails closed without burning the challenge or recovery code on a settings or eviction failure", async () => {
+    const username = `mfa_max_sess_${Date.now()}`;
+    const password = "TestPassword1!";
+    const { userId, token: t1 } = await createUserAndLogin(testApp.app, username, "user", password);
+
+    try {
+      const enrollRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/enroll",
+        headers: { authorization: `Bearer ${t1}` },
+      });
+      const { uri, recoveryCodes } = JSON.parse(enrollRes.body) as {
+        uri: string;
+        recoveryCodes: string[];
+      };
+      const verifyRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/verify",
+        headers: { authorization: `Bearer ${t1}` },
+        payload: { code: await generatePrevStepTotpCode(uri) },
+      });
+      expect(verifyRes.statusCode).toBe(200);
+
+      // Seed a second session older than t1's follow-up login so the user already holds 2 sessions.
+      const t0 = randomUUID();
+      await db.insert(schema.sessions).values({
+        id: t0,
+        userId,
+        createdAt: new Date(Date.now() - 60_000),
+        expiresAt: new Date(Date.now() + 3_600_000),
+      });
+
+      await db
+        .insert(schema.settings)
+        .values({ key: "maxSessionsPerUser", value: "2" })
+        .onConflictDoUpdate({ target: schema.settings.key, set: { value: "2" } });
+
+      const loginRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username, password },
+      });
+      expect(loginRes.statusCode).toBe(200);
+      const { mfaToken } = JSON.parse(loginRes.body) as { mfaToken: string };
+
+      // 1. If reading maxSessionsPerUser fails, /mfa/complete fails closed with 500 without
+      // burning either the challenge token in Redis or the offered recovery code.
+      const selectSpy = breakMaxSessionsRead();
+      try {
+        const failReadRes = await testApp.app.inject({
+          method: "POST",
+          url: "/api/auth/mfa/complete",
+          payload: { mfaToken, code: recoveryCodes[0] },
+        });
+        expect(failReadRes.statusCode).toBe(500);
+      } finally {
+        selectSpy.mockRestore();
+      }
+      expect(await sharedRedis().get(`mfa:${mfaToken}`)).toBeTruthy();
+      const [userAfterFailRead] = await db
+        .select({ recoveryCodesHash: schema.users.recoveryCodesHash })
+        .from(schema.users)
+        .where(eq(schema.users.id, userId));
+      expect(
+        verifyRecoveryCode(recoveryCodes[0], userAfterFailRead.recoveryCodesHash ?? "").valid,
+      ).toBe(true);
+
+      const remainingMs = OTPAuth.TOTP.remaining({ period: 30 });
+      if (remainingMs < 5_000) {
+        await new Promise((r) => setTimeout(r, remainingMs + 50));
+      }
+      const totpCode = generateTotpCode(uri);
+
+      // 2. If FIFO eviction fails inside the transaction, the new session rolls back and
+      // the challenge + TOTP step are restored so retrying the same TOTP code succeeds.
+      const realTransaction = db.transaction.bind(db) as (
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) => Promise<unknown>;
+      const txSpy = vi.spyOn(db, "transaction").mockImplementationOnce(((
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) =>
+        realTransaction((tx) => {
+          const failingTx = new Proxy(tx, {
+            get(target, prop, receiver) {
+              if (prop === "delete") {
+                return () => {
+                  throw new Error("simulated FIFO eviction delete failure");
+                };
+              }
+              return Reflect.get(target, prop, receiver);
+            },
+          });
+          return cb(failingTx);
+        }, config)) as unknown as typeof db.transaction);
+      try {
+        const failEvictRes = await testApp.app.inject({
+          method: "POST",
+          url: "/api/auth/mfa/complete",
+          payload: { mfaToken, code: totpCode },
+        });
+        expect(failEvictRes.statusCode).toBe(500);
+      } finally {
+        txSpy.mockRestore();
+      }
+      expect(await sharedRedis().get(`mfa:${mfaToken}`)).toBeTruthy();
+
+      // 3. Retrying with the same TOTP code succeeds and evicts t0 (oldest).
+      const completeRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code: totpCode },
+      });
+      expect(completeRes.statusCode).toBe(200);
+      const { token: t2 } = JSON.parse(completeRes.body) as { token: string };
+
+      const remaining = await db
+        .select({ id: schema.sessions.id })
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, userId))
+        .orderBy(asc(schema.sessions.createdAt));
+      expect(remaining.map((r) => r.id)).toEqual([t1, t2]);
+    } finally {
+      await db.delete(schema.users).where(eq(schema.users.id, userId));
+    }
   });
 });

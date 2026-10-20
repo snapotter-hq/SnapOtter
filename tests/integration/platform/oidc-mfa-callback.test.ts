@@ -12,7 +12,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import * as OTPAuth from "otpauth";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -418,5 +418,122 @@ describe("OIDC callback MFA outcomes", () => {
     });
     expect(completeRes.statusCode).toBe(200);
     expect(JSON.parse(completeRes.body).user.username).toBe(username);
+  });
+
+  it("evicts the oldest sessions on GET /api/auth/oidc/callback when maxSessionsPerUser is exceeded and rolls back on settings or eviction failure (#2540)", async () => {
+    const { userId, externalId } = await insertOidcUser({ totpEnabled: false });
+    await setMfaPolicy("optional");
+
+    const t1 = randomUUID();
+    const t2 = randomUUID();
+    await db.insert(schema.sessions).values([
+      {
+        id: t1,
+        userId,
+        createdAt: new Date(Date.now() - 120_000),
+        expiresAt: new Date(Date.now() + 3_600_000),
+      },
+      {
+        id: t2,
+        userId,
+        createdAt: new Date(Date.now() - 60_000),
+        expiresAt: new Date(Date.now() + 3_600_000),
+      },
+    ]);
+
+    await db
+      .insert(schema.settings)
+      .values({ key: "maxSessionsPerUser", value: "2" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "2" } });
+
+    try {
+      // 1. Failing the maxSessionsPerUser read aborts with 500 and creates no session.
+      const originalSelect = db.select.bind(db);
+      const selectSpy = vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+        const selection = args[0] as Record<string, unknown> | undefined;
+        // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+        const builder = (originalSelect as any)(...args);
+        if (selection && "value" in selection) {
+          const origFrom = builder.from.bind(builder);
+          builder.from = (...fromArgs: unknown[]) => {
+            const query = origFrom(...fromArgs);
+            const origWhere = query.where.bind(query);
+            query.where = (...whereArgs: unknown[]) => {
+              const filtered = origWhere(...whereArgs);
+              if (filtered.toSQL().params.includes("maxSessionsPerUser")) {
+                throw new Error("simulated settings store failure for maxSessionsPerUser");
+              }
+              return filtered;
+            };
+            return query;
+          };
+        }
+        return builder;
+      });
+      try {
+        const failReadRes = await callbackAsUser(externalId);
+        expect(failReadRes.statusCode).toBe(500);
+        expect(String(failReadRes.headers["set-cookie"] ?? "")).not.toContain("snapotter-session=");
+      } finally {
+        selectSpy.mockRestore();
+      }
+
+      // 2. Failing FIFO eviction inside the transaction rolls back the inserted session.
+      const realTransaction = db.transaction.bind(db) as (
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) => Promise<unknown>;
+      const txSpy = vi.spyOn(db, "transaction").mockImplementationOnce(((
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) =>
+        realTransaction((tx) => {
+          const failingTx = new Proxy(tx, {
+            get(target, prop, receiver) {
+              if (prop === "delete") {
+                return () => {
+                  throw new Error("simulated FIFO eviction delete failure");
+                };
+              }
+              return Reflect.get(target, prop, receiver);
+            },
+          });
+          return cb(failingTx);
+        }, config)) as unknown as typeof db.transaction);
+      try {
+        const failEvictRes = await callbackAsUser(externalId);
+        expect(failEvictRes.statusCode).toBe(500);
+        expect(String(failEvictRes.headers["set-cookie"] ?? "")).not.toContain(
+          "snapotter-session=",
+        );
+      } finally {
+        txSpy.mockRestore();
+      }
+
+      const midSessions = await db
+        .select({ id: schema.sessions.id })
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, userId))
+        .orderBy(asc(schema.sessions.createdAt));
+      expect(midSessions.map((r) => r.id)).toEqual([t1, t2]);
+
+      // 3. Normal OIDC callback succeeds and evicts the oldest session (t1).
+      const okRes = await callbackAsUser(externalId);
+      expect(okRes.statusCode).toBe(302);
+      expect(okRes.headers.location).toBe("/");
+      const rawCookie = String(okRes.headers["set-cookie"] ?? "");
+      const cookieMatch = rawCookie.match(/snapotter-session=([^;]+)/);
+      const t3 = cookieMatch?.[1];
+      expect(t3).toBeTruthy();
+
+      const remaining = await db
+        .select({ id: schema.sessions.id })
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, userId))
+        .orderBy(asc(schema.sessions.createdAt));
+      expect(remaining.map((r) => r.id)).toEqual([t2, t3]);
+    } finally {
+      await db.delete(schema.settings).where(eq(schema.settings.key, "maxSessionsPerUser"));
+    }
   });
 });
