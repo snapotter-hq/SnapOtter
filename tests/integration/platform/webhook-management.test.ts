@@ -622,5 +622,95 @@ describe("webhook management", () => {
         await db.delete(schema.settings).where(eq(schema.settings.key, "webhook_destinations"));
       }
     });
+
+    it("POST rejects loopback, private IP, and non-HTTP(S) webhook URLs (#3076)", async () => {
+      const rejectedCases = [
+        ["http://127.0.0.1:8080/hook", "private or reserved IP"],
+        ["http://10.0.0.1/hook", "private or reserved IP"],
+        ["http://[::1]:8080/hook", "private or reserved IP"],
+        ["ftp://example.com/hook", "Only HTTP and HTTPS URLs are supported"],
+      ] as const;
+
+      try {
+        for (const [url, expectedDetail] of rejectedCases) {
+          const postRes = await testApp.app.inject({
+            method: "POST",
+            url: "/api/v1/enterprise/webhooks",
+            headers: { authorization: `Bearer ${adminToken}` },
+            payload: {
+              name: "Rejected Webhook",
+              url,
+              type: "alerts",
+            },
+          });
+          expect(postRes.statusCode).toBe(400);
+          const postBody = JSON.parse(postRes.body);
+          expect(postBody.error).toBe("Webhook URL must resolve to a public HTTP(S) destination");
+          expect(postBody.details).toContain(expectedDetail);
+        }
+
+        const [afterPostRow] = await db
+          .select({ value: schema.settings.value })
+          .from(schema.settings)
+          .where(eq(schema.settings.key, "webhook_destinations"));
+        expect(afterPostRow).toBeUndefined();
+      } finally {
+        await db.delete(schema.settings).where(eq(schema.settings.key, "webhook_destinations"));
+      }
+    });
+
+    it("PUT rejects loopback, private IP, and non-HTTP(S) webhook URLs (#3076)", async () => {
+      const rejectedCases = [
+        ["http://127.0.0.1:8080/hook", "private or reserved IP"],
+        ["http://10.0.0.1/hook", "private or reserved IP"],
+        ["http://[::1]:8080/hook", "private or reserved IP"],
+        ["ftp://example.com/hook", "Only HTTP and HTTPS URLs are supported"],
+      ] as const;
+
+      try {
+        const seedRes = await testApp.app.inject({
+          method: "POST",
+          url: "/api/v1/enterprise/webhooks",
+          headers: { authorization: `Bearer ${adminToken}` },
+          payload: {
+            name: "Seeded Webhook",
+            url: "https://93.184.216.34/seeded",
+            authHeader: "Bearer seeded-token",
+            type: "alerts",
+          },
+        });
+        expect(seedRes.statusCode).toBe(201);
+
+        const [beforePutRow] = await db
+          .select({ value: schema.settings.value })
+          .from(schema.settings)
+          .where(eq(schema.settings.key, "webhook_destinations"));
+
+        for (const [url, expectedDetail] of rejectedCases) {
+          const putRes = await testApp.app.inject({
+            method: "PUT",
+            url: "/api/v1/enterprise/webhooks/0",
+            headers: { authorization: `Bearer ${adminToken}` },
+            payload: {
+              name: "Mutated Webhook",
+              url,
+              type: "siem",
+            },
+          });
+          expect(putRes.statusCode).toBe(400);
+          const putBody = JSON.parse(putRes.body);
+          expect(putBody.error).toBe("Webhook URL must resolve to a public HTTP(S) destination");
+          expect(putBody.details).toContain(expectedDetail);
+        }
+
+        const [afterPutRow] = await db
+          .select({ value: schema.settings.value })
+          .from(schema.settings)
+          .where(eq(schema.settings.key, "webhook_destinations"));
+        expect(afterPutRow?.value).toBe(beforePutRow.value);
+      } finally {
+        await db.delete(schema.settings).where(eq(schema.settings.key, "webhook_destinations"));
+      }
+    });
   });
 });

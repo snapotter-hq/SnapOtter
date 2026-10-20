@@ -444,6 +444,139 @@ describe("enterprise settings JSON resilience (#2554)", () => {
     });
   });
 
+  describe("POST and PUT /api/v1/enterprise/webhooks (#3076)", () => {
+    it("validates url with validateFetchUrl on POST and returns 400 when rejected (#3076)", async () => {
+      isEnterpriseFeatureEnabledMock.mockResolvedValue(true);
+      requirePermissionMock.mockResolvedValue({ id: "admin-1", username: "admin" });
+
+      const { registerWebhookRoutes } = await import(
+        "../../../apps/api/src/routes/enterprise/webhooks.js"
+      );
+      const app = Fastify();
+      await registerWebhookRoutes(app);
+
+      try {
+        validateFetchUrlMock.mockRejectedValueOnce(
+          new Error("URL resolves to a private or reserved IP address"),
+        );
+
+        const postLoopbackRes = await app.inject({
+          method: "POST",
+          url: "/api/v1/enterprise/webhooks",
+          payload: {
+            name: "Loopback Hook",
+            url: "http://127.0.0.1:8080/hook",
+          },
+        });
+        expect(postLoopbackRes.statusCode).toBe(400);
+        expect(postLoopbackRes.json()).toEqual({
+          error: "Webhook URL must resolve to a public HTTP(S) destination",
+          details: "URL resolves to a private or reserved IP address",
+        });
+        expect(validateFetchUrlMock).toHaveBeenCalledWith("http://127.0.0.1:8080/hook");
+        expect(selectMock).not.toHaveBeenCalled();
+        expect(insertMock).not.toHaveBeenCalled();
+        expect(updateMock).not.toHaveBeenCalled();
+        expect(auditFnMock).not.toHaveBeenCalled();
+
+        validateFetchUrlMock.mockRejectedValueOnce("Only HTTP and HTTPS URLs are supported");
+
+        const postSchemeRes = await app.inject({
+          method: "POST",
+          url: "/api/v1/enterprise/webhooks",
+          payload: {
+            name: "FTP Hook",
+            url: "ftp://example.com/hook",
+          },
+        });
+        expect(postSchemeRes.statusCode).toBe(400);
+        expect(postSchemeRes.json()).toEqual({
+          error: "Webhook URL must resolve to a public HTTP(S) destination",
+          details: "Only HTTP and HTTPS URLs are supported",
+        });
+        expect(validateFetchUrlMock).toHaveBeenCalledWith("ftp://example.com/hook");
+        expect(selectMock).not.toHaveBeenCalled();
+        expect(insertMock).not.toHaveBeenCalled();
+        expect(updateMock).not.toHaveBeenCalled();
+        expect(auditFnMock).not.toHaveBeenCalled();
+      } finally {
+        await app.close();
+      }
+    });
+
+    it("validates url with validateFetchUrl on PUT and returns 400 when rejected (#3076)", async () => {
+      isEnterpriseFeatureEnabledMock.mockResolvedValue(true);
+      requirePermissionMock.mockResolvedValue({ id: "admin-1", username: "admin" });
+      mockSelectRow(
+        JSON.stringify([
+          {
+            name: "Existing Hook",
+            url: "https://example.com/hook",
+            authHeader: "",
+            eventFilter: [],
+            batchIntervalSeconds: 30,
+            enabled: true,
+            type: "alerts",
+          },
+        ]),
+      );
+
+      const { registerWebhookRoutes } = await import(
+        "../../../apps/api/src/routes/enterprise/webhooks.js"
+      );
+      const app = Fastify();
+      await registerWebhookRoutes(app);
+
+      try {
+        validateFetchUrlMock.mockRejectedValueOnce(
+          new Error("URL resolves to a private or reserved IP address"),
+        );
+
+        const putLoopbackRes = await app.inject({
+          method: "PUT",
+          url: "/api/v1/enterprise/webhooks/0",
+          payload: {
+            name: "Loopback Hook",
+            url: "http://127.0.0.1:8080/hook",
+          },
+        });
+        expect(putLoopbackRes.statusCode).toBe(400);
+        expect(putLoopbackRes.json()).toEqual({
+          error: "Webhook URL must resolve to a public HTTP(S) destination",
+          details: "URL resolves to a private or reserved IP address",
+        });
+        expect(validateFetchUrlMock).toHaveBeenCalledWith("http://127.0.0.1:8080/hook");
+        expect(selectMock).toHaveBeenCalledTimes(1);
+        expect(insertMock).not.toHaveBeenCalled();
+        expect(updateMock).not.toHaveBeenCalled();
+        expect(auditFnMock).not.toHaveBeenCalled();
+
+        validateFetchUrlMock.mockRejectedValueOnce("Only HTTP and HTTPS URLs are supported");
+
+        const putSchemeRes = await app.inject({
+          method: "PUT",
+          url: "/api/v1/enterprise/webhooks/0",
+          payload: {
+            name: "FTP Hook",
+            url: "ftp://example.com/hook",
+          },
+        });
+        expect(putSchemeRes.statusCode).toBe(400);
+        expect(putSchemeRes.json()).toEqual({
+          error: "Webhook URL must resolve to a public HTTP(S) destination",
+          details: "Only HTTP and HTTPS URLs are supported",
+        });
+        expect(validateFetchUrlMock).toHaveBeenCalledWith("ftp://example.com/hook");
+        expect(selectMock).toHaveBeenCalledTimes(2);
+        expect(insertMock).not.toHaveBeenCalled();
+        expect(updateMock).not.toHaveBeenCalled();
+        expect(auditFnMock).not.toHaveBeenCalled();
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
   describe("GET /api/v1/enterprise/ip-allowlist (#3038)", () => {
     it("logs a warning and returns empty cidrs when stored ipAllowlist is malformed JSON", async () => {
       isEnterpriseFeatureEnabledMock.mockResolvedValue(true);
