@@ -20,15 +20,11 @@
  */
 
 import { writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import type { FastifyInstance } from "fastify";
 import { PYTHON_SIDECAR_TOOLS, TOOLS } from "../../packages/shared/src/constants.js";
 import { deriveAxes, type PictAxis } from "../helpers/zod-pict.js";
-
-process.env.DATA_DIR ||= "/tmp/qa-tool-contract";
-process.env.DATABASE_URL ||= "postgres://snapotter:snapotter@localhost:5432/snapotter";
-process.env.REDIS_URL ||= "redis://127.0.0.1:6379";
-process.env.AUTH_ENABLED ||= "true";
 
 export interface ToolContract {
   id: string;
@@ -51,7 +47,9 @@ export interface ToolContract {
 
 interface FieldBounds {
   min?: number;
+  minInclusive?: boolean;
   max?: number;
+  maxInclusive?: boolean;
   kind: "number" | "enum" | "boolean" | "other";
 }
 
@@ -67,7 +65,7 @@ interface ZodDefLike {
   innerType?: ZodNodeLike;
   in?: ZodNodeLike;
   shape?: () => Record<string, ZodNodeLike>;
-  checks?: Array<{ kind: string; value?: number }>;
+  checks?: Array<{ kind: string; value?: number; inclusive?: boolean }>;
 }
 
 interface ZodNodeLike {
@@ -103,7 +101,7 @@ function unwrapNode(node: ZodNodeLike): ZodNodeLike {
  * min and max checks or they accuse the container of accepting things it is
  * supposed to accept.
  */
-function readFieldBounds(schema: unknown): Map<string, FieldBounds> {
+export function readFieldBounds(schema: unknown): Map<string, FieldBounds> {
   const bounds = new Map<string, FieldBounds>();
   const root = unwrapNode(schema as ZodNodeLike);
   const shape = root._def?.shape;
@@ -115,8 +113,28 @@ function readFieldBounds(schema: unknown): Map<string, FieldBounds> {
     if (typeName === "ZodNumber") {
       const entry: FieldBounds = { kind: "number" };
       for (const check of inner._def?.checks ?? []) {
-        if (check.kind === "min") entry.min = check.value;
-        if (check.kind === "max") entry.max = check.value;
+        if (check.kind === "min" && check.value !== undefined) {
+          const inc = check.inclusive !== false;
+          if (
+            entry.min === undefined ||
+            check.value > entry.min ||
+            (check.value === entry.min && !inc)
+          ) {
+            entry.min = check.value;
+            entry.minInclusive = inc;
+          }
+        }
+        if (check.kind === "max" && check.value !== undefined) {
+          const inc = check.inclusive !== false;
+          if (
+            entry.max === undefined ||
+            check.value < entry.max ||
+            (check.value === entry.max && !inc)
+          ) {
+            entry.max = check.value;
+            entry.maxInclusive = inc;
+          }
+        }
       }
       bounds.set(key, entry);
     } else if (typeName === "ZodEnum" || typeName === "ZodNativeEnum") {
@@ -131,7 +149,7 @@ function readFieldBounds(schema: unknown): Map<string, FieldBounds> {
 }
 
 /** Settings values the live schema is obliged to refuse. */
-function invalidProbesFor(
+export function invalidProbesFor(
   axes: PictAxis[],
   bounds: Map<string, FieldBounds>,
 ): ToolContract["invalidProbes"] {
@@ -141,10 +159,18 @@ function invalidProbesFor(
     if (!field) continue;
     if (field.kind === "number") {
       if (field.min !== undefined) {
-        probes.push({ key: axis.key, value: field.min - 1, why: "below declared min" });
+        probes.push({
+          key: axis.key,
+          value: field.minInclusive === false ? field.min : field.min - 1,
+          why: "below declared min",
+        });
       }
       if (field.max !== undefined) {
-        probes.push({ key: axis.key, value: field.max + 1, why: "above declared max" });
+        probes.push({
+          key: axis.key,
+          value: field.maxInclusive === false ? field.max : field.max + 1,
+          why: "above declared max",
+        });
       }
       probes.push({ key: axis.key, value: "not-a-number", why: "wrong type" });
       continue;
@@ -162,6 +188,11 @@ function invalidProbesFor(
 }
 
 async function main(): Promise<void> {
+  process.env.DATA_DIR ||= "/tmp/qa-tool-contract";
+  process.env.DATABASE_URL ||= "postgres://snapotter:snapotter@localhost:5432/snapotter";
+  process.env.REDIS_URL ||= "redis://127.0.0.1:6379";
+  process.env.AUTH_ENABLED ||= "true";
+
   const repo = join(import.meta.dirname, "..", "..");
   const fastifyModule = await import(
     join(repo, "apps", "api", "node_modules", "fastify", "fastify.js")
@@ -242,7 +273,11 @@ async function main(): Promise<void> {
   process.exit(process.exitCode ?? 0);
 }
 
-main().catch((error) => {
-  console.error("FATAL:", error);
-  process.exit(2);
-});
+const isMain =
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+if (isMain) {
+  main().catch((error) => {
+    console.error("FATAL:", error);
+    process.exit(2);
+  });
+}

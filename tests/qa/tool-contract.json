@@ -48,11 +48,11 @@
     "axes": [
       {
         "key": "width",
-        "values": [0, 8192, 16383, null]
+        "values": [1, 8192, 16383, null]
       },
       {
         "key": "height",
-        "values": [0, 8192, 16383, null]
+        "values": [1, 8192, 16383, null]
       },
       {
         "key": "fit",
@@ -64,13 +64,13 @@
       },
       {
         "key": "percentage",
-        "values": [0, 500, 1000, null]
+        "values": [1, 500.5, 1000, null]
       }
     ],
     "invalidProbes": [
       {
         "key": "width",
-        "value": -1,
+        "value": 0,
         "why": "below declared min"
       },
       {
@@ -85,7 +85,7 @@
       },
       {
         "key": "height",
-        "value": -1,
+        "value": 0,
         "why": "below declared min"
       },
       {
@@ -115,7 +115,7 @@
       },
       {
         "key": "percentage",
-        "value": -1,
+        "value": 0,
         "why": "below declared min"
       },
       {
@@ -187,11 +187,11 @@
       },
       {
         "key": "width",
-        "values": [0, 50, 100]
+        "values": [1, 51, 101]
       },
       {
         "key": "height",
-        "values": [0, 50, 100]
+        "values": [1, 51, 101]
       },
       {
         "key": "unit",
@@ -221,7 +221,7 @@
       },
       {
         "key": "width",
-        "value": -1,
+        "value": 0,
         "why": "below declared min"
       },
       {
@@ -231,7 +231,7 @@
       },
       {
         "key": "height",
-        "value": -1,
+        "value": 0,
         "why": "below declared min"
       },
       {
@@ -488,7 +488,7 @@
       },
       {
         "key": "targetSizeKb",
-        "values": [0, 50, 100, null]
+        "values": [1, 51, 101, null]
       }
     ],
     "invalidProbes": [
@@ -519,7 +519,7 @@
       },
       {
         "key": "targetSizeKb",
-        "value": -1,
+        "value": 0,
         "why": "below declared min"
       },
       {
@@ -586,11 +586,11 @@
       },
       {
         "key": "maxWidth",
-        "values": [0, 50, 100, null]
+        "values": [1, 8192, 16383, null]
       },
       {
         "key": "maxHeight",
-        "values": [0, 50, 100, null]
+        "values": [1, 8192, 16383, null]
       },
       {
         "key": "progressive",
@@ -629,8 +629,13 @@
       },
       {
         "key": "maxWidth",
-        "value": -1,
+        "value": 0,
         "why": "below declared min"
+      },
+      {
+        "key": "maxWidth",
+        "value": 16384,
+        "why": "above declared max"
       },
       {
         "key": "maxWidth",
@@ -639,8 +644,13 @@
       },
       {
         "key": "maxHeight",
-        "value": -1,
+        "value": 0,
         "why": "below declared min"
+      },
+      {
+        "key": "maxHeight",
+        "value": 16384,
+        "why": "above declared max"
       },
       {
         "key": "maxHeight",
@@ -2441,11 +2451,11 @@
       },
       {
         "key": "width",
-        "values": [0, 50, 100, null]
+        "values": [1, 8192, 16383, null]
       },
       {
         "key": "height",
-        "values": [0, 50, 100, null]
+        "values": [1, 8192, 16383, null]
       },
       {
         "key": "padding",
@@ -2469,7 +2479,7 @@
       },
       {
         "key": "targetSize",
-        "values": [0, 50, 100, null]
+        "values": [1, 4097, 8192, null]
       },
       {
         "key": "quality",
@@ -2499,8 +2509,13 @@
       },
       {
         "key": "width",
-        "value": -1,
+        "value": 0,
         "why": "below declared min"
+      },
+      {
+        "key": "width",
+        "value": 16384,
+        "why": "above declared max"
       },
       {
         "key": "width",
@@ -2509,8 +2524,13 @@
       },
       {
         "key": "height",
-        "value": -1,
+        "value": 0,
         "why": "below declared min"
+      },
+      {
+        "key": "height",
+        "value": 16384,
+        "why": "above declared max"
       },
       {
         "key": "height",
@@ -2579,8 +2599,13 @@
       },
       {
         "key": "targetSize",
-        "value": -1,
+        "value": 0,
         "why": "below declared min"
+      },
+      {
+        "key": "targetSize",
+        "value": 8193,
+        "why": "above declared max"
       },
       {
         "key": "targetSize",
@@ -3358,11 +3383,11 @@
     "axes": [
       {
         "key": "width",
-        "values": [0, 50, 100, null]
+        "values": [1, 8192, 16383, null]
       },
       {
         "key": "height",
-        "values": [0, 50, 100, null]
+        "values": [1, 8192, 16383, null]
       },
       {
         "key": "protectFaces",
@@ -3384,8 +3409,13 @@
     "invalidProbes": [
       {
         "key": "width",
-        "value": -1,
+        "value": 0,
         "why": "below declared min"
+      },
+      {
+        "key": "width",
+        "value": 16384,
+        "why": "above declared max"
       },
       {
         "key": "width",
@@ -3394,8 +3424,13 @@
       },
       {
         "key": "height",
-        "value": -1,
+        "value": 0,
         "why": "below declared min"
+      },
+      {
+        "key": "height",
+        "value": 16384,
+        "why": "above declared max"
       },
       {
         "key": "height",
@@ -7406,7 +7441,7 @@
       },
       {
         "key": "durationS",
-        "values": [0, 30, 60, null]
+        "values": [1, 30.5, 60, null]
       }
     ],
     "invalidProbes": [
@@ -7452,7 +7487,7 @@
       },
       {
         "key": "durationS",
-        "value": -1,
+        "value": 0,
         "why": "below declared min"
       },
       {
@@ -9657,7 +9692,7 @@
       },
       {
         "key": "targetSizeKb",
-        "values": [0, 50, 100, null]
+        "values": [1, 51, 101, null]
       }
     ],
     "invalidProbes": [
@@ -9688,7 +9723,7 @@
       },
       {
         "key": "targetSizeKb",
-        "value": -1,
+        "value": 0,
         "why": "below declared min"
       },
       {
