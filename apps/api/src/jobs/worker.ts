@@ -116,7 +116,13 @@ import {
 import { createBullMQConnection } from "./connection.js";
 import { createMonotonicReporter } from "./monotonic-progress.js";
 import { resolveOutputSource } from "./output-resolve.js";
-import { autoSaveToLibrary, buildOutputName, generatePreview } from "./postprocess.js";
+import {
+  type AutoSaveTx,
+  buildOutputName,
+  generatePreview,
+  type StagedAutoSave,
+  stageAutoSaveToLibrary,
+} from "./postprocess.js";
 import { runSystemJob, SYSTEM_JOBS } from "./system-jobs.js";
 import {
   POOLS,
@@ -720,14 +726,18 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       // picks between an independent new file (default) and a superseding
       // version. Without a fileId this is a no-op, so tool-first uploads are
       // not auto-saved.
-      let savedFileId: string | undefined;
-      let autoSaveError: string | undefined;
+      //
+      // Staged here (upload blob, probe dimensions, claim finalize) and
+      // committed inside updateSingleFileProgressAtomically below so a
+      // completion-commit fault rolls back the version row and storage charge
+      // with the job (#2350).
+      let stagedSave: StagedAutoSave = {};
       if (resultBuffer) {
         // Re-check just before the library overwrite, the one write a cancel is
         // most costly to lose to (#2092). The save checks again up to its
-        // version row (#2143).
+        // finalize claim (#2143, #2349).
         if (wasUserCanceled(jobId)) throw new Error("Canceled");
-        const autoSaveResult = await autoSaveToLibrary({
+        stagedSave = await stageAutoSaveToLibrary({
           fileId: data.fileId,
           saveMode: data.saveMode,
           userId: data.userId,
@@ -738,8 +748,9 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
           jobId,
           userCancel,
         });
-        savedFileId = autoSaveResult.fileId;
-        autoSaveError = autoSaveResult.error;
+        if (stagedSave.finalizeClaimed) {
+          finalizeClaimed = true;
+        }
       } else if (data.fileId) {
         logger.info(
           { jobId, toolId: data.toolId, bytes: resultSize },
@@ -757,48 +768,67 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         originalSize,
         processedSize: resultSize,
         previewRef,
-        savedFileId,
-        autoSaveError,
+        ...(stagedSave.fileId && { savedFileId: stagedSave.fileId }),
+        ...(stagedSave.error && { autoSaveError: stagedSave.error }),
         resultPayload,
       };
       const legacyResult = buildLegacyResultPayload(jobResult, jobId);
 
-      // A library run that inserted a version row already claimed finalize
-      // before its insert (#2349) and must complete with that version (#2143).
-      // Every other run claims finalize here, right before the completion commit.
-      if (!savedFileId) {
+      // A library run that staged a save already claimed finalize before
+      // returning (#2349). Every other run claims finalize here, right before
+      // the completion commit.
+      if (!finalizeClaimed) {
         if (wasUserCanceled(jobId) || !(await claimFinalize(jobId))) {
           throw new Error("Canceled");
         }
         finalizeClaimed = true;
       }
 
-      // Commit the authoritative artifact row and client replay alias in one
-      // transaction before terminal Redis publication. A crash can no longer
-      // leave `completed` durable state without the exact result payload.
-      await updateSingleFileProgressAtomically(
-        {
-          jobId: progressJobId,
-          phase: "complete",
-          percent: 100,
-          stage: "complete",
-          result: legacyResult,
-        },
-        async (tx) => {
-          await tx
-            .update(schema.jobs)
-            .set({
-              status: "completed",
-              completedAt: new Date(),
-              durationMs,
-              bytesIn: originalSize,
-              bytesOut: resultSize,
-              outputRefs,
-              progress: { percent: 100, stage: "complete", result: legacyResult },
-            })
-            .where(eq(schema.jobs.id, jobId));
-        },
-      );
+      // Commit the authoritative artifact row, any staged library version row,
+      // and the client replay alias in one transaction before terminal Redis
+      // publication. A crash or commit fault can no longer leave `completed`
+      // durable state without the exact result payload or leave a version row
+      // behind an uncommitted job (#2350).
+      try {
+        await updateSingleFileProgressAtomically(
+          {
+            jobId: progressJobId,
+            phase: "complete",
+            percent: 100,
+            stage: "complete",
+            result: legacyResult,
+          },
+          async (tx) => {
+            if (stagedSave.commit) {
+              const committed = await stagedSave.commit(tx as AutoSaveTx);
+              if (committed.fileId) {
+                jobResult.savedFileId = committed.fileId;
+                legacyResult.savedFileId = committed.fileId;
+              }
+              if (committed.error) {
+                jobResult.autoSaveError = committed.error;
+                legacyResult.autoSaveError = committed.error;
+              }
+            }
+            await tx
+              .update(schema.jobs)
+              .set({
+                status: "completed",
+                completedAt: new Date(),
+                durationMs,
+                bytesIn: originalSize,
+                bytesOut: resultSize,
+                outputRefs,
+                progress: { percent: 100, stage: "complete", result: legacyResult },
+              })
+              .where(eq(schema.jobs.id, jobId));
+          },
+        );
+      } catch (commitErr) {
+        await stagedSave.onAbort?.();
+        throw commitErr;
+      }
+      await stagedSave.afterCommit?.();
 
       // The deadline fired under a handler that kept going, and the row now
       // carries the result it returned. Nothing else records the overrun, so

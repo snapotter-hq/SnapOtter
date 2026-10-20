@@ -11,10 +11,14 @@ import type { AutoSaveOpts } from "../../../apps/api/src/jobs/postprocess.js";
 const stubs = vi.hoisted(() => ({
   parent: null as Record<string, unknown> | null,
   inserted: [] as Record<string, unknown>[],
+  executedSql: [] as string[],
   saved: [] as string[],
   deleted: [] as string[],
+  saveError: null as Error | null,
   deleteError: null as Error | null,
   insertError: null as Error | null,
+  rollbackError: null as Error | null,
+  txCommitError: null as Error | null,
   quotaError: null as string | null,
   // Each one aborts from inside a step of the save, so a test can place the
   // cancel on either side of the checks under test.
@@ -35,6 +39,13 @@ vi.mock("../../../apps/api/src/jobs/cancel.js", () => ({
 
 vi.mock("../../../apps/api/src/db/index.js", () => {
   const tx = {
+    execute: async (query: unknown) => {
+      const text = String(query);
+      stubs.executedSql.push(text);
+      if (text.includes("ROLLBACK TO SAVEPOINT") && stubs.rollbackError) {
+        throw stubs.rollbackError;
+      }
+    },
     insert: () => ({
       values: async (row: Record<string, unknown>) => {
         stubs.abortDuringInsert?.abort();
@@ -58,7 +69,11 @@ vi.mock("../../../apps/api/src/db/index.js", () => {
           },
         }),
       }),
-      transaction: async <T>(fn: (t: typeof tx) => Promise<T>) => fn(tx),
+      transaction: async <T>(fn: (t: typeof tx) => Promise<T>) => {
+        const res = await fn(tx);
+        if (stubs.txCommitError) throw stubs.txCommitError;
+        return res;
+      },
     },
     schema: {
       jobs: {},
@@ -70,7 +85,7 @@ vi.mock("../../../apps/api/src/db/index.js", () => {
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(() => "eq"),
-  sql: vi.fn(() => "sql"),
+  sql: vi.fn((strings: TemplateStringsArray) => strings.join("?")),
 }));
 
 vi.mock("../../../apps/api/src/lib/quota.js", () => ({
@@ -93,6 +108,7 @@ vi.mock("sharp", () => ({
 
 vi.mock("../../../apps/api/src/lib/file-storage.js", () => ({
   saveFile: async (_buffer: Buffer, originalName: string) => {
+    if (stubs.saveError) throw stubs.saveError;
     const storedName = `stored-${originalName}`;
     stubs.saved.push(storedName);
     stubs.abortDuringSave?.abort();
@@ -110,7 +126,9 @@ vi.mock("../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
 const reportErrorMock = vi.hoisted(() => vi.fn());
 vi.mock("../../../apps/api/src/lib/error-report.js", () => ({ reportError: reportErrorMock }));
 
-const { autoSaveToLibrary } = await import("../../../apps/api/src/jobs/postprocess.js");
+const { autoSaveToLibrary, stageAutoSaveToLibrary } = await import(
+  "../../../apps/api/src/jobs/postprocess.js"
+);
 
 const PARENT = {
   id: "file-1",
@@ -137,10 +155,14 @@ function opts(extra: Partial<AutoSaveOpts> = {}): AutoSaveOpts {
 beforeEach(() => {
   stubs.parent = PARENT;
   stubs.inserted.length = 0;
+  stubs.executedSql.length = 0;
   stubs.saved.length = 0;
   stubs.deleted.length = 0;
+  stubs.saveError = null;
   stubs.deleteError = null;
   stubs.insertError = null;
+  stubs.rollbackError = null;
+  stubs.txCommitError = null;
   stubs.quotaError = null;
   stubs.abortDuringLookup = null;
   stubs.abortDuringSave = null;
@@ -557,5 +579,145 @@ describe("autoSaveToLibrary under a user cancel (#2143)", () => {
 
     expect(stubs.saved).toEqual([]);
     expect(stubs.inserted).toEqual([]);
+  });
+
+  it("discards the staged blob via onAbort when the outer completion transaction rolls back (#2350)", async () => {
+    const { db } = await import("../../../apps/api/src/db/index.js");
+    const staged = await stageAutoSaveToLibrary(opts({ userCancel: new AbortController().signal }));
+    expect(staged.finalizeClaimed).toBe(true);
+    expect(stubs.saved).toEqual(["stored-out.pdf"]);
+    expect(stubs.inserted).toEqual([]);
+
+    await expect(
+      db.transaction(async (tx) => {
+        const res = await staged.commit?.(tx);
+        expect(res?.fileId).toBeDefined();
+        throw new Error("outer completion commit failed");
+      }),
+    ).rejects.toThrow("outer completion commit failed");
+
+    await staged.onAbort?.();
+    // Calling onAbort a second time is a no-op rather than a duplicate delete.
+    await staged.onAbort?.();
+
+    expect(stubs.deleted).toEqual(["stored-out.pdf"]);
+    expect(loggerMock.warn).not.toHaveBeenCalled();
+    expect(loggerMock.error).not.toHaveBeenCalled();
+    expect(reportErrorMock).not.toHaveBeenCalled();
+  });
+
+  it("reports STAGED_DISCARD_FAILED with the cancel message when onAbort cannot remove the blob after a canceled commit fault (#2350)", async () => {
+    const { db } = await import("../../../apps/api/src/db/index.js");
+    const ac = new AbortController();
+    const staged = await stageAutoSaveToLibrary(opts({ userCancel: ac.signal }));
+    stubs.deleteError = new Error("injected storage outage");
+
+    await expect(
+      db.transaction(async (tx) => {
+        await staged.commit?.(tx);
+        ac.abort();
+        throw new Error("outer completion commit failed");
+      }),
+    ).rejects.toThrow("outer completion commit failed");
+
+    await staged.onAbort?.();
+
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      {
+        err: stubs.deleteError,
+        jobId: "job-1",
+        storedName: "stored-out.pdf",
+        fileId: "file-1",
+        toolId: "compress",
+      },
+      "canceled library auto-save could not remove its blob; it is an orphan",
+    );
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("wraps save queries in SAVEPOINT autosave_library and rethrows when ROLLBACK TO SAVEPOINT fails (#2350)", async () => {
+    const { db } = await import("../../../apps/api/src/db/index.js");
+    const stagedOk = await stageAutoSaveToLibrary(opts());
+    await db.transaction(async (tx) => {
+      await stagedOk.commit?.(tx);
+    });
+    expect(stubs.executedSql).toEqual([
+      "SAVEPOINT autosave_library",
+      "RELEASE SAVEPOINT autosave_library",
+    ]);
+
+    stubs.executedSql.length = 0;
+    stubs.insertError = new Error("fk violation");
+    const stagedRecover = await stageAutoSaveToLibrary(opts());
+    await db.transaction(async (tx) => {
+      const res = await stagedRecover.commit?.(tx);
+      expect(res?.error).toBe("An unexpected system error prevented saving to your library.");
+    });
+    expect(stubs.executedSql).toEqual([
+      "SAVEPOINT autosave_library",
+      "ROLLBACK TO SAVEPOINT autosave_library",
+      "RELEASE SAVEPOINT autosave_library",
+    ]);
+
+    // When ROLLBACK TO SAVEPOINT itself fails (connection lost / fatal tx error),
+    // commit(tx) rethrows the original error instead of returning normally so the
+    // outer transaction aborts with its root cause rather than a secondary 25P02.
+    stubs.executedSql.length = 0;
+    stubs.insertError = new Error("connection terminated");
+    stubs.rollbackError = new Error("cannot rollback savepoint");
+    const stagedFatal = await stageAutoSaveToLibrary(opts());
+    await expect(
+      db.transaction(async (tx) => {
+        await stagedFatal.commit?.(tx);
+      }),
+    ).rejects.toThrow("connection terminated");
+  });
+
+  it("handles a staging saveFile error, outer transaction commit rejection, and releaseFinalize warning (#2350)", async () => {
+    stubs.saveError = new Error("disk full during stage");
+    await expect(autoSaveToLibrary(opts())).resolves.toEqual({
+      error: "An unexpected system error prevented saving to your library.",
+    });
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ err: stubs.saveError }),
+      "library auto-save failed; no library copy was made",
+    );
+    expect(reportErrorMock).toHaveBeenCalledWith(stubs.saveError, {
+      source: "worker",
+      toolId: "compress",
+      jobId: "job-1",
+    });
+
+    stubs.saveError = null;
+    loggerMock.warn.mockReset();
+    loggerMock.error.mockReset();
+    reportErrorMock.mockReset();
+    stubs.txCommitError = new Error("outer COMMIT failed");
+    stubs.deleteError = new Error("unlink failed on commit error");
+    const releaseErr = new Error("redis release failed");
+    releaseFinalizeMock.mockRejectedValueOnce(releaseErr);
+
+    await expect(
+      autoSaveToLibrary(opts({ userCancel: new AbortController().signal })),
+    ).resolves.toEqual({
+      error: "An unexpected system error prevented saving to your library.",
+    });
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      { err: releaseErr, jobId: "job-1", toolId: "compress" },
+      "failed to release finalize claim after auto-save error",
+    );
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      expect.objectContaining({ err: stubs.deleteError, storedName: "stored-out.pdf" }),
+      "Failed to delete orphaned file after auto-save error",
+    );
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ err: stubs.txCommitError, storedName: "stored-out.pdf" }),
+      "library auto-save failed; no library copy was made",
+    );
+    expect(reportErrorMock).toHaveBeenCalledWith(stubs.txCommitError, {
+      source: "worker",
+      toolId: "compress",
+      jobId: "job-1",
+    });
   });
 });

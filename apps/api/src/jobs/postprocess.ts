@@ -254,24 +254,40 @@ async function discardStagedBlob(
   }
 }
 
+async function releaseStagedFinalize(opts: AutoSaveOpts): Promise<void> {
+  await releaseFinalize(opts.jobId).catch((releaseErr) => {
+    logger.warn(
+      { err: releaseErr, jobId: opts.jobId, toolId: opts.toolId },
+      "failed to release finalize claim after auto-save error",
+    );
+  });
+}
+
+export type AutoSaveTx = Pick<typeof db, "select" | "insert" | "update"> & {
+  execute?: typeof db.execute;
+};
+
+export interface StagedAutoSave {
+  fileId?: string;
+  error?: string;
+  finalizeClaimed?: boolean;
+  commit?: (tx: AutoSaveTx) => Promise<{ fileId?: string; error?: string }>;
+  afterCommit?: (releaseClaim?: boolean) => Promise<{ fileId?: string; error?: string }>;
+  onAbort?: (unhandledTxErr?: unknown) => Promise<void>;
+}
+
 /**
- * Auto-save a processed output to the persistent user file library when a
- * fileId is provided. The tool is appended to the parent's toolChain either
- * way; saveMode decides the linkage (issue #495):
- *   - "new" (default): independent root row (version 1, no parentId), so the
- *     original stays visible in the leaf-only library list.
- *   - "overwrite": new version linked to the parent (version + 1, parentId),
- *     which supersedes the original in the list.
- *
- * Returns `{ fileId }` on success, `{ error }` when over quota or on a save
- * failure, or `{}` when there is no fileId or no such file of the requester's.
- * Rejects when a user cancel landed before the version row (#2143): with
- * "Canceled", or with the save's own error if it failed meanwhile. Either way
- * the worker's catch settles the job canceled instead of completing it.
+ * Stage a library auto-save outside the job's completion transaction (parent
+ * lookup, blob upload, dimension probe, and finalize claim), returning hooks
+ * that insert the `user_files` row and charge `users.storage_used` inside the
+ * caller's transaction (#2350):
+ *   - `commit(tx)` runs the quota lock-and-check, row insert, and storage charge.
+ *   - `afterCommit()` discards the staged blob and reports any save-only fault
+ *     when the save was skipped inside a transaction that still committed.
+ *   - `onAbort()` discards the staged blob and reports any save fault when the
+ *     enclosing transaction rolled back.
  */
-export async function autoSaveToLibrary(
-  opts: AutoSaveOpts,
-): Promise<{ fileId?: string; error?: string }> {
+export async function stageAutoSaveToLibrary(opts: AutoSaveOpts): Promise<StagedAutoSave> {
   if (!opts.fileId) return {};
 
   let storedName: string | undefined;
@@ -293,6 +309,7 @@ export async function autoSaveToLibrary(
     // another user's file via a known fileId.
     if (!parentUserId || parentUserId !== opts.userId) return {};
 
+    const fileId = opts.fileId;
     const overwrite = opts.saveMode === "overwrite";
     const parentChain: string[] = parent.toolChain ?? [];
     const newToolChain = [...parentChain, opts.toolId];
@@ -328,7 +345,7 @@ export async function autoSaveToLibrary(
     }
 
     // The last point a cancel can stop the save (#2143, #2349). Past it the
-    // version row goes in, and a cancel is too late.
+    // version row goes in with the completion commit, and a cancel is too late.
     if (opts.userCancel && (opts.userCancel.aborted || !(await claimFinalize(opts.jobId)))) {
       await discardStagedBlob(
         opts,
@@ -339,57 +356,204 @@ export async function autoSaveToLibrary(
     }
     finalizeClaimed = Boolean(opts.userCancel);
 
+    const stagedBlobName = storedName;
     const newId = randomUUID();
-    const result = await db.transaction(async (tx) => {
-      const overQuota = await quotaRefusal(tx, parentUserId, opts.buffer.length, true);
-      if (overQuota) return { error: overQuota };
+    let commitOutcome:
+      | { kind: "none" }
+      | { kind: "saved"; fileId: string }
+      | { kind: "quota"; error: string }
+      | { kind: "error"; err: unknown; error: string } = { kind: "none" };
+    let blobCleaned = false;
 
-      await tx.insert(schema.userFiles).values({
-        id: newId,
-        userId: parentUserId,
-        originalName: opts.outName,
-        storedName: storedName as string,
-        mimeType: opts.contentType,
-        size: opts.buffer.length,
-        width,
-        height,
-        version: overwrite ? parent.version + 1 : 1,
-        parentId: overwrite ? opts.fileId : null,
-        toolChain: newToolChain,
-      });
+    const discardOnce = async (logMessage: string): Promise<void> => {
+      if (blobCleaned) return;
+      blobCleaned = true;
+      await discardStagedBlob(opts, stagedBlobName, logMessage);
+    };
 
-      await tx
-        .update(schema.users)
-        .set({ storageUsed: sql`${schema.users.storageUsed} + ${opts.buffer.length}` })
-        .where(eq(schema.users.id, parentUserId));
-
-      return { fileId: newId };
-    });
-
-    if (result.error) {
-      if (finalizeClaimed) {
-        await releaseFinalize(opts.jobId).catch(() => {});
-        finalizeClaimed = false;
+    const runSaveQueries = async (tx: AutoSaveTx): Promise<{ fileId?: string; error?: string }> => {
+      const runSql = typeof tx.execute === "function" ? tx.execute.bind(tx) : undefined;
+      if (runSql) {
+        await runSql(sql`SAVEPOINT autosave_library`);
       }
-      if (storedName) {
-        await discardStagedBlob(
-          opts,
-          storedName,
-          "Failed to delete orphaned file during quota rejection",
+      try {
+        const overQuota = await quotaRefusal(tx, parentUserId, opts.buffer.length, true);
+        if (overQuota) {
+          if (runSql) {
+            await runSql(sql`RELEASE SAVEPOINT autosave_library`);
+          }
+          return { error: overQuota };
+        }
+
+        await tx.insert(schema.userFiles).values({
+          id: newId,
+          userId: parentUserId,
+          originalName: opts.outName,
+          storedName: stagedBlobName,
+          mimeType: opts.contentType,
+          size: opts.buffer.length,
+          width,
+          height,
+          version: overwrite ? parent.version + 1 : 1,
+          parentId: overwrite ? fileId : null,
+          toolChain: newToolChain,
+        });
+
+        await tx
+          .update(schema.users)
+          .set({ storageUsed: sql`${schema.users.storageUsed} + ${opts.buffer.length}` })
+          .where(eq(schema.users.id, parentUserId));
+
+        if (runSql) {
+          await runSql(sql`RELEASE SAVEPOINT autosave_library`);
+        }
+        return { fileId: newId };
+      } catch (err) {
+        let savepointRecovered = !runSql;
+        if (runSql) {
+          try {
+            await runSql(sql`ROLLBACK TO SAVEPOINT autosave_library`);
+            await runSql(sql`RELEASE SAVEPOINT autosave_library`).catch(() => {});
+            savepointRecovered = true;
+          } catch {
+            savepointRecovered = false;
+          }
+        }
+        if (!savepointRecovered) {
+          throw Object.assign(err instanceof Error ? err : new Error(String(err)), {
+            _txAborted: true,
+          });
+        }
+        throw err;
+      }
+    };
+
+    return {
+      finalizeClaimed,
+      commit: async (tx: AutoSaveTx) => {
+        try {
+          const res = await runSaveQueries(tx);
+          if (res.error) {
+            commitOutcome = { kind: "quota", error: res.error };
+            if (opts.userCancel?.aborted) {
+              throw new AutoSaveCanceledError();
+            }
+            return res;
+          }
+          commitOutcome = { kind: "saved", fileId: newId };
+          return res;
+        } catch (err) {
+          if (err instanceof AutoSaveCanceledError) throw err;
+          // If ROLLBACK TO SAVEPOINT failed, the enclosing transaction cannot
+          // execute any more statements; rethrow the original fault when the
+          // user did not cancel so the outer transaction fails with its real
+          // cause instead of a secondary 25P02 on the next query.
+          if ((err as { _txAborted?: boolean })?._txAborted && !opts.userCancel?.aborted) {
+            throw err;
+          }
+          commitOutcome = {
+            kind: "error",
+            err,
+            error: "An unexpected system error prevented saving to your library.",
+          };
+          if (opts.userCancel?.aborted) {
+            throw err;
+          }
+          return { error: commitOutcome.error };
+        }
+      },
+      afterCommit: async (releaseClaim = false) => {
+        if (commitOutcome.kind === "saved") {
+          return { fileId: commitOutcome.fileId };
+        }
+        if (commitOutcome.kind === "quota") {
+          if (releaseClaim && finalizeClaimed) {
+            await releaseStagedFinalize(opts);
+            finalizeClaimed = false;
+          }
+          await discardOnce("Failed to delete orphaned file during quota rejection");
+          return { error: commitOutcome.error };
+        }
+        if (commitOutcome.kind === "error") {
+          if (releaseClaim && finalizeClaimed) {
+            await releaseStagedFinalize(opts);
+            finalizeClaimed = false;
+          }
+          await discardOnce("Failed to delete orphaned file after auto-save error");
+          logger.warn(
+            {
+              err: commitOutcome.err,
+              jobId: opts.jobId,
+              storedName: stagedBlobName,
+              fileId: opts.fileId,
+              toolId: opts.toolId,
+            },
+            "library auto-save failed; no library copy was made",
+          );
+          await reportError(commitOutcome.err as Error, {
+            source: "worker",
+            toolId: opts.toolId,
+            jobId: opts.jobId,
+          });
+          return { error: commitOutcome.error };
+        }
+        return {};
+      },
+      onAbort: async (unhandledTxErr?: unknown) => {
+        if (commitOutcome.kind === "quota") {
+          await discardOnce("Failed to delete orphaned file during quota rejection");
+          return;
+        }
+        if (commitOutcome.kind === "error") {
+          await discardOnce("Failed to delete orphaned file after auto-save error");
+          logger.warn(
+            {
+              err: commitOutcome.err,
+              jobId: opts.jobId,
+              storedName: stagedBlobName,
+              fileId: opts.fileId,
+              toolId: opts.toolId,
+            },
+            "library auto-save failed; no library copy was made",
+          );
+          await reportError(commitOutcome.err as Error, {
+            source: "worker",
+            toolId: opts.toolId,
+            jobId: opts.jobId,
+          });
+          return;
+        }
+        await discardOnce(
+          opts.userCancel?.aborted
+            ? "canceled library auto-save could not remove its blob; it is an orphan"
+            : "Failed to delete orphaned file after auto-save error",
         );
-      }
-      if (opts.userCancel?.aborted) throw new AutoSaveCanceledError();
-      return result;
-    }
-
-    return result;
+        if (unhandledTxErr !== undefined && !(unhandledTxErr instanceof AutoSaveCanceledError)) {
+          logger.warn(
+            {
+              err: unhandledTxErr,
+              jobId: opts.jobId,
+              storedName: stagedBlobName,
+              fileId: opts.fileId,
+              toolId: opts.toolId,
+            },
+            "library auto-save failed; no library copy was made",
+          );
+          await reportError(unhandledTxErr as Error, {
+            source: "worker",
+            toolId: opts.toolId,
+            jobId: opts.jobId,
+          });
+        }
+      },
+    };
   } catch (err) {
     // The save stopped for a cancel and has dealt with its blob (removed, or
     // logged as an orphan). The worker's catch settles the job canceled and
     // removes its outputs (#2143).
     if (err instanceof AutoSaveCanceledError) throw err;
     if (finalizeClaimed) {
-      await releaseFinalize(opts.jobId).catch(() => {});
+      await releaseStagedFinalize(opts);
     }
     if (storedName) {
       await discardStagedBlob(
@@ -414,4 +578,47 @@ export async function autoSaveToLibrary(
     // downloadable without a library copy.
     return { error: "An unexpected system error prevented saving to your library." };
   }
+}
+
+/**
+ * Auto-save a processed output to the persistent user file library when a
+ * fileId is provided. The tool is appended to the parent's toolChain either
+ * way; saveMode decides the linkage (issue #495):
+ *   - "new" (default): independent root row (version 1, no parentId), so the
+ *     original stays visible in the leaf-only library list.
+ *   - "overwrite": new version linked to the parent (version + 1, parentId),
+ *     which supersedes the original in the list.
+ *
+ * Returns `{ fileId }` on success, `{ error }` when over quota or on a save
+ * failure, or `{}` when there is no fileId or no such file of the requester's.
+ * Rejects when a user cancel landed before the version row (#2143): with
+ * "Canceled", or with the save's own error if it failed meanwhile. Either way
+ * the worker's catch settles the job canceled instead of completing it.
+ */
+export async function autoSaveToLibrary(
+  opts: AutoSaveOpts,
+): Promise<{ fileId?: string; error?: string }> {
+  const staged = await stageAutoSaveToLibrary(opts);
+  const commit = staged.commit;
+  if (!commit) {
+    return {
+      ...(staged.fileId && { fileId: staged.fileId }),
+      ...(staged.error && { error: staged.error }),
+    };
+  }
+  try {
+    await db.transaction(async (tx) => {
+      await commit(tx as unknown as AutoSaveTx);
+    });
+  } catch (err) {
+    if (staged.finalizeClaimed && !(err instanceof AutoSaveCanceledError)) {
+      await releaseStagedFinalize(opts);
+    }
+    await staged.onAbort?.(err);
+    if (err instanceof AutoSaveCanceledError || opts.userCancel?.aborted) {
+      throw err;
+    }
+    return { error: "An unexpected system error prevented saving to your library." };
+  }
+  return (await staged.afterCommit?.(true)) ?? {};
 }

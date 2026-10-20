@@ -92,6 +92,7 @@ vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
 const completionFault = vi.hoisted(() => ({
   jobId: null as string | null,
   before: null as (() => Promise<void>) | null,
+  afterCommit: null as (() => Promise<void>) | null,
 }));
 
 vi.mock("../../../apps/api/src/routes/progress.js", async (importOriginal) => {
@@ -110,13 +111,19 @@ vi.mock("../../../apps/api/src/routes/progress.js", async (importOriginal) => {
     ) => {
       if (frame.jobId === completionFault.jobId) {
         const before = completionFault.before;
+        const afterCommit = completionFault.afterCommit;
         completionFault.jobId = null;
         completionFault.before = null;
+        completionFault.afterCommit = null;
         if (before) {
           await before();
           return actual.updateSingleFileProgressAtomically(frame, commit);
         }
-        throw new Error("injected completion outage");
+        return actual.updateSingleFileProgressAtomically(frame, async (tx) => {
+          await commit(tx);
+          await afterCommit?.();
+          throw new Error("injected completion outage");
+        });
       }
       return actual.updateSingleFileProgressAtomically(frame, commit);
     },
@@ -956,6 +963,207 @@ describe("requestCancel through a single-tool alias (#808)", () => {
       expect(await listObjects(`outputs/${jobId}/`)).toHaveLength(1);
     } finally {
       txSpy.mockRestore();
+    }
+  });
+
+  it("rolls back the library version row and discards its staged blob when the completion commit faults, so the retry saves only one version (#2350)", async () => {
+    const owner = await createOwner();
+    const fileId = await createLibraryFile(owner);
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    const savedBlobs: string[] = [];
+    librarySaveHook.after = async (storedName) => {
+      savedBlobs.push(storedName);
+      // Re-arm for attempt 2 so both attempts' blobs are tracked.
+      librarySaveHook.after = async (retryStoredName) => {
+        savedBlobs.push(retryStoredName);
+      };
+    };
+    completionFault.jobId = clientJobId;
+    try {
+      await enqueueSingleRun({
+        mode: "fast",
+        tag: "commit-fault-retry-save",
+        clientJobId,
+        jobId,
+        userId: owner,
+        fileId,
+        saveMode: "overwrite",
+      });
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("completed");
+      expect(row.attempts).toBe(2);
+      expect((await terminalRow(clientJobId)).status).toBe("completed");
+
+      const versions = await db
+        .select()
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.parentId, fileId));
+      expect(versions).toHaveLength(1);
+      expect(versions[0]).toMatchObject({ userId: owner, version: 2 });
+
+      const [user] = await db.select().from(schema.users).where(eq(schema.users.id, owner));
+      expect(user?.storageUsed).toBe(7);
+
+      expect(savedBlobs).toHaveLength(2);
+      await expect(readStoredFile(savedBlobs[0] ?? "")).rejects.toMatchObject({ code: "ENOENT" });
+      await expect(readStoredFile(savedBlobs[1] ?? "")).resolves.toBeInstanceOf(Buffer);
+      expect(versions[0]?.storedName).toBe(savedBlobs[1]);
+      expect(
+        (row.progress as { result?: { savedFileId?: string } } | null)?.result?.savedFileId,
+      ).toBe(versions[0]?.id);
+    } finally {
+      librarySaveHook.after = null;
+      completionFault.jobId = null;
+    }
+  });
+
+  it("leaves no version row or staged blob behind when attempt 1's completion commit faults and attempt 2 is canceled (#2350)", async () => {
+    const owner = await createOwner();
+    const fileId = await createLibraryFile(owner);
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    const hook = { firstBlob: null as string | null };
+    librarySaveHook.after = async (storedName) => {
+      hook.firstBlob = storedName;
+    };
+    completionFault.jobId = clientJobId;
+    try {
+      await enqueueSingleRun({
+        mode: "retry-slow",
+        tag: "commit-fault-then-cancel-save",
+        clientJobId,
+        jobId,
+        userId: owner,
+        fileId,
+        saveMode: "overwrite",
+      });
+      await waitFor(async () =>
+        invoked.filter((t) => t === "commit-fault-then-cancel-save").length === 2
+          ? true
+          : undefined,
+      );
+
+      expect(await requestCancel(clientJobId)).toBe(true);
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("canceled");
+      expect(row.attempts).toBe(2);
+      expect((await terminalRow(clientJobId)).status).toBe("canceled");
+
+      const files = await db
+        .select()
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.userId, owner));
+      expect(files.map((f) => f.id)).toEqual([fileId]);
+      const [user] = await db.select().from(schema.users).where(eq(schema.users.id, owner));
+      expect(user?.storageUsed).toBe(0);
+      if (!hook.firstBlob) throw new Error("attempt 1 never staged its library blob");
+      await expect(readStoredFile(hook.firstBlob)).rejects.toMatchObject({ code: "ENOENT" });
+      expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
+    } finally {
+      librarySaveHook.after = null;
+      completionFault.jobId = null;
+    }
+  });
+
+  it("rolls back the version row and discards its staged blob when a cancel coincides with a completion-commit fault (#2350)", async () => {
+    const owner = await createOwner();
+    const fileId = await createLibraryFile(owner);
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    const hook = { storedName: null as string | null };
+    librarySaveHook.after = async (storedName) => {
+      hook.storedName = storedName;
+    };
+    completionFault.jobId = clientJobId;
+    completionFault.afterCommit = async () => {
+      await sharedRedis().publish(`${bullPrefix()}:cancel`, jobId);
+      await waitFor(async () => (wasUserCanceled(jobId) ? true : undefined));
+    };
+    try {
+      await enqueueSingleRun({
+        mode: "fast",
+        tag: "cancel-on-commit-fault-save",
+        clientJobId,
+        jobId,
+        userId: owner,
+        fileId,
+        saveMode: "overwrite",
+      });
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("canceled");
+      expect(row.attempts).toBe(1);
+      expect((await terminalRow(clientJobId)).status).toBe("canceled");
+
+      const files = await db
+        .select()
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.userId, owner));
+      expect(files.map((f) => f.id)).toEqual([fileId]);
+      const [user] = await db.select().from(schema.users).where(eq(schema.users.id, owner));
+      expect(user?.storageUsed).toBe(0);
+      if (!hook.storedName) throw new Error("the library save never staged its blob");
+      await expect(readStoredFile(hook.storedName)).rejects.toMatchObject({ code: "ENOENT" });
+      expect(await listObjects(`outputs/${jobId}/`)).toEqual([]);
+    } finally {
+      librarySaveHook.after = null;
+      completionFault.jobId = null;
+      completionFault.afterCommit = null;
+    }
+  });
+
+  it("recovers via the savepoint and completes with autoSaveError when the save query faults inside the completion transaction (#2350)", async () => {
+    const owner = await createOwner();
+    const fileId = await createLibraryFile(owner);
+    const clientJobId = randomUUID();
+    const jobId = randomUUID();
+    const hook = { storedName: null as string | null };
+    librarySaveHook.after = async (storedName) => {
+      hook.storedName = storedName;
+      // Deleting the user after staging looked up the parent makes
+      // tx.insert(schema.userFiles) fail with a 23503 foreign-key violation
+      // inside updateSingleFileProgressAtomically (jobs.user_id is ON DELETE
+      // SET NULL, so the job rows stay). SAVEPOINT autosave_library must
+      // recover the transaction so the job still commits as completed.
+      await db.delete(schema.users).where(eq(schema.users.id, owner));
+    };
+    const warnLog = vi.spyOn(logger, "warn");
+    try {
+      await enqueueSingleRun({
+        mode: "fast",
+        tag: "owner-deleted-before-commit",
+        clientJobId,
+        jobId,
+        userId: owner,
+        fileId,
+        saveMode: "overwrite",
+      });
+
+      const row = await terminalRow(jobId);
+      expect(row.status).toBe("completed");
+      expect(row.attempts).toBe(1);
+      expect((await terminalRow(clientJobId)).status).toBe("completed");
+      const result = (row.progress as { result?: { savedFileId?: string; autoSaveError?: string } })
+        ?.result;
+      expect(result?.savedFileId).toBeUndefined();
+      expect(result?.autoSaveError).toBe(
+        "An unexpected system error prevented saving to your library.",
+      );
+      if (!hook.storedName) throw new Error("the library save never staged its blob");
+      await expect(readStoredFile(hook.storedName)).rejects.toMatchObject({ code: "ENOENT" });
+      expect(
+        warnLog.mock.calls.filter(
+          ([ctx, msg]) =>
+            msg === "library auto-save failed; no library copy was made" &&
+            (ctx as { jobId?: string }).jobId === jobId,
+        ),
+      ).toHaveLength(1);
+    } finally {
+      librarySaveHook.after = null;
+      warnLog.mockRestore();
     }
   });
 

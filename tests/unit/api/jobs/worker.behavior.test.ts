@@ -149,6 +149,7 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
     autoSaveToLibrary: vi.fn(),
     buildOutputName: vi.fn(),
     generatePreview: vi.fn(),
+    stageAutoSaveToLibrary: vi.fn().mockResolvedValue({}),
   }));
 
   vi.doMock("../../../../apps/api/src/jobs/system-jobs.js", () => ({
@@ -508,6 +509,7 @@ describe("worker result payload behavior", () => {
         autoSaveToLibrary: vi.fn().mockResolvedValue({}),
         buildOutputName: vi.fn((out: string) => out),
         generatePreview: generatePreviewMock,
+        stageAutoSaveToLibrary: vi.fn().mockResolvedValue({}),
       }));
       vi.doMock("@snapotter/media-engine", () => ({
         HW_ACCEL_FAMILIES: [],
@@ -673,8 +675,9 @@ describe("worker result payload behavior", () => {
     wasUserCanceledMock.mockReturnValue(false);
 
     // 6. A completion-commit fault releases the finalize claim on a retryable
-    // attempt (logging a warning if releaseFinalize rejects), but keeps the
-    // claim on a final attempt or once autoSaveToLibrary committed a version row (#2349).
+    // attempt (logging a warning if releaseFinalize rejects), including when
+    // stageAutoSaveToLibrary claimed finalize before the rolled-back commit
+    // (#2349, #2350), and keeps the claim on a final attempt.
     releaseFinalizeMock.mockClear();
     (logger.warn as ReturnType<typeof vi.fn>).mockClear();
     const releaseErr = new Error("redis blip");
@@ -708,8 +711,15 @@ describe("worker result payload behavior", () => {
     expect(releaseFinalizeMock).not.toHaveBeenCalled();
 
     const postprocessMod = await import("../../../../apps/api/src/jobs/postprocess.js");
-    (postprocessMod.autoSaveToLibrary as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      fileId: "saved-v2",
+    const stageAutoSaveMock = postprocessMod.stageAutoSaveToLibrary as ReturnType<typeof vi.fn>;
+    const saveCommitMock = vi.fn().mockResolvedValue({ fileId: "saved-v2" });
+    const saveAfterCommitMock = vi.fn().mockResolvedValue({ fileId: "saved-v2" });
+    const saveOnAbortMock = vi.fn().mockResolvedValue(undefined);
+    stageAutoSaveMock.mockResolvedValueOnce({
+      finalizeClaimed: true,
+      commit: saveCommitMock,
+      afterCommit: saveAfterCommitMock,
+      onAbort: saveOnAbortMock,
     });
     claimFinalizeMock.mockClear();
     releaseFinalizeMock.mockClear();
@@ -726,7 +736,121 @@ describe("worker result payload behavior", () => {
       }),
     ).rejects.toThrow("commit after save failed");
     expect(claimFinalizeMock).not.toHaveBeenCalled();
-    expect(releaseFinalizeMock).not.toHaveBeenCalled();
+    expect(saveOnAbortMock).toHaveBeenCalledTimes(1);
+    expect(saveAfterCommitMock).not.toHaveBeenCalled();
+    expect(releaseFinalizeMock).toHaveBeenCalledWith("job-saved-commit-fault");
+
+    // 7. When the completion transaction succeeds, stageAutoSaveToLibrary's
+    // commit callback runs inside updateSingleFileProgressAtomically and
+    // stamps savedFileId onto both the job row's progress and the returned
+    // ToolJobResult (#2350).
+    stageAutoSaveMock.mockResolvedValueOnce({
+      finalizeClaimed: true,
+      commit: saveCommitMock,
+      afterCommit: saveAfterCommitMock,
+      onAbort: saveOnAbortMock,
+    });
+    saveCommitMock.mockClear();
+    saveAfterCommitMock.mockClear();
+    saveOnAbortMock.mockClear();
+    dbSetMock.mockClear();
+    const txStub = {
+      update: vi.fn(() => ({ set: dbSetMock })),
+    };
+    atomicCommitMock.mockImplementationOnce(
+      async (_frame: unknown, mutate: (tx: unknown) => Promise<void>) => {
+        await mutate(txStub);
+      },
+    );
+    processV2Mock.mockResolvedValueOnce({
+      buffer: Buffer.from("out-bytes"),
+      filename: "out.jpg",
+      contentType: "image/jpeg",
+    });
+    const completedSaved = (await processor(makeJob("job-saved-commit-ok"))) as {
+      savedFileId?: string;
+    };
+    expect(saveCommitMock).toHaveBeenCalledWith(txStub);
+    expect(saveAfterCommitMock).toHaveBeenCalledTimes(1);
+    expect(saveOnAbortMock).not.toHaveBeenCalled();
+    expect(completedSaved.savedFileId).toBe("saved-v2");
+    expect(dbSetMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        status: "completed",
+        progress: expect.objectContaining({
+          result: expect.objectContaining({ savedFileId: "saved-v2" }),
+        }),
+      }),
+    );
+
+    // 8. When stagedSave.commit(tx) returns an error (quota refusal or caught
+    // save fault) or stageAutoSaveToLibrary returns a staging error,
+    // autoSaveError propagates onto both the job row's progress and the
+    // returned ToolJobResult (#2350).
+    const quotaError = "Storage quota exceeded. Please delete some files.";
+    const saveQuotaCommitMock = vi.fn().mockResolvedValue({ error: quotaError });
+    const saveQuotaAfterCommitMock = vi.fn().mockResolvedValue({ error: quotaError });
+    stageAutoSaveMock.mockResolvedValueOnce({
+      finalizeClaimed: true,
+      commit: saveQuotaCommitMock,
+      afterCommit: saveQuotaAfterCommitMock,
+      onAbort: saveOnAbortMock,
+    });
+    dbSetMock.mockClear();
+    atomicCommitMock.mockImplementationOnce(
+      async (_frame: unknown, mutate: (tx: unknown) => Promise<void>) => {
+        await mutate(txStub);
+      },
+    );
+    processV2Mock.mockResolvedValueOnce({
+      buffer: Buffer.from("out-bytes"),
+      filename: "out.jpg",
+      contentType: "image/jpeg",
+    });
+    const completedQuota = (await processor(makeJob("job-saved-quota"))) as {
+      savedFileId?: string;
+      autoSaveError?: string;
+    };
+    expect(saveQuotaCommitMock).toHaveBeenCalledWith(txStub);
+    expect(saveQuotaAfterCommitMock).toHaveBeenCalledWith();
+    expect(completedQuota.savedFileId).toBeUndefined();
+    expect(completedQuota.autoSaveError).toBe(quotaError);
+    expect(dbSetMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        status: "completed",
+        progress: expect.objectContaining({
+          result: expect.objectContaining({ autoSaveError: quotaError }),
+        }),
+      }),
+    );
+
+    const stageError = "An unexpected system error prevented saving to your library.";
+    stageAutoSaveMock.mockResolvedValueOnce({ error: stageError });
+    claimFinalizeMock.mockClear();
+    dbSetMock.mockClear();
+    atomicCommitMock.mockImplementationOnce(
+      async (_frame: unknown, mutate: (tx: unknown) => Promise<void>) => {
+        await mutate(txStub);
+      },
+    );
+    processV2Mock.mockResolvedValueOnce({
+      buffer: Buffer.from("out-bytes"),
+      filename: "out.jpg",
+      contentType: "image/jpeg",
+    });
+    const completedStageErr = (await processor(makeJob("job-saved-stage-err"))) as {
+      autoSaveError?: string;
+    };
+    expect(claimFinalizeMock).toHaveBeenCalledWith("job-saved-stage-err");
+    expect(completedStageErr.autoSaveError).toBe(stageError);
+    expect(dbSetMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        status: "completed",
+        progress: expect.objectContaining({
+          result: expect.objectContaining({ autoSaveError: stageError }),
+        }),
+      }),
+    );
   });
 
   it("arms a fresh upload timeout signal after the handler returns for streamed primary and extra outputs (#2295)", async () => {
@@ -785,6 +909,7 @@ describe("worker result payload behavior", () => {
           autoSaveToLibrary: vi.fn().mockResolvedValue({}),
           buildOutputName: vi.fn((out: string) => out),
           generatePreview: vi.fn().mockResolvedValue(undefined),
+          stageAutoSaveToLibrary: vi.fn().mockResolvedValue({}),
         }));
         vi.doMock("@snapotter/media-engine", () => ({
           HW_ACCEL_FAMILIES: [],
