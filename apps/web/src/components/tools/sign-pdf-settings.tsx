@@ -299,12 +299,21 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     // a reorder, and leaves alone a fresh file that took the slot.
     const capturedEntryId = useFileStore.getState().entries[capturedIndex]?.id;
 
+    let runFailed = false;
+    let settled = false;
+    let landed = false;
+    let landingResult = false;
+
     const failEntry = (message: string, category?: FeedbackErrorCategory) => {
       try {
         if (!capturedEntryId) return;
         const { entries, updateEntryById } = useFileStore.getState();
-        if (entries.find((e) => e.id === capturedEntryId)?.status === "pending") {
+        const status = entries.find((e) => e.id === capturedEntryId)?.status;
+        if (status && (status !== "completed" || !landingResult)) {
           updateEntryById(capturedEntryId, {
+            processedUrl: null,
+            processedPreviewUrl: null,
+            processedFilename: null,
             status: "failed",
             error: message,
             errorCategory: category ?? null,
@@ -326,28 +335,6 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       }
     };
 
-    setError(null);
-    if (useFileStore.getState().error !== null) {
-      useFileStore.getState().setError(null);
-    }
-    setDownloadUrl(null);
-    setStaleEntryId(null);
-    setProgress(0);
-    setProcessing(true);
-    // The state above draws this panel; the copy below is what the navigation
-    // guard reads, and it is the only reason the store is touched here.
-    // Clearing the entry's result also clears its claim (see the `claimed`
-    // invariant in file-store), so a second run cannot inherit the first's.
-    useFileStore.getState().setProcessing(true);
-    runOwnedRef.current = true;
-    useFileStore.getState().updateEntry(capturedIndex, {
-      processedUrl: null,
-      processedPreviewUrl: null,
-      processedFilename: null,
-      status: "pending",
-      error: null,
-    });
-
     /** Both copies of the flag, together. One cleared without the other leaves
      *  the guard warning about a run that is over, with no way to answer it. */
     const endRun = () => {
@@ -368,15 +355,11 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
      * run ends must not leave the entry pending. The first teardown error is
      * rethrown after it, so it still surfaces; the entry write itself logs and
      * reports instead of throwing. The entry is found by id, so a reorder or a
-     * fresh file in the slot can't redirect the failure, and only the
-     * "pending" the run reset it to is failed: an entry already holding this
-     * run's result keeps it. Once per run: the progress stream calls onFailed
-     * again as a tracking failure when the first call throws, and that retry
-     * must not replace the server's message (#2498).
+     * fresh file in the slot can't redirect the failure, and an entry already
+     * holding this run's result keeps it. Once per run: the progress stream
+     * calls onFailed again as a tracking failure when the first call throws,
+     * and that retry must not replace the server's message (#2498).
      */
-    let runFailed = false;
-    let settled = false;
-    let landed = false;
     const failRun = (message: string, category?: FeedbackErrorCategory) => {
       if (runFailed) return;
       runFailed = true;
@@ -392,6 +375,45 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       failEntry(message, category);
       if (teardown) throw teardown.cause;
     };
+
+    setError(null);
+    setDownloadUrl(null);
+    setProgress(0);
+    setProcessing(true);
+    runOwnedRef.current = true;
+    try {
+      if (useFileStore.getState().error !== null) {
+        useFileStore.getState().setError(null);
+        if (!runOwnedRef.current) return;
+      }
+      // The state above draws this panel; the copy below is what the navigation
+      // guard reads, and it is the only reason the store is touched here.
+      // Clearing the entry's result also clears its claim (see the `claimed`
+      // invariant in file-store), so a second run cannot inherit the first's.
+      useFileStore.getState().setProcessing(true);
+      if (!runOwnedRef.current) return;
+      if (capturedEntryId) {
+        useFileStore.getState().updateEntryById(capturedEntryId, {
+          processedUrl: null,
+          processedPreviewUrl: null,
+          processedFilename: null,
+          status: "pending",
+          error: null,
+        });
+        if (!runOwnedRef.current) return;
+      }
+      setStaleEntryId(null);
+    } catch (err) {
+      if (runOwnedRef.current) {
+        try {
+          failRun(jobFailureMessage({ reason: "trackingFailed" }, t.errors), "processing_error");
+        } catch (teardownErr) {
+          console.error("Ending the run after a start error failed", teardownErr);
+          reportRunEndFailure("Ending a tool run after its start failed", teardownErr, "sign-pdf");
+        }
+      }
+      throw err;
+    }
 
     const exported = await canvas.exportPlacements().catch((cause: unknown) => {
       // Without this the run never ends: the button stays disabled and the
@@ -422,6 +444,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     const landResult = (r: SignResult) => {
       if (settled) return;
       settled = true;
+      landingResult = true;
       const url = r.downloadUrl;
       if (capturedEntryId) {
         useFileStore.getState().updateEntryById(capturedEntryId, {

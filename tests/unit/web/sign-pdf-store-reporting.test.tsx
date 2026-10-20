@@ -918,6 +918,278 @@ describe("sign-pdf tells its own failures apart from a bad response", () => {
       .mockImplementation(realUpdateEntry);
   }
 
+  function takeOverUnhandledRejections() {
+    const saved = process.listeners("unhandledRejection");
+    const rejections: unknown[] = [];
+    const onRejection = (reason: unknown) => {
+      rejections.push(reason);
+    };
+    process.removeAllListeners("unhandledRejection");
+    process.on("unhandledRejection", onRejection);
+    return {
+      rejections,
+      restore() {
+        process.off("unhandledRejection", onRejection);
+        for (const listener of saved) process.on("unhandledRejection", listener);
+      },
+    };
+  }
+
+  it("ends the run when resetting the entry at kickoff throws (#2510)", async () => {
+    const unhandled = takeOverUnhandledRejections();
+    const exportPlacements = vi.fn(async () => ({
+      pngs: [new Blob(["png"], { type: "image/png" })],
+      placements: [PLACEMENT],
+    }));
+    try {
+      renderPanel(fakeCanvas({ exportPlacements }));
+      breakNextEntryWrite();
+
+      fireEvent.click(screen.getByRole("button", { name: /apply & download/i }));
+      await waitFor(() =>
+        expect(unhandled.rejections).toEqual([expect.objectContaining({ message: "boom" })]),
+      );
+
+      expect(exportPlacements).not.toHaveBeenCalled();
+      expect(FakeXhr.instances).toHaveLength(0);
+      expect(FakeEventSource.instances).toHaveLength(0);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByRole("button", { name: /apply & download/i })).toBeEnabled();
+      expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument();
+      expect(entry().status).toBe("failed");
+      expect(entry().error).toBe(en.errors.jobTrackingFailed);
+      expect(entry().errorCategory).toBe("processing_error");
+      expect(guardWork()).toBeNull();
+    } finally {
+      unhandled.restore();
+    }
+  });
+
+  it.each([
+    [
+      "setting processing to true",
+      () => {},
+      (
+        state: ReturnType<typeof useFileStore.getState>,
+        prev: ReturnType<typeof useFileStore.getState>,
+      ) => !prev.processing && state.processing,
+    ],
+    [
+      "clearing a prior store error",
+      () => {
+        useFileStore.getState().setError(en.errors.runInterrupted);
+      },
+      (
+        state: ReturnType<typeof useFileStore.getState>,
+        prev: ReturnType<typeof useFileStore.getState>,
+      ) => prev.error !== null && state.error === null,
+    ],
+  ])("ends the run when %s at kickoff throws (#2510)", async (_label, setup, shouldThrow) => {
+    const unhandled = takeOverUnhandledRejections();
+    let armed = true;
+    setup();
+    const unsubscribe = useFileStore.subscribe((state, prev) => {
+      if (armed && shouldThrow(state, prev)) {
+        armed = false;
+        throw new Error("kickoff broke");
+      }
+    });
+    try {
+      renderPanel();
+
+      fireEvent.click(screen.getByRole("button", { name: /apply & download/i }));
+      await waitFor(() =>
+        expect(unhandled.rejections).toEqual([
+          expect.objectContaining({ message: "kickoff broke" }),
+        ]),
+      );
+
+      expect(FakeXhr.instances).toHaveLength(0);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByRole("button", { name: /apply & download/i })).toBeEnabled();
+      expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument();
+      expect(entry().status).toBe("failed");
+      expect(entry().error).toBe(en.errors.jobTrackingFailed);
+      expect(entry().errorCategory).toBe("processing_error");
+    } finally {
+      unsubscribe();
+      unhandled.restore();
+    }
+  });
+
+  it("rethrows the kickoff root cause and reports the teardown failure when ending a failed start throws too (#2510)", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const unhandled = takeOverUnhandledRejections();
+    let writes = 0;
+    const unsubscribe = useFileStore.subscribe(() => {
+      writes++;
+      throw new Error(writes === 1 ? "kickoff root cause" : "kickoff teardown broke");
+    });
+    try {
+      renderPanel();
+
+      fireEvent.click(screen.getByRole("button", { name: /apply & download/i }));
+      await waitFor(() =>
+        expect(unhandled.rejections).toEqual([
+          expect.objectContaining({ message: "kickoff root cause" }),
+        ]),
+      );
+
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run after a start error failed",
+        expect.objectContaining({ message: "kickoff teardown broke" }),
+      );
+      expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /apply & download/i })).toBeEnabled();
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(entry().status).toBe("failed");
+      expect(entry().error).toBe(en.errors.jobTrackingFailed);
+      expect(entry().errorCategory).toBe("processing_error");
+      const reports = vi
+        .mocked(captureHandledError)
+        .mock.calls.filter(([e]) => e.message === "Ending a tool run after its start failed");
+      expect(reports).toHaveLength(1);
+      expect(reports[0][0].cause).toMatchObject({ message: "kickoff teardown broke" });
+      expect(reports[0][1]).toEqual({ error_class: "bug", tool_id: "sign-pdf" });
+      const entryReports = vi
+        .mocked(captureHandledError)
+        .mock.calls.filter(([e]) => e.message === "Failing a Sign PDF run's entry failed");
+      expect(entryReports).toHaveLength(1);
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(2);
+    } finally {
+      unsubscribe();
+      unhandled.restore();
+      consoleError.mockRestore();
+    }
+  });
+
+  it("updates the entry error when a retry after a failed run throws at kickoff (#2510)", async () => {
+    const unhandled = takeOverUnhandledRejections();
+    let unsubscribe = () => {};
+    try {
+      renderPanel();
+      (await apply()).respond(422, { error: "Processing failed" });
+      expect(entry().status).toBe("failed");
+      expect(entry().error).toBe("Processing failed");
+      expect(entry().errorCategory).toBeNull();
+
+      let armed = true;
+      unsubscribe = useFileStore.subscribe((state, prev) => {
+        if (armed && !prev.processing && state.processing) {
+          armed = false;
+          throw new Error("retry kickoff broke");
+        }
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: /apply & download/i }));
+      await waitFor(() =>
+        expect(unhandled.rejections).toEqual([
+          expect.objectContaining({ message: "retry kickoff broke" }),
+        ]),
+      );
+
+      expect(FakeXhr.instances).toHaveLength(1);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByRole("button", { name: /apply & download/i })).toBeEnabled();
+      expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument();
+      expect(entry().status).toBe("failed");
+      expect(entry().error).toBe(en.errors.jobTrackingFailed);
+      expect(entry().errorCategory).toBe("processing_error");
+    } finally {
+      unsubscribe();
+      unhandled.restore();
+    }
+  });
+
+  it("clears the previous run's result and keeps Apply visible when a re-run after editing placements throws at kickoff (#2510)", async () => {
+    const unhandled = takeOverUnhandledRejections();
+    try {
+      renderPanel(fakeCanvas(), true);
+      (await apply()).respond(200, { downloadUrl: DOWNLOAD_URL });
+      expect(entry().status).toBe("completed");
+      expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+
+      fireEvent.click(screen.getByRole("button", { name: /✕ delete/i }));
+      expect(screen.queryByRole("link", { name: /download signed pdf/i })).not.toBeInTheDocument();
+
+      breakNextEntryWrite();
+      fireEvent.click(screen.getByRole("button", { name: /apply & download/i }));
+      await waitFor(() =>
+        expect(unhandled.rejections).toEqual([expect.objectContaining({ message: "boom" })]),
+      );
+
+      expect(FakeXhr.instances).toHaveLength(1);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.queryByRole("link", { name: /download signed pdf/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /apply & download/i })).toBeEnabled();
+      expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument();
+      expect(entry().status).toBe("failed");
+      expect(entry().processedUrl).toBeNull();
+      expect(entry().error).toBe(en.errors.jobTrackingFailed);
+      expect(entry().errorCategory).toBe("processing_error");
+    } finally {
+      unhandled.restore();
+    }
+  });
+
+  it("settles the run when a store listener unmounts the panel during setProcessing(true) at kickoff (#2510)", async () => {
+    const exportPlacements = vi.fn(async () => ({
+      pngs: [new Blob(["png"], { type: "image/png" })],
+      placements: [PLACEMENT],
+    }));
+    renderPanel(fakeCanvas({ exportPlacements }));
+    const unsubscribe = useFileStore.subscribe((state, prev) => {
+      if (!prev.processing && state.processing) {
+        cleanup();
+      }
+    });
+
+    try {
+      fireEvent.click(screen.getByRole("button", { name: /apply & download/i }));
+      await act(async () => {});
+
+      expect(exportPlacements).not.toHaveBeenCalled();
+      expect(FakeXhr.instances).toHaveLength(0);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().error).toBe(en.errors.runInterrupted);
+      expect(entry().status).toBe("failed");
+      expect(entry().error).toBe(en.errors.runInterrupted);
+      expect(entry().errorCategory).toBe("processing_error");
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it("keeps runInterrupted on the entry when a store listener unmounts and throws during setProcessing(true) at kickoff (#2510)", async () => {
+    const unhandled = takeOverUnhandledRejections();
+    renderPanel();
+    const unsubscribe = useFileStore.subscribe((state, prev) => {
+      if (!prev.processing && state.processing) {
+        cleanup();
+        throw new Error("unmount listener broke");
+      }
+    });
+
+    try {
+      fireEvent.click(screen.getByRole("button", { name: /apply & download/i }));
+      await waitFor(() =>
+        expect(unhandled.rejections).toEqual([
+          expect.objectContaining({ message: "unmount listener broke" }),
+        ]),
+      );
+
+      expect(FakeXhr.instances).toHaveLength(0);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().error).toBe(en.errors.runInterrupted);
+      expect(entry().status).toBe("failed");
+      expect(entry().error).toBe(en.errors.runInterrupted);
+      expect(entry().errorCategory).toBe("processing_error");
+    } finally {
+      unsubscribe();
+      unhandled.restore();
+    }
+  });
+
   it("ends the run with the tracking message when landing the result throws", async () => {
     renderPanel();
     const xhr = await apply();
