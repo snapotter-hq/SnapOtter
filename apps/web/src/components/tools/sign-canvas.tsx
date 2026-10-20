@@ -1,8 +1,9 @@
-import type { SignPlacement } from "@snapotter/shared";
+import { SafeError, type SignPlacement } from "@snapotter/shared";
 import Konva from "konva";
 import * as pdfjs from "pdfjs-dist";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { captureHandledError } from "@/lib/analytics";
 import { pdfDocumentOptions } from "@/lib/pdfjs-options";
 import { toNormalizedRect } from "@/lib/sign-geometry";
 import type { SavedSignature } from "@/lib/signature-store";
@@ -90,6 +91,7 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
     let cancelled = false;
     setDocReady(false);
     setLoadFailed(false);
+    docRef.current = null;
     scalesRef.current.clear();
     for (const placed of placementsRef.current) placed.node.destroy();
     placementsRef.current = [];
@@ -100,8 +102,9 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
     trRef.current = null;
     onCountChange?.(0);
     onSelectionChange?.(false);
+    const loadingTask = pdfjs.getDocument({ url: fileUrl, ...pdfDocumentOptions() });
     (async () => {
-      const doc = await pdfjs.getDocument({ url: fileUrl, ...pdfDocumentOptions() }).promise;
+      const doc = await loadingTask.promise;
       if (cancelled) return;
       docRef.current = doc;
       setPageCount(doc.numPages);
@@ -116,22 +119,26 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
     });
     return () => {
       cancelled = true;
+      loadingTask.destroy?.();
       docRef.current?.loadingTask.destroy();
+      docRef.current = null;
     };
   }, [fileUrl]);
 
   // Render the current page and show that page's nodes. The Konva stage is
   // created once (lazily) and reused; switching pages resizes it and swaps which
   // signature nodes are attached.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: onCountChange is a stable parent setter
   useEffect(() => {
     if (!docReady) return;
+    const doc = docRef.current;
+    const canvas = pdfCanvasRef.current;
+    if (!doc || !canvas) return;
     let cancelled = false;
+    let renderTask: pdfjs.RenderTask | undefined;
     (async () => {
-      const doc = docRef.current;
-      const canvas = pdfCanvasRef.current;
-      if (!doc || !canvas) return;
       const pdfPage = await doc.getPage(page + 1);
-      if (cancelled) return;
+      if (cancelled || docRef.current !== doc) return;
       const ptsViewport = pdfPage.getViewport({ scale: 1 });
       let scale = scalesRef.current.get(page);
       if (scale === undefined) {
@@ -155,12 +162,13 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
       canvas.style.width = `${viewport.width}px`;
       canvas.style.height = `${viewport.height}px`;
       setSize({ w: viewport.width, h: viewport.height });
-      await pdfPage.render({
+      renderTask = pdfPage.render({
         canvas,
         viewport,
         transform: ratio !== 1 ? [ratio, 0, 0, ratio, 0, 0] : undefined,
-      }).promise;
-      if (cancelled) return;
+      });
+      await renderTask.promise;
+      if (cancelled || docRef.current !== doc) return;
 
       pageMetaRef.current.set(page, {
         sizeW: viewport.width,
@@ -226,12 +234,31 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
       }
       layer.batchDraw();
       onSelectionChange?.(false);
-    })().catch(() => {
-      // getPage()/render() reject when the loadingTask is destroyed mid-render
-      // (file swap or unmount); expected teardown, same as the load effect.
+    })().catch((cause: unknown) => {
+      // getPage()/render() reject when the loadingTask or renderTask is
+      // cancelled mid-render (page navigation, file swap, or unmount);
+      // `cancelled` is already true then (or `docRef` moved on), so stay
+      // silent. A genuine render failure must tear down the stage, surface the
+      // error state, and report it instead of leaving a blank page (#2249).
+      if (cancelled || docRef.current !== doc) return;
+      for (const placed of placementsRef.current) placed.node.destroy();
+      placementsRef.current = [];
+      pageMetaRef.current.clear();
+      stageRef.current?.destroy();
+      stageRef.current = null;
+      layerRef.current = null;
+      trRef.current = null;
+      onCountChange?.(0);
+      onSelectionChange?.(false);
+      setLoadFailed(true);
+      void captureHandledError(
+        new SafeError("Sign PDF page failed to render", { kind: "operational", cause }),
+        { error_class: "operational", tool_id: "sign-pdf" },
+      );
     });
     return () => {
       cancelled = true;
+      renderTask?.cancel?.();
     };
   }, [page, docReady, onSelectionChange]);
 
@@ -312,46 +339,53 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
         return placementsRef.current.length > 0;
       },
       async exportPlacements() {
+        const layer = layerRef.current;
+        if (!layer) {
+          throw new Error("Sign PDF canvas is not ready to export placements");
+        }
         const pngs: Blob[] = [];
         const placements: SignPlacement[] = [];
-        const layer = layerRef.current;
         const tr = trRef.current;
         const selected = tr?.nodes() ?? [];
         tr?.nodes([]);
         // Detach all visible signatures; we re-attach each node one at a time so
         // getClientRect/toDataURL run on an attached node regardless of page.
-        if (layer) {
+        for (const child of [...layer.getChildren()]) {
+          if (child instanceof Konva.Image) child.remove();
+        }
+        try {
+          let sigIndex = 0;
+          for (const placed of placementsRef.current) {
+            const meta = pageMetaRef.current.get(placed.page);
+            if (!meta) {
+              throw new Error(`Missing page metadata for page ${placed.page + 1}`);
+            }
+            layer.add(placed.node);
+            const box = placed.node.getClientRect({ relativeTo: layer });
+            const norm = toNormalizedRect(
+              { x: box.x, y: box.y, w: box.width, h: box.height },
+              meta.sizeW,
+              meta.sizeH,
+            );
+            placements.push({
+              sig: sigIndex,
+              page: placed.page,
+              x: norm.x,
+              y: norm.y,
+              w: norm.w,
+              h: norm.h,
+            });
+            const ratio = (EXPORT_QUALITY * meta.ptsW) / meta.sizeW;
+            const dataUrl = placed.node.toDataURL({ pixelRatio: ratio });
+            pngs.push(await (await fetch(dataUrl)).blob());
+            placed.node.remove();
+            sigIndex++;
+          }
+        } finally {
+          // Restore the current page's view.
           for (const child of [...layer.getChildren()]) {
             if (child instanceof Konva.Image) child.remove();
           }
-        }
-        let sigIndex = 0;
-        for (const placed of placementsRef.current) {
-          const meta = pageMetaRef.current.get(placed.page);
-          if (!meta || !layer) continue;
-          layer.add(placed.node);
-          const box = placed.node.getClientRect({ relativeTo: layer });
-          const norm = toNormalizedRect(
-            { x: box.x, y: box.y, w: box.width, h: box.height },
-            meta.sizeW,
-            meta.sizeH,
-          );
-          placements.push({
-            sig: sigIndex,
-            page: placed.page,
-            x: norm.x,
-            y: norm.y,
-            w: norm.w,
-            h: norm.h,
-          });
-          const ratio = (EXPORT_QUALITY * meta.ptsW) / meta.sizeW;
-          const dataUrl = placed.node.toDataURL({ pixelRatio: ratio });
-          pngs.push(await (await fetch(dataUrl)).blob());
-          placed.node.remove();
-          sigIndex++;
-        }
-        // Restore the current page's view.
-        if (layer) {
           for (const placed of placementsRef.current) {
             if (placed.page === page) layer.add(placed.node);
           }
