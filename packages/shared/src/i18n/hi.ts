@@ -5643,6 +5643,7 @@ export const hi: TranslationKeys = {
       importing: "आयात हो रहा है...",
       importCount: "आयात करें ({count})",
       import: "इम्पोर्ट",
+      importFailed: "{total} में से {failed} फ़ाइलें आयात नहीं हो सकीं।",
     },
     metadataGrid: {
       noData: "कोई डेटा नहीं",

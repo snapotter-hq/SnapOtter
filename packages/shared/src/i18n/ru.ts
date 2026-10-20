@@ -5880,6 +5880,7 @@ export const ru: TranslationKeys = {
       importing: "Импорт...",
       importCount: "Импортировать ({count})",
       import: "Импорт",
+      importFailed: "Не удалось импортировать {failed} из {total} файлов.",
     },
     metadataGrid: {
       noData: "Нет данных",

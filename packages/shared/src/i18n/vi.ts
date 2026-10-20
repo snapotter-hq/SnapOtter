@@ -5851,6 +5851,7 @@ export const vi: TranslationKeys = {
       importing: "Đang nhập...",
       importCount: "Nhập ({count})",
       import: "Nhập",
+      importFailed: "Không thể nhập {failed} trong số {total} tệp.",
     },
     metadataGrid: {
       noData: "Không có dữ liệu",

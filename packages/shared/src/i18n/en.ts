@@ -5791,6 +5791,7 @@ export const en = {
       importing: "Importing...",
       importCount: "Import ({count})",
       import: "Import",
+      importFailed: "Couldn't import {failed} of {total} files.",
     },
     metadataGrid: {
       noData: "No data",

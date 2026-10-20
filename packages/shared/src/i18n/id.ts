@@ -5866,6 +5866,7 @@ export const id: TranslationKeys = {
       importing: "Mengimpor...",
       importCount: "Impor ({count})",
       import: "Impor",
+      importFailed: "Gagal mengimpor {failed} dari {total} file.",
     },
     metadataGrid: {
       noData: "Tidak ada data",

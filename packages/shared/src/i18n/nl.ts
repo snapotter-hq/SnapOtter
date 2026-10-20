@@ -5894,6 +5894,7 @@ export const nl: TranslationKeys = {
       importing: "Importeren...",
       importCount: "Importeren ({count})",
       import: "Importeren",
+      importFailed: "{failed} van {total} bestanden konden niet worden geïmporteerd.",
     },
     metadataGrid: {
       noData: "Geen gegevens",

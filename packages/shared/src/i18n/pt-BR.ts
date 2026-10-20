@@ -5888,6 +5888,7 @@ export const ptBR: TranslationKeys = {
       importing: "Importando...",
       importCount: "Importar ({count})",
       import: "Importar",
+      importFailed: "Não foi possível importar {failed} de {total} arquivos.",
     },
     metadataGrid: {
       noData: "Sem dados",

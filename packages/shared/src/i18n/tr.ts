@@ -5878,6 +5878,7 @@ export const tr: TranslationKeys = {
       importing: "İçe aktarılıyor...",
       importCount: "İçe Aktar ({count})",
       import: "İçe Aktar",
+      importFailed: "{total} dosyadan {failed} tanesi içe aktarılamadı.",
     },
     metadataGrid: {
       noData: "Veri yok",

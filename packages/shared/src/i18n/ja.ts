@@ -5819,6 +5819,7 @@ export const ja: TranslationKeys = {
       importing: "インポート中...",
       importCount: "インポート（{count}）",
       import: "インポート",
+      importFailed: "{total}件中{failed}件のファイルをインポートできませんでした。",
     },
     metadataGrid: {
       noData: "データなし",

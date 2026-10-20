@@ -5552,6 +5552,7 @@ export const zhTW: TranslationKeys = {
       importing: "匯入中...",
       importCount: "匯入（{count}）",
       import: "匯入",
+      importFailed: "{total} 個檔案中有 {failed} 個無法匯入。",
     },
     metadataGrid: {
       noData: "無資料",

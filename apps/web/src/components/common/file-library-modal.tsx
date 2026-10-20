@@ -72,12 +72,19 @@ export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalPr
   const [loading, setLoading] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [importFailed, setImportFailed] = useState<{ failed: number; total: number } | null>(null);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Every file seen while the modal has been open, keyed by id, so ticked files
+  // filtered out by a later search still import when the user clicks Import (#1948).
+  const knownFilesRef = useRef<Map<string, UserFile>>(new Map());
   // Only the newest list request may write state, so a slow search answering
   // after a newer request (say, the unfiltered list of a reopen) is dropped.
   const latestRequestRef = useRef(0);
+  // Closing or reopening invalidates an import still in flight so its downloads
+  // cannot import into the page or write error state after the modal moved on.
+  const latestImportRef = useRef(0);
 
   const fetchFiles = useCallback(async (search?: string) => {
     const request = ++latestRequestRef.current;
@@ -86,13 +93,21 @@ export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalPr
     setLoadFailed(false);
     try {
       const result = await apiListFiles({ search: search || undefined, limit: 200 });
-      if (isLatest()) setFiles(result.files);
+      if (isLatest()) {
+        for (const f of result.files) {
+          knownFilesRef.current.set(f.id, f);
+        }
+        setFiles(result.files);
+      }
     } catch (err) {
       if (!isLatest()) return;
+      latestImportRef.current++;
+      setImporting(false);
       console.error("[file-library-modal] failed to load the file library", err);
       setFiles([]);
       // The ticked files are gone from the list, so Import has nothing to fetch.
       setCheckedIds(new Set());
+      setImportFailed(null);
       setLoadFailed(true);
     } finally {
       if (isLatest()) setLoading(false);
@@ -100,14 +115,20 @@ export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalPr
   }, []);
 
   useEffect(() => {
+    latestImportRef.current++;
+    setImporting(false);
+    setImportFailed(null);
     if (open) {
+      knownFilesRef.current = new Map();
       fetchFiles();
       setCheckedIds(new Set());
       setSearchQuery("");
     }
     // Closing (or unmounting) the modal drops a search still waiting on its
-    // debounce, so it never fires against a closed modal.
+    // debounce, and invalidates any list or import request still in flight.
     return () => {
+      latestRequestRef.current++;
+      latestImportRef.current++;
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [open, fetchFiles]);
@@ -125,6 +146,8 @@ export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalPr
   }
 
   function toggleCheck(id: string) {
+    if (importing) return;
+    setImportFailed(null);
     setCheckedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -134,39 +157,76 @@ export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalPr
   }
 
   function toggleAll() {
-    if (checkedIds.size === files.length) {
-      setCheckedIds(new Set());
-    } else {
-      setCheckedIds(new Set(files.map((f) => f.id)));
-    }
+    if (importing || files.length === 0) return;
+    setImportFailed(null);
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      if (files.every((f) => prev.has(f.id))) {
+        for (const f of files) next.delete(f.id);
+      } else {
+        for (const f of files) next.add(f.id);
+      }
+      return next;
+    });
   }
 
   async function handleImport() {
     if (checkedIds.size === 0) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const importRun = ++latestImportRef.current;
+    const isLatestImport = () => importRun === latestImportRef.current;
+    const toDownload: UserFile[] = [];
+    for (const id of checkedIds) {
+      const file = knownFilesRef.current.get(id) ?? files.find((f) => f.id === id);
+      if (file) toDownload.push(file);
+    }
+    if (toDownload.length === 0) return;
     setImporting(true);
+    setImportFailed(null);
     try {
-      const toDownload = files.filter((f) => checkedIds.has(f.id));
-      const downloaded = await Promise.all(
+      const outcomes = await Promise.allSettled(
         toDownload.map(async (f) => {
           const res = await fetch(getFileDownloadUrl(f.id), { headers: formatHeaders() });
-          if (!res.ok) return null;
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+          }
           const blob = await res.blob();
           return new File([blob], f.originalName, { type: f.mimeType });
         }),
       );
-      const valid = downloaded.filter((f): f is File => f !== null);
+      if (!isLatestImport()) return;
+      const valid: File[] = [];
+      const failedIds = new Set<string>();
+      for (let i = 0; i < outcomes.length; i++) {
+        const outcome = outcomes[i];
+        const source = toDownload[i];
+        if (outcome.status === "fulfilled") {
+          valid.push(outcome.value);
+        } else {
+          console.error(
+            `[file-library-modal] failed to download file ${source.id}`,
+            outcome.reason,
+          );
+          failedIds.add(source.id);
+        }
+      }
       if (valid.length > 0) {
         onImport(valid);
+      }
+      if (failedIds.size === 0) {
         onClose();
+      } else {
+        setCheckedIds(failedIds);
+        setImportFailed({ failed: failedIds.size, total: toDownload.length });
       }
     } finally {
-      setImporting(false);
+      if (isLatestImport()) setImporting(false);
     }
   }
 
   if (!open) return null;
 
-  const allChecked = files.length > 0 && checkedIds.size === files.length;
+  const allChecked = files.length > 0 && files.every((f) => checkedIds.has(f.id));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -206,7 +266,8 @@ export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalPr
               placeholder={t.files.searchPlaceholder}
               value={searchQuery}
               onChange={handleSearchChange}
-              className="w-full ps-8 pe-3 py-1.5 text-sm bg-muted rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ring text-foreground placeholder:text-muted-foreground"
+              disabled={importing}
+              className="w-full ps-8 pe-3 py-1.5 text-sm bg-muted rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ring text-foreground placeholder:text-muted-foreground disabled:opacity-50"
             />
           </div>
         </div>
@@ -217,6 +278,7 @@ export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalPr
             type="checkbox"
             checked={allChecked}
             onChange={toggleAll}
+            disabled={importing}
             className="h-4 w-4 accent-primary"
           />
           <span className="text-xs text-muted-foreground flex-1">
@@ -260,9 +322,10 @@ export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalPr
                   <button
                     key={file.id}
                     type="button"
+                    disabled={importing}
                     onClick={() => toggleCheck(file.id)}
                     className={cn(
-                      "relative group rounded-lg border overflow-hidden aspect-square flex items-center justify-center bg-muted/30 transition-all",
+                      "relative group rounded-lg border overflow-hidden aspect-square flex items-center justify-center bg-muted/30 transition-all disabled:opacity-50",
                       checked
                         ? "border-primary ring-2 ring-primary/30"
                         : "border-border hover:border-primary/50",
@@ -290,6 +353,11 @@ export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalPr
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border shrink-0">
+          {importFailed && (
+            <p role="alert" className="text-xs text-destructive flex-1">
+              {format(t.commonUi.fileLibrary.importFailed, importFailed)}
+            </p>
+          )}
           <button
             type="button"
             onClick={onClose}

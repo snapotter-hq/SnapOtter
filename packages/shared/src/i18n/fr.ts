@@ -5908,6 +5908,7 @@ export const fr: TranslationKeys = {
       importing: "Importation...",
       importCount: "Importer ({count})",
       import: "Importer",
+      importFailed: "Impossible d'importer {failed} fichiers sur {total}.",
     },
     metadataGrid: {
       noData: "Aucune donnée",

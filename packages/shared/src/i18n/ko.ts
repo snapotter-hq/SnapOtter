@@ -5778,6 +5778,7 @@ export const ko: TranslationKeys = {
       importing: "가져오는 중...",
       importCount: "가져오기 ({count})",
       import: "가져오기",
+      importFailed: "파일 {total}개 중 {failed}개를 가져오지 못했습니다.",
     },
     metadataGrid: {
       noData: "데이터 없음",

@@ -5814,6 +5814,7 @@ export const ar: TranslationKeys = {
       importing: "جارٍ الاستيراد...",
       importCount: "استيراد ({count})",
       import: "استيراد",
+      importFailed: "تعذّر استيراد {failed} من أصل {total} ملفات.",
     },
     metadataGrid: {
       noData: "لا توجد بيانات",

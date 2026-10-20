@@ -5776,6 +5776,7 @@ export const th: TranslationKeys = {
       importing: "กำลังนำเข้า...",
       importCount: "นำเข้า ({count})",
       import: "นำเข้า",
+      importFailed: "นำเข้าไฟล์ไม่สำเร็จ {failed} จาก {total} ไฟล์",
     },
     metadataGrid: {
       noData: "ไม่มีข้อมูล",

@@ -5865,6 +5865,7 @@ export const sv: TranslationKeys = {
       importing: "Importerar...",
       importCount: "Importera ({count})",
       import: "Importera",
+      importFailed: "Kunde inte importera {failed} av {total} filer.",
     },
     metadataGrid: {
       noData: "Ingen data",

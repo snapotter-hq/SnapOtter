@@ -5551,6 +5551,7 @@ export const zhCN: TranslationKeys = {
       importing: "导入中...",
       importCount: "导入（{count}）",
       import: "导入",
+      importFailed: "{total} 个文件中有 {failed} 个无法导入。",
     },
     metadataGrid: {
       noData: "无数据",
