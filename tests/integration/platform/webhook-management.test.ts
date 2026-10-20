@@ -598,7 +598,7 @@ describe("webhook management", () => {
           ],
         });
 
-        for (const nonArray of ["{}", "null", "42"]) {
+        for (const nonArray of ["{}", "null", "42", "[null]", "[42]", "[[]]"]) {
           warnSpy.mockClear();
           await db
             .update(schema.settings)

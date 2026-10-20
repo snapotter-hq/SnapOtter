@@ -285,6 +285,15 @@ describe("enterprise settings JSON resilience (#2554)", () => {
     it("logs a warning and returns [] when stored webhook_destinations is non-array JSON", async () => {
       isEnterpriseFeatureEnabledMock.mockResolvedValue(true);
       requirePermissionMock.mockResolvedValue({ id: "admin-1", username: "admin" });
+      const updates: Array<Record<string, unknown>> = [];
+      updateMock.mockReturnValue({
+        set: (arg: Record<string, unknown>) => {
+          updates.push(arg);
+          return {
+            where: () => Promise.resolve(),
+          };
+        },
+      });
 
       const { registerWebhookRoutes } = await import(
         "../../../apps/api/src/routes/enterprise/webhooks.js"
@@ -292,8 +301,23 @@ describe("enterprise settings JSON resilience (#2554)", () => {
       const app = Fastify();
       await registerWebhookRoutes(app);
 
-      for (const raw of ["{}", "null", "123", '"str"']) {
+      for (const raw of [
+        "{}",
+        "null",
+        "123",
+        '"str"',
+        "[null]",
+        "[42]",
+        '["str"]',
+        "[true]",
+        "[[]]",
+        JSON.stringify([
+          { name: "Hook", url: "https://example.com/hook", enabled: true, type: "alerts" },
+          null,
+        ]),
+      ]) {
         loggerMock.warn.mockClear();
+        updates.length = 0;
         mockSelectRow(raw);
 
         const getRes = await app.inject({
@@ -307,6 +331,56 @@ describe("enterprise settings JSON resilience (#2554)", () => {
           { key: "webhook_destinations" },
           "webhooks: stored webhook_destinations is not a JSON array",
         );
+
+        loggerMock.warn.mockClear();
+        const postRes = await app.inject({
+          method: "POST",
+          url: "/api/v1/enterprise/webhooks",
+          payload: {
+            name: "New Hook",
+            url: "https://example.com/hook",
+          },
+        });
+        expect(postRes.statusCode).toBe(201);
+        expect(postRes.json()).toEqual({ ok: true, index: 0 });
+        expect(updates).toHaveLength(1);
+        expect(JSON.parse(updates[0].value as string)).toEqual([
+          expect.objectContaining({
+            name: "New Hook",
+            url: "https://example.com/hook",
+          }),
+        ]);
+        expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+        expect(loggerMock.warn).toHaveBeenCalledWith(
+          { key: "webhook_destinations" },
+          "webhooks: stored webhook_destinations is not a JSON array",
+        );
+
+        for (const req of [
+          {
+            method: "PUT" as const,
+            url: "/api/v1/enterprise/webhooks/0",
+            payload: { name: "Updated", url: "https://example.com/hook", authHeader: "***" },
+          },
+          {
+            method: "DELETE" as const,
+            url: "/api/v1/enterprise/webhooks/0",
+          },
+          {
+            method: "POST" as const,
+            url: "/api/v1/enterprise/webhooks/0/test",
+          },
+        ]) {
+          loggerMock.warn.mockClear();
+          const res = await app.inject(req);
+          expect(res.statusCode).toBe(404);
+          expect(res.json()).toEqual({ error: "Webhook destination not found" });
+          expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+          expect(loggerMock.warn).toHaveBeenCalledWith(
+            { key: "webhook_destinations" },
+            "webhooks: stored webhook_destinations is not a JSON array",
+          );
+        }
       }
 
       await app.close();

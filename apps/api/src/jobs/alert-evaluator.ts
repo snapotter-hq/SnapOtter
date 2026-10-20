@@ -83,7 +83,10 @@ export async function evaluateAlerts(): Promise<void> {
   }[];
   try {
     const parsed: unknown = JSON.parse(destJson);
-    if (!Array.isArray(parsed)) {
+    if (
+      !Array.isArray(parsed) ||
+      !parsed.every((d) => Boolean(d) && typeof d === "object" && !Array.isArray(d))
+    ) {
       logger.warn(
         { key: "webhook_destinations" },
         "alert-evaluator: stored webhook_destinations is not a JSON array",

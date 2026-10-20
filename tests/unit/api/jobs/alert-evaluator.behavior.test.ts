@@ -148,11 +148,25 @@ describe("alert evaluator behavior", () => {
     expect(deliverWebhookMock).not.toHaveBeenCalled();
   });
 
-  it("returns early and logs a warning when webhook_destinations JSON is not an array (#2554)", async () => {
+  it("returns early and logs a warning when webhook_destinations JSON is not an array or contains non-object elements (#2554, #3040)", async () => {
     const { evaluateAlerts } = await loadAlertEvaluator();
-    for (const nonArray of ["{}", "null", "42", '"string"']) {
+    for (const nonObjectArray of [
+      "{}",
+      "null",
+      "42",
+      '"string"',
+      "[null]",
+      "[42]",
+      '["string"]',
+      "[true]",
+      "[[]]",
+      JSON.stringify([
+        { url: "https://example.test/alerts", authHeader: "", enabled: true, type: "alerts" },
+        null,
+      ]),
+    ]) {
       loggerMock.warn.mockClear();
-      getSettingStringMock.mockResolvedValueOnce(nonArray);
+      getSettingStringMock.mockResolvedValueOnce(nonObjectArray);
 
       await expect(evaluateAlerts()).resolves.toBeUndefined();
 

@@ -49,7 +49,10 @@ async function readDestinationsWithRaw(): Promise<{
 
   try {
     const parsed: unknown = JSON.parse(row.value);
-    if (!Array.isArray(parsed)) {
+    if (
+      !Array.isArray(parsed) ||
+      !parsed.every((d) => Boolean(d) && typeof d === "object" && !Array.isArray(d))
+    ) {
       logger.warn(
         { key: SETTINGS_KEY },
         "webhooks: stored webhook_destinations is not a JSON array",

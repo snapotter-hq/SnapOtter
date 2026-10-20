@@ -776,5 +776,31 @@ describe("alert-evaluator.ts mutation coverage", () => {
       expect(statfsMock).not.toHaveBeenCalled();
       expect(deliverWebhookMock).not.toHaveBeenCalled();
     });
+
+    it("returns early and logs a warning when webhook_destinations array contains null or non-object elements (#3040)", async () => {
+      const { evaluateAlerts } = await loadAlertEvaluator();
+      for (const invalidArray of [
+        "[null]",
+        "[42]",
+        "[[]]",
+        JSON.stringify([
+          { url: "https://example.test/alerts", authHeader: "", enabled: true, type: "alerts" },
+          null,
+        ]),
+      ]) {
+        loggerMock.warn.mockClear();
+        getSettingStringMock.mockResolvedValueOnce(invalidArray);
+
+        await evaluateAlerts();
+
+        expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+        expect(loggerMock.warn).toHaveBeenCalledWith(
+          { key: "webhook_destinations" },
+          "alert-evaluator: stored webhook_destinations is not a JSON array",
+        );
+        expect(statfsMock).not.toHaveBeenCalled();
+        expect(deliverWebhookMock).not.toHaveBeenCalled();
+      }
+    });
   });
 });
