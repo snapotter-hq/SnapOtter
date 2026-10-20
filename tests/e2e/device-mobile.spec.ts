@@ -423,6 +423,85 @@ test.describe("@mobile Organize PDF on a phone", () => {
     await page.getByRole("button", { name: "Process", exact: true }).click();
     await expect(page.locator("#op-order")).toHaveValue("2,1,3-z");
   });
+
+  test("caps auto-scroll at the end of the grid when dragging a card to the bottom edge (#2257)", async ({
+    loggedInPage: page,
+  }) => {
+    await page.goto("/pdf/organize-pdf");
+    const chooser = page.waitForEvent("filechooser");
+    await page
+      .getByRole("button", { name: /upload from computer/i })
+      .first()
+      .click();
+    await (await chooser).setFiles(ORGANIZE_PDF_FIXTURE);
+
+    const page1 = page.getByTestId("organize-page-1");
+    await expect(page1).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("organize-page-6")).toBeAttached();
+
+    const initialMetrics = await page1.evaluate((el) => {
+      const scroller = el.closest(".overflow-auto") as HTMLElement | null;
+      if (!scroller) throw new Error("scroller missing");
+      const rect = scroller.getBoundingClientRect();
+      return {
+        scrollHeight: scroller.scrollHeight,
+        clientHeight: scroller.clientHeight,
+        maxScroll: scroller.scrollHeight - scroller.clientHeight,
+        bottomX: Math.round(rect.left + rect.width / 2),
+        bottomY: Math.round(rect.bottom - 10),
+      };
+    });
+    expect(initialMetrics.maxScroll).toBeGreaterThan(0);
+
+    const box1 = await page1.boundingBox();
+    expect(box1).not.toBeNull();
+    if (!box1) return;
+
+    await page.mouse.move(
+      Math.round(box1.x + box1.width / 2),
+      Math.round(box1.y + box1.height / 2),
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      Math.round(box1.x + box1.width / 2),
+      Math.round(box1.y + box1.height / 2) + 10,
+      { steps: 2 },
+    );
+    await page.mouse.move(initialMetrics.bottomX, initialMetrics.bottomY, { steps: 10 });
+    await expect(page.getByTestId("organize-drag-overlay")).toBeVisible();
+
+    // Poll until auto-scroll reaches the bottom of the grid, then hold briefly to confirm it does not overshoot.
+    await expect
+      .poll(
+        () =>
+          page1.evaluate((el) => {
+            const scroller = el.closest(".overflow-auto") as HTMLElement | null;
+            return scroller ? Math.round(scroller.scrollTop) : 0;
+          }),
+        { timeout: 5_000 },
+      )
+      .toBeGreaterThanOrEqual(initialMetrics.maxScroll - 2);
+    await page.waitForTimeout(250);
+
+    const scrolledMetrics = await page1.evaluate((el) => {
+      const scroller = el.closest(".overflow-auto") as HTMLElement | null;
+      if (!scroller) throw new Error("scroller missing");
+      return {
+        scrollTop: scroller.scrollTop,
+        scrollHeight: scroller.scrollHeight,
+      };
+    });
+    expect(scrolledMetrics.scrollHeight).toBe(initialMetrics.scrollHeight);
+    expect(scrolledMetrics.scrollTop).toBeLessThanOrEqual(initialMetrics.maxScroll + 1);
+
+    await page.mouse.up();
+    await expect(page.getByTestId("organize-drag-overlay")).toHaveCount(0);
+    await expect(page.getByTestId("organize-reset")).toBeEnabled();
+    const orderedTestIds = await page
+      .locator('[data-testid^="organize-page-"]')
+      .evaluateAll((els) => els.map((el) => el.getAttribute("data-testid")));
+    expect(orderedTestIds[orderedTestIds.length - 1]).toBe("organize-page-1");
+  });
 });
 
 test.describe("@mobile Automate pipeline on a phone", () => {

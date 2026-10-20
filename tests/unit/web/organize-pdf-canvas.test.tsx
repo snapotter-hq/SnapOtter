@@ -181,6 +181,129 @@ describe("OrganizePdfCanvas touch and mouse reordering (#2256)", () => {
     });
   });
 
+  it("caps auto-scroll at the end of the grid instead of stretching scrollHeight with the dragged card (#2257)", async () => {
+    const { card1, card2, card3 } = await renderLoadedGrid();
+    const scroller = card1.closest(".overflow-auto") as HTMLElement;
+    expect(scroller).not.toBeNull();
+    scroller.style.overflow = "auto";
+
+    // Vertically stacked rows inside a 300px-tall scroller with 600px base content height
+    // (maxScroll = 300px). In Chromium/Firefox, a child's downward translate3d inside the
+    // scroller expands scrollHeight past the base content height.
+    const baseBottoms = new Map<HTMLElement, number>([
+      [card1, 200],
+      [card2, 400],
+      [card3, 600],
+    ]);
+    for (const [card, bottom] of baseBottoms) {
+      const top = bottom - 180;
+      vi.spyOn(card, "getBoundingClientRect").mockImplementation(() => ({
+        x: 16,
+        y: top - scroller.scrollTop,
+        left: 16,
+        top: top - scroller.scrollTop,
+        right: 156,
+        bottom: bottom - scroller.scrollTop,
+        width: 140,
+        height: 180,
+        toJSON: () => ({}),
+      }));
+    }
+
+    const baseScrollHeight = 600;
+    const clientHeight = 300;
+    const parseTranslateY = (transform: string) => {
+      const match = /translate3d\([^,]+,\s*(-?\d+(?:\.\d+)?)px/.exec(transform);
+      return match ? Number(match[1]) : 0;
+    };
+    const computeScrollHeight = () => {
+      let maxBottom = baseScrollHeight;
+      for (const [card, baseBottom] of baseBottoms) {
+        const ty = parseTranslateY(card.style.transform);
+        maxBottom = Math.max(maxBottom, baseBottom + ty);
+      }
+      return maxBottom;
+    };
+
+    Object.defineProperty(scroller, "clientHeight", { value: clientHeight, configurable: true });
+    Object.defineProperty(scroller, "clientWidth", { value: 500, configurable: true });
+    Object.defineProperty(scroller, "scrollWidth", { value: 500, configurable: true });
+    Object.defineProperty(scroller, "scrollHeight", {
+      get: computeScrollHeight,
+      configurable: true,
+    });
+    vi.spyOn(scroller, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: 500,
+      bottom: clientHeight,
+      width: 500,
+      height: clientHeight,
+      toJSON: () => ({}),
+    });
+    scroller.scrollBy = vi.fn((_x: number, y: number) => {
+      const maxScroll = scroller.scrollHeight - scroller.clientHeight;
+      scroller.scrollTop = Math.min(maxScroll, Math.max(0, scroller.scrollTop + y));
+      fireEvent.scroll(scroller);
+    }) as unknown as typeof scroller.scrollBy;
+
+    // Start dragging page 1 and hold near the bottom edge of the 300px scroller (y = 290).
+    act(() => {
+      fireEvent.mouseDown(card1, { button: 0, clientX: 70, clientY: 100 });
+      fireEvent.mouseMove(document, { clientX: 70, clientY: 110 });
+    });
+    act(() => {
+      fireEvent.mouseMove(document, { clientX: 70, clientY: 290 });
+    });
+
+    for (let i = 0; i < 40; i += 1) {
+      await act(async () => {
+        vi.advanceTimersByTime(10);
+      });
+    }
+
+    expect(scroller.scrollTop).toBeGreaterThan(0);
+    expect(scroller.scrollTop).toBeLessThanOrEqual(baseScrollHeight - clientHeight);
+    expect(scroller.scrollHeight).toBe(baseScrollHeight);
+    expect(screen.getByTestId("organize-drag-overlay")).toBeInTheDocument();
+    expect(card1.className).toContain("opacity-40");
+
+    await act(async () => {
+      fireEvent.mouseUp(document, { clientX: 70, clientY: 290 });
+    });
+
+    expect(screen.queryByTestId("organize-drag-overlay")).toBeNull();
+    await waitFor(() => {
+      expect(useOrganizeStore.getState().pageOrder).toEqual([2, 3, 1]);
+    });
+  });
+
+  it("clears the drag overlay without reordering when a drag is cancelled with Escape (#2257)", async () => {
+    const { card1 } = await renderLoadedGrid();
+    act(() => {
+      useOrganizeStore.getState().movePage(0, 2);
+    });
+
+    act(() => {
+      fireEvent.mouseDown(card1, { button: 0, clientX: 370, clientY: 100 });
+      fireEvent.mouseMove(document, { clientX: 220, clientY: 100 });
+    });
+
+    const overlay = screen.getByTestId("organize-drag-overlay");
+    expect(overlay).toBeInTheDocument();
+    expect(overlay).toHaveTextContent("3");
+    expect(overlay).toHaveTextContent("← 1");
+
+    await act(async () => {
+      fireEvent.keyDown(document, { key: "Escape", code: "Escape" });
+    });
+
+    expect(screen.queryByTestId("organize-drag-overlay")).toBeNull();
+    expect(useOrganizeStore.getState().pageOrder).toEqual([2, 3, 1]);
+  });
+
   it("marks rendered thumbnail images non-draggable and suppresses iOS touch callout", async () => {
     const { card1 } = await renderLoadedGrid();
 

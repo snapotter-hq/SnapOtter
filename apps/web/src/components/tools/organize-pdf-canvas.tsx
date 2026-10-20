@@ -2,6 +2,8 @@ import {
   closestCenter,
   DndContext,
   type DragEndEvent,
+  DragOverlay,
+  type DragStartEvent,
   KeyboardSensor,
   MouseSensor,
   TouchSensor,
@@ -115,31 +117,14 @@ interface PageCardProps {
   label: string;
 }
 
-/** One draggable page tile: the rendered page, its new position, its origin. */
-function PageCard({ pageNumber, position, thumb, label }: PageCardProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: pageNumber,
-  });
-
+/** Shared visual body for an in-grid page tile and its drag overlay. */
+function PageCardBody({
+  pageNumber,
+  position,
+  thumb,
+}: Pick<PageCardProps, "pageNumber" | "position" | "thumb">) {
   return (
-    <button
-      type="button"
-      ref={setNodeRef}
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-        WebkitTouchCallout: "none",
-      }}
-      className={`relative rounded-lg border bg-background p-1.5 select-none [-webkit-touch-callout:none] cursor-grab active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
-        isDragging
-          ? "border-primary shadow-lg z-10 opacity-90"
-          : "border-border hover:border-primary/50"
-      }`}
-      aria-label={label}
-      data-testid={`organize-page-${pageNumber}`}
-      {...attributes}
-      {...listeners}
-    >
+    <>
       <div
         className="flex items-center justify-center rounded bg-muted overflow-hidden"
         style={{ width: THUMB_W, height: THUMB_H }}
@@ -159,6 +144,34 @@ function PageCard({ pageNumber, position, thumb, label }: PageCardProps) {
         <span className="font-medium text-foreground">{position}</span>
         {position !== pageNumber && <span>&larr; {pageNumber}</span>}
       </div>
+    </>
+  );
+}
+
+/** One draggable page tile: the rendered page, its new position, its origin. */
+function PageCard({ pageNumber, position, thumb, label }: PageCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: pageNumber,
+  });
+
+  return (
+    <button
+      type="button"
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        WebkitTouchCallout: "none",
+      }}
+      className={`relative rounded-lg border bg-background p-1.5 select-none [-webkit-touch-callout:none] cursor-grab active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
+        isDragging ? "border-primary opacity-40" : "border-border hover:border-primary/50"
+      }`}
+      aria-label={label}
+      data-testid={`organize-page-${pageNumber}`}
+      {...attributes}
+      {...listeners}
+    >
+      <PageCardBody pageNumber={pageNumber} position={position} thumb={thumb} />
     </button>
   );
 }
@@ -178,6 +191,7 @@ export function OrganizePdfCanvas() {
   } = useOrganizeStore();
   const [thumbs, setThumbs] = useState<Record<number, string>>({});
   const [failed, setFailed] = useState(false);
+  const [activePage, setActivePage] = useState<number | null>(null);
 
   const file = files[0];
 
@@ -188,6 +202,7 @@ export function OrganizePdfCanvas() {
     if (!file) return;
     setThumbs({});
     setFailed(false);
+    setActivePage(null);
     return renderPageThumbs(
       file,
       (count) => setDocument(file, count),
@@ -202,10 +217,21 @@ export function OrganizePdfCanvas() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
+  const handleDragStart = ({ active }: DragStartEvent) => {
+    setActivePage(Number(active.id));
+  };
+
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
+    setActivePage(null);
     if (!over || active.id === over.id) return;
     movePage(pageOrder.indexOf(Number(active.id)), pageOrder.indexOf(Number(over.id)));
   };
+
+  const handleDragCancel = () => {
+    setActivePage(null);
+  };
+
+  const activeIndex = activePage !== null ? pageOrder.indexOf(activePage) : -1;
 
   if (failed) return <DocumentView />;
 
@@ -238,7 +264,13 @@ export function OrganizePdfCanvas() {
       </div>
 
       <div className="flex-1 overflow-auto p-4">
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
+        >
           <SortableContext items={pageOrder} strategy={rectSortingStrategy}>
             <div className="flex flex-wrap gap-3">
               {pageOrder.map((pageNumber, i) => (
@@ -252,6 +284,20 @@ export function OrganizePdfCanvas() {
               ))}
             </div>
           </SortableContext>
+          <DragOverlay dropAnimation={null}>
+            {activePage !== null && activeIndex >= 0 ? (
+              <div
+                data-testid="organize-drag-overlay"
+                className="rounded-lg border border-primary bg-background p-1.5 shadow-lg opacity-90 select-none pointer-events-none cursor-grabbing"
+              >
+                <PageCardBody
+                  pageNumber={activePage}
+                  position={activeIndex + 1}
+                  thumb={thumbs[activePage]}
+                />
+              </div>
+            ) : null}
+          </DragOverlay>
         </DndContext>
       </div>
     </div>
