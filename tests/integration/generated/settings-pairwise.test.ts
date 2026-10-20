@@ -15,7 +15,7 @@ import {
   isExpectedGeneratedRejection,
   runGeneratedTool,
 } from "../../helpers/run-generated-tool.js";
-import { defaultSettingsFor } from "../../helpers/tool-default-settings.js";
+import { pairwiseSettingsFor } from "../../helpers/tool-default-settings.js";
 import { compactCase, deriveAxes } from "../../helpers/zod-pict.js";
 import { buildTestApp, type TestApp } from "../test-server.js";
 
@@ -89,7 +89,7 @@ describe("pairwise settings matrix", () => {
 
       // Merge combos over the tool's minimal valid settings so required
       // fields that are not enumerable axes (e.g. watermark text) are present.
-      const base = defaultSettingsFor(toolId) as Record<string, unknown>;
+      const base = pairwiseSettingsFor(toolId);
       const combos = axes.length < 2 ? [base] : pairwise(axes);
       const cases = combos
         .map((combo) => ({ ...base, ...compactCase(combo) }))

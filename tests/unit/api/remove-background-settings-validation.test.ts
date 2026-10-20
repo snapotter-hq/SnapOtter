@@ -8,6 +8,13 @@ import {
   phase1SettingsSchema,
   registerRemoveBackground,
 } from "../../../apps/api/src/routes/tools/remove-background.js";
+import { pairwise } from "../../helpers/pairwise.js";
+import {
+  defaultSettingsFor,
+  pairwiseSettingsFor,
+  TOOL_SETTINGS_OVERRIDES,
+} from "../../helpers/tool-default-settings.js";
+import { compactCase, deriveAxes } from "../../helpers/zod-pict.js";
 
 const mocks = vi.hoisted(() => ({
   removeBackground: vi.fn(),
@@ -277,5 +284,71 @@ describe("remove-background Phase 1 settings validation (#2281)", () => {
       const parsed = JSON.parse(match[1]) as Record<string, unknown>;
       expect(phase1SettingsSchema.safeParse(parsed).success).toBe(true);
     }
+  });
+
+  it("defaultSettingsFor('remove-background') is valid for both Phase 1 HTTP and pipeline schemas (#2978)", async () => {
+    const defaults = defaultSettingsFor("remove-background") as Record<string, unknown>;
+    expect(TOOL_SETTINGS_OVERRIDES["remove-background"]).toBeUndefined();
+    expect(phase1SettingsSchema.safeParse(defaults)).toEqual({
+      success: true,
+      data: {},
+    });
+    expect(accepts(defaults)).toBe(true);
+
+    const res = await callPhase1Route(defaults);
+    expect(res.statusCode).toBe(202);
+    expect(mocks.enqueueToolJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolId: "remove-background",
+        kind: "ai-tool",
+        settings: {},
+      }),
+    );
+  });
+
+  it("pairwiseSettingsFor('remove-background') keeps color and gradient background types reachable in pairwise sampling (#2978)", () => {
+    const schema = getToolConfig("remove-background")?.settingsSchema;
+    if (!schema) throw new Error("remove-background is not registered");
+
+    const axes = deriveAxes(schema);
+    const base = pairwiseSettingsFor("remove-background");
+    const cases = pairwise(axes)
+      .map((combo) => ({ ...base, ...compactCase(combo) }))
+      .map((combo) => schema.safeParse(combo))
+      .filter(
+        (parsed): parsed is { success: true; data: { backgroundType?: string } } => parsed.success,
+      );
+
+    const backgroundTypes = new Set(cases.map((c) => c.data.backgroundType));
+    expect(backgroundTypes.has("transparent")).toBe(true);
+    expect(backgroundTypes.has("color")).toBe(true);
+    expect(backgroundTypes.has("gradient")).toBe(true);
+    expect(backgroundTypes.has("blur")).toBe(true);
+  });
+
+  it("QA verify-ai scripts pass Phase 1-valid settings to remove-background (#2978)", () => {
+    const parseObjectLiteral = (literal: string): Record<string, unknown> =>
+      JSON.parse(
+        literal.replace(/([a-zA-Z_$][\w$]*)\s*:/g, '"$1":').replace(/,\s*\}/g, "}"),
+      ) as Record<string, unknown>;
+
+    const matrixSource = readFileSync(
+      path.join(REPO_ROOT, "tests/qa/verify-ai-tool-matrix.mts"),
+      "utf8",
+    );
+    const matrixMatch = matrixSource.match(
+      /\{\s*toolId:\s*"remove-background"[^}]*?settings:\s*(\{[^}]*\})/,
+    );
+    expect(matrixMatch).not.toBeNull();
+    const matrixSettings = parseObjectLiteral(matrixMatch?.[1] ?? "");
+    expect(phase1SettingsSchema.safeParse(matrixSettings).success).toBe(true);
+
+    const verifyAiSource = readFileSync(path.join(REPO_ROOT, "tests/qa/verify-ai.mts"), "utf8");
+    const verifyAiMatch = verifyAiSource.match(
+      /run\(\s*"remove-background"\s*,\s*[^,]+,\s*(\{[^}]*\})\s*\)/,
+    );
+    expect(verifyAiMatch).not.toBeNull();
+    const verifyAiSettings = parseObjectLiteral(verifyAiMatch?.[1] ?? "");
+    expect(phase1SettingsSchema.safeParse(verifyAiSettings).success).toBe(true);
   });
 });

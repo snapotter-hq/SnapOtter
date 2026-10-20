@@ -38,12 +38,6 @@ export const TOOL_SETTINGS_OVERRIDES: Record<string, unknown> = {
   "convert-spreadsheet": { format: "ods" },
   "content-aware-resize": { width: 50 },
   "ai-canvas-expand": { extendRight: 32 },
-  // Colors the pairwise lane needs to reach the color and gradient background types (#2075).
-  "remove-background": {
-    backgroundColor: "#ffffff",
-    gradientColor1: "#000000",
-    gradientColor2: "#ffffff",
-  },
   // Generated matrices validate route/format contracts, not long-running OCR
   // execution. Request the optional tier so model-free test environments fail
   // cleanly at ingress instead of saturating their shared CPUs with Tesseract.
@@ -51,6 +45,30 @@ export const TOOL_SETTINGS_OVERRIDES: Record<string, unknown> = {
   "ocr-pdf": { quality: "balanced" },
 };
 
+/**
+ * Extra fields merged over `defaultSettingsFor(toolId)` in the pairwise
+ * settings matrix (`tests/integration/generated/settings-pairwise.test.ts`),
+ * which calls `config.process` directly against the pipeline/batch schema.
+ *
+ * Kept separate from `TOOL_SETTINGS_OVERRIDES` so HTTP route matrices
+ * (`format-matrix-generated`) continue to send Phase 1-valid defaults (#2978).
+ */
+export const PAIRWISE_SETTINGS_OVERRIDES: Record<string, Record<string, unknown>> = {
+  // Colors the pairwise lane needs to reach the color and gradient background types (#2075).
+  "remove-background": {
+    backgroundColor: "#ffffff",
+    gradientColor1: "#000000",
+    gradientColor2: "#ffffff",
+  },
+};
+
 export function defaultSettingsFor(toolId: string): unknown {
   return TOOL_SETTINGS_OVERRIDES[toolId] ?? {};
+}
+
+export function pairwiseSettingsFor(toolId: string): Record<string, unknown> {
+  return {
+    ...(defaultSettingsFor(toolId) as Record<string, unknown>),
+    ...PAIRWISE_SETTINGS_OVERRIDES[toolId],
+  };
 }
