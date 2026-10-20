@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   extractPdfText: vi.fn(),
   getAuthUser: vi.fn(),
   getOcrRuntimeCapability: vi.fn(),
+  hasPersistedJobRow: vi.fn(),
   insertToolJobAlias: vi.fn(),
   prepare: vi.fn(),
   receiveUpload: vi.fn(),
@@ -45,6 +46,10 @@ vi.mock("../../../apps/api/src/routes/progress.js", () => ({
 
 vi.mock("../../../apps/api/src/lib/object-storage.js", () => ({
   deleteObject: mocks.deleteObject,
+}));
+
+vi.mock("../../../apps/api/src/lib/upload-cleanup.js", () => ({
+  hasPersistedJobRow: mocks.hasPersistedJobRow,
 }));
 
 vi.mock("../../../apps/api/src/lib/upload-stream.js", () => ({
@@ -97,6 +102,7 @@ beforeEach(() => {
   mocks.cancelSingleJobGuarded.mockResolvedValue(undefined);
   mocks.deleteObject.mockResolvedValue(undefined);
   mocks.enqueueToolJob.mockResolvedValue(undefined);
+  mocks.hasPersistedJobRow.mockResolvedValue(false);
   mocks.insertToolJobAlias.mockResolvedValue(undefined);
   mocks.requestCancel.mockResolvedValue(true);
   mocks.waitForJob.mockResolvedValue(null);
@@ -371,12 +377,272 @@ describe("OCR route enqueue safety", () => {
       env.MAX_UPLOAD_SIZE_MB = originalLimit;
     }
 
-    expect(mocks.receiveUpload).toHaveBeenCalledWith(filePart, expect.any(String), {
+    const enqueuedJobId = mocks.enqueueToolJob.mock.calls[0]?.[0]?.jobId as string;
+    expect(mocks.receiveUpload).toHaveBeenCalledWith(filePart, enqueuedJobId, {
       maxBytes: 512 * 1024 * 1024,
     });
+    expect(mocks.hasPersistedJobRow).toHaveBeenCalledWith(enqueuedJobId, request.log);
     expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/ocr-job/scan.png");
     expect(reply.statusCode).toBe(503);
     expect(reply.payload).toMatchObject({ error: "Failed to queue OCR" });
+  });
+
+  it("rethrows a 429 quota rejection from enqueueToolJob after deleting the upload when no jobs row was persisted (#2616)", async () => {
+    const quotaErr = Object.assign(
+      new Error("Too many concurrent AI jobs. Please wait for existing jobs to finish."),
+      { statusCode: 429 },
+    );
+    const deleteErr = Object.assign(new Error("Access Denied"), { name: "AccessDenied" });
+    mocks.enqueueToolJob.mockRejectedValueOnce(quotaErr);
+    mocks.hasPersistedJobRow.mockResolvedValueOnce(false);
+    mocks.deleteObject.mockRejectedValueOnce(deleteErr);
+
+    let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+    registerOcr({
+      post: vi.fn((_path, handler) => {
+        routeHandler = handler;
+      }),
+    } as never);
+
+    const warn = vi.fn();
+    const request = {
+      headers: {},
+      log: { error: vi.fn(), info: vi.fn(), warn },
+      parts: async function* () {
+        yield { type: "file", filename: "scan.png", file: {} };
+        yield { type: "field", fieldname: "settings", value: '{"quality":"fast"}' };
+        yield {
+          type: "field",
+          fieldname: "clientJobId",
+          value: "11111111-1111-4111-8111-111111111111",
+        };
+      },
+    };
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      send(payload: unknown) {
+        this.payload = payload;
+        return payload;
+      },
+    };
+
+    await expect(routeHandler?.(request, reply)).rejects.toBe(quotaErr);
+    const enqueuedJobId = mocks.enqueueToolJob.mock.calls[0]?.[0]?.jobId as string;
+    expect(enqueuedJobId).not.toBe("11111111-1111-4111-8111-111111111111");
+    expect(mocks.hasPersistedJobRow).toHaveBeenCalledWith(enqueuedJobId, request.log);
+    expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/ocr-job/scan.png");
+    expect(warn).toHaveBeenCalledWith(
+      {
+        err: deleteErr,
+        jobId: enqueuedJobId,
+        key: "uploads/ocr-job/scan.png",
+      },
+      "Failed to delete rejected upload",
+    );
+    expect(request.log.error).not.toHaveBeenCalled();
+    expect(reply.payload).toBeUndefined();
+  });
+
+  it("keeps the uploaded image when enqueueToolJob fails after the durable jobs row was committed (#2616)", async () => {
+    mocks.enqueueToolJob.mockRejectedValueOnce(new Error("Redis unavailable"));
+    mocks.hasPersistedJobRow.mockResolvedValueOnce(true);
+
+    let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+    registerOcr({
+      post: vi.fn((_path, handler) => {
+        routeHandler = handler;
+      }),
+    } as never);
+
+    const request = {
+      headers: {},
+      log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+      parts: async function* () {
+        yield { type: "file", filename: "scan.png", file: {} };
+        yield { type: "field", fieldname: "settings", value: '{"quality":"fast"}' };
+      },
+    };
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      send(payload: unknown) {
+        this.payload = payload;
+        return payload;
+      },
+    };
+
+    await expect(routeHandler?.(request, reply)).resolves.toBeDefined();
+    const enqueuedJobId = mocks.enqueueToolJob.mock.calls[0]?.[0]?.jobId as string;
+    expect(mocks.hasPersistedJobRow).toHaveBeenCalledWith(enqueuedJobId, request.log);
+    expect(mocks.deleteObject).not.toHaveBeenCalled();
+    expect(reply.statusCode).toBe(503);
+    expect(reply.payload).toMatchObject({ error: "Failed to queue OCR" });
+  });
+
+  it("keeps the uploaded image when the client disconnected during enqueue after the durable jobs row was committed (#2616)", async () => {
+    mocks.hasPersistedJobRow.mockResolvedValueOnce(true);
+
+    let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+    registerOcr({
+      post: vi.fn((_path, handler) => {
+        routeHandler = handler;
+      }),
+    } as never);
+
+    const clientJobId = "11111111-1111-4111-8111-111111111111";
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      raw: { destroyed: false, writableEnded: false, once: vi.fn(), removeListener: vi.fn() },
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      send(payload: unknown) {
+        this.payload = payload;
+        return payload;
+      },
+    };
+    mocks.enqueueToolJob.mockImplementationOnce(async () => {
+      reply.raw.destroyed = true;
+      throw new Error("Redis unavailable");
+    });
+
+    const request = {
+      headers: {},
+      log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+      raw: { socket: { destroyed: false } },
+      parts: async function* () {
+        yield { type: "file", filename: "scan.png", file: {} };
+        yield { type: "field", fieldname: "settings", value: '{"quality":"fast"}' };
+        yield { type: "field", fieldname: "clientJobId", value: clientJobId };
+      },
+    };
+
+    await routeHandler?.(request, reply);
+
+    const enqueuedJobId = mocks.enqueueToolJob.mock.calls[0]?.[0]?.jobId as string;
+    expect(enqueuedJobId).not.toBe(clientJobId);
+    expect(mocks.hasPersistedJobRow).toHaveBeenCalledWith(enqueuedJobId, request.log);
+    expect(mocks.deleteObject).not.toHaveBeenCalled();
+    expect(mocks.cancelSingleJobGuarded).toHaveBeenCalledWith({
+      jobId: clientJobId,
+      expectedArtifactJobId: enqueuedJobId,
+    });
+    expect(reply.payload).toBeUndefined();
+  });
+
+  it("discards the uploaded image and settles the alias when the client disconnected during enqueue before the durable jobs row was committed (#2616)", async () => {
+    mocks.hasPersistedJobRow.mockResolvedValueOnce(false);
+
+    let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+    registerOcr({
+      post: vi.fn((_path, handler) => {
+        routeHandler = handler;
+      }),
+    } as never);
+
+    const clientJobId = "11111111-1111-4111-8111-111111111111";
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      raw: { destroyed: false, writableEnded: false, once: vi.fn(), removeListener: vi.fn() },
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      send(payload: unknown) {
+        this.payload = payload;
+        return payload;
+      },
+    };
+    mocks.enqueueToolJob.mockImplementationOnce(async () => {
+      reply.raw.destroyed = true;
+      throw Object.assign(new Error("Too many concurrent AI jobs"), { statusCode: 429 });
+    });
+
+    const request = {
+      headers: {},
+      log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+      raw: { socket: { destroyed: false } },
+      parts: async function* () {
+        yield { type: "file", filename: "scan.png", file: {} };
+        yield { type: "field", fieldname: "settings", value: '{"quality":"fast"}' };
+        yield { type: "field", fieldname: "clientJobId", value: clientJobId };
+      },
+    };
+
+    await routeHandler?.(request, reply);
+
+    const enqueuedJobId = mocks.enqueueToolJob.mock.calls[0]?.[0]?.jobId as string;
+    expect(mocks.hasPersistedJobRow).toHaveBeenCalledWith(enqueuedJobId, request.log);
+    expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/ocr-job/scan.png");
+    expect(mocks.cancelSingleJobGuarded).toHaveBeenCalledWith({
+      jobId: clientJobId,
+      expectedArtifactJobId: enqueuedJobId,
+    });
+    expect(reply.payload).toBeUndefined();
+  });
+
+  it("deletes the uploaded image and logs a warning if deleteObject rejects when insertToolJobAlias throws (#2616)", async () => {
+    const aliasFault = new Error("DB alias insert failed");
+    const deleteErr = Object.assign(new Error("Access Denied"), { name: "AccessDenied" });
+    mocks.insertToolJobAlias.mockRejectedValueOnce(aliasFault);
+    mocks.deleteObject.mockRejectedValueOnce(deleteErr);
+
+    let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+    registerOcr({
+      post: vi.fn((_path, handler) => {
+        routeHandler = handler;
+      }),
+    } as never);
+
+    const warn = vi.fn();
+    const request = {
+      headers: {},
+      log: { error: vi.fn(), info: vi.fn(), warn },
+      parts: async function* () {
+        yield { type: "file", filename: "scan.png", file: {} };
+        yield {
+          type: "field",
+          fieldname: "clientJobId",
+          value: "11111111-1111-4111-8111-111111111111",
+        };
+      },
+    };
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      send(payload: unknown) {
+        this.payload = payload;
+        return payload;
+      },
+    };
+
+    await expect(routeHandler?.(request, reply)).rejects.toBe(aliasFault);
+    expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/ocr-job/scan.png");
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      {
+        err: deleteErr,
+        jobId: expect.any(String),
+        key: "uploads/ocr-job/scan.png",
+      },
+      "Failed to delete rejected upload",
+    );
   });
 
   it("discards the upload, settles the alias, and skips enqueueing when the client disconnected before enqueue (#2238)", async () => {

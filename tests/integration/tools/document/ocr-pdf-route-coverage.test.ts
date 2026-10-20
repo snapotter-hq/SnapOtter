@@ -6,8 +6,11 @@
  * async job submission are exercised without running PDF OCR.
  */
 
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { objectExists } from "../../../../apps/api/src/lib/object-storage.js";
+import { db, schema } from "../../../../apps/api/src/db/index.js";
+import type { ToolJobData } from "../../../../apps/api/src/jobs/types.js";
+import { deleteObject, objectExists } from "../../../../apps/api/src/lib/object-storage.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
@@ -48,6 +51,7 @@ vi.mock("../../../../apps/api/src/jobs/enqueue.js", async (importOriginal) => {
 });
 
 const PDF = readFixture(fixtures.document.pdf3);
+const PNG = readFixture(fixtures.image.base.png200);
 
 let testApp: TestApp;
 let app: TestApp["app"];
@@ -322,5 +326,165 @@ describe("ocr-pdf route coverage", () => {
     const jobId = mocks.enqueueToolJob.mock.calls.at(-1)?.[0].jobId;
     expect(jobId).toBeDefined();
     await expect(objectExists(`uploads/${jobId}/scan.pdf`)).resolves.toBe(false);
+  });
+
+  it("returns 429 and deletes the uploaded PDF when enqueueToolJob rejects with a 429 quota error (#2616)", async () => {
+    const clientJobId = "22222222-2222-4222-8222-222222222222";
+    mocks.enqueueToolJob.mockRejectedValueOnce(
+      Object.assign(
+        new Error("Too many concurrent AI jobs. Please wait for existing jobs to finish."),
+        { statusCode: 429 },
+      ),
+    );
+    const res = await postOcrPdf([
+      {
+        name: "file",
+        filename: "scan.pdf",
+        contentType: "application/pdf",
+        content: PDF,
+      },
+      { name: "settings", content: JSON.stringify({ quality: "fast", pages: "1" }) },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+
+    try {
+      expect(res.statusCode).toBe(429);
+      const body = JSON.parse(res.body) as { details?: string; message?: string; error?: string };
+      expect(body.details ?? body.message ?? body.error).toBe(
+        "Too many concurrent AI jobs. Please wait for existing jobs to finish.",
+      );
+      const jobId = mocks.enqueueToolJob.mock.calls.at(-1)?.[0].jobId;
+      expect(jobId).toBeDefined();
+      await expect(objectExists(`uploads/${jobId}/scan.pdf`)).resolves.toBe(false);
+    } finally {
+      await db.delete(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    }
+  });
+
+  it("keeps the uploaded PDF when enqueueToolJob fails after committing the durable jobs row (#2616)", async () => {
+    mocks.enqueueToolJob.mockImplementationOnce(async (data: ToolJobData) => {
+      await db.insert(schema.jobs).values({
+        id: data.jobId,
+        userId: data.userId,
+        toolId: data.toolId,
+        pool: data.pool,
+        type: data.kind,
+        status: "queued",
+        inputRefs: data.inputRefs,
+        settings: {},
+      });
+      throw new Error("Redis unavailable");
+    });
+
+    const res = await postOcrPdf([
+      {
+        name: "file",
+        filename: "scan.pdf",
+        contentType: "application/pdf",
+        content: PDF,
+      },
+      { name: "settings", content: JSON.stringify({ quality: "fast", pages: "1" }) },
+    ]);
+
+    const jobId = mocks.enqueueToolJob.mock.calls.at(-1)?.[0].jobId as string;
+    expect(jobId).toBeDefined();
+    try {
+      expect(res.statusCode).toBe(503);
+      expect(JSON.parse(res.body)).toMatchObject({ error: "Failed to queue PDF OCR" });
+      await expect(objectExists(`uploads/${jobId}/scan.pdf`)).resolves.toBe(true);
+    } finally {
+      await db.delete(schema.jobs).where(eq(schema.jobs.id, jobId));
+      await deleteObject(`uploads/${jobId}/scan.pdf`).catch(() => {});
+    }
+  });
+
+  it("returns 429 on /api/v1/tools/image/ocr and deletes the uploaded image when enqueueToolJob rejects with 429, and keeps the upload when the durable jobs row was committed (#2616)", async () => {
+    const clientJobId = "33333333-3333-4333-8333-333333333333";
+    mocks.enqueueToolJob.mockRejectedValueOnce(
+      Object.assign(
+        new Error("Too many concurrent AI jobs. Please wait for existing jobs to finish."),
+        { statusCode: 429 },
+      ),
+    );
+    const { body: quotaBody, contentType: quotaCt } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "scan.png",
+        contentType: "image/png",
+        content: PNG,
+      },
+      { name: "settings", content: JSON.stringify({ quality: "fast" }) },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+    const quotaRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/ocr",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": quotaCt,
+      },
+      body: quotaBody,
+    });
+
+    try {
+      expect(quotaRes.statusCode).toBe(429);
+      const body = JSON.parse(quotaRes.body) as {
+        details?: string;
+        message?: string;
+        error?: string;
+      };
+      expect(body.details ?? body.message ?? body.error).toBe(
+        "Too many concurrent AI jobs. Please wait for existing jobs to finish.",
+      );
+      const quotaJobId = mocks.enqueueToolJob.mock.calls.at(-1)?.[0].jobId as string;
+      expect(quotaJobId).toBeDefined();
+      await expect(objectExists(`uploads/${quotaJobId}/scan.png`)).resolves.toBe(false);
+    } finally {
+      await db.delete(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    }
+
+    mocks.enqueueToolJob.mockImplementationOnce(async (data: ToolJobData) => {
+      await db.insert(schema.jobs).values({
+        id: data.jobId,
+        userId: data.userId,
+        toolId: data.toolId,
+        pool: data.pool,
+        type: data.kind,
+        status: "queued",
+        inputRefs: data.inputRefs,
+        settings: {},
+      });
+      throw new Error("Redis unavailable");
+    });
+
+    const { body: failBody, contentType: failCt } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "scan.png",
+        contentType: "image/png",
+        content: PNG,
+      },
+      { name: "settings", content: JSON.stringify({ quality: "fast" }) },
+    ]);
+    const failRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/ocr",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": failCt,
+      },
+      body: failBody,
+    });
+
+    const failJobId = mocks.enqueueToolJob.mock.calls.at(-1)?.[0].jobId as string;
+    expect(failJobId).toBeDefined();
+    try {
+      expect(failRes.statusCode).toBe(503);
+      expect(JSON.parse(failRes.body)).toMatchObject({ error: "Failed to queue OCR" });
+      await expect(objectExists(`uploads/${failJobId}/scan.png`)).resolves.toBe(true);
+    } finally {
+      await db.delete(schema.jobs).where(eq(schema.jobs.id, failJobId));
+      await deleteObject(`uploads/${failJobId}/scan.png`).catch(() => {});
+    }
   });
 });

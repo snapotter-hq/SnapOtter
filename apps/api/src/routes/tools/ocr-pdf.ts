@@ -26,6 +26,7 @@ import {
   resolveOcrEncodedInputLimit,
 } from "../../lib/ocr-limits.js";
 import { withRouteScratch } from "../../lib/route-scratch.js";
+import { hasPersistedJobRow } from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { validatePdfPath } from "../../modality/document-input.js";
@@ -182,7 +183,12 @@ export function registerOcrPdf(app: FastifyInstance) {
       // cancel landing between parse and enqueueToolJob needs a durable pointer
       // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
       if (clientJobId && clientJobId !== jobId) {
-        await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" });
+        try {
+          await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" });
+        } catch (err) {
+          if (inputKey) await discardUpload(inputKey);
+          throw err;
+        }
       }
 
       const saveMode = parseSaveModeField(saveModeRaw);
@@ -304,16 +310,22 @@ export function registerOcrPdf(app: FastifyInstance) {
         await enqueueToolJob(jobData);
         clientJobId = jobData.clientJobId ?? null;
       } catch (err) {
+        const jobPersisted = await hasPersistedJobRow(jobId, request.log);
         if (disconnect.clientGone()) {
           await disconnect.settleAbandoned({
             jobId,
             clientJobId,
-            uploadKeys: [uploadedInputKey],
+            uploadKeys: jobPersisted ? [] : [uploadedInputKey],
             log: request.log,
           });
           return;
         }
-        await discardUpload(uploadedInputKey);
+        if (!jobPersisted) {
+          await discardUpload(uploadedInputKey);
+        }
+        if ((err as { statusCode?: number } | null)?.statusCode === 429) {
+          throw err;
+        }
         request.log.error({ err, toolId, jobId }, "Failed to enqueue PDF OCR");
         return reply.status(503).send({
           error: "Failed to queue PDF OCR",

@@ -29,6 +29,7 @@ import {
   ocrUploadErrorStatus,
   resolveOcrEncodedInputLimit,
 } from "../../lib/ocr-limits.js";
+import { hasPersistedJobRow } from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { inputHandlerFor } from "../../modality/input-handler.js";
 import { requireToolAccess } from "../../permissions.js";
@@ -198,7 +199,12 @@ export function registerOcr(app: FastifyInstance) {
       // cancel landing between parse and enqueueToolJob needs a durable pointer
       // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
       if (clientJobId && clientJobId !== jobId) {
-        await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" });
+        try {
+          await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" });
+        } catch (err) {
+          if (inputKey) await discardUpload(inputKey);
+          throw err;
+        }
       }
 
       const saveMode = parseSaveModeField(saveModeRaw);
@@ -281,16 +287,22 @@ export function registerOcr(app: FastifyInstance) {
         await enqueueToolJob(jobData);
         clientJobId = jobData.clientJobId ?? null;
       } catch (err) {
+        const jobPersisted = await hasPersistedJobRow(jobId, request.log);
         if (disconnect.clientGone()) {
           await disconnect.settleAbandoned({
             jobId,
             clientJobId,
-            uploadKeys: [inputKey],
+            uploadKeys: jobPersisted ? [] : [inputKey],
             log: request.log,
           });
           return;
         }
-        await discardUpload(inputKey);
+        if (!jobPersisted) {
+          await discardUpload(inputKey);
+        }
+        if ((err as { statusCode?: number } | null)?.statusCode === 429) {
+          throw err;
+        }
         request.log.error({ err, toolId, jobId }, "Failed to enqueue OCR");
         return reply.status(503).send({
           error: "Failed to queue OCR",
