@@ -31,7 +31,7 @@ import { multipartFailure } from "../lib/multipart-parts.js";
 import { deletePrefix, getObjectBuffer, putObject } from "../lib/object-storage.js";
 import { resolveToolPool, shouldSkipSyncWindow } from "../lib/pool.js";
 import { getSettingStrict, parseNumericSettingValue } from "../lib/settings-helpers.js";
-import { settleUnenqueuedAlias } from "../lib/upload-cleanup.js";
+import { hasPersistedJobRow, settleUnenqueuedAlias } from "../lib/upload-cleanup.js";
 import { type ReceivedUpload, receiveUpload } from "../lib/upload-stream.js";
 import { type InputHandler, InputValidationError } from "../modality/contract.js";
 import { inputHandlerFor } from "../modality/input-handler.js";
@@ -643,14 +643,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           await enqueueToolJob(jobData);
           clientJobId = jobData.clientJobId ?? null;
         } catch (err) {
-          const rowExists = await db
-            .select({ id: schema.jobs.id })
-            .from(schema.jobs)
-            .where(eq(schema.jobs.id, jobId))
-            .then((rows) => rows.length > 0)
-            // Can't tell: keep the upload rather than delete a queued job's input.
-            .catch(() => true);
-          if (!rowExists) enqueued = false;
+          if (!(await hasPersistedJobRow(jobId, request.log))) enqueued = false;
           throw err;
         }
 

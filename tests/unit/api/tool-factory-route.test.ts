@@ -672,6 +672,37 @@ describe("createToolRoute", () => {
       expect(deletePrefix).toHaveBeenCalledWith(expect.stringMatching(/^uploads\/[^/]+\/$/));
     });
 
+    it("keeps the upload and logs a warning when the jobs row check itself fails after enqueueToolJob throws (#3144)", async () => {
+      const dbErr = new Error("db connection lost");
+      vi.mocked(enqueueToolJob).mockRejectedValueOnce(new Error("queue add failed"));
+      const select = vi.mocked(db.select);
+      const original = select.getMockImplementation();
+      select.mockImplementation(((fields?: Record<string, unknown>) =>
+        fields && "id" in fields
+          ? { from: () => ({ where: () => Promise.reject(dbErr) }) }
+          : original?.()) as never);
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+      const req = createMockRequest({ fileBuffer: Buffer.from("png-data") });
+
+      try {
+        await expect(handler(req, createMockReply())).rejects.toThrow("queue add failed");
+      } finally {
+        select.mockImplementation(original as never);
+      }
+      expect(deletePrefix).not.toHaveBeenCalled();
+      const jobId = vi.mocked(enqueueToolJob).mock.calls[0][0].jobId;
+      expect(req.log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          err: dbErr,
+          jobId,
+        }),
+        "failed to check whether rejected request persisted a jobs row; keeping uploads",
+      );
+    });
+
     it("rejects and discards the upload without enqueuing when reading maxConcurrentJobsPerUser fails (#2545)", async () => {
       const select = vi.mocked(db.select);
       const original = select.getMockImplementation();
