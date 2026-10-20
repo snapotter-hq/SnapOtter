@@ -2566,6 +2566,33 @@ describe("bridge - extractPythonError via dispatcher responses", () => {
     expect(err.message).toContain("out of memory");
   });
 
+  it("classifies PyTorch CPU allocator errors reported on exit as operational (#2543)", async () => {
+    const mock = await setupReadyDispatcher();
+    for (const oomMsg of [
+      "RuntimeError: [enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes.",
+      "DefaultCPUAllocator: can't allocate memory: you tried to allocate 104857600 bytes.",
+      "OSError: [Errno 12] Cannot allocate memory",
+    ]) {
+      const promise = runPythonWithProgress("test.py", []);
+      await new Promise((r) => setTimeout(r, 10));
+      const lines = mock.stdinWrites.join("").split("\n").filter(Boolean);
+      const id = JSON.parse(lines[lines.length - 1]).id;
+      mock.stdout.emit(
+        "data",
+        Buffer.from(
+          `${JSON.stringify({ id, exitCode: 1, stdout: JSON.stringify({ error: oomMsg }) })}\n`,
+        ),
+      );
+      const err = (await promise.catch((e: unknown) => e)) as Error & {
+        isSafeMessage?: unknown;
+        kind?: string;
+      };
+      expect(err.isSafeMessage).toBe(true);
+      expect(err.kind).toBe("operational");
+      expect(err.message).toBe(oomMsg);
+    }
+  });
+
   it("classifies an in-band Python MemoryError as operational and falls back to errorInfo.type when error is empty", async () => {
     const mock = await setupReadyDispatcher();
     const promise = runPythonWithProgress("test.py", []);

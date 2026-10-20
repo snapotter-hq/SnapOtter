@@ -24,14 +24,16 @@ const MAX_REMBG_PX = Number(process.env.MAX_REMBG_PX) || 2048;
 const OOM_FALLBACK_MODEL = "u2net";
 
 /**
- * onnxruntime / CUDA surface allocation failures with several different
- * messages ("out of memory", "Failed to allocate memory for requested buffer",
- * CUBLAS_STATUS_ALLOC_FAILED, bad_alloc). Match them all so the lighter-model
- * fallback actually triggers instead of failing the job.
+ * onnxruntime / CUDA / PyTorch CPU allocator surface allocation failures with
+ * several different messages ("out of memory", "not enough memory",
+ * "can't allocate memory", "cannot allocate memory",
+ * "Failed to allocate memory for requested buffer",
+ * CUBLAS_STATUS_ALLOC_FAILED, bad_alloc, MemoryError). Match them all so the
+ * lighter-model fallback actually triggers instead of failing the job.
  */
 export function isMemoryAllocError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
-  return /out of memory|failed to allocate|cudaerrormemoryallocation|cublas_status_alloc_failed|bad_alloc|memoryerror/i.test(
+  return /out of memory|not enough memory|can't allocate memory|cannot allocate memory|failed to allocate|cudaerrormemoryallocation|cublas_status_alloc_failed|bad_alloc|memoryerror/i.test(
     err.message,
   );
 }

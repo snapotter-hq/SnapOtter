@@ -72,7 +72,7 @@ export async function seamCarve(
 
     const MAX_MP = 25;
     if (megapixels > MAX_MP) {
-      throw new Error(
+      throw new ToolInputError(
         `Image is too large for content-aware resize (${megapixels.toFixed(1)} MP, max ${MAX_MP} MP). Resize the image to a smaller size first.`,
       );
     }

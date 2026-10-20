@@ -274,8 +274,9 @@ describe("seamCarve", () => {
     expect(result).toBeDefined();
   });
 
-  it("throws when image exceeds 25 MP", async () => {
+  it("throws ToolInputError when image exceeds 25 MP and allows exactly 25 MP (#2543)", async () => {
     const { seamCarve } = await importFresh();
+    // 5000x5000 = 25.0 MP (exact boundary, allowed)
     vi.mocked(sharp).mockImplementation(
       () =>
         ({
@@ -283,14 +284,31 @@ describe("seamCarve", () => {
           jpeg: vi.fn().mockReturnThis(),
           resize: vi.fn().mockReturnThis(),
           toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-jpeg-data")),
-          // 6000x5000 = 30 MP, exceeds 25 MP limit
+          metadata: vi.fn().mockResolvedValue({ width: 5000, height: 5000 }),
+        }) as unknown as ReturnType<typeof sharp>,
+    );
+    await expect(seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR)).resolves.toBeDefined();
+
+    // 6000x5000 = 30 MP, exceeds 25 MP limit
+    mockExecFileAsync.mockClear();
+    vi.mocked(sharp).mockImplementation(
+      () =>
+        ({
+          png: vi.fn().mockReturnThis(),
+          jpeg: vi.fn().mockReturnThis(),
+          resize: vi.fn().mockReturnThis(),
+          toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-jpeg-data")),
           metadata: vi.fn().mockResolvedValue({ width: 6000, height: 5000 }),
         }) as unknown as ReturnType<typeof sharp>,
     );
 
-    await expect(seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow(
-      "Image is too large for content-aware resize",
+    const rejected = seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR);
+    await expect(rejected).rejects.toSatisfy(isToolInputError);
+    await expect(rejected).rejects.toThrow("Image is too large for content-aware resize");
+    const caireCalls = mockExecFileAsync.mock.calls.filter(
+      (c: unknown[]) => Array.isArray(c[1]) && c[1].includes("-preview=false"),
     );
+    expect(caireCalls).toHaveLength(0);
   });
 
   it("pre-resizes when width reduction exceeds 75%", async () => {

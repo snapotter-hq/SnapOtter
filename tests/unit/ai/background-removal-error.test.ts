@@ -73,11 +73,27 @@ describe("removeBackground error surfacing", () => {
     expect((caught as SafeError).message).toBe("still failing");
   });
 
-  it("recognizes Python MemoryError as an allocation failure and retries with the lighter model", async () => {
-    expect(isMemoryAllocError(new Error("MemoryError"))).toBe(true);
+  it("recognizes Python MemoryError and PyTorch CPU allocator errors as allocation failures and retries with the lighter model (#2543)", async () => {
+    for (const msg of [
+      "MemoryError",
+      "RuntimeError: [enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes.",
+      "DefaultCPUAllocator: can't allocate memory: you tried to allocate 104857600 bytes.",
+      "Cannot allocate memory",
+    ]) {
+      expect(isMemoryAllocError(new Error(msg))).toBe(true);
+    }
+    expect(isMemoryAllocError(null)).toBe(false);
+    expect(isMemoryAllocError("out of memory")).toBe(false);
+    expect(
+      isMemoryAllocError(new Error("RuntimeError: DefaultCPUAllocator: invalid alignment")),
+    ).toBe(false);
 
     parseStdoutJson
-      .mockReturnValueOnce({ success: false, error: "MemoryError" })
+      .mockReturnValueOnce({
+        success: false,
+        error:
+          "RuntimeError: [enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes.",
+      })
       .mockReturnValueOnce({ success: false, error: "still failing" });
     runPythonWithProgress.mockResolvedValue({ stdout: "{}" });
 
@@ -89,8 +105,29 @@ describe("removeBackground error surfacing", () => {
     }
 
     expect(runPythonWithProgress).toHaveBeenCalledTimes(2);
+    const secondCallArgs = runPythonWithProgress.mock.calls[1]?.[1] as string[];
+    expect(JSON.parse(secondCallArgs[2])).toMatchObject({ model: "u2net" });
     expect(isSafeMessageError(caught)).toBe(true);
     expect((caught as SafeError).message).toBe("still failing");
+  });
+
+  it("surfaces CPU allocator OOM as an operational SafeError without retrying when already on u2net (#2543)", async () => {
+    const cpuOom =
+      "RuntimeError: [enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes.";
+    parseStdoutJson.mockReturnValueOnce({ success: false, error: cpuOom });
+    runPythonWithProgress.mockResolvedValue({ stdout: "{}" });
+
+    let caught: unknown;
+    try {
+      await removeBackground(png, tmpdir(), { model: "u2net" });
+    } catch (e) {
+      caught = e;
+    }
+
+    expect(runPythonWithProgress).toHaveBeenCalledTimes(1);
+    expect(isSafeMessageError(caught)).toBe(true);
+    expect((caught as SafeError).kind).toBe("operational");
+    expect((caught as SafeError).message).toBe(cpuOom);
   });
 
   it("passes a bridge SafeError (e.g. timeout) through unchanged, not re-wrapped as a bug", async () => {

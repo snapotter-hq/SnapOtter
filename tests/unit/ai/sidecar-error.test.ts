@@ -37,6 +37,9 @@ describe("toSidecarError", () => {
       "CUBLAS_STATUS_ALLOC_FAILED",
       "std::bad_alloc",
       "MemoryError",
+      "RuntimeError: [enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes.",
+      "DefaultCPUAllocator: can't allocate memory: you tried to allocate 104857600 bytes.",
+      "cannot allocate memory",
     ]) {
       const err = toSidecarError(reason, "Upscaling failed") as SafeError;
       expect(err.kind).toBe("operational");

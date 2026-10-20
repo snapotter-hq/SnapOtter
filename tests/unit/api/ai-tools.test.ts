@@ -1342,13 +1342,19 @@ describe("seamCarve", () => {
     expect(mockRm).toHaveBeenCalledTimes(2);
   });
 
-  it("rejects images larger than 25 MP", async () => {
+  it("rejects images larger than 25 MP with ToolInputError (#2543)", async () => {
     // 6000 x 5000 = 30 MP
     mockSharp.mockReturnValue(createSharpChain({ width: 6000, height: 5000 }));
 
-    await expect(seamCarve(INPUT_BUFFER, OUTPUT_DIR, { width: 5000 })).rejects.toThrow(
-      "too large for content-aware resize",
-    );
+    let caught: unknown;
+    try {
+      await seamCarve(INPUT_BUFFER, OUTPUT_DIR, { width: 5000 });
+    } catch (e) {
+      caught = e;
+    }
+    expect((caught as Error)?.name).toBe("ToolInputError");
+    expect((caught as { isToolInputError?: boolean })?.isToolInputError).toBe(true);
+    expect((caught as Error)?.message).toContain("too large for content-aware resize");
   });
 
   it("pre-resizes when reduction exceeds 75% instead of rejecting", async () => {
