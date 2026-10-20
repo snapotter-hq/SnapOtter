@@ -1,3 +1,4 @@
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -67,5 +68,68 @@ describe("PDF validation when qpdf cannot be started", () => {
     expect(failure.code).toBe("ENGINE_UNAVAILABLE");
     expect(failure.details).toContain("QPDF_PATH");
     expect(failure.message).not.toMatch(/damaged/i);
+  });
+
+  it.each([
+    ["exit 126 (cannot execute)", 'echo "Exec format error" >&2\nexit 126'],
+    ["exit 127 (not found under shim)", 'echo "not found" >&2\nexit 127'],
+    ["signal kill (RLIMIT_AS / OOM)", "kill -TERM $$"],
+  ])(
+    "reports %s during the password probe as 503 ENGINE_UNAVAILABLE (#1331)",
+    async (_label, body) => {
+      const dir = mkdtempSync(join(tmpdir(), "snapotter-qpdf-1331-"));
+      const stub = join(dir, "qpdf");
+      writeFileSync(stub, `#!/bin/sh\n${body}\n`);
+      chmodSync(stub, 0o755);
+      setEnv("QPDF_PATH", stub);
+      try {
+        const validatePdfPath = await freshValidator();
+        const error = await validatePdfPath(PDF, { rejectPasswordProtected: true }).then(
+          () => null,
+          (caught: unknown) => caught,
+        );
+        const failure = error as {
+          name?: string;
+          message: string;
+          statusCode?: number;
+          code?: string;
+          details?: string;
+        };
+        expect(failure?.name).toBe("InputValidationError");
+        expect(failure.statusCode).toBe(503);
+        expect(failure.code).toBe("ENGINE_UNAVAILABLE");
+        expect(failure.details).toContain("QPDF_PATH");
+        expect(failure.message).not.toMatch(/damaged/i);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it("reports a non-zero qpdf crash during the password probe as 400 Damaged PDF (#1331)", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "snapotter-qpdf-1331-"));
+    const stub = join(dir, "qpdf");
+    writeFileSync(stub, '#!/bin/sh\necho "broken xref table" >&2\nexit 1\n');
+    chmodSync(stub, 0o755);
+    setEnv("QPDF_PATH", stub);
+    try {
+      const validatePdfPath = await freshValidator();
+      const error = await validatePdfPath(PDF, { rejectPasswordProtected: true }).then(
+        () => null,
+        (caught: unknown) => caught,
+      );
+      const failure = error as {
+        name?: string;
+        message: string;
+        statusCode?: number;
+        code?: string;
+      };
+      expect(failure?.name).toBe("InputValidationError");
+      expect(failure.statusCode).toBe(400);
+      expect(failure.code).toBeUndefined();
+      expect(failure.message).toMatch(/Damaged PDF: qpdf exited 1: broken xref table/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

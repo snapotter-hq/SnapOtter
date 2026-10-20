@@ -32,12 +32,14 @@ function isQpdfTimeout(err: unknown): boolean {
  */
 function qpdfUnavailable(err: unknown): InputValidationError | null {
   if (!isBinarySpawnFailure(err)) return null;
-  return new InputValidationError(
+  const converted = new InputValidationError(
     "PDF processing is unavailable on this server because qpdf could not be started.",
     503,
     "Check QPDF_PATH: it must point at an executable qpdf binary, or be unset to use the one in the container.",
     "ENGINE_UNAVAILABLE",
   );
+  converted.cause = err;
+  return converted;
 }
 
 export interface PdfPathValidationOptions {
@@ -79,7 +81,11 @@ export async function validatePdfPath(
   } catch (err) {
     const unavailable = qpdfUnavailable(err);
     if (unavailable) throw unavailable;
-    if (!isQpdfTimeout(err)) throw err;
+    if (!isQpdfTimeout(err)) {
+      throw new InputValidationError(
+        `Damaged PDF: ${err instanceof Error ? err.message.slice(0, 300) : "structural check failed"}`,
+      );
+    }
     // --requires-password only reads the encryption dictionary, so it does not
     // scale with content the way --check does: a stall here is anomalous (a
     // pathological xref forcing reconstruction, a dead disk, a crafted file),

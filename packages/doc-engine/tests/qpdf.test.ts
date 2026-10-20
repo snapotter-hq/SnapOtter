@@ -240,6 +240,62 @@ describe("qpdfRequiresPassword", () => {
     ).resolves.toBe(false);
   });
 
+  it("rejects exit codes 126 and 127 as errno-coded spawn failures (#1331)", async () => {
+    nextChild({ stderr: "sh: exec format error\n", code: 126 });
+    await expect(
+      import("../src/qpdf.js").then((m) => m.qpdfRequiresPassword("/enc.pdf")),
+    ).rejects.toMatchObject({
+      message: "qpdf exited 126: sh: exec format error",
+      code: "ENOEXEC",
+      syscall: "spawn",
+      path: QPDF_STUB,
+    });
+
+    nextChild({ stderr: "sh: qpdf: not found\n", code: 127 });
+    await expect(
+      import("../src/qpdf.js").then((m) => m.qpdfRequiresPassword("/enc.pdf")),
+    ).rejects.toMatchObject({
+      message: "qpdf exited 127: sh: qpdf: not found",
+      code: "ENOENT",
+      syscall: "spawn",
+      path: QPDF_STUB,
+    });
+  });
+
+  it("rejects a signal kill (code === null) as an errno-coded spawn failure (#1331)", async () => {
+    nextChild({ stderr: "", code: null, signal: "SIGKILL" });
+    await expect(
+      import("../src/qpdf.js").then((m) => m.qpdfRequiresPassword("/enc.pdf")),
+    ).rejects.toMatchObject({
+      message: `spawn ${QPDF_STUB} ENOMEM`,
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: QPDF_STUB,
+      signal: "SIGKILL",
+    });
+
+    nextChild({ stderr: "Out of memory\n", code: null, signal: "SIGKILL" });
+    await expect(
+      import("../src/qpdf.js").then((m) => m.qpdfRequiresPassword("/enc.pdf")),
+    ).rejects.toMatchObject({
+      message: "qpdf exited SIGKILL: Out of memory",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: QPDF_STUB,
+      signal: "SIGKILL",
+    });
+  });
+
+  it("rejects any other non-zero exit code with the captured stderr (#1331)", async () => {
+    nextChild({ stderr: "qpdf: unexpected crash", code: 1 });
+    const err = await import("../src/qpdf.js")
+      .then((m) => m.qpdfRequiresPassword("/enc.pdf"))
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toBe("qpdf exited 1: qpdf: unexpected crash");
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
+  });
+
   it("rejects on an error event", async () => {
     nextChildError(new Error("spawn failed hard"));
     await expect(

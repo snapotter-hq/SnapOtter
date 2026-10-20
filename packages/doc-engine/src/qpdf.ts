@@ -81,6 +81,7 @@ export async function qpdfRequiresPassword(filePath: string): Promise<boolean> {
     const child = spawn(limBin, limArgs, {
       stdio: ["ignore", "ignore", "pipe"],
     });
+    let err = "";
     let settled = false;
     const timer = setTimeout(() => {
       if (settled) return;
@@ -88,17 +89,42 @@ export async function qpdfRequiresPassword(filePath: string): Promise<boolean> {
       child.kill("SIGKILL");
       reject(new QpdfTimeoutError("qpdf timed out after 30s"));
     }, 30_000);
+    child.stderr.on("data", (c: Buffer) => {
+      err = (err + c.toString("utf8")).slice(-4096);
+    });
     child.on("error", (e) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       reject(e);
     });
-    child.on("close", (code) => {
+    child.on("close", (code, signal) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      resolvePromise(code === 0);
+      if (code === 0) {
+        resolvePromise(true);
+        return;
+      }
+      if (code === 2 || code === 3) {
+        resolvePromise(false);
+        return;
+      }
+      if (code === null || code === 126 || code === 127) {
+        const errno = code === 127 ? "ENOENT" : code === 126 ? "ENOEXEC" : "ENOMEM";
+        const detail = err.slice(-1000).trim();
+        const msg = detail ? `qpdf exited ${code ?? signal}: ${detail}` : `spawn ${bin} ${errno}`;
+        reject(
+          Object.assign(new Error(msg), {
+            code: errno,
+            syscall: "spawn",
+            path: bin,
+            ...(signal ? { signal } : {}),
+          }),
+        );
+        return;
+      }
+      reject(new Error(`qpdf exited ${code}: ${err.slice(-1000)}`));
     });
   });
 }
