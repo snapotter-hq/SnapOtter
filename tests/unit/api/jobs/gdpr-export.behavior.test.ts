@@ -50,6 +50,41 @@ function queryChain<T>(result: T) {
   return chain;
 }
 
+/**
+ * Intercepts the export-deadline `AbortSignal.timeout(expectedMs)` call in
+ * `gdprExportJob` and holds the deadline open until the test's target hang
+ * point invokes `fireTimeout()`. Without this, a real 40ms timer armed at
+ * job entry races `archiver("zip")` + `archive.finalize()` under CI CPU
+ * load and can reject before execution reaches `readStoredFile` or
+ * `putObjectStream` (#3082). Secondary timeouts (such as
+ * `CLEANUP_TIMEOUT_MS`) still delegate to the real `AbortSignal.timeout`.
+ */
+function armExportTimeout(expectedMs: number) {
+  const realTimeout = AbortSignal.timeout.bind(AbortSignal);
+  let controller: AbortController | undefined;
+  const timeoutSpy = vi.spyOn(AbortSignal, "timeout").mockImplementation((ms: number) => {
+    if (ms === expectedMs && !controller) {
+      controller = new AbortController();
+      return controller.signal;
+    }
+    return realTimeout(ms);
+  });
+  return {
+    timeoutSpy,
+    fireTimeout() {
+      if (!controller) {
+        throw new Error(
+          `Expected AbortSignal.timeout(${expectedMs}) to have been called before fireTimeout()`,
+        );
+      }
+      const target = controller;
+      queueMicrotask(() => {
+        target.abort(new DOMException("The operation was aborted due to timeout", "TimeoutError"));
+      });
+    },
+  };
+}
+
 async function loadGdprExport() {
   vi.resetModules();
   selectMock.mockReset();
@@ -874,6 +909,7 @@ describe("GDPR export job behavior", () => {
       const { env } = await import("../../../../apps/api/src/config.js");
       const prevTimeout = env.GDPR_EXPORT_TIMEOUT_MS;
       env.GDPR_EXPORT_TIMEOUT_MS = 40;
+      const { timeoutSpy, fireTimeout } = armExportTimeout(40);
       try {
         selectMock
           .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
@@ -895,6 +931,7 @@ describe("GDPR export job behavior", () => {
         readStoredFileMock.mockImplementationOnce(
           (_name: string, opts?: { signal?: AbortSignal }) => {
             readSignal = opts?.signal;
+            fireTimeout();
             // Simulate a read that never resolves on its own.
             return new Promise<Buffer>(() => {});
           },
@@ -906,12 +943,14 @@ describe("GDPR export job behavior", () => {
           message: expect.stringContaining("GDPR export timed out after 40ms"),
         });
 
+        expect(timeoutSpy).toHaveBeenCalledWith(40);
         expect(readSignal).toBeInstanceOf(AbortSignal);
         expect(readSignal?.aborted).toBe(true);
         expect(putObjectStreamMock).not.toHaveBeenCalled();
         expect(loggerWarnMock).not.toHaveBeenCalled();
         expect(unregisterCancelableMock).toHaveBeenCalledWith("export-hung-read");
       } finally {
+        timeoutSpy.mockRestore();
         env.GDPR_EXPORT_TIMEOUT_MS = prevTimeout;
       }
     });
@@ -921,6 +960,7 @@ describe("GDPR export job behavior", () => {
       const { env } = await import("../../../../apps/api/src/config.js");
       const prevTimeout = env.GDPR_EXPORT_TIMEOUT_MS;
       env.GDPR_EXPORT_TIMEOUT_MS = 40;
+      const { timeoutSpy, fireTimeout } = armExportTimeout(40);
       try {
         selectMock
           .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
@@ -930,8 +970,9 @@ describe("GDPR export job behavior", () => {
           .mockReturnValueOnce(queryChain([{ id: "export-hung-write", status: "processing" }]));
 
         putObjectStreamMock.mockImplementationOnce(
-          (_key: string, _source: AsyncIterable<Buffer>, opts?: { signal?: AbortSignal }) =>
-            new Promise<number>((_resolve, reject) => {
+          (_key: string, _source: AsyncIterable<Buffer>, opts?: { signal?: AbortSignal }) => {
+            fireTimeout();
+            return new Promise<number>((_resolve, reject) => {
               opts?.signal?.addEventListener(
                 "abort",
                 () => {
@@ -941,7 +982,8 @@ describe("GDPR export job behavior", () => {
                 },
                 { once: true },
               );
-            }),
+            });
+          },
         );
 
         await expect(gdprExportJob("user-1", "export-hung-write")).rejects.toMatchObject({
@@ -950,9 +992,11 @@ describe("GDPR export job behavior", () => {
           message: expect.stringContaining("GDPR export timed out after 40ms"),
         });
 
+        expect(timeoutSpy).toHaveBeenCalledWith(40);
         expect(deletePrefixMock).toHaveBeenCalledWith("outputs/export-hung-write/");
         expect(unregisterCancelableMock).toHaveBeenCalledWith("export-hung-write");
       } finally {
+        timeoutSpy.mockRestore();
         env.GDPR_EXPORT_TIMEOUT_MS = prevTimeout;
       }
     });
@@ -1019,6 +1063,7 @@ describe("GDPR export job behavior", () => {
       const { env } = await import("../../../../apps/api/src/config.js");
       const prevTimeout = env.GDPR_EXPORT_TIMEOUT_MS;
       env.GDPR_EXPORT_TIMEOUT_MS = 40;
+      const { timeoutSpy, fireTimeout } = armExportTimeout(40);
       try {
         selectMock
           .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
@@ -1028,7 +1073,10 @@ describe("GDPR export job behavior", () => {
           .mockReturnValueOnce(queryChain([{ id: "export-post-write-timeout", status: "queued" }]))
           .mockReturnValueOnce({
             from: vi.fn().mockReturnThis(),
-            where: vi.fn(() => new Promise(() => {})),
+            where: vi.fn(() => {
+              fireTimeout();
+              return new Promise(() => {});
+            }),
           });
 
         await expect(gdprExportJob("user-1", "export-post-write-timeout")).rejects.toMatchObject({
@@ -1036,9 +1084,12 @@ describe("GDPR export job behavior", () => {
           code: "ETIMEDOUT",
         });
 
+        expect(timeoutSpy).toHaveBeenCalledWith(40);
+        expect(putObjectStreamMock).toHaveBeenCalledTimes(1);
         expect(deletePrefixMock).toHaveBeenCalledWith("outputs/export-post-write-timeout/");
         expect(unregisterCancelableMock).toHaveBeenCalledWith("export-post-write-timeout");
       } finally {
+        timeoutSpy.mockRestore();
         env.GDPR_EXPORT_TIMEOUT_MS = prevTimeout;
       }
     });
@@ -1048,6 +1099,7 @@ describe("GDPR export job behavior", () => {
       const { env } = await import("../../../../apps/api/src/config.js");
       const prevTimeout = env.GDPR_EXPORT_TIMEOUT_MS;
       env.GDPR_EXPORT_TIMEOUT_MS = 40;
+      const { timeoutSpy, fireTimeout } = armExportTimeout(40);
       try {
         selectMock
           .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
@@ -1066,8 +1118,9 @@ describe("GDPR export job behavior", () => {
           .mockReturnValueOnce(queryChain([]));
 
         readStoredFileMock.mockImplementationOnce(
-          (_name: string, opts?: { signal?: AbortSignal }) =>
-            new Promise<Buffer>((_resolve, reject) => {
+          (_name: string, opts?: { signal?: AbortSignal }) => {
+            fireTimeout();
+            return new Promise<Buffer>((_resolve, reject) => {
               opts?.signal?.addEventListener(
                 "abort",
                 () => {
@@ -1078,14 +1131,17 @@ describe("GDPR export job behavior", () => {
                 },
                 { once: true },
               );
-            }),
+            });
+          },
         );
 
         await expect(gdprExportJob("user-1", "export-cancel-wins")).resolves.toEqual({
           outputRef: null,
         });
+        expect(timeoutSpy).toHaveBeenCalledWith(40);
         expect(putObjectStreamMock).not.toHaveBeenCalled();
       } finally {
+        timeoutSpy.mockRestore();
         env.GDPR_EXPORT_TIMEOUT_MS = prevTimeout;
       }
     });
@@ -1095,6 +1151,7 @@ describe("GDPR export job behavior", () => {
       const { env } = await import("../../../../apps/api/src/config.js");
       const prevTimeout = env.GDPR_EXPORT_TIMEOUT_MS;
       env.GDPR_EXPORT_TIMEOUT_MS = 40;
+      const { timeoutSpy, fireTimeout } = armExportTimeout(40);
       try {
         selectMock
           .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
@@ -1105,13 +1162,17 @@ describe("GDPR export job behavior", () => {
 
         const cleanupFault = new Error("S3 cleanup failed");
         deletePrefixMock.mockRejectedValueOnce(cleanupFault);
-        putObjectStreamMock.mockImplementationOnce(() => new Promise<number>(() => {}));
+        putObjectStreamMock.mockImplementationOnce(() => {
+          fireTimeout();
+          return new Promise<number>(() => {});
+        });
 
         await expect(gdprExportJob("user-1", "export-cleanup-fault")).rejects.toMatchObject({
           name: "TimeoutError",
           code: "ETIMEDOUT",
         });
 
+        expect(timeoutSpy).toHaveBeenCalledWith(40);
         expect(loggerErrorMock).toHaveBeenCalledWith(
           expect.objectContaining({
             err: cleanupFault,
@@ -1131,6 +1192,7 @@ describe("GDPR export job behavior", () => {
           }),
         );
       } finally {
+        timeoutSpy.mockRestore();
         env.GDPR_EXPORT_TIMEOUT_MS = prevTimeout;
       }
     });
@@ -1331,6 +1393,7 @@ describe("GDPR export job behavior", () => {
       const { env, getObjectSpy, gdprExportJob } = await loadGdprExportWithRealFileStorage();
       const prevTimeout = env.GDPR_EXPORT_TIMEOUT_MS;
       env.GDPR_EXPORT_TIMEOUT_MS = 40;
+      const { timeoutSpy, fireTimeout } = armExportTimeout(40);
       try {
         selectMock
           .mockReturnValueOnce(queryChain([{ id: "user-s3", email: "s3@example.test" }]))
@@ -1352,6 +1415,7 @@ describe("GDPR export job behavior", () => {
         getObjectSpy.mockImplementationOnce((...args: unknown[]) => {
           const sig = args[1] as AbortSignal | undefined;
           s3Signal = sig;
+          fireTimeout();
           return new Promise<Buffer>((_resolve, reject) => {
             sig?.addEventListener(
               "abort",
@@ -1373,6 +1437,7 @@ describe("GDPR export job behavior", () => {
           message: expect.stringContaining("GDPR export timed out after 40ms"),
         });
 
+        expect(timeoutSpy).toHaveBeenCalledWith(40);
         expect(getObjectSpy).toHaveBeenCalledWith(
           "11111111-1111-1111-1111-111111111111.png",
           expect.any(AbortSignal),
@@ -1381,6 +1446,7 @@ describe("GDPR export job behavior", () => {
         expect(putObjectStreamMock).not.toHaveBeenCalled();
         expect(loggerWarnMock).not.toHaveBeenCalled();
       } finally {
+        timeoutSpy.mockRestore();
         env.GDPR_EXPORT_TIMEOUT_MS = prevTimeout;
         (env as Record<string, unknown>).STORAGE_MODE = "local";
       }
