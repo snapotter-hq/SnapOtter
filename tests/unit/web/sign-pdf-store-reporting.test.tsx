@@ -964,6 +964,48 @@ describe("sign-pdf tells its own failures apart from a bad response", () => {
     expect(entry().error).toBe(en.errors.jobTrackingFailed);
   });
 
+  it("keeps the download link without jobTrackingFailed when ending a completed streamed run throws (#2509)", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ canceled: true })));
+    vi.stubGlobal("fetch", fetchMock);
+    renderPanel();
+    const xhr = await apply();
+    const unsubscribe = useFileStore.subscribe((state, previous) => {
+      if (previous.processing && !state.processing) {
+        throw new Error("boom");
+      }
+    });
+
+    try {
+      expect(() =>
+        act(() => {
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({
+              type: "single",
+              phase: "complete",
+              result: { downloadUrl: DOWNLOAD_URL },
+            }),
+          });
+        }),
+      ).toThrow("boom");
+      await act(async () => {});
+
+      expect(screen.getByRole("link", { name: /download signed pdf/i })).toHaveAttribute(
+        "href",
+        DOWNLOAD_URL,
+      );
+      expect(screen.queryByText(en.errors.jobTrackingFailed)).not.toBeInTheDocument();
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(xhr.aborted).toBe(false);
+      expect(entry().status).toBe("completed");
+      expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+      expect(entry().error).toBeNull();
+      xhr.respond(202, { jobId: "job-1", async: true });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+    }
+  });
+
   it("rethrows the root cause when ending the run throws too", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     renderPanel();

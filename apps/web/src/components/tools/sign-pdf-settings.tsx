@@ -376,6 +376,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
      */
     let runFailed = false;
     let settled = false;
+    let landed = false;
     const failRun = (message: string, category?: FeedbackErrorCategory) => {
       if (runFailed) return;
       runFailed = true;
@@ -441,6 +442,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       // Last, so a throw above never leaves the link up beside the error the
       // run ends with (#1354).
       setDownloadUrl(url, capturedEntryId);
+      landed = true;
     };
 
     // The request outlives a progress stream that gave up on the run (a failed
@@ -490,6 +492,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
           abandonRequest();
           return;
         }
+        if (landed) return;
         if (settled && !("reason" in failure && failure.reason === "trackingFailed")) return;
         cancelIfHandlingFailed(failure, abandonedJob);
         abandonRequest();
