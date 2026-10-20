@@ -90,6 +90,12 @@ beforeEach(() => {
   mocks.enqueueToolJob.mockResolvedValue(undefined);
   mocks.detectAnimation.mockResolvedValue({ animated: true, frames: 2 });
   mocks.removeBackground.mockResolvedValue(validPng);
+  mocks.removeBackgroundAnimated.mockResolvedValue({
+    buffer: validPng,
+    ext: "webp",
+    format: "webp",
+    contentType: "image/webp",
+  });
 });
 
 async function callRoute(path: string, settings: Record<string, unknown>) {
@@ -394,5 +400,78 @@ describe("remove-gif-background color validation (#2282)", () => {
     expect(backgroundTypes.has("color")).toBe(true);
     expect(backgroundTypes.has("gradient")).toBe(true);
     expect(backgroundTypes.has("blur")).toBe(true);
+    expect(backgroundTypes.has("image")).toBe(false);
+  });
+
+  it("rejects the image background type for pipelines and batches (#3005)", async () => {
+    expect(acceptsGifBg({ backgroundType: "image" })).toBe(false);
+
+    const processFn = getToolConfig("remove-gif-background")?.process;
+    if (!processFn) throw new Error("remove-gif-background process fn missing");
+
+    await expect(
+      processFn(validPng, { backgroundType: "image" }, "anim.gif", {
+        scratchDir: "/tmp",
+        signal: new AbortController().signal,
+        report: vi.fn(),
+      }),
+    ).rejects.toMatchObject({
+      cause: expect.objectContaining({
+        message: expect.stringMatching(/backgroundType/),
+      }),
+    });
+    expect(mocks.removeBackgroundAnimated).not.toHaveBeenCalled();
+  });
+
+  it("worker handler rejects an image background job without a background image (#3005)", async () => {
+    for (const badSettings of [
+      { backgroundType: "image" },
+      { backgroundType: "image", bgImageKey: "" },
+    ]) {
+      await expect(
+        runAiToolJob(
+          {
+            jobId: "j-gif-img",
+            toolId: "remove-gif-background",
+            userId: null,
+            pool: "ai",
+            inputRefs: ["uploads/j-gif-img/anim.gif"],
+            filename: "anim.gif",
+            settings: badSettings,
+            kind: "ai-tool",
+          },
+          validPng,
+          { scratchDir: "/tmp", signal: new AbortController().signal, report: vi.fn() },
+        ),
+      ).rejects.toMatchObject({
+        cause: expect.objectContaining({
+          message: expect.stringMatching(/An image background needs a background image/i),
+        }),
+      });
+    }
+
+    mocks.getObjectBuffer.mockResolvedValueOnce(Buffer.alloc(0));
+    await expect(
+      runAiToolJob(
+        {
+          jobId: "j-gif-empty-bg",
+          toolId: "remove-gif-background",
+          userId: null,
+          pool: "ai",
+          inputRefs: ["uploads/j-gif-empty-bg/anim.gif"],
+          filename: "anim.gif",
+          settings: { backgroundType: "image", bgImageKey: "uploads/j-gif-empty-bg/bg.png" },
+          kind: "ai-tool",
+        },
+        validPng,
+        { scratchDir: "/tmp", signal: new AbortController().signal, report: vi.fn() },
+      ),
+    ).rejects.toMatchObject({
+      cause: expect.objectContaining({
+        message: expect.stringMatching(/An image background needs a background image/i),
+      }),
+    });
+
+    expect(mocks.removeBackgroundAnimated).not.toHaveBeenCalled();
   });
 });

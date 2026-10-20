@@ -161,9 +161,11 @@ def _apply_shadow(base, cutout, settings):
 
 def _apply_effect(cutout, original, settings, bg_img):
     c1_rgba, _ = _validate_bg_colors(settings)
+    bg_type = settings.get("backgroundType", "transparent")
+    if bg_type == "image" and bg_img is None:
+        raise ValueError("An image background needs a background image")
     from PIL import Image, ImageFilter
 
-    bg_type = settings.get("backgroundType", "transparent")
     w, h = cutout.size
     if bg_type == "color":
         base = Image.new("RGBA", (w, h), c1_rgba)
@@ -172,7 +174,7 @@ def _apply_effect(cutout, original, settings, bg_img):
     elif bg_type == "blur":
         radius = max(1.0, float(settings.get("blurIntensity", 20)) / 3.0)
         base = original.convert("RGBA").filter(ImageFilter.GaussianBlur(radius=radius))
-    elif bg_type == "image" and bg_img is not None:
+    elif bg_type == "image":
         base = _cover(bg_img, w, h)
     else:
         base = Image.new("RGBA", (w, h), (0, 0, 0, 0))
@@ -289,6 +291,8 @@ def main():
     canceled = False
     try:
         _validate_bg_colors(settings)
+        if settings.get("backgroundType") == "image" and not bg_path:
+            raise ValueError("An image background needs a background image")
         from PIL import Image
 
         from gpu import onnx_providers

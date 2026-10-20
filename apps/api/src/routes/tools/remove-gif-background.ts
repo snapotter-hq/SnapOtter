@@ -91,6 +91,13 @@ const settingsShape = z.object({
 
 const settingsSchema = settingsShape.superRefine(requireBackgroundColors);
 
+// Pipelines and batches carry settings as JSON, so an uploaded background image
+// can't reach the worker. Reject the type up front instead of returning a
+// cutout with the background dropped (#3005).
+const pipelineSettingsSchema = settingsShape
+  .extend({ backgroundType: z.enum(["transparent", "color", "gradient", "blur"]).optional() })
+  .superRefine(requireBackgroundColors);
+
 // The worker also receives the staged background-image storage key (never
 // persisted to the audit row — passed via dbSettings redaction on enqueue).
 const jobSettingsSchema = settingsShape
@@ -158,6 +165,9 @@ registerAiJobHandler(
           bgImagePath = join(ctx.scratchDir, "bg-input");
           await writeFile(bgImagePath, bg);
         }
+      }
+      if (settings.backgroundType === "image" && !bgImagePath) {
+        throw new Error("An image background needs a background image");
       }
 
       let result: Awaited<ReturnType<typeof removeBackgroundAnimated>>;
@@ -382,12 +392,12 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
   // ── Pipeline/batch registry ──────────────────────────────────────
   registerToolProcessFn({
     toolId: "remove-gif-background",
-    settingsSchema,
+    settingsSchema: pipelineSettingsSchema,
     process: withImageEncodeContext<unknown>(
       "Animated background removal failed",
       (s) => (s as Settings)?.outputFormat ?? "webp",
       async (inputBuffer, settings, filename, ctx) => {
-        const s = settingsSchema.parse(settings);
+        const s = pipelineSettingsSchema.parse(settings);
         const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
         const needsCleanup = !ctx?.scratchDir;
         if (needsCleanup) await mkdir(scratchDir, { recursive: true });
@@ -399,8 +409,6 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
           let result: Awaited<ReturnType<typeof removeBackgroundAnimated>>;
           try {
             const animation = await detectAnimation(inputBuffer, filename);
-            // Batch/pipeline has no per-request background image; "image" degrades
-            // to transparent in the pipeline (the Python side handles a null bg).
             result = await removeBackgroundAnimated(
               inputBuffer,
               scratchDir,

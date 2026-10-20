@@ -109,11 +109,38 @@ for bad_effect in (
     {"backgroundType": "color"},
     {"backgroundType": "color", "backgroundColor": "red"},
     {"backgroundType": "gradient", "gradientColor1": "#000"},
+    {"backgroundType": "image"},
 ):
     try:
         gif_remove_bg._apply_effect(None, None, bad_effect, None)
         raise AssertionError(f"gif_remove_bg._apply_effect(..., {bad_effect!r}) did not raise")
     except ValueError:
         pass
+
+try:
+    gif_remove_bg._apply_effect(None, None, {"backgroundType": "image"}, None)
+    raise AssertionError("gif_remove_bg._apply_effect image without bg_img did not raise")
+except ValueError as err:
+    assert "An image background needs a background image" in str(err), err
+
+import subprocess  # noqa: E402
+
+proc = subprocess.run(
+    [
+        sys.executable,
+        os.path.join(SIDE, "gif_remove_bg.py"),
+        "in.gif",
+        "out.webp",
+        json.dumps({"backgroundType": "image"}),
+    ],
+    capture_output=True,
+    text=True,
+    check=True,
+)
+main_payload = json.loads(proc.stdout.strip())
+assert main_payload == {
+    "success": False,
+    "error": "An image background needs a background image",
+}, main_payload
 
 print("WIRE OK")

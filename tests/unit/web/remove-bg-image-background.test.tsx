@@ -30,10 +30,13 @@ import {
   RemoveBgPipelineControls,
   RemoveBgSettings,
 } from "@/components/tools/remove-bg-settings";
+import { RemoveGifBackgroundSettings } from "@/components/tools/remove-gif-background-settings";
 import { useFileStore } from "@/stores/file-store";
 
 const imageLabel = en.toolSettings["remove-bg"].image;
+const gifImageLabel = en.toolSettings["remove-gif-background"].bgImage;
 const png = (name: string) => new File([new Uint8Array([1, 2, 3])], name, { type: "image/png" });
+const gif = (name: string) => new File([new Uint8Array([1, 2, 3])], name, { type: "image/gif" });
 
 beforeEach(() => {
   URL.createObjectURL = vi.fn(() => "blob:mock");
@@ -123,6 +126,53 @@ describe("remove-background image background option (#2074)", () => {
 
     act(() => useFileStore.getState().setFiles([png("a.png")]));
     expect(screen.getByRole("button", { name: imageLabel })).toBeInTheDocument();
+  });
+});
+
+describe("remove-gif-background image background option (#3005)", () => {
+  it("offers the Image background for one file and hides it for several", () => {
+    useFileStore.getState().setFiles([gif("a.gif")]);
+    const { unmount } = render(<RemoveGifBackgroundSettings />);
+    expect(screen.getByRole("button", { name: gifImageLabel })).toBeInTheDocument();
+    unmount();
+
+    useFileStore.getState().setFiles([gif("a.gif"), gif("b.gif")]);
+    render(<RemoveGifBackgroundSettings />);
+    expect(screen.queryByRole("button", { name: gifImageLabel })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: en.toolSettings["remove-gif-background"].bgColor }),
+    ).toBeVisible();
+  });
+
+  it("follows the file count on a mounted page and never sends image for several files", () => {
+    useFileStore.getState().setFiles([gif("a.gif")]);
+    render(<RemoveGifBackgroundSettings />);
+    fireEvent.click(screen.getByRole("button", { name: gifImageLabel }));
+
+    const submitBtn = screen.getByTestId("remove-gif-background-submit");
+    expect(submitBtn).toBeDisabled();
+
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const bgFile = png("bg.png");
+    fireEvent.change(fileInput, { target: { files: [bgFile] } });
+    expect(submitBtn).toBeEnabled();
+
+    act(() => useFileStore.getState().setFiles([gif("a.gif"), gif("b.gif")]));
+    expect(screen.queryByRole("button", { name: gifImageLabel })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "bg.png" })).not.toBeInTheDocument();
+    expect(submitBtn).toBeEnabled();
+
+    fireEvent.click(submitBtn);
+    const sent = processor.processAllFiles.mock.calls[0][1] as Record<string, unknown>;
+    expect(sent.backgroundType).toBe("transparent");
+    expect(sent._bgImageFile).toBeUndefined();
+
+    act(() => useFileStore.getState().setFiles([gif("a.gif")]));
+    expect(screen.getByRole("button", { name: gifImageLabel })).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("remove-gif-background-submit"));
+    const singleSent = processor.processFiles.mock.calls[0][1] as Record<string, unknown>;
+    expect(singleSent.backgroundType).toBe("image");
+    expect(singleSent._bgImageFile).toBe(bgFile);
   });
 });
 

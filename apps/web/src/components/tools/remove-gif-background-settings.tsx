@@ -60,7 +60,10 @@ export function RemoveGifBackgroundSettings() {
 
   const [quality, setQuality] = useState<Quality>("fast");
   const [outputFormat, setOutputFormat] = useState<OutputFormat>("webp");
-  const [backgroundType, setBackgroundType] = useState<BackgroundType>("transparent");
+  const allowImageBackground = files.length <= 1;
+  const [chosenBgType, setBackgroundType] = useState<BackgroundType>("transparent");
+  const backgroundType: BackgroundType =
+    chosenBgType === "image" && !allowImageBackground ? "transparent" : chosenBgType;
   const [backgroundColor, setBackgroundColor] = useState("#ffffff");
   const [gradientColor1, setGradientColor1] = useState("#4f46e5");
   const [gradientColor2, setGradientColor2] = useState("#ec4899");
@@ -142,7 +145,7 @@ export function RemoveGifBackgroundSettings() {
             { value: "color", label: s.bgColor },
             { value: "gradient", label: s.bgGradient },
             { value: "blur", label: s.bgBlur },
-            { value: "image", label: s.bgImage },
+            ...(allowImageBackground ? [{ value: "image" as const, label: s.bgImage }] : []),
           ]}
         />
 

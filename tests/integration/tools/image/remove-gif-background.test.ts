@@ -118,6 +118,69 @@ describe("Remove GIF Background (#496)", () => {
     expect(JSON.parse(res.body).error).toMatch(/background image/i);
   });
 
+  it("rejects backgroundType 'image' on /batch and /api/v1/pipeline/execute (#3005)", async () => {
+    setInstalled(["background-removal"]);
+    const batchPayload = createMultipartPayload([
+      { name: "file", filename: "a.gif", contentType: "image/gif", content: GIF },
+      { name: "file", filename: "b.gif", contentType: "image/gif", content: GIF },
+      { name: "settings", content: JSON.stringify({ backgroundType: "image" }) },
+    ]);
+    const batchRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/remove-gif-background/batch",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": batchPayload.contentType },
+      body: batchPayload.body,
+    });
+    expect(batchRes.statusCode).toBe(400);
+    expect(JSON.parse(batchRes.body).error).toMatch(/invalid settings/i);
+    expect(batchRes.body).toContain("backgroundType");
+
+    const batchArrayPayload = createMultipartPayload([
+      { name: "file", filename: "a.gif", contentType: "image/gif", content: GIF },
+      { name: "file", filename: "b.gif", contentType: "image/gif", content: GIF },
+      {
+        name: "settings",
+        content: JSON.stringify([{ backgroundType: "transparent" }, { backgroundType: "image" }]),
+      },
+    ]);
+    const batchArrayRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/remove-gif-background/batch",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": batchArrayPayload.contentType,
+      },
+      body: batchArrayPayload.body,
+    });
+    expect(batchArrayRes.statusCode).toBe(400);
+    expect(JSON.parse(batchArrayRes.body).error).toMatch(/invalid settings/i);
+    expect(batchArrayRes.body).toContain("backgroundType");
+
+    for (const url of ["/api/v1/pipeline/execute", "/api/v1/pipeline/batch"]) {
+      const pipelinePayload = createMultipartPayload([
+        { name: "file", filename: "a.gif", contentType: "image/gif", content: GIF },
+        {
+          name: "pipeline",
+          content: JSON.stringify({
+            steps: [{ toolId: "remove-gif-background", settings: { backgroundType: "image" } }],
+          }),
+        },
+      ]);
+      const pipelineRes = await app.inject({
+        method: "POST",
+        url,
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": pipelinePayload.contentType,
+        },
+        body: pipelinePayload.body,
+      });
+      expect(pipelineRes.statusCode).toBe(400);
+      expect(JSON.parse(pipelineRes.body).error).toMatch(/invalid settings/i);
+      expect(pipelineRes.body).toContain("backgroundType");
+    }
+  });
+
   it.each([
     ["a color that isn't hex", { backgroundType: "color", backgroundColor: "red" }],
     ["a color background without a color", { backgroundType: "color" }],
