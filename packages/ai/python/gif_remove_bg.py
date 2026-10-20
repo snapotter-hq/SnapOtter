@@ -17,6 +17,9 @@ _HEX_COLOR_RE = re.compile(r"^#?(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 MAX_REMBG_PX = int(os.environ.get("MAX_REMBG_PX", "2048"))
 _OOM_MARKERS = (
     "out of memory",
+    "not enough memory",
+    "can't allocate memory",
+    "cannot allocate memory",
     "failed to allocate",
     "cudaerrormemoryallocation",
     "cublas_status_alloc_failed",

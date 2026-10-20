@@ -88,6 +88,227 @@ for script_file in AI_ENTRYPOINT_SCRIPTS:
 import gif_remove_bg  # noqa: E402
 assert gif_remove_bg._is_oom(MemoryError()) is True, "gif_remove_bg._is_oom must recognize bare MemoryError()"
 assert gif_remove_bg._is_oom(RuntimeError("MemoryError")) is True
+for cpu_oom_err in (
+    RuntimeError(
+        "RuntimeError: [enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes."
+    ),
+    RuntimeError("DefaultCPUAllocator: can't allocate memory: you tried to allocate 104857600 bytes."),
+    RuntimeError("OSError: [Errno 12] Cannot allocate memory"),
+    OSError(12, "Cannot allocate memory"),
+    RuntimeError("DefaultCPUAllocator: NOT ENOUGH MEMORY"),
+    RuntimeError("DefaultCPUAllocator: CAN'T ALLOCATE MEMORY"),
+):
+    assert gif_remove_bg._is_oom(cpu_oom_err) is True, (
+        f"gif_remove_bg._is_oom must recognize CPU allocator OOM: {cpu_oom_err!r}"
+    )
+assert (
+    gif_remove_bg._is_oom(RuntimeError("RuntimeError: DefaultCPUAllocator: invalid alignment"))
+    is False
+)
+
+# Verify _remove_one does not retry with alpha_matting=False when a CPU allocator OOM occurs,
+# and verify main()'s frame-0 probe falls back from birefnet* to u2net on CPU allocator OOM.
+import tempfile  # noqa: E402
+import types  # noqa: E402
+
+
+def _verify_gif_cpu_oom_handling():
+    rembg_calls = []
+    fake_rembg = types.ModuleType("rembg")
+    active_err = [None]
+
+    def _fake_remove(_data, session=None, alpha_matting=False, **_kwargs):
+        rembg_calls.append((session, alpha_matting))
+        if active_err[0] is not None and alpha_matting:
+            raise active_err[0]
+        return b"png"
+
+    fake_rembg.remove = _fake_remove
+    fake_pil = types.ModuleType("PIL")
+
+    class _FakeFrame:
+        size = (16, 16)
+
+        def save(self, buf, format="PNG"):  # noqa: A002
+            buf.write(b"png")
+
+        def convert(self, _mode):
+            return self
+
+    fake_pil.Image = types.SimpleNamespace(LANCZOS=1, open=lambda _b: _FakeFrame())
+    prev_rembg = sys.modules.get("rembg")
+    prev_pil = sys.modules.get("PIL")
+    sys.modules["rembg"] = fake_rembg
+    sys.modules["PIL"] = fake_pil
+    try:
+        for oom_msg in (
+            "[enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes.",
+            "DefaultCPUAllocator: can't allocate memory: you tried to allocate 104857600 bytes.",
+            "[Errno 12] Cannot allocate memory",
+        ):
+            rembg_calls.clear()
+            active_err[0] = RuntimeError(oom_msg)
+            try:
+                gif_remove_bg._remove_one(_FakeFrame(), "sess", True, {}, None, (16, 16))
+                raise AssertionError(f"_remove_one did not re-raise CPU allocator OOM: {oom_msg!r}")
+            except RuntimeError:
+                pass
+            assert rembg_calls == [("sess", True)], (
+                f"_remove_one should not retry alpha_matting=False on CPU OOM, got {rembg_calls!r}"
+            )
+
+        # Non-OOM with use_alpha=True falls back to alpha_matting=False.
+        rembg_calls.clear()
+        active_err[0] = ValueError("pymatting Cholesky failed")
+        gif_remove_bg._remove_one(_FakeFrame(), "sess", True, {}, None, (16, 16))
+        assert rembg_calls == [("sess", True), ("sess", False)], rembg_calls
+
+        # Now exercise main()'s frame-0 probe fallback from birefnet-general to u2net on CPU OOM,
+        # and confirm non-OOM errors or OOMs when already on u2net are not retried.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            for m_name in ("birefnet-general", "u2net"):
+                open(os.path.join(tmpdir, f"{m_name}.onnx"), "wb").close()
+
+            fake_gpu = types.ModuleType("gpu")
+            fake_gpu.onnx_providers = lambda: (["CPUExecutionProvider"], "cpu")
+            fake_model_paths = types.ModuleType("model_paths")
+            fake_model_paths.ensure_rembg_model_home = lambda: None
+            fake_remove_bg = types.ModuleType("remove_bg")
+            fake_remove_bg.ALLOWED_MODELS = {"birefnet-general", "u2net"}
+
+            prev_mods = {
+                k: sys.modules.get(k) for k in ("gpu", "model_paths", "remove_bg")
+            }
+            sys.modules["gpu"] = fake_gpu
+            sys.modules["model_paths"] = fake_model_paths
+            sys.modules["remove_bg"] = fake_remove_bg
+
+            orig_read_frames = gif_remove_bg._read_frames
+            orig_create_session = gif_remove_bg._create_session
+            orig_remove_one = gif_remove_bg._remove_one
+            orig_apply_effect = gif_remove_bg._apply_effect
+            orig_encode = gif_remove_bg._encode
+            orig_argv = sys.argv
+            orig_u2net_home = os.environ.get("U2NET_HOME")
+
+            created_models = []
+            removed_sessions = []
+            probe_err = [None]
+
+            def _stub_create_session(model, _providers, device):
+                created_models.append(model)
+                return f"session:{model}", device
+
+            def _stub_remove_one(_frame, session, *_args):
+                removed_sessions.append(session)
+                if probe_err[0] is not None and session in probe_err[0][0]:
+                    raise probe_err[0][1]
+                return _FakeFrame()
+
+            def _run_main(settings_dict):
+                created_models.clear()
+                removed_sessions.clear()
+                sys.argv = [
+                    "gif_remove_bg.py",
+                    "in.gif",
+                    "out.webp",
+                    json.dumps(settings_dict),
+                ]
+                r_fd, w_fd = os.pipe()
+                try:
+                    saved_stdout_fd = os.dup(1)
+                    os.dup2(w_fd, 1)
+                    os.close(w_fd)
+                    try:
+                        gif_remove_bg.main()
+                    finally:
+                        os.dup2(saved_stdout_fd, 1)
+                        os.close(saved_stdout_fd)
+                    captured = os.read(r_fd, 4096).decode("utf-8")
+                finally:
+                    os.close(r_fd)
+                return json.loads(captured.strip())
+
+            gif_remove_bg._read_frames = lambda _p: ([_FakeFrame(), _FakeFrame()], [100, 100], 0)
+            gif_remove_bg._create_session = _stub_create_session
+            gif_remove_bg._remove_one = _stub_remove_one
+            gif_remove_bg._apply_effect = lambda cut, *_a: cut
+            gif_remove_bg._encode = lambda *_a: None
+            os.environ["U2NET_HOME"] = tmpdir
+            try:
+                for oom_msg in (
+                    "[enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes.",
+                    "DefaultCPUAllocator: can't allocate memory: you tried to allocate 104857600 bytes.",
+                    "[Errno 12] Cannot allocate memory",
+                ):
+                    probe_err[0] = ({"session:birefnet-general"}, RuntimeError(oom_msg))
+                    probe_payload = _run_main({"model": "birefnet-general", "outputFormat": "webp"})
+                    assert probe_payload == {
+                        "success": True,
+                        "model": "u2net",
+                        "device": "cpu",
+                        "frames": 2,
+                        "format": "webp",
+                    }, probe_payload
+                    assert created_models == ["birefnet-general", "u2net"], created_models
+                    assert removed_sessions == [
+                        "session:birefnet-general",
+                        "session:u2net",
+                        "session:u2net",
+                    ], removed_sessions
+
+                # Non-OOM error on birefnet-general does not fall back to u2net.
+                probe_err[0] = (
+                    {"session:birefnet-general"},
+                    RuntimeError("DefaultCPUAllocator: invalid alignment"),
+                )
+                non_oom_payload = _run_main({"model": "birefnet-general", "outputFormat": "webp"})
+                assert non_oom_payload == {
+                    "success": False,
+                    "error": "DefaultCPUAllocator: invalid alignment",
+                }, non_oom_payload
+                assert created_models == ["birefnet-general"], created_models
+
+                # CPU OOM when already on u2net does not retry session creation.
+                probe_err[0] = (
+                    {"session:u2net"},
+                    RuntimeError("DefaultCPUAllocator: not enough memory"),
+                )
+                u2net_oom_payload = _run_main({"model": "u2net", "outputFormat": "webp"})
+                assert u2net_oom_payload == {
+                    "success": False,
+                    "error": "DefaultCPUAllocator: not enough memory",
+                }, u2net_oom_payload
+                assert created_models == ["u2net"], created_models
+                assert removed_sessions == ["session:u2net"], removed_sessions
+            finally:
+                gif_remove_bg._read_frames = orig_read_frames
+                gif_remove_bg._create_session = orig_create_session
+                gif_remove_bg._remove_one = orig_remove_one
+                gif_remove_bg._apply_effect = orig_apply_effect
+                gif_remove_bg._encode = orig_encode
+                sys.argv = orig_argv
+                if orig_u2net_home is None:
+                    os.environ.pop("U2NET_HOME", None)
+                else:
+                    os.environ["U2NET_HOME"] = orig_u2net_home
+                for k, v in prev_mods.items():
+                    if v is None:
+                        sys.modules.pop(k, None)
+                    else:
+                        sys.modules[k] = v
+    finally:
+        if prev_rembg is None:
+            sys.modules.pop("rembg", None)
+        else:
+            sys.modules["rembg"] = prev_rembg
+        if prev_pil is None:
+            sys.modules.pop("PIL", None)
+        else:
+            sys.modules["PIL"] = prev_pil
+
+
+_verify_gif_cpu_oom_handling()
 assert gif_remove_bg._hex_to_rgba("#F50") == (255, 85, 0, 255)
 assert gif_remove_bg._hex_to_rgba("ff5500") == (255, 85, 0, 255)
 assert gif_remove_bg._hex_to_rgba(" #f50 ") == (255, 85, 0, 255)
