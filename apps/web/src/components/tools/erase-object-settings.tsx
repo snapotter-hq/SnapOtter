@@ -472,6 +472,7 @@ export function EraseObjectSettings({
     const clientJobId = generateId();
 
     let settled = false;
+    let landed = false;
     const applyResult = (r: Record<string, unknown>) => {
       if (settled) return;
       settled = true;
@@ -492,6 +493,7 @@ export function EraseObjectSettings({
       // An auto-saved result is already in the library, so it was never at risk.
       // Must follow the updateEntryById above; see the `claimed` invariant in file-store.
       if (r.savedFileId) useFileStore.getState().markClaimedById(capturedEntryId);
+      landed = true;
     };
 
     // The store watch below ends with the run. Every terminal handler calls
@@ -584,7 +586,7 @@ export function EraseObjectSettings({
       },
       onFailed: (failure) => {
         endWatch();
-        if (runEndedWithError) return;
+        if (landed || runEndedWithError) return;
         const isTrackingFailure = "reason" in failure && failure.reason === "trackingFailed";
         if (settled && !isTrackingFailure) return;
         cancelIfHandlingFailed(failure, clientJobId);

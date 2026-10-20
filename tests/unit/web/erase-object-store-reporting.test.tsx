@@ -980,6 +980,42 @@ describe("erase-object single file: a completed frame with nothing to download (
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
   });
 
+  it("keeps the completed result without jobTrackingFailed or a cancel when ending a completed streamed run throws (#3018)", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ canceled: true })));
+    vi.stubGlobal("fetch", fetchMock);
+    renderPanel();
+    const xhr = await submit();
+    const unsubscribe = useFileStore.subscribe((state, previous) => {
+      if (previous.processing && !state.processing) {
+        throw new Error("boom");
+      }
+    });
+
+    try {
+      expect(() =>
+        act(() => {
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+          });
+        }),
+      ).toThrow("boom");
+      await act(async () => {});
+
+      expect(entry().status).toBe("completed");
+      expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+      expect(screen.getByTestId("erase-object-download")).toHaveAttribute("href", DOWNLOAD_URL);
+      expect(useFileStore.getState().error).toBeNull();
+      expect(screen.queryByText(en.errors.jobTrackingFailed)).not.toBeInTheDocument();
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(xhr.aborted).toBe(false);
+      xhr.respond(202, { jobId: "job-1", async: true });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+    }
+  });
+
   it("rethrows the root cause and reports the teardown failure once when ending a streamed run throws too", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     renderPanel();
