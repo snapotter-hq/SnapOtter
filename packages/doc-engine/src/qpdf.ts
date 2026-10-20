@@ -14,6 +14,23 @@ export class QpdfTimeoutError extends Error {
   }
 }
 
+function qpdfSpawnFailure(
+  bin: string,
+  code: null | 126 | 127,
+  signal: NodeJS.Signals | null,
+  output: string,
+): NodeJS.ErrnoException {
+  const errno = code === 127 ? "ENOENT" : code === 126 ? "ENOEXEC" : "ENOMEM";
+  const detail = output.slice(-1000).trim();
+  const msg = detail ? `qpdf exited ${code ?? signal}: ${detail}` : `spawn ${bin} ${errno}`;
+  return Object.assign(new Error(msg), {
+    code: errno,
+    syscall: "spawn",
+    path: bin,
+    ...(signal ? { signal } : {}),
+  });
+}
+
 /** @internal Shared qpdf CLI runner for doc-engine modules; not part of the public package API. */
 export function runQpdf(args: string[], timeoutMs = 30_000): Promise<string> {
   const bin = resolveQpdf();
@@ -49,9 +66,16 @@ export function runQpdf(args: string[], timeoutMs = 30_000): Promise<string> {
       // qpdf exit codes: 0 = success, 2 = errors (real failure),
       // 3 = warnings only (file processed successfully despite minor
       // structural quirks common in web-generated and scanned PDFs).
-      if (code === 0 || code === 3) resolvePromise(out);
-      else
-        reject(new Error(`qpdf exited ${code ?? signal}: ${err.slice(-1000) || out.slice(-1000)}`));
+      if (code === 0 || code === 3) {
+        resolvePromise(out);
+        return;
+      }
+      const detail = err.slice(-1000).trim() ? err.slice(-1000) : out.slice(-1000);
+      if (code === null || code === 126 || code === 127) {
+        reject(qpdfSpawnFailure(bin, code, signal, detail));
+        return;
+      }
+      reject(new Error(`qpdf exited ${code}: ${detail}`));
     });
   });
 }
@@ -111,17 +135,7 @@ export async function qpdfRequiresPassword(filePath: string): Promise<boolean> {
         return;
       }
       if (code === null || code === 126 || code === 127) {
-        const errno = code === 127 ? "ENOENT" : code === 126 ? "ENOEXEC" : "ENOMEM";
-        const detail = err.slice(-1000).trim();
-        const msg = detail ? `qpdf exited ${code ?? signal}: ${detail}` : `spawn ${bin} ${errno}`;
-        reject(
-          Object.assign(new Error(msg), {
-            code: errno,
-            syscall: "spawn",
-            path: bin,
-            ...(signal ? { signal } : {}),
-          }),
-        );
+        reject(qpdfSpawnFailure(bin, code, signal, err));
         return;
       }
       reject(new Error(`qpdf exited ${code}: ${err.slice(-1000)}`));

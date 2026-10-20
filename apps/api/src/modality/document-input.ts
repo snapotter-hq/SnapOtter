@@ -144,14 +144,16 @@ export async function validatePdfPath(
     } catch (err) {
       const unavailable = qpdfUnavailable(err);
       if (unavailable) throw unavailable;
-      if (isQpdfTimeout(err)) {
-        // Fail closed: the cap is a resource guard, so a file that stalls the
-        // page-count probe must not slip past it. Say so instead of a 500.
+      if (!isQpdfTimeout(err)) {
         throw new InputValidationError(
-          `Could not count this PDF's pages within the time limit, and this server caps PDFs at ${env.MAX_PDF_PAGES} pages. Try a smaller file.`,
+          `Damaged PDF: ${err instanceof Error ? err.message.slice(0, 300) : "structural check failed"}`,
         );
       }
-      throw err;
+      // Fail closed: the cap is a resource guard, so a file that stalls the
+      // page-count probe must not slip past it. Say so instead of a 500.
+      throw new InputValidationError(
+        `Could not count this PDF's pages within the time limit, and this server caps PDFs at ${env.MAX_PDF_PAGES} pages. Try a smaller file.`,
+      );
     }
     opts.signal?.throwIfAborted();
     if (pages > env.MAX_PDF_PAGES) {

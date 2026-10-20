@@ -132,4 +132,128 @@ describe("PDF validation when qpdf cannot be started", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it.each([
+    ["exit 126 (cannot execute)", 'echo "Exec format error" >&2\nexit 126'],
+    ["exit 127 (not found under shim)", 'echo "not found" >&2\nexit 127'],
+    ["signal kill (RLIMIT_AS / OOM)", "kill -TERM $$"],
+  ])(
+    "reports %s during the structural check as 503 ENGINE_UNAVAILABLE (#2920)",
+    async (_label, body) => {
+      const dir = mkdtempSync(join(tmpdir(), "snapotter-qpdf-2920-"));
+      const stub = join(dir, "qpdf");
+      writeFileSync(
+        stub,
+        `#!/bin/sh\nif [ "$1" = "--requires-password" ]; then exit 2; fi\n${body}\n`,
+      );
+      chmodSync(stub, 0o755);
+      setEnv("QPDF_PATH", stub);
+      try {
+        const validatePdfPath = await freshValidator();
+        const error = await validatePdfPath(PDF, { rejectPasswordProtected: true }).then(
+          () => null,
+          (caught: unknown) => caught,
+        );
+        const failure = error as {
+          name?: string;
+          message: string;
+          statusCode?: number;
+          code?: string;
+          details?: string;
+        };
+        expect(failure?.name).toBe("InputValidationError");
+        expect(failure.statusCode).toBe(503);
+        expect(failure.code).toBe("ENGINE_UNAVAILABLE");
+        expect(failure.details).toContain("QPDF_PATH");
+        expect(failure.message).not.toMatch(/damaged/i);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it.each([
+    ["exit 126 (cannot execute)", 'echo "Exec format error" >&2\nexit 126'],
+    ["exit 127 (not found under shim)", 'echo "not found" >&2\nexit 127'],
+    ["signal kill (RLIMIT_AS / OOM)", "kill -TERM $$"],
+  ])(
+    "reports %s during the page-count probe as 503 ENGINE_UNAVAILABLE (#2920)",
+    async (_label, body) => {
+      const dir = mkdtempSync(join(tmpdir(), "snapotter-qpdf-2920-"));
+      const stub = join(dir, "qpdf");
+      writeFileSync(
+        stub,
+        `#!/bin/sh\nif [ "$1" = "--requires-password" ]; then exit 2; fi\nif [ "$1" = "--check" ]; then exit 0; fi\n${body}\n`,
+      );
+      chmodSync(stub, 0o755);
+      setEnv("QPDF_PATH", stub);
+      setEnv("MAX_PDF_PAGES", "10");
+      try {
+        const validatePdfPath = await freshValidator();
+        const error = await validatePdfPath(PDF, { rejectPasswordProtected: true }).then(
+          () => null,
+          (caught: unknown) => caught,
+        );
+        const failure = error as {
+          name?: string;
+          message: string;
+          statusCode?: number;
+          code?: string;
+          details?: string;
+        };
+        expect(failure?.name).toBe("InputValidationError");
+        expect(failure.statusCode).toBe(503);
+        expect(failure.code).toBe("ENGINE_UNAVAILABLE");
+        expect(failure.details).toContain("QPDF_PATH");
+        expect(failure.message).not.toMatch(/damaged/i);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it.each([
+    [
+      "non-zero exit",
+      'echo "unable to find trailer dictionary" >&2\nexit 2',
+      /Damaged PDF: qpdf exited 2: unable to find trailer dictionary/,
+    ],
+    [
+      "non-numeric stdout",
+      'echo "not-a-number"\nexit 0',
+      /Damaged PDF: qpdf returned a non-numeric page count: not-a-number/,
+    ],
+  ])(
+    "reports a %s during the page-count probe as 400 Damaged PDF (#2920)",
+    async (_label, body, expectedMessage) => {
+      const dir = mkdtempSync(join(tmpdir(), "snapotter-qpdf-2920-"));
+      const stub = join(dir, "qpdf");
+      writeFileSync(
+        stub,
+        `#!/bin/sh\nif [ "$1" = "--requires-password" ]; then exit 2; fi\nif [ "$1" = "--check" ]; then exit 0; fi\n${body}\n`,
+      );
+      chmodSync(stub, 0o755);
+      setEnv("QPDF_PATH", stub);
+      setEnv("MAX_PDF_PAGES", "10");
+      try {
+        const validatePdfPath = await freshValidator();
+        const error = await validatePdfPath(PDF, { rejectPasswordProtected: true }).then(
+          () => null,
+          (caught: unknown) => caught,
+        );
+        const failure = error as {
+          name?: string;
+          message: string;
+          statusCode?: number;
+          code?: string;
+        };
+        expect(failure?.name).toBe("InputValidationError");
+        expect(failure.statusCode).toBe(400);
+        expect(failure.code).toBeUndefined();
+        expect(failure.message).toMatch(expectedMessage);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  );
 });

@@ -12,7 +12,7 @@ describe("doc-engine binary resolution", () => {
   });
 });
 
-describe("qpdfRequiresPassword exit and signal handling (#1331)", () => {
+describe("qpdf exit and signal handling (#1331, #2920)", () => {
   let dir: string;
   let stubPath: string;
   let pdfPath: string;
@@ -77,5 +77,32 @@ describe("qpdfRequiresPassword exit and signal handling (#1331)", () => {
     expect(err).toBeInstanceOf(Error);
     expect(isBinarySpawnFailure(err)).toBe(false);
     expect((err as Error).message).toBe("qpdf exited 1: qpdf: broken object stream\n");
+  });
+
+  it("attaches errno-coded spawn metadata when qpdfCheck or qpdfPageCount exits 126/127 or dies by signal (#2920)", async () => {
+    writeFileSync(stubPath, '#!/bin/sh\necho "Exec format error" >&2\nexit 126\n');
+    chmodSync(stubPath, 0o755);
+    const { qpdfCheck, qpdfPageCount } = await import("@snapotter/doc-engine");
+
+    const err126 = await qpdfCheck(pdfPath).catch((e: unknown) => e);
+    expect(isBinarySpawnFailure(err126)).toBe(true);
+    expect(err126).toMatchObject({ code: "ENOEXEC", syscall: "spawn", path: stubPath });
+
+    writeFileSync(stubPath, '#!/bin/sh\necho "not found" >&2\nexit 127\n');
+    chmodSync(stubPath, 0o755);
+    const err127 = await qpdfPageCount(pdfPath).catch((e: unknown) => e);
+    expect(isBinarySpawnFailure(err127)).toBe(true);
+    expect(err127).toMatchObject({ code: "ENOENT", syscall: "spawn", path: stubPath });
+
+    writeFileSync(stubPath, "#!/bin/sh\nkill -TERM $$\n");
+    chmodSync(stubPath, 0o755);
+    const errSig = await qpdfPageCount(pdfPath).catch((e: unknown) => e);
+    expect(isBinarySpawnFailure(errSig)).toBe(true);
+    expect(errSig).toMatchObject({
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: stubPath,
+      signal: "SIGTERM",
+    });
   });
 });

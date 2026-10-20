@@ -119,18 +119,80 @@ describe("runQpdf via qpdfCheck (exit-code handling)", () => {
     );
   });
 
-  it("falls back to stdout in the error message when stderr is empty", async () => {
+  it("falls back to stdout in the error message when stderr is empty or whitespace-only", async () => {
     nextChild({ stdout: "stdout-only diagnostic", code: 2 });
     await expect(import("../src/qpdf.js").then((m) => m.qpdfCheck("/doc.pdf"))).rejects.toThrow(
       "qpdf exited 2: stdout-only diagnostic",
     );
+
+    nextChild({ stderr: "  \n", stdout: "stdout-only diagnostic", code: null, signal: "SIGKILL" });
+    await expect(
+      import("../src/qpdf.js").then((m) => m.qpdfCheck("/doc.pdf")),
+    ).rejects.toMatchObject({
+      message: "qpdf exited SIGKILL: stdout-only diagnostic",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: QPDF_STUB,
+      signal: "SIGKILL",
+    });
   });
 
   it("reports the signal when the exit code is null", async () => {
     nextChild({ stderr: "killed by signal", code: null, signal: "SIGTERM" });
-    await expect(import("../src/qpdf.js").then((m) => m.qpdfCheck("/doc.pdf"))).rejects.toThrow(
-      "qpdf exited SIGTERM: killed by signal",
-    );
+    await expect(
+      import("../src/qpdf.js").then((m) => m.qpdfCheck("/doc.pdf")),
+    ).rejects.toMatchObject({
+      message: "qpdf exited SIGTERM: killed by signal",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: QPDF_STUB,
+      signal: "SIGTERM",
+    });
+  });
+
+  it("rejects exit codes 126 and 127 as errno-coded spawn failures (#2920)", async () => {
+    nextChild({ stderr: "sh: exec format error\n", code: 126 });
+    await expect(
+      import("../src/qpdf.js").then((m) => m.qpdfCheck("/doc.pdf")),
+    ).rejects.toMatchObject({
+      message: "qpdf exited 126: sh: exec format error",
+      code: "ENOEXEC",
+      syscall: "spawn",
+      path: QPDF_STUB,
+    });
+
+    nextChild({ stderr: "sh: qpdf: not found\n", code: 127 });
+    await expect(
+      import("../src/qpdf.js").then((m) => m.qpdfPageCount("/doc.pdf")),
+    ).rejects.toMatchObject({
+      message: "qpdf exited 127: sh: qpdf: not found",
+      code: "ENOENT",
+      syscall: "spawn",
+      path: QPDF_STUB,
+    });
+  });
+
+  it("falls back to a spawn ENOMEM message when a signal kill produces no output (#2920)", async () => {
+    nextChild({ stderr: "", stdout: "", code: null, signal: "SIGKILL" });
+    await expect(
+      import("../src/qpdf.js").then((m) => m.qpdfPageCount("/doc.pdf")),
+    ).rejects.toMatchObject({
+      message: `spawn ${QPDF_STUB} ENOMEM`,
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: QPDF_STUB,
+      signal: "SIGKILL",
+    });
+  });
+
+  it("does not mark ordinary qpdf exit codes as spawn failures (#2920)", async () => {
+    nextChild({ stderr: "unable to find trailer dictionary", code: 2 });
+    const err = await import("../src/qpdf.js")
+      .then((m) => m.qpdfPageCount("/doc.pdf"))
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toBe("qpdf exited 2: unable to find trailer dictionary");
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
   });
 
   it("rejects with the spawn error object on an error event", async () => {

@@ -244,6 +244,44 @@ describe("path-backed PDF validation", () => {
     }
   });
 
+  it("reports a non-timeout qpdfPageCount failure as a 400 Damaged PDF (#2920)", async () => {
+    const inputPath = join(scratchDir, "damaged-page-count.pdf");
+    writeFileSync(inputPath, "%PDF-path-backed");
+    qpdf.requiresPassword.mockResolvedValueOnce(false);
+    qpdf.check.mockRejectedValueOnce(new QpdfTimeoutError("qpdf timed out after 30s"));
+    qpdf.pageCount.mockRejectedValueOnce(
+      new Error("qpdf exited 2: unable to find trailer dictionary"),
+    );
+    const log = { warn: vi.fn() };
+    const originalMaxPages = env.MAX_PDF_PAGES;
+    env.MAX_PDF_PAGES = 10;
+
+    try {
+      await expect(
+        validatePdfPath(inputPath, { rejectPasswordProtected: true, log }),
+      ).rejects.toMatchObject({
+        name: "InputValidationError",
+        statusCode: 400,
+        message: expect.stringMatching(
+          /Damaged PDF: qpdf exited 2: unable to find trailer dictionary/i,
+        ),
+      });
+
+      qpdf.requiresPassword.mockResolvedValueOnce(false);
+      qpdf.check.mockRejectedValueOnce(new QpdfTimeoutError("qpdf timed out after 30s"));
+      qpdf.pageCount.mockRejectedValueOnce("non-error rejection");
+      await expect(
+        validatePdfPath(inputPath, { rejectPasswordProtected: true, log }),
+      ).rejects.toMatchObject({
+        name: "InputValidationError",
+        statusCode: 400,
+        message: "Damaged PDF: structural check failed",
+      });
+    } finally {
+      env.MAX_PDF_PAGES = originalMaxPages;
+    }
+  });
+
   it("fails closed with a clear error when the password probe times out (#982)", async () => {
     const inputPath = join(scratchDir, "stalls-requires-password.pdf");
     writeFileSync(inputPath, "%PDF-path-backed");
@@ -332,28 +370,42 @@ describe("qpdf spawn failures", () => {
     },
   );
 
-  it("does not blame the file when the structural check cannot start qpdf", async () => {
-    const inputPath = join(scratchDir, "fine.pdf");
-    writeFileSync(inputPath, "%PDF-path-backed");
-    qpdf.requiresPassword.mockResolvedValueOnce(false);
-    qpdf.check.mockRejectedValueOnce(spawnFailure());
+  it.each(["ENOENT", "EACCES", "ENOEXEC", "ENOMEM"])(
+    "does not blame the file when the structural check cannot start qpdf (%s)",
+    async (code) => {
+      const inputPath = join(scratchDir, "fine.pdf");
+      writeFileSync(inputPath, "%PDF-path-backed");
+      const cause = spawnFailure(code);
+      qpdf.requiresPassword.mockResolvedValueOnce(false);
+      qpdf.check.mockRejectedValueOnce(cause);
 
-    await expectEngineUnavailable(validatePdfPath(inputPath, { rejectPasswordProtected: true }));
-    expect(qpdf.pageCount).not.toHaveBeenCalled();
-  });
+      await expectEngineUnavailable(
+        validatePdfPath(inputPath, { rejectPasswordProtected: true }),
+        cause,
+      );
+      expect(qpdf.pageCount).not.toHaveBeenCalled();
+    },
+  );
 
-  it("reports the page-count probe the same way", async () => {
-    const inputPath = join(scratchDir, "fine.pdf");
-    writeFileSync(inputPath, "%PDF-path-backed");
-    qpdf.requiresPassword.mockResolvedValueOnce(false);
-    qpdf.check.mockResolvedValueOnce(undefined);
-    qpdf.pageCount.mockRejectedValueOnce(spawnFailure());
-    const original = env.MAX_PDF_PAGES;
-    env.MAX_PDF_PAGES = 5;
-    try {
-      await expectEngineUnavailable(validatePdfPath(inputPath, { rejectPasswordProtected: true }));
-    } finally {
-      env.MAX_PDF_PAGES = original;
-    }
-  });
+  it.each(["ENOENT", "EACCES", "ENOEXEC", "ENOMEM"])(
+    "reports the page-count probe the same way (%s)",
+    async (code) => {
+      const inputPath = join(scratchDir, "fine.pdf");
+      writeFileSync(inputPath, "%PDF-path-backed");
+      const cause = spawnFailure(code);
+      qpdf.requiresPassword.mockResolvedValueOnce(false);
+      qpdf.check.mockResolvedValueOnce(undefined);
+      qpdf.pageCount.mockRejectedValueOnce(cause);
+      const original = env.MAX_PDF_PAGES;
+      env.MAX_PDF_PAGES = 5;
+      try {
+        await expectEngineUnavailable(
+          validatePdfPath(inputPath, { rejectPasswordProtected: true }),
+          cause,
+        );
+      } finally {
+        env.MAX_PDF_PAGES = original;
+      }
+    },
+  );
 });
