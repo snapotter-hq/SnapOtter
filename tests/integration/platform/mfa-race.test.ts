@@ -421,6 +421,174 @@ describe("MFA Race Condition #2328", () => {
     ).toBe(false);
   });
 
+  it("preserves the recovery code if db.transaction rolls back or aborts on password/role change on /mfa/complete (#2602)", async () => {
+    const { userId, username, password, recoveryCodes } = await createEnrolledUser();
+    const realTransaction = db.transaction.bind(db) as (
+      cb: (tx: object) => Promise<unknown>,
+      config?: unknown,
+    ) => Promise<unknown>;
+
+    const [initialUser] = await db
+      .select({ passwordHash: schema.users.passwordHash, role: schema.users.role })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId));
+
+    // 1. In-transaction aborts (password_changed, password_removed, user_disabled) burn the
+    // challenge and clear attemptsKey without spending the recovery code.
+    for (const abortCase of [
+      {
+        set: { passwordHash: "rotated-password-hash-mid-mfa" },
+        expectedStatus: 401,
+        expectedCode: "MFA_EXPIRED",
+      },
+      {
+        set: { passwordHash: null },
+        expectedStatus: 401,
+        expectedCode: "MFA_EXPIRED",
+      },
+      {
+        set: { role: "disabled:user" },
+        expectedStatus: 403,
+        expectedCode: "USER_DISABLED",
+      },
+    ] as const) {
+      const loginRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username, password },
+      });
+      expect(loginRes.statusCode).toBe(200);
+      const { mfaToken: abortToken } = JSON.parse(loginRes.body);
+
+      const badRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken: abortToken, code: "000000" },
+      });
+      expect(badRes.statusCode).toBe(401);
+      expect(await sharedRedis().get(`mfa:attempts:${abortToken}`)).toBe("1");
+
+      const txAbortSpy = vi.spyOn(db, "transaction").mockImplementationOnce((async (
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) => {
+        await db
+          .update(schema.users)
+          .set({ ...abortCase.set, updatedAt: new Date() })
+          .where(eq(schema.users.id, userId));
+        return realTransaction(cb, config);
+      }) as unknown as typeof db.transaction);
+
+      try {
+        const abortRes = await testApp.app.inject({
+          method: "POST",
+          url: "/api/auth/mfa/complete",
+          payload: { mfaToken: abortToken, code: recoveryCodes[0] },
+        });
+        expect(abortRes.statusCode).toBe(abortCase.expectedStatus);
+        expect(JSON.parse(abortRes.body).code).toBe(abortCase.expectedCode);
+      } finally {
+        txAbortSpy.mockRestore();
+        await db
+          .update(schema.users)
+          .set({
+            passwordHash: initialUser.passwordHash,
+            role: initialUser.role,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.users.id, userId));
+      }
+
+      expect(await sharedRedis().get(`mfa:${abortToken}`)).toBeNull();
+      expect(await sharedRedis().get(`mfa:attempts:${abortToken}`)).toBeNull();
+      const [afterAbortUser] = await db
+        .select({ recoveryCodesHash: schema.users.recoveryCodesHash })
+        .from(schema.users)
+        .where(eq(schema.users.id, userId));
+      expect(
+        verifyRecoveryCode(recoveryCodes[0], afterAbortUser.recoveryCodesHash ?? "").valid,
+      ).toBe(true);
+    }
+
+    // 2. Fault tx.insert inside db.transaction after recovery code update runs:
+    // Postgres rolls back the recoveryCodesHash update and Redis restores the challenge
+    // while preserving attemptsKey, so retrying the same mfaToken + recovery code succeeds.
+    const loginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username, password },
+    });
+    expect(loginRes.statusCode).toBe(200);
+    const { mfaToken } = JSON.parse(loginRes.body);
+
+    const badRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: "000000" },
+    });
+    expect(badRes.statusCode).toBe(401);
+    expect(await sharedRedis().get(`mfa:attempts:${mfaToken}`)).toBe("1");
+
+    const txFailSpy = vi.spyOn(db, "transaction").mockImplementationOnce(((
+      cb: (tx: object) => Promise<unknown>,
+      config?: unknown,
+    ) =>
+      realTransaction((tx) => {
+        const failingTx = new Proxy(tx, {
+          get(target, prop, receiver) {
+            if (prop === "insert") {
+              return () => {
+                throw new Error("simulated session insert failure after recovery code update");
+              };
+            }
+            return Reflect.get(target, prop, receiver);
+          },
+        });
+        return cb(failingTx);
+      }, config)) as unknown as typeof db.transaction);
+
+    try {
+      const errRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code: recoveryCodes[0] },
+      });
+      expect(errRes.statusCode).toBe(500);
+    } finally {
+      txFailSpy.mockRestore();
+    }
+
+    expect(await sharedRedis().get(`mfa:${mfaToken}`)).toBeTruthy();
+    expect(await sharedRedis().get(`mfa:attempts:${mfaToken}`)).toBe("1");
+    const [afterRollbackUser] = await db
+      .select({ recoveryCodesHash: schema.users.recoveryCodesHash })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId));
+    expect(
+      verifyRecoveryCode(recoveryCodes[0], afterRollbackUser.recoveryCodesHash ?? "").valid,
+    ).toBe(true);
+
+    // 3. Direct retry with the same mfaToken and the same recovery code succeeds and spends it.
+    const retryRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: recoveryCodes[0] },
+    });
+    expect(retryRes.statusCode).toBe(200);
+    expect(await sharedRedis().get(`mfa:${mfaToken}`)).toBeNull();
+    expect(await sharedRedis().get(`mfa:attempts:${mfaToken}`)).toBeNull();
+    const [afterSuccessUser] = await db
+      .select({ recoveryCodesHash: schema.users.recoveryCodesHash })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId));
+    expect(
+      verifyRecoveryCode(recoveryCodes[0], afterSuccessUser.recoveryCodesHash ?? "").valid,
+    ).toBe(false);
+    expect(
+      verifyRecoveryCode(recoveryCodes[1], afterSuccessUser.recoveryCodesHash ?? "").valid,
+    ).toBe(true);
+  });
+
   it("allows only one session and caps concurrent wrong guesses on /mfa/enroll-complete", async () => {
     const username = `mfaenrollrace_${Date.now()}`;
     const password = "Userpass1";

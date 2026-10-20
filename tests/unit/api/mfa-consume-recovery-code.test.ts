@@ -109,6 +109,31 @@ describe("consumeRecoveryCode", () => {
 
     await expect(consumeRecoveryCode("u1", "bbbb2222", list(CODES))).resolves.toBe("consumed");
   });
+
+  it("runs its update and re-read on a passed transaction store (#2602)", async () => {
+    const txUpdates: Record<string, unknown>[] = [];
+    const txUpdateResults = [[], [{ id: "u1" }]];
+    const txSelectResults = [[{ recoveryCodesHash: list(["bbbb2222", "cccc3333"]) }]];
+    const tx = {
+      update: () => ({
+        set: (set: Record<string, unknown>) => {
+          txUpdates.push(set);
+          return {
+            where: () => ({ returning: async () => txUpdateResults.shift() ?? [] }),
+          };
+        },
+      }),
+      select: () => ({
+        from: () => ({ where: async () => txSelectResults.shift() ?? [] }),
+      }),
+    } as unknown as Parameters<typeof consumeRecoveryCode>[3];
+
+    await expect(consumeRecoveryCode("u1", "bbbb2222", list(CODES), tx)).resolves.toBe("consumed");
+
+    expect(db.updates).toHaveLength(0);
+    expect(txUpdates).toHaveLength(2);
+    expect(txUpdates[1].recoveryCodesHash).toBe(list(["cccc3333"]));
+  });
 });
 
 describe("decryptSecret (#2033)", () => {

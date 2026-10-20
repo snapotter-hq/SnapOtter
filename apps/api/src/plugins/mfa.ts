@@ -184,6 +184,7 @@ export function verifyRecoveryCode(
 
 /** What happened when a recovery code was offered at login. */
 type RecoveryOutcome = "consumed" | "invalid" | "spent_concurrently";
+type RecoveryCodeStore = Pick<typeof db, "update" | "select">;
 
 /**
  * Spends a recovery code. "consumed" only if this call removed it from the
@@ -204,19 +205,20 @@ export async function consumeRecoveryCode(
   userId: string,
   code: string,
   storedList: string,
+  store: RecoveryCodeStore = db,
 ): Promise<RecoveryOutcome> {
   let list = storedList;
   const rounds = storedList.split(",").length;
   for (let round = 0; round < rounds; round++) {
     const result = verifyRecoveryCode(code, list);
     if (!result.valid) return round === 0 ? "invalid" : "spent_concurrently";
-    const updated = await db
+    const updated = await store
       .update(schema.users)
       .set({ recoveryCodesHash: result.remaining || null, updatedAt: new Date() })
       .where(and(eq(schema.users.id, userId), eq(schema.users.recoveryCodesHash, list)))
       .returning({ id: schema.users.id });
     if (updated.length > 0) return "consumed";
-    const [fresh] = await db
+    const [fresh] = await store
       .select({ recoveryCodesHash: schema.users.recoveryCodesHash })
       .from(schema.users)
       .where(eq(schema.users.id, userId));
@@ -781,8 +783,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       let claimedStep: ClaimedTotpStep | null = null;
       let maxSessions = 0;
       let verified = false;
-      let recoveryUsed = false;
-      let recoveryRace = false;
+      let recoveryCandidate: string | null = null;
 
       try {
         // Load user
@@ -855,20 +856,16 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         // credentials (#2540).
         maxSessions = await readMaxSessionsPerUser();
 
-        // Try recovery code first so a user can still sign in when the stored
-        // TOTP secret cannot be decrypted (#2034).
-        if (dbUser.recoveryCodesHash) {
-          const outcome = await consumeRecoveryCode(userId, code, dbUser.recoveryCodesHash);
-          if (outcome === "consumed") {
-            verified = true;
-            recoveryUsed = true;
-          } else if (outcome === "spent_concurrently") {
-            recoveryRace = true;
-            logger.warn({ userId }, "A recovery code was used by two logins at once; refusing one");
-          }
+        // Check recovery code first so a user can still sign in when the stored
+        // TOTP secret cannot be decrypted (#2034). The database write that spends
+        // the recovery code runs inside the session transaction below so a failed
+        // or aborted transaction rolls it back (#2602).
+        if (dbUser.recoveryCodesHash && verifyRecoveryCode(code, dbUser.recoveryCodesHash).valid) {
+          recoveryCandidate = dbUser.recoveryCodesHash;
+          verified = true;
         }
 
-        if (!verified && !recoveryRace) {
+        if (!verified) {
           // Decrypt the stored secret
           secretBase32 = await decryptSecret(userId, dbUser.totpSecret);
           if (!secretBase32) {
@@ -891,8 +888,9 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       }
 
       const audit = auditFromRequest(request);
+      const verifiedUser = dbUser;
 
-      if (!verified) {
+      const replyInvalidMfaCode = async (recoveryRace: boolean) => {
         // Burn the challenge after a few wrong codes so an attacker who already
         // holds valid credentials cannot grind TOTP guesses within the challenge
         // window, or put the challenge back if attempts remain.
@@ -904,7 +902,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         );
         await audit("MFA_VERIFY_FAILED", {
           userId,
-          username: dbUser.username,
+          username: verifiedUser.username,
           ...(recoveryRace && { reason: "recovery_code_spent_concurrently" }),
         });
         if (attemptOutcome === "exhausted") {
@@ -923,23 +921,33 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           error: "Invalid TOTP or recovery code",
           code: "INVALID_CODE",
         });
+      };
+
+      if (!verified) {
+        return replyInvalidMfaCode(false);
       }
 
       // Create session (same as normal login completion)
       const token = createSessionToken();
       const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
-      const verifiedUser = dbUser;
 
       let inserted:
         | { status: "success"; role: string }
-        | { status: "password_changed" | "password_removed" | "user_disabled" | "user_deleted" };
+        | {
+            status:
+              | "password_changed"
+              | "password_removed"
+              | "user_disabled"
+              | "user_deleted"
+              | "recovery_spent_concurrently";
+          };
       try {
         inserted = await db.transaction(async (tx) => {
           const [lockedUser] = await tx
             .select({ passwordHash: schema.users.passwordHash, role: schema.users.role })
             .from(schema.users)
             .where(eq(schema.users.id, verifiedUser.id))
-            .for("share");
+            .for(recoveryCandidate ? "no key update" : "share");
 
           if (!lockedUser) {
             return { status: "user_deleted" as const };
@@ -967,6 +975,13 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
             return { status: "user_disabled" as const };
           }
 
+          if (recoveryCandidate) {
+            const outcome = await consumeRecoveryCode(verifiedUser.id, code, recoveryCandidate, tx);
+            if (outcome !== "consumed") {
+              return { status: "recovery_spent_concurrently" as const };
+            }
+          }
+
           await tx.insert(schema.sessions).values({
             id: token,
             userId: verifiedUser.id,
@@ -983,6 +998,11 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         }
         await restoreMfaChallenge(redis, challengeKey, claimed);
         throw err;
+      }
+
+      if (inserted.status === "recovery_spent_concurrently") {
+        logger.warn({ userId }, "A recovery code was used by two logins at once; refusing one");
+        return replyInvalidMfaCode(true);
       }
 
       // Clear any failed-attempt counter once the transaction finishes (the
@@ -1015,7 +1035,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         });
       }
 
-      await audit(recoveryUsed ? "MFA_RECOVERY_USED" : "MFA_VERIFIED", {
+      await audit(recoveryCandidate ? "MFA_RECOVERY_USED" : "MFA_VERIFIED", {
         userId: verifiedUser.id,
         username: verifiedUser.username,
       });
