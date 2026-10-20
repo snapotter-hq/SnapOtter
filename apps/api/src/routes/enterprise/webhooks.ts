@@ -288,7 +288,7 @@ export async function registerWebhookRoutes(app: FastifyInstance): Promise<void>
       const dest = destinations[index];
 
       // Decrypt auth header if needed
-      let authHeader = dest.authHeader;
+      let authHeader = typeof dest.authHeader === "string" ? dest.authHeader : "";
       if (authHeader) {
         const decrypted = await decryptSettingWithRotation(authHeader);
         if (decrypted === null) {

@@ -107,7 +107,7 @@ export async function runSiemForward(): Promise<{ forwarded: number } | undefine
   }
 
   // 5. Decrypt auth header if encrypted
-  let authHeader = config.authHeader;
+  let authHeader = typeof config.authHeader === "string" ? config.authHeader : "";
   if (authHeader) {
     const decrypted = await decryptSettingWithRotation(authHeader);
     if (decrypted === null) {

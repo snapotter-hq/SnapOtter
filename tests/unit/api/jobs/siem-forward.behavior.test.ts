@@ -331,6 +331,40 @@ describe("SIEM forwarding behavior", () => {
     );
   });
 
+  it("treats a non-string stored authHeader as empty instead of throwing", async () => {
+    const { runSiemForward } = await loadSiemForward();
+    readSiemConfigMock.mockResolvedValue({
+      enabled: true,
+      webhookUrl: "https://siem.test/events",
+      authHeader: 123,
+    });
+    selectMock
+      .mockReturnValueOnce(queryChain([{ value: "0" }], true))
+      .mockReturnValueOnce(queryChain([], true))
+      .mockReturnValueOnce(
+        queryChain([
+          {
+            createdAt: new Date("2026-06-29T12:00:00.000Z"),
+            action: "FILE_DELETED",
+          },
+        ]),
+      );
+    decryptSettingMock.mockImplementation((value: string) => {
+      if (typeof value !== "string") throw new TypeError("value.startsWith is not a function");
+      return Promise.resolve({ value });
+    });
+    deliverWebhookMock.mockResolvedValue({ success: true });
+
+    await expect(runSiemForward()).resolves.toEqual({ forwarded: 1 });
+
+    expect(decryptSettingMock).not.toHaveBeenCalled();
+    expect(deliverWebhookMock).toHaveBeenCalledWith(
+      "https://siem.test/events",
+      "",
+      expect.anything(),
+    );
+  });
+
   it("re-encrypts a rotated siem_config authHeader with a compare-and-swap (#2843)", async () => {
     const { runSiemForward } = await loadSiemForward();
     const rawConfig = JSON.stringify({

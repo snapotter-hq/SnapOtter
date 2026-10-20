@@ -179,7 +179,7 @@ export async function evaluateAlerts(): Promise<void> {
   let delivered = 0;
   let currentDestJson = destJson;
   for (const dest of alertDests) {
-    let authHeader = dest.authHeader;
+    let authHeader = typeof dest.authHeader === "string" ? dest.authHeader : "";
 
     // Decrypt auth header if encrypted
     if (authHeader) {
