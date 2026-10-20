@@ -15,6 +15,9 @@ type ExtractTab = "single" | "range" | "all";
 
 const OPTIMIZE_COLORS = [2, 4, 16, 256] as const;
 type OptimizeColors = (typeof OPTIMIZE_COLORS)[number];
+const EXTRACT_TABS: readonly ExtractTab[] = ["single", "range", "all"];
+const EXTRACT_FORMATS: readonly ("png" | "webp")[] = ["png", "webp"];
+const ROTATE_ANGLES = [90, 180, 270] as const;
 
 const MODES: { id: GifMode; requiresAnimation: boolean }[] = [
   { id: "resize", requiresAnimation: false },
@@ -78,29 +81,94 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
   useEffect(() => {
     if (!initialSettings || initializedRef.current) return;
     initializedRef.current = true;
-    if (initialSettings.mode != null) setMode(initialSettings.mode as GifMode);
+    if (
+      typeof initialSettings.mode === "string" &&
+      MODES.some((m) => m.id === initialSettings.mode)
+    ) {
+      setMode(initialSettings.mode as GifMode);
+    }
     if (initialSettings.width != null) setWidth(String(initialSettings.width));
     if (initialSettings.height != null) setHeight(String(initialSettings.height));
-    if (initialSettings.percentage != null) setPercentage(String(initialSettings.percentage));
+    if (initialSettings.percentage != null) {
+      setPercentage(String(initialSettings.percentage));
+      if (initialSettings.width == null && initialSettings.height == null) {
+        setResizeTab("percentage");
+      }
+    }
     if (
       typeof initialSettings.colors === "number" &&
       (OPTIMIZE_COLORS as readonly number[]).includes(initialSettings.colors)
     ) {
       setColors(initialSettings.colors as OptimizeColors);
     }
+    if (initialSettings.dither != null) {
+      const d = Number(initialSettings.dither);
+      if (Number.isFinite(d) && d >= 0 && d <= 1) setDither(d);
+    }
+    if (initialSettings.effort != null) {
+      const e = Number(initialSettings.effort);
+      if (Number.isFinite(e) && e >= 1 && e <= 10) setEffort(e);
+    }
+    if (initialSettings.speedFactor != null) {
+      const factor = Number(initialSettings.speedFactor);
+      if (Number.isFinite(factor) && factor >= 0.1 && factor <= 10) {
+        setSpeedFactor(factor);
+        if (initialSettings.mode === "reverse") {
+          setReverseAdjustSpeed(true);
+          setReverseSpeed(factor);
+        }
+      }
+    }
+    if (
+      typeof initialSettings.extractMode === "string" &&
+      EXTRACT_TABS.includes(initialSettings.extractMode as ExtractTab)
+    ) {
+      setExtractTab(initialSettings.extractMode as ExtractTab);
+    }
+    if (initialSettings.frameNumber != null) {
+      setFrameNumber(String(initialSettings.frameNumber));
+    }
+    if (initialSettings.frameStart != null) {
+      setFrameStart(String(initialSettings.frameStart));
+    }
+    if (initialSettings.frameEnd != null) {
+      setFrameEnd(String(initialSettings.frameEnd));
+    }
+    if (
+      typeof initialSettings.extractFormat === "string" &&
+      EXTRACT_FORMATS.includes(initialSettings.extractFormat as "png" | "webp")
+    ) {
+      setExtractFormat(initialSettings.extractFormat as "png" | "webp");
+    }
+    if (initialSettings.angle != null) {
+      const a = Number(initialSettings.angle);
+      if ((ROTATE_ANGLES as readonly number[]).includes(a)) {
+        setAngle(a);
+      }
+    }
+    if (initialSettings.flipH != null) setFlipH(Boolean(initialSettings.flipH));
+    if (initialSettings.flipV != null) setFlipV(Boolean(initialSettings.flipV));
+    if (initialSettings.loop != null) {
+      const loop = Number(initialSettings.loop);
+      if (loop === 0) setLoopMode("infinite");
+      else if (loop === 1) setLoopMode("once");
+      else if (Number.isFinite(loop) && loop >= 2) {
+        setLoopMode("custom");
+        setLoopCount(String(loop));
+      }
+    }
   }, [initialSettings]);
 
   // Initialize loop from metadata
   useEffect(() => {
-    if (info) {
-      if (info.loop === 0) setLoopMode("infinite");
-      else if (info.loop === 1) setLoopMode("once");
-      else {
-        setLoopMode("custom");
-        setLoopCount(String(info.loop));
-      }
+    if (!info || initialSettings != null) return;
+    if (info.loop === 0) setLoopMode("infinite");
+    else if (info.loop === 1) setLoopMode("once");
+    else if (Number.isFinite(info.loop) && info.loop >= 2) {
+      setLoopMode("custom");
+      setLoopCount(String(info.loop));
     }
-  }, [info]);
+  }, [info, initialSettings]);
 
   // Emit settings
   const onChangeRef = useRef(onChange);

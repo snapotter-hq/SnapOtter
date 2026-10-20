@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConvertAudioControls } from "@/components/tools/convert-audio-settings";
@@ -256,5 +256,272 @@ describe("GifToolsControls (#1223)", async () => {
     expect(onFallback).toHaveBeenLastCalledWith(
       expect.objectContaining({ mode: "optimize", colors: 256 }),
     );
+  });
+
+  it("switches resizeTab to percentage when initialSettings has percentage without width or height (#2918)", () => {
+    const onChange = vi.fn();
+    const { container } = render(
+      <GifToolsControls settings={{ mode: "resize", percentage: 75 }} onChange={onChange} />,
+    );
+    const pctInput = container.querySelector<HTMLInputElement>("#gif-pct");
+    expect(pctInput).not.toBeNull();
+    expect(pctInput?.value).toBe("75");
+    expect(onChange).toHaveBeenLastCalledWith({
+      mode: "resize",
+      percentage: 75,
+      loop: 0,
+    });
+
+    cleanup();
+    const onPixel = vi.fn();
+    const { container: pixelContainer } = render(
+      <GifToolsControls
+        settings={{ mode: "resize", width: 320, percentage: 75 }}
+        onChange={onPixel}
+      />,
+    );
+    expect(pixelContainer.querySelector<HTMLInputElement>("#gif-width")?.value).toBe("320");
+    expect(pixelContainer.querySelector<HTMLInputElement>("#gif-height")?.value).toBe("");
+    expect(onPixel).toHaveBeenLastCalledWith({
+      mode: "resize",
+      width: 320,
+      loop: 0,
+    });
+  });
+
+  it("hydrates optimize dither, effort, and loop settings including dither 0 (#2918)", () => {
+    const onChange = vi.fn();
+    const { container } = render(
+      <GifToolsControls
+        settings={{ mode: "optimize", colors: 16, dither: 0, effort: 9, loop: 3 }}
+        onChange={onChange}
+      />,
+    );
+    expect(container.querySelector<HTMLInputElement>("#gif-dither")?.value).toBe("0");
+    expect(container.querySelector<HTMLInputElement>("#gif-effort")?.value).toBe("9");
+    expect(container.querySelector<HTMLInputElement>("input[type='number']")?.value).toBe("3");
+    expect(onChange).toHaveBeenLastCalledWith({
+      mode: "optimize",
+      colors: 16,
+      dither: 0,
+      effort: 9,
+      loop: 3,
+    });
+  });
+
+  it("hydrates speed, reverse, extract, and rotate pipeline step settings (#2918)", () => {
+    const onSpeed = vi.fn();
+    const { container: speedContainer } = render(
+      <GifToolsControls
+        settings={{ mode: "speed", speedFactor: 2.5, loop: 1 }}
+        onChange={onSpeed}
+      />,
+    );
+    expect(speedContainer.querySelector<HTMLInputElement>("#gif-speed")?.value).toBe("2.5");
+    expect(onSpeed).toHaveBeenLastCalledWith({
+      mode: "speed",
+      speedFactor: 2.5,
+      loop: 1,
+    });
+    cleanup();
+
+    const onReverse = vi.fn();
+    const { container: revContainer } = render(
+      <GifToolsControls
+        settings={{ mode: "reverse", speedFactor: 1.5, loop: 0 }}
+        onChange={onReverse}
+      />,
+    );
+    expect(revContainer.querySelector<HTMLInputElement>("input[type='checkbox']")?.checked).toBe(
+      true,
+    );
+    expect(revContainer.querySelector<HTMLInputElement>("#gif-rev-speed")?.value).toBe("1.5");
+    expect(onReverse).toHaveBeenLastCalledWith({
+      mode: "reverse",
+      speedFactor: 1.5,
+      loop: 0,
+    });
+    cleanup();
+
+    const onReverseDefault = vi.fn();
+    const { container: revDefaultContainer } = render(
+      <GifToolsControls settings={{ mode: "reverse", loop: 0 }} onChange={onReverseDefault} />,
+    );
+    expect(
+      revDefaultContainer.querySelector<HTMLInputElement>("input[type='checkbox']")?.checked,
+    ).toBe(false);
+    expect(revDefaultContainer.querySelector("#gif-rev-speed")).toBeNull();
+    expect(onReverseDefault).toHaveBeenLastCalledWith({
+      mode: "reverse",
+      loop: 0,
+    });
+    cleanup();
+
+    const onExtractSingle = vi.fn();
+    const { container: singleContainer } = render(
+      <GifToolsControls
+        settings={{
+          mode: "extract",
+          extractMode: "single",
+          frameNumber: 4,
+          extractFormat: "webp",
+          loop: 0,
+        }}
+        onChange={onExtractSingle}
+      />,
+    );
+    expect(singleContainer.querySelector<HTMLInputElement>("#gif-frame")?.value).toBe("4");
+    expect(onExtractSingle).toHaveBeenLastCalledWith({
+      mode: "extract",
+      extractMode: "single",
+      frameNumber: 4,
+      extractFormat: "webp",
+      loop: 0,
+    });
+    cleanup();
+
+    const onExtractRange = vi.fn();
+    const { container: rangeContainer } = render(
+      <GifToolsControls
+        settings={{
+          mode: "extract",
+          extractMode: "range",
+          frameStart: 2,
+          frameEnd: 8,
+          extractFormat: "webp",
+          loop: 0,
+        }}
+        onChange={onExtractRange}
+      />,
+    );
+    expect(rangeContainer.querySelector<HTMLInputElement>("#gif-frame-start")?.value).toBe("2");
+    expect(rangeContainer.querySelector<HTMLInputElement>("#gif-frame-end")?.value).toBe("8");
+    expect(onExtractRange).toHaveBeenLastCalledWith({
+      mode: "extract",
+      extractMode: "range",
+      frameStart: 2,
+      frameEnd: 8,
+      extractFormat: "webp",
+      loop: 0,
+    });
+    cleanup();
+
+    const onExtractAll = vi.fn();
+    render(
+      <GifToolsControls
+        settings={{
+          mode: "extract",
+          extractMode: "all",
+          extractFormat: "webp",
+          loop: 1,
+        }}
+        onChange={onExtractAll}
+      />,
+    );
+    expect(onExtractAll).toHaveBeenLastCalledWith({
+      mode: "extract",
+      extractMode: "all",
+      extractFormat: "webp",
+      loop: 1,
+    });
+    cleanup();
+
+    const onRotate = vi.fn();
+    render(
+      <GifToolsControls
+        settings={{ mode: "rotate", angle: 180, flipH: true, flipV: false, loop: 0 }}
+        onChange={onRotate}
+      />,
+    );
+    expect(onRotate).toHaveBeenLastCalledWith({
+      mode: "rotate",
+      angle: 180,
+      flipH: true,
+      flipV: false,
+      loop: 0,
+    });
+    cleanup();
+
+    const onRotateInvalidAngle = vi.fn();
+    render(
+      <GifToolsControls
+        settings={{ mode: "rotate", angle: 45, flipH: false, flipV: true, loop: 0 }}
+        onChange={onRotateInvalidAngle}
+      />,
+    );
+    expect(onRotateInvalidAngle).toHaveBeenLastCalledWith({
+      mode: "rotate",
+      flipH: false,
+      flipV: true,
+      loop: 0,
+    });
+  });
+
+  it("does not overwrite a provided loop setting when GIF metadata resolves (#2918)", async () => {
+    const { useFileStore } = await import("@/stores/file-store");
+    useFileStore.setState({
+      files: [new File(["gif"], "anim.gif", { type: "image/gif" })],
+      selectedIndex: 0,
+    });
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({
+            width: 100,
+            height: 100,
+            pages: 4,
+            delay: [100, 100, 100, 100],
+            loop: 1,
+            fileSize: 1024,
+            duration: 400,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    );
+
+    try {
+      const onChange = vi.fn();
+      await act(async () => {
+        render(
+          <GifToolsControls
+            settings={{ mode: "optimize", colors: 16, dither: 0.5, effort: 6, loop: 4 }}
+            onChange={onChange}
+          />,
+        );
+      });
+      expect(screen.getByText("100x100")).toBeDefined();
+      expect(onChange).toHaveBeenLastCalledWith({
+        mode: "optimize",
+        colors: 16,
+        dither: 0.5,
+        effort: 6,
+        loop: 4,
+      });
+
+      cleanup();
+      const onEmptyPipelineStep = vi.fn();
+      await act(async () => {
+        render(<GifToolsControls settings={{}} onChange={onEmptyPipelineStep} />);
+      });
+      expect(screen.getByText("100x100")).toBeDefined();
+      expect(onEmptyPipelineStep).toHaveBeenLastCalledWith({
+        mode: "resize",
+        loop: 0,
+      });
+
+      cleanup();
+      const onStandalone = vi.fn();
+      await act(async () => {
+        render(<GifToolsControls onChange={onStandalone} />);
+      });
+      expect(screen.getByText("100x100")).toBeDefined();
+      expect(onStandalone).toHaveBeenLastCalledWith({
+        mode: "resize",
+        loop: 1,
+      });
+    } finally {
+      cleanup();
+      useFileStore.setState({ files: [], selectedIndex: 0 });
+    }
   });
 });
