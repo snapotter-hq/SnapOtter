@@ -2,6 +2,7 @@ import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { canManageTargetRole, hasToolAccess } from "../../../apps/api/src/permissions.js";
+import { raceRowLocks } from "../../helpers/pg-race.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 let testApp: TestApp;
@@ -496,6 +497,205 @@ describe("role authority containment", () => {
     expect.soft(response.statusCode).toBe(403);
     expect.soft(JSON.parse(response.body).code).toBe("ESCALATION_DENIED");
     expect(persistedRole).toMatchObject({ id: targetId, name: targetName });
+  });
+
+  it("rejects updating a role widened beyond actor authority between pre-check and row lock (#1196)", async () => {
+    const targetName = uniqueName("race-upd");
+    const renamedName = uniqueName("race-upd-n");
+    const targetId = await createRoleAsAdmin(targetName, ["security:manage"]);
+    const memberUsername = uniqueName("race-upd-member");
+    await createUserAndLogin(memberUsername, targetName);
+
+    const response = await raceRowLocks(
+      "roles",
+      1,
+      () =>
+        testApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/roles/${targetId}`,
+          headers: { authorization: `Bearer ${scopeManagerToken}` },
+          payload: { name: renamedName, description: "stale pre-check write" },
+        }),
+      (tx) =>
+        tx
+          .update(schema.roles)
+          .set({ permissions: ["security:manage", "settings:write"] })
+          .where(eq(schema.roles.id, targetId)),
+    );
+
+    expect(response.statusCode, response.body).toBe(403);
+    expect(JSON.parse(response.body)).toEqual({
+      error: "Cannot manage a role beyond your role authority",
+      code: "ESCALATION_DENIED",
+    });
+
+    const [after] = await db.select().from(schema.roles).where(eq(schema.roles.id, targetId));
+    expect(after?.name).toBe(targetName);
+    expect(after?.description).toBe("");
+    expect(after?.permissions).toEqual(["security:manage", "settings:write"]);
+    const [memberAfter] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, memberUsername));
+    expect(memberAfter?.role).toBe(targetName);
+
+    const auditRows = await db
+      .select()
+      .from(schema.auditLog)
+      .where(sql`${schema.auditLog.action} = 'ROLE_UPDATED'`);
+    expect(
+      auditRows.filter((r) => (r.details as { roleId?: string } | null)?.roleId === targetId),
+    ).toHaveLength(0);
+  });
+
+  it("re-evaluates prospective grant authority against locked fallback fields on PUT (#1196)", async () => {
+    const targetName = uniqueName("race-grant");
+    const targetId = await createRoleAsAdmin(targetName, ["security:manage"], {
+      mode: "category",
+      allowed: ["image"],
+    });
+
+    // The role starts without tools:use, so clearing toolPermissions to null in
+    // the race window leaves locked.permissions as ["security:manage"], which
+    // still passes canManageRoleDefinition. Only re-computing the prospective
+    // definition from the locked row catches that adding tools:use would combine
+    // with the newly null toolPermissions to grant unrestricted tool access.
+    const response = await raceRowLocks(
+      "roles",
+      1,
+      () =>
+        testApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/roles/${targetId}`,
+          headers: { authorization: `Bearer ${scopeManagerToken}` },
+          payload: { permissions: ["security:manage", "tools:use"] },
+        }),
+      (tx) =>
+        tx.update(schema.roles).set({ toolPermissions: null }).where(eq(schema.roles.id, targetId)),
+    );
+
+    expect(response.statusCode, response.body).toBe(403);
+    expect(JSON.parse(response.body)).toEqual({
+      error: "Cannot update a role beyond your role authority",
+      code: "ESCALATION_DENIED",
+    });
+
+    const [after] = await db.select().from(schema.roles).where(eq(schema.roles.id, targetId));
+    expect(after?.permissions).toEqual(["security:manage"]);
+    expect(after?.toolPermissions).toBeNull();
+
+    // Symmetric fallback: request sends toolPermissions: null with permissions
+    // omitted while the race window adds tools:use (keeping the contained image
+    // tool scope so canManageRoleDefinition still passes on the locked row).
+    const symName = uniqueName("race-sym");
+    const symId = await createRoleAsAdmin(symName, ["security:manage"], {
+      mode: "category",
+      allowed: ["image"],
+    });
+
+    const symResponse = await raceRowLocks(
+      "roles",
+      1,
+      () =>
+        testApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/roles/${symId}`,
+          headers: { authorization: `Bearer ${scopeManagerToken}` },
+          payload: { toolPermissions: null },
+        }),
+      (tx) =>
+        tx
+          .update(schema.roles)
+          .set({ permissions: ["security:manage", "tools:use"] })
+          .where(eq(schema.roles.id, symId)),
+    );
+
+    expect(symResponse.statusCode, symResponse.body).toBe(403);
+    expect(JSON.parse(symResponse.body)).toEqual({
+      error: "Cannot update a role beyond your role authority",
+      code: "ESCALATION_DENIED",
+    });
+
+    const [symAfter] = await db.select().from(schema.roles).where(eq(schema.roles.id, symId));
+    expect(symAfter?.permissions).toEqual(["security:manage", "tools:use"]);
+    expect(symAfter?.toolPermissions).toEqual({ mode: "category", allowed: ["image"] });
+
+    const auditRows = await db
+      .select()
+      .from(schema.auditLog)
+      .where(sql`${schema.auditLog.action} = 'ROLE_UPDATED'`);
+    expect(
+      auditRows.filter((r) =>
+        [targetId, symId].includes((r.details as { roleId?: string } | null)?.roleId ?? ""),
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("rejects deleting a role widened beyond actor authority between pre-check and row lock (#1196)", async () => {
+    const keyResponse = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/api-keys",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        name: uniqueName("scoped-del-key"),
+        permissions: [
+          "security:manage",
+          "tools:use",
+          "files:own",
+          "apikeys:own",
+          "pipelines:own",
+          "settings:read",
+        ],
+      },
+    });
+    expect(keyResponse.statusCode, keyResponse.body).toBe(201);
+    const scopedAdminKey = JSON.parse(keyResponse.body).key as string;
+
+    const targetName = uniqueName("race-del");
+    const targetId = await createRoleAsAdmin(targetName, ["security:manage"]);
+    const memberUsername = uniqueName("race-del-member");
+    await createUserAndLogin(memberUsername, targetName);
+
+    const response = await raceRowLocks(
+      "roles",
+      1,
+      () =>
+        testApp.app.inject({
+          method: "DELETE",
+          url: `/api/v1/roles/${targetId}`,
+          headers: { authorization: `Bearer ${scopedAdminKey}` },
+        }),
+      (tx) =>
+        tx
+          .update(schema.roles)
+          .set({ permissions: ["security:manage", "settings:write"] })
+          .where(eq(schema.roles.id, targetId)),
+    );
+
+    expect(response.statusCode, response.body).toBe(403);
+    expect(JSON.parse(response.body)).toEqual({
+      error: "Cannot manage a role beyond your role authority",
+      code: "ESCALATION_DENIED",
+    });
+
+    const [persistedRole] = await db
+      .select()
+      .from(schema.roles)
+      .where(eq(schema.roles.id, targetId));
+    expect(persistedRole?.permissions).toEqual(["security:manage", "settings:write"]);
+    const [memberAfter] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, memberUsername));
+    expect(memberAfter?.role).toBe(targetName);
+
+    const auditRows = await db
+      .select()
+      .from(schema.auditLog)
+      .where(sql`${schema.auditLog.action} = 'ROLE_DELETED'`);
+    expect(
+      auditRows.filter((r) => (r.details as { roleId?: string } | null)?.roleId === targetId),
+    ).toHaveLength(0);
   });
 
   it("rejects updating a user to an unknown role with 400 UNKNOWN_ROLE while preserving target authority and session invalidation (#2232)", async () => {
