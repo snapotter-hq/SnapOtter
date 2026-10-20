@@ -26,39 +26,16 @@ function isExemptPath(url: string): boolean {
   return EXEMPT_PATHS.some((p) => url.startsWith(p));
 }
 
-/**
- * Parse an array of CIDR strings (or bare addresses) into a BlockList.
- * Returns null when the list is empty (meaning "allow all").
- */
-export function buildBlockList(cidrs: string[]): BlockList | null {
-  if (cidrs.length === 0) return null;
-  const bl = new BlockList();
-  for (const cidr of cidrs) {
-    try {
-      if (cidr.includes("/")) {
-        const [addr, prefix] = cidr.split("/");
-        bl.addSubnet(addr, Number(prefix), addr.includes(":") ? "ipv6" : "ipv4");
-      } else {
-        bl.addAddress(cidr, cidr.includes(":") ? "ipv6" : "ipv4");
-      }
-    } catch {
-      // Invalid CIDR -- skip silently
-    }
-  }
-  return bl;
-}
+const CIDR_PREFIX_RE = /^(?:0|[1-9]\d*)$/;
 
-/**
- * Validate a single CIDR string (or bare IP).
- * Returns true when the string can be parsed without error.
- */
-export function isValidCidr(cidr: string): boolean {
+function addCidrToBlockList(bl: BlockList, cidr: string): boolean {
   try {
-    const bl = new BlockList();
     if (cidr.includes("/")) {
-      const [addr, prefix] = cidr.split("/");
+      const parts = cidr.split("/");
+      if (parts.length !== 2) return false;
+      const [addr, prefix] = parts;
+      if (!CIDR_PREFIX_RE.test(prefix)) return false;
       const prefixNum = Number(prefix);
-      if (Number.isNaN(prefixNum) || prefixNum < 0) return false;
       const family = addr.includes(":") ? "ipv6" : "ipv4";
       if (family === "ipv4" && prefixNum > 32) return false;
       if (family === "ipv6" && prefixNum > 128) return false;
@@ -70,6 +47,27 @@ export function isValidCidr(cidr: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Parse an array of CIDR strings (or bare addresses) into a BlockList.
+ * Returns null when the list is empty (meaning "allow all").
+ */
+export function buildBlockList(cidrs: string[]): BlockList | null {
+  if (cidrs.length === 0) return null;
+  const bl = new BlockList();
+  for (const cidr of cidrs) {
+    addCidrToBlockList(bl, cidr);
+  }
+  return bl;
+}
+
+/**
+ * Validate a single CIDR string (or bare IP).
+ * Returns true when the string can be parsed without error.
+ */
+export function isValidCidr(cidr: string): boolean {
+  return addCidrToBlockList(new BlockList(), cidr);
 }
 
 /**

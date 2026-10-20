@@ -42,6 +42,21 @@ describe("IP allowlist", () => {
       const bl = buildBlockList(["not-a-cidr", "10.0.0.0/8"]);
       expect(bl).not.toBeNull();
     });
+
+    it("skips malformed CIDR prefixes instead of treating trailing slashes as /0 (#3051)", () => {
+      const bl = mustBuild([
+        "10.0.0.0/",
+        "10.0.0.0/ ",
+        "10.0.0.0/24/extra",
+        "10.0.0.0/+8",
+        "10.0.0.0/08",
+        "10.0.0.0/0x10",
+        "192.168.1.0/24",
+      ]);
+      expect(isIpAllowed("203.0.113.5", bl)).toBe(false);
+      expect(isIpAllowed("10.0.0.1", bl)).toBe(false);
+      expect(isIpAllowed("192.168.1.42", bl)).toBe(true);
+    });
   });
 
   // ── isIpAllowed ──────────────────────────────────────────────────
@@ -115,6 +130,7 @@ describe("IP allowlist", () => {
     it("accepts valid IPv6 CIDR", () => {
       expect(isValidCidr("2001:db8::/32")).toBe(true);
       expect(isValidCidr("::1/128")).toBe(true);
+      expect(isValidCidr("::/0")).toBe(true);
     });
 
     it("accepts valid bare IPv6 address", () => {
@@ -136,6 +152,27 @@ describe("IP allowlist", () => {
 
     it("rejects negative prefix", () => {
       expect(isValidCidr("10.0.0.0/-1")).toBe(false);
+    });
+
+    it("rejects trailing slash, extra slash segments, and non-canonical prefix strings (#3051)", () => {
+      for (const invalid of [
+        "10.0.0.0/",
+        "10.0.0.0/ ",
+        "10.0.0.0/ 24",
+        "10.0.0.0/24 ",
+        "10.0.0.0/24/extra",
+        "10.0.0.0/+8",
+        "10.0.0.0/08",
+        "10.0.0.0/0x10",
+        "10.0.0.0/0b1000",
+        "10.0.0.0/0o10",
+        "10.0.0.0/8.0",
+        "10.0.0.0/1e1",
+        "2001:db8::/",
+        "2001:db8::/32/extra",
+      ]) {
+        expect(isValidCidr(invalid), invalid).toBe(false);
+      }
     });
   });
 

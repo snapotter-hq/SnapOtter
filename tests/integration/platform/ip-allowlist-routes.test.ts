@@ -140,15 +140,25 @@ describe("IP allowlist with enterprise license", () => {
   });
 
   it("PUT rejects invalid CIDR values", async () => {
-    const res = await enterpriseApp.app.inject({
-      method: "PUT",
-      url: "/api/v1/enterprise/ip-allowlist",
-      headers: { authorization: `Bearer ${entAdminToken}` },
-      payload: { cidrs: ["not-a-cidr"] },
-    });
-    expect(res.statusCode).toBe(400);
-    const body = JSON.parse(res.body);
-    expect(body.code).toBe("INVALID_CIDR");
+    for (const invalid of [
+      "not-a-cidr",
+      "10.0.0.0/",
+      "10.0.0.0/ ",
+      "10.0.0.0/24/extra",
+      "10.0.0.0/+8",
+      "10.0.0.0/08",
+      "10.0.0.0/0x10",
+    ]) {
+      const res = await enterpriseApp.app.inject({
+        method: "PUT",
+        url: "/api/v1/enterprise/ip-allowlist",
+        headers: { authorization: `Bearer ${entAdminToken}` },
+        payload: { cidrs: [invalid] },
+      });
+      expect(res.statusCode, invalid).toBe(400);
+      const body = JSON.parse(res.body);
+      expect(body.code, invalid).toBe("INVALID_CIDR");
+    }
   });
 
   it("PUT rejects entries longer than 45 characters", async () => {
