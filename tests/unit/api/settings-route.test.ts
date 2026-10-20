@@ -360,13 +360,14 @@ describe("settingsRoutes decryption failure handling (#2534)", () => {
     }
   });
 
-  it("decrypts an $ENC$ value on GET /api/v1/settings and GET /api/v1/settings/:key when DATA_ENCRYPTION_KEY_PREVIOUS matches", async () => {
+  it("decrypts an $ENC$ value on GET /api/v1/settings and GET /api/v1/settings/:key when DATA_ENCRYPTION_KEY_PREVIOUS matches and re-encrypts under DATA_ENCRYPTION_KEY (#2843)", async () => {
     vi.resetModules();
     const reportErrorSpy = vi.fn().mockResolvedValue(undefined);
     const keyA = "a".repeat(64);
     const keyB = "b".repeat(64);
 
     vi.doMock("drizzle-orm", () => ({
+      and: (...args: unknown[]) => ({ op: "and", args }),
       eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
     }));
     vi.doMock("../../../apps/api/src/config.js", () => ({
@@ -382,9 +383,10 @@ describe("settingsRoutes decryption failure handling (#2534)", () => {
       return { ...actual, reportError: reportErrorSpy };
     });
 
-    const { encrypt } = await import("../../../apps/api/src/lib/encryption.js");
+    const { decrypt, encrypt } = await import("../../../apps/api/src/lib/encryption.js");
     const rotatedCiphertext = await encrypt("dark", keyA);
     const updatedAt = new Date("2026-10-14T00:00:00.000Z");
+    const updates: Array<{ set: Record<string, unknown>; where: unknown }> = [];
 
     vi.doMock("../../../apps/api/src/db/index.js", () => ({
       db: {
@@ -396,8 +398,16 @@ describe("settingsRoutes decryption failure handling (#2534)", () => {
             });
           },
         }),
+        update: () => ({
+          set: (setArg: Record<string, unknown>) => ({
+            where: (whereArg: unknown) => {
+              updates.push({ set: setArg, where: whereArg });
+              return Promise.resolve();
+            },
+          }),
+        }),
       },
-      schema: { settings: { key: "settings.key" } },
+      schema: { settings: { key: "settings.key", value: "settings.value" } },
     }));
     vi.doMock("../../../apps/api/src/permissions.js", () => ({
       requirePermission: () => async () => ({ id: "admin-1", username: "admin", role: "admin" }),
@@ -426,6 +436,18 @@ describe("settingsRoutes decryption failure handling (#2534)", () => {
         value: "dark",
         updatedAt: updatedAt.toISOString(),
       });
+      expect(updates).toHaveLength(2);
+      for (const u of updates) {
+        expect(await decrypt(u.set.value as string, keyB)).toBe("dark");
+        expect(await decrypt(u.set.value as string, keyA)).toBeNull();
+        expect(u.where).toEqual({
+          op: "and",
+          args: [
+            { op: "eq", col: "settings.key", val: "defaultTheme" },
+            { op: "eq", col: "settings.value", val: rotatedCiphertext },
+          ],
+        });
+      }
       expect(reportErrorSpy).not.toHaveBeenCalled();
       expect(errorLogSpy).not.toHaveBeenCalled();
     } finally {

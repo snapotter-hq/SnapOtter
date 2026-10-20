@@ -20,6 +20,10 @@ const upsertSettingMock = vi.hoisted(() => vi.fn());
 const decryptSettingMock = vi.hoisted(() => vi.fn());
 const isFeatureEnabledMock = vi.hoisted(() => vi.fn());
 const selectMock = vi.hoisted(() => vi.fn());
+const updateMock = vi.hoisted(() => vi.fn());
+const updatesRecorded = vi.hoisted(
+  () => [] as Array<{ set: Record<string, unknown>; where: unknown }>,
+);
 const reportErrorMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 
 function queryChain<T>(result: T, terminalWhere = false) {
@@ -41,17 +45,29 @@ async function loadSiemForward() {
   isFeatureEnabledMock.mockReset();
   isFeatureEnabledMock.mockReturnValue(true);
   selectMock.mockReset();
+  updateMock.mockReset();
+  updatesRecorded.length = 0;
+  updateMock.mockImplementation(() => ({
+    set: (setArg: Record<string, unknown>) => ({
+      where: (whereArg: unknown) => {
+        updatesRecorded.push({ set: setArg, where: whereArg });
+        return Promise.resolve();
+      },
+    }),
+  }));
   reportErrorMock.mockClear();
 
   vi.doMock("drizzle-orm", () => ({
+    and: vi.fn((...args: unknown[]) => ({ op: "and", args })),
     asc: vi.fn(() => "asc"),
-    eq: vi.fn(() => "eq"),
+    eq: vi.fn((col: unknown, val: unknown) => ({ op: "eq", col, val })),
     gte: vi.fn(() => "gte"),
   }));
 
   vi.doMock("../../../../apps/api/src/db/index.js", () => ({
     db: {
       select: selectMock,
+      update: updateMock,
     },
     schema: {
       auditLog: {
@@ -73,6 +89,11 @@ async function loadSiemForward() {
 
   vi.doMock("../../../../apps/api/src/lib/encryption.js", () => ({
     decryptSetting: decryptSettingMock,
+    decryptSettingWithRotation: async (val: string) => {
+      const res = await decryptSettingMock(val);
+      if (res === null || res === undefined) return null;
+      return typeof res === "string" ? { value: res } : res;
+    },
   }));
 
   vi.doMock("../../../../apps/api/src/lib/error-report.js", () => ({
@@ -181,6 +202,7 @@ describe("SIEM forwarding behavior", () => {
       "2026-06-29T12:00:00.000Z",
     );
     expect(upsertSettingMock).toHaveBeenCalledWith("siem_consecutive_failures", "0");
+    expect(updatesRecorded).toHaveLength(0);
   });
 
   it("increments failure counter when delivery fails", async () => {
@@ -208,5 +230,153 @@ describe("SIEM forwarding behavior", () => {
 
     expect(upsertSettingMock).toHaveBeenCalledWith("siem_consecutive_failures", "5");
     expect(error).toHaveBeenCalledWith("SIEM forwarding failed (attempt 5/5): downstream 500");
+  });
+
+  it("re-encrypts a rotated siem_config authHeader with a compare-and-swap (#2843)", async () => {
+    const { runSiemForward } = await loadSiemForward();
+    const rawConfig = JSON.stringify({
+      webhookUrl: "https://siem.test/events",
+      authHeader: "$ENC$old",
+      flushIntervalSeconds: 30,
+      enabled: true,
+    });
+    readSiemConfigMock.mockResolvedValue(JSON.parse(rawConfig));
+    selectMock
+      .mockReturnValueOnce(queryChain([{ value: "0" }], true))
+      .mockReturnValueOnce(queryChain([], true))
+      .mockReturnValueOnce(
+        queryChain([
+          {
+            createdAt: new Date("2026-06-29T12:00:00.000Z"),
+            action: "LOGIN_FAILED",
+          },
+        ]),
+      )
+      .mockReturnValueOnce(queryChain([{ value: rawConfig }], true));
+    decryptSettingMock.mockResolvedValue({
+      value: "Bearer rotated-siem",
+      reencrypted: "$ENC$new",
+    });
+    deliverWebhookMock.mockResolvedValue({ success: true });
+
+    await expect(runSiemForward()).resolves.toEqual({ forwarded: 1 });
+
+    expect(deliverWebhookMock).toHaveBeenCalledWith(
+      "https://siem.test/events",
+      "Bearer rotated-siem",
+      expect.any(Array),
+    );
+    expect(updatesRecorded).toHaveLength(1);
+    expect(JSON.parse(updatesRecorded[0].set.value as string)).toEqual({
+      webhookUrl: "https://siem.test/events",
+      authHeader: "$ENC$new",
+      flushIntervalSeconds: 30,
+      enabled: true,
+    });
+    expect(updatesRecorded[0].where).toEqual({
+      op: "and",
+      args: [
+        { op: "eq", col: "key", val: "siem_config" },
+        { op: "eq", col: "value", val: rawConfig },
+      ],
+    });
+  });
+
+  it("skips siem_config rotation writeback when a concurrent update changed authHeader (#2843)", async () => {
+    const { runSiemForward } = await loadSiemForward();
+    readSiemConfigMock.mockResolvedValue({
+      webhookUrl: "https://siem.test/events",
+      authHeader: "$ENC$old",
+      flushIntervalSeconds: 30,
+      enabled: true,
+    });
+    const concurrentConfig = JSON.stringify({
+      webhookUrl: "https://siem.test/events",
+      authHeader: "$ENC$concurrently-updated",
+      flushIntervalSeconds: 60,
+      enabled: true,
+    });
+    selectMock
+      .mockReturnValueOnce(queryChain([{ value: "0" }], true))
+      .mockReturnValueOnce(queryChain([], true))
+      .mockReturnValueOnce(
+        queryChain([
+          {
+            createdAt: new Date("2026-06-29T12:00:00.000Z"),
+            action: "LOGIN_FAILED",
+          },
+        ]),
+      )
+      .mockReturnValueOnce(queryChain([{ value: concurrentConfig }], true));
+    decryptSettingMock.mockResolvedValue({
+      value: "Bearer rotated-siem",
+      reencrypted: "$ENC$new",
+    });
+    deliverWebhookMock.mockResolvedValue({ success: true });
+
+    await expect(runSiemForward()).resolves.toEqual({ forwarded: 1 });
+    expect(updatesRecorded).toHaveLength(0);
+  });
+
+  it("logs a warning on malformed siem_config JSON during rotation writeback and lets db.update errors propagate (#2843)", async () => {
+    const { runSiemForward } = await loadSiemForward();
+    readSiemConfigMock.mockResolvedValue({
+      webhookUrl: "https://siem.test/events",
+      authHeader: "$ENC$old",
+      flushIntervalSeconds: 30,
+      enabled: true,
+    });
+    selectMock
+      .mockReturnValueOnce(queryChain([{ value: "0" }], true))
+      .mockReturnValueOnce(queryChain([], true))
+      .mockReturnValueOnce(
+        queryChain([
+          {
+            createdAt: new Date("2026-06-29T12:00:00.000Z"),
+            action: "LOGIN_FAILED",
+          },
+        ]),
+      )
+      .mockReturnValueOnce(queryChain([{ value: "{corrupted" }], true));
+    decryptSettingMock.mockResolvedValue({
+      value: "Bearer rotated-siem",
+      reencrypted: "$ENC$new",
+    });
+    deliverWebhookMock.mockResolvedValue({ success: true });
+    const warn = loggerCalls("warn");
+
+    await expect(runSiemForward()).resolves.toEqual({ forwarded: 1 });
+    expect(updatesRecorded).toHaveLength(0);
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ key: "siem_config" }),
+      expect.stringContaining("siem_config JSON"),
+    );
+
+    // A database error during the rotation writeback must propagate rather than being caught
+    const rawConfig = JSON.stringify({
+      webhookUrl: "https://siem.test/events",
+      authHeader: "$ENC$old",
+      flushIntervalSeconds: 30,
+      enabled: true,
+    });
+    selectMock
+      .mockReturnValueOnce(queryChain([{ value: "0" }], true))
+      .mockReturnValueOnce(queryChain([], true))
+      .mockReturnValueOnce(
+        queryChain([
+          {
+            createdAt: new Date("2026-06-29T12:00:00.000Z"),
+            action: "LOGIN_FAILED",
+          },
+        ]),
+      )
+      .mockReturnValueOnce(queryChain([{ value: rawConfig }], true));
+    updateMock.mockImplementationOnce(() => ({
+      set: () => ({
+        where: () => Promise.reject(new Error("db writeback failed")),
+      }),
+    }));
+
+    await expect(runSiemForward()).rejects.toThrow("db writeback failed");
   });
 });

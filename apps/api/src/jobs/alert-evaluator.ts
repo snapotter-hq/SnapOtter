@@ -15,7 +15,7 @@ import { SafeError } from "@snapotter/shared";
 import { and, eq, gte, sql } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
-import { decryptSetting } from "../lib/encryption.js";
+import { decryptSettingWithRotation } from "../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { reportError } from "../lib/error-report.js";
 import { logger } from "../lib/logger.js";
@@ -125,12 +125,13 @@ export async function evaluateAlerts(): Promise<void> {
 
   // 5. Deliver to each enabled "alerts" webhook
   let delivered = 0;
+  let currentDestJson = destJson;
   for (const dest of alertDests) {
     let authHeader = dest.authHeader;
 
     // Decrypt auth header if encrypted
     if (authHeader) {
-      const decrypted = await decryptSetting(authHeader);
+      const decrypted = await decryptSettingWithRotation(authHeader);
       if (decrypted === null) {
         logger.error(
           { name: dest.name },
@@ -149,7 +150,21 @@ export async function evaluateAlerts(): Promise<void> {
         );
         continue;
       }
-      authHeader = decrypted;
+      if (decrypted.reencrypted) {
+        dest.authHeader = decrypted.reencrypted;
+        const nextDestJson = JSON.stringify(destinations);
+        await db
+          .update(schema.settings)
+          .set({ value: nextDestJson, updatedAt: new Date() })
+          .where(
+            and(
+              eq(schema.settings.key, "webhook_destinations"),
+              eq(schema.settings.value, currentDestJson),
+            ),
+          );
+        currentDestJson = nextDestJson;
+      }
+      authHeader = decrypted.value;
     }
 
     const { deliverWebhook } = await import("../lib/webhook-delivery.js");

@@ -7,13 +7,13 @@
  */
 
 import { SafeError } from "@snapotter/shared";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { auditFromRequest } from "../lib/audit.js";
-import { decryptSetting, encrypt } from "../lib/encryption.js";
+import { decryptSettingWithRotation, encrypt } from "../lib/encryption.js";
 import { reportError } from "../lib/error-report.js";
 import {
   getSettingPolicy,
@@ -51,7 +51,7 @@ async function decryptIfNeeded(
   key: string,
   value: string,
 ): Promise<string | null> {
-  const decrypted = await decryptSetting(value);
+  const decrypted = await decryptSettingWithRotation(value);
   if (decrypted === null) {
     request.log.error(
       { key },
@@ -73,7 +73,13 @@ async function decryptIfNeeded(
     );
     return null;
   }
-  return decrypted;
+  if (decrypted.reencrypted) {
+    await db
+      .update(schema.settings)
+      .set({ value: decrypted.reencrypted, updatedAt: new Date() })
+      .where(and(eq(schema.settings.key, key), eq(schema.settings.value, value)));
+  }
+  return decrypted.value;
 }
 
 export async function settingsRoutes(app: FastifyInstance): Promise<void> {

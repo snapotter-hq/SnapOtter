@@ -15,9 +15,9 @@
  *   - siem_consecutive_failures: circuit breaker counter
  */
 import { SafeError } from "@snapotter/shared";
-import { asc, eq, gte } from "drizzle-orm";
+import { and, asc, eq, gte } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
-import { decryptSetting } from "../lib/encryption.js";
+import { decryptSettingWithRotation } from "../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { reportError } from "../lib/error-report.js";
 import { logger } from "../lib/logger.js";
@@ -89,7 +89,7 @@ export async function runSiemForward(): Promise<{ forwarded: number } | undefine
   // 5. Decrypt auth header if encrypted
   let authHeader = config.authHeader;
   if (authHeader) {
-    const decrypted = await decryptSetting(authHeader);
+    const decrypted = await decryptSettingWithRotation(authHeader);
     if (decrypted === null) {
       logger.error(
         "siem-forward: stored SIEM authHeader could not be decrypted; check DATA_ENCRYPTION_KEY and DATA_ENCRYPTION_KEY_PREVIOUS",
@@ -107,7 +107,37 @@ export async function runSiemForward(): Promise<{ forwarded: number } | undefine
       );
       return;
     }
-    authHeader = decrypted;
+    if (decrypted.reencrypted) {
+      const rawConfig = await readSettingValue("siem_config");
+      if (rawConfig !== null) {
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(rawConfig);
+        } catch (err) {
+          logger.warn(
+            { err, key: "siem_config" },
+            "siem-forward: failed to parse stored siem_config JSON during rotation writeback",
+          );
+        }
+        if (
+          parsed &&
+          typeof parsed === "object" &&
+          !Array.isArray(parsed) &&
+          (parsed as { authHeader?: unknown }).authHeader === authHeader
+        ) {
+          await db
+            .update(schema.settings)
+            .set({
+              value: JSON.stringify({ ...parsed, authHeader: decrypted.reencrypted }),
+              updatedAt: new Date(),
+            })
+            .where(
+              and(eq(schema.settings.key, "siem_config"), eq(schema.settings.value, rawConfig)),
+            );
+        }
+      }
+    }
+    authHeader = decrypted.value;
   }
 
   // 6. Map rows to SIEM event payload

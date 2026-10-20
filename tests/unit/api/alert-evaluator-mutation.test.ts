@@ -77,6 +77,11 @@ async function loadAlertEvaluator() {
 
   vi.doMock("../../../apps/api/src/lib/encryption.js", () => ({
     decryptSetting: decryptSettingMock,
+    decryptSettingWithRotation: async (val: string) => {
+      const res = await decryptSettingMock(val);
+      if (res === null || res === undefined) return null;
+      return typeof res === "string" ? { value: res } : res;
+    },
   }));
 
   vi.doMock("../../../apps/api/src/lib/error-report.js", () => ({
@@ -279,6 +284,11 @@ describe("alert-evaluator.ts mutation coverage", () => {
       }));
       vi.doMock("../../../apps/api/src/lib/encryption.js", () => ({
         decryptSetting: decryptSettingMock,
+        decryptSettingWithRotation: async (val: string) => {
+          const res = await decryptSettingMock(val);
+          if (res === null || res === undefined) return null;
+          return typeof res === "string" ? { value: res } : res;
+        },
       }));
       vi.doMock("../../../apps/api/src/lib/error-report.js", () => ({
         reportError: reportErrorMock,

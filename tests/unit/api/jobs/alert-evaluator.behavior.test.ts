@@ -7,6 +7,10 @@ const decryptSettingMock = vi.hoisted(() => vi.fn());
 const getActiveLicenseMock = vi.hoisted(() => vi.fn());
 const isFeatureEnabledMock = vi.hoisted(() => vi.fn());
 const selectMock = vi.hoisted(() => vi.fn());
+const updateMock = vi.hoisted(() => vi.fn());
+const updatesRecorded = vi.hoisted(
+  () => [] as Array<{ set: Record<string, unknown>; where: unknown }>,
+);
 const reportErrorMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const loggerMock = vi.hoisted(() => ({
   info: vi.fn(),
@@ -33,6 +37,16 @@ async function loadAlertEvaluator() {
   isFeatureEnabledMock.mockReset();
   isFeatureEnabledMock.mockReturnValue(true);
   selectMock.mockReset();
+  updateMock.mockReset();
+  updatesRecorded.length = 0;
+  updateMock.mockImplementation(() => ({
+    set: (setArg: Record<string, unknown>) => ({
+      where: (whereArg: unknown) => {
+        updatesRecorded.push({ set: setArg, where: whereArg });
+        return Promise.resolve();
+      },
+    }),
+  }));
   reportErrorMock.mockClear();
   for (const fn of Object.values(loggerMock)) fn.mockClear();
 
@@ -41,8 +55,8 @@ async function loadAlertEvaluator() {
   }));
 
   vi.doMock("drizzle-orm", () => ({
-    and: vi.fn(() => "and"),
-    eq: vi.fn(() => "eq"),
+    and: vi.fn((...args: unknown[]) => ({ op: "and", args })),
+    eq: vi.fn((col: unknown, val: unknown) => ({ op: "eq", col, val })),
     gte: vi.fn(() => "gte"),
     sql: vi.fn(() => "sql"),
   }));
@@ -56,11 +70,16 @@ async function loadAlertEvaluator() {
   vi.doMock("../../../../apps/api/src/db/index.js", () => ({
     db: {
       select: selectMock,
+      update: updateMock,
     },
     schema: {
       auditLog: {
         action: "action",
         createdAt: "createdAt",
+      },
+      settings: {
+        key: "settings.key",
+        value: "settings.value",
       },
     },
   }));
@@ -71,6 +90,11 @@ async function loadAlertEvaluator() {
 
   vi.doMock("../../../../apps/api/src/lib/encryption.js", () => ({
     decryptSetting: decryptSettingMock,
+    decryptSettingWithRotation: async (val: string) => {
+      const res = await decryptSettingMock(val);
+      if (res === null || res === undefined) return null;
+      return typeof res === "string" ? { value: res } : res;
+    },
   }));
 
   vi.doMock("../../../../apps/api/src/lib/error-report.js", () => ({
@@ -177,6 +201,7 @@ describe("alert evaluator behavior", () => {
       ]),
       { maxRetries: 1 },
     );
+    expect(updatesRecorded).toHaveLength(0);
     expect(loggerMock.error).not.toHaveBeenCalled();
   });
 
@@ -546,5 +571,149 @@ describe("alert evaluator behavior", () => {
     expect(deliverWebhookMock).toHaveBeenCalledTimes(2);
     const urls = deliverWebhookMock.mock.calls.map((call) => call[0]);
     expect(urls).toEqual(["https://example.test/a", "https://example.test/b"]);
+  });
+
+  it("re-encrypts rotated webhook authHeaders with a compare-and-swap on webhook_destinations (#2843)", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
+    const { evaluateAlerts } = await loadAlertEvaluator();
+    const rawDestinations = JSON.stringify([
+      {
+        name: "Ops Alerts",
+        url: "https://example.test/alerts",
+        authHeader: "$ENC$old",
+        enabled: true,
+        type: "alerts",
+      },
+      {
+        name: "SIEM Dest",
+        url: "https://example.test/siem",
+        authHeader: "$ENC$untouched",
+        enabled: true,
+        type: "siem",
+      },
+    ]);
+
+    getSettingStringMock.mockResolvedValueOnce(rawDestinations).mockResolvedValueOnce("");
+    statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
+    selectMock.mockReturnValue(queryChain([{ count: 0 }]));
+    getActiveLicenseMock.mockReturnValue(null);
+    decryptSettingMock.mockResolvedValue({
+      value: "Bearer rotated-token",
+      reencrypted: "$ENC$new",
+    });
+    deliverWebhookMock.mockResolvedValue({ success: true });
+
+    await evaluateAlerts();
+
+    expect(deliverWebhookMock).toHaveBeenCalledWith(
+      "https://example.test/alerts",
+      "Bearer rotated-token",
+      [{ condition: "backup_never_run" }],
+      { maxRetries: 1 },
+    );
+    expect(updatesRecorded).toHaveLength(1);
+    expect(JSON.parse(updatesRecorded[0].set.value as string)).toEqual([
+      {
+        name: "Ops Alerts",
+        url: "https://example.test/alerts",
+        authHeader: "$ENC$new",
+        enabled: true,
+        type: "alerts",
+      },
+      {
+        name: "SIEM Dest",
+        url: "https://example.test/siem",
+        authHeader: "$ENC$untouched",
+        enabled: true,
+        type: "siem",
+      },
+    ]);
+    expect(updatesRecorded[0].where).toEqual({
+      op: "and",
+      args: [
+        { op: "eq", col: "settings.key", val: "webhook_destinations" },
+        { op: "eq", col: "settings.value", val: rawDestinations },
+      ],
+    });
+  });
+
+  it("chains compare-and-swap baselines when multiple alert destinations rotate in one run (#2843)", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
+    const { evaluateAlerts } = await loadAlertEvaluator();
+    const rawDestinations = JSON.stringify([
+      {
+        name: "Hook 1",
+        url: "https://example.test/alerts-1",
+        authHeader: "$ENC$old-1",
+        enabled: true,
+        type: "alerts",
+      },
+      {
+        name: "Hook Current",
+        url: "https://example.test/alerts-current",
+        authHeader: "$ENC$current",
+        enabled: true,
+        type: "alerts",
+      },
+      {
+        name: "Hook 2",
+        url: "https://example.test/alerts-2",
+        authHeader: "$ENC$old-2",
+        enabled: true,
+        type: "alerts",
+      },
+    ]);
+
+    getSettingStringMock.mockResolvedValueOnce(rawDestinations).mockResolvedValueOnce("");
+    statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
+    selectMock.mockReturnValue(queryChain([{ count: 0 }]));
+    getActiveLicenseMock.mockReturnValue(null);
+    decryptSettingMock
+      .mockResolvedValueOnce({ value: "Bearer one", reencrypted: "$ENC$new-1" })
+      .mockResolvedValueOnce("Bearer current")
+      .mockResolvedValueOnce({ value: "Bearer two", reencrypted: "$ENC$new-2" });
+    deliverWebhookMock.mockResolvedValue({ success: true });
+
+    await evaluateAlerts();
+
+    expect(updatesRecorded).toHaveLength(2);
+    const firstJson = updatesRecorded[0].set.value as string;
+    expect(updatesRecorded[0].where).toEqual({
+      op: "and",
+      args: [
+        { op: "eq", col: "settings.key", val: "webhook_destinations" },
+        { op: "eq", col: "settings.value", val: rawDestinations },
+      ],
+    });
+    expect(updatesRecorded[1].where).toEqual({
+      op: "and",
+      args: [
+        { op: "eq", col: "settings.key", val: "webhook_destinations" },
+        { op: "eq", col: "settings.value", val: firstJson },
+      ],
+    });
+    expect(JSON.parse(updatesRecorded[1].set.value as string)).toEqual([
+      {
+        name: "Hook 1",
+        url: "https://example.test/alerts-1",
+        authHeader: "$ENC$new-1",
+        enabled: true,
+        type: "alerts",
+      },
+      {
+        name: "Hook Current",
+        url: "https://example.test/alerts-current",
+        authHeader: "$ENC$current",
+        enabled: true,
+        type: "alerts",
+      },
+      {
+        name: "Hook 2",
+        url: "https://example.test/alerts-2",
+        authHeader: "$ENC$new-2",
+        enabled: true,
+        type: "alerts",
+      },
+    ]);
   });
 });

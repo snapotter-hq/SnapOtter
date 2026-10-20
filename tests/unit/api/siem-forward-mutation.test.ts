@@ -67,6 +67,7 @@ async function loadSiemForward() {
   reportErrorMock.mockClear();
 
   vi.doMock("drizzle-orm", () => ({
+    and: vi.fn((...args: unknown[]) => ({ op: "and", args })),
     asc: ascMock,
     eq: vi.fn(() => "eq"),
     gte: gteMock,
@@ -91,6 +92,11 @@ async function loadSiemForward() {
 
   vi.doMock("../../../apps/api/src/lib/encryption.js", () => ({
     decryptSetting: decryptSettingMock,
+    decryptSettingWithRotation: async (val: string) => {
+      const res = await decryptSettingMock(val);
+      if (res === null || res === undefined) return null;
+      return typeof res === "string" ? { value: res } : res;
+    },
   }));
 
   vi.doMock("../../../apps/api/src/lib/error-report.js", () => ({

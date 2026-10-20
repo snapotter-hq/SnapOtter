@@ -25,7 +25,7 @@ mockEnterpriseFeatures(["admin_alerts", "webhooks", "siem_forwarding"]);
 const { buildTestApp, loginAsAdmin } = await import("../test-server.js");
 const { env } = await import("../../../apps/api/src/config.js");
 const { db, schema } = await import("../../../apps/api/src/db/index.js");
-const { encrypt } = await import("../../../apps/api/src/lib/encryption.js");
+const { decrypt, encrypt } = await import("../../../apps/api/src/lib/encryption.js");
 const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
 const { logger } = await import("../../../apps/api/src/lib/logger.js");
 const { upsertSetting } = await import("../../../apps/api/src/lib/settings-helpers.js");
@@ -162,19 +162,64 @@ describe("Encrypted-setting decrypt callers (#2031)", () => {
       expect(reportErrorSpy).toHaveBeenCalledTimes(1);
     });
 
-    it("falls back to DATA_ENCRYPTION_KEY_PREVIOUS during key rotation", async () => {
+    it("falls back to DATA_ENCRYPTION_KEY_PREVIOUS during key rotation and re-encrypts under DATA_ENCRYPTION_KEY (#2843)", async () => {
       env.DATA_ENCRYPTION_KEY = KEY_B;
       env.DATA_ENCRYPTION_KEY_PREVIOUS = KEY_A;
-      await seedWebhookDestination(await encrypt(AUTH_HEADER, KEY_A));
+      const untouchedHeader = await encrypt("Bearer sibling-token", KEY_B);
+      await upsertSetting(
+        "webhook_destinations",
+        JSON.stringify([
+          {
+            name: "Sibling Hook",
+            url: "https://example.com/sibling",
+            authHeader: untouchedHeader,
+            eventFilter: [],
+            batchIntervalSeconds: 30,
+            enabled: true,
+            type: "siem",
+          },
+          {
+            name: "Ops Alerts",
+            url: "https://example.com/alerts",
+            authHeader: await encrypt(AUTH_HEADER, KEY_A),
+            eventFilter: [],
+            batchIntervalSeconds: 30,
+            enabled: true,
+            type: "alerts",
+          },
+        ]),
+      );
 
       const res = await testApp.app.inject({
         method: "POST",
-        url: "/api/v1/enterprise/webhooks/0/test",
+        url: "/api/v1/enterprise/webhooks/1/test",
         headers: { authorization: `Bearer ${adminToken}` },
       });
 
       expect(res.statusCode).toBe(200);
       expect(JSON.parse(res.body)).toMatchObject({ ok: true, statusCode: 200 });
+      expect(deliverWebhookSpy).toHaveBeenCalledTimes(1);
+      expect(deliverWebhookSpy.mock.calls[0][1]).toBe(AUTH_HEADER);
+
+      const [rotatedRow] = await db
+        .select({ value: schema.settings.value })
+        .from(schema.settings)
+        .where(eq(schema.settings.key, "webhook_destinations"));
+      const rotatedDests = JSON.parse(rotatedRow.value) as Array<{ authHeader: string }>;
+      expect(rotatedDests[0].authHeader).toBe(untouchedHeader);
+      expect(await decrypt(rotatedDests[1].authHeader, KEY_B)).toBe(AUTH_HEADER);
+      expect(await decrypt(rotatedDests[1].authHeader, KEY_A)).toBeNull();
+
+      // Drop the previous key as documented in guide/configuration.md
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = "";
+      deliverWebhookSpy.mockClear();
+
+      const afterDrop = await testApp.app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/webhooks/1/test",
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(afterDrop.statusCode).toBe(200);
       expect(deliverWebhookSpy).toHaveBeenCalledTimes(1);
       expect(deliverWebhookSpy.mock.calls[0][1]).toBe(AUTH_HEADER);
       expect(reportErrorSpy).not.toHaveBeenCalled();
@@ -234,7 +279,7 @@ describe("Encrypted-setting decrypt callers (#2031)", () => {
       expect(reportErrorSpy).toHaveBeenCalledTimes(1);
     });
 
-    it("decrypts via DATA_ENCRYPTION_KEY_PREVIOUS during key rotation", async () => {
+    it("decrypts via DATA_ENCRYPTION_KEY_PREVIOUS during key rotation and re-encrypts under DATA_ENCRYPTION_KEY (#2843)", async () => {
       env.DATA_ENCRYPTION_KEY = KEY_B;
       env.DATA_ENCRYPTION_KEY_PREVIOUS = KEY_A;
       await seedSiemConfig(await encrypt(AUTH_HEADER, KEY_A));
@@ -242,6 +287,23 @@ describe("Encrypted-setting decrypt callers (#2031)", () => {
       const result = await runSiemForward();
 
       expect(result?.forwarded).toBeGreaterThan(0);
+      expect(deliverWebhookSpy).toHaveBeenCalledTimes(1);
+      expect(deliverWebhookSpy.mock.calls[0][1]).toBe(AUTH_HEADER);
+
+      const [rotatedRow] = await db
+        .select({ value: schema.settings.value })
+        .from(schema.settings)
+        .where(eq(schema.settings.key, "siem_config"));
+      const rotatedConfig = JSON.parse(rotatedRow.value) as { authHeader: string };
+      expect(await decrypt(rotatedConfig.authHeader, KEY_B)).toBe(AUTH_HEADER);
+      expect(await decrypt(rotatedConfig.authHeader, KEY_A)).toBeNull();
+
+      // Drop the previous key as documented in guide/configuration.md
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = "";
+      deliverWebhookSpy.mockClear();
+
+      const afterDrop = await runSiemForward();
+      expect(afterDrop?.forwarded).toBeGreaterThan(0);
       expect(deliverWebhookSpy).toHaveBeenCalledTimes(1);
       expect(deliverWebhookSpy.mock.calls[0][1]).toBe(AUTH_HEADER);
       expect(reportErrorSpy).not.toHaveBeenCalled();
@@ -294,13 +356,29 @@ describe("Encrypted-setting decrypt callers (#2031)", () => {
       expect(reportErrorSpy).toHaveBeenCalledTimes(1);
     });
 
-    it("decrypts via DATA_ENCRYPTION_KEY_PREVIOUS during key rotation", async () => {
+    it("decrypts via DATA_ENCRYPTION_KEY_PREVIOUS during key rotation and re-encrypts under DATA_ENCRYPTION_KEY (#2843)", async () => {
       env.DATA_ENCRYPTION_KEY = KEY_B;
       env.DATA_ENCRYPTION_KEY_PREVIOUS = KEY_A;
       await seedWebhookDestination(await encrypt(AUTH_HEADER, KEY_A));
 
       await evaluateAlerts();
 
+      expect(deliverWebhookSpy).toHaveBeenCalledTimes(1);
+      expect(deliverWebhookSpy.mock.calls[0][1]).toBe(AUTH_HEADER);
+
+      const [rotatedRow] = await db
+        .select({ value: schema.settings.value })
+        .from(schema.settings)
+        .where(eq(schema.settings.key, "webhook_destinations"));
+      const rotatedDests = JSON.parse(rotatedRow.value) as Array<{ authHeader: string }>;
+      expect(await decrypt(rotatedDests[0].authHeader, KEY_B)).toBe(AUTH_HEADER);
+      expect(await decrypt(rotatedDests[0].authHeader, KEY_A)).toBeNull();
+
+      // Drop the previous key as documented in guide/configuration.md
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = "";
+      deliverWebhookSpy.mockClear();
+
+      await evaluateAlerts();
       expect(deliverWebhookSpy).toHaveBeenCalledTimes(1);
       expect(deliverWebhookSpy.mock.calls[0][1]).toBe(AUTH_HEADER);
       expect(reportErrorSpy).not.toHaveBeenCalled();
@@ -384,7 +462,7 @@ describe("Encrypted-setting decrypt callers (#2031)", () => {
       });
     });
 
-    it("decrypts an $ENC$ row via DATA_ENCRYPTION_KEY_PREVIOUS during key rotation", async () => {
+    it("decrypts an $ENC$ row via DATA_ENCRYPTION_KEY_PREVIOUS during key rotation and re-encrypts under DATA_ENCRYPTION_KEY (#2843)", async () => {
       env.DATA_ENCRYPTION_KEY = KEY_B;
       env.DATA_ENCRYPTION_KEY_PREVIOUS = KEY_A;
       await upsertSetting("defaultTheme", await encrypt("dark", KEY_A));
@@ -397,6 +475,15 @@ describe("Encrypted-setting decrypt callers (#2031)", () => {
       expect(listRes.statusCode).toBe(200);
       expect(JSON.parse(listRes.body).settings.defaultTheme).toBe("dark");
 
+      const [afterList] = await db
+        .select({ value: schema.settings.value })
+        .from(schema.settings)
+        .where(eq(schema.settings.key, "defaultTheme"));
+      expect(await decrypt(afterList.value, KEY_B)).toBe("dark");
+      expect(await decrypt(afterList.value, KEY_A)).toBeNull();
+
+      // Re-seed with KEY_A to verify GET /api/v1/settings/:key also re-encrypts
+      await upsertSetting("defaultTheme", await encrypt("dark", KEY_A));
       const keyRes = await testApp.app.inject({
         method: "GET",
         url: "/api/v1/settings/defaultTheme",
@@ -404,8 +491,71 @@ describe("Encrypted-setting decrypt callers (#2031)", () => {
       });
       expect(keyRes.statusCode).toBe(200);
       expect(JSON.parse(keyRes.body).value).toBe("dark");
+
+      const [afterKey] = await db
+        .select({ value: schema.settings.value })
+        .from(schema.settings)
+        .where(eq(schema.settings.key, "defaultTheme"));
+      expect(await decrypt(afterKey.value, KEY_B)).toBe("dark");
+      expect(await decrypt(afterKey.value, KEY_A)).toBeNull();
+
+      // Drop the previous key as documented in guide/configuration.md
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = "";
+
+      const listAfterDrop = await testApp.app.inject({
+        method: "GET",
+        url: "/api/v1/settings",
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(listAfterDrop.statusCode).toBe(200);
+      expect(JSON.parse(listAfterDrop.body).settings.defaultTheme).toBe("dark");
+
+      const keyAfterDrop = await testApp.app.inject({
+        method: "GET",
+        url: "/api/v1/settings/defaultTheme",
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(keyAfterDrop.statusCode).toBe(200);
+      expect(JSON.parse(keyAfterDrop.body).value).toBe("dark");
       expect(reportErrorSpy).not.toHaveBeenCalled();
       expect(appLogError).not.toHaveBeenCalled();
+    });
+
+    it("does not overwrite a concurrently updated setting row when rotation writeback loses a compare-and-swap race (#2843)", async () => {
+      env.DATA_ENCRYPTION_KEY = KEY_B;
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = KEY_A;
+      await upsertSetting("defaultTheme", await encrypt("dark", KEY_A));
+
+      const encryptionModule = await import("../../../apps/api/src/lib/encryption.js");
+      const realDecryptWithRotation = encryptionModule.decryptSettingWithRotation;
+      const concurrentValue = await encrypt("light", KEY_B);
+      const spy = vi
+        .spyOn(encryptionModule, "decryptSettingWithRotation")
+        .mockImplementationOnce(async (val: string) => {
+          const result = await realDecryptWithRotation(val);
+          // Simulate a concurrent PUT landing before the compare-and-swap UPDATE runs
+          await upsertSetting("defaultTheme", concurrentValue);
+          return result;
+        });
+
+      try {
+        const res = await testApp.app.inject({
+          method: "GET",
+          url: "/api/v1/settings/defaultTheme",
+          headers: { authorization: `Bearer ${adminToken}` },
+        });
+        expect(res.statusCode).toBe(200);
+        expect(JSON.parse(res.body).value).toBe("dark");
+
+        const [afterRace] = await db
+          .select({ value: schema.settings.value })
+          .from(schema.settings)
+          .where(eq(schema.settings.key, "defaultTheme"));
+        expect(afterRace.value).toBe(concurrentValue);
+        expect(await decrypt(afterRace.value, KEY_B)).toBe("light");
+      } finally {
+        spy.mockRestore();
+      }
     });
   });
 });

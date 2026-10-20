@@ -8,13 +8,13 @@
  * Gated behind the `webhooks:manage` permission + `admin_alerts` enterprise feature.
  */
 import { SafeError } from "@snapotter/shared";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
 import { auditFromRequest } from "../../lib/audit.js";
-import { decryptSetting, encrypt, isEncrypted } from "../../lib/encryption.js";
+import { decryptSettingWithRotation, encrypt, isEncrypted } from "../../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
 import { reportError } from "../../lib/error-report.js";
 import { validateFetchUrl } from "../../lib/ssrf.js";
@@ -35,19 +35,30 @@ const webhookSchema = z.object({
 
 export type WebhookDestination = z.infer<typeof webhookSchema>;
 
-async function readDestinations(): Promise<WebhookDestination[]> {
+async function readDestinationsWithRaw(): Promise<{
+  destinations: WebhookDestination[];
+  rawJson: string | null;
+}> {
   const [row] = await db
     .select({ value: schema.settings.value })
     .from(schema.settings)
     .where(eq(schema.settings.key, SETTINGS_KEY));
 
-  if (!row) return [];
+  if (!row) return { destinations: [], rawJson: null };
 
   try {
-    return JSON.parse(row.value) as WebhookDestination[];
+    return {
+      destinations: JSON.parse(row.value) as WebhookDestination[],
+      rawJson: row.value,
+    };
   } catch {
-    return [];
+    return { destinations: [], rawJson: null };
   }
+}
+
+async function readDestinations(): Promise<WebhookDestination[]> {
+  const { destinations } = await readDestinationsWithRaw();
+  return destinations;
 }
 
 async function writeDestinations(destinations: WebhookDestination[]): Promise<void> {
@@ -253,7 +264,7 @@ export async function registerWebhookRoutes(app: FastifyInstance): Promise<void>
         return reply.status(400).send({ error: "Invalid index" });
       }
 
-      const destinations = await readDestinations();
+      const { destinations, rawJson } = await readDestinationsWithRaw();
       if (index >= destinations.length) {
         return reply.status(404).send({ error: "Webhook destination not found" });
       }
@@ -263,7 +274,7 @@ export async function registerWebhookRoutes(app: FastifyInstance): Promise<void>
       // Decrypt auth header if needed
       let authHeader = dest.authHeader;
       if (authHeader) {
-        const decrypted = await decryptSetting(authHeader);
+        const decrypted = await decryptSettingWithRotation(authHeader);
         if (decrypted === null) {
           request.log.error(
             { index, name: dest.name, type: dest.type },
@@ -288,7 +299,14 @@ export async function registerWebhookRoutes(app: FastifyInstance): Promise<void>
             code: "DECRYPTION_FAILED",
           });
         }
-        authHeader = decrypted;
+        if (decrypted.reencrypted && rawJson !== null) {
+          dest.authHeader = decrypted.reencrypted;
+          await db
+            .update(schema.settings)
+            .set({ value: JSON.stringify(destinations), updatedAt: new Date() })
+            .where(and(eq(schema.settings.key, SETTINGS_KEY), eq(schema.settings.value, rawJson)));
+        }
+        authHeader = decrypted.value;
       }
 
       const testEvent = [
