@@ -396,26 +396,46 @@ describe("a setting that needs alpha does not cost the animation (#1083)", () =>
   // PNG is the natural choice and cannot hold frames, which flattens the
   // animation as silently as the original bug did. WebP has both.
   it.each([
-    { toolId: "replace-color", settings: { makeTransparent: true } },
-    { toolId: "image-pad", settings: { background: "transparent" } },
-  ])("$toolId falls back to WebP rather than PNG", async ({ toolId, settings }) => {
-    const config = getToolConfig(toolId);
-    if (!config) throw new Error(`${toolId} must be registered`);
+    {
+      toolId: "replace-color",
+      settings: { makeTransparent: true },
+      expectedFilename: "frames.webp",
+    },
+    {
+      toolId: "image-pad",
+      settings: { background: "transparent" },
+      expectedFilename: "frames_padded.webp",
+    },
+  ])(
+    "$toolId falls back to WebP rather than PNG",
+    async ({ toolId, settings, expectedFilename }) => {
+      const config = getToolConfig(toolId);
+      if (!config) throw new Error(`${toolId} must be registered`);
 
-    const result = await config.process(
-      await gifSource(),
-      config.settingsSchema.parse(settings),
-      "frames.gif",
-    );
+      const result = await config.process(
+        await gifSource(),
+        config.settingsSchema.parse(settings),
+        "frames.gif",
+      );
 
-    expect(result.contentType).toBe("image/webp");
-    expect((await frameShape(result.buffer)).pages).toBe(3);
-  });
+      expect(result.contentType).toBe("image/webp");
+      expect(result.filename).toBe(expectedFilename);
+      expect((await frameShape(result.buffer)).pages).toBe(3);
+    },
+  );
 
   it.each([
-    { toolId: "replace-color", settings: { makeTransparent: true } },
-    { toolId: "image-pad", settings: { background: "transparent" } },
-  ])("$toolId still returns PNG for a still", async ({ toolId, settings }) => {
+    {
+      toolId: "replace-color",
+      settings: { makeTransparent: true },
+      expectedFilename: "test-200x150.png",
+    },
+    {
+      toolId: "image-pad",
+      settings: { background: "transparent" },
+      expectedFilename: "test-200x150_padded.png",
+    },
+  ])("$toolId still returns PNG for a still", async ({ toolId, settings, expectedFilename }) => {
     const config = getToolConfig(toolId);
     if (!config) throw new Error(`${toolId} must be registered`);
 
@@ -426,7 +446,66 @@ describe("a setting that needs alpha does not cost the animation (#1083)", () =>
     );
 
     expect(result.contentType).toBe("image/png");
+    expect(result.filename).toBe(expectedFilename);
   });
+
+  it.each([
+    {
+      label: "still JPEG with .jpg extension",
+      load: async () => readFixture(fixtures.image.base.jpg100),
+      filename: "test-100x100.jpg",
+      settings: { makeTransparent: true },
+      expectedContentType: "image/png",
+      expectedFilename: "test-100x100.png",
+    },
+    {
+      label: "still JPEG without extension",
+      load: async () => readFixture(fixtures.image.base.jpg100),
+      filename: "image",
+      settings: { makeTransparent: true },
+      expectedContentType: "image/png",
+      expectedFilename: "image.png",
+    },
+    {
+      label: "animated GIF without extension",
+      load: gifSource,
+      filename: "frames",
+      settings: { makeTransparent: true },
+      expectedContentType: "image/webp",
+      expectedFilename: "frames.webp",
+    },
+    {
+      label: "single-frame GIF",
+      load: async () => firstFrameOnly(await gifSource(), "gif"),
+      filename: "still.gif",
+      settings: { makeTransparent: true },
+      expectedContentType: "image/png",
+      expectedFilename: "still.png",
+    },
+    {
+      label: "still JPEG when makeTransparent is false",
+      load: async () => readFixture(fixtures.image.base.jpg100),
+      filename: "test-100x100.jpg",
+      settings: { makeTransparent: false },
+      expectedContentType: "image/jpeg",
+      expectedFilename: "test-100x100.jpg",
+    },
+  ])(
+    "replace-color updates filename extension only when container changes ($label) (#3048)",
+    async ({ load, filename, settings, expectedContentType, expectedFilename }) => {
+      const config = getToolConfig("replace-color");
+      if (!config) throw new Error("replace-color must be registered");
+
+      const result = await config.process(
+        await load(),
+        config.settingsSchema.parse(settings),
+        filename,
+      );
+
+      expect(result.contentType).toBe(expectedContentType);
+      expect(result.filename).toBe(expectedFilename);
+    },
+  );
 });
 
 describe("converting an animation to a still format does not stack frames (#1083)", () => {
@@ -680,35 +759,40 @@ describe("animation detection inspects buffer format, not filename extension or 
       toolId: "optimize-for-web",
       settings: { format: "webp" },
       expectedContentType: "image/webp",
+      expectedFilename: "multipage.webp",
       expectedShape: { pages: 1, width: 800, pageHeight: 600 },
     },
     {
       toolId: "convert",
       settings: { format: "webp" },
       expectedContentType: "image/webp",
+      expectedFilename: "multipage.webp",
       expectedShape: { pages: 1, width: 800, pageHeight: 600 },
     },
     {
       toolId: "convert",
       settings: { format: "gif" },
       expectedContentType: "image/gif",
+      expectedFilename: "multipage.gif",
       expectedShape: { pages: 1, width: 800, pageHeight: 600 },
     },
     {
       toolId: "replace-color",
       settings: { makeTransparent: true },
       expectedContentType: "image/png",
+      expectedFilename: "multipage.png",
       expectedShape: { pages: 1, width: 800, pageHeight: 600 },
     },
     {
       toolId: "image-pad",
       settings: { background: "transparent" },
       expectedContentType: "image/png",
+      expectedFilename: "multipage_padded.png",
       expectedShape: { pages: 1, width: 800, pageHeight: 800 },
     },
   ])(
     "$toolId converts multipage.tiff page 1 as a single-frame still instead of an animation",
-    async ({ toolId, settings, expectedContentType, expectedShape }) => {
+    async ({ toolId, settings, expectedContentType, expectedFilename, expectedShape }) => {
       const config = getToolConfig(toolId);
       if (!config) throw new Error(`${toolId} must be registered`);
 
@@ -719,6 +803,7 @@ describe("animation detection inspects buffer format, not filename extension or 
       );
 
       expect(result.contentType).toBe(expectedContentType);
+      expect(result.filename).toBe(expectedFilename);
       expect(await frameShape(result.buffer)).toEqual(expectedShape);
     },
   );

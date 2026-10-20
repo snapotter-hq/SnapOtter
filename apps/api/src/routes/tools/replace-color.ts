@@ -1,3 +1,4 @@
+import { extname } from "node:path";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -113,7 +114,14 @@ export function registerReplaceColor(app: FastifyInstance) {
           throw await asInputErrorIfUndecodable(inputBuffer, err);
         }
 
-        return { buffer, filename, contentType: useFormat.contentType };
+        const ext = extname(filename);
+        const baseName = ext ? filename.slice(0, -ext.length) : filename;
+        const outputFilename =
+          useFormat.format !== outputFormat.format
+            ? `${baseName}.${useFormat.extension}`
+            : filename;
+
+        return { buffer, filename: outputFilename, contentType: useFormat.contentType };
       },
     ),
   });
