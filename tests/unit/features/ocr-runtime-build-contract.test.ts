@@ -216,7 +216,8 @@ describe("OCR v3 runtime artifact contract", () => {
       expect(contents).not.toMatch(/paddle|cuda|onnxruntime-gpu/i);
       expect(lines.some((line) => /^rapidocr==3\.9\.1\b/.test(line))).toBe(true);
       expect(lines.some((line) => /^onnxruntime==1\.20\.1\b/.test(line))).toBe(true);
-      expect(lines.some((line) => /^pillow==12\.3\.0\b/.test(line))).toBe(true);
+      expect(lines.some((line) => /^pillow==13\.0\.0\b/.test(line))).toBe(true);
+      expect(lines.some((line) => /^pillow==12\.3\.0\b/.test(line))).toBe(false);
       expect(lines.some((line) => /^protobuf==5\.29\.6\b/.test(line))).toBe(true);
       expect(lines.some((line) => /^urllib3==2\.8\.0\b/.test(line))).toBe(true);
       for (const line of lines) {
@@ -230,8 +231,12 @@ describe("OCR v3 runtime artifact contract", () => {
     const arm64 = requirementsFor("linux-arm64-cpu-py311");
     expect(amd64).toContain("bb71a814f66517a65628c9e4a2bb530a6edd2cd5d87ffa0af0f6f773a027d99e");
     expect(arm64).toContain("f6243e34d74423bdd1edf0ae9596dd61023b260f546ee17d701723915f06a9f7");
-    expect(amd64).toContain("78cb2c6865a35ab8ff8b75fd122f6033b92a62c82801110e48ddd6c936a45d91");
-    expect(arm64).toContain("bcb46e2f9feff8d06323983bd83ed00c201fdcab3d74973e7072a889b3979fcd");
+    expect(amd64).toMatch(
+      /^pillow==13\.0\.0 --hash=sha256:42d63be3af4f9b951b199b0a9d23365d37ab14687e6d77b74940432c8515c4ca$/m,
+    );
+    expect(arm64).toMatch(
+      /^pillow==13\.0\.0 --hash=sha256:7c88c10dd432f3b39ccdafc9ed81d0c21b8fd634502574da76d1bfa4fe2c76d0$/m,
+    );
     expect(amd64).not.toContain("f6243e34d74423bdd1edf0ae9596dd61023b260f546ee17d701723915f06a9f7");
     expect(arm64).not.toContain("bb71a814f66517a65628c9e4a2bb530a6edd2cd5d87ffa0af0f6f773a027d99e");
   });
