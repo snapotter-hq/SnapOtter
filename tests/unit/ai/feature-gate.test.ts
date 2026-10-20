@@ -382,7 +382,6 @@ describe("per-bundle CPU memory floor (issue #1162)", () => {
       "upscale.py",
       "enhance_faces.py",
       "noise_removal.py",
-      "restore.py",
       "inpaint_hq.py",
     ]) {
       expect(sidecarMemoryRefusal(torchScript, onnxOnlyGpu), torchScript).toContain(
@@ -402,6 +401,7 @@ describe("per-bundle CPU memory floor (issue #1162)", () => {
       "inpaint.py",
       "outpaint.py",
       "colorize.py",
+      "restore.py",
     ]) {
       expect(sidecarMemoryRefusal(onnxScript, onnxOnlyGpu), onnxScript).toBeNull();
     }
@@ -418,6 +418,11 @@ describe("per-bundle CPU memory floor (issue #1162)", () => {
     expect(sidecarMemoryRefusal("remove_bg.py", torchAndCtranslateGpu)).toContain(
       "remove-background needs about 2.5 GB free on CPU hosts, this host has 1.5 GB",
     );
+    expect(sidecarMemoryRefusal("restore.py", torchAndCtranslateGpu)).toContain(
+      "restore-photo needs about 3 GB free on CPU hosts, this host has 1.5 GB",
+    );
+    expect(BUNDLE_GPU_FRAMEWORK["photo-restoration"]).toBe("onnx");
+    expect(SCRIPT_GPU_FRAMEWORK.restore).toBe("onnx");
 
     // MediaPipe face-detection scripts always run on CPU even when all GPU frameworks are present.
     expect(

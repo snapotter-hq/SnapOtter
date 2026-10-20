@@ -762,8 +762,8 @@ def main():
     colorize_strength = float(settings.get("colorizeStrength", 85)) / 100.0
 
     try:
-        from gpu import torch_gpu_available
-        device = "cuda" if torch_gpu_available() else "cpu"
+        from gpu import onnx_gpu_available
+        device = "cuda" if onnx_gpu_available() else "cpu"
 
         emit_progress(5, "Opening image")
         img_bgr = cv2.imread(input_path, cv2.IMREAD_COLOR)

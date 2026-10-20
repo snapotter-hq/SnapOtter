@@ -174,17 +174,54 @@ describe("bridge - parseStdoutJson", () => {
 });
 
 describe("bridge - isGpuAvailable", () => {
-  let isGpuAvailable: () => boolean;
+  let isGpuAvailable: typeof import("../../../packages/ai/src/bridge.js").isGpuAvailable;
+  let initDispatcher: typeof import("../../../packages/ai/src/bridge.js").initDispatcher;
+  let shutdownDispatcher: typeof import("../../../packages/ai/src/bridge.js").shutdownDispatcher;
 
   beforeEach(async () => {
     vi.resetModules();
+    vi.mocked(spawn).mockReset();
     const mod = await import("../../../packages/ai/src/bridge.js");
     isGpuAvailable = mod.isGpuAvailable;
+    initDispatcher = mod.initDispatcher;
+    shutdownDispatcher = mod.shutdownDispatcher;
+  });
+
+  afterEach(() => {
+    shutdownDispatcher();
+    vi.restoreAllMocks();
   });
 
   it("returns false by default (no dispatcher started)", () => {
     // Without starting a dispatcher, GPU should default to false
     expect(isGpuAvailable()).toBe(false);
+    expect(isGpuAvailable("torch")).toBe(false);
+    expect(isGpuAvailable("onnx")).toBe(false);
+    expect(isGpuAvailable("ctranslate2")).toBe(false);
+  });
+
+  it("returns per-framework GPU availability when gpuFrameworks is populated and falls back to gpuAvail when omitted (issue #2576)", async () => {
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    const initReady = initDispatcher();
+    mock.stderr.emit(
+      "data",
+      Buffer.from(
+        '{"ready": true, "gpu": true, "gpuFrameworks": {"torch": false, "onnx": true, "ctranslate2": false}}\n',
+      ),
+    );
+    await initReady;
+
+    expect(isGpuAvailable()).toBe(true);
+    expect(isGpuAvailable("torch")).toBe(false);
+    expect(isGpuAvailable("onnx")).toBe(true);
+    expect(isGpuAvailable("ctranslate2")).toBe(false);
+
+    // After shutdown(), gpuFrameworks is cleared and isGpuAvailable(framework) falls back to gpuAvail
+    shutdownDispatcher();
+    expect(isGpuAvailable("torch")).toBe(true);
+    expect(isGpuAvailable("onnx")).toBe(true);
   });
 });
 

@@ -10,11 +10,13 @@ import { fixtures, readFixture } from "../../fixtures/index.js";
 
 const mocks = vi.hoisted(() => ({
   cancelSingleJobGuarded: vi.fn(),
+  containerMemoryLimitBytes: vi.fn<() => number | null>(() => null),
   deleteObject: vi.fn(),
   enqueueToolJob: vi.fn(),
   getObjectBuffer: vi.fn(),
   inpaint: vi.fn(),
   insertToolJobAlias: vi.fn(),
+  isGpuAvailable: vi.fn<(framework?: string) => boolean>(() => false),
   isToolInstalled: vi.fn(),
   putObject: vi.fn(),
   receiveUpload: vi.fn(),
@@ -23,7 +25,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@snapotter/ai", () => ({
   inpaint: mocks.inpaint,
-  isGpuAvailable: vi.fn(() => false),
+  isGpuAvailable: mocks.isGpuAvailable,
+}));
+
+vi.mock("../../../apps/api/src/lib/hq-memory-gate.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/api/src/lib/hq-memory-gate.js")>()),
+  containerMemoryLimitBytes: mocks.containerMemoryLimitBytes,
 }));
 
 vi.mock("../../../apps/api/src/jobs/enqueue.js", () => ({
@@ -84,6 +91,8 @@ beforeAll(() => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.containerMemoryLimitBytes.mockReturnValue(null);
+  mocks.isGpuAvailable.mockImplementation(() => false);
   mocks.isToolInstalled.mockReturnValue(true);
   mocks.getObjectBuffer.mockResolvedValue(MASK);
   mocks.inpaint.mockResolvedValue(PNG);
@@ -294,5 +303,57 @@ describe("erase-object route disconnect handling (#2238)", () => {
     expect(mocks.enqueueToolJob).toHaveBeenCalledTimes(1);
     const enqueuedJobId = mocks.enqueueToolJob.mock.calls[0][0].jobId as string;
     expect(mocks.requestCancel).toHaveBeenCalledWith(enqueuedJobId);
+  });
+
+  it("queries isGpuAvailable('torch') before hqCpuMemoryRefusal so an ONNX-only GPU does not bypass the 8 GB CPU container floor (issue #2576)", async () => {
+    mocks.getObjectBuffer.mockResolvedValue(PNG);
+    mocks.receiveUpload
+      .mockResolvedValueOnce({
+        key: "uploads/erase-job/photo.png",
+        filename: "photo.png",
+        size: PNG.length,
+      })
+      .mockResolvedValueOnce({
+        key: "uploads/erase-job/mask.png",
+        filename: "mask.png",
+        size: PNG.length,
+      });
+    // Simulate ONNX-only GPU: unscoped isGpuAvailable() returns true, but isGpuAvailable("torch") returns false.
+    mocks.isGpuAvailable.mockImplementation((framework?: string) => framework !== "torch");
+    mocks.containerMemoryLimitBytes.mockReturnValue(6 * 1024 ** 3);
+
+    const request = {
+      headers: {},
+      log: { error: vi.fn(), warn: vi.fn() },
+      raw: { socket: { destroyed: false } },
+      parts: async function* () {
+        yield { type: "file", fieldname: "file", filename: "photo.png", file: {} };
+        yield { type: "file", fieldname: "mask", filename: "mask.png", file: {} };
+        yield { type: "field", fieldname: "qualityMode", value: "hq" };
+      },
+    };
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      raw: { destroyed: false, writableEnded: false, once: vi.fn(), removeListener: vi.fn() },
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      send(payload: unknown) {
+        this.payload = payload;
+        return payload;
+      },
+    };
+
+    await routeHandler?.(request, reply);
+
+    expect(mocks.isGpuAvailable).toHaveBeenCalledWith("torch");
+    expect(reply.statusCode).toBe(422);
+    expect(reply.payload).toMatchObject({
+      error: "Not enough memory for HQ mode",
+      details: expect.stringContaining("8g"),
+    });
+    expect(mocks.enqueueToolJob).not.toHaveBeenCalled();
   });
 });

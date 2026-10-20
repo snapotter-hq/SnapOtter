@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { context, propagation, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
 import { isSafeMessageError, SafeError } from "@snapotter/shared";
 import {
+  type GpuFramework,
   type GpuFrameworks,
   missingBundleForScript,
   type SidecarMemoryOptions,
@@ -846,9 +847,15 @@ export class PythonDispatcher {
   // ── Public API ──────────────────────────────────────────────────
 
   /**
-   * Whether the Python dispatcher detected a CUDA GPU at startup.
+   * Whether the Python dispatcher detected a CUDA GPU at startup, optionally
+   * scoped to a specific inference framework (`torch`, `onnx`, `ctranslate2`).
+   * Falls back to `this.gpuAvail` when `framework` is omitted or when
+   * `this.gpuFrameworks` was not populated.
    */
-  isGpuAvailable(): boolean {
+  isGpuAvailable(framework?: GpuFramework): boolean {
+    if (framework !== undefined) {
+      return this.gpuFrameworks?.[framework] ?? this.gpuAvail;
+    }
     return this.gpuAvail;
   }
 
@@ -1033,10 +1040,11 @@ function getAiDispatcher(): PythonDispatcher {
 }
 
 /**
- * Whether the Python dispatcher detected a CUDA GPU at startup.
+ * Whether the Python dispatcher detected a CUDA GPU at startup, optionally
+ * scoped to a specific inference framework (`torch`, `onnx`, `ctranslate2`).
  */
-export function isGpuAvailable(): boolean {
-  return getAiDispatcher().isGpuAvailable();
+export function isGpuAvailable(framework?: GpuFramework): boolean {
+  return getAiDispatcher().isGpuAvailable(framework);
 }
 
 export function getDispatcherStatus(): DispatcherStatus {

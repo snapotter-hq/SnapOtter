@@ -164,11 +164,37 @@ describe("AI Bridge - isGpuAvailable", () => {
   it("returns true when dispatcher reports GPU", async () => {
     await spawnReadyDispatcher({ gpu: true });
     expect(bridge.isGpuAvailable()).toBe(true);
+    expect(bridge.isGpuAvailable("torch")).toBe(true);
+    expect(bridge.isGpuAvailable("onnx")).toBe(true);
+    expect(bridge.isGpuAvailable("ctranslate2")).toBe(true);
   });
 
   it("returns false when dispatcher reports no GPU", async () => {
     await spawnReadyDispatcher({ gpu: false });
     expect(bridge.isGpuAvailable()).toBe(false);
+    expect(bridge.isGpuAvailable("torch")).toBe(false);
+    expect(bridge.isGpuAvailable("onnx")).toBe(false);
+    expect(bridge.isGpuAvailable("ctranslate2")).toBe(false);
+  });
+
+  it("returns per-framework GPU status when gpuFrameworks is reported and falls back to gpuAvail otherwise (issue #2576)", async () => {
+    const proc = createMockProcess();
+    spawnMock.mockReturnValue(proc as unknown as ChildProcess);
+
+    const initPromise = bridge.initDispatcher(5_000);
+    proc._pushStderr(
+      `${JSON.stringify({
+        ready: true,
+        gpu: true,
+        gpuFrameworks: { torch: false, onnx: true, ctranslate2: false },
+      })}\n`,
+    );
+    await initPromise;
+
+    expect(bridge.isGpuAvailable()).toBe(true);
+    expect(bridge.isGpuAvailable("torch")).toBe(false);
+    expect(bridge.isGpuAvailable("onnx")).toBe(true);
+    expect(bridge.isGpuAvailable("ctranslate2")).toBe(false);
   });
 });
 

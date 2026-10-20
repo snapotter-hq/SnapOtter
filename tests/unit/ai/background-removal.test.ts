@@ -338,6 +338,17 @@ describe("removeBackground", () => {
         const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
         expect(options.timeout).toBe(600000);
       });
+
+      it("queries isGpuAvailable('onnx') so Torch-only GPU does not use the 30s/MP GPU timeout for CPU ONNX inference (issue #2576)", async () => {
+        mock24MpImage();
+        vi.mocked(isGpuAvailable).mockImplementation((framework?: string) => framework !== "onnx");
+
+        await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "u2net" });
+
+        expect(isGpuAvailable).toHaveBeenCalledWith("onnx");
+        const options = vi.mocked(runPythonWithProgress).mock.calls[0][2];
+        expect(options.timeout).toBe(24 * 180_000);
+      });
     });
   });
 

@@ -73,7 +73,7 @@ export async function removeBackground(
 
   try {
     const megapixels = (origW * origH) / 1_000_000;
-    const gpu = isGpuAvailable();
+    const gpu = isGpuAvailable("onnx");
     // CPU inference is ~50-100x slower than GPU; mirror the upscaler's CPU
     // rate, and give CPU runs a 10-minute floor since model load alone can
     // exceed 5 minutes on NAS-class hardware.

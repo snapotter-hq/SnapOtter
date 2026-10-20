@@ -72,7 +72,7 @@ export async function upscale(
   const megapixels = ((meta.width ?? 0) * (meta.height ?? 0)) / 1_000_000;
   const scale = pythonOptions.scale ?? 2;
   const effectiveMp = megapixels * scale ** 2;
-  const gpu = isGpuAvailable();
+  const gpu = isGpuAvailable("torch");
 
   if (!gpu) {
     const maxCpuMp = resolveMaxCpuUpscaleMp();

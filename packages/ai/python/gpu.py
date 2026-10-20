@@ -134,10 +134,10 @@ def _try_onnx_cuda():
 def torch_gpu_available():
     """True iff torch itself can use CUDA (honors the SNAPOTTER_GPU override).
 
-    Torch-based tools (upscale, denoise, face enhancement, restore) must gate on
-    this rather than gpu_available(), which can report True based on ONNX Runtime
-    while torch is a CPU-only build. Routing those tools to CUDA on a
-    device torch cannot use would crash them.
+    Torch-based tools (upscale, denoise, face enhancement, HQ inpainting) must
+    gate on this rather than gpu_available(), which can report True based on
+    ONNX Runtime while torch is a CPU-only build. Routing those tools to CUDA
+    on a device torch cannot use would crash them.
     """
     if _override_disables_gpu():
         return False
@@ -163,9 +163,9 @@ def ctranslate2_gpu_available():
 def onnx_gpu_available():
     """True iff ONNX Runtime itself can use CUDA (honors the SNAPOTTER_GPU override).
 
-    ONNX-based tools (background removal, LaMa inpainting/outpainting, DDColor)
-    require CUDAExecutionProvider in onnxruntime plus a usable GPU, not merely a
-    CUDA-enabled torch build (#490).
+    ONNX-based tools (background removal, LaMa inpainting/outpainting, DDColor,
+    photo restoration) require CUDAExecutionProvider in onnxruntime plus a
+    usable GPU, not merely a CUDA-enabled torch build (#490).
     """
     if _override_disables_gpu():
         return False

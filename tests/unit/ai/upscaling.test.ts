@@ -507,6 +507,43 @@ describe("upscale", () => {
       expect(runPythonWithProgress).not.toHaveBeenCalled();
     });
 
+    it("queries isGpuAvailable('torch') so ONNX-only GPU does not bypass the 4 MP CPU ceiling or use the GPU timeout (issue #2576)", async () => {
+      const toBuffer = vi.fn().mockResolvedValue(Buffer.from("mock-png-data"));
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer,
+            metadata: vi.fn().mockResolvedValue({ width: 4000, height: 3000 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+      // Simulate ONNX-only GPU: unscoped isGpuAvailable() and isGpuAvailable("onnx") return true,
+      // but isGpuAvailable("torch") returns false.
+      vi.mocked(isGpuAvailable).mockImplementation((framework?: string) => framework !== "torch");
+
+      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 })).rejects.toThrow(
+        /12\.0 MP.*max 4 MP on CPU/i,
+      );
+      expect(isGpuAvailable).toHaveBeenCalledWith("torch");
+      expect(runPythonWithProgress).not.toHaveBeenCalled();
+
+      // For a 2 MP input at 2x (8 MP effective), CPU rate (180s/MP -> 1,440,000ms) is used instead of GPU rate (600,000ms floor).
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer,
+            metadata: vi.fn().mockResolvedValue({ width: 2000, height: 1000 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+      await upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 });
+      expect(runPythonWithProgress).toHaveBeenCalledWith(
+        "upscale.py",
+        expect.any(Array),
+        expect.objectContaining({ timeout: 8 * 180_000 }),
+      );
+    });
+
     it("allows a 12 MP (4000x3000) input when a GPU is available", async () => {
       vi.mocked(sharp).mockImplementation(
         () =>

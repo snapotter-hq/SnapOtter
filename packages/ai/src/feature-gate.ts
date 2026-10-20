@@ -94,7 +94,7 @@ export const BUNDLE_GPU_FRAMEWORK: Readonly<Record<string, GpuFramework | null>>
   "object-eraser-colorize": "onnx",
   "inpaint-hq": "torch",
   "upscale-enhance": "torch",
-  "photo-restoration": "torch",
+  "photo-restoration": "onnx",
   ocr: null,
   transcription: "ctranslate2",
 };
@@ -115,7 +115,7 @@ export const SCRIPT_GPU_FRAMEWORK: Readonly<Record<string, GpuFramework | null>>
   upscale: "torch",
   enhance_faces: "torch",
   noise_removal: "torch",
-  restore: "torch",
+  restore: "onnx",
   transcribe: "ctranslate2",
 };
 

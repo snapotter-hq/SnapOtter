@@ -747,6 +747,86 @@ print("RESTORE_INPAINT_TILED_OK")
         expect(res.status, res.stderr).toBe(0);
         expect(res.stdout).toContain("RESTORE_INPAINT_TILED_OK");
       });
+
+      it("gates restore.py device and 2 MP CPU colorization cap on onnx_gpu_available rather than torch_gpu_available (issue #2576)", () => {
+        const res = runPy(`
+import contextlib, importlib.util, io, json, os, sys, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+import gpu
+
+spec = importlib.util.spec_from_file_location("restore_mod", os.path.join(py_dir, "restore.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+# Stub cv2, numpy, is_grayscale, and colorize_bw so main() exercises the real
+# GPU probe + 2 MP colorization gate on a 5 MP (2000x2500) grayscale image.
+class FakeImg:
+    shape = (2000, 2500, 3)
+    def copy(self):
+        return self
+
+mod._IMPORT_ERROR = None
+mod.cv2 = types.SimpleNamespace(
+    IMREAD_COLOR=1,
+    imread=lambda _p, _f: FakeImg(),
+    imwrite=lambda _p, _img: True,
+)
+mod.is_grayscale = lambda _img: True
+mod.DDCOLOR_MODEL_PATH = os.path.join(py_dir, "restore.py")
+colorize_calls = []
+def fake_colorize_bw(img, intensity=0.85):
+    colorize_calls.append(intensity)
+    return img, True
+mod.colorize_bw = fake_colorize_bw
+
+settings = json.dumps({
+    "scratchRemoval": False,
+    "faceEnhancement": False,
+    "denoise": False,
+    "colorize": True,
+})
+
+# Case 1: Torch has CUDA, but ONNX Runtime is CPU-only (#490).
+# restore.py runs all models via ONNX Runtime, so it must treat the host as CPU
+# and skip colorizing a 5 MP image (> 2 MP CPU cap).
+gpu.torch_gpu_available = lambda: True
+gpu.onnx_gpu_available = lambda: False
+sys.argv = ["restore.py", "/tmp/in.png", "/tmp/out.png", settings]
+out_buf = io.StringIO()
+err_buf = io.StringIO()
+with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+    mod.main()
+
+payload_cpu = json.loads(out_buf.getvalue().strip())
+assert payload_cpu["success"] is True, payload_cpu
+assert payload_cpu["device"] == "cpu", payload_cpu
+assert payload_cpu["colorized"] is False, payload_cpu
+assert colorize_calls == [], colorize_calls
+assert "Colorization skipped: image too large for CPU (5.0MP, max 2MP)" in err_buf.getvalue(), err_buf.getvalue()
+
+# Case 2: Torch is CPU-only, but ONNX Runtime has CUDAExecutionProvider.
+# restore.py must detect CUDA via onnx_gpu_available() and colorize the 5 MP image.
+gpu.torch_gpu_available = lambda: False
+gpu.onnx_gpu_available = lambda: True
+out_buf = io.StringIO()
+err_buf = io.StringIO()
+with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+    mod.main()
+
+payload_gpu = json.loads(out_buf.getvalue().strip())
+assert payload_gpu["success"] is True, payload_gpu
+assert payload_gpu["device"] == "cuda", payload_gpu
+assert payload_gpu["colorized"] is True, payload_gpu
+assert "colorize" in payload_gpu["steps"], payload_gpu
+assert len(colorize_calls) == 1, colorize_calls
+
+print("RESTORE_ONNX_GPU_GATE_OK")
+`);
+        expect(res.status, res.stderr).toBe(0);
+        expect(res.stdout).toContain("RESTORE_ONNX_GPU_GATE_OK");
+      });
     },
   );
 });

@@ -212,7 +212,7 @@ export function registerEraseObject(app: FastifyInstance) {
         // inference; the alternative is an OOM-killed dispatcher ~40s in and a
         // "try a smaller image" hint that cannot help (#670).
         if (qualityMode === "hq") {
-          const refusal = hqCpuMemoryRefusal(isGpuAvailable(), containerMemoryLimitBytes());
+          const refusal = hqCpuMemoryRefusal(isGpuAvailable("torch"), containerMemoryLimitBytes());
           if (refusal) {
             return reply
               .status(422)
