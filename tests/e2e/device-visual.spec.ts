@@ -3,7 +3,9 @@
  *
  * Screenshots a few key pages on mobile-chromium (Pixel 7) and
  * tablet-chromium (Galaxy Tab S9). Uses toHaveScreenshot with
- * platform-suffixed baselines (darwin locally, linux via CI workflow).
+ * platform-suffixed baselines: update-visual-baselines.yml generates both
+ * linux (ubuntu-latest) and darwin (macos-latest) baselines in CI, and darwin
+ * baselines can also be refreshed locally on macOS.
  *
  * Tagged @mobile / @tablet so device projects' grep filter picks them up.
  * Matched by DEVICE_SPECS for project routing.

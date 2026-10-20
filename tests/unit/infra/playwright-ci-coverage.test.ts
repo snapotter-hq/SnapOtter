@@ -305,7 +305,7 @@ describe("nightly visual comparison (#1507)", () => {
     }
   });
 
-  it("keeps playwright.config.ts and gui-visual-tools.spec.ts comments aligned with the dual-OS workflow (#2484)", () => {
+  it("keeps playwright.config.ts, gui-visual-tools.spec.ts, and device-visual.spec.ts comments aligned with the dual-OS workflow (#2484, #2487)", () => {
     const pwConfig = readFileSync(path.join(root, "playwright.config.ts"), "utf8");
     expect(pwConfig.match(/linux \(ubuntu-latest\) and darwin \(macos-latest\)/g)).toHaveLength(2);
     expect(pwConfig).not.toContain(
@@ -322,5 +322,14 @@ describe("nightly visual comparison (#1507)", () => {
     expect(visualToolsSpec).toContain("linux (ubuntu-latest)");
     expect(visualToolsSpec).toContain("darwin (macos-latest)");
     expect(visualToolsSpec).not.toContain("darwin baselines come from local runs, linux baselines");
+
+    const deviceVisualSpec = readFileSync(
+      path.join(root, "tests/e2e/device-visual.spec.ts"),
+      "utf8",
+    );
+    expect(deviceVisualSpec).toContain("update-visual-baselines.yml");
+    expect(deviceVisualSpec).toContain("linux (ubuntu-latest)");
+    expect(deviceVisualSpec).toContain("darwin (macos-latest)");
+    expect(deviceVisualSpec).not.toContain("darwin locally, linux via CI workflow");
   });
 });
