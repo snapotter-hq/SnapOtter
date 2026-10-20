@@ -195,3 +195,66 @@ describe("ChartMakerControls", async () => {
     );
   });
 });
+
+describe("GifToolsControls (#1223)", async () => {
+  const { GifToolsControls } = await import("@/components/tools/gif-tools-settings");
+
+  it("presents the four effective optimize palette sizes as buttons instead of a range slider", async () => {
+    const onChange = vi.fn();
+    const { container } = render(<GifToolsControls onChange={onChange} />);
+    await userEvent.click(screen.getByRole("button", { name: "Optimize" }));
+
+    const group = container.querySelector<HTMLElement>("#gif-colors");
+    expect(group).not.toBeNull();
+    if (!group) throw new Error("#gif-colors missing");
+    expect(group.querySelector("input[type='range']")).toBeNull();
+
+    const buttons = within(group).getAllByRole("button");
+    expect(buttons.map((b) => b.textContent)).toEqual(["2", "4", "16", "256"]);
+    expect(within(group).getByRole("button", { name: "256" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+
+    for (const colors of [2, 4, 16, 256] as const) {
+      await userEvent.click(within(group).getByRole("button", { name: String(colors) }));
+      const pressed = within(group).getAllByRole("button", { pressed: true });
+      expect(pressed.map((b) => b.textContent)).toEqual([String(colors)]);
+      expect(onChange).toHaveBeenLastCalledWith({
+        mode: "optimize",
+        colors,
+        dither: 1,
+        effort: 7,
+        loop: 0,
+      });
+    }
+  });
+
+  it("hydrates a valid optimize colors setting and ignores unsupported intermediate values", () => {
+    const onChange = vi.fn();
+    const { container } = render(
+      <GifToolsControls settings={{ mode: "optimize", colors: 16 }} onChange={onChange} />,
+    );
+    const group = container.querySelector<HTMLElement>("#gif-colors");
+    if (!group) throw new Error("#gif-colors missing");
+    expect(within(group).getByRole("button", { name: "16" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ mode: "optimize", colors: 16 }),
+    );
+
+    cleanup();
+    const onFallback = vi.fn();
+    const { container: fallbackContainer } = render(
+      <GifToolsControls settings={{ mode: "optimize", colors: 64 }} onChange={onFallback} />,
+    );
+    const fallbackGroup = fallbackContainer.querySelector<HTMLElement>("#gif-colors");
+    if (!fallbackGroup) throw new Error("#gif-colors missing");
+    expect(
+      within(fallbackGroup).getByRole("button", { name: "256" }).getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(onFallback).toHaveBeenLastCalledWith(
+      expect.objectContaining({ mode: "optimize", colors: 256 }),
+    );
+  });
+});

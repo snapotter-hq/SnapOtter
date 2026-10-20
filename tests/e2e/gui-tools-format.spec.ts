@@ -298,7 +298,9 @@ test.describe("GUI Format & Conversion Tools", () => {
       await expect(page.locator("#gif-height")).toBeVisible();
     });
 
-    test("optimize mode shows colors and dither sliders", async ({ loggedInPage: page }) => {
+    test("optimize mode shows colors selector and dither/effort sliders", async ({
+      loggedInPage: page,
+    }) => {
       await page.goto("/image/gif-tools");
       await uploadTestImage(page);
 

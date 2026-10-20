@@ -95,6 +95,15 @@ describe("Sharp-backed image settings schemas", () => {
     expect(parses("lqip-placeholder", { blur: Number.MIN_VALUE })).toBe(false);
   });
 
+  it("accepts only the four GIF palette sizes Sharp's encoder can represent (#1223)", () => {
+    for (const colors of [2, 4, 16, 256]) {
+      expect(parses("gif-tools", { mode: "optimize", colors })).toBe(true);
+    }
+    for (const colors of [1, 3, 8, 32, 64, 128, 255, 257]) {
+      expect(parses("gif-tools", { mode: "optimize", colors })).toBe(false);
+    }
+  });
+
   it("rejects fractional Beautify pixel geometry", () => {
     expect(beautifySettingsSchema.safeParse({ padding: Number.MIN_VALUE }).success).toBe(false);
     expect(beautifySettingsSchema.safeParse({ shadowOffsetY: 0.5 }).success).toBe(false);

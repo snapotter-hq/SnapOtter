@@ -13,6 +13,9 @@ type LoopMode = "infinite" | "once" | "custom";
 type ResizeTab = "pixel" | "percentage";
 type ExtractTab = "single" | "range" | "all";
 
+const OPTIMIZE_COLORS = [2, 4, 16, 256] as const;
+type OptimizeColors = (typeof OPTIMIZE_COLORS)[number];
+
 const MODES: { id: GifMode; requiresAnimation: boolean }[] = [
   { id: "resize", requiresAnimation: false },
   { id: "optimize", requiresAnimation: false },
@@ -43,7 +46,7 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
   const [lockAspect, setLockAspect] = useState(true);
 
   // Optimize state
-  const [colors, setColors] = useState(256);
+  const [colors, setColors] = useState<OptimizeColors>(256);
   const [dither, setDither] = useState(1.0);
   const [effort, setEffort] = useState(7);
 
@@ -79,6 +82,12 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
     if (initialSettings.width != null) setWidth(String(initialSettings.width));
     if (initialSettings.height != null) setHeight(String(initialSettings.height));
     if (initialSettings.percentage != null) setPercentage(String(initialSettings.percentage));
+    if (
+      typeof initialSettings.colors === "number" &&
+      (OPTIMIZE_COLORS as readonly number[]).includes(initialSettings.colors)
+    ) {
+      setColors(initialSettings.colors as OptimizeColors);
+    }
   }, [initialSettings]);
 
   // Initialize loop from metadata
@@ -350,22 +359,22 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
       {mode === "optimize" && (
         <div className="space-y-3">
           <div>
-            <div className="flex items-center justify-between">
-              <label htmlFor="gif-colors" className="text-xs text-muted-foreground">
-                {t.toolSettings["gif-tools"].colors}
-              </label>
-              <span className="text-xs tabular-nums text-muted-foreground">{colors}</span>
+            <p className="text-xs text-muted-foreground mb-1">
+              {t.toolSettings["gif-tools"].colors}
+            </p>
+            <div id="gif-colors" className="flex gap-1">
+              {OPTIMIZE_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  aria-pressed={colors === c}
+                  onClick={() => setColors(c)}
+                  className={tabClass(colors === c)}
+                >
+                  {c}
+                </button>
+              ))}
             </div>
-            <input
-              id="gif-colors"
-              type="range"
-              min={2}
-              max={256}
-              step={2}
-              value={colors}
-              onChange={(e) => setColors(Number(e.target.value))}
-              className="w-full mt-1 h-1.5 rounded-full appearance-none bg-muted accent-primary"
-            />
             <p className="text-[10px] text-muted-foreground mt-0.5">
               {t.toolSettings["gif-tools"].fewerColorsSmallerFile}
             </p>

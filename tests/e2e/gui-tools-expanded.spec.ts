@@ -959,14 +959,31 @@ test.describe("GUI Expanded Tool Coverage", () => {
       await expect(page.locator("#gif-width")).toHaveValue("200");
     });
 
-    test("optimize mode colors slider has correct range", async ({ loggedInPage: page }) => {
+    test("optimize mode colors selector offers the four supported palette sizes", async ({
+      loggedInPage: page,
+    }) => {
       await page.goto("/image/gif-tools");
       await uploadTestImage(page);
 
       await page.getByRole("button", { name: "Optimize" }).first().click();
-      const slider = page.locator("#gif-colors");
-      await expect(slider).toBeVisible();
-      await expect(slider).toHaveAttribute("type", "range");
+      const group = page.locator("#gif-colors");
+      await expect(group).toBeVisible();
+      for (const colors of ["2", "4", "16", "256"]) {
+        await expect(group.getByRole("button", { name: colors, exact: true })).toBeVisible();
+      }
+      await expect(group.getByRole("button", { name: "256", exact: true })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      await group.getByRole("button", { name: "16", exact: true }).click();
+      await expect(group.getByRole("button", { name: "16", exact: true })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      await expect(group.getByRole("button", { name: "256", exact: true })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
     });
 
     test("optimize mode effort slider is interactive", async ({ loggedInPage: page }) => {

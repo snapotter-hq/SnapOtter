@@ -22,7 +22,11 @@ const settingsSchema = z.object({
   percentage: z.number().finite().min(1).max(500).optional(),
 
   // Optimize
-  colors: z.number().int().min(2).max(256).default(256),
+  colors: z
+    .union([z.literal(2), z.literal(4), z.literal(16), z.literal(256)], {
+      errorMap: () => ({ message: "Colors must be 2, 4, 16, or 256" }),
+    })
+    .default(256),
   dither: z.number().min(0).max(1).default(1.0),
   effort: z.number().int().min(1).max(10).default(7),
 
