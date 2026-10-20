@@ -363,6 +363,48 @@ describe("automate pipeline save (#1987)", () => {
     expect(screen.queryByText(en.automate.saveListRefreshFailed)).not.toBeInTheDocument();
     expect(screen.queryByText(en.errors.networkError)).not.toBeInTheDocument();
   });
+
+  it("closes the save form and resets its inputs and error when the last step is removed (#2962)", async () => {
+    server = { save: () => "network-down", list: listOk };
+    usePipelineStore.getState().loadSteps([
+      { toolId: "resize", settings: {} },
+      { toolId: "compress", settings: {} },
+    ]);
+    renderAutomate();
+
+    fireEvent.click(await screen.findByRole("button", { name: en.automate.saveButton }));
+    fireEvent.change(screen.getByPlaceholderText(en.automate.pipelineName), {
+      target: { value: "Draft Pipeline" },
+    });
+    fireEvent.change(screen.getByPlaceholderText(en.automate.descriptionPlaceholder), {
+      target: { value: "Draft notes" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: en.common.save }));
+    await waitFor(() => expect(screen.getByText(en.errors.networkError)).toBeInTheDocument());
+
+    // Removing one step while another remains keeps the form open and preserves draft inputs.
+    fireEvent.click(screen.getAllByTitle(en.automate.removeStep)[0]);
+    expect(screen.getByPlaceholderText(en.automate.pipelineName)).toHaveValue("Draft Pipeline");
+    expect(screen.getByPlaceholderText(en.automate.descriptionPlaceholder)).toHaveValue(
+      "Draft notes",
+    );
+
+    // Removing the last step closes the form and clears the draft inputs and error.
+    fireEvent.click(screen.getByTitle(en.automate.removeStep));
+
+    expect(screen.queryByPlaceholderText(en.automate.pipelineName)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: en.common.save })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: en.automate.saveButton })).not.toBeInTheDocument();
+    expect(screen.queryByText(en.errors.networkError)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole("button", { name: /resize/i })[0]);
+    const saveTrigger = await screen.findByRole("button", { name: en.automate.saveButton });
+    expect(screen.queryByPlaceholderText(en.automate.pipelineName)).not.toBeInTheDocument();
+
+    fireEvent.click(saveTrigger);
+    expect(screen.getByPlaceholderText(en.automate.pipelineName)).toHaveValue("");
+    expect(screen.getByPlaceholderText(en.automate.descriptionPlaceholder)).toHaveValue("");
+  });
 });
 
 /** Lands on /automate with four saved pipelines, expands the list, and clicks Delete on the first. */

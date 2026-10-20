@@ -281,6 +281,15 @@ function AutomatePageContent() {
     if (!(location.state as { libraryFileIds?: string[] } | null)?.libraryFileIds) resetFiles();
   }, []);
 
+  useEffect(() => {
+    if (steps.length === 0) {
+      setShowSaveForm(false);
+      setSaveName("");
+      setSaveDescription("");
+      setSaveError(null);
+    }
+  }, [steps.length]);
+
   const handleLibraryImport = useCallback(
     (imported: File[]) => {
       if (files.length === 0) {
@@ -1300,7 +1309,7 @@ function AutomatePageContent() {
                 </button>
               )}
 
-              {showSaveForm && (
+              {steps.length > 0 && showSaveForm && (
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
