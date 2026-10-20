@@ -28,6 +28,7 @@ import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerConvert } from "../../../apps/api/src/routes/tools/convert.js";
 import { registerGifWebp } from "../../../apps/api/src/routes/tools/gif-webp.js";
 import { registerImagePad } from "../../../apps/api/src/routes/tools/image-pad.js";
+import { fixtures, readFixture } from "../../fixtures/index.js";
 
 async function threeFrameGif(size = 8): Promise<Buffer> {
   // Distinct luminance per frame, or the GIF encoder merges identical frames.
@@ -172,6 +173,20 @@ describe("gif-webp and convert enforce assertGifWorkload on animated input (#252
     expect((error as Error).message).toMatch(/GIF input must not exceed .* total pixels/i);
   });
 
+  it("rejects an animated GIF exceeding total pixel cap in convert to webp even when filename extension is .png (#2549)", async () => {
+    const convertTool = getToolConfig("convert");
+    expect(convertTool).toBeDefined();
+    const settings = convertTool?.settingsSchema.parse({ format: "webp" });
+
+    const error = await convertTool
+      ?.process(await threeFrameGif(64), settings, "anim.png")
+      .catch((e: unknown) => e);
+
+    expect(isToolInputError(error)).toBe(true);
+    expect((error as { statusCode?: number }).statusCode).toBe(400);
+    expect((error as Error).message).toMatch(/GIF input must not exceed .* total pixels/i);
+  });
+
   it("rejects an animated WebP exceeding total pixel cap in convert to gif", async () => {
     const convertTool = getToolConfig("convert");
     expect(convertTool).toBeDefined();
@@ -261,5 +276,23 @@ describe("gif-webp and convert enforce assertGifWorkload on animated input (#252
     expect(meta.pages).toBe(3);
     expect(meta.width).toBe(16);
     expect(meta.pageHeight).toBe(16);
+  });
+
+  it("does not enforce assertGifWorkload across pages of multipage.tiff when converting to webp (#2549)", async () => {
+    const convertTool = getToolConfig("convert");
+    expect(convertTool).toBeDefined();
+    const settings = convertTool?.settingsSchema.parse({ format: "webp" });
+
+    const result = await convertTool?.process(
+      readFixture(fixtures.image.multipageTiff),
+      settings,
+      "multipage.tiff",
+    );
+
+    expect(result?.contentType).toBe("image/webp");
+    const meta = await sharp(result?.buffer, { animated: true }).metadata();
+    expect(meta.pages ?? 1).toBe(1);
+    expect(meta.width).toBe(800);
+    expect(meta.height).toBe(600);
   });
 });

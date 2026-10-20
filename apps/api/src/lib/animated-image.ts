@@ -70,6 +70,7 @@ async function readAnimation(buffer: Buffer): Promise<FrameInfo> {
     return STILL;
   }
 
+  if (meta.format !== "gif" && meta.format !== "webp") return STILL;
   const pages = meta.pages ?? 1;
   if (pages <= 1) return STILL;
 

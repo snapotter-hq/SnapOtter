@@ -77,8 +77,6 @@ const CLI_ENCODERS: Record<string, (buf: Buffer, quality?: number) => Promise<Bu
   tga: encodeTga,
 };
 
-const ANIMATABLE_FORMATS = new Set(["gif", "webp"]);
-
 const settingsSchema = z.object({
   format: z.enum([
     "jpg",
@@ -129,12 +127,10 @@ export function registerConvert(app: FastifyInstance) {
           };
         }
 
-        const inputExt = extname(filename).toLowerCase().replace(".", "");
         // Preserve animation frames when both input and output are animatable formats
-        const image =
-          ANIMATABLE_FORMATS.has(inputExt) && ANIMATABLE_FORMATS.has(settings.format)
-            ? openAnimated(inputBuffer, await readAnimationFor(inputBuffer, settings.format))
-            : sharp(inputBuffer, isSvgBuffer(inputBuffer) ? { density: 300 } : {});
+        const image = isSvgBuffer(inputBuffer)
+          ? sharp(inputBuffer, { density: 300 })
+          : openAnimated(inputBuffer, await readAnimationFor(inputBuffer, settings.format));
 
         let buffer: Buffer;
         if (settings.format === "psd") {

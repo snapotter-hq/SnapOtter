@@ -1,11 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { beforeAll, describe, expect, it } from "vitest";
+import { isAnimated, readAnimationFor } from "../../../apps/api/src/lib/animated-image.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerColorAdjustments } from "../../../apps/api/src/routes/tools/adjust-colors.js";
 import { registerCircleCrop } from "../../../apps/api/src/routes/tools/circle-crop.js";
 import { registerColorBlindness } from "../../../apps/api/src/routes/tools/color-blindness.js";
 import { registerCompress } from "../../../apps/api/src/routes/tools/compress.js";
+import { registerConvert } from "../../../apps/api/src/routes/tools/convert.js";
 import { registerCrop } from "../../../apps/api/src/routes/tools/crop.js";
 import { registerDuotone } from "../../../apps/api/src/routes/tools/duotone.js";
 import { registerGifTools } from "../../../apps/api/src/routes/tools/gif-tools.js";
@@ -46,6 +48,7 @@ beforeAll(() => {
   registerCircleCrop(app);
   registerColorBlindness(app);
   registerCompress(app);
+  registerConvert(app);
   registerCrop(app);
   registerDuotone(app);
   registerGifTools(app);
@@ -614,4 +617,109 @@ describe("gif-tools reverse and rotate preserve each frame's colours (#1221)", (
     expect(await frameCentres(out)).toEqual(["30,200,60"]);
     expect(await frameShape(out)).toEqual({ pages: 1, width: 24, pageHeight: 40 });
   });
+});
+
+describe("animation detection inspects buffer format, not filename extension or document pages (#2549)", () => {
+  it.each([
+    {
+      label: "animated GIF named frames.png -> webp",
+      load: gifSource,
+      filename: "frames.png",
+      format: "webp" as const,
+      expectedContentType: "image/webp",
+      expectedFilename: "frames.webp",
+    },
+    {
+      label: "animated WebP with extensionless filename -> gif",
+      load: async () => readFixture(fixtures.image.animated.webp),
+      filename: "animation",
+      format: "gif" as const,
+      expectedContentType: "image/gif",
+      expectedFilename: "animation.gif",
+    },
+  ])(
+    "convert preserves animation frames for $label",
+    async ({ load, filename, format, expectedContentType, expectedFilename }) => {
+      const convertTool = getToolConfig("convert");
+      if (!convertTool) throw new Error("convert must be registered");
+      const source = await load();
+      const sourceShape = await frameShape(source);
+
+      const result = await convertTool.process(
+        source,
+        convertTool.settingsSchema.parse({ format }),
+        filename,
+      );
+
+      expect(result.contentType).toBe(expectedContentType);
+      expect(result.filename).toBe(expectedFilename);
+      expect(await frameShape(result.buffer)).toEqual(sourceShape);
+    },
+  );
+
+  it("treats multipage.tiff as a still in readAnimationFor and isAnimated", async () => {
+    const tiff = readFixture(fixtures.image.multipageTiff);
+
+    expect(await readAnimationFor(tiff, "webp")).toEqual({
+      animated: false,
+      pages: 1,
+      pageHeight: 0,
+      width: 0,
+    });
+    expect(await readAnimationFor(tiff, "gif")).toEqual({
+      animated: false,
+      pages: 1,
+      pageHeight: 0,
+      width: 0,
+    });
+    expect(await isAnimated(tiff)).toBe(false);
+  });
+
+  it.each([
+    {
+      toolId: "optimize-for-web",
+      settings: { format: "webp" },
+      expectedContentType: "image/webp",
+      expectedShape: { pages: 1, width: 800, pageHeight: 600 },
+    },
+    {
+      toolId: "convert",
+      settings: { format: "webp" },
+      expectedContentType: "image/webp",
+      expectedShape: { pages: 1, width: 800, pageHeight: 600 },
+    },
+    {
+      toolId: "convert",
+      settings: { format: "gif" },
+      expectedContentType: "image/gif",
+      expectedShape: { pages: 1, width: 800, pageHeight: 600 },
+    },
+    {
+      toolId: "replace-color",
+      settings: { makeTransparent: true },
+      expectedContentType: "image/png",
+      expectedShape: { pages: 1, width: 800, pageHeight: 600 },
+    },
+    {
+      toolId: "image-pad",
+      settings: { background: "transparent" },
+      expectedContentType: "image/png",
+      expectedShape: { pages: 1, width: 800, pageHeight: 800 },
+    },
+  ])(
+    "$toolId converts multipage.tiff page 1 as a single-frame still instead of an animation",
+    async ({ toolId, settings, expectedContentType, expectedShape }) => {
+      const config = getToolConfig(toolId);
+      if (!config) throw new Error(`${toolId} must be registered`);
+
+      const result = await config.process(
+        readFixture(fixtures.image.multipageTiff),
+        config.settingsSchema.parse(settings),
+        "multipage.tiff",
+      );
+
+      expect(result.contentType).toBe(expectedContentType);
+      expect(await frameShape(result.buffer)).toEqual(expectedShape);
+    },
+  );
 });
