@@ -104,12 +104,32 @@ export async function processImage(
     image = await handler(image, op.options);
   }
 
-  // Convert to output format if specified
+  // Resolve effective target format from outputFormat, the last convert/compress
+  // operation in operations[], or the input metadata when neither is present (#3114).
+  let sharpFormat: string | undefined;
   if (outputFormat) {
-    const sharpFormat = FORMAT_MAP[outputFormat];
+    sharpFormat = FORMAT_MAP[outputFormat];
     if (!sharpFormat) {
       throw new Error(`Unsupported output format: ${outputFormat}`);
     }
+  } else {
+    for (let i = operations.length - 1; i >= 0; i--) {
+      const op = operations[i];
+      if (
+        (op.type === "convert" || op.type === "compress") &&
+        typeof op.options.format === "string"
+      ) {
+        sharpFormat = op.options.format === "jpeg" ? "jpeg" : FORMAT_MAP[op.options.format];
+        break;
+      }
+    }
+    if (!sharpFormat) {
+      const inputMeta = await sharp(input).metadata();
+      sharpFormat = inputMeta.format;
+    }
+  }
+
+  if (outputFormat || sharpFormat === "gif" || sharpFormat === "tiff") {
     const formatOptions: Record<string, unknown> = {};
     if (sharpFormat === "gif") {
       formatOptions.reuse = false;
@@ -117,8 +137,8 @@ export async function processImage(
       formatOptions.compression = "lzw";
       // vips_recomb and 3-channel vips_convolve leave the pipeline in 32-bit
       // float (0..255), which LZW tiffsave writes as a float scRGB TIFF unless
-      // cast back to 8-bit uchar first (#2607). keepMetadata() forwards any
-      // ICC/XMP metadata that the first hop intentionally kept.
+      // cast back to 8-bit uchar first (#2607, #3114). keepMetadata() forwards
+      // any ICC/XMP metadata that the first hop intentionally kept.
       image = sharp(await image.png().toBuffer()).keepMetadata();
     }
     image = image.toFormat(sharpFormat as SharpFormat, formatOptions);

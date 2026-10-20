@@ -1,6 +1,7 @@
 import { formatTargetKb, ToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
 import type { CompressOptions, Sharp, SharpFormat } from "../types.js";
+import { hasFloatPipelineStage } from "./convert.js";
 
 const FORMAT_MAP: Record<string, SharpFormat> = {
   jpg: "jpeg",
@@ -68,15 +69,24 @@ export async function compressDetailed(
   const outputFormat = explicitFormat ?? detectedFormat;
 
   if (targetSizeBytes !== undefined) {
-    const inputBuffer = await (metadata.format === "tiff"
-      ? image.tiff({ compression: "lzw" })
-      : image
+    const inputBuffer = await (metadata.format === "gif"
+      ? image.gif({ reuse: false })
+      : (outputFormat === "tiff" || metadata.format === "tiff") && hasFloatPipelineStage(image)
+        ? image.png()
+        : metadata.format === "tiff"
+          ? image.tiff({ compression: "lzw" })
+          : image
     ).toBuffer();
     return compressToTargetSize(inputBuffer, outputFormat, targetSizeBytes, animated);
   }
 
+  const pipeline =
+    outputFormat === "tiff" && hasFloatPipelineStage(image)
+      ? sharp(await image.png().toBuffer()).keepMetadata()
+      : image;
+
   const q = quality ?? 80;
-  return { image: image.toFormat(outputFormat, formatOpts(outputFormat, q)) };
+  return { image: pipeline.toFormat(outputFormat, formatOpts(outputFormat, q)) };
 }
 
 interface CompressionCandidate {

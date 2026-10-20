@@ -1,4 +1,15 @@
+import sharp from "sharp";
 import type { ConvertOptions, Sharp, SharpFormat } from "../types.js";
+
+type FloatPipelineOptions = {
+  recombMatrix?: unknown;
+  convKernel?: unknown;
+};
+
+export function hasFloatPipelineStage(image: Sharp): boolean {
+  const opts = (image as unknown as { options?: FloatPipelineOptions }).options;
+  return opts?.recombMatrix !== undefined || opts?.convKernel !== undefined;
+}
 
 /**
  * Maps user-facing format names to Sharp format strings.
@@ -30,11 +41,15 @@ export async function convert(image: Sharp, options: ConvertOptions): Promise<Sh
     }
     formatOptions.quality = quality;
   }
+  let pipeline = image;
   if (sharpFormat === "gif") {
     formatOptions.reuse = false;
   } else if (sharpFormat === "tiff") {
     formatOptions.compression = "lzw";
+    if (hasFloatPipelineStage(pipeline)) {
+      pipeline = sharp(await pipeline.png().toBuffer()).keepMetadata();
+    }
   }
 
-  return image.toFormat(sharpFormat, formatOptions);
+  return pipeline.toFormat(sharpFormat, formatOptions);
 }

@@ -1,8 +1,13 @@
 import sharp from "sharp";
 import { describe, expect, it, vi } from "vitest";
 import { processImage } from "../src/engine.js";
+import { colorBlindness } from "../src/operations/color-blindness.js";
+import { colorChannels } from "../src/operations/color-channels.js";
 import { compress, compressDetailed } from "../src/operations/compress.js";
 import { convert } from "../src/operations/convert.js";
+import { sepia } from "../src/operations/sepia.js";
+import { sharpenAdvanced } from "../src/operations/sharpen.js";
+import type { Sharp } from "../src/types.js";
 
 async function rgbaCornerPng(size = 20): Promise<Buffer> {
   const raw = Buffer.alloc(size * size * 4);
@@ -102,6 +107,93 @@ describe("GIF Palette Reuse", () => {
     } finally {
       toFormatSpy.mockRestore();
     }
+  });
+
+  it("passes reuse: false and regenerates the palette in processImage when outputFormat is omitted (#3114)", async () => {
+    const redGif = await sharp({
+      create: {
+        width: 10,
+        height: 10,
+        channels: 4,
+        background: { r: 200, g: 40, b: 40, alpha: 1 },
+      },
+    })
+      .gif()
+      .toBuffer();
+
+    const toFormatSpy = vi.spyOn(sharp.prototype, "toFormat");
+    try {
+      const result = await processImage(redGif, [
+        { type: "color-channels", options: { red: 0, green: 200, blue: 100 } },
+      ]);
+      expect(toFormatSpy).toHaveBeenCalledWith("gif", { reuse: false });
+      expect(result.info.format).toBe("gif");
+      expect(await pixelAt(result.buffer, 5, 5)).toEqual([0, 80, 40, 255]);
+    } finally {
+      toFormatSpy.mockRestore();
+    }
+
+    const viaConvertOp = await processImage(redGif, [
+      { type: "color-channels", options: { red: 0, green: 200, blue: 100 } },
+      { type: "convert", options: { format: "gif" } },
+    ]);
+    expect(viaConvertOp.info.format).toBe("gif");
+    expect(await pixelAt(viaConvertOp.buffer, 5, 5)).toEqual([0, 80, 40, 255]);
+
+    const viaCompressOp = await processImage(redGif, [
+      { type: "color-channels", options: { red: 0, green: 200, blue: 100 } },
+      { type: "compress", options: { format: "gif", quality: 80 } },
+    ]);
+    expect(viaCompressOp.info.format).toBe("gif");
+    expect(await pixelAt(viaCompressOp.buffer, 5, 5)).toEqual([0, 80, 40, 255]);
+
+    const targetGifAfterColorOp = await compressDetailed(
+      await colorChannels(sharp(redGif), { red: 0, green: 200, blue: 100 }),
+      { targetSizeBytes: redGif.length * 4 },
+    );
+    expect(await pixelAt(targetGifAfterColorOp.buffer as Buffer, 5, 5)).toEqual([0, 80, 40, 255]);
+
+    // Animated GIF with a float stage in targetSizeBytes mode keeps all frames.
+    const frame0 = await sharp({
+      create: {
+        width: 10,
+        height: 10,
+        channels: 4,
+        background: { r: 200, g: 40, b: 40, alpha: 1 },
+      },
+    })
+      .png()
+      .toBuffer();
+    const frame1 = await sharp({
+      create: {
+        width: 10,
+        height: 10,
+        channels: 4,
+        background: { r: 40, g: 40, b: 200, alpha: 1 },
+      },
+    })
+      .png()
+      .toBuffer();
+    const animGif = await sharp([frame0, frame1], { join: { animated: true } })
+      .gif({ delay: [100, 100], loop: 0 })
+      .toBuffer();
+    const animTarget = await compressDetailed(await sepia(sharp(animGif, { animated: true })), {
+      targetSizeBytes: animGif.length * 4,
+      animated: true,
+    });
+    const animMeta = await sharp(animTarget.buffer as Buffer, { animated: true }).metadata();
+    expect(animMeta.format).toBe("gif");
+    expect(animMeta.pages).toBe(2);
+    expect(animMeta.pageHeight).toBe(10);
+
+    // Converting a GIF to PNG or JPEG via operations[] with outputFormat omitted
+    // must not clobber the output back to GIF.
+    const gifToPng = await processImage(redGif, [{ type: "convert", options: { format: "png" } }]);
+    expect(gifToPng.info.format).toBe("png");
+    const gifToJpeg = await processImage(redGif, [
+      { type: "compress", options: { format: "jpeg" as "jpg", quality: 80 } },
+    ]);
+    expect(gifToJpeg.info.format).toBe("jpeg");
   });
 });
 
@@ -219,8 +311,10 @@ describe("TIFF LZW alpha preservation (#2607)", () => {
 
       const pngHandle = sharp(png);
       const tiffSpy = vi.spyOn(pngHandle, "tiff");
+      const pngSpy = vi.spyOn(pngHandle, "png");
       await compressDetailed(pngHandle, { targetSizeBytes: png.length * 2, format: "png" });
       expect(tiffSpy).not.toHaveBeenCalled();
+      expect(pngSpy).not.toHaveBeenCalled();
     },
   );
 
@@ -287,5 +381,163 @@ describe("TIFF LZW alpha preservation (#2607)", () => {
     } finally {
       toFormatSpy.mockRestore();
     }
+  });
+
+  it("preserves 4-channel alpha and 8-bit uchar depth when outputFormat is omitted or convert/compress is called after float ops (#3114)", async () => {
+    const png = await rgbaCornerPng();
+    const opaquePng = await sharp({
+      create: { width: 20, height: 20, channels: 3, background: { r: 200, g: 40, b: 40 } },
+    })
+      .png()
+      .toBuffer();
+    const rgbaTiff = await sharp(png).tiff({ compression: "lzw" }).toBuffer();
+    const opaqueTiff = await sharp(opaquePng).tiff({ compression: "lzw" }).toBuffer();
+
+    const resizedTiff = await processImage(rgbaTiff, [
+      { type: "resize", options: { width: 10, height: 10 } },
+    ]);
+    expect(resizedTiff.info.format).toBe("tiff");
+    expect(resizedTiff.info.channels).toBe(4);
+    expect(resizedTiff.info.hasAlpha).toBe(true);
+    expect((await pixelAt(resizedTiff.buffer, 0, 0))[3]).toBe(0);
+    expect(await pixelAt(resizedTiff.buffer, 7, 7)).toEqual([200, 40, 40, 255]);
+
+    const floatOps = [
+      {
+        type: "sepia",
+        options: {},
+        apply: (img: Sharp) => sepia(img),
+      },
+      {
+        type: "color-channels",
+        options: { red: 120, green: 80, blue: 100 },
+        apply: (img: Sharp) => colorChannels(img, { red: 120, green: 80, blue: 100 }),
+      },
+      {
+        type: "color-blindness",
+        options: { type: "protanopia" },
+        apply: (img: Sharp) => colorBlindness(img, { type: "protanopia" }),
+      },
+      {
+        type: "sharpen-advanced",
+        options: { method: "high-pass", strength: 50, kernelSize: 3 },
+        apply: (img: Sharp) =>
+          sharpenAdvanced(img, { method: "high-pass", strength: 50, kernelSize: 3 }),
+      },
+    ];
+
+    for (const op of floatOps) {
+      const [
+        pngRef,
+        opaquePngRef,
+        tiffInputNoFormat,
+        opaqueTiffInputNoFormat,
+        viaConvertOp,
+        viaCompressOp,
+        directConvertRgba,
+        directConvertOpaque,
+        directCompressQuality,
+        directCompressOpaqueQuality,
+        directCompressTarget,
+        directCompressOpaqueTarget,
+      ] = await Promise.all([
+        processImage(png, [{ type: op.type, options: op.options }], "png"),
+        processImage(opaquePng, [{ type: op.type, options: op.options }], "png"),
+        processImage(rgbaTiff, [{ type: op.type, options: op.options }]),
+        processImage(opaqueTiff, [{ type: op.type, options: op.options }]),
+        processImage(png, [
+          { type: op.type, options: op.options },
+          { type: "convert", options: { format: "tiff" } },
+        ]),
+        processImage(png, [
+          { type: op.type, options: op.options },
+          { type: "compress", options: { format: "tiff", quality: 80 } },
+        ]),
+        convert(await op.apply(sharp(png)), { format: "tiff" }).then((s) => s.toBuffer()),
+        convert(await op.apply(sharp(opaquePng)), { format: "tiff" }).then((s) => s.toBuffer()),
+        compress(await op.apply(sharp(png)), { format: "tiff", quality: 80 }).then((s) =>
+          s.toBuffer(),
+        ),
+        compress(await op.apply(sharp(opaquePng)), { format: "tiff", quality: 80 }).then((s) =>
+          s.toBuffer(),
+        ),
+        compressDetailed(await op.apply(sharp(rgbaTiff)), {
+          targetSizeBytes: rgbaTiff.length * 4,
+        }).then((r) => r.buffer as Buffer),
+        compressDetailed(await op.apply(sharp(opaquePng)), {
+          format: "tiff",
+          targetSizeBytes: opaqueTiff.length * 4,
+        }).then((r) => r.buffer as Buffer),
+      ]);
+
+      const expectedRgbaBody = await pixelAt(pngRef.buffer, 14, 14);
+      const expectedOpaqueBody = await pixelAt(opaquePngRef.buffer, 14, 14);
+
+      for (const [label, buf] of [
+        ["tiffInputNoFormat", tiffInputNoFormat.buffer],
+        ["viaConvertOp", viaConvertOp.buffer],
+        ["viaCompressOp", viaCompressOp.buffer],
+        ["directConvertRgba", directConvertRgba],
+        ["directCompressQuality", directCompressQuality],
+        ["directCompressTarget", directCompressTarget],
+      ] as const) {
+        const meta = await sharp(buf).metadata();
+        expect(meta.format, `${op.type} ${label} format`).toBe("tiff");
+        expect(meta.depth, `${op.type} ${label} depth`).toBe("uchar");
+        expect(meta.channels, `${op.type} ${label} channels`).toBe(4);
+        expect(meta.hasAlpha, `${op.type} ${label} hasAlpha`).toBe(true);
+        expect((await pixelAt(buf, 2, 2))[3], `${op.type} ${label} corner alpha`).toBe(0);
+        expect(await pixelAt(buf, 14, 14), `${op.type} ${label} body`).toEqual(expectedRgbaBody);
+      }
+
+      for (const [label, buf] of [
+        ["opaqueTiffInputNoFormat", opaqueTiffInputNoFormat.buffer],
+        ["directConvertOpaque", directConvertOpaque],
+        ["directCompressOpaqueQuality", directCompressOpaqueQuality],
+        ["directCompressOpaqueTarget", directCompressOpaqueTarget],
+      ] as const) {
+        const opaqueMeta = await sharp(buf).metadata();
+        expect(opaqueMeta.format, `${op.type} ${label} format`).toBe("tiff");
+        expect(opaqueMeta.depth, `${op.type} ${label} depth`).toBe("uchar");
+        expect(await pixelAt(buf, 14, 14), `${op.type} ${label} opaque body`).toEqual(
+          expectedOpaqueBody,
+        );
+      }
+    }
+
+    // Reverse scan in engine.ts picks the last convert/compress with a format
+    // string and casts a trailing float operation (sepia after convert to tiff)
+    // back to 8-bit uchar.
+    const convertBeforeSepia = await processImage(png, [
+      { type: "convert", options: { format: "jpg" } },
+      { type: "convert", options: { format: "tiff" } },
+      { type: "sepia", options: {} },
+      { type: "resize", options: { width: 10, height: 10 } },
+    ]);
+    const convertBeforeSepiaMeta = await sharp(convertBeforeSepia.buffer).metadata();
+    expect(convertBeforeSepiaMeta.format).toBe("tiff");
+    expect(convertBeforeSepiaMeta.depth).toBe("uchar");
+    expect(convertBeforeSepiaMeta.width).toBe(10);
+
+    // Converting a TIFF to PNG via operations[] with outputFormat omitted
+    // must not fall back to inputMeta.format ("tiff").
+    const tiffToPng = await processImage(rgbaTiff, [
+      { type: "convert", options: { format: "png" } },
+    ]);
+    expect(tiffToPng.info.format).toBe("png");
+
+    // ICC profile survives convert/compress float-to-uchar cast via keepMetadata().
+    const pngWithIcc = await sharp(png).withMetadata({ icc: "p3" }).png().toBuffer();
+    const convertIccBuf = await (
+      await convert((await sepia(sharp(pngWithIcc))).keepMetadata(), { format: "tiff" })
+    ).toBuffer();
+    expect((await sharp(convertIccBuf).metadata()).hasProfile).toBe(true);
+    const compressIccBuf = await (
+      await compress((await sepia(sharp(pngWithIcc))).keepMetadata(), {
+        format: "tiff",
+        quality: 80,
+      })
+    ).toBuffer();
+    expect((await sharp(compressIccBuf).metadata()).hasProfile).toBe(true);
   });
 });
