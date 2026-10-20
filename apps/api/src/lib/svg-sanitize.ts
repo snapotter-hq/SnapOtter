@@ -185,6 +185,23 @@ export function decompressSvgz(buffer: Buffer): Buffer {
   return decompressed;
 }
 
+/**
+ * True when an error thrown from decompressSvgz() or sanitizeSvg() is a client
+ * input rejection (400) rather than an unexpected sanitizer crash (500):
+ *  - statusCode === 400 from sanitizeSvg() size/element caps
+ *  - Z_DATA_ERROR / Z_BUF_ERROR from malformed or truncated gzip streams
+ *  - RangeError (ERR_BUFFER_TOO_LARGE) when gunzipSync hits MAX_SVGZ_DECOMPRESSED_SIZE
+ */
+export function isSvgzClientError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  return (
+    (err as { statusCode?: number }).statusCode === 400 ||
+    (err as { code?: string }).code === "Z_DATA_ERROR" ||
+    (err as { code?: string }).code === "Z_BUF_ERROR" ||
+    err instanceof RangeError
+  );
+}
+
 const SVG_PROLOG_COMMENT = /^<!--[\s\S]*?-->\s*/;
 const SVG_PROLOG_PI = /^<\?[\s\S]*?\?>\s*/;
 const SVG_PROLOG_DOCTYPE = new RegExp(`^${DOCTYPE_SOURCE}\\s*`, "i");

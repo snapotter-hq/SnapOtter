@@ -25,7 +25,12 @@ import {
   putObject,
   verifyS3Bucket,
 } from "../lib/object-storage.js";
-import { decompressSvgz, isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
+import {
+  decompressSvgz,
+  isSvgBuffer,
+  isSvgzClientError,
+  sanitizeSvg,
+} from "../lib/svg-sanitize.js";
 import { engineUnavailable } from "../modality/image-input.js";
 import { requireFileAccess, requirePermission } from "../permissions.js";
 
@@ -168,17 +173,13 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
                 }
               }
             } catch (err) {
-              if ((err as Error).message.includes("SVGZ file does not contain")) {
+              if ((err as { message?: string })?.message?.includes("SVGZ file does not contain")) {
                 request.log.warn(
                   { err, filename: part.filename },
                   "Uploaded .svgz file does not contain SVG, storing as opaque file",
                 );
                 safeBuffer = buffer;
-              } else if (
-                (err as { statusCode?: number }).statusCode === 400 ||
-                (err as { code?: string }).code === "Z_DATA_ERROR" ||
-                (err as { code?: string }).code === "Z_BUF_ERROR"
-              ) {
+              } else if (isSvgzClientError(err)) {
                 request.log.warn({ err, filename: part.filename }, "SVGZ decompression failed");
                 await discardUploads();
                 return reply.status(400).send({ error: (err as Error).message });

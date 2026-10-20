@@ -46,7 +46,12 @@ import { deleteLibraryFileStorage } from "../lib/library-cleanup.js";
 import { readFilePart } from "../lib/multipart-parts.js";
 import { normalizeS3ReadFault } from "../lib/object-storage.js";
 import { quotaRefusal } from "../lib/quota.js";
-import { decompressSvgz, isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
+import {
+  decompressSvgz,
+  isSvgBuffer,
+  isSvgzClientError,
+  sanitizeSvg,
+} from "../lib/svg-sanitize.js";
 import { engineUnavailable } from "../modality/image-input.js";
 import { pdfFirstPagePreview, videoPosterPreview } from "../modality/preview.js";
 import { hasEffectivePermission, requireFileAccess } from "../permissions.js";
@@ -176,23 +181,6 @@ function discardStagedBlob(request: FastifyRequest, route: string, storedName: s
       },
     );
   });
-}
-
-/**
- * True when an error thrown from decompressSvgz() or sanitizeSvg() is a client
- * input rejection (400) rather than an unexpected sanitizer crash (500):
- *  - statusCode === 400 from sanitizeSvg() size/element caps
- *  - Z_DATA_ERROR / Z_BUF_ERROR from malformed or truncated gzip streams
- *  - RangeError (ERR_BUFFER_TOO_LARGE) when gunzipSync hits MAX_SVGZ_DECOMPRESSED_SIZE
- */
-function isSvgzClientError(err: unknown): boolean {
-  if (!err || typeof err !== "object") return false;
-  return (
-    (err as { statusCode?: number }).statusCode === 400 ||
-    (err as { code?: string }).code === "Z_DATA_ERROR" ||
-    (err as { code?: string }).code === "Z_BUF_ERROR" ||
-    err instanceof RangeError
-  );
 }
 
 function rethrowIfLibraryStorageFault(e: unknown): void {

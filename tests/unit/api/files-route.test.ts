@@ -5,6 +5,7 @@
  * logic helpers from the files route.
  */
 import { Readable } from "node:stream";
+import { gzipSync } from "node:zlib";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── Mocks ───────────────────────────────────────────────────────────────
@@ -864,6 +865,40 @@ describe("files route logic", () => {
       expect(reply.statusCode).toBe(200);
       expect(mocks.putObject).toHaveBeenCalledTimes(2);
       expect(mocks.deletePrefix).not.toHaveBeenCalled();
+    });
+
+    it("rejects an .svgz upload that decompresses past the 50 MiB cap with 400, cleans up earlier parts, and skips reportError (#2593)", async () => {
+      const svgzBomb = gzipSync(
+        Buffer.concat([
+          Buffer.from('<svg xmlns="http://www.w3.org/2000/svg">'),
+          Buffer.alloc(51 * 1024 * 1024, 0x20),
+          Buffer.from("</svg>"),
+        ]),
+      );
+      const log = { warn: vi.fn(), error: vi.fn() };
+      const req = makeRequest(
+        [filePart("first.txt", Buffer.from("hello")), filePart("bomb.svgz", svgzBomb)],
+        log,
+      );
+      const reply = makeReply();
+
+      await uploadHandler(req, reply);
+
+      expect(reply.statusCode).toBe(400);
+      expect(reply.payload).toEqual({
+        error: expect.stringMatching(/52428800|larger than/i),
+      });
+      expect(mocks.reportError).not.toHaveBeenCalled();
+      expect(log.error).not.toHaveBeenCalled();
+      expect(log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ err: expect.any(RangeError), filename: "bomb.svgz" }),
+        "SVGZ decompression failed",
+      );
+      expect(mocks.putObject).toHaveBeenCalledTimes(1);
+      const writtenKey = (mocks.putObject.mock.calls[0] as unknown[])[0] as string;
+      const prefix = writtenKey.replace(/first\.txt$/, "");
+      expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
+      expect(mocks.deletePrefix).toHaveBeenCalledWith(prefix);
     });
   });
 });

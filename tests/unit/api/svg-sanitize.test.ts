@@ -8,6 +8,7 @@ vi.mock("../../../apps/api/src/config.js", () => ({
 import {
   decompressSvgz,
   isSvgBuffer,
+  isSvgzClientError,
   sanitizeSvg,
 } from "../../../apps/api/src/lib/svg-sanitize.js";
 
@@ -393,5 +394,31 @@ describe("decompressSvgz", () => {
     // 60MB of spaces compresses to very small gzip
     const bomb = gzipSync(Buffer.alloc(60 * 1024 * 1024, 0x20));
     expect(() => decompressSvgz(bomb)).toThrow(RangeError);
+  });
+});
+
+describe("isSvgzClientError", () => {
+  it("recognizes statusCode 400, Z_DATA_ERROR, Z_BUF_ERROR, and RangeError as client errors", () => {
+    expect(isSvgzClientError(Object.assign(new Error("over cap"), { statusCode: 400 }))).toBe(true);
+    expect(isSvgzClientError(Object.assign(new Error("corrupt"), { code: "Z_DATA_ERROR" }))).toBe(
+      true,
+    );
+    expect(isSvgzClientError(Object.assign(new Error("truncated"), { code: "Z_BUF_ERROR" }))).toBe(
+      true,
+    );
+    expect(isSvgzClientError(new RangeError("Cannot create a Buffer larger than 52428800"))).toBe(
+      true,
+    );
+  });
+
+  it("rejects non-client errors and non-objects", () => {
+    expect(isSvgzClientError(new Error("unexpected sanitizer crash"))).toBe(false);
+    expect(isSvgzClientError(Object.assign(new Error("server error"), { statusCode: 500 }))).toBe(
+      false,
+    );
+    expect(isSvgzClientError({})).toBe(false);
+    expect(isSvgzClientError(null)).toBe(false);
+    expect(isSvgzClientError(undefined)).toBe(false);
+    expect(isSvgzClientError("string error")).toBe(false);
   });
 });
