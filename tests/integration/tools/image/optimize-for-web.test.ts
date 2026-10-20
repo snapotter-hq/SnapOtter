@@ -6,6 +6,7 @@
  * and the preview endpoint.
  */
 
+import { gzipSync } from "node:zlib";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
@@ -280,6 +281,29 @@ describe("Preview endpoint", () => {
       },
     });
     expect(res.statusCode).toBe(400);
+  });
+
+  it("preview decompresses and sanitizes .svgz inputs (#3083)", async () => {
+    const svgz = gzipSync(SVG);
+    const { body: payload, contentType } = makePayload(
+      { format: "webp", quality: 80 },
+      svgz,
+      "icon.svgz",
+      "image/svg+xml",
+    );
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/optimize-for-web/preview",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toContain("image/webp");
+    const meta = await sharp(res.rawPayload).metadata();
+    expect(meta.format).toBe("webp");
   });
 });
 

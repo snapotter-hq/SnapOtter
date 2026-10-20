@@ -5,6 +5,7 @@
  * unique filename deduplication, and the pipeline step schema constraints.
  */
 import { Readable } from "node:stream";
+import { gzipSync } from "node:zlib";
 import Fastify, { type FastifyRequest } from "fastify";
 import { describe, expect, it, vi } from "vitest";
 
@@ -101,10 +102,15 @@ vi.mock("../../../apps/api/src/lib/heic-converter.js", () => ({
   decodeHeic: vi.fn(),
 }));
 
-vi.mock("../../../apps/api/src/lib/svg-sanitize.js", () => ({
-  isSvgBuffer: vi.fn(() => false),
-  sanitizeSvg: vi.fn((b: Buffer) => b),
-}));
+vi.mock("../../../apps/api/src/lib/svg-sanitize.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/svg-sanitize.js")>();
+  return {
+    ...actual,
+    decompressSvgz: vi.fn((b: Buffer) => actual.decompressSvgz(b)),
+    isSvgBuffer: vi.fn((b: Buffer) => actual.isSvgBuffer(b)),
+    sanitizeSvg: vi.fn((b: Buffer) => actual.sanitizeSvg(b)),
+  };
+});
 
 vi.mock("../../../apps/api/src/lib/feature-status.js", () => ({
   isToolInstalled: vi.fn(() => true),
@@ -209,6 +215,8 @@ vi.mock("../../../apps/api/src/permissions.js", () => ({
   requirePermission: () => vi.fn(() => ({ id: "user-1", username: "test", role: "admin" })),
 }));
 
+import { autoOrient } from "../../../apps/api/src/lib/auto-orient.js";
+import { validateImageBuffer } from "../../../apps/api/src/lib/file-validation.js";
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
 import { registerPipelineRoutes } from "../../../apps/api/src/routes/pipeline.js";
 import {
@@ -973,6 +981,88 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685)", () => {
       }
     },
   );
+
+  it("decompresses .svgz, sanitizes SVG, and records preFailures on /api/v1/pipeline/batch (#3083)", async () => {
+    vi.clearAllMocks();
+    vi.mocked(validateImageBuffer).mockImplementation(async (_buf: Buffer, name?: string) => ({
+      valid: true,
+      format: name?.endsWith(".png") ? "png" : "svg",
+      width: 100,
+      height: 100,
+    }));
+
+    const rawSvg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><script>alert(1)</script><rect width="100" height="100" fill="red"/></svg>',
+      "utf-8",
+    );
+    const svgz = gzipSync(rawSvg);
+    const notSvgSvgz = gzipSync(Buffer.from("not an svg document", "utf-8"));
+    const overElementSvg = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg">${"<rect/>".repeat(5001)}</svg>`,
+      "utf-8",
+    );
+
+    try {
+      const reply = await invokePipelineBatchRoute([
+        { type: "file", filename: "icon.svgz", content: svgz },
+        { type: "file", filename: "bad.svgz", content: notSvgSvgz },
+        { type: "file", filename: "too-many.svg", content: overElementSvg },
+        { type: "file", filename: "good.png", content: Buffer.from("good-png") },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: batchTestToolId, settings: {} }],
+          }),
+        },
+        { type: "field", fieldname: "clientJobId", value: "pipeline-batch-svg" },
+      ]);
+
+      expect(reply.statusCode).toBe(202);
+      expect(putObjectMock).toHaveBeenCalledTimes(2);
+      const firstCall = putObjectMock.mock.calls[0] as unknown[] | undefined;
+      const secondCall = putObjectMock.mock.calls[1] as unknown[] | undefined;
+      const firstStored = (firstCall ? (firstCall[1] as Buffer) : Buffer.alloc(0)).toString(
+        "utf-8",
+      );
+      expect(firstStored).toContain("<svg");
+      expect(firstStored).not.toContain("<script");
+      expect(secondCall ? String(secondCall[0]) : "").toMatch(
+        /^uploads\/pipeline-batch-svg-f1-s0\/good\.png$/,
+      );
+      expect(recordChildOutcomeMock).toHaveBeenCalledWith(
+        "pipeline-batch-svg",
+        4,
+        "bad.svgz",
+        "SVGZ file does not contain valid SVG content after decompression",
+      );
+      expect(recordChildOutcomeMock).toHaveBeenCalledWith(
+        "pipeline-batch-svg",
+        4,
+        "too-many.svg",
+        "SVG exceeds maximum element count of 5000",
+      );
+      expect(flowAddMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            totalFiles: 4,
+            settings: expect.objectContaining({
+              flowChildCount: 2,
+              fileIndexMap: [0, 3],
+            }),
+          }),
+        }),
+      );
+      expect(autoOrient).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.mocked(validateImageBuffer).mockResolvedValue({
+        valid: true,
+        format: "png",
+        width: 100,
+        height: 100,
+      });
+    }
+  });
 });
 
 describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
@@ -1303,6 +1393,98 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
       storeValidatedOcrPdfSpy.mockReset();
       deleteObjectMock.mockReset();
       flowAddMock.mockReset();
+    }
+  });
+
+  it("decompresses .svgz, sanitizes SVG, and skips autoOrient on /api/v1/pipeline/execute (#3083)", async () => {
+    vi.clearAllMocks();
+    vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+      valid: true,
+      format: "svg",
+      width: 0,
+      height: 0,
+    });
+
+    const rawSvg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><script>alert(1)</script><rect width="100" height="100" fill="red"/></svg>',
+      "utf-8",
+    );
+    const svgz = gzipSync(rawSvg);
+
+    const reply = await invokePipelineExecuteRoute([
+      { type: "file", filename: "icon.svgz", content: svgz },
+      {
+        type: "field",
+        fieldname: "pipeline",
+        value: JSON.stringify({
+          steps: [{ toolId: executeTestToolId, settings: {} }],
+        }),
+      },
+    ]);
+
+    expect(reply.statusCode).toBe(202);
+    expect(putObjectMock).toHaveBeenCalledTimes(1);
+    const firstCall = putObjectMock.mock.calls[0] as unknown[] | undefined;
+    const storedBuf = firstCall ? (firstCall[1] as Buffer) : Buffer.alloc(0);
+    const storedSvg = storedBuf.toString("utf-8");
+    expect(storedSvg).toContain("<svg");
+    expect(storedSvg).not.toContain("<script");
+    expect(storedSvg).not.toContain("alert(1)");
+    expect(autoOrient).not.toHaveBeenCalled();
+  });
+
+  it("answers 400 when decompressSvgz or sanitizeSvg rejects on /api/v1/pipeline/execute (#3083)", async () => {
+    vi.clearAllMocks();
+    vi.mocked(validateImageBuffer).mockResolvedValue({
+      valid: true,
+      format: "svg",
+      width: 0,
+      height: 0,
+    });
+
+    try {
+      const notSvgSvgz = gzipSync(Buffer.from("not an svg document", "utf-8"));
+      const badSvgzReply = await invokePipelineExecuteRoute([
+        { type: "file", filename: "bad.svgz", content: notSvgSvgz },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: executeTestToolId, settings: {} }],
+          }),
+        },
+      ]);
+      expect(badSvgzReply.statusCode).toBe(400);
+      expect(badSvgzReply.payload).toEqual({
+        error: "SVGZ file does not contain valid SVG content after decompression",
+      });
+
+      const overElementSvg = Buffer.from(
+        `<svg xmlns="http://www.w3.org/2000/svg">${"<rect/>".repeat(5001)}</svg>`,
+        "utf-8",
+      );
+      const overCapReply = await invokePipelineExecuteRoute([
+        { type: "file", filename: "too-many.svg", content: overElementSvg },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: executeTestToolId, settings: {} }],
+          }),
+        },
+      ]);
+      expect(overCapReply.statusCode).toBe(400);
+      expect(overCapReply.payload).toEqual({
+        error: "SVG exceeds maximum element count of 5000",
+      });
+      expect(putObjectMock).not.toHaveBeenCalled();
+    } finally {
+      vi.mocked(validateImageBuffer).mockResolvedValue({
+        valid: true,
+        format: "png",
+        width: 100,
+        height: 100,
+      });
     }
   });
 });

@@ -18,7 +18,7 @@ import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
-import { sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
 import { engineUnavailable } from "../../modality/image-input.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -159,6 +159,7 @@ export function registerOptimizeForWeb(app: FastifyInstance) {
       // Sanitize SVG
       if (validation.format === "svg") {
         try {
+          fileBuffer = decompressSvgz(fileBuffer);
           fileBuffer = sanitizeSvg(fileBuffer);
         } catch (err) {
           return reply.status(400).send({

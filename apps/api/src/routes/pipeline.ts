@@ -72,7 +72,7 @@ import { resolveToolPool } from "../lib/pool.js";
 import { withRouteScratch } from "../lib/route-scratch.js";
 import { settledFailureResponse } from "../lib/settled-failure.js";
 import { isStorableJson, toStorableJson } from "../lib/storable-json.js";
-import { isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
+import { decompressSvgz, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { InputValidationError } from "../modality/contract.js";
 import { engineUnavailable } from "../modality/image-input.js";
 import { inputHandlerFor } from "../modality/input-handler.js";
@@ -480,9 +480,15 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                     }
 
                     // Sanitize SVG input and normalize EXIF orientation
-                    const isSvg = isSvgBuffer(processBuffer);
-                    if (isSvg) {
-                      processBuffer = sanitizeSvg(processBuffer);
+                    if (validation.format === "svg") {
+                      try {
+                        processBuffer = decompressSvgz(processBuffer);
+                        processBuffer = sanitizeSvg(processBuffer);
+                      } catch (err) {
+                        return reply.status(400).send({
+                          error: err instanceof Error ? err.message : "Invalid SVG",
+                        });
+                      }
                     } else {
                       processBuffer = await autoOrient(processBuffer);
                     }
@@ -1554,8 +1560,18 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   }
                 }
 
-                if (isSvgBuffer(processBuffer)) {
-                  processBuffer = sanitizeSvg(processBuffer);
+                if (fileValidation.format === "svg") {
+                  try {
+                    processBuffer = decompressSvgz(processBuffer);
+                    processBuffer = sanitizeSvg(processBuffer);
+                  } catch (err) {
+                    preFailures.push({
+                      originalIndex: fi,
+                      filename: file.filename,
+                      error: err instanceof Error ? err.message : "Invalid SVG",
+                    });
+                    continue;
+                  }
                 } else {
                   processBuffer = await autoOrient(processBuffer);
                 }

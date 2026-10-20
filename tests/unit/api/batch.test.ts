@@ -6,6 +6,7 @@
  */
 import { existsSync } from "node:fs";
 import { Readable } from "node:stream";
+import { gzipSync } from "node:zlib";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -76,6 +77,7 @@ vi.mock("../../../apps/api/src/config.js", () => ({
     WORKSPACE_PATH: "/tmp/test",
     SCRATCH_PATH: "",
     MAX_MEGAPIXELS: 100,
+    MAX_SVG_SIZE_MB: 10,
     MAX_BATCH_SIZE: 10,
     MAX_UPLOAD_SIZE_MB: 100,
     MAX_WORKSPACE_SIZE_GB: 0,
@@ -778,4 +780,107 @@ describe("batch route spooled multipart ingress (#1239)", () => {
       });
     },
   );
+
+  it("decompresses .svgz, sanitizes SVG, and skips autoOrient on image batch uploads (#3083)", async () => {
+    const uploadedPayloads: string[] = [];
+    mocks.validateImageBuffer.mockResolvedValue({ valid: true, format: "svg" });
+    mocks.putObject.mockImplementation(async (_key: string, data: Buffer) => {
+      uploadedPayloads.push(data.toString("utf-8"));
+    });
+
+    const rawSvg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><script>alert(1)</script><rect width="100" height="100" fill="red"/></svg>',
+      "utf-8",
+    );
+    const svgz = gzipSync(rawSvg);
+
+    const reply = await invokeBatchRoute({
+      section: "image",
+      toolId: "resize",
+      parts: [
+        { type: "file", filename: "dirty.svg", content: rawSvg },
+        { type: "file", filename: "compressed.svgz", content: svgz },
+        { type: "field", fieldname: "settings", value: "{}" },
+      ],
+    });
+
+    expect(reply.statusCode).toBe(202);
+    expect(uploadedPayloads).toHaveLength(2);
+    for (const stored of uploadedPayloads) {
+      expect(stored).toContain("<svg");
+      expect(stored).not.toContain("<script");
+      expect(stored).not.toContain("alert(1)");
+    }
+    expect(mocks.autoOrient).not.toHaveBeenCalled();
+
+    uploadedPayloads.length = 0;
+    const metaReply = await invokeBatchRoute({
+      section: "image",
+      toolId: "strip-metadata",
+      parts: [
+        { type: "file", filename: "meta.svgz", content: svgz },
+        { type: "field", fieldname: "settings", value: "{}" },
+      ],
+    });
+    expect(metaReply.statusCode).toBe(202);
+    expect(uploadedPayloads).toHaveLength(1);
+    expect(uploadedPayloads[0]).toContain("<svg");
+    expect(uploadedPayloads[0]).not.toContain("<script");
+    expect(mocks.autoOrient).not.toHaveBeenCalled();
+  });
+
+  it("records a preFailure and continues the batch when decompressSvgz or sanitizeSvg rejects (#3083)", async () => {
+    const uploadedKeys: string[] = [];
+    mocks.validateImageBuffer.mockImplementation(async (_buf: Buffer, name: string) => ({
+      valid: true,
+      format: name.endsWith(".png") ? "png" : "svg",
+    }));
+    mocks.putObject.mockImplementation(async (key: string) => {
+      uploadedKeys.push(key);
+    });
+
+    const notSvgSvgz = gzipSync(Buffer.from("not an svg document", "utf-8"));
+    const overElementSvg = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg">${"<rect/>".repeat(5001)}</svg>`,
+      "utf-8",
+    );
+
+    const reply = await invokeBatchRoute({
+      section: "image",
+      toolId: "resize",
+      parts: [
+        { type: "file", filename: "bad.svgz", content: notSvgSvgz },
+        { type: "file", filename: "too-many.svg", content: overElementSvg },
+        { type: "file", filename: "good.png", content: Buffer.from("good-png") },
+        { type: "field", fieldname: "settings", value: "{}" },
+        { type: "field", fieldname: "clientJobId", value: "batch-svg-prefail" },
+      ],
+    });
+
+    expect(reply.statusCode).toBe(202);
+    expect(uploadedKeys).toEqual(["uploads/batch-svg-prefail-f0/good.png"]);
+    expect(mocks.recordChildOutcome).toHaveBeenCalledWith(
+      "batch-svg-prefail",
+      3,
+      "bad.svgz",
+      "SVGZ file does not contain valid SVG content after decompression",
+    );
+    expect(mocks.recordChildOutcome).toHaveBeenCalledWith(
+      "batch-svg-prefail",
+      3,
+      "too-many.svg",
+      "SVG exceeds maximum element count of 5000",
+    );
+    expect(mocks.autoOrient).toHaveBeenCalledTimes(1);
+    expect(mocks.flowAdd).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          settings: expect.objectContaining({
+            flowChildCount: 1,
+            fileIndexMap: [2],
+          }),
+        }),
+      }),
+    );
+  });
 });
