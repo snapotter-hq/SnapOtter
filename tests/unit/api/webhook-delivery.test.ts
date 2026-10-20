@@ -299,4 +299,102 @@ describe("webhook delivery", () => {
     const headers = fetchMock.mock.calls[0][1].headers;
     expect(headers.Authorization).toBe("Bearer sk-live-abc123");
   });
+
+  it("includes statusCode on 5xx failure when maxRetries is 0 (#2557)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { deliverWebhook } = await import("../../../apps/api/src/lib/webhook-delivery.js");
+    const result = await deliverWebhook("https://example.com", "", [{ event: "test" }], {
+      maxRetries: 0,
+      initialDelayMs: 1,
+    });
+
+    expect(result).toEqual({
+      success: false,
+      statusCode: 500,
+      error: "HTTP 500",
+      attempts: 1,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("includes last statusCode when 5xx or 3xx responses exhaust retries (#2557)", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 500 })
+      .mockResolvedValueOnce({ ok: false, status: 503 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { deliverWebhook } = await import("../../../apps/api/src/lib/webhook-delivery.js");
+    const result = await deliverWebhook("https://example.com", "", [{ event: "test" }], {
+      maxRetries: 1,
+      initialDelayMs: 1,
+    });
+
+    expect(result).toEqual({
+      success: false,
+      statusCode: 503,
+      error: "HTTP 503",
+      attempts: 2,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    const redirectFetchMock = vi.fn().mockResolvedValue({ ok: false, status: 302 });
+    vi.stubGlobal("fetch", redirectFetchMock);
+
+    const redirectResult = await deliverWebhook("https://example.com", "", [{ event: "test" }], {
+      maxRetries: 1,
+      initialDelayMs: 1,
+    });
+
+    expect(redirectResult).toEqual({
+      success: false,
+      statusCode: 302,
+      error: "HTTP 302",
+      attempts: 2,
+    });
+    expect(redirectFetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("clears statusCode when a 5xx response is followed by a network error on retry, and sets it when a network error is followed by a 5xx (#2557)", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 502 })
+      .mockRejectedValueOnce(new Error("connection reset"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { deliverWebhook } = await import("../../../apps/api/src/lib/webhook-delivery.js");
+    const result = await deliverWebhook("https://example.com", "", [{ event: "test" }], {
+      maxRetries: 1,
+      initialDelayMs: 1,
+    });
+
+    expect(result).toEqual({
+      success: false,
+      statusCode: undefined,
+      error: "connection reset",
+      attempts: 2,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    const reverseFetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("connection reset"))
+      .mockResolvedValueOnce({ ok: false, status: 504 });
+    vi.stubGlobal("fetch", reverseFetchMock);
+
+    const reverseResult = await deliverWebhook("https://example.com", "", [{ event: "test" }], {
+      maxRetries: 1,
+      initialDelayMs: 1,
+    });
+
+    expect(reverseResult).toEqual({
+      success: false,
+      statusCode: 504,
+      error: "HTTP 504",
+      attempts: 2,
+    });
+    expect(reverseFetchMock).toHaveBeenCalledTimes(2);
+  });
 });
