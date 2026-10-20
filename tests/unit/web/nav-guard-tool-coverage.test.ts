@@ -49,18 +49,30 @@ const EXEMPT: Record<string, string> = {
   "sign-pdf":
     "writes its result back onto the file-store entry (updateEntry), which the guard already reads",
   "barcode-read":
-    "writes the annotated image onto the file-store entry (updateEntry), which the guard already reads; the decoded text beside it is component state (#1111)",
+    "writes the annotated image onto the file-store entry (updateEntryById), which the guard already reads, and claims the entries when the decoded barcodes are copied or exported (#1111)",
   "bulk-rename":
     "downloads its zip the moment the run finishes, so nothing is left on the page to lose",
   info: "produces no file: it reads metadata out of the input, and re-reads it on demand",
   "color-palette":
     "produces no file: it reads colors out of the input, and re-reads them on demand",
-  ocr: "result lives in component state no store exposes, so the guard can only see the run itself, through the file store's processing flag (#1111)",
+  ocr: "writes the extracted text onto the file-store entry (updateEntryById), which the guard already reads, and claims it when copied, downloaded, or auto-saved (#1111)",
   favicon:
-    "result lives in component state no store exposes, so the guard can only see the run itself, through the file store's processing flag (#1111)",
+    "writes the generated zip onto the file-store entry (updateEntryById), which the guard already reads (#1111)",
   "image-to-pdf":
-    "result lives in component state no store exposes, so the guard can only see the run itself, through the file store's processing flag (#1111)",
+    "writes the generated PDF or zip onto the file-store entry (updateEntryById), which the guard already reads (#1111)",
 };
+
+const FILE_STORE_REPORTING_TOOLS = [
+  "watermark-image",
+  "compose",
+  "stitch",
+  "erase-object",
+  "sign-pdf",
+  "barcode-read",
+  "ocr",
+  "favicon",
+  "image-to-pdf",
+] as const;
 
 /** const X = lazy(() => import("@/components/tools/x-settings")... */
 function lazyImportSpecs(): Map<string, string> {
@@ -312,6 +324,60 @@ describe("navigation guard tool coverage", () => {
     expect(
       stale,
       "These run through useToolProcessor now, so the file store covers them and the exemption is noise.",
+    ).toEqual([]);
+  });
+
+  it("verifies that file-store-reporting tools actually write processedUrl and claim it (#1111)", () => {
+    const reportingInExempt = Object.entries(EXEMPT)
+      .filter(([, reason]) => /\b(updateEntry(?:ById)?|setProcessedUrl)\b/.test(reason))
+      .map(([id]) => id)
+      .sort();
+    expect(reportingInExempt).toEqual([...FILE_STORE_REPORTING_TOOLS].sort());
+
+    const missingWriteOrClaim: string[] = [];
+    for (const id of FILE_STORE_REPORTING_TOOLS) {
+      const files = claimFilesFor(id);
+      const combined = files.map((f) => withoutComments(readFileSync(f, "utf8"))).join("\n");
+      const writesProcessedUrl =
+        /\b(updateEntry(?:ById)?|setProcessedUrl)\b/.test(combined) &&
+        (/\bprocessedUrl\s*:\s*(?!null\b)/.test(combined) ||
+          /\bsetProcessedUrl\(\s*(?!null\b)/.test(combined));
+      const claimsEntry = /\b(ResultDownloadLink|markClaimed(?:ById)?|claimSelected)\b/.test(
+        combined,
+      );
+      if (!writesProcessedUrl || !claimsEntry) {
+        missingWriteOrClaim.push(id);
+      }
+    }
+
+    expect(
+      missingWriteOrClaim,
+      "These tools bypass useToolProcessor and say they report to the file store, " +
+        "so their panels must both write processedUrl to the entry and claim it when taken.",
+    ).toEqual([]);
+  });
+
+  it("gives every imperative download in a tool panel a claim path (#1111)", () => {
+    const toolsDir = path.join(WEB_SRC, "components/tools");
+    const bulkRenameFile = settingsFileFor("bulk-rename");
+    const unclaimedImperative: string[] = [];
+
+    for (const file of webSources(toolsDir)) {
+      if (file === bulkRenameFile) continue;
+      const source = withoutComments(readFileSync(file, "utf8"));
+      if (!/createElement\(\s*"a"\s*\)/.test(source)) continue;
+      const claims = /\b(claimToolResult(?:Item)?|markClaimed(?:ById)?|claimSelected)\b/.test(
+        source,
+      );
+      if (!claims) {
+        unclaimedImperative.push(path.relative(WEB_SRC, file));
+      }
+    }
+
+    expect(
+      unclaimedImperative,
+      "These tool panels trigger a download via document.createElement('a') without claiming " +
+        "the result in useFileStore or useToolResultClaims, so the guard keeps warning after download.",
     ).toEqual([]);
   });
 });

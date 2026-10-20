@@ -18,6 +18,16 @@ const PAGE_SIZES: Record<string, [number, number]> = {
 
 const PREVIEW_HEIGHT = 220;
 
+function pdfResultFilenameFrom(downloadUrl: string): string | null {
+  const last = downloadUrl.split("/").pop();
+  if (!last) return null;
+  try {
+    return decodeURIComponent(last);
+  } catch {
+    return last;
+  }
+}
+
 function PdfPagePreview({
   pageSize,
   orientation,
@@ -171,6 +181,9 @@ export function ImageToPdfSettings() {
   const handleProcess = useCallback(() => {
     if (files.length === 0) return;
 
+    const { entries: startEntries, selectedIndex: capturedIndex } = useFileStore.getState();
+    const capturedEntryId = startEntries[capturedIndex]?.id ?? startEntries[0]?.id;
+
     // The request is made, and the ref set, before the store flag goes up: a throw
     // between the two would leave `processing` set with nothing for the unmount to
     // end (#2304).
@@ -180,11 +193,22 @@ export function ImageToPdfSettings() {
     // flushSync forces React to paint the ProgressCard before the XHR starts,
     // so users always see feedback even if the request completes quickly.
     flushSync(() => {
-      setBusy(true);
-      setProcessing(true);
+      for (const entry of useFileStore.getState().entries) {
+        if (entry.processedUrl) {
+          useFileStore.getState().updateEntryById(entry.id, {
+            processedUrl: null,
+            processedPreviewUrl: null,
+            processedFilename: null,
+            status: "pending",
+            error: null,
+          });
+        }
+      }
       setError(null);
       setDownloadUrl(null);
       setCompressionResult(null);
+      setBusy(true);
+      setProcessing(true);
       setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
     });
 
@@ -229,40 +253,69 @@ export function ImageToPdfSettings() {
     };
 
     xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const result = resolveServerUrls(JSON.parse(xhr.responseText));
-          setDownloadUrl(result.downloadUrl);
-          setCompressionResult(result.compression ?? null);
-          setProgress((prev) => ({ ...prev, phase: "complete", percent: 100 }));
-        } catch {
-          setError(t.toolSettings["image-to-pdf"].parseResponseFailed);
+      try {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          let result: {
+            downloadUrl?: unknown;
+            compression?: { targetMet: boolean; jpegQuality: number; targetRequested: number };
+          } | null = null;
+          try {
+            result = resolveServerUrls(JSON.parse(xhr.responseText));
+          } catch {
+            setError(t.toolSettings["image-to-pdf"].parseResponseFailed);
+          }
+          if (result) {
+            const url =
+              typeof result.downloadUrl === "string" && result.downloadUrl
+                ? result.downloadUrl
+                : null;
+            if (!url) {
+              setError(t.toolSettings["image-to-pdf"].parseResponseFailed);
+            } else {
+              try {
+                if (capturedEntryId) {
+                  useFileStore.getState().updateEntryById(capturedEntryId, {
+                    processedUrl: url,
+                    processedFilename: pdfResultFilenameFrom(url),
+                    status: "completed",
+                  });
+                }
+                setDownloadUrl(url);
+                setCompressionResult(result.compression ?? null);
+                setProgress((prev) => ({ ...prev, phase: "complete", percent: 100 }));
+              } catch (err) {
+                setError(t.errors.jobTrackingFailed);
+                throw err;
+              }
+            }
+          }
+        } else {
+          try {
+            const body = JSON.parse(xhr.responseText);
+            setError(
+              failedAnswerMessage(
+                t,
+                body,
+                xhr.status,
+                format(t.errors.failedWithStatus, { status: xhr.status }),
+              ),
+            );
+          } catch {
+            setError(
+              failedAnswerMessage(
+                t,
+                null,
+                xhr.status,
+                format(t.toolSettings["image-to-pdf"].creationFailedWithStatus, {
+                  status: xhr.status,
+                }),
+              ),
+            );
+          }
         }
-      } else {
-        try {
-          const body = JSON.parse(xhr.responseText);
-          setError(
-            failedAnswerMessage(
-              t,
-              body,
-              xhr.status,
-              format(t.errors.failedWithStatus, { status: xhr.status }),
-            ),
-          );
-        } catch {
-          setError(
-            failedAnswerMessage(
-              t,
-              null,
-              xhr.status,
-              format(t.toolSettings["image-to-pdf"].creationFailedWithStatus, {
-                status: xhr.status,
-              }),
-            ),
-          );
-        }
+      } finally {
+        cleanup();
       }
-      cleanup();
     };
 
     xhr.onerror = () => {

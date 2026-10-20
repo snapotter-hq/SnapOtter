@@ -1,6 +1,6 @@
 import type { TranslationKeys } from "@snapotter/shared";
 import { Check, Copy, Download, Search, X } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useTimeouts } from "@/hooks/use-timeouts";
@@ -221,6 +221,8 @@ export function BarcodeReadSettings() {
   const [rowCopy, setRowCopy] = useState<{ idx: number; ok: boolean } | null>(null);
   const [allCopy, setAllCopy] = useState<"copied" | "failed" | null>(null);
   const later = useTimeouts();
+  const copiedRowsRef = useRef<Set<number>>(new Set());
+
   // Unmounting stops the elapsed counter. The scan itself stops only once its
   // files leave the store (see handleProcess), and shared progress state lets a
   // remounted panel show the live phase, percent, stage, and elapsed counter (#2315).
@@ -239,6 +241,7 @@ export function BarcodeReadSettings() {
   const handleProcess = async () => {
     if (files.length === 0) return;
 
+    copiedRowsRef.current.clear();
     setError(null);
     setResults([]);
     setProcessing(true);
@@ -249,6 +252,17 @@ export function BarcodeReadSettings() {
     const errors: string[] = [];
     const { entries: initialEntries, updateEntryById } = useFileStore.getState();
     const entryIds = initialEntries.map((e) => e.id);
+    for (const entry of initialEntries) {
+      if (entry.processedUrl !== null) {
+        updateEntryById(entry.id, {
+          processedUrl: null,
+          processedPreviewUrl: null,
+          processedFilename: null,
+          status: "pending",
+          error: null,
+        });
+      }
+    }
 
     // Leaving the tool route bumps stopCount (#1994), leaving for another tool
     // resets the file store, and opening library files replaces it. Either way
@@ -378,22 +392,46 @@ export function BarcodeReadSettings() {
   // Total barcode count across all files
   const totalBarcodes = results.reduce((sum, r) => sum + r.barcodes.length, 0);
 
+  const captureEntryUrls = (): Array<{ id: string; url: string }> =>
+    useFileStore
+      .getState()
+      .entries.flatMap((e) => (e.processedUrl ? [{ id: e.id, url: e.processedUrl }] : []));
+
+  const claimCapturedEntries = (targets: ReadonlyArray<{ id: string; url: string }>) => {
+    const store = useFileStore.getState();
+    for (const { id, url } of targets) {
+      store.markClaimedById(id, url);
+    }
+  };
+
   const handleCopyOne = async (text: string, globalIdx: number) => {
+    const targets = captureEntryUrls();
     const ok = await copyToClipboard(text);
+    if (ok) {
+      copiedRowsRef.current.add(globalIdx);
+      if (totalBarcodes > 0 && copiedRowsRef.current.size >= totalBarcodes) {
+        claimCapturedEntries(targets);
+      }
+    }
     setRowCopy({ idx: globalIdx, ok });
     later(() => setRowCopy(null), 1500, "rowCopy");
   };
 
   const handleCopyAll = async () => {
+    const targets = captureEntryUrls();
     const allText = results
       .flatMap((r) => r.barcodes.map((b) => `${FORMAT_LABELS[b.type] ?? b.type}: ${b.text}`))
       .join("\n");
     const ok = await copyToClipboard(allText);
+    if (ok) {
+      claimCapturedEntries(targets);
+    }
     setAllCopy(ok ? "copied" : "failed");
     later(() => setAllCopy(null), 2000, "allCopy");
   };
 
   const handleExportCsv = () => {
+    const targets = captureEntryUrls();
     const header = "File,Type,Value\n";
     const rows = results
       .flatMap((r) =>
@@ -413,6 +451,7 @@ export function BarcodeReadSettings() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    claimCapturedEntries(targets);
   };
 
   const hasFile = files.length > 0;

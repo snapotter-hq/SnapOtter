@@ -92,6 +92,7 @@ export function usePipelineProcessor() {
   const activeJobIdRef = useRef<string | null>(null);
   const activeEntryIdRef = useRef<string | null>(null);
   const activeEntryIdsRef = useRef<ReadonlySet<string> | null>(null);
+  const saveModeRef = useRef<"new" | "overwrite">("new");
   const asyncModeRef = useRef(false);
   const sawJobEvidenceRef = useRef(false);
   // Set on the user's cancel click once the server acknowledged it (#771).
@@ -605,8 +606,14 @@ export function usePipelineProcessor() {
                   status: "completed",
                   originalSize: result.originalSize,
                   processedSize: result.processedSize,
-                  ...(result.savedFileId ? { serverFileId: result.savedFileId } : {}),
+                  ...(result.savedFileId && saveModeRef.current === "overwrite"
+                    ? { serverFileId: result.savedFileId }
+                    : {}),
                 });
+                if (result.savedFileId) {
+                  useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
+                  useFileStore.getState().markClaimedById(entryId);
+                }
               }
               clearActiveJob();
               batchRunRef.current = null;
@@ -778,6 +785,10 @@ export function usePipelineProcessor() {
         claimed = true;
         activeEntryIdRef.current = capturedEntryId;
         activeEntryIdsRef.current = runEntryIds;
+        saveModeRef.current = useFileStore.getState().librarySaveMode;
+        if (useFileStore.getState().lastSavedLibraryFileId !== null) {
+          useFileStore.getState().setLastSavedLibraryFileId(null);
+        }
 
         setProcessing(true);
         setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
@@ -938,8 +949,14 @@ export function usePipelineProcessor() {
                     status: "completed",
                     originalSize: result.originalSize,
                     processedSize: result.processedSize,
-                    ...(result.savedFileId ? { serverFileId: result.savedFileId } : {}),
+                    ...(result.savedFileId && saveModeRef.current === "overwrite"
+                      ? { serverFileId: result.savedFileId }
+                      : {}),
                   });
+                  if (result.savedFileId) {
+                    useFileStore.getState().setLastSavedLibraryFileId(result.savedFileId);
+                    useFileStore.getState().markClaimedById(capturedEntryId);
+                  }
                 }
               } catch (cause) {
                 handlingError = { cause };
@@ -1120,6 +1137,9 @@ export function usePipelineProcessor() {
         claimed = true;
         activeEntryIdRef.current = null;
         activeEntryIdsRef.current = runEntryIds;
+        if (useFileStore.getState().lastSavedLibraryFileId !== null) {
+          useFileStore.getState().setLastSavedLibraryFileId(null);
+        }
 
         setProcessing(true);
         setProgress({ phase: "uploading", percent: 0, elapsed: 0 });

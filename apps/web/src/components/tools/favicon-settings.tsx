@@ -84,6 +84,9 @@ export function FaviconSettings() {
   const handleProcess = useCallback(() => {
     if (files.length === 0) return;
 
+    const { entries: startEntries, selectedIndex: capturedIndex } = useFileStore.getState();
+    const capturedEntryId = startEntries[capturedIndex]?.id ?? startEntries[0]?.id;
+
     // The request is made, and the ref set, before the store flag goes up: a throw
     // between the two would leave `processing` set with nothing for the unmount to
     // end (#2304).
@@ -91,13 +94,31 @@ export function FaviconSettings() {
     xhrRef.current = xhr;
 
     flushSync(() => {
-      setBusy(true);
-      setProcessing(true);
-      setError(null);
+      const revoked = new Set<string>();
+      for (const entry of useFileStore.getState().entries) {
+        if (entry.processedUrl) {
+          if (entry.processedUrl.startsWith("blob:")) {
+            revoked.add(entry.processedUrl);
+            URL.revokeObjectURL(entry.processedUrl);
+          }
+          useFileStore.getState().updateEntryById(entry.id, {
+            processedUrl: null,
+            processedPreviewUrl: null,
+            processedFilename: null,
+            status: "pending",
+            error: null,
+          });
+        }
+      }
       if (downloadUrl) {
-        URL.revokeObjectURL(downloadUrl);
+        if (downloadUrl.startsWith("blob:") && !revoked.has(downloadUrl)) {
+          URL.revokeObjectURL(downloadUrl);
+        }
         setDownloadUrl(null);
       }
+      setError(null);
+      setBusy(true);
+      setProcessing(true);
       setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
     });
 
@@ -149,14 +170,30 @@ export function FaviconSettings() {
     };
 
     xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        const blob = xhr.response as Blob;
-        setDownloadUrl(URL.createObjectURL(blob));
-        setProgress((prev) => ({ ...prev, phase: "complete", percent: 100 }));
-      } else {
-        setError(format(t.toolSettings.favicon.generationFailed, { status: xhr.status }));
+      try {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const blob = xhr.response as Blob;
+          const url = URL.createObjectURL(blob);
+          try {
+            if (capturedEntryId) {
+              useFileStore.getState().updateEntryById(capturedEntryId, {
+                processedUrl: url,
+                processedFilename: "favicons.zip",
+                status: "completed",
+              });
+            }
+            setDownloadUrl(url);
+            setProgress((prev) => ({ ...prev, phase: "complete", percent: 100 }));
+          } catch (err) {
+            setError(t.errors.jobTrackingFailed);
+            throw err;
+          }
+        } else {
+          setError(format(t.toolSettings.favicon.generationFailed, { status: xhr.status }));
+        }
+      } finally {
+        cleanup();
       }
-      cleanup();
     };
 
     xhr.onerror = () => {

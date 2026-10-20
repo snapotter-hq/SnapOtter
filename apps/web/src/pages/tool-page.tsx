@@ -886,12 +886,17 @@ function ToolPageContent({
   const displayMode = registryEntry.displayMode;
   const isNoDropzone = displayMode === "no-dropzone";
   const isLivePreview = registryEntry.livePreview ?? false;
-  // A landed result normally swaps the image area for a view of it. interactive-sign
-  // is the exception: renderImageArea keeps the sign canvas either way, and the
-  // result is a download its own settings panel offers. Remounting on a new key
-  // would throw away the signatures the user just placed, and fading the area
-  // back in would flash the page for a view that did not change.
-  const resultOwnsImageArea = hasProcessed && displayMode !== "interactive-sign";
+  // A landed result normally swaps the image area for a view of it and opens
+  // ReviewPanel below the settings. interactive-sign and the three tools that
+  // render their own result inline (ocr, favicon, image-to-pdf) keep the input
+  // view in the main area and offer their own download/copy controls in the
+  // panel (#1111).
+  const panelOwnsResult =
+    displayMode === "interactive-sign" ||
+    toolId === "ocr" ||
+    toolId === "favicon" ||
+    toolId === "image-to-pdf";
+  const resultOwnsImageArea = hasProcessed && !panelOwnsResult;
   // Shared between the mobile and desktop image-area divs so they reconcile in
   // place when useMobile flips at 768px and interactive canvases survive (#2248).
   const imageAreaKey = resultOwnsImageArea
@@ -1003,7 +1008,7 @@ function ToolPageContent({
     // original under the processed filename and size (#746, #1240, #2449).
     if (
       shouldShowConversionCard({
-        hasProcessed,
+        hasProcessed: resultOwnsImageArea,
         isProcessedPreviewable,
         processedUrl,
         processedPreviewUrl,
@@ -1263,7 +1268,7 @@ function ToolPageContent({
     }
 
     if (
-      hasProcessed &&
+      resultOwnsImageArea &&
       originalBlobUrl &&
       (displayMode === "side-by-side" || displayMode === "interactive-crop")
     ) {
@@ -1277,7 +1282,7 @@ function ToolPageContent({
       );
     }
 
-    if (hasProcessed && originalBlobUrl && displayMode === "no-comparison") {
+    if (resultOwnsImageArea && originalBlobUrl && displayMode === "no-comparison") {
       return (
         <ImageViewer
           src={displayUrl}
@@ -1293,7 +1298,12 @@ function ToolPageContent({
     // overlay is an input control (pixelate's selection box) get the opposite
     // treatment: the style simulates nothing, so show the server result and
     // keep the overlay on top for the next region (#713).
-    if (hasProcessed && originalBlobUrl && displayMode === "live-preview" && imageWrapperStyle) {
+    if (
+      resultOwnsImageArea &&
+      originalBlobUrl &&
+      displayMode === "live-preview" &&
+      imageWrapperStyle
+    ) {
       const overlayIsInput = toolId ? LIVE_PREVIEW_INPUT_OVERLAY_TOOLS.has(toolId) : false;
       if (overlayIsInput) {
         // Never substitute the original for the result here: pixelate
@@ -1326,7 +1336,7 @@ function ToolPageContent({
       );
     }
 
-    if (hasProcessed && originalBlobUrl && displayMode === "live-preview") {
+    if (resultOwnsImageArea && originalBlobUrl && displayMode === "live-preview") {
       return (
         <ImageViewer
           src={displayUrl}
@@ -1337,7 +1347,7 @@ function ToolPageContent({
       );
     }
 
-    if (hasProcessed && originalBlobUrl) {
+    if (resultOwnsImageArea && originalBlobUrl) {
       return (
         <BeforeAfterSlider
           beforeSrc={originalBlobUrl}
@@ -1531,7 +1541,7 @@ function ToolPageContent({
           </button>
         )}
 
-        {hasProcessed && (processedSize != null || batchTotal > 1) && (
+        {resultOwnsImageArea && (processedSize != null || batchTotal > 1) && (
           <div className="animate-fade-in">
             <ReviewPanel
               filename={processedFileName}

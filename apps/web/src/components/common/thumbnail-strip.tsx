@@ -43,10 +43,14 @@ const THUMB_H = 76;
 function imageThumbSrc(entry: FileEntry): string | null {
   if (entry.processedPreviewUrl) return entry.processedPreviewUrl;
   if (entry.processedUrl) {
-    const ext =
-      decodeURIComponent(entry.processedUrl).split("?")[0].split(".").pop()?.toLowerCase() ?? "";
+    const source = entry.processedFilename ?? entry.processedUrl;
+    const ext = decodeURIComponent(source).split("?")[0].split(".").pop()?.toLowerCase() ?? "";
     if (BROWSER_IMG_EXTS.has(ext)) return entry.processedUrl;
-    if (entry.processedUrl.startsWith("blob:") && entry.previewKind === "image")
+    if (
+      !entry.processedFilename &&
+      entry.processedUrl.startsWith("blob:") &&
+      entry.previewKind === "image"
+    )
       return entry.processedUrl;
   }
   if (entry.previewKind === "image") return entry.blobUrl;

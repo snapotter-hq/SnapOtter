@@ -914,9 +914,24 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   const [settings, setSettingsState] = useState<Record<string, unknown>>(
     () => removeBgSession.settings,
   );
+  const sameSettings = (a: Record<string, unknown>, b: Record<string, unknown>): boolean => {
+    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+    for (const key of keys) {
+      if (a[key] !== b[key]) return false;
+    }
+    return true;
+  };
   const setSettings = (next: Record<string, unknown>) => {
+    const changed = !sameSettings(removeBgSession.settings, next);
     removeBgSession.settings = next;
     setSettingsState(next);
+    if (changed && bgRemovedRef.current) {
+      const store = useFileStore.getState();
+      const entry = store.entries[store.selectedIndex] ?? store.entries[0];
+      if (entry?.claimed && entry.processedUrl) {
+        store.updateEntryById(entry.id, { processedUrl: entry.processedUrl });
+      }
+    }
   };
   const setControls = (next: RemoveBgControlState) => {
     removeBgSession.controls = next;
@@ -926,7 +941,6 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   const [bgJobId, setBgJobId] = useState<string | null>(null);
   const [bgFilename, setBgFilename] = useState<string | null>(null);
   const [bgOriginalUrl, setBgOriginalUrl] = useState<string | null>(null);
-  const [_effectsDownloadUrl, setEffectsDownloadUrl] = useState<string | null>(null);
 
   // The file a finished removal belongs to, and the file the running one was
   // started on. The result only counts while that file is the one loaded:
@@ -1145,7 +1159,6 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     setBgJobId(null);
     setBgFilename(null);
     setBgOriginalUrl(null);
-    setEffectsDownloadUrl(null);
     setEffectsError(null);
 
     if (files.length > 1) {
@@ -1248,6 +1261,8 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     // the effects request is the FINAL step, so it carries the save choice.
     const { entries, selectedIndex, librarySaveMode } = useFileStore.getState();
     const capturedEntry = entries[selectedIndex];
+    const expectedProcessedUrl = capturedEntry?.processedUrl ?? undefined;
+    const settingsAtStart = { ...removeBgSession.settings };
 
     setApplyingEffects(true);
     setEffectsError(null);
@@ -1309,7 +1324,9 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
       }
 
       const result = resolveServerUrls(await response.json());
-      setEffectsDownloadUrl(result.downloadUrl);
+      if (typeof result?.downloadUrl !== "string" || !result.downloadUrl) {
+        throw new Error(t.errors.invalidResponse);
+      }
       setEffectsError(null);
 
       // Surface the "saved to your files" indicator and, on overwrite,
@@ -1329,6 +1346,9 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      if (capturedEntry?.id && sameSettings(removeBgSession.settings, settingsAtStart)) {
+        useFileStore.getState().markClaimedById(capturedEntry.id, expectedProcessedUrl);
+      }
     } catch (err) {
       const live = useFileStore.getState().files;
       if (live.length === 1 && live[0] === files[0] && bgRemovedRef.current) {
