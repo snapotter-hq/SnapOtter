@@ -1,3 +1,4 @@
+import { isSafeMessageError, isToolInputError, type SafeError } from "@snapotter/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock sharp
@@ -610,5 +611,82 @@ describe("seamCarve", () => {
     const paths = writeCalls.map((c) => c[0] as string);
     // Each call generates a different UUID in the filename
     expect(paths[0]).not.toBe(paths[1]);
+  });
+
+  it("rejects target pixel count exceeding 25 MP with ToolInputError before spawning caire (#2997)", async () => {
+    const { seamCarve } = await importFresh();
+    vi.mocked(sharp).mockImplementation(
+      () =>
+        ({
+          png: vi.fn().mockReturnThis(),
+          jpeg: vi.fn().mockReturnThis(),
+          resize: vi.fn().mockReturnThis(),
+          toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-jpeg-data")),
+          // 5000x4000 = 20 MP input: width 6250 (1.25x) gives 25,000,000 pixels (exact limit),
+          // while width 6251 gives 25,004,000 pixels and width 8000 gives 32,000,000 pixels.
+          metadata: vi.fn().mockResolvedValue({ width: 5000, height: 4000 }),
+        }) as unknown as ReturnType<typeof sharp>,
+    );
+
+    await expect(seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR, { width: 6250 })).resolves.toBeDefined();
+
+    mockExecFileAsync.mockClear();
+    const overBoundary = seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR, { width: 6251 });
+    await expect(overBoundary).rejects.toSatisfy(isToolInputError);
+    await expect(overBoundary).rejects.toThrow(/6251 x 4000.*25000000/);
+
+    const run = seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR, { width: 8000 });
+    await expect(run).rejects.toSatisfy(isToolInputError);
+    await expect(run).rejects.toThrow(/8000 x 4000.*25000000/);
+
+    const caireCalls = mockExecFileAsync.mock.calls.filter(
+      (c: unknown[]) => Array.isArray(c[1]) && c[1].includes("-preview=false"),
+    );
+    expect(caireCalls).toHaveLength(0);
+  });
+
+  it("rejects seam-insertion enlargement beyond 2x on either axis with ToolInputError (#2997)", async () => {
+    const { seamCarve } = await importFresh();
+    // Default metadata is 800x600: 1600x1200 (2x) is allowed, 1601 width or 1201 height is rejected
+    await expect(
+      seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR, { width: 1600, height: 1200 }),
+    ).resolves.toBeDefined();
+
+    mockExecFileAsync.mockClear();
+    const overWidth = seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR, { width: 1601 });
+    await expect(overWidth).rejects.toSatisfy(isToolInputError);
+    await expect(overWidth).rejects.toThrow(/at most 2x.*1601 x 600.*800 x 600/);
+
+    const overHeight = seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR, { height: 1201 });
+    await expect(overHeight).rejects.toSatisfy(isToolInputError);
+    await expect(overHeight).rejects.toThrow(/at most 2x.*800 x 1201.*800 x 600/);
+
+    const caireCalls = mockExecFileAsync.mock.calls.filter(
+      (c: unknown[]) => Array.isArray(c[1]) && c[1].includes("-preview=false"),
+    );
+    expect(caireCalls).toHaveLength(0);
+  });
+
+  it("throws an operational SafeError when caire is killed on timeout (#2997)", async () => {
+    const { seamCarve } = await importFresh();
+    const killedErr = Object.assign(new Error("Command failed: caire"), { killed: true });
+    mockExecFileAsync
+      .mockResolvedValueOnce({ stdout: "", stderr: "" })
+      .mockRejectedValueOnce(killedErr);
+
+    const err = await seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR, { width: 400 }).then(
+      () => null,
+      (e: unknown) => e,
+    );
+
+    expect(isSafeMessageError(err)).toBe(true);
+    expect((err as SafeError).name).toBe("SafeError");
+    expect((err as SafeError).kind).toBe("operational");
+    expect((err as SafeError).code).toBe("PROCESSING_TIMEOUT");
+    expect((err as SafeError).statusCode).toBe(422);
+    expect((err as SafeError).message).toBe(
+      "Content-aware resize timed out on this image. Try a smaller image or a larger target size.",
+    );
+    expect((err as SafeError).cause).toBe(killedErr);
   });
 });

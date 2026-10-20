@@ -643,7 +643,13 @@ describe("Content-Aware Resize", () => {
     ],
     ["huge width", { width: 100_000_000 }],
     ["huge height", { height: 100_000_000 }],
-  ])("rejects %s with 400 (#2204)", async (_label, settings) => {
+    ["pair over the 25 MP pixel limit", { width: 5000, height: 5001 }],
+    ["8192 x 8192 pair over the 25 MP pixel limit", { width: 8192, height: 8192 }],
+    [
+      "both dimensions at the resize ceiling",
+      { width: MAX_RESIZE_OUTPUT_DIMENSION, height: MAX_RESIZE_OUTPUT_DIMENSION },
+    ],
+  ])("rejects %s with 400 (#2204, #2997)", async (_label, settings) => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
       { name: "settings", content: JSON.stringify(settings) },
@@ -702,5 +708,30 @@ describe("Content-Aware Resize", () => {
 
     // No settings means no width/height/square => 400
     expect(res.statusCode).toBe(400);
+  });
+
+  it("rejects pipeline step with empty content-aware-resize settings at ingress (#2997)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      {
+        name: "pipeline",
+        content: JSON.stringify({
+          steps: [{ toolId: "content-aware-resize", settings: {} }],
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/pipeline/execute",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/invalid settings/i);
   });
 });

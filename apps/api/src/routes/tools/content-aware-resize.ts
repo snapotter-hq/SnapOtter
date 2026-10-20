@@ -26,14 +26,36 @@ import { registerToolProcessFn } from "../tool-factory.js";
 
 // caire's -width/-height/-blur/-sobel flags are integer-only; a fractional
 // value makes the binary exit with a flag parse error.
-const settingsSchema = z.object({
-  width: z.number().int().positive().max(MAX_RESIZE_OUTPUT_DIMENSION).optional(),
-  height: z.number().int().positive().max(MAX_RESIZE_OUTPUT_DIMENSION).optional(),
-  protectFaces: z.boolean().default(false),
-  blurRadius: z.number().int().min(0).max(20).default(4),
-  sobelThreshold: z.number().int().min(1).max(20).default(2),
-  square: z.boolean().default(false),
-});
+const MAX_SEAM_CARVE_PIXELS = 25_000_000;
+const MISSING_DIMENSIONS_MESSAGE = "Either width, height, or square mode must be specified";
+
+const settingsSchema = z
+  .object({
+    width: z.number().int().positive().max(MAX_RESIZE_OUTPUT_DIMENSION).optional(),
+    height: z.number().int().positive().max(MAX_RESIZE_OUTPUT_DIMENSION).optional(),
+    protectFaces: z.boolean().default(false),
+    blurRadius: z.number().int().min(0).max(20).default(4),
+    sobelThreshold: z.number().int().min(1).max(20).default(2),
+    square: z.boolean().default(false),
+  })
+  .superRefine((s, ctx) => {
+    if (!s.square && s.width === undefined && s.height === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        message: MISSING_DIMENSIONS_MESSAGE,
+      });
+      return;
+    }
+    if (s.square || s.width === undefined || s.height === undefined) return;
+    if (s.width > MAX_RESIZE_OUTPUT_DIMENSION || s.height > MAX_RESIZE_OUTPUT_DIMENSION) return;
+    if (s.width * s.height > MAX_SEAM_CARVE_PIXELS) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["width"],
+        message: `Target size ${s.width} x ${s.height} is over the ${MAX_SEAM_CARVE_PIXELS} pixel limit`,
+      });
+    }
+  });
 
 type Settings = z.infer<typeof settingsSchema>;
 
@@ -97,20 +119,18 @@ export function registerContentAwareResize(app: FastifyInstance) {
         const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
         const result = settingsSchema.safeParse(parsed);
         if (!result.success) {
+          const issues = result.error.issues;
+          if (issues.length === 1 && issues[0]?.message === MISSING_DIMENSIONS_MESSAGE) {
+            return reply.status(400).send({ error: MISSING_DIMENSIONS_MESSAGE });
+          }
           return reply.status(400).send({
             error: "Invalid settings",
-            details: formatZodErrors(result.error.issues),
+            details: formatZodErrors(issues),
           });
         }
         settings = result.data;
       } catch {
         return reply.status(400).send({ error: "Settings must be valid JSON" });
-      }
-
-      if (!settings.square && !settings.width && !settings.height) {
-        return reply.status(400).send({
-          error: "Either width, height, or square mode must be specified",
-        });
       }
 
       try {

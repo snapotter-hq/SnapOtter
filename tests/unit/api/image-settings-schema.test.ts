@@ -59,8 +59,8 @@ describe("Sharp-backed image settings schemas", () => {
   it.each([
     ["content-aware-resize", { width: 100.5 }],
     ["content-aware-resize", { height: 80.25 }],
-    ["content-aware-resize", { blurRadius: 2.5 }],
-    ["content-aware-resize", { sobelThreshold: 10.5 }],
+    ["content-aware-resize", { width: 100, blurRadius: 2.5 }],
+    ["content-aware-resize", { width: 100, sobelThreshold: 10.5 }],
     ["optimize-for-web", { maxWidth: 640.5 }],
     ["optimize-for-web", { maxHeight: Number.POSITIVE_INFINITY }],
     ["split", { columns: 2.5 }],
@@ -86,19 +86,50 @@ describe("Sharp-backed image settings schemas", () => {
     expect(parses("optimize-for-web", { maxWidth: 100_000_001 })).toBe(false);
   });
 
-  it("bounds content-aware-resize dimensions by the resize ceiling (#2204)", () => {
+  it("bounds content-aware-resize dimensions by the resize ceiling and 25 MP pixel limit (#2204, #2997)", () => {
+    expect(parses("content-aware-resize", {})).toBe(false);
+    expect(parses("content-aware-resize", { protectFaces: true })).toBe(false);
+    expect(parses("content-aware-resize", { square: true })).toBe(true);
     expect(parses("content-aware-resize", { width: MAX_RESIZE_OUTPUT_DIMENSION })).toBe(true);
     expect(parses("content-aware-resize", { height: MAX_RESIZE_OUTPUT_DIMENSION })).toBe(true);
+    expect(parses("content-aware-resize", { width: 5000, height: 5000 })).toBe(true);
+    expect(parses("content-aware-resize", { width: 5000, height: 5001 })).toBe(false);
+    expect(parses("content-aware-resize", { width: 8192, height: 8192 })).toBe(false);
     expect(
       parses("content-aware-resize", {
         width: MAX_RESIZE_OUTPUT_DIMENSION,
         height: MAX_RESIZE_OUTPUT_DIMENSION,
+      }),
+    ).toBe(false);
+    expect(
+      parses("content-aware-resize", {
+        width: MAX_RESIZE_OUTPUT_DIMENSION,
+        height: MAX_RESIZE_OUTPUT_DIMENSION,
+        square: true,
       }),
     ).toBe(true);
     expect(parses("content-aware-resize", { width: MAX_RESIZE_OUTPUT_DIMENSION + 1 })).toBe(false);
     expect(parses("content-aware-resize", { height: MAX_RESIZE_OUTPUT_DIMENSION + 1 })).toBe(false);
     expect(parses("content-aware-resize", { width: 100_000_000 })).toBe(false);
     expect(parses("content-aware-resize", { height: 100_000_000 })).toBe(false);
+
+    const config = getToolConfig("content-aware-resize");
+    if (!config) throw new Error("content-aware-resize must be registered");
+    const overPixels = config.settingsSchema.safeParse({ width: 5000, height: 5001 });
+    expect(overPixels.success).toBe(false);
+    if (!overPixels.success) {
+      expect(overPixels.error.message).toMatch(/5000 x 5001.*25000000 pixel limit/);
+    }
+
+    const overSide = config.settingsSchema.safeParse({
+      width: MAX_RESIZE_OUTPUT_DIMENSION + 1,
+      height: 2000,
+    });
+    expect(overSide.success).toBe(false);
+    if (!overSide.success) {
+      expect(overSide.error.issues).toHaveLength(1);
+      expect(overSide.error.message).not.toMatch(/pixel limit/i);
+    }
   });
 
   it("rejects a non-finite resize percentage", () => {

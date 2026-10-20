@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import { SafeError, ToolInputError } from "@snapotter/shared";
 import sharp from "sharp";
 
 const execFileAsync = promisify(execFile);
@@ -85,6 +86,23 @@ export async function seamCarve(
       targetH = shortest;
     }
 
+    const MAX_PIXELS = MAX_MP * 1_000_000;
+    if (targetW * targetH > MAX_PIXELS) {
+      throw new ToolInputError(
+        `Target size ${targetW} x ${targetH} is over the ${MAX_PIXELS} pixel (${MAX_MP} MP) limit for content-aware resize`,
+      );
+    }
+
+    const MAX_ENLARGE_RATIO = 2;
+    if (
+      (width > 0 && targetW > width * MAX_ENLARGE_RATIO) ||
+      (height > 0 && targetH > height * MAX_ENLARGE_RATIO)
+    ) {
+      throw new ToolInputError(
+        `Content-aware resize can enlarge each side by at most ${MAX_ENLARGE_RATIO}x (requested ${targetW} x ${targetH} from ${width} x ${height})`,
+      );
+    }
+
     const wRatio = targetW / width;
     const hRatio = targetH / height;
 
@@ -137,9 +155,9 @@ export async function seamCarve(
       // Replace the raw caire terminal output (ANSI/spinner control chars) with
       // an actionable message; keep the original as `cause` for server logs.
       if ((err as { killed?: boolean }).killed) {
-        throw new Error(
+        throw new SafeError(
           "Content-aware resize timed out on this image. Try a smaller image or a larger target size.",
-          { cause: err },
+          { kind: "operational", code: "PROCESSING_TIMEOUT", statusCode: 422, cause: err },
         );
       }
       throw err;
