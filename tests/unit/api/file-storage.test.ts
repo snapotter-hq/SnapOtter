@@ -41,6 +41,7 @@ const diskState = vi.hoisted(() => ({
   failStatfsWith: "",
   failMkdirWith: "",
   failOpenWith: "",
+  failReadFileWith: "",
   failWriteMidway: false as boolean | string,
   failRenameWith: "",
   failUnlink: false as boolean | string,
@@ -59,6 +60,10 @@ vi.mock("node:fs/promises", async (importOriginal) => {
     mkdir: async (...args: Parameters<typeof actual.mkdir>) => {
       if (diskState.failMkdirWith) throw errno(diskState.failMkdirWith);
       return actual.mkdir(...args);
+    },
+    readFile: async (...args: Parameters<typeof actual.readFile>) => {
+      if (diskState.failReadFileWith) throw errno(diskState.failReadFileWith);
+      return actual.readFile(...args);
     },
     open: async (...args: Parameters<typeof actual.open>) => {
       const [path, flags] = args;
@@ -120,6 +125,7 @@ afterEach(async () => {
   diskState.failStatfsWith = "";
   diskState.failMkdirWith = "";
   diskState.failOpenWith = "";
+  diskState.failReadFileWith = "";
   diskState.failWriteMidway = false;
   diskState.failRenameWith = "";
   diskState.failUnlink = false;
@@ -436,6 +442,52 @@ describe("thumbnail functions", () => {
     const result = await getCachedThumbnail("nope.png");
     expect(result).toBeNull();
   });
+
+  const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
+  it.skipIf(isRoot)(
+    "getCachedThumbnail rejects with EACCES when the cached thumbnail is unreadable (#2836)",
+    async () => {
+      const { saveThumbnail, getCachedThumbnail } = await importModule();
+      await saveThumbnail("photo.png", Buffer.from("jpg"));
+      const thumbFile = join(testDir, ".thumbs", "photo.png.thumb.jpg");
+      await chmod(thumbFile, 0o000);
+      try {
+        const err = (await getCachedThumbnail("photo.png").then(
+          () => null,
+          (e: unknown) => e,
+        )) as NodeJS.ErrnoException | null;
+        expect(err).toBeInstanceOf(Error);
+        expect(err?.code).toBe("EACCES");
+      } finally {
+        await chmod(thumbFile, 0o644).catch(() => {});
+      }
+    },
+  );
+
+  it("getCachedThumbnail rejects with EISDIR when the cached thumbnail path is a directory (#2836)", async () => {
+    const { getCachedThumbnail } = await importModule();
+    await mkdir(join(testDir, ".thumbs", "photo.png.thumb.jpg"), { recursive: true });
+    const err = (await getCachedThumbnail("photo.png").then(
+      () => null,
+      (e: unknown) => e,
+    )) as NodeJS.ErrnoException | null;
+    expect(err).toBeInstanceOf(Error);
+    expect(err?.code).toBe("EISDIR");
+  });
+
+  it.each(["EACCES", "EPERM", "EIO", "EISDIR", "ENOTDIR"] as const)(
+    "getCachedThumbnail rethrows %s from readFile instead of returning null (#2836)",
+    async (code) => {
+      diskState.failReadFileWith = code;
+      const { getCachedThumbnail } = await importModule();
+      const err = (await getCachedThumbnail("photo.png").then(
+        () => null,
+        (e: unknown) => e,
+      )) as NodeJS.ErrnoException | null;
+      expect(err).toBeInstanceOf(Error);
+      expect(err?.code).toBe(code);
+    },
+  );
 
   it("deleteThumbnail removes the file", async () => {
     const { saveThumbnail, deleteThumbnail } = await importModule();

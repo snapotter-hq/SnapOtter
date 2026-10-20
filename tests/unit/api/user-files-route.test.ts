@@ -860,6 +860,22 @@ describe("user files route logic", () => {
           ),
         ).rejects.toBe(invalidName);
         expect(mocks.readStoredFile).not.toHaveBeenCalled();
+
+        for (const code of ["EACCES", "EISDIR", "EIO"] as const) {
+          const localErr = Object.assign(new Error(`${code}: local thumbnail read fault`), {
+            code,
+            syscall: "open",
+          });
+          mocks.getCachedThumbnail.mockRejectedValueOnce(localErr);
+          await expect(
+            thumbnailHandler(
+              { params: { id: row.id }, log: { warn: vi.fn(), error: vi.fn() } },
+              makeReply(),
+            ),
+          ).rejects.toBe(localErr);
+          expect(mocks.readStoredFile).not.toHaveBeenCalled();
+          expect(mocks.saveThumbnail).not.toHaveBeenCalled();
+        }
       });
 
       it("normalizes S3 read faults from getCachedThumbnail and readStoredFile into a 503 storage-unavailable SafeError (#2808)", async () => {

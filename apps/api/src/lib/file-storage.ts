@@ -325,8 +325,9 @@ export async function getCachedThumbnail(storedName: string): Promise<Buffer | n
   }
   try {
     return await readFile(thumbPath(storedName));
-  } catch {
-    return null;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException | null)?.code === "ENOENT") return null;
+    throw err;
   }
 }
 

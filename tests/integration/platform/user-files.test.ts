@@ -6,6 +6,7 @@
  */
 
 import { chmod, unlink } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
@@ -563,6 +564,54 @@ describe("Thumbnail generation", () => {
         expect(res.statusCode).toBe(500);
       } finally {
         await chmod(blobPath, 0o644);
+      }
+    },
+  );
+
+  it.skipIf(isRoot)(
+    "returns 500, not a regenerated 200 cache miss, when the cached thumbnail is unreadable (#2836)",
+    async () => {
+      const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+        {
+          name: "file",
+          filename: "locked-cached-thumb.png",
+          contentType: "image/png",
+          content: PNG,
+        },
+      ]);
+
+      const uploadRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/files/upload",
+        headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+        body: uploadBody,
+      });
+
+      const fileId = JSON.parse(uploadRes.body).files[0].id;
+
+      const [row] = await db
+        .select({ storedName: schema.userFiles.storedName })
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.id, fileId));
+      const { saveThumbnail } = await import("../../../apps/api/src/lib/file-storage.js");
+      await saveThumbnail(row.storedName, TINY_PNG);
+      const cachedThumbPath = join(
+        dirname(getStoredFilePath(row.storedName)),
+        ".thumbs",
+        `${row.storedName}.thumb.jpg`,
+      );
+      await chmod(cachedThumbPath, 0o000);
+
+      try {
+        const res = await app.inject({
+          method: "GET",
+          url: `/api/v1/files/${fileId}/thumbnail`,
+          headers: { authorization: `Bearer ${adminToken}` },
+        });
+
+        expect(res.statusCode).toBe(500);
+      } finally {
+        await chmod(cachedThumbPath, 0o644);
       }
     },
   );
