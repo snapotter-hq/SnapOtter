@@ -22,6 +22,9 @@ const { db, schema } = await import("../../../apps/api/src/db/index.js");
 const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js");
 const { decrypt, encrypt } = await import("../../../apps/api/src/lib/encryption.js");
 const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+const { hashRecoveryCodes, verifyRecoveryCode } = await import(
+  "../../../apps/api/src/plugins/mfa.js"
+);
 
 import type { TestApp } from "../test-server.js";
 
@@ -35,10 +38,15 @@ let adminId: string;
 const originalKey = env.DATA_ENCRYPTION_KEY;
 const originalPreviousKey = env.DATA_ENCRYPTION_KEY_PREVIOUS;
 
-async function setAdminMfa(totpEnabled: boolean): Promise<void> {
+async function setAdminMfa(totpEnabled: boolean, recoveryCodes?: string[]): Promise<void> {
   await db
     .update(schema.users)
-    .set({ totpSecret: await encrypt(SECRET, KEY_A), totpEnabled, updatedAt: new Date() })
+    .set({
+      totpSecret: await encrypt(SECRET, KEY_A),
+      totpEnabled,
+      recoveryCodesHash: recoveryCodes ? hashRecoveryCodes(recoveryCodes) : null,
+      updatedAt: new Date(),
+    })
     .where(eq(schema.users.id, adminId));
 }
 
@@ -407,5 +415,132 @@ describe("MFA routes when the stored TOTP secret can't be decrypted (#2020)", ()
       .from(schema.users)
       .where(eq(schema.users.id, adminId));
     expect(replacedRow.totpSecret).toBe(newerSecret);
+  });
+
+  it("POST /api/auth/mfa/complete accepts a valid recovery code when the TOTP secret cannot be decrypted, and still returns 500 for a wrong recovery code (#2034)", async () => {
+    await db.delete(schema.auditLog).where(eq(schema.auditLog.action, "MFA_RECOVERY_USED"));
+    const recoveryCodes = ["a3f9c01b", "d4e8f12a"];
+    await setAdminMfa(true, recoveryCodes);
+    const mfaToken = randomUUID();
+    await sharedRedis().set(`mfa:${mfaToken}`, adminId, "EX", 60);
+    await sharedRedis().set(`mfa:attempts:${mfaToken}`, "1", "EX", 60);
+
+    // A wrong recovery code falls through to TOTP verification, which cannot
+    // decrypt the secret and returns 500 DECRYPTION_FAILED while preserving the
+    // challenge and recovery codes.
+    const wrongRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: "deadbeef" },
+    });
+    expect(wrongRes.statusCode).toBe(500);
+    expect(JSON.parse(wrongRes.body).code).toBe("DECRYPTION_FAILED");
+    expectReportedAsOperational("/api/auth/mfa/complete");
+    expect(await sharedRedis().get(`mfa:${mfaToken}`)).toBe(adminId);
+    expect(await sharedRedis().get(`mfa:attempts:${mfaToken}`)).toBe("1");
+
+    reportErrorSpy.mockClear();
+    logError.mockClear();
+
+    // A valid recovery code succeeds without touching the undecryptable TOTP secret.
+    const okRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken, code: "A3F9-C01B" },
+    });
+    expect(okRes.statusCode).toBe(200);
+    const body = JSON.parse(okRes.body);
+    expect(body.token).toBeDefined();
+    expect(body.user.id).toBe(adminId);
+    expect(reportErrorSpy).not.toHaveBeenCalled();
+    expect(logError).not.toHaveBeenCalled();
+    expect(await sharedRedis().get(`mfa:${mfaToken}`)).toBeNull();
+    expect(await sharedRedis().get(`mfa:attempts:${mfaToken}`)).toBeNull();
+
+    // The used recovery code is consumed, the remaining recovery code is preserved,
+    // and MFA_RECOVERY_USED is recorded in the audit log.
+    const [afterUser] = await db
+      .select({ recoveryCodesHash: schema.users.recoveryCodesHash })
+      .from(schema.users)
+      .where(eq(schema.users.id, adminId));
+    expect(verifyRecoveryCode("a3f9c01b", afterUser.recoveryCodesHash ?? "").valid).toBe(false);
+    expect(verifyRecoveryCode("d4e8f12a", afterUser.recoveryCodesHash ?? "").valid).toBe(true);
+
+    const recoveryAudits = await db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "MFA_RECOVERY_USED"));
+    expect(recoveryAudits).toHaveLength(1);
+    expect(recoveryAudits[0].details).toMatchObject({ userId: adminId, username: "admin" });
+
+    // Re-submitting the already-spent recovery code on a new challenge no longer
+    // matches recoveryCodesHash and falls through to 500 DECRYPTION_FAILED.
+    const secondToken = randomUUID();
+    await sharedRedis().set(`mfa:${secondToken}`, adminId, "EX", 60);
+    const spentRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken: secondToken, code: "a3f9c01b" },
+    });
+    expect(spentRes.statusCode).toBe(500);
+    expect(JSON.parse(spentRes.body).code).toBe("DECRYPTION_FAILED");
+    expectReportedAsOperational("/api/auth/mfa/complete");
+    await sharedRedis().del(`mfa:${secondToken}`);
+  });
+
+  it("POST /api/auth/mfa/complete returns 401 INVALID_CODE (not 500 DECRYPTION_FAILED) when a recovery code loses a concurrent-spend race while the TOTP secret cannot be decrypted (#2034)", async () => {
+    await db.delete(schema.auditLog).where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+    await setAdminMfa(true, ["a3f9c01b"]);
+    const [staleUser] = await db.select().from(schema.users).where(eq(schema.users.id, adminId));
+
+    // Simulate another login spending the recovery code right after this request
+    // reads dbUser, before consumeRecoveryCode's conditional update runs.
+    await db
+      .update(schema.users)
+      .set({ recoveryCodesHash: null, updatedAt: new Date() })
+      .where(eq(schema.users.id, adminId));
+
+    const originalSelect = db.select.bind(db);
+    const selectSpy = vi.spyOn(db, "select").mockImplementationOnce((...args: unknown[]) => {
+      if (args.length === 0) {
+        return {
+          from: () => ({
+            where: async () => [staleUser],
+          }),
+        } as unknown as ReturnType<typeof db.select>;
+      }
+      // biome-ignore lint/suspicious/noExplicitAny: passthrough to overloaded select
+      return (originalSelect as any)(...args);
+    });
+
+    const mfaToken = randomUUID();
+    await sharedRedis().set(`mfa:${mfaToken}`, adminId, "EX", 60);
+    try {
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code: "a3f9c01b" },
+      });
+      expect(res.statusCode).toBe(401);
+      expect(JSON.parse(res.body).code).toBe("INVALID_CODE");
+      expect(reportErrorSpy).not.toHaveBeenCalled();
+      expect(logError).not.toHaveBeenCalled();
+      expect(await sharedRedis().get(`mfa:${mfaToken}`)).toBe(adminId);
+      expect(await sharedRedis().get(`mfa:attempts:${mfaToken}`)).toBe("1");
+
+      const failedAudits = await db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.action, "MFA_VERIFY_FAILED"));
+      expect(failedAudits).toHaveLength(1);
+      expect(failedAudits[0].details).toMatchObject({
+        userId: adminId,
+        username: "admin",
+        reason: "recovery_code_spent_concurrently",
+      });
+    } finally {
+      selectSpy.mockRestore();
+      await sharedRedis().del(`mfa:${mfaToken}`, `mfa:attempts:${mfaToken}`);
+    }
   });
 });

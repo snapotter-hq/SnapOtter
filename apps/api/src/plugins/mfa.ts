@@ -845,21 +845,9 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           });
         }
 
-        // Decrypt the stored secret
-        secretBase32 = await decryptSecret(userId, dbUser.totpSecret);
-        if (!secretBase32) {
-          await restoreMfaChallenge(redis, challengeKey, claimed);
-          return replyDecryptionFailed(request, reply, userId);
-        }
-
-        // Try TOTP code first (atomically refusing a replayed or earlier time step)
-        claimedStep = await claimTotpStep(redis, userId, secretBase32, code);
-        if (claimedStep) {
-          verified = true;
-        }
-
-        // Try recovery code if TOTP failed
-        if (!verified && dbUser.recoveryCodesHash) {
+        // Try recovery code first so a user can still sign in when the stored
+        // TOTP secret cannot be decrypted (#2034).
+        if (dbUser.recoveryCodesHash) {
           const outcome = await consumeRecoveryCode(userId, code, dbUser.recoveryCodesHash);
           if (outcome === "consumed") {
             verified = true;
@@ -867,6 +855,21 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           } else if (outcome === "spent_concurrently") {
             recoveryRace = true;
             logger.warn({ userId }, "A recovery code was used by two logins at once; refusing one");
+          }
+        }
+
+        if (!verified && !recoveryRace) {
+          // Decrypt the stored secret
+          secretBase32 = await decryptSecret(userId, dbUser.totpSecret);
+          if (!secretBase32) {
+            await restoreMfaChallenge(redis, challengeKey, claimed);
+            return replyDecryptionFailed(request, reply, userId);
+          }
+
+          // Try TOTP code (atomically refusing a replayed or earlier time step)
+          claimedStep = await claimTotpStep(redis, userId, secretBase32, code);
+          if (claimedStep) {
+            verified = true;
           }
         }
       } catch (err) {
