@@ -28,7 +28,9 @@ vi.mock("@/lib/image-preview", () => ({
 
 import { I18nProvider } from "@/contexts/i18n-context";
 import { ToolPage } from "@/pages/tool-page";
+import { useFeaturesStore } from "@/stores/features-store";
 import { useFileStore } from "@/stores/file-store";
+import { useSettingsStore } from "@/stores/settings-store";
 
 const storageMap = new Map<string, string>();
 const localStorageMock = {
@@ -86,13 +88,17 @@ beforeEach(() => {
     ),
   );
   useFileStore.getState().reset();
+  useSettingsStore.setState({ disabledTools: [], loaded: true, loadError: false });
+  useFeaturesStore.setState({ bundles: [], loaded: false, loadError: false });
 });
 
 afterEach(() => {
   cleanup();
-  useFileStore.getState().reset();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  useFileStore.getState().reset();
+  useSettingsStore.setState({ disabledTools: [], loaded: false, loadError: false });
+  useFeaturesStore.setState({ bundles: [], loaded: false, loadError: false });
 });
 
 describe("ToolPage unsupported file paste and drop (#2305)", () => {
@@ -314,6 +320,255 @@ describe("ToolPage unsupported file paste and drop (#2305)", () => {
     });
     expect(toastErrorSpy).not.toHaveBeenCalled();
     expect(useFileStore.getState().files).toEqual([initialPng]);
+  });
+});
+
+describe("ToolPage document paste readiness gate (#2844)", () => {
+  it("ignores file pastes on an unknown 404 tool route without loading files or showing a toast", async () => {
+    await act(async () => {
+      renderToolPage("/image/nonexistent");
+    });
+    expect(screen.getByText(en.toolPage.notFound)).toBeTruthy();
+
+    const png = new File(["png-bytes"], "photo.png", { type: "image/png" });
+    const event = makePasteEvent({ files: [png] });
+    act(() => {
+      document.dispatchEvent(event);
+    });
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(toastErrorSpy).not.toHaveBeenCalled();
+    expect(toastInfoSpy).not.toHaveBeenCalled();
+    expect(useFileStore.getState().files).toEqual([]);
+  });
+
+  it("ignores supported and unsupported file pastes when the tool is disabled by admin", async () => {
+    useSettingsStore.setState({ disabledTools: ["resize"], loaded: true, loadError: false });
+    await act(async () => {
+      renderToolPage("/image/resize");
+    });
+    expect(screen.getByText(en.toolPage.disabledByAdmin)).toBeTruthy();
+
+    const png = new File(["png-bytes"], "photo.png", { type: "image/png" });
+    const supportedPaste = makePasteEvent({ files: [png] });
+    act(() => {
+      document.dispatchEvent(supportedPaste);
+    });
+
+    const txt = new File(["hello"], "notes.txt", { type: "text/plain" });
+    const unsupportedPaste = makePasteEvent({ files: [txt] });
+    act(() => {
+      document.dispatchEvent(unsupportedPaste);
+    });
+
+    expect(supportedPaste.defaultPrevented).toBe(false);
+    expect(unsupportedPaste.defaultPrevented).toBe(false);
+    expect(toastErrorSpy).not.toHaveBeenCalled();
+    expect(toastInfoSpy).not.toHaveBeenCalled();
+    expect(useFileStore.getState().files).toEqual([]);
+  });
+
+  it("ignores file pastes while an AI tool is still loading feature bundle state", async () => {
+    useFeaturesStore.setState({ bundles: [], loaded: false, loadError: false });
+    vi.spyOn(useFeaturesStore.getState(), "fetch").mockResolvedValue(undefined);
+
+    await act(async () => {
+      renderToolPage("/image/remove-background");
+    });
+    expect(screen.getByText(en.common.loading)).toBeTruthy();
+
+    const png = new File(["png-bytes"], "photo.png", { type: "image/png" });
+    const supportedPaste = makePasteEvent({ files: [png] });
+    act(() => {
+      document.dispatchEvent(supportedPaste);
+    });
+
+    const txt = new File(["hello"], "notes.txt", { type: "text/plain" });
+    const unsupportedPaste = makePasteEvent({ files: [txt] });
+    act(() => {
+      document.dispatchEvent(unsupportedPaste);
+    });
+
+    expect(supportedPaste.defaultPrevented).toBe(false);
+    expect(unsupportedPaste.defaultPrevented).toBe(false);
+    expect(toastErrorSpy).not.toHaveBeenCalled();
+    expect(toastInfoSpy).not.toHaveBeenCalled();
+    expect(useFileStore.getState().files).toEqual([]);
+  });
+
+  it("ignores supported and unsupported file pastes when an AI tool bundle is not installed, then accepts pastes once installed", async () => {
+    useFeaturesStore.setState({
+      loaded: true,
+      loadError: false,
+      bundles: [
+        {
+          id: "background-removal",
+          name: "Background Removal",
+          description: "Remove backgrounds",
+          estimatedSize: "170 MB",
+          enablesTools: ["remove-background"],
+          status: "not_installed",
+          installedVersion: null,
+          progress: null,
+          error: null,
+        },
+      ],
+    });
+    vi.spyOn(useFeaturesStore.getState(), "fetch").mockResolvedValue(undefined);
+
+    await act(async () => {
+      renderToolPage("/image/remove-background");
+    });
+
+    const png = new File(["png-bytes"], "photo.png", { type: "image/png" });
+    const supportedPaste = makePasteEvent({ files: [png] });
+    act(() => {
+      document.dispatchEvent(supportedPaste);
+    });
+
+    const txt = new File(["hello"], "notes.txt", { type: "text/plain" });
+    const unsupportedPaste = makePasteEvent({ files: [txt] });
+    act(() => {
+      document.dispatchEvent(unsupportedPaste);
+    });
+
+    expect(supportedPaste.defaultPrevented).toBe(false);
+    expect(unsupportedPaste.defaultPrevented).toBe(false);
+    expect(toastErrorSpy).not.toHaveBeenCalled();
+    expect(toastInfoSpy).not.toHaveBeenCalled();
+    expect(useFileStore.getState().files).toEqual([]);
+
+    await act(async () => {
+      useFeaturesStore.setState({
+        bundles: [
+          {
+            id: "background-removal",
+            name: "Background Removal",
+            description: "Remove backgrounds",
+            estimatedSize: "170 MB",
+            enablesTools: ["remove-background"],
+            status: "installed",
+            installedVersion: "1.0.0",
+            progress: null,
+            error: null,
+          },
+        ],
+      });
+    });
+
+    const installedPaste = makePasteEvent({ files: [png] });
+    act(() => {
+      document.dispatchEvent(installedPaste);
+    });
+
+    expect(installedPaste.defaultPrevented).toBe(true);
+    expect(useFileStore.getState().files).toEqual([png]);
+  });
+
+  it("ignores file pastes on a multi-bundle AI tool when only the primary bundle is installed, then accepts pastes once all required bundles are installed", async () => {
+    useFeaturesStore.setState({
+      loaded: true,
+      loadError: false,
+      bundles: [
+        {
+          id: "background-removal",
+          name: "Background Removal",
+          description: "Remove backgrounds",
+          estimatedSize: "170 MB",
+          enablesTools: ["remove-background", "passport-photo"],
+          status: "installed",
+          installedVersion: "1.0.0",
+          progress: null,
+          error: null,
+        },
+        {
+          id: "face-detection",
+          name: "Face Detection",
+          description: "Detect faces",
+          estimatedSize: "40 MB",
+          enablesTools: ["blur-faces", "passport-photo"],
+          status: "not_installed",
+          installedVersion: null,
+          progress: null,
+          error: null,
+        },
+      ],
+    });
+    vi.spyOn(useFeaturesStore.getState(), "fetch").mockResolvedValue(undefined);
+
+    await act(async () => {
+      renderToolPage("/image/passport-photo");
+    });
+
+    const png = new File(["png-bytes"], "portrait.png", { type: "image/png" });
+    const partialPaste = makePasteEvent({ files: [png] });
+    act(() => {
+      document.dispatchEvent(partialPaste);
+    });
+
+    expect(partialPaste.defaultPrevented).toBe(false);
+    expect(toastErrorSpy).not.toHaveBeenCalled();
+    expect(useFileStore.getState().files).toEqual([]);
+
+    await act(async () => {
+      useFeaturesStore.setState({
+        bundles: [
+          {
+            id: "background-removal",
+            name: "Background Removal",
+            description: "Remove backgrounds",
+            estimatedSize: "170 MB",
+            enablesTools: ["remove-background", "passport-photo"],
+            status: "installed",
+            installedVersion: "1.0.0",
+            progress: null,
+            error: null,
+          },
+          {
+            id: "face-detection",
+            name: "Face Detection",
+            description: "Detect faces",
+            estimatedSize: "40 MB",
+            enablesTools: ["blur-faces", "passport-photo"],
+            status: "installed",
+            installedVersion: "1.0.0",
+            progress: null,
+            error: null,
+          },
+        ],
+      });
+    });
+
+    const installedPaste = makePasteEvent({ files: [png] });
+    act(() => {
+      document.dispatchEvent(installedPaste);
+    });
+
+    expect(installedPaste.defaultPrevented).toBe(true);
+    expect(useFileStore.getState().files).toEqual([png]);
+  });
+
+  it("accepts file pastes on an AI tool with only optional bundles (ocr) once feature state is loaded", async () => {
+    useFeaturesStore.setState({
+      loaded: true,
+      loadError: false,
+      bundles: [],
+    });
+    vi.spyOn(useFeaturesStore.getState(), "fetch").mockResolvedValue(undefined);
+
+    await act(async () => {
+      renderToolPage("/image/ocr");
+    });
+
+    const png = new File(["png-bytes"], "scan.png", { type: "image/png" });
+    const paste = makePasteEvent({ files: [png] });
+    act(() => {
+      document.dispatchEvent(paste);
+    });
+
+    expect(paste.defaultPrevented).toBe(true);
+    expect(toastErrorSpy).not.toHaveBeenCalled();
+    expect(useFileStore.getState().files).toEqual([png]);
   });
 });
 

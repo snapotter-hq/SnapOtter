@@ -757,9 +757,17 @@ function ToolPageContent({
     ],
   );
 
-  // Document-level paste handler (skip for generator tools that don't accept file input)
+  // Document-level paste handler (only when an active, installed tool workspace with a dropzone is rendered)
+  const isToolDisabled = Boolean(tool && disabledTools.includes(tool.id));
+  const canAcceptPaste = Boolean(
+    tool &&
+      registryEntry &&
+      registryEntry.displayMode !== "no-dropzone" &&
+      !isToolDisabled &&
+      (!isAiTool || (featuresLoaded && (toolInstalled || !featureBundle))),
+  );
   useEffect(() => {
-    if (registryEntry?.displayMode === "no-dropzone") return;
+    if (!canAcceptPaste) return;
 
     const handlePaste = (e: ClipboardEvent) => {
       const pastedFiles: File[] = [];
@@ -793,11 +801,11 @@ function ToolPageContent({
     document.addEventListener("paste", handlePaste);
     return () => document.removeEventListener("paste", handlePaste);
   }, [
+    canAcceptPaste,
     toolFileFilter,
     isMultiFileTool,
     addFiles,
     setFiles,
-    registryEntry?.displayMode,
     allowIntake,
     t.dropzone.unsupportedFileType,
   ]);
@@ -808,7 +816,7 @@ function ToolPageContent({
     useFileStore.getState().markBatchClaimed();
   }, [batchZipBlob, batchZipFilename]);
 
-  if (tool && disabledTools.includes(tool.id)) {
+  if (isToolDisabled) {
     return (
       <AppLayout>
         <div className="flex flex-col items-center justify-center h-full gap-4 text-muted-foreground">
