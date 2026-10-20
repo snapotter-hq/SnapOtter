@@ -2043,10 +2043,14 @@ def write_installed_atomic(ai_dir: str, data: dict) -> None:
     """Write installed.json atomically (write .tmp then rename)."""
     path = os.path.join(ai_dir, "installed.json")
     tmp_path = path + ".tmp"
-    with open(tmp_path, "w") as f:
-        json.dump(data, f, indent=2)
-        f.write("\n")
-    os.rename(tmp_path, path)
+    try:
+        with open(tmp_path, "w") as f:
+            json.dump(data, f, indent=2)
+            f.write("\n")
+        os.rename(tmp_path, path)
+    except OSError:
+        _unlink_quietly(tmp_path)
+        raise
 
 
 # -- Main --
@@ -2680,7 +2684,15 @@ def _install() -> None:
         "installedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "models": model_ids,
     }
-    write_installed_atomic(ai_dir, installed)
+    try:
+        write_installed_atomic(ai_dir, installed)
+    except OSError as e:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        abandon_merge(
+            site_packages_dir, reconciliation_plan, quarantine_dir,
+            venv_writing_marker, bundle_id,
+        )
+        fail(f"Failed to record installation: {e}")
 
     # -- Cleanup --
     # The install is recorded, so the versions this bundle displaced are never
@@ -2690,7 +2702,7 @@ def _install() -> None:
         shutil.rmtree(staging_dir, ignore_errors=True)
     # Clean up downloaded tar (but not if local override)
     if not local_path and os.path.exists(tar_path):
-        os.unlink(tar_path)
+        _unlink_quietly(tar_path)
 
     # -- Done --
     emit_progress(100, "Complete")

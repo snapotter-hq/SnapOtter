@@ -2388,4 +2388,184 @@ assert not os.path.exists(os.path.join(${JSON.stringify(aiDir)}, "venv.writing")
     );
     expect(pyCheck.status, `stderr: ${pyCheck.stderr}`).toBe(0);
   });
+
+  it("rolls back site-packages, removes installed.json.tmp, and emits a structured error when write_installed_atomic raises OSError (#2595)", () => {
+    seedExistingTestPkg();
+    const buildDir = join(tempDir, "build-write-installed-rollback");
+    mkdirSync(join(buildDir, "models", "testmodel"), { recursive: true });
+    mkdirSync(join(buildDir, "site-packages", "testpkg"), { recursive: true });
+    mkdirSync(join(buildDir, "site-packages", "testpkg-1.0.0.dist-info"), { recursive: true });
+    writeFileSync(join(buildDir, "models", "testmodel", "weights.bin"), "model-weights");
+    writeFileSync(join(buildDir, "site-packages", "testpkg", "__init__.py"), "# v1.0.0");
+    writeFileSync(
+      join(buildDir, "site-packages", "testpkg-1.0.0.dist-info", "RECORD"),
+      "testpkg/__init__.py,,\ntestpkg-1.0.0.dist-info/RECORD,,\n",
+    );
+    writeFileSync(
+      join(buildDir, "bundle.json"),
+      JSON.stringify({
+        bundleId: "face-detection",
+        version: "1.0.0-test",
+        arch: "amd64-gpu",
+        imageVersion: "2.0.0",
+        pythonVersion: "3.12",
+        models: ["testmodel"],
+      }),
+    );
+    const tarPath = join(tempDir, "write-installed-rollback.tar.gz");
+    execFileSync("tar", ["czf", tarPath, "-C", buildDir, "."]);
+    rmSync(buildDir, { recursive: true, force: true });
+    const sha256 = createHash("sha256").update(readFileSync(tarPath)).digest("hex");
+    writeManifest("face-detection", tarPath, sha256, {
+      smokeImports: ["testpkg"],
+    });
+
+    // Replace installed.json with a directory so write_installed_atomic writes
+    // installed.json.tmp and then raises IsADirectoryError (OSError) on os.rename.
+    const installedPath = join(aiDir, "installed.json");
+    unlinkSync(installedPath);
+    mkdirSync(installedPath);
+
+    const result = installBundle("face-detection", tarPath);
+    expect(result.status).toBe(1);
+    const stderr = result.stderr?.toString() ?? "";
+    expect(stderr).not.toContain("Traceback (most recent call last)");
+    const errorFrames = stderr.split("\n").flatMap((line) => {
+      try {
+        const parsed = JSON.parse(line) as { error?: string };
+        return typeof parsed.error === "string" ? [parsed.error] : [];
+      } catch {
+        return [];
+      }
+    });
+    expect(errorFrames.length).toBe(1);
+    expect(errorFrames[0]).toMatch(/Failed to record installation:/);
+
+    // Partial installed.json.tmp is cleaned up and site-packages is rolled back.
+    expect(existsSync(join(aiDir, "installed.json.tmp"))).toBe(false);
+    expect(readFileSync(join(sitePackagesDir, "testpkg", "__init__.py"), "utf-8")).toBe("# v0.9.0");
+    expect(existsSync(join(sitePackagesDir, "testpkg-0.9.0.dist-info"))).toBe(true);
+    expect(existsSync(join(sitePackagesDir, "testpkg-1.0.0.dist-info"))).toBe(false);
+    expect(existsSync(join(venvDir, ".superseded"))).toBe(false);
+    expect(existsSync(join(aiDir, "staging-face-detection"))).toBe(false);
+    expect(existsSync(join(aiDir, "venv.writing"))).toBe(false);
+
+    // Restore installed.json as a regular file and verify EACCES in write_installed_atomic
+    // plus best-effort _unlink_quietly(tar_path) on post-install cleanup.
+    rmSync(installedPath, { recursive: true, force: true });
+    writeFileSync(installedPath, JSON.stringify({ bundles: {} }));
+
+    const pyCheck = spawnSync(
+      "python3",
+      [
+        "-c",
+        `
+import builtins, errno, importlib.util, json, os, sys
+
+spec = importlib.util.spec_from_file_location("inst", ${JSON.stringify(scriptPath)})
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+ai_dir = ${JSON.stringify(aiDir)}
+venv_dir = ${JSON.stringify(venvDir)}
+sp_dir = ${JSON.stringify(sitePackagesDir)}
+models_dir = ${JSON.stringify(modelsDir)}
+manifest_path = ${JSON.stringify(manifestPath)}
+tar_path = ${JSON.stringify(tarPath)}
+
+errors = []
+def fake_fail(msg):
+    errors.append(msg)
+    raise SystemExit(1)
+mod.fail = fake_fail
+mod.emit_progress = lambda p, s: None
+
+os.environ["PYTHON_VENV_PATH"] = venv_dir
+os.environ["SNAPOTTER_BUNDLE_LOCAL_PATH"] = tar_path
+sys.argv = ["install_feature.py", "face-detection", manifest_path, models_dir]
+
+real_open = builtins.open
+def raise_eacces_on_tmp(file, mode="r", *a, **kw):
+    if str(file).endswith("installed.json.tmp") and "w" in str(mode):
+        raise OSError(errno.EACCES, "Permission denied")
+    return real_open(file, mode, *a, **kw)
+builtins.open = raise_eacces_on_tmp
+try:
+    mod._install()
+    assert False, "expected SystemExit when opening installed.json.tmp raises EACCES"
+except SystemExit:
+    pass
+finally:
+    builtins.open = real_open
+
+assert "Failed to record installation: [Errno 13] Permission denied" in errors[-1], errors[-1]
+assert open(os.path.join(sp_dir, "testpkg", "__init__.py")).read() == "# v0.9.0"
+assert os.path.isdir(os.path.join(sp_dir, "testpkg-0.9.0.dist-info"))
+assert not os.path.exists(os.path.join(sp_dir, "testpkg-1.0.0.dist-info"))
+assert not os.path.exists(os.path.join(venv_dir, ".superseded"))
+assert not os.path.exists(os.path.join(ai_dir, "staging-face-detection"))
+assert not os.path.exists(os.path.join(ai_dir, "venv.writing"))
+
+# Mid-write OSError (ENOSPC during json.dump) unlinks partial installed.json.tmp and preserves existing installed.json
+with open(os.path.join(ai_dir, "installed.json"), "w") as f:
+    json.dump({"bundles": {"prior-bundle": {"version": "0.1.0", "installedAt": "2026-01-01T00:00:00Z", "models": []}}}, f)
+
+real_dump = mod.json.dump
+def fail_dump(obj, fp, *a, **kw):
+    if getattr(fp, "name", "").endswith("installed.json.tmp"):
+        fp.write('{"bundles": {')
+        fp.flush()
+        raise OSError(errno.ENOSPC, "No space left on device")
+    return real_dump(obj, fp, *a, **kw)
+mod.json.dump = fail_dump
+try:
+    mod._install()
+    assert False, "expected SystemExit when json.dump raises ENOSPC"
+except SystemExit:
+    pass
+finally:
+    mod.json.dump = real_dump
+
+assert "Failed to record installation: [Errno 28] No space left on device" in errors[-1], errors[-1]
+assert not os.path.exists(os.path.join(ai_dir, "installed.json.tmp"))
+assert json.loads(open(os.path.join(ai_dir, "installed.json")).read()) == {
+    "bundles": {"prior-bundle": {"version": "0.1.0", "installedAt": "2026-01-01T00:00:00Z", "models": []}}
+}
+assert open(os.path.join(sp_dir, "testpkg", "__init__.py")).read() == "# v0.9.0"
+
+# Remote mode post-install tar cleanup uses _unlink_quietly(tar_path) so an unlink OSError does not fail a recorded install
+os.environ.pop("SNAPOTTER_BUNDLE_LOCAL_PATH", None)
+staging_base = os.path.join(ai_dir, "staging")
+os.makedirs(staging_base, exist_ok=True)
+remote_tar = os.path.join(staging_base, f"face-detection-{mod.detect_arch()}.tar.gz")
+import shutil
+shutil.copy2(tar_path, remote_tar)
+
+mod.check_disk_space = lambda *a, **kw: None
+mod.ensure_hf_hub = lambda *a, **kw: None
+mod.download_and_verify = lambda *a, **kw: None
+
+real_unlink = mod.os.unlink
+def fail_tar_unlink(p, *a, **kw):
+    if p == remote_tar:
+        raise OSError(errno.EACCES, "Permission denied unlinking tar")
+    return real_unlink(p, *a, **kw)
+mod.os.unlink = fail_tar_unlink
+try:
+    mod._install()
+finally:
+    mod.os.unlink = real_unlink
+    if os.path.exists(remote_tar):
+        real_unlink(remote_tar)
+
+recorded = json.loads(open(os.path.join(ai_dir, "installed.json")).read())
+assert "face-detection" in recorded["bundles"]
+assert "prior-bundle" in recorded["bundles"]
+assert open(os.path.join(sp_dir, "testpkg", "__init__.py")).read() == "# v1.0.0"
+`,
+      ],
+      { encoding: "utf-8" },
+    );
+    expect(pyCheck.status, `stderr: ${pyCheck.stderr}`).toBe(0);
+  });
 });
