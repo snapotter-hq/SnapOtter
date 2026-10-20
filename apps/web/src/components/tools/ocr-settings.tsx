@@ -1,6 +1,6 @@
 import { en, type LibrarySaveMode, type TranslationKeys } from "@snapotter/shared";
 import { Check, CheckCircle2, ChevronDown, ChevronRight, Copy, Download, Info } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Link } from "react-router";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
@@ -263,6 +263,76 @@ export function ocrOneFile(
   });
 }
 
+interface OcrResultSnapshot {
+  text: string | null;
+  savedLibraryFileId: string | null;
+  resultEntryId: string | null;
+}
+
+const IDLE_OCR_RESULT: OcrResultSnapshot = {
+  text: null,
+  savedLibraryFileId: null,
+  resultEntryId: null,
+};
+
+let currentOcrResult: OcrResultSnapshot = IDLE_OCR_RESULT;
+let ocrRunFiles: ReadonlySet<File> | null = null;
+let ocrRunEntryIds: ReadonlySet<string> | null = null;
+const ocrResultListeners = new Set<() => void>();
+
+function notifyOcrResult() {
+  for (const listener of ocrResultListeners) {
+    listener();
+  }
+}
+
+function subscribeOcrResult(listener: () => void) {
+  ocrResultListeners.add(listener);
+  return () => {
+    ocrResultListeners.delete(listener);
+  };
+}
+
+function getOcrResultSnapshot(): OcrResultSnapshot {
+  return currentOcrResult;
+}
+
+function updateOcrResult(patch: Partial<OcrResultSnapshot>) {
+  currentOcrResult = { ...currentOcrResult, ...patch };
+  notifyOcrResult();
+}
+
+export function resetOcrResult() {
+  ocrRunFiles = null;
+  ocrRunEntryIds = null;
+  if (currentOcrResult === IDLE_OCR_RESULT) return;
+  currentOcrResult = IDLE_OCR_RESULT;
+  notifyOcrResult();
+}
+
+useFileStore.subscribe((state, prev) => {
+  if (
+    state.stopCount !== prev.stopCount ||
+    state.files.length === 0 ||
+    (ocrRunFiles && !state.files.some((f) => ocrRunFiles?.has(f))) ||
+    (ocrRunEntryIds &&
+      ocrRunEntryIds.size > 0 &&
+      !state.entries.some((e) => ocrRunEntryIds?.has(e.id)))
+  ) {
+    resetOcrResult();
+  }
+});
+
+function resolveOcrEntryId(
+  store: ReturnType<typeof useFileStore.getState>,
+  resultEntryId: string | null,
+): string | null {
+  if (resultEntryId !== null && store.entries.some((e) => e.id === resultEntryId)) {
+    return resultEntryId;
+  }
+  return store.entries.find((e) => e.processedUrl)?.id ?? store.entries[0]?.id ?? null;
+}
+
 export function OcrSettings() {
   const { t } = useTranslation();
   const { files, processing, error, setProcessing, setError } = useFileStore();
@@ -273,14 +343,16 @@ export function OcrSettings() {
   const [enhanceManuallySet, setEnhanceManuallySet] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
 
-  const [text, setText] = useState<string | null>(null);
-  // Library file id the extracted text was auto-saved as (single-file runs from
-  // the library only). OCR renders its own text result, not the shared
-  // ReviewPanel, so it surfaces the "saved to Files" confirmation inline (#565).
-  const [savedLibraryFileId, setSavedLibraryFileId] = useState<string | null>(null);
+  // Shared across a bare panel unmount so closing the mobile settings sheet or
+  // crossing the 768px breakpoint keeps the extracted text and library save
+  // confirmation visible (#2889).
+  const { text, savedLibraryFileId, resultEntryId } = useSyncExternalStore(
+    subscribeOcrResult,
+    getOcrResultSnapshot,
+    getOcrResultSnapshot,
+  );
   const [copyStatus, setCopyStatus] = useState<"copied" | "failed" | null>(null);
   const later = useTimeouts();
-  const resultEntryIdRef = useRef<string | null>(null);
 
   const ocrFilenameFor = (currentFiles: File[]) => {
     const baseName =
@@ -328,7 +400,6 @@ export function OcrSettings() {
       librarySaveMode: capturedSaveMode,
     } = useFileStore.getState();
     const capturedEntryId = startEntries[capturedIndex]?.id ?? startEntries[0]?.id ?? null;
-    resultEntryIdRef.current = capturedEntryId;
     for (const entry of startEntries) {
       if (entry.processedUrl) {
         if (entry.processedUrl.startsWith("blob:")) URL.revokeObjectURL(entry.processedUrl);
@@ -342,9 +413,16 @@ export function OcrSettings() {
       }
     }
 
+    const runFiles = new Set(files);
+    const runEntryIds = new Set(startEntries.map((e) => e.id));
+    ocrRunFiles = runFiles;
+    ocrRunEntryIds = runEntryIds;
     setError(null);
-    setText(null);
-    setSavedLibraryFileId(null);
+    updateOcrResult({
+      text: null,
+      savedLibraryFileId: null,
+      resultEntryId: capturedEntryId,
+    });
     setProcessing(true);
     const runTimer = startRunProgress();
 
@@ -360,14 +438,15 @@ export function OcrSettings() {
     // stream and stall timer) and no more files are sent (#1932). This keys on
     // the store rather than on unmount because the panel also unmounts when the
     // layout swaps across the breakpoint, and that must not end the scan.
-    const runFiles = new Set(files);
     const startStopCount = useFileStore.getState().stopCount;
     let filesGone = false;
     let stopInFlight: (() => void) | null = null;
     const unsubscribe = useFileStore.subscribe((state) => {
       if (
         filesGone ||
-        (state.stopCount === startStopCount && state.files.some((f) => runFiles.has(f)))
+        (state.stopCount === startStopCount &&
+          state.files.some((f) => runFiles.has(f)) &&
+          (runEntryIds.size === 0 || state.entries.some((e) => runEntryIds.has(e.id))))
       ) {
         return;
       }
@@ -443,7 +522,6 @@ export function OcrSettings() {
           // Only single-file runs send a fileId, so savedFileId is single-file only.
           if (savedFileId) {
             autoSavedFileId = savedFileId;
-            setSavedLibraryFileId(savedFileId);
             useFileStore.getState().setLastSavedLibraryFileId(savedFileId);
           }
           results.push(
@@ -503,17 +581,20 @@ export function OcrSettings() {
           store.markClaimedById(capturedEntryId);
         }
       }
-      setText(joined);
+      updateOcrResult({
+        text: joined,
+        savedLibraryFileId: autoSavedFileId ?? null,
+        resultEntryId: capturedEntryId,
+      });
     } finally {
       setProcessing(false);
     }
   };
 
   const handleTextChange = (nextText: string) => {
-    setText(nextText);
     const store = useFileStore.getState();
-    const entryId =
-      resultEntryIdRef.current ?? store.entries.find((e) => e.processedUrl)?.id ?? null;
+    const entryId = resolveOcrEntryId(store, resultEntryId);
+    updateOcrResult({ text: nextText, resultEntryId: entryId });
     if (!entryId) return;
     const prevUrl = store.entries.find((e) => e.id === entryId)?.processedUrl;
     if (prevUrl?.startsWith("blob:")) URL.revokeObjectURL(prevUrl);
@@ -536,8 +617,7 @@ export function OcrSettings() {
   const handleCopy = async () => {
     if (text !== null) {
       const storeBefore = useFileStore.getState();
-      const entryId =
-        resultEntryIdRef.current ?? storeBefore.entries.find((e) => e.processedUrl)?.id ?? null;
+      const entryId = resolveOcrEntryId(storeBefore, resultEntryId);
       const expectedUrl = entryId
         ? (storeBefore.entries.find((e) => e.id === entryId)?.processedUrl ?? undefined)
         : undefined;
@@ -562,8 +642,7 @@ export function OcrSettings() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     const store = useFileStore.getState();
-    const entryId =
-      resultEntryIdRef.current ?? store.entries.find((e) => e.processedUrl)?.id ?? null;
+    const entryId = resolveOcrEntryId(store, resultEntryId);
     if (entryId) {
       store.markClaimedById(entryId);
     } else {

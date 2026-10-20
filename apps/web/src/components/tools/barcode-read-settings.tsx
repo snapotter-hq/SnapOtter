@@ -1,6 +1,6 @@
 import type { TranslationKeys } from "@snapotter/shared";
 import { Check, Copy, Download, Search, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useTimeouts } from "@/hooks/use-timeouts";
@@ -212,16 +212,80 @@ function scanOneFile(
   });
 }
 
+const EMPTY_BARCODE_RESULTS: FileResult[] = [];
+let currentBarcodeResults: FileResult[] = EMPTY_BARCODE_RESULTS;
+const barcodeCopiedRows = new Set<number>();
+let barcodeRunFiles: ReadonlySet<File> | null = null;
+let barcodeRunEntryIds: ReadonlySet<string> | null = null;
+const barcodeResultListeners = new Set<() => void>();
+
+function notifyBarcodeResults() {
+  for (const listener of barcodeResultListeners) {
+    listener();
+  }
+}
+
+function subscribeBarcodeResults(listener: () => void) {
+  barcodeResultListeners.add(listener);
+  return () => {
+    barcodeResultListeners.delete(listener);
+  };
+}
+
+function getBarcodeResultsSnapshot(): FileResult[] {
+  return currentBarcodeResults;
+}
+
+function setBarcodeResults(next: FileResult[]) {
+  if (next.length === 0) {
+    if (currentBarcodeResults === EMPTY_BARCODE_RESULTS) return;
+    currentBarcodeResults = EMPTY_BARCODE_RESULTS;
+  } else {
+    currentBarcodeResults = next;
+  }
+  notifyBarcodeResults();
+}
+
+export function resetBarcodeResults() {
+  barcodeRunFiles = null;
+  barcodeRunEntryIds = null;
+  barcodeCopiedRows.clear();
+  if (currentBarcodeResults === EMPTY_BARCODE_RESULTS) return;
+  currentBarcodeResults = EMPTY_BARCODE_RESULTS;
+  notifyBarcodeResults();
+}
+
+useFileStore.subscribe((state, prev) => {
+  if (
+    state.stopCount !== prev.stopCount ||
+    state.files.length === 0 ||
+    (barcodeRunFiles && !state.files.some((f) => barcodeRunFiles?.has(f))) ||
+    (barcodeRunEntryIds &&
+      barcodeRunEntryIds.size > 0 &&
+      !state.entries.some((e) => barcodeRunEntryIds?.has(e.id))) ||
+    (!state.processing &&
+      prev.entries.some((e) => e.processedUrl !== null || e.status === "completed") &&
+      state.entries.every((e) => e.processedUrl === null && e.status === "pending"))
+  ) {
+    resetBarcodeResults();
+  }
+});
+
 export function BarcodeReadSettings() {
   const { t } = useTranslation();
   const { files, processing, error, setProcessing, setError } = useFileStore();
 
   const [tryHarder, setTryHarder] = useState(false);
-  const [results, setResults] = useState<FileResult[]>([]);
+  // Shared across a bare panel unmount so closing the mobile settings sheet or
+  // crossing the 768px breakpoint keeps the decoded barcode table visible (#2889).
+  const results = useSyncExternalStore(
+    subscribeBarcodeResults,
+    getBarcodeResultsSnapshot,
+    getBarcodeResultsSnapshot,
+  );
   const [rowCopy, setRowCopy] = useState<{ idx: number; ok: boolean } | null>(null);
   const [allCopy, setAllCopy] = useState<"copied" | "failed" | null>(null);
   const later = useTimeouts();
-  const copiedRowsRef = useRef<Set<number>>(new Set());
 
   // Unmounting stops the elapsed counter. The scan itself stops only once its
   // files leave the store (see handleProcess), and shared progress state lets a
@@ -241,12 +305,6 @@ export function BarcodeReadSettings() {
   const handleProcess = async () => {
     if (files.length === 0) return;
 
-    copiedRowsRef.current.clear();
-    setError(null);
-    setResults([]);
-    setProcessing(true);
-    const runTimer = startRunProgress();
-
     const total = files.length;
     const allResults: FileResult[] = [];
     const errors: string[] = [];
@@ -264,6 +322,16 @@ export function BarcodeReadSettings() {
       }
     }
 
+    const runFiles = new Set(files);
+    const runEntryIds = new Set(entryIds);
+    barcodeRunFiles = runFiles;
+    barcodeRunEntryIds = runEntryIds;
+    barcodeCopiedRows.clear();
+    setError(null);
+    setBarcodeResults(EMPTY_BARCODE_RESULTS);
+    setProcessing(true);
+    const runTimer = startRunProgress();
+
     // Leaving the tool route bumps stopCount (#1994), leaving for another tool
     // resets the file store, and opening library files replaces it. Either way
     // the scan stops there: the request in flight is dropped, no more files are
@@ -271,14 +339,15 @@ export function BarcodeReadSettings() {
     // (#1932). This keys on the store rather than on unmount because the panel
     // also unmounts when the layout swaps across the breakpoint, and that must
     // not end the scan.
-    const runFiles = new Set(files);
     const startStopCount = useFileStore.getState().stopCount;
     let filesGone = false;
     let stopInFlight: (() => void) | null = null;
     const unsubscribe = useFileStore.subscribe((state) => {
       if (
         filesGone ||
-        (state.stopCount === startStopCount && state.files.some((f) => runFiles.has(f)))
+        (state.stopCount === startStopCount &&
+          state.files.some((f) => runFiles.has(f)) &&
+          (runEntryIds.size === 0 || state.entries.some((e) => runEntryIds.has(e.id))))
       ) {
         return;
       }
@@ -379,14 +448,19 @@ export function BarcodeReadSettings() {
       return;
     }
 
-    if (errors.length === total) {
-      setError(errors.join("; "));
-    } else if (errors.length > 0) {
-      setError(format(t.toolSettings["barcode-read"].filesFailed, { count: errors.length, total }));
-    }
+    try {
+      if (errors.length === total) {
+        setError(errors.join("; "));
+      } else if (errors.length > 0) {
+        setError(
+          format(t.toolSettings["barcode-read"].filesFailed, { count: errors.length, total }),
+        );
+      }
 
-    setResults(allResults);
-    setProcessing(false);
+      setBarcodeResults(allResults);
+    } finally {
+      setProcessing(false);
+    }
   };
 
   // Total barcode count across all files
@@ -408,8 +482,8 @@ export function BarcodeReadSettings() {
     const targets = captureEntryUrls();
     const ok = await copyToClipboard(text);
     if (ok) {
-      copiedRowsRef.current.add(globalIdx);
-      if (totalBarcodes > 0 && copiedRowsRef.current.size >= totalBarcodes) {
+      barcodeCopiedRows.add(globalIdx);
+      if (totalBarcodes > 0 && barcodeCopiedRows.size >= totalBarcodes) {
         claimCapturedEntries(targets);
       }
     }
