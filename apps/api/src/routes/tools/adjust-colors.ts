@@ -5,6 +5,7 @@ import {
   colorChannels,
   grayscale,
   invert,
+  type Sharp,
   sepia,
 } from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
@@ -35,15 +36,14 @@ const settingsSchema = z.object({
   effect: z.enum(["none", "grayscale", "sepia", "invert"]).default("none"),
 });
 
+type Matrix3x3 = [[number, number, number], [number, number, number], [number, number, number]];
+
 /**
  * Build a 3x3 recomb matrix for color temperature + tint shift.
  * Temperature: cool (blue) <-> warm (orange) on the blue-orange axis.
  * Tint: green <-> magenta on the green-magenta axis.
  */
-function colorTempTintMatrix(
-  temp: number,
-  tintVal: number,
-): [[number, number, number], [number, number, number], [number, number, number]] {
+function colorTempTintMatrix(temp: number, tintVal: number): Matrix3x3 {
   const t = temp / 100;
   const n = tintVal / 100;
   return [
@@ -51,6 +51,67 @@ function colorTempTintMatrix(
     [0, 1 + t * 0.05 - n * 0.15, 0],
     [0, 0, 1 - t * 0.15 + n * 0.1],
   ];
+}
+
+type RecombCarrier = { options?: { recombMatrix?: unknown } };
+
+function readRecombMatrix(image: Sharp): Matrix3x3 | null {
+  const flat = (image as unknown as RecombCarrier).options?.recombMatrix;
+  if (flat === undefined) return null;
+  if (!Array.isArray(flat) || flat.length !== 9 || !flat.every((n) => typeof n === "number")) {
+    throw new Error("Expected Sharp options.recombMatrix to be a 9-number array");
+  }
+  return [
+    [flat[0], flat[1], flat[2]],
+    [flat[3], flat[4], flat[5]],
+    [flat[6], flat[7], flat[8]],
+  ];
+}
+
+export function multiplyMatrix3x3(a: Matrix3x3, b: Matrix3x3): Matrix3x3 {
+  return [
+    [
+      a[0][0] * b[0][0] + a[0][1] * b[1][0] + a[0][2] * b[2][0],
+      a[0][0] * b[0][1] + a[0][1] * b[1][1] + a[0][2] * b[2][1],
+      a[0][0] * b[0][2] + a[0][1] * b[1][2] + a[0][2] * b[2][2],
+    ],
+    [
+      a[1][0] * b[0][0] + a[1][1] * b[1][0] + a[1][2] * b[2][0],
+      a[1][0] * b[0][1] + a[1][1] * b[1][1] + a[1][2] * b[2][1],
+      a[1][0] * b[0][2] + a[1][1] * b[1][2] + a[1][2] * b[2][2],
+    ],
+    [
+      a[2][0] * b[0][0] + a[2][1] * b[1][0] + a[2][2] * b[2][0],
+      a[2][0] * b[0][1] + a[2][1] * b[1][1] + a[2][2] * b[2][1],
+      a[2][0] * b[0][2] + a[2][1] * b[1][2] + a[2][2] * b[2][2],
+    ],
+  ];
+}
+
+/**
+ * Sharp stores a single recombMatrix slot per pipeline instance, so calling
+ * .recomb() a second or third time overwrites the earlier matrix (#2608).
+ * Multiply the new 3x3 matrix with any previous one so temperature/tint,
+ * channel multipliers, and sepia compose in sequence.
+ */
+async function chainRecomb(
+  image: Sharp,
+  apply: (img: Sharp) => Promise<Sharp> | Sharp,
+): Promise<Sharp> {
+  const prev = readRecombMatrix(image);
+  const carrier = image as unknown as RecombCarrier;
+  if (carrier.options) {
+    carrier.options.recombMatrix = undefined;
+  }
+  const nextImage = await apply(image);
+  const next = readRecombMatrix(nextImage);
+  if (!next) {
+    throw new Error("Expected recomb step to populate Sharp options.recombMatrix");
+  }
+  if (prev) {
+    return nextImage.recomb(multiplyMatrix3x3(next, prev));
+  }
+  return nextImage;
 }
 
 /**
@@ -127,11 +188,13 @@ async function processColorAdjustments(
 
   // Channels
   if (settings.red !== 100 || settings.green !== 100 || settings.blue !== 100) {
-    image = await colorChannels(image, {
-      red: settings.red,
-      green: settings.green,
-      blue: settings.blue,
-    });
+    image = await chainRecomb(image, (img) =>
+      colorChannels(img, {
+        red: settings.red,
+        green: settings.green,
+        blue: settings.blue,
+      }),
+    );
   }
 
   // Effects
@@ -140,7 +203,7 @@ async function processColorAdjustments(
       image = await grayscale(image);
       break;
     case "sepia":
-      image = await sepia(image);
+      image = await chainRecomb(image, (img) => sepia(img));
       break;
     case "invert":
       image = await invert(image);

@@ -698,6 +698,64 @@ describe("Effect combined with adjustments", () => {
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();
   });
+
+  it("composes temperature/tint, channel multipliers, and sepia in a single request (#2608)", async () => {
+    const gray = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 128, g: 128, b: 128 } },
+    })
+      .png()
+      .toBuffer();
+
+    const [sepiaOnlyRes, zeroRedSepiaRes, tempTintChannelsRes] = await Promise.all([
+      postTool(
+        "adjust-colors",
+        { red: 100, green: 100, blue: 100, effect: "sepia" },
+        gray,
+        "gray.png",
+        "image/png",
+      ),
+      postTool(
+        "adjust-colors",
+        { red: 0, green: 100, blue: 100, effect: "sepia" },
+        gray,
+        "gray.png",
+        "image/png",
+      ),
+      postTool(
+        "adjust-colors",
+        { temperature: 80, tint: 60, red: 0, green: 150, blue: 100 },
+        gray,
+        "gray.png",
+        "image/png",
+      ),
+    ]);
+
+    expect(sepiaOnlyRes.statusCode).toBe(200);
+    expect(zeroRedSepiaRes.statusCode).toBe(200);
+    expect(tempTintChannelsRes.statusCode).toBe(200);
+
+    const downloadPixel = async (res: { body: string }) => {
+      const { downloadUrl } = JSON.parse(res.body);
+      const dl = await app.inject({
+        method: "GET",
+        url: downloadUrl,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(dl.statusCode).toBe(200);
+      const raw = await sharp(dl.rawPayload).raw().toBuffer();
+      return [raw[0], raw[1], raw[2]];
+    };
+
+    const sepiaPx = await downloadPixel(sepiaOnlyRes);
+    const zeroRedSepiaPx = await downloadPixel(zeroRedSepiaRes);
+    const tempTintChannelsPx = await downloadPixel(tempTintChannelsRes);
+
+    expect(sepiaPx).toEqual([172, 153, 119]);
+    expect(zeroRedSepiaPx).toEqual([122, 109, 85]);
+    // red=0 zeroes red; green=150 * (1 + 0.04 - 0.09 = 0.95) * 128 = 182.4 -> 182;
+    // blue=100 * (1 - 0.12 + 0.06 = 0.94) * 128 = 120.32 -> 120
+    expect(tempTintChannelsPx).toEqual([0, 182, 120]);
+  });
 });
 
 // ── Reset to defaults (all zeroes) verifies no change ─────────
