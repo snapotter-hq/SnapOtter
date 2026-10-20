@@ -265,17 +265,21 @@ describe("remove-background refinements changed after the first run (#2112)", ()
     const view = render(<RemoveBgSettings />);
     await runAndLand(view);
 
-    // Uncheck Passport / ID photo and switch Quality from HD (birefnet-portrait) to Max (birefnet-matting).
+    // Uncheck Passport / ID photo at the default HD tier: model switches from
+    // birefnet-portrait to birefnet-general-lite and flags the cutout as stale (#2503).
     fireEvent.click(screen.getByLabelText(en.toolSettings["remove-background"].passportIdPhoto));
-    fireEvent.click(screen.getByRole("button", { name: en.toolSettings["remove-background"].max }));
     expect(stale()).toHaveTextContent(en.toolSettings["remove-background"].refineChanged);
 
     // Re-checking Passport returns the model to birefnet-portrait and clears the notice.
     fireEvent.click(screen.getByLabelText(en.toolSettings["remove-background"].passportIdPhoto));
     expect(stale()).not.toBeInTheDocument();
 
-    // Uncheck Passport again so model is birefnet-matting, then re-run.
-    fireEvent.click(screen.getByLabelText(en.toolSettings["remove-background"].passportIdPhoto));
+    // Clicking Max directly while Passport is checked unchecks Passport, selects
+    // birefnet-matting, and offers to re-run (#2503).
+    fireEvent.click(screen.getByRole("button", { name: en.toolSettings["remove-background"].max }));
+    expect(
+      screen.getByLabelText(en.toolSettings["remove-background"].passportIdPhoto),
+    ).not.toBeChecked();
     expect(stale()).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("remove-background-rerun"));
 
@@ -285,7 +289,7 @@ describe("remove-background refinements changed after the first run (#2112)", ()
     expect(options).toEqual({ skipLibrarySave: true });
 
     // Land the second run: notice clears while model stays birefnet-matting, and
-    // reappears if Quality is moved back to HD (birefnet-portrait).
+    // reappears if Quality is moved back to HD (birefnet-general-lite) or Passport is checked.
     deployment.downloadUrl = "/api/v1/download/JOB456/pic_mask.png";
     view.rerender(<RemoveBgSettings />);
     await screen.findByTestId("remove-background-download");
@@ -294,6 +298,115 @@ describe("remove-background refinements changed after the first run (#2112)", ()
     fireEvent.click(screen.getByRole("button", { name: en.toolSettings["remove-background"].hd }));
     expect(stale()).toBeInTheDocument();
   });
+
+  it("sends u2net, birefnet-matting, and birefnet-hr-matting when Fast, Max, or Ultra is clicked on People without manually unchecking Passport (#2503)", async () => {
+    const onChange = vi.fn();
+    const lastModel = () => (onChange.mock.calls.at(-1)?.[0] as Record<string, unknown>)?.model;
+    render(<RemoveBgControls settings={{}} onChange={onChange} />);
+
+    const passportCheckbox = screen.getByLabelText(
+      en.toolSettings["remove-background"].passportIdPhoto,
+    );
+    expect(passportCheckbox).toBeChecked();
+    expect(lastModel()).toBe("birefnet-portrait");
+
+    // Clicking the already-active HD button keeps Passport checked and birefnet-portrait active.
+    fireEvent.click(screen.getByRole("button", { name: en.toolSettings["remove-background"].hd }));
+    expect(passportCheckbox).toBeChecked();
+    expect(lastModel()).toBe("birefnet-portrait");
+
+    // Clicking Fast unchecks Passport and emits u2net.
+    fireEvent.click(
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].fast }),
+    );
+    expect(passportCheckbox).not.toBeChecked();
+    expect(lastModel()).toBe("u2net");
+
+    // Re-checking Passport resets Quality to HD and emits birefnet-portrait.
+    fireEvent.click(passportCheckbox);
+    expect(passportCheckbox).toBeChecked();
+    expect(lastModel()).toBe("birefnet-portrait");
+
+    // Clicking Max unchecks Passport and emits birefnet-matting.
+    fireEvent.click(screen.getByRole("button", { name: en.toolSettings["remove-background"].max }));
+    expect(passportCheckbox).not.toBeChecked();
+    expect(lastModel()).toBe("birefnet-matting");
+
+    // Clicking Ultra keeps Passport unchecked and emits birefnet-hr-matting.
+    fireEvent.click(
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].ultra }),
+    );
+    expect(passportCheckbox).not.toBeChecked();
+    expect(lastModel()).toBe("birefnet-hr-matting");
+
+    // Re-checking Passport from Ultra returns to HD + birefnet-portrait, and unchecking it at HD
+    // switches to birefnet-general-lite (#2503).
+    fireEvent.click(passportCheckbox);
+    expect(passportCheckbox).toBeChecked();
+    expect(lastModel()).toBe("birefnet-portrait");
+
+    fireEvent.click(passportCheckbox);
+    expect(passportCheckbox).not.toBeChecked();
+    expect(lastModel()).toBe("birefnet-general-lite");
+
+    // Switching to Products and back to People while on HD re-checks Passport (birefnet-portrait).
+    fireEvent.click(
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].products }),
+    );
+    expect(lastModel()).toBe("bria-rmbg");
+    fireEvent.click(
+      screen.getByRole("button", { name: en.toolSettings["remove-background"].people }),
+    );
+    expect(
+      screen.getByLabelText(en.toolSettings["remove-background"].passportIdPhoto),
+    ).toBeChecked();
+    expect(lastModel()).toBe("birefnet-portrait");
+
+    // Switching to Products and back to People while on Fast, Max, or Ultra preserves the chosen
+    // quality model and keeps Passport unchecked.
+    for (const [tierKey, tierModel, productsModel] of [
+      ["fast", "u2net", "u2net"],
+      ["max", "birefnet-matting", "birefnet-general"],
+      ["ultra", "birefnet-hr-matting", "birefnet-general"],
+    ] as const) {
+      fireEvent.click(
+        screen.getByRole("button", { name: en.toolSettings["remove-background"][tierKey] }),
+      );
+      fireEvent.click(
+        screen.getByRole("button", { name: en.toolSettings["remove-background"].products }),
+      );
+      expect(lastModel()).toBe(productsModel);
+      fireEvent.click(
+        screen.getByRole("button", { name: en.toolSettings["remove-background"].people }),
+      );
+      expect(
+        screen.getByLabelText(en.toolSettings["remove-background"].passportIdPhoto),
+      ).not.toBeChecked();
+      expect(lastModel()).toBe(tierModel);
+    }
+  });
+
+  it.each([
+    { labelKey: "fast" as const, expectedModel: "u2net" },
+    { labelKey: "max" as const, expectedModel: "birefnet-matting" },
+    { labelKey: "ultra" as const, expectedModel: "birefnet-hr-matting" },
+  ])(
+    "submits Phase 1 with $expectedModel when $labelKey is clicked on People (#2503)",
+    async ({ labelKey, expectedModel }) => {
+      deployment.beforeRun = true;
+      render(<RemoveBgSettings />);
+
+      fireEvent.click(
+        await screen.findByRole("button", {
+          name: en.toolSettings["remove-background"][labelKey],
+        }),
+      );
+      fireEvent.click(screen.getByTestId("remove-background-submit"));
+
+      await waitFor(() => expect(deployment.processFiles).toHaveBeenCalledTimes(1));
+      expect(deployment.processFiles.mock.calls[0][1]).toEqual({ model: expectedModel });
+    },
+  );
 
   it("assumes the default model after a remount and offers to run again when Subject changes (#2488)", async () => {
     const first = render(<RemoveBgSettings />);

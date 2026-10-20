@@ -34,7 +34,7 @@ type BgModel =
 const MODEL_MAP: Record<SubjectType, Partial<Record<Quality, BgModel>>> = {
   people: {
     fast: "u2net",
-    balanced: "birefnet-portrait",
+    balanced: "birefnet-general-lite",
     best: "birefnet-matting",
     ultra: "birefnet-hr-matting",
   },
@@ -316,7 +316,7 @@ export function RemoveBgControls({
   const effectiveQuality = quality === "ultra" && subject !== "people" ? "best" : quality;
 
   const model =
-    isPassport && subject === "people"
+    isPassport && subject === "people" && effectiveQuality === "balanced"
       ? "birefnet-portrait"
       : MODEL_MAP[subject][effectiveQuality] || "birefnet-general";
 
@@ -432,7 +432,7 @@ export function RemoveBgControls({
               onClick={() => {
                 setSubject(opt.value);
                 if (opt.value !== "people") setIsPassport(false);
-                else setIsPassport(true);
+                else setIsPassport(quality === "balanced");
               }}
               className={`flex flex-col items-center gap-1 py-2 px-2 rounded-lg border text-xs font-medium transition-colors ${
                 subject === opt.value
@@ -453,7 +453,11 @@ export function RemoveBgControls({
           <input
             type="checkbox"
             checked={isPassport}
-            onChange={(e) => setIsPassport(e.target.checked)}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              setIsPassport(checked);
+              if (checked) setQuality("balanced");
+            }}
             className="rounded border-border accent-primary"
           />
           <span className="text-sm text-muted-foreground">
@@ -469,7 +473,10 @@ export function RemoveBgControls({
           <button
             key={opt.value}
             type="button"
-            onClick={() => setQuality(opt.value)}
+            onClick={() => {
+              setQuality(opt.value);
+              if (opt.value !== "balanced") setIsPassport(false);
+            }}
             className={`py-2 px-2 rounded-lg border text-xs font-medium transition-colors ${
               effectiveQuality === opt.value
                 ? "border-primary bg-primary/10 text-primary-ink"
