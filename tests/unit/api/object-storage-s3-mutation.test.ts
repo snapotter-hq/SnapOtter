@@ -6,9 +6,11 @@
 // mutation file, which cannot run under STORAGE_MODE="s3".
 
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import http from "node:http";
+import type net from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Readable } from "node:stream";
+import { PassThrough, Readable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const s3 = vi.hoisted(() => ({
@@ -82,6 +84,7 @@ import {
   putObject,
   putObjectStream,
   STORAGE_UNAVAILABLE_MESSAGE,
+  STORAGE_WRITE_FAILED_MESSAGE,
   verifyS3Bucket,
 } from "../../../apps/api/src/lib/object-storage.js";
 
@@ -792,6 +795,131 @@ describe("object-storage S3 dispatch (STORAGE_MODE=s3)", () => {
       } finally {
         warnSpy.mockRestore();
       }
+    });
+
+    it("classifies an AbortSignal.timeout abort in S3 mode as 503 storage-unavailable across stalled S3 PUT, stalled source, and pre-aborted signals (#2881)", async () => {
+      // 1. Real putGenericObjectStream against a stalled HTTP PUT server with a 64 KiB stream.
+      const { configureS3, putGenericObjectStream } = await vi.importActual<
+        typeof import("../../../packages/enterprise/src/storage-s3.js")
+      >("../../../packages/enterprise/src/storage-s3.js");
+      const sockets = new Set<net.Socket>();
+      const server = http.createServer((_req, _res) => {
+        // Accept PUT and never respond.
+      });
+      server.on("connection", (socket) => sockets.add(socket));
+      await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+      const { port } = server.address() as net.AddressInfo;
+
+      try {
+        configureS3({
+          bucket: S3_ENV.S3_BUCKET,
+          region: S3_ENV.S3_REGION,
+          endpoint: `http://127.0.0.1:${port}`,
+          accessKeyId: S3_ENV.S3_ACCESS_KEY_ID,
+          secretAccessKey: S3_ENV.S3_SECRET_ACCESS_KEY,
+          forcePathStyle: true,
+          prefix: S3_ENV.S3_PREFIX,
+        });
+        s3.putStream.mockImplementationOnce(putGenericObjectStream);
+
+        const s3TimeoutSignal = AbortSignal.timeout(80);
+        const stalledPutErr = await putObjectStream(
+          "outputs/job-s3timeout/stalled-put.bin",
+          Readable.from([Buffer.alloc(64 * 1024, 1)]),
+          { signal: s3TimeoutSignal },
+        ).then(
+          () => null,
+          (e: unknown) => e,
+        );
+        expect(s3TimeoutSignal.reason).toMatchObject({ name: "TimeoutError" });
+        expect(stalledPutErr).toMatchObject({
+          message: STORAGE_UNAVAILABLE_MESSAGE,
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-unavailable",
+          statusCode: 503,
+          cause: s3TimeoutSignal.reason,
+        });
+        expect(s3.deleteObject).toHaveBeenCalledWith("outputs/job-s3timeout/stalled-put.bin");
+      } finally {
+        for (const socket of sockets) socket.destroy();
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+      }
+
+      // 2. Stalled source stream destroyed by abortSource while counter(source) awaits it.
+      s3.deleteObject.mockClear();
+      const stalledSource = new PassThrough();
+      stalledSource.write(Buffer.from("partial"));
+      const sourceTimeoutSignal = AbortSignal.timeout(50);
+      const stalledSourceErr = await putObjectStream(
+        "outputs/job-s3timeout/stalled-source.bin",
+        stalledSource,
+        { signal: sourceTimeoutSignal },
+      ).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(sourceTimeoutSignal.reason).toMatchObject({ name: "TimeoutError" });
+      expect(stalledSourceErr).toMatchObject({
+        message: STORAGE_UNAVAILABLE_MESSAGE,
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause: sourceTimeoutSignal.reason,
+      });
+      expect(stalledSource.destroyed).toBe(true);
+      expect(s3.deleteObject).toHaveBeenCalledWith("outputs/job-s3timeout/stalled-source.bin");
+
+      // 3. Pre-aborted timeout signal at putObjectStream entry (e.g. extra output after expired uploadSignal).
+      s3.putStream.mockClear();
+      s3.deleteObject.mockClear();
+      const preAbortedSource = Readable.from([Buffer.from("extra")]);
+      await expect(
+        putObjectStream("outputs/job-s3timeout/pre-aborted.bin", preAbortedSource, {
+          signal: sourceTimeoutSignal,
+        }),
+      ).rejects.toMatchObject({
+        message: STORAGE_UNAVAILABLE_MESSAGE,
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause: sourceTimeoutSignal.reason,
+      });
+      expect(preAbortedSource.destroyed).toBe(true);
+      expect(s3.putStream).not.toHaveBeenCalled();
+      expect(s3.deleteObject).not.toHaveBeenCalled();
+
+      // 4. Local source read EIO keeps 503 storage-write-failed even if signal aborts during deleteObject cleanup.
+      const readEio = Object.assign(new Error("EIO: local scratch read failed"), {
+        code: "EIO",
+        syscall: "read",
+      });
+      const lateTimeoutAc = new AbortController();
+      s3.deleteObject.mockImplementationOnce(async () => {
+        lateTimeoutAc.abort(
+          new DOMException("The operation was aborted due to timeout", "TimeoutError"),
+        );
+      });
+      const eioSource = Readable.from(
+        (async function* () {
+          yield Buffer.from("partial");
+          throw readEio;
+        })(),
+      );
+      await expect(
+        putObjectStream("outputs/job-s3timeout/local-eio.bin", eioSource, {
+          signal: lateTimeoutAc.signal,
+        }),
+      ).rejects.toMatchObject({
+        message: STORAGE_WRITE_FAILED_MESSAGE,
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-write-failed",
+        statusCode: 503,
+        cause: readEio,
+      });
     });
   });
 

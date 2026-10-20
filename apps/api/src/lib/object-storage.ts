@@ -289,7 +289,6 @@ export async function putObjectStream(
   opts: { maxBytes?: number; signal?: AbortSignal } = {},
 ): Promise<number> {
   assertValidKey(key);
-  opts.signal?.throwIfAborted();
   const abortSource = () => {
     const reason =
       opts.signal?.reason instanceof Error
@@ -329,6 +328,7 @@ export async function putObjectStream(
     let streamStarted = false;
     try {
       try {
+        opts.signal?.throwIfAborted();
         s3 = await getS3();
         opts.signal?.throwIfAborted();
         streamStarted = true;
@@ -345,7 +345,14 @@ export async function putObjectStream(
             logger.warn({ err, key }, "Failed to delete partial S3 upload");
           });
         }
-        throw sourceError !== undefined ? localWriteFault(sourceError) : s3WriteFault(error);
+        const sourceAbortedBySignal =
+          Boolean(opts.signal?.aborted) &&
+          (sourceError === opts.signal?.reason ||
+            (sourceError as { name?: unknown } | null)?.name === "AbortError" ||
+            timeoutCause(sourceError) !== null);
+        throw sourceError !== undefined && !sourceAbortedBySignal
+          ? localWriteFault(sourceError)
+          : s3WriteFault(sourceError ?? error);
       }
     } finally {
       opts.signal?.removeEventListener("abort", abortSource);
@@ -358,6 +365,7 @@ export async function putObjectStream(
   opts.signal?.addEventListener("abort", abortSource, { once: true });
   try {
     try {
+      opts.signal?.throwIfAborted();
       await assertLocalCapacity();
       opts.signal?.throwIfAborted();
       await mkdir(dirname(p), { recursive: true });
@@ -486,13 +494,22 @@ function objectSizeLimitError(maxBytes: number): Error & { statusCode: 413; limi
   });
 }
 
+function timeoutCause(error: unknown): Error | null {
+  let e: unknown = error;
+  for (let depth = 0; depth < 5 && e instanceof Error; depth++) {
+    if (e.name === "TimeoutError") return e;
+    e = e.cause;
+  }
+  return null;
+}
+
 /** True when the client caused this: a 4xx set upstream, or an abort, anywhere in the cause chain. */
 function isClientSide(error: unknown): boolean {
   let e: unknown = error;
   for (let depth = 0; depth < 5 && e instanceof Error; depth++) {
     const status = (e as { statusCode?: unknown }).statusCode;
     if (typeof status === "number" && status >= 400 && status < 500) return true;
-    if (e.name === "AbortError") return true;
+    if (e.name === "AbortError" && !timeoutCause(e)) return true;
     e = e.cause;
   }
   return false;
@@ -593,6 +610,10 @@ export function normalizeOperationalWriteError(error: unknown): unknown {
 function localWriteFault(error: unknown): unknown {
   const normalized = normalizeOperationalWriteError(error);
   if (alreadyClassified(normalized)) return normalized;
+  const timeout = timeoutCause(error);
+  if (timeout) {
+    return storageFault(STORAGE_WRITE_FAILED_MESSAGE, "storage-write-failed", timeout);
+  }
   const { syscall } = (error ?? {}) as NodeJS.ErrnoException;
   if (typeof syscall === "string") {
     return storageFault(STORAGE_WRITE_FAILED_MESSAGE, "storage-write-failed", error);
@@ -611,6 +632,10 @@ export function s3WriteFault(error: unknown): unknown {
   const s3Answered = typeof error === "object" && error !== null && "$metadata" in error;
   if (s3Answered) {
     return storageFault(STORAGE_UNAVAILABLE_MESSAGE, "storage-unavailable", error);
+  }
+  const timeout = timeoutCause(error);
+  if (timeout) {
+    return storageFault(STORAGE_UNAVAILABLE_MESSAGE, "storage-unavailable", timeout);
   }
   return serverFault(error);
 }

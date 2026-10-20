@@ -11,6 +11,7 @@
 
 import http from "node:http";
 import net from "node:net";
+import { Readable } from "node:stream";
 import { loadS3Storage, type S3StorageModule } from "@snapotter/enterprise";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -194,6 +195,76 @@ describe("checkConnection missing-bucket normalization (#996)", () => {
       statusToReturn = 200;
       await expect(s3.checkConnection()).resolves.toBeUndefined();
     } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+});
+
+describe("putGenericObjectStream signal.reason preservation (#2881)", () => {
+  it("rethrows signal.reason (TimeoutError) instead of @aws-sdk/lib-storage's generic AbortError when a stalled PUT is aborted by AbortSignal.timeout", async () => {
+    const sockets = new Set<net.Socket>();
+    const server = http.createServer((_req, _res) => {
+      // Accept PUT and never respond.
+    });
+    server.on("connection", (socket) => sockets.add(socket));
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as net.AddressInfo;
+
+    try {
+      s3.configureS3({
+        bucket: "stalled-upload-bucket",
+        region: "us-east-1",
+        endpoint: `http://127.0.0.1:${port}`,
+        accessKeyId: "k",
+        secretAccessKey: "s",
+        forcePathStyle: true,
+        prefix: "",
+      });
+
+      const timeoutSignal = AbortSignal.timeout(80);
+      const timeoutErr = await s3
+        .putGenericObjectStream(
+          "outputs/job-1/out.bin",
+          Readable.from([Buffer.alloc(64 * 1024, 1)]),
+          timeoutSignal,
+        )
+        .then(
+          () => null,
+          (err: unknown) => err,
+        );
+      expect(timeoutErr).toBe(timeoutSignal.reason);
+      expect(timeoutErr).toMatchObject({ name: "TimeoutError" });
+
+      const cancelController = new AbortController();
+      setTimeout(() => cancelController.abort(), 50);
+      const cancelErr = await s3
+        .putGenericObjectStream(
+          "outputs/job-1/out.bin",
+          Readable.from([Buffer.alloc(64 * 1024, 1)]),
+          cancelController.signal,
+        )
+        .then(
+          () => null,
+          (err: unknown) => err,
+        );
+      expect(cancelErr).toBe(cancelController.signal.reason);
+      expect(cancelErr).toMatchObject({ name: "AbortError" });
+
+      const primitiveAbortController = new AbortController();
+      setTimeout(() => primitiveAbortController.abort("canceled"), 50);
+      const primitiveAbortErr = await s3
+        .putGenericObjectStream(
+          "outputs/job-1/out.bin",
+          Readable.from([Buffer.alloc(64 * 1024, 1)]),
+          primitiveAbortController.signal,
+        )
+        .then(
+          () => null,
+          (err: unknown) => err,
+        );
+      expect(primitiveAbortErr).toMatchObject({ name: "AbortError", message: "Upload aborted." });
+    } finally {
+      for (const socket of sockets) socket.destroy();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
   });

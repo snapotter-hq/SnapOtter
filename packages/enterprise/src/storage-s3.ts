@@ -326,6 +326,16 @@ export async function putGenericObjectStream(
   try {
     await upload.done();
     signal?.throwIfAborted();
+  } catch (err) {
+    const errName = (err as { name?: unknown } | null)?.name;
+    if (
+      signal?.aborted &&
+      signal.reason instanceof Error &&
+      (err === signal.reason || errName === "AbortError" || errName === "RequestAbortedError")
+    ) {
+      throw signal.reason;
+    }
+    throw err;
   } finally {
     signal?.removeEventListener("abort", abortUpload);
   }

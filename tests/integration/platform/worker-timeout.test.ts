@@ -674,9 +674,10 @@ describe("Worker timeout classification", () => {
         expect(finalRow?.status).toBe("failed");
         expect(finalRow?.attempts).toBe(2);
 
-        const error = finalRow?.error as { message: string; httpStatus?: number };
-        expect(error.message).not.toMatch(/timed out after 1s/i);
-        expect(error.message).not.toBe("Canceled");
+        const error = finalRow?.error as { message: string; code?: string; httpStatus?: number };
+        expect(error.message).toBe("The server couldn't write to its storage.");
+        expect(error.code).toBe("storage-write-failed");
+        expect(error.httpStatus).toBe(503);
 
         const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${jobId}`);
         const frame = JSON.parse(cached ?? "{}");
@@ -734,9 +735,10 @@ describe("Worker timeout classification", () => {
       expect(finalRow?.status).toBe("failed");
       expect(finalRow?.attempts).toBe(2);
 
-      const error = finalRow?.error as { message: string; httpStatus?: number };
-      expect(error.message).not.toMatch(/timed out after 1s/i);
-      expect(error.message).not.toBe("Canceled");
+      const error = finalRow?.error as { message: string; code?: string; httpStatus?: number };
+      expect(error.message).toBe("The server couldn't write to its storage.");
+      expect(error.code).toBe("storage-write-failed");
+      expect(error.httpStatus).toBe(503);
 
       const logged = errorLog.mock.calls.filter(
         ([ctx, msg]) => msg === "tool job failed" && (ctx as { jobId?: string }).jobId === jobId,

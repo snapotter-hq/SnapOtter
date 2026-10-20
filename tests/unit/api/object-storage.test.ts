@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Readable } from "node:stream";
+import { PassThrough, Readable } from "node:stream";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import {
@@ -23,6 +23,7 @@ import {
   objectExists,
   putObject,
   putObjectStream,
+  STORAGE_WRITE_FAILED_MESSAGE,
   verifyS3Bucket,
 } from "../../../apps/api/src/lib/object-storage.js";
 
@@ -155,6 +156,63 @@ describe("object-storage (local backend)", () => {
       const bug = new TypeError("Cannot read properties of undefined");
       await expect(putObjectStream(unavailableKey, failingSource(bug))).rejects.toBe(bug);
       expect((bug as TypeError & { statusCode?: number }).statusCode).toBe(500);
+    });
+
+    it("classifies an AbortSignal.timeout abort (in-flight, pre-aborted, or pipeline AbortError cause) as 503 storage-write-failed (#2881)", async () => {
+      const stalled = new PassThrough();
+      stalled.write(Buffer.from("partial"));
+      const timeoutSignal = AbortSignal.timeout(50);
+      const inFlightErr = await putObjectStream(unavailableKey, stalled, {
+        signal: timeoutSignal,
+      }).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(timeoutSignal.reason).toMatchObject({ name: "TimeoutError" });
+      expect(inFlightErr).toMatchObject({
+        message: STORAGE_WRITE_FAILED_MESSAGE,
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-write-failed",
+        statusCode: 503,
+        cause: timeoutSignal.reason,
+      });
+      await expect(objectExists(unavailableKey)).resolves.toBe(false);
+
+      // Pre-aborted timeout signal (e.g., shared uploadSignal expired before extra output).
+      await expect(
+        putObjectStream(unavailableKey, Readable.from([Buffer.from("extra")]), {
+          signal: timeoutSignal,
+        }),
+      ).rejects.toMatchObject({
+        message: STORAGE_WRITE_FAILED_MESSAGE,
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-write-failed",
+        statusCode: 503,
+        cause: timeoutSignal.reason,
+      });
+      await expect(objectExists(unavailableKey)).resolves.toBe(false);
+
+      // Node's pipeline(..., { signal }) wraps a signal timeout in AbortError({ cause: TimeoutError }).
+      const timeoutCause = new DOMException(
+        "The operation was aborted due to timeout",
+        "TimeoutError",
+      );
+      const pipelineWrappedAbort = Object.assign(
+        new Error("The operation was aborted", { cause: timeoutCause }),
+        { name: "AbortError", code: "ABORT_ERR" },
+      );
+      await expect(
+        putObjectStream(unavailableKey, failingSource(pipelineWrappedAbort)),
+      ).rejects.toMatchObject({
+        message: STORAGE_WRITE_FAILED_MESSAGE,
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-write-failed",
+        statusCode: 503,
+        cause: timeoutCause,
+      });
     });
   });
 
