@@ -12,30 +12,41 @@ import {
 import { format } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-function AuthImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+export function AuthImage({
+  src,
+  alt,
+  className,
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+}) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let revoked = false;
-    fetch(src, { headers: formatHeaders() })
+    let objectUrl: string | null = null;
+    const controller = new AbortController();
+    setFailed(false);
+    fetch(src, { headers: formatHeaders(), signal: controller.signal })
       .then((res) => {
         if (!res.ok) throw new Error();
         return res.blob();
       })
       .then((blob) => {
         if (revoked) return;
-        setBlobUrl(URL.createObjectURL(blob));
+        objectUrl = URL.createObjectURL(blob);
+        setBlobUrl(objectUrl);
       })
       .catch(() => {
         if (!revoked) setFailed(true);
       });
     return () => {
       revoked = true;
-      setBlobUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return null;
-      });
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      setBlobUrl(null);
     };
   }, [src]);
 
@@ -55,7 +66,15 @@ function AuthImage({ src, alt, className }: { src: string; alt: string; classNam
     );
   }
 
-  return <img src={blobUrl} alt={alt} className={className} loading="lazy" />;
+  return (
+    <img
+      src={blobUrl}
+      alt={alt}
+      className={className}
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
+  );
 }
 
 interface FileLibraryModalProps {

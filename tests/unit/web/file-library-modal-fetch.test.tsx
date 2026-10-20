@@ -18,7 +18,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
   return { ...actual, apiListFiles };
 });
 
-import { FileLibraryModal } from "@/components/common/file-library-modal";
+import { AuthImage, FileLibraryModal } from "@/components/common/file-library-modal";
 import type { UserFile } from "@/lib/api";
 
 function userFile(id: string, originalName: string): UserFile {
@@ -442,5 +442,142 @@ describe("FileLibraryModal import (#1948)", () => {
     });
     expect(onImport).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe("FileLibraryModal AuthImage (#2957)", () => {
+  beforeEach(() => {
+    vi.stubGlobal("URL", {
+      ...URL,
+      createObjectURL: vi.fn(() => "blob:thumb"),
+      revokeObjectURL: vi.fn(),
+    });
+  });
+
+  it("resets failed state when src changes from a failing thumbnail URL to a working one", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input).includes("/f1/")) {
+          return new Response("Not found", { status: 404 });
+        }
+        return new Response("png-bytes", {
+          status: 200,
+          headers: { "Content-Type": "image/png" },
+        });
+      }),
+    );
+
+    const view = render(<AuthImage src="/api/v1/files/f1/thumbnail" alt="thumbnail" />);
+    await waitFor(() => {
+      expect(view.container.querySelector(".animate-spin")).toBeNull();
+    });
+    expect(screen.queryByRole("img")).toBeNull();
+
+    view.rerender(<AuthImage src="/api/v1/files/f2/thumbnail" alt="thumbnail" />);
+
+    const img = await screen.findByRole("img", { name: "thumbnail" });
+    expect(img).toHaveAttribute("src", "blob:thumb");
+
+    view.rerender(<AuthImage src="/api/v1/files/f1/thumbnail" alt="thumbnail" />);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:thumb");
+    await waitFor(() => {
+      expect(screen.queryByRole("img")).toBeNull();
+    });
+
+    vi.mocked(URL.revokeObjectURL).mockClear();
+    view.rerender(<AuthImage src="/api/v1/files/f2/thumbnail" alt="thumbnail" />);
+    expect(await screen.findByRole("img", { name: "thumbnail" })).toHaveAttribute(
+      "src",
+      "blob:thumb",
+    );
+
+    view.unmount();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:thumb");
+  });
+
+  it("aborts in-flight fetch and ignores late blob resolution or rejection after src changes", async () => {
+    const firstFetch = deferred<Response>();
+    const secondFetch = deferred<Response>();
+    const thirdFetch = deferred<Response>();
+    const signals: AbortSignal[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.signal) signals.push(init.signal);
+        const url = String(input);
+        if (url.includes("/f1/")) return firstFetch.promise;
+        if (url.includes("/f2/")) return secondFetch.promise;
+        return thirdFetch.promise;
+      }),
+    );
+
+    const view = render(<AuthImage src="/api/v1/files/f1/thumbnail" alt="thumbnail" />);
+    expect(signals).toHaveLength(1);
+    expect(signals[0].aborted).toBe(false);
+
+    view.rerender(<AuthImage src="/api/v1/files/f2/thumbnail" alt="thumbnail" />);
+    expect(signals[0].aborted).toBe(true);
+    expect(signals).toHaveLength(2);
+    expect(signals[1].aborted).toBe(false);
+
+    await act(async () => {
+      firstFetch.reject(new TypeError("Failed to fetch"));
+    });
+    expect(view.container.querySelector(".animate-spin")).not.toBeNull();
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+
+    view.rerender(<AuthImage src="/api/v1/files/f3/thumbnail" alt="thumbnail" />);
+    expect(signals[1].aborted).toBe(true);
+
+    await act(async () => {
+      secondFetch.resolve(
+        new Response("stale-png-bytes", {
+          status: 200,
+          headers: { "Content-Type": "image/png" },
+        }),
+      );
+    });
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    expect(screen.queryByRole("img")).toBeNull();
+
+    await act(async () => {
+      thirdFetch.resolve(
+        new Response("png-bytes", {
+          status: 200,
+          headers: { "Content-Type": "image/png" },
+        }),
+      );
+    });
+    expect(await screen.findByRole("img", { name: "thumbnail" })).toHaveAttribute(
+      "src",
+      "blob:thumb",
+    );
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+  });
+
+  it("switches to the fallback icon when the modal thumbnail img fires an error event", async () => {
+    apiListFiles.mockResolvedValueOnce({
+      files: [userFile("a", "corrupt.png")],
+      total: 1,
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response("not-an-image", {
+            status: 200,
+            headers: { "Content-Type": "image/png" },
+          }),
+      ),
+    );
+
+    render(<FileLibraryModal open onClose={() => {}} onImport={() => {}} />);
+
+    const img = await screen.findByRole("img", { name: "corrupt.png" });
+    expect(img).toHaveAttribute("src", "blob:thumb");
+
+    fireEvent.error(img);
+    expect(screen.queryByRole("img", { name: "corrupt.png" })).toBeNull();
   });
 });
