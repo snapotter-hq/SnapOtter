@@ -686,6 +686,8 @@ function ToolPageContent({
     if (!allowIntake()) return;
     reset();
     usePassportPhotoStore.getState().reset();
+    useDuplicateStore.getState().reset();
+    useSplitStore.getState().reset();
   }, [allowIntake, reset]);
 
   const handleAddMore = useCallback(() => {

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useFileStore } from "@/stores/file-store";
 
 export interface DuplicateFileInfo {
   filename: string;
@@ -74,3 +75,9 @@ export const useDuplicateStore = create<DuplicateState>((set) => ({
       bestOverrides: {},
     }),
 }));
+
+useFileStore.subscribe((state, prevState) => {
+  if (prevState.files.length > 0 && state.files.length === 0) {
+    useDuplicateStore.getState().reset();
+  }
+});

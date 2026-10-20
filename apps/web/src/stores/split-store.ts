@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useFileStore } from "@/stores/file-store";
 
 export type SplitMode = "grid" | "tile-size";
 
@@ -164,3 +165,9 @@ export const useSplitStore = create<SplitState>((set, get) => ({
     };
   },
 }));
+
+useFileStore.subscribe((state, prevState) => {
+  if (prevState.files.length > 0 && state.files.length === 0) {
+    useSplitStore.getState().reset();
+  }
+});

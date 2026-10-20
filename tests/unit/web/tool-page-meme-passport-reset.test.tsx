@@ -22,6 +22,7 @@ import { de } from "@snapotter/shared/i18n/de.js";
 import { I18nProvider } from "@/contexts/i18n-context";
 import { useWorkInFlight } from "@/hooks/use-work-in-flight";
 import { ToolPage } from "@/pages/tool-page";
+import { useDuplicateStore } from "@/stores/duplicate-store";
 import { useFeaturesStore } from "@/stores/features-store";
 import { useFileStore } from "@/stores/file-store";
 import { type MemeTemplate, useMemeStore } from "@/stores/meme-store";
@@ -30,6 +31,7 @@ import {
   passportFileKey,
   usePassportPhotoStore,
 } from "@/stores/passport-photo-store";
+import { useSplitStore } from "@/stores/split-store";
 import { useToolResultClaims } from "@/stores/tool-result-claims";
 
 const PREVIEW_PNG =
@@ -154,6 +156,7 @@ beforeEach(() => {
     disconnect() {}
   }
   vi.stubGlobal("ResizeObserver", MockResizeObserver);
+  Element.prototype.scrollIntoView = vi.fn();
   class ImmediateImage {
     width = 900;
     height = 1200;
@@ -251,16 +254,20 @@ beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
 
   useFileStore.getState().reset();
+  useDuplicateStore.getState().reset();
   useMemeStore.getState().reset();
   usePassportPhotoStore.getState().reset();
+  useSplitStore.getState().reset();
   useToolResultClaims.getState().reset();
 });
 
 afterEach(() => {
   cleanup();
   useFileStore.getState().reset();
+  useDuplicateStore.getState().reset();
   useMemeStore.getState().reset();
   usePassportPhotoStore.getState().reset();
+  useSplitStore.getState().reset();
   useToolResultClaims.getState().reset();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -837,5 +844,166 @@ describe("ToolPage resets usePassportPhotoStore and useMemeStore across tool cha
     const fileForKey = new File(["k"], "key.jpg", { type: "image/jpeg", lastModified: 42 });
     expect(passportFileKey(fileForKey)).toBe("key.jpg-1-42");
     expect(passportFileKey(fileForKey, "entry-9")).toBe("entry-9:key.jpg-1-42");
+  });
+
+  it("clears useDuplicateStore results and error on Clear all and on direct useFileStore.reset() (#3169)", async () => {
+    renderRoutes("/image/find-duplicates");
+
+    const fileA = new File(["img-a"], "one.png", { type: "image/png" });
+    const fileB = new File(["img-b"], "two.png", { type: "image/png" });
+    await act(async () => {
+      useFileStore.getState().setFiles([fileA, fileB]);
+    });
+
+    await screen.findByTestId("find-duplicates-submit");
+
+    const duplicateResult = {
+      totalImages: 2,
+      uniqueImages: 1,
+      spaceSaveable: 512,
+      duplicateGroups: [
+        {
+          groupId: 1,
+          files: [
+            {
+              filename: "one.png",
+              similarity: 100,
+              width: 100,
+              height: 100,
+              fileSize: 512,
+              format: "png",
+              isBest: true,
+              thumbnail: null,
+            },
+            {
+              filename: "two.png",
+              similarity: 100,
+              width: 100,
+              height: 100,
+              fileSize: 512,
+              format: "png",
+              isBest: false,
+              thumbnail: null,
+            },
+          ],
+        },
+      ],
+    };
+
+    act(() => {
+      useDuplicateStore.setState({
+        results: duplicateResult,
+        error: "Previous scan warning",
+        viewMode: "detail",
+        selectedGroupIndex: 0,
+        bestOverrides: { 0: 1 },
+      });
+    });
+    expect(screen.getByTestId("work-probe")).toHaveTextContent("unsaved");
+
+    fireEvent.click(screen.getByRole("button", { name: en.toolPage.clearAll }));
+
+    expect(useFileStore.getState().files).toEqual([]);
+    expect(useDuplicateStore.getState().results).toBeNull();
+    expect(useDuplicateStore.getState().error).toBeNull();
+    expect(useDuplicateStore.getState().viewMode).toBe("overview");
+    expect(useDuplicateStore.getState().selectedGroupIndex).toBe(0);
+    expect(useDuplicateStore.getState().bestOverrides).toEqual({});
+    expect(screen.getByTestId("work-probe")).toHaveTextContent("clean");
+
+    // Direct useFileStore.getState().reset() when transitioning from non-empty to empty also resets useDuplicateStore.
+    await act(async () => {
+      useFileStore.getState().setFiles([fileA, fileB]);
+    });
+    act(() => {
+      useDuplicateStore.setState({
+        results: duplicateResult,
+        error: "Another scan warning",
+        viewMode: "detail",
+        selectedGroupIndex: 0,
+        bestOverrides: { 0: 0 },
+      });
+    });
+    expect(screen.getByTestId("work-probe")).toHaveTextContent("unsaved");
+
+    act(() => {
+      useFileStore.getState().reset();
+    });
+    expect(useDuplicateStore.getState().results).toBeNull();
+    expect(useDuplicateStore.getState().error).toBeNull();
+    expect(useDuplicateStore.getState().viewMode).toBe("overview");
+    expect(useDuplicateStore.getState().bestOverrides).toEqual({});
+    expect(screen.getByTestId("work-probe")).toHaveTextContent("clean");
+  });
+
+  it("clears useSplitStore tiles and zipBlobUrl and revokes blob URLs on Clear all and on direct useFileStore.reset() (#3169)", async () => {
+    renderRoutes("/image/split");
+
+    const fileA = new File(["img-a"], "one.png", { type: "image/png" });
+    await act(async () => {
+      useFileStore.getState().setFiles([fileA]);
+    });
+
+    await screen.findByTestId("split-submit");
+
+    act(() => {
+      useSplitStore.setState({
+        columns: 4,
+        rows: 2,
+        tiles: [
+          { row: 0, col: 0, label: "1", width: 100, height: 100, blobUrl: "blob:split-tile-1" },
+          { row: 0, col: 1, label: "2", width: 100, height: 100, blobUrl: "blob:split-tile-2" },
+        ],
+        runFileCount: 1,
+        zipBlobUrl: "blob:split-zip-1",
+        error: "Previous split warning",
+        imageDimensions: { width: 900, height: 1200 },
+      });
+    });
+    expect(screen.getByTestId("work-probe")).toHaveTextContent("unsaved");
+    revokeObjectURLMock.mockClear();
+
+    fireEvent.click(screen.getByRole("button", { name: en.toolPage.clearAll }));
+
+    expect(useFileStore.getState().files).toEqual([]);
+    expect(useSplitStore.getState().tiles).toEqual([]);
+    expect(useSplitStore.getState().runFileCount).toBe(0);
+    expect(useSplitStore.getState().zipBlobUrl).toBeNull();
+    expect(useSplitStore.getState().error).toBeNull();
+    expect(useSplitStore.getState().imageDimensions).toBeNull();
+    expect(useSplitStore.getState().columns).toBe(4);
+    expect(useSplitStore.getState().rows).toBe(2);
+    expect(revokeObjectURLMock).toHaveBeenCalledWith("blob:split-zip-1");
+    expect(revokeObjectURLMock).toHaveBeenCalledWith("blob:split-tile-1");
+    expect(revokeObjectURLMock).toHaveBeenCalledWith("blob:split-tile-2");
+    expect(screen.getByTestId("work-probe")).toHaveTextContent("clean");
+
+    // Direct useFileStore.getState().reset() when transitioning from non-empty to empty also resets useSplitStore.
+    await act(async () => {
+      useFileStore.getState().setFiles([fileA]);
+    });
+    act(() => {
+      useSplitStore.setState({
+        tiles: [
+          { row: 0, col: 0, label: "1", width: 100, height: 100, blobUrl: "blob:split-tile-3" },
+        ],
+        runFileCount: 1,
+        zipBlobUrl: "blob:split-zip-2",
+        error: "Another split warning",
+      });
+    });
+    expect(screen.getByTestId("work-probe")).toHaveTextContent("unsaved");
+    revokeObjectURLMock.mockClear();
+
+    act(() => {
+      useFileStore.getState().reset();
+    });
+    expect(useSplitStore.getState().tiles).toEqual([]);
+    expect(useSplitStore.getState().runFileCount).toBe(0);
+    expect(useSplitStore.getState().zipBlobUrl).toBeNull();
+    expect(useSplitStore.getState().error).toBeNull();
+    expect(revokeObjectURLMock).toHaveBeenCalledWith("blob:split-zip-2");
+    expect(revokeObjectURLMock).toHaveBeenCalledWith("blob:split-tile-3");
+    expect(screen.getByTestId("work-probe")).toHaveTextContent("clean");
   });
 });
