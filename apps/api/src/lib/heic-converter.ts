@@ -49,6 +49,7 @@ async function verifyDecodedImageLimits(
   decoded: Buffer,
   options: HeicDecodeOptions,
 ): Promise<Buffer> {
+  options.signal?.throwIfAborted();
   if (options.maxPixels !== undefined || options.maxDimension !== undefined) {
     try {
       const metadata = await sharp(decoded, {
@@ -56,15 +57,8 @@ async function verifyDecodedImageLimits(
       }).metadata();
       assertImageLimits(metadata.width, metadata.height, options.maxPixels, options.maxDimension);
     } catch (error) {
-      if (
-        error instanceof Error &&
-        /(?:pixel (?:dimension )?safety limit|input image exceeds pixel limit)/i.test(error.message)
-      ) {
-        throw error;
-      }
-      throw new Error("Decoded image exceeds the configured image safety limits", {
-        cause: error,
-      });
+      options.signal?.throwIfAborted();
+      throw asDecoderOutOfMemory(error);
     }
   }
   options.signal?.throwIfAborted();
@@ -126,6 +120,8 @@ async function findDecodeCmd(options: HeicDecodeOptions = {}): Promise<string> {
       return cmd;
     } catch (err) {
       options.signal?.throwIfAborted();
+      const outOfMemory = asDecoderOutOfMemory(err);
+      if (outOfMemory !== err) throw outOfMemory;
       probeFailures.push(err);
     }
   }
@@ -156,6 +152,7 @@ export async function decodeHeic(buffer: Buffer, options: HeicDecodeOptions = {}
     encodedDimensions.length === 0
   ) {
     let dimensionsVerified = false;
+    let metadataError: unknown;
     try {
       const metadata = await sharp(buffer, {
         limitInputPixels: options.maxPixels ?? false,
@@ -167,6 +164,7 @@ export async function decodeHeic(buffer: Buffer, options: HeicDecodeOptions = {}
         metadata.width > 0 &&
         metadata.height > 0;
     } catch (error) {
+      options.signal?.throwIfAborted();
       // Sharp often has enough libheif support for metadata but not HEVC pixel
       // decode. Only turn a proven size-limit failure into a rejection.
       if (
@@ -175,9 +173,19 @@ export async function decodeHeic(buffer: Buffer, options: HeicDecodeOptions = {}
       ) {
         throw error;
       }
+      const outOfMemory = asDecoderOutOfMemory(
+        error instanceof Error && /\bAllocating \d+ bytes failed\b/.test(error.message)
+          ? Object.assign(error, { stderr: error.message })
+          : error,
+      );
+      if (outOfMemory !== error) throw outOfMemory;
+      metadataError = error;
     }
     if (!dimensionsVerified) {
-      throw new Error("Cannot safely decode HEIF: encoded dimensions are unavailable");
+      throw new Error(
+        "Cannot safely decode HEIF: encoded dimensions are unavailable",
+        metadataError !== undefined ? { cause: metadataError } : undefined,
+      );
     }
   }
 

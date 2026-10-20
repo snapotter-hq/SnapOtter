@@ -18,7 +18,33 @@ const failures = vi.hoisted(() => ({
   // Which output read fails: heif-dec's single-image name or the -1 fallback.
   pattern: /heic-out-(?![^/\\]*-1\.png$)[^/\\]*\.png$/,
   kill: null as Record<string, unknown> | null,
+  probe: null as Record<string, unknown> | null,
+  probed: [] as string[],
+  readResult: null as Buffer | null,
+  metadataError: null as Error | null,
 }));
+
+vi.mock("sharp", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("sharp")>();
+  const realSharp = actual.default;
+  const wrapped = ((input?: unknown, options?: unknown) => {
+    const instance = realSharp(input as Parameters<typeof realSharp>[0], options as never);
+    if (failures.metadataError) {
+      const origMetadata = instance.metadata.bind(instance);
+      instance.metadata = (async (...args: Parameters<typeof origMetadata>) => {
+        if (failures.metadataError) {
+          const err = failures.metadataError;
+          failures.metadataError = null;
+          throw err;
+        }
+        return origMetadata(...args);
+      }) as typeof instance.metadata;
+    }
+    return instance;
+  }) as typeof realSharp;
+  Object.assign(wrapped, realSharp);
+  return { ...actual, default: wrapped };
+});
 
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
@@ -29,6 +55,11 @@ vi.mock("node:fs/promises", async (importOriginal) => {
         const err = failures.next;
         failures.next = null;
         throw err;
+      }
+      if (failures.readResult && failures.pattern.test(String(path))) {
+        const buf = failures.readResult;
+        failures.readResult = null;
+        return buf;
       }
       return (actual.readFile as (...args: unknown[]) => unknown)(path, ...rest);
     }) as typeof actual.readFile,
@@ -44,6 +75,16 @@ vi.mock("node:child_process", async (importOriginal) => {
   // and only once.
   const execFile = Object.assign((...args: unknown[]) => actual.execFile(...(args as [string])), {
     [promisify.custom]: (file: string, argv: string[], options?: unknown) => {
+      if (argv.includes("--version")) {
+        failures.probed.push(file);
+        if (failures.probe) {
+          const fields = failures.probe;
+          failures.probe = null;
+          return Promise.reject(
+            Object.assign(new Error(`Command failed: ${file} --version`), fields),
+          );
+        }
+      }
       if (failures.kill && argv.some((arg) => /heic-in-[^/\\]*\.heic$/.test(arg))) {
         const fields = failures.kill;
         failures.kill = null;
@@ -65,16 +106,134 @@ afterEach(() => {
   failures.next = null;
   failures.pattern = SINGLE;
   failures.kill = null;
+  failures.probe = null;
+  failures.probed = [];
+  failures.readResult = null;
+  failures.metadataError = null;
 });
 
-async function decodeError(buffer: Buffer): Promise<Error & { cause?: unknown }> {
+async function decodeError(
+  buffer: Buffer,
+  options?: Parameters<typeof decodeHeic>[1],
+): Promise<Error & { cause?: unknown }> {
   try {
-    await decodeHeic(buffer);
+    await decodeHeic(buffer, options);
   } catch (err) {
     return err as Error & { cause?: unknown };
   }
   throw new Error("decodeHeic resolved");
 }
+
+function makeHeicHeaderWithoutIspe(): Buffer {
+  const buf = Buffer.alloc(16);
+  buf.writeUInt32BE(16, 0);
+  buf.write("ftyp", 4, 4, "ascii");
+  buf.write("heic", 8, 4, "ascii");
+  return buf;
+}
+
+describe("findDecodeCmd probe fault handling (#2883)", () => {
+  // Runs before the decode tests below so cachedDecodeCmd is still null and
+  // findDecodeCmd actually executes its `--version` probe (#2883).
+  it("surfaces a killed heif-convert --version probe as a 503 DecoderOutOfMemoryError instead of probing heif-dec", async () => {
+    failures.probe = { code: null, signal: "SIGKILL", stderr: "" };
+    const err = await decodeError(readFixture(fixtures.image.formats("heic")));
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect(err.name).toBe("DecoderOutOfMemoryError");
+    expect((err.cause as { signal?: string } | undefined)?.signal).toBe("SIGKILL");
+    expect(failures.probed).toEqual(["heif-convert"]);
+  });
+
+  it("surfaces a heif-convert --version probe hitting a thread limit as a 503 DecoderOutOfMemoryError", async () => {
+    failures.probe = {
+      code: null,
+      signal: "SIGABRT",
+      stderr:
+        "terminate called after throwing an instance of 'std::system_error'\n  what():  Resource temporarily unavailable\n",
+    };
+    const err = await decodeError(readFixture(fixtures.image.formats("heic")));
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect(err.name).toBe("DecoderOutOfMemoryError");
+    expect(err.message).toContain("thread or process limit");
+    expect(failures.probed).toEqual(["heif-convert"]);
+  });
+});
+
+describe("verifyDecodedImageLimits and metadata preflight fault handling (#2883)", () => {
+  it("keeps Sharp's error in verifyDecodedImageLimits when the decoded PNG is corrupt", async () => {
+    failures.readResult = Buffer.from("not a valid png");
+    const err = await decodeError(readFixture(fixtures.image.formats("heic")), {
+      maxPixels: 10_000_000,
+    });
+    expect(isDecoderUnavailable(err)).toBe(false);
+    expect(err.message).not.toMatch(/configured image safety limits/);
+    expect(err.message).toMatch(/unsupported image format|VipsPng/i);
+  });
+
+  it("surfaces a V8 buffer allocation RangeError in verifyDecodedImageLimits as a 503 DecoderOutOfMemoryError", async () => {
+    const heic = readFixture(fixtures.image.formats("heic"));
+    // Trigger metadataError on the post-decode verifyDecodedImageLimits call (when input has an ispe box, preflight metadata() is skipped).
+    const oom = new RangeError("Array buffer allocation failed");
+    failures.metadataError = oom;
+    const err = await decodeError(heic, { maxPixels: 10_000_000 });
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect(err.name).toBe("DecoderOutOfMemoryError");
+    expect(err.cause).toBe(oom);
+  });
+
+  it("surfaces a libheif allocation failure in decodeHeic's metadata preflight as a 503 DecoderOutOfMemoryError", async () => {
+    const libheifOom = new Error(
+      "heif: Memory allocation error: Unspecified: Allocating 4147215 bytes failed (4.1000)",
+    );
+    failures.metadataError = libheifOom;
+    const err = await decodeError(makeHeicHeaderWithoutIspe(), { maxPixels: 1_000_000 });
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect(err.name).toBe("DecoderOutOfMemoryError");
+    expect(err.cause).toBe(libheifOom);
+  });
+
+  it("surfaces a V8 RangeError in decodeHeic's metadata preflight as a 503 DecoderOutOfMemoryError", async () => {
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    failures.metadataError = v8Oom;
+    const err = await decodeError(makeHeicHeaderWithoutIspe(), { maxPixels: 1_000_000 });
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect(err.name).toBe("DecoderOutOfMemoryError");
+    expect(err.cause).toBe(v8Oom);
+  });
+
+  it("rethrows a pixel safety limit error from decodeHeic's metadata preflight directly", async () => {
+    failures.metadataError = new Error("Input image exceeds pixel limit");
+    const err = await decodeError(makeHeicHeaderWithoutIspe(), { maxPixels: 50_000 });
+    expect(isDecoderUnavailable(err)).toBe(false);
+    expect(err.message).toBe("Input image exceeds pixel limit");
+  });
+
+  it("attaches Sharp's metadata error as cause when encoded dimensions are unavailable", async () => {
+    const err = await decodeError(makeHeicHeaderWithoutIspe(), { maxPixels: 1_000_000 });
+    expect(isDecoderUnavailable(err)).toBe(false);
+    expect(err.message).toBe("Cannot safely decode HEIF: encoded dimensions are unavailable");
+    expect(err.cause).toBeInstanceOf(Error);
+  });
+
+  it("still enforces limitInputPixels and maxDimension in verifyDecodedImageLimits when decoded output exceeds them", async () => {
+    const heic200 = readFixture(fixtures.image.base.heic200);
+    const largePng = await sharp({
+      create: { width: 400, height: 300, channels: 3, background: { r: 0, g: 0, b: 0 } },
+    })
+      .png()
+      .toBuffer();
+
+    failures.readResult = largePng;
+    const pixelErr = await decodeError(heic200, { maxPixels: 50_000 });
+    expect(isDecoderUnavailable(pixelErr)).toBe(false);
+    expect(pixelErr.message).toMatch(/input image exceeds pixel limit/i);
+
+    failures.readResult = largePng;
+    const dimErr = await decodeError(heic200, { maxDimension: 250, maxPixels: 500_000 });
+    expect(isDecoderUnavailable(dimErr)).toBe(false);
+    expect(dimErr.message).toMatch(/pixel dimension safety limit.*400x300/i);
+  });
+});
 
 describe("decodeHeic reading its output", () => {
   it("answers V8 failing to allocate the output as a 503, not a bad file (#1577)", async () => {
