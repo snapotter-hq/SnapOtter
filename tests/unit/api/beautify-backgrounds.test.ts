@@ -525,11 +525,11 @@ describe("beautify route and processBeautify validation & backgroundImage prepar
     // 2. CLI-decoded backgroundImage passes fileExt to decodeToSharpCompat
     const cliSpy = vi.spyOn(formatDecoders, "decodeToSharpCompat").mockResolvedValueOnce(PNG_200);
     try {
-      const dngBuf = readFixture(fixtures.image.formats("dng"));
+      const dngBuf = Buffer.from("fake-raw-dng-header");
       const resCli = await invokeBeautify({
         file: { filename: "main.png", content: PNG_200 },
         backgroundImage: { filename: "bg.dng", content: dngBuf },
-        settings: { backgroundType: "image" },
+        settings: { backgroundType: "image", shadowPreset: "none" },
       });
       expect(resCli.statusCode).toBe(200);
       expect(cliSpy).toHaveBeenCalledWith(dngBuf, "raw", "dng");
@@ -544,7 +544,7 @@ describe("beautify route and processBeautify validation & backgroundImage prepar
       const resHeic = await invokeBeautify({
         file: { filename: "main.png", content: PNG_200 },
         backgroundImage: { filename: "bg.heic", content: heicBuf },
-        settings: { backgroundType: "image" },
+        settings: { backgroundType: "image", shadowPreset: "none" },
       });
       expect(resHeic.statusCode).toBe(200);
       expect(heicSpy).toHaveBeenCalledWith(heicBuf);
