@@ -95,8 +95,20 @@ const FORMAT_OPTIONS: {
 // A capture whose width or height rounds to 0 px throws InvalidStateError. The 200 px
 // thumbnail of a very wide or tall document asks for exactly that (on 40000x100 the
 // short side would be 0.5 px), so never ask for less than 1 px on the shorter side.
+// Konva truncates `side * ratio` on SceneCanvas and `((side * ratio) / ratio) * ratio`
+// on its internal bufferCanvas, and for side lengths such as 49 or 93 those float
+// products land just under 1 (#2338); nudging the ratio when either side still
+// truncates below 1 px keeps both canvases at least 1 px.
+function konvaSideAtLeastOnePixel(side: number, ratio: number): boolean {
+  const scaled = side * ratio;
+  return Math.floor(scaled) >= 1 && Math.floor((scaled / ratio) * ratio) >= 1;
+}
+
 function atLeastOnePixel(ratio: number, width: number, height: number): number {
-  return Math.max(ratio, 1 / Math.min(width, height));
+  const clamped = Math.max(ratio, 1 / Math.min(width, height));
+  return !konvaSideAtLeastOnePixel(width, clamped) || !konvaSideAtLeastOnePixel(height, clamped)
+    ? clamped * (1 + 1e-9)
+    : clamped;
 }
 
 function getMimeType(format: ExportFormat): string {
@@ -270,7 +282,11 @@ function renderExportCanvas(
     stage,
     canvasSize.width,
     canvasSize.height,
-    Math.max(width / canvasSize.width, height / canvasSize.height),
+    atLeastOnePixel(
+      Math.max(width / canvasSize.width, height / canvasSize.height),
+      canvasSize.width,
+      canvasSize.height,
+    ),
   );
   const opaque = !settings.transparent || settings.format === "jpeg";
   if (!opaque && captured.width === width && captured.height === height) return captured;

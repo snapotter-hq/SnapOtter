@@ -98,9 +98,15 @@ vi.mock("@/components/editor/stage-capture", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/components/editor/stage-capture")>()),
   captureDocumentCanvas: (_stage: unknown, w: number, h: number, ratio = 1) => {
     fake.state.captures.push({ width: w, height: h, ratio });
-    // Konva sizes the capture by truncating w * ratio, and drawing a layer canvas
-    // with a 0 px side throws InvalidStateError.
-    if (Math.floor(w * ratio) < 1 || Math.floor(h * ratio) < 1) {
+    // Konva sizes the capture by truncating w * ratio (and its internal bufferCanvas
+    // by truncating ((w * ratio) / ratio) * ratio), and drawing a canvas with a 0 px
+    // side throws InvalidStateError.
+    if (
+      Math.floor(w * ratio) < 1 ||
+      Math.floor(h * ratio) < 1 ||
+      Math.floor(((w * ratio) / ratio) * ratio) < 1 ||
+      Math.floor(((h * ratio) / ratio) * ratio) < 1
+    ) {
       throw new DOMException("The object is in an invalid state.", "InvalidStateError");
     }
     return fake.canvas(Math.floor(w * ratio), Math.floor(h * ratio), fake.state.deadCaptures);
@@ -322,6 +328,72 @@ describe("the height box is honoured with the aspect lock off (#2174)", () => {
     expect(click.encoded.map(size)).toEqual([[1920, 1080]]);
     await waitFor(() => expect(markClean).toHaveBeenCalledTimes(1));
   });
+
+  it("nudges the 1 px capture ratio when side * (1 / side) lands under 1 (#2338)", async () => {
+    // 49 * (1 / 49) === 0.9999999999999999 in IEEE 754 float, which Konva truncates to 0 px.
+    useEditorStore.setState({ canvasSize: { width: 800, height: 49 } });
+    render(<ExportDialog onClose={() => {}} />);
+    const [width, height] = boxes();
+    type(width, "1");
+    expect(height).toHaveValue(1);
+
+    const click = during(clickExport);
+    expect(click.encoded.map(size)).toEqual([[1, 1]]);
+    for (const c of click.captures) {
+      expect(Math.floor(800 * c.ratio)).toBeGreaterThanOrEqual(1);
+      expect(Math.floor(49 * c.ratio)).toBeGreaterThanOrEqual(1);
+    }
+    await waitFor(() => expect(markClean).toHaveBeenCalledTimes(1));
+
+    const copy = during(clickCopy);
+    expect(copy.encoded.map(size)).toEqual([[1, 1]]);
+    await waitFor(() => expect(copyImageToClipboard).toHaveBeenCalledTimes(1));
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("nudges the 1 px capture ratio when the document width is the side where side * (1 / side) < 1 (#2338)", async () => {
+    useEditorStore.setState({ canvasSize: { width: 49, height: 800 } });
+    render(<ExportDialog onClose={() => {}} />);
+    const [width, height] = boxes();
+    type(height, "1");
+    expect(width).toHaveValue(1);
+
+    const click = during(clickExport);
+    expect(click.encoded.map(size)).toEqual([[1, 1]]);
+    for (const c of click.captures) {
+      expect(Math.floor(49 * c.ratio)).toBeGreaterThanOrEqual(1);
+      expect(Math.floor(800 * c.ratio)).toBeGreaterThanOrEqual(1);
+    }
+    await waitFor(() => expect(markClean).toHaveBeenCalledTimes(1));
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["wide", { width: 10000, height: 49 }],
+    ["tall", { width: 49, height: 10000 }],
+    ["wide bufferCanvas round-trip", { width: 10000, height: 93 }],
+    ["tall bufferCanvas round-trip", { width: 93, height: 10000 }],
+  ])(
+    "renders the 200 px thumbnail on a %s document when the clamped short side truncates below 1 (#2338)",
+    (_shape, docSize) => {
+      useEditorStore.setState({ canvasSize: docSize });
+      render(<ExportDialog onClose={() => {}} />);
+      expect(screen.getByAltText(en.editor.ui.exportDialog.previewAlt)).toHaveAttribute(
+        "src",
+        fake.state.dataUrl,
+      );
+      for (const c of fake.state.captures) {
+        expect(Math.floor(docSize.width * c.ratio)).toBeGreaterThanOrEqual(1);
+        expect(Math.floor(docSize.height * c.ratio)).toBeGreaterThanOrEqual(1);
+        expect(Math.floor(((docSize.width * c.ratio) / c.ratio) * c.ratio)).toBeGreaterThanOrEqual(
+          1,
+        );
+        expect(Math.floor(((docSize.height * c.ratio) / c.ratio) * c.ratio)).toBeGreaterThanOrEqual(
+          1,
+        );
+      }
+    },
+  );
 });
 
 describe("a capture the browser couldn't back (#2174)", () => {
@@ -599,6 +671,19 @@ describe("the size estimate waits for typing to stop (#2174)", () => {
       vi.advanceTimersByTime(ESTIMATE_DEBOUNCE_MS);
     });
     expect(screen.queryByText("~2 KB")).not.toBeInTheDocument();
+  });
+
+  it("keeps the estimated size when a 1 px target hits a side where side * (1 / side) < 1 (#2338)", () => {
+    fake.state.dataUrl = `data:image/png;base64,${"A".repeat(2731)}=`;
+    useEditorStore.setState({ canvasSize: { width: 800, height: 49 } });
+    render(<ExportDialog onClose={() => {}} />);
+    expect(screen.getByText("~2 KB")).toBeInTheDocument();
+
+    type(boxes()[0], "1");
+    act(() => {
+      vi.advanceTimersByTime(ESTIMATE_DEBOUNCE_MS);
+    });
+    expect(screen.getByText("~2 KB")).toBeInTheDocument();
   });
 
   it("recomputes the debounced estimate when only the height changes with the lock off", () => {
