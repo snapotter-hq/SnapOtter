@@ -4,8 +4,73 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
-import { beginBase64Run, useBase64Store } from "@/stores/base64-store";
+import {
+  type Base64Error,
+  type Base64Result,
+  beginBase64Run,
+  useBase64Store,
+} from "@/stores/base64-store";
 import { useFileStore } from "@/stores/file-store";
+
+type ServerBase64Result = Omit<Base64Result, "entryId">;
+type ServerBase64Error = Omit<Base64Error, "entryId">;
+
+interface Base64Response {
+  results: ServerBase64Result[];
+  errors: ServerBase64Error[];
+}
+
+function isBase64Result(value: unknown): value is ServerBase64Result {
+  if (value === null || typeof value !== "object") return false;
+  const r = value as Record<string, unknown>;
+  return (
+    typeof r.filename === "string" &&
+    r.filename.length > 0 &&
+    typeof r.mimeType === "string" &&
+    r.mimeType.length > 0 &&
+    typeof r.width === "number" &&
+    Number.isFinite(r.width) &&
+    r.width >= 0 &&
+    typeof r.height === "number" &&
+    Number.isFinite(r.height) &&
+    r.height >= 0 &&
+    typeof r.originalSize === "number" &&
+    Number.isFinite(r.originalSize) &&
+    r.originalSize >= 0 &&
+    typeof r.encodedSize === "number" &&
+    Number.isFinite(r.encodedSize) &&
+    r.encodedSize >= 0 &&
+    typeof r.overheadPercent === "number" &&
+    Number.isFinite(r.overheadPercent) &&
+    typeof r.base64 === "string" &&
+    r.base64.length > 0 &&
+    typeof r.dataUri === "string" &&
+    r.dataUri.length > 0
+  );
+}
+
+function isBase64Error(value: unknown): value is ServerBase64Error {
+  if (value === null || typeof value !== "object") return false;
+  const e = value as Record<string, unknown>;
+  return (
+    typeof e.filename === "string" &&
+    e.filename.length > 0 &&
+    typeof e.error === "string" &&
+    e.error.trim().length > 0
+  );
+}
+
+function isBase64Response(value: unknown): value is Base64Response {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return (
+    Array.isArray(data.results) &&
+    data.results.every(isBase64Result) &&
+    Array.isArray(data.errors) &&
+    data.errors.every(isBase64Error) &&
+    data.results.length + data.errors.length > 0
+  );
+}
 
 // Format names (JPEG, PNG, ...) are locale-invariant; "original" resolves via i18n.
 const OUTPUT_FORMATS = [
@@ -69,35 +134,18 @@ export function ImageToBase64Settings() {
         currentEntryId = entryId;
         currentEntryController = entryController;
 
+        let res: Response;
         try {
           const formData = new FormData();
           formData.append("files", file);
           formData.append("settings", settings);
 
-          const res = await fetch(appUrl("/api/v1/tools/image/image-to-base64"), {
+          res = await fetch(appUrl("/api/v1/tools/image/image-to-base64"), {
             method: "POST",
             headers: formatHeaders(),
             body: formData,
             signal: entryController.signal,
           });
-
-          if (!res.ok) {
-            const body = await res.json().catch(() => ({}));
-            if (isCanceled()) break;
-            if (entryController.signal.aborted || !isEntryPresent(entryId)) continue;
-            addError({
-              entryId,
-              filename: file.name,
-              error: failedAnswerMessage(t, body, res.status, `Failed: ${res.status}`),
-            });
-            continue;
-          }
-
-          const data = await res.json();
-          if (isCanceled()) break;
-          if (entryController.signal.aborted || !isEntryPresent(entryId)) continue;
-          for (const r of data.results) addResult({ ...r, entryId });
-          for (const e of data.errors) addError({ ...e, entryId });
         } catch (err) {
           if (isCanceled()) break;
           if (
@@ -112,7 +160,57 @@ export function ImageToBase64Settings() {
             filename: file.name,
             error: err instanceof Error ? err.message : "Failed to convert",
           });
+          continue;
         }
+
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          if (isCanceled()) break;
+          if (entryController.signal.aborted || !isEntryPresent(entryId)) continue;
+          addError({
+            entryId,
+            filename: file.name,
+            error: failedAnswerMessage(t, body, res.status, `Failed: ${res.status}`),
+          });
+          continue;
+        }
+
+        let data: unknown;
+        try {
+          data = await res.json();
+        } catch (err) {
+          if (isCanceled()) break;
+          if (
+            entryController.signal.aborted ||
+            !isEntryPresent(entryId) ||
+            (err instanceof DOMException && err.name === "AbortError")
+          ) {
+            continue;
+          }
+          console.warn(
+            "Unexpected image-to-base64 response:",
+            err instanceof Error ? err.message : err,
+          );
+          addError({
+            entryId,
+            filename: file.name,
+            error: t.errors.invalidServerResponse,
+          });
+          continue;
+        }
+        if (isCanceled()) break;
+        if (entryController.signal.aborted || !isEntryPresent(entryId)) continue;
+        if (!isBase64Response(data)) {
+          console.warn("Unexpected image-to-base64 response shape");
+          addError({
+            entryId,
+            filename: file.name,
+            error: t.errors.invalidServerResponse,
+          });
+          continue;
+        }
+        for (const r of data.results) addResult({ ...r, entryId });
+        for (const e of data.errors) addError({ ...e, entryId });
       }
     } finally {
       currentEntryId = null;

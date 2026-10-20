@@ -75,6 +75,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -361,5 +362,130 @@ describe("image-to-base64 settings", () => {
     expect(encode).toHaveBeenCalledTimes(2);
     expect(useBase64Store.getState().results).toEqual([]);
     expect(useBase64Store.getState().processing).toBe(false);
+  });
+
+  it("shows a translated unexpected-response error and logs a warning when the server answers 200 with non-JSON (#1719)", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { fetchMock, encode } = encodeServer(
+      () => Promise.resolve(new Response("<html>login</html>", { status: 200 })),
+      () => respond({ results: [serverResult("image.png", "c2Vjb25k")], errors: [] }),
+      () => respond({}, 200),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const [first, second, third] = useFileStore.getState().entries;
+
+    const { getByTestId } = render(
+      <I18nProvider>
+        <ImageToBase64Settings />
+      </I18nProvider>,
+    );
+    fireEvent.click(getByTestId("base64-submit"));
+    await waitFor(() => expect(encode).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(useBase64Store.getState().processing).toBe(false));
+
+    const { results, errors } = useBase64Store.getState();
+    expect(results).toEqual([expect.objectContaining({ entryId: second.id, base64: "c2Vjb25k" })]);
+    expect(errors).toEqual([
+      { entryId: first.id, filename: "image.png", error: en.errors.invalidServerResponse },
+      { entryId: third.id, filename: "image.png", error: en.errors.invalidServerResponse },
+    ]);
+    expect(warnSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ["a JSON primitive", () => respond("ok", 200)],
+    ["a JSON array", () => respond([], 200)],
+    ["a JSON null", () => respond(null, 200)],
+    ["missing errors array", () => respond({ results: [] }, 200)],
+    ["missing results array", () => respond({ errors: [] }, 200)],
+    ["empty results and errors arrays", () => respond({ results: [], errors: [] }, 200)],
+    [
+      "a malformed result item",
+      () => respond({ results: [{ filename: "image.png" }], errors: [] }, 200),
+    ],
+    [
+      "a malformed error item",
+      () => respond({ results: [], errors: [{ filename: "image.png" }] }, 200),
+    ],
+    [
+      "an error item with a blank message",
+      () => respond({ results: [], errors: [{ filename: "image.png", error: "   " }] }, 200),
+    ],
+    [
+      "a result item with a non-numeric field",
+      () =>
+        respond(
+          { results: [{ ...serverResult("image.png", "Zmlyc3Q="), width: null }], errors: [] },
+          200,
+        ),
+    ],
+    [
+      "a result item with a negative dimension",
+      () =>
+        respond(
+          { results: [{ ...serverResult("image.png", "Zmlyc3Q="), width: -1 }], errors: [] },
+          200,
+        ),
+    ],
+  ])(
+    "rejects %s on a 200 response with the translated unexpected-response message (#1719)",
+    async (_label, answer) => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      useFileStore.getState().setFiles([new File(["a"], "image.png", { type: "image/png" })]);
+      const [first] = useFileStore.getState().entries;
+      const { fetchMock, encode } = encodeServer(answer);
+      vi.stubGlobal("fetch", fetchMock);
+
+      const { getByTestId } = render(
+        <I18nProvider>
+          <ImageToBase64Settings />
+        </I18nProvider>,
+      );
+      fireEvent.click(getByTestId("base64-submit"));
+      await waitFor(() => expect(encode).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(useBase64Store.getState().processing).toBe(false));
+
+      expect(useBase64Store.getState().results).toEqual([]);
+      expect(useBase64Store.getState().errors).toEqual([
+        { entryId: first.id, filename: "image.png", error: en.errors.invalidServerResponse },
+      ]);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("ignores a non-JSON 200 body if the file was removed while the body was being read (#1719)", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    let resolveFirst: (res: Response) => void = () => {};
+    const { fetchMock, encode } = encodeServer(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveFirst = resolve;
+        }),
+      () => respond({ results: [serverResult("image.png", "c2Vjb25k")], errors: [] }),
+      () => respond({ results: [serverResult("image.png", "dGhpcmQ=")], errors: [] }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const [, second, third] = useFileStore.getState().entries;
+
+    const { getByTestId } = render(
+      <I18nProvider>
+        <ImageToBase64Settings />
+      </I18nProvider>,
+    );
+    fireEvent.click(getByTestId("base64-submit"));
+    await waitFor(() => expect(encode).toHaveBeenCalledTimes(1));
+
+    act(() => {
+      useFileStore.getState().removeFile(0);
+    });
+    await act(async () => {
+      resolveFirst(new Response("<html>", { status: 200 }));
+    });
+
+    await waitFor(() => expect(useBase64Store.getState().processing).toBe(false));
+
+    expect(useBase64Store.getState().results.map((r) => r.entryId)).toEqual([second.id, third.id]);
+    expect(useBase64Store.getState().errors).toEqual([]);
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 });
