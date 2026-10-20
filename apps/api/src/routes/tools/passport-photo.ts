@@ -7,6 +7,7 @@ import {
   FEATURE_BUNDLES,
   formatTargetKb,
   hasServerErrorStatus,
+  isSafeMessageError,
   isToolInputError,
   kbToBytes,
   PASSPORT_SPECS,
@@ -251,11 +252,6 @@ export function registerPassportPhoto(app: FastifyInstance) {
         );
 
         const jobId = randomUUID();
-        const scratchDir = join(tmpdir(), "snapotter-scratch", jobId);
-        await mkdir(scratchDir, { recursive: true });
-
-        // Save original to object storage for generate phase
-        await putObject(`uploads/${jobId}/${filename}`, fileBuffer);
 
         // Progress callback
         const jobIdForProgress = clientJobId;
@@ -293,6 +289,11 @@ export function registerPassportPhoto(app: FastifyInstance) {
               phase: "complete",
               percent: 100,
               result: { jobId, faceDetected: false },
+            }).catch((persistErr) => {
+              request.log.error(
+                { err: persistErr, jobId: clientJobId, toolId: "passport-photo" },
+                "Failed to persist passport photo analysis progress",
+              );
             });
           }
           return reply.status(422).send({
@@ -309,8 +310,10 @@ export function registerPassportPhoto(app: FastifyInstance) {
             }
           : undefined;
 
+        const scratchDir = join(tmpdir(), "snapotter-scratch", jobId);
         let bgRemovedBuffer: Buffer;
         try {
+          await mkdir(scratchDir, { recursive: true });
           try {
             bgRemovedBuffer = await removeBackground(
               fileBuffer,
@@ -325,10 +328,6 @@ export function registerPassportPhoto(app: FastifyInstance) {
           await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
         }
 
-        // Save bg-removed image to object storage for generate phase
-        const bgRemovedFilename = `${filename.replace(/\.[^.]+$/, "")}_nobg.png`;
-        await putObject(`outputs/${jobId}/${bgRemovedFilename}`, bgRemovedBuffer);
-
         // Create a smaller preview for fast transfer (max 800px wide)
         const meta = await sharp(bgRemovedBuffer).metadata();
         const previewWidth = Math.min(meta.width ?? 800, 800);
@@ -339,12 +338,21 @@ export function registerPassportPhoto(app: FastifyInstance) {
 
         const preview = previewBuffer.data.toString("base64");
 
+        // Save bg-removed image to object storage for generate phase
+        const bgRemovedFilename = `${filename.replace(/\.[^.]+$/, "")}_nobg.png`;
+        await putObject(`outputs/${jobId}/${bgRemovedFilename}`, bgRemovedBuffer);
+
         if (clientJobId) {
           await updateSingleFileProgress({
             jobId: clientJobId,
             phase: "complete",
             percent: 100,
             result: { jobId, faceDetected: true },
+          }).catch((persistErr) => {
+            request.log.error(
+              { err: persistErr, jobId: clientJobId, toolId: "passport-photo" },
+              "Failed to persist passport photo analysis progress",
+            );
           });
         }
 
@@ -359,6 +367,24 @@ export function registerPassportPhoto(app: FastifyInstance) {
           imageHeight: landmarksResult.imageHeight,
         });
       } catch (err) {
+        const details = err instanceof Error ? err.message : "Unknown error";
+        const progressError =
+          hasServerErrorStatus(err) && !isSafeMessageError(err)
+            ? "Passport photo analysis failed"
+            : details;
+        if (clientJobId) {
+          await updateSingleFileProgress({
+            jobId: clientJobId,
+            phase: "failed",
+            percent: 0,
+            error: progressError,
+          }).catch((persistErr) => {
+            request.log.error(
+              { err: persistErr, jobId: clientJobId, toolId: "passport-photo" },
+              "Failed to persist passport photo analysis progress",
+            );
+          });
+        }
         if (isDecoderUnavailable(err)) throw err;
         if (hasServerErrorStatus(err)) throw err;
         if (!isToolInputError(err)) {
@@ -366,7 +392,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
         }
         return reply.status(422).send({
           error: "Passport photo analysis failed",
-          details: err instanceof Error ? err.message : "Unknown error",
+          details,
         });
       }
     },

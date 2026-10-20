@@ -290,13 +290,23 @@ describe("progress stream access", () => {
       });
     }
 
-    it("reserves the caller's clientJobId as a row they own", async () => {
+    it("reserves the caller's clientJobId as a row they own and settles it when analyze finishes (#2577)", async () => {
       const clientJobId = `analyze_${randomUUID()}`;
 
       await analyze(clientJobId, owner.token);
 
       const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
       expect(row?.userId).toBe(owner.userId);
+      expect(["completed", "failed"]).toContain(row?.status);
+      expect(row?.completedAt).not.toBeNull();
+      if (row?.status === "failed") {
+        expect(row.error).toMatchObject({ message: expect.any(String) });
+      } else {
+        expect(row?.progress).toMatchObject({
+          percent: 100,
+          result: { faceDetected: false },
+        });
+      }
     });
 
     it("answers 409 when the clientJobId already belongs to a job", async () => {
