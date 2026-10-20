@@ -679,6 +679,94 @@ describe("erase-object single file: every other way the request ends", () => {
     expect(entry().processedUrl).toBe(DOWNLOAD_URL);
     expect(useFileStore.getState().processing).toBe(false);
   });
+
+  it("ignores a malformed sync 200 after the result landed on the stream (#2931)", async () => {
+    renderPanel();
+    const xhr = await submit();
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+      });
+    });
+
+    xhr.respondRaw(200, "<html>not json</html>");
+
+    expect(entry().status).toBe("completed");
+    expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "a late 504 answer",
+      (xhr: FakeXhr) => xhr.respondRaw(504, "<html>504 Gateway Time-out</html>"),
+    ],
+    ["a late network error", (xhr: FakeXhr) => act(() => xhr.onerror?.())],
+    ["a late timeout", (xhr: FakeXhr) => act(() => xhr.ontimeout?.())],
+  ])("ignores %s after the result landed on the stream (#2931)", async (_label, fireLate) => {
+    renderPanel();
+    const xhr = await submit();
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+      });
+    });
+
+    fireLate(xhr);
+
+    expect(entry().status).toBe("completed");
+    expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+
+  it("keeps a claim and leaves a retry running when a stream-completed run's XHR answers late (#2931)", async () => {
+    renderPanel();
+    const first = await submit();
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+      });
+    });
+    act(() => useFileStore.getState().markClaimed(0));
+    expect(entry().claimed).toBe(true);
+
+    // A second run starts before the first request's late 200 arrives.
+    const second = await submit(2);
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(screen.getByRole("status")).toHaveTextContent("0%");
+    expect(screen.getByRole("status").querySelector(".animate-spin")).toBeNull();
+
+    first.respond(200, {
+      downloadUrl: "/api/v1/download/job-stale/stale.png",
+      originalSize: 1000,
+      processedSize: 900,
+      savedFileId: "file-stale",
+    });
+
+    expect(entry().claimed).toBe(true);
+    expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+    expect(useFileStore.getState().lastSavedLibraryFileId).toBeNull();
+    expect(useFileStore.getState().processing).toBe(true);
+
+    // Late upload callbacks from the first request must not reset progress phase/percent.
+    first.uploadProgress(50, 100);
+    first.uploadFinished();
+    expect(screen.getByRole("status")).toHaveTextContent("0%");
+    expect(screen.getByRole("status").querySelector(".animate-spin")).toBeNull();
+
+    second.respond(200, {
+      downloadUrl: "/api/v1/download/job-2/photo.png",
+      originalSize: 1000,
+      processedSize: 850,
+    });
+    expect(entry().processedUrl).toBe("/api/v1/download/job-2/photo.png");
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
 });
 
 /** Answer the request with a 202, then send one frame on the progress stream. */
@@ -771,6 +859,21 @@ describe("erase-object single file: a completed frame with nothing to download (
     expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument();
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
   });
+
+  it("reports once when both the streamed frame and a queued 200 are malformed (#2931)", async () => {
+    renderPanel();
+    const xhr = await submit();
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
+      });
+    });
+
+    xhr.respondRaw(200, "<html>not json</html>");
+
+    expect(screen.getByText(en.errors.invalidResponse)).toBeInTheDocument();
+    expectReported("Tool result has no download URL", undefined);
+  });
 });
 
 describe("erase-object batch: a completed frame with nothing to download (#1830)", () => {
@@ -807,6 +910,60 @@ describe("erase-object batch: a completed frame with nothing to download (#1830)
     expect(entry(0).status).toBe("completed");
     expect(entry(0).processedUrl).toBe(DOWNLOAD_URL);
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+
+  it("ignores a late malformed 200 or late valid 200 after a batch file completed on the stream (#2931)", async () => {
+    renderPanel(2);
+    const first = await submit(1);
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+      });
+    });
+    act(() => useFileStore.getState().markClaimed(0));
+    expect(entry(0).claimed).toBe(true);
+
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    // First file's XHR answers late with a malformed 200, then a valid 200 with a different URL,
+    // plus a 504, network error, and timeout.
+    first.respondRaw(200, "<html>not json</html>");
+    first.respond(200, {
+      downloadUrl: "/api/v1/download/job-stale/stale.png",
+      originalSize: 1000,
+      processedSize: 900,
+    });
+    first.respondRaw(504, "<html>504 Gateway Time-out</html>");
+    act(() => first.onerror?.());
+    act(() => first.ontimeout?.());
+
+    FakeXhr.instances[1].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(entry(0).status).toBe("completed");
+    expect(entry(0).processedUrl).toBe(DOWNLOAD_URL);
+    expect(entry(0).claimed).toBe(true);
+    expect(entry(1).status).toBe("completed");
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+
+  it("reports once when both a batch file's streamed frame and a queued 200 are malformed (#2931)", async () => {
+    renderPanel(2);
+    const first = await submit(1);
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
+      });
+    });
+
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    first.respondRaw(200, "<html>not json</html>");
+    FakeXhr.instances[1].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(entry(0).status).toBe("failed");
+    expect(entry(0).error).toBe(en.errors.invalidResponse);
+    expect(entry(1).status).toBe("completed");
+    expectReported("Tool result has no download URL", undefined);
   });
 
   it("lands each batch file's result on its own entry when reordered mid-batch (#1114)", async () => {

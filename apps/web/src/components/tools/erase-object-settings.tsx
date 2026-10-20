@@ -269,6 +269,7 @@ export function EraseObjectSettings({
       const clientJobId = generateId();
 
       const applyResult = (r: Record<string, unknown>) => {
+        if (settled) return;
         useFileStore.getState().updateEntryById(entryId, {
           processedUrl: r.downloadUrl as string,
           processedPreviewUrl: (r.previewUrl as string) ?? null,
@@ -363,7 +364,7 @@ export function EraseObjectSettings({
       };
       xhr.onload = () => {
         if (xhr.status === 202) abandonedJob.onAccepted();
-        if (abandoned || xhr.status === 202) return;
+        if (abandoned || settled || xhr.status === 202) return;
         stopProgress();
         if (xhr.status >= 200 && xhr.status < 300) {
           // Only a body that isn't a result is the server's fault, and it gets
@@ -405,12 +406,12 @@ export function EraseObjectSettings({
         }
       };
       xhr.onerror = () => {
-        if (abandoned) return;
+        if (abandoned || settled) return;
         stopProgress();
         rejectOnce(new Error(t.errors.network));
       };
       xhr.ontimeout = () => {
-        if (abandoned) return;
+        if (abandoned || settled) return;
         stopProgress();
         rejectOnce(new FeedbackCategoryError(t.errors.requestTimedOut, "timeout"));
       };
@@ -460,7 +461,10 @@ export function EraseObjectSettings({
 
     const clientJobId = generateId();
 
+    let settled = false;
     const applyResult = (r: Record<string, unknown>) => {
+      if (settled) return;
+      settled = true;
       if (r.savedFileId) {
         useFileStore.getState().setLastSavedLibraryFileId(r.savedFileId as string);
       }
@@ -506,6 +510,7 @@ export function EraseObjectSettings({
     const endRunWithError = (message: string, before?: () => void) => {
       if (runEndedWithError) return;
       runEndedWithError = true;
+      settled = true;
       let first: { cause: unknown } | null = null;
       let second: { cause: unknown } | null = null;
       for (const step of [...(before ? [before] : []), () => setError(message), finishUi]) {
@@ -536,11 +541,13 @@ export function EraseObjectSettings({
     let abandoned = false;
     const abandonedJob = trackAbandonedJob(clientJobId, "erase-object");
     const abandonRequest = () => {
+      settled = true;
       abandoned = true;
       xhr.abort();
     };
     const dropRequest = () => {
       if (abandonedJob.keepRequestOnStop()) {
+        settled = true;
         abandoned = true;
         return;
       }
@@ -632,7 +639,7 @@ export function EraseObjectSettings({
       // cutting the upload off (#1959).
       subscription.touch();
       abandonedJob.onUploadProgress(e);
-      if (e.lengthComputable && !abandoned) {
+      if (e.lengthComputable && !abandoned && !settled) {
         setProgressPercent((e.loaded / e.total) * 15);
       }
     };
@@ -640,14 +647,14 @@ export function EraseObjectSettings({
       abandonedJob.onUploadLoad();
       // Firefox fires this after a stop, once the answer starts: the run is over,
       // and a new one may be on the panel by now.
-      if (abandoned) return;
+      if (abandoned || settled) return;
       setProgressPhase("processing");
       setProgressPercent(15);
     };
     xhr.onload = () => {
       // 202 = async: the progress subscription drives completion via SSE.
       if (xhr.status === 202) abandonedJob.onAccepted();
-      if (abandoned || xhr.status === 202) return;
+      if (abandoned || settled || xhr.status === 202) return;
 
       endWatch();
       stopProgress();
@@ -714,13 +721,13 @@ export function EraseObjectSettings({
       finishUi();
     };
     xhr.onerror = () => {
-      if (abandoned) return;
+      if (abandoned || settled) return;
       endWatch();
       stopProgress();
       endRunWithError(t.errors.network);
     };
     xhr.ontimeout = () => {
-      if (abandoned) return;
+      if (abandoned || settled) return;
       endWatch();
       stopProgress();
       endRunWithError(t.toolSettings["erase-object"].timeoutOverloaded);
