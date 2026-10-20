@@ -177,3 +177,84 @@ postgres_ready() {
   printf 'Set EMBEDDED_POSTGRES_TIMEOUT_S (whole seconds) higher if the host is only slow.\n' >&2
   return 1
 }
+
+# mark_snapotter_ready <api_pid>
+# Polls the local /api/v1/health endpoint while <api_pid> stays alive and writes
+# SNAPOTTER_READY_FILE (/run/s6/snapotter-ready by default) as soon as the API
+# answers HTTP 200 with `"status":"healthy"`. /run/s6 is wiped by s6-overlay
+# preinit on every container boot, so the file's presence tells snapotter_finish
+# that this container's API completed its initial startup at least once (#2267).
+mark_snapotter_ready() {
+  _msr_pid="$1"
+  _msr_file="${SNAPOTTER_READY_FILE:-/run/s6/snapotter-ready}"
+  if [ -f "$_msr_file" ]; then
+    return 0
+  fi
+  if [ -z "$_msr_pid" ]; then
+    return 1
+  fi
+  while kill -0 "$_msr_pid" 2>/dev/null; do
+    if _msr_out="$(curl --noproxy '*' -sf --max-time 2 \
+      "http://127.0.0.1:${PORT:-1349}/api/v1/health" 2>/dev/null)"; then
+      case "$_msr_out" in
+        *'"status":"healthy"'*)
+          # printf, not `:`: in dash (the image's /bin/sh), `:` is a POSIX
+          # special built-in whose redirection failure aborts the whole shell
+          # with status 2 before `if !` can run the warning branch.
+          if ! printf '' > "$_msr_file" 2>/dev/null; then
+            printf 'WARNING: mark_snapotter_ready could not write %s\n' "$_msr_file" >&2
+            return 1
+          fi
+          return 0
+          ;;
+      esac
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+# snapotter_finish <exit_code> [signal]
+# Called by s6-supervise when the snapotter longrun process exits. s6 passes the
+# exit status as $1 (0..255), or 256 when the process was killed by a signal
+# (with the signal number in $2).
+#
+# When the API exits non-zero (1..255) before its first boot has reached healthy
+# (for example a loadEnv() validation error on BASE_PATH or a rejected
+# DEFAULT_PASSWORD in ensureDefaultAdmin), record the exit code for
+# s6-linux-init, ask s6 to halt the container, and return 125 so s6-supervise
+# does not respawn the service while the shutdown tree runs (#2267). Signal
+# terminations ($1 = 256, such as SIGTERM from `docker stop` while still booting
+# or an OOM SIGKILL) and any crash after mark_snapotter_ready has recorded a
+# healthy boot return 0 so s6 supervises them normally.
+snapotter_finish() {
+  _sf_code="${1:-0}"
+  _sf_ready="${SNAPOTTER_READY_FILE:-/run/s6/snapotter-ready}"
+  _sf_exitfile="${S6_EXITCODE_FILE:-/run/s6-linux-init-container-results/exitcode}"
+  _sf_halt="${S6_HALT_BIN:-/run/s6/basedir/bin/halt}"
+
+  if [ -f "$_sf_ready" ]; then
+    return 0
+  fi
+
+  case "$_sf_code" in
+    "" | *[!0-9]*)
+      return 0
+      ;;
+  esac
+
+  if [ "$_sf_code" -le 0 ] || [ "$_sf_code" -ge 256 ]; then
+    return 0
+  fi
+
+  if ! printf '%s\n' "$_sf_code" > "$_sf_exitfile"; then
+    printf 'FATAL: snapotter_finish could not write exit code %s to %s.\n' \
+      "$_sf_code" "$_sf_exitfile" >&2
+  fi
+  if ! "$_sf_halt"; then
+    printf 'FATAL: snapotter_finish failed to halt container via %s (API exit code %s).\n' \
+      "$_sf_halt" "$_sf_code" >&2
+    return 1
+  fi
+  return 125
+}

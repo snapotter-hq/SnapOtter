@@ -1,0 +1,3 @@
+#!/command/with-contenv sh
+. /usr/local/bin/embedded-lib.sh
+snapotter_finish "$@"

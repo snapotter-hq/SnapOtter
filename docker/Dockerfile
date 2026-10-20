@@ -812,7 +812,7 @@ COPY docker/s6/s6-rc.d /etc/s6-overlay/s6-rc.d
 RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/embedded-postgres-bootstrap.sh \
     /usr/local/bin/reseed-ai-venv.sh \
     && chmod +x /etc/s6-overlay/s6-rc.d/postgres/run /etc/s6-overlay/s6-rc.d/redis/run \
-                /etc/s6-overlay/s6-rc.d/snapotter/run \
+                /etc/s6-overlay/s6-rc.d/snapotter/run /etc/s6-overlay/s6-rc.d/snapotter/finish \
                 /etc/s6-overlay/s6-rc.d/postgres-init/up /etc/s6-overlay/s6-rc.d/postgres-ready/up \
                 /etc/s6-overlay/s6-rc.d/redis-ready/up
 
