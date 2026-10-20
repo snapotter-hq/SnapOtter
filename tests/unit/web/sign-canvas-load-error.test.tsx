@@ -531,4 +531,74 @@ describe("SignCanvas load and page-render failures (#2249)", () => {
     });
     expect(onPlacementsChange).toHaveBeenCalledTimes(4);
   });
+
+  it("restores the Konva layer and transformer synchronously before exportPlacements awaits blob conversion (#3100)", async () => {
+    vi.stubGlobal("Image", ImmediateImage);
+    let resolveBlob = (_blob: Blob) => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveBlob = (blob: Blob) =>
+              resolve({ blob: async () => blob } as unknown as Response);
+          }),
+      ),
+    );
+    getDocument.mockReturnValue({
+      promise: Promise.resolve({
+        numPages: 1,
+        loadingTask: { destroy: vi.fn() },
+        getPage: async () => ({
+          getViewport: ({ scale }: { scale: number }) => ({
+            width: 595 * scale,
+            height: 842 * scale,
+          }),
+          render: () => ({ promise: Promise.resolve() }),
+        }),
+      }),
+    });
+
+    const onPlacementsChange = vi.fn();
+    const ref = createRef<SignCanvasRef>();
+    render(
+      <SignCanvas ref={ref} fileUrl="blob:one-page" onPlacementsChange={onPlacementsChange} />,
+    );
+
+    await waitFor(() => expect(konvaState.layers).toHaveLength(1));
+    act(() => {
+      ref.current?.addSignature({
+        id: "sig-1",
+        dataUrl: "data:image/png;base64,AAA=",
+        createdAt: 1,
+      });
+    });
+
+    const layer = konvaState.layers[0];
+    const tr = konvaState.transformers[0];
+    expect(tr.selectedNodes).toHaveLength(1);
+
+    // Start exportPlacements; it pauses inside fetch().blob().
+    const exportPromise = ref.current?.exportPlacements();
+
+    // The layer and transformer selection must already be restored so mid-run
+    // deleteSelected / addSignature work while exportPlacements is awaiting blob().
+    expect(layer.children).toHaveLength(2);
+    expect(tr.selectedNodes).toHaveLength(1);
+
+    act(() => {
+      ref.current?.deleteSelected();
+    });
+    expect(tr.selectedNodes).toHaveLength(0);
+    expect(ref.current?.hasPlacements()).toBe(false);
+    expect(onPlacementsChange).toHaveBeenCalledTimes(2);
+
+    resolveBlob?.(new Blob(["png"], { type: "image/png" }));
+    const exported = await exportPromise;
+    expect(exported?.placements).toHaveLength(1);
+    expect(exported?.pngs).toHaveLength(1);
+    // Completing the blob await must not resurrect the deleted node or its selection.
+    expect(tr.selectedNodes).toHaveLength(0);
+    expect(layer.children).toHaveLength(1);
+  });
 });

@@ -588,8 +588,8 @@ function ToolPageContent({
   const [signPlacementCount, setSignPlacementCount] = useState(0);
   const [signStaleEntryId, setSignStaleEntryId] = useState<string | null>(null);
   const handleSignPlacementsChange = useCallback(() => {
-    const entry = useFileStore.getState().currentEntry;
-    if (entry?.processedUrl) {
+    const { currentEntry: entry, processing } = useFileStore.getState();
+    if (entry && (entry.processedUrl || processing)) {
       setSignStaleEntryId(entry.id);
     }
   }, []);

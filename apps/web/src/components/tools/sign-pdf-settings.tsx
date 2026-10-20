@@ -246,6 +246,8 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
   const stopRunRef = useRef<() => void>(() => {});
   /** Set while this panel owns the store's processing flag; see endRun. */
   const runOwnedRef = useRef(false);
+  /** The entry whose sign request is currently in flight, if any. */
+  const signingEntryIdRef = useRef<string | null>(null);
 
   const setError = (message: string | null, entryId = currentEntry?.id) =>
     setLocalError(message === null ? null : { entryId, message });
@@ -278,10 +280,12 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
   const markPlacementsEdited = () => {
     setDownloadUrl(null);
     if (
-      signProps?.onStaleEntryChange === undefined &&
-      (currentEntry?.processedUrl || (localDownload && localDownload.entryId === currentEntry?.id))
+      currentEntry &&
+      (signingEntryIdRef.current === currentEntry.id ||
+        currentEntry.processedUrl ||
+        (localDownload && localDownload.entryId === currentEntry.id))
     ) {
-      setLocalStaleEntryId(currentEntry?.id ?? null);
+      setStaleEntryId(currentEntry.id);
     }
   };
 
@@ -343,6 +347,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     // runs the previous run's closure (#2313).
     stopRunRef.current = () => {
       runOwnedRef.current = false;
+      signingEntryIdRef.current = null;
       if (useFileStore.getState().processing) {
         failEntry(t.errors.runInterrupted, "processing_error");
       }
@@ -352,6 +357,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
      *  the guard warning about a run that is over, with no way to answer it. */
     const endRun = () => {
       runOwnedRef.current = false;
+      signingEntryIdRef.current = null;
       setProcessing(false);
       useFileStore.getState().setProcessing(false);
     };
@@ -394,6 +400,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     setProgress(0);
     setProcessing(true);
     runOwnedRef.current = true;
+    signingEntryIdRef.current = capturedEntryId ?? null;
     try {
       if (useFileStore.getState().error !== null) {
         useFileStore.getState().setError(null);
@@ -555,6 +562,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     const stopProgress = subscription.stop;
     stopRunRef.current = () => {
       runOwnedRef.current = false;
+      signingEntryIdRef.current = null;
       const keepRequest = abandonedJob.keepRequestOnStop();
       try {
         // When the upload finished and the server hasn't accepted the job yet,

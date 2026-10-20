@@ -353,7 +353,7 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
         if (!layer) {
           throw new Error("Sign PDF canvas is not ready to export placements");
         }
-        const pngs: Blob[] = [];
+        const dataUrls: string[] = [];
         const placements: SignPlacement[] = [];
         const tr = trRef.current;
         const selected = tr?.nodes() ?? [];
@@ -386,13 +386,13 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
               h: norm.h,
             });
             const ratio = (EXPORT_QUALITY * meta.ptsW) / meta.sizeW;
-            const dataUrl = placed.node.toDataURL({ pixelRatio: ratio });
-            pngs.push(await (await fetch(dataUrl)).blob());
+            dataUrls.push(placed.node.toDataURL({ pixelRatio: ratio }));
             placed.node.remove();
             sigIndex++;
           }
         } finally {
-          // Restore the current page's view.
+          // Restore the current page's view synchronously before awaiting blob
+          // conversion so mid-run canvas edits see an intact layer and selection.
           for (const child of [...layer.getChildren()]) {
             if (child instanceof Konva.Image) child.remove();
           }
@@ -401,6 +401,10 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
           }
           if (selected.length) tr?.nodes(selected);
           layer.batchDraw();
+        }
+        const pngs: Blob[] = [];
+        for (const dataUrl of dataUrls) {
+          pngs.push(await (await fetch(dataUrl)).blob());
         }
         return { pngs, placements };
       },

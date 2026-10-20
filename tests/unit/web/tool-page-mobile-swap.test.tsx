@@ -91,6 +91,12 @@ vi.mock("../../../apps/web/node_modules/konva", () => {
     fire(event: string) {
       for (const cb of this.handlers.get(event) ?? []) cb();
     }
+    getClientRect() {
+      return { x: 10, y: 20, width: 100, height: 50 };
+    }
+    toDataURL() {
+      return "data:image/png;base64,AAA=";
+    }
     dragBoundFunc() {}
     remove() {}
     destroy() {
@@ -455,6 +461,98 @@ describe("ToolPage interactive canvases across the 768px breakpoint (#2248)", ()
     expect(screen.queryByRole("link", { name: /Download signed PDF/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Apply & Download/i })).toBeDisabled();
   });
+
+  it.each(["dragend", "transformend"] as const)(
+    "keeps Apply & Download visible when a placed signature fires %s while a sign request is in flight and across 768px (#3100)",
+    async (konvaEvent) => {
+      class FakeInFlightXhr {
+        static instances: FakeInFlightXhr[] = [];
+        timeout = 0;
+        status = 0;
+        responseText = "";
+        onload: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        ontimeout: (() => void) | null = null;
+        upload: { onprogress: unknown; onload: unknown } = { onprogress: null, onload: null };
+        constructor() {
+          FakeInFlightXhr.instances.push(this);
+        }
+        open() {}
+        setRequestHeader() {}
+        send() {}
+        abort() {}
+        respond(status: number, body: unknown) {
+          act(() => {
+            this.status = status;
+            this.responseText = JSON.stringify(body);
+            this.onload?.();
+          });
+        }
+      }
+      class FakeInFlightEventSource {
+        static OPEN = 1;
+        readyState = 1;
+        onmessage: ((event: { data: string }) => void) | null = null;
+        onerror: (() => void) | null = null;
+        close() {
+          this.readyState = 2;
+        }
+      }
+      vi.stubGlobal("XMLHttpRequest", FakeInFlightXhr);
+      vi.stubGlobal("EventSource", FakeInFlightEventSource);
+
+      addSignature("data:image/png;base64,sig");
+      renderToolPage("/pdf/sign-pdf");
+
+      await act(async () => {
+        useFileStore
+          .getState()
+          .setFiles([new File(["%PDF-1.4"], "contract.pdf", { type: "application/pdf" })]);
+      });
+
+      const canvas = (await screen.findByTestId("sign-pdf-canvas")) as HTMLCanvasElement;
+      await waitFor(() => expect(canvas.getAttribute("width")).not.toBeNull());
+
+      fireEvent.click(screen.getByRole("button", { name: "Process" }));
+      const savedSigImg = await screen.findByAltText(/saved signature/i);
+      fireEvent.click(savedSigImg.closest("button") as HTMLButtonElement);
+      await waitFor(() => expect(konvaImages).toHaveLength(1));
+
+      fireEvent.click(screen.getByRole("button", { name: /Apply & Download/i }));
+      await waitFor(() => expect(FakeInFlightXhr.instances).toHaveLength(1));
+      expect(screen.getByRole("button", { name: /Signing/i })).toBeDisabled();
+
+      // Drag or transform the signature while the sign request is still in flight.
+      act(() => {
+        konvaImages[0].fire(konvaEvent);
+      });
+
+      FakeInFlightXhr.instances[0].respond(200, {
+        downloadUrl: "/api/v1/download/job-1/contract_signed.pdf",
+      });
+
+      expect(screen.queryByRole("link", { name: /Download signed PDF/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Apply & Download/i })).toBeEnabled();
+
+      // Rotating across 768px keeps Apply & Download visible instead of restoring the
+      // superseded download link from currentEntry.processedUrl.
+      setMobileViewport(false);
+      expect(screen.queryByRole("link", { name: /Download signed PDF/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Apply & Download/i })).toBeEnabled();
+
+      // Re-signing with the updated placement clears the stale state and shows the new link.
+      FakeInFlightXhr.instances = [];
+      fireEvent.click(screen.getByRole("button", { name: /Apply & Download/i }));
+      await waitFor(() => expect(FakeInFlightXhr.instances).toHaveLength(1));
+      FakeInFlightXhr.instances[0].respond(200, {
+        downloadUrl: "/api/v1/download/job-2/contract_signed.pdf",
+      });
+      expect(screen.getByRole("link", { name: /Download signed PDF/i })).toHaveAttribute(
+        "href",
+        "/api/v1/download/job-2/contract_signed.pdf",
+      );
+    },
+  );
 
   it("keeps the failed-run error message in Sign PDF when rotating across 768px (#2512)", async () => {
     addSignature("data:image/png;base64,sig");

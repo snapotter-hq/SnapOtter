@@ -364,6 +364,131 @@ describe("sign-pdf reports its run to the file store", () => {
     );
   });
 
+  it("keeps Apply & Download visible when a saved signature is placed while a sign request is in flight (#3100)", async () => {
+    const secondUrl = "/api/v1/download/job-2/contract_signed.pdf";
+    const listSpy = vi
+      .spyOn(signatureStore, "listSignatures")
+      .mockReturnValue([{ id: "sig-1", dataUrl: "data:image/png;base64,sig", createdAt: 1 }]);
+    try {
+      renderPanel();
+      const firstXhr = await apply();
+
+      // Edit placements while the sign request is still in flight.
+      const savedSigImg = screen.getByAltText(/saved signature/i);
+      fireEvent.click(savedSigImg.closest("button") as HTMLButtonElement);
+
+      firstXhr.respond(200, { downloadUrl: DOWNLOAD_URL });
+
+      expect(screen.queryByRole("link", { name: /download signed pdf/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /apply & download/i })).toBeEnabled();
+      expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+
+      // Re-signing clears the stale state and shows the new download link.
+      FakeXhr.instances = [];
+      (await apply()).respond(200, { downloadUrl: secondUrl });
+      expect(screen.getByRole("link", { name: /download signed pdf/i })).toHaveAttribute(
+        "href",
+        secondUrl,
+      );
+    } finally {
+      listSpy.mockRestore();
+    }
+  });
+
+  it("keeps Apply & Download visible when deleting a selected signature while an async sign request is in flight (#3100)", async () => {
+    let currentStaleId: string | null = null;
+    const onStaleEntryChange = vi.fn((next: string | null) => {
+      currentStaleId = next;
+    });
+    const canvas = fakeCanvas();
+    const view = render(
+      <SignPdfSettings
+        signProps={{
+          canvasRef: { current: canvas },
+          hasSelection: true,
+          placementCount: 1,
+          staleEntryId: currentStaleId,
+          onStaleEntryChange,
+        }}
+      />,
+    );
+
+    const xhr = await apply();
+    xhr.respond(202, { jobId: "job-1", async: true });
+
+    // Deleting the selected signature mid-run notifies onStaleEntryChange.
+    fireEvent.click(screen.getByRole("button", { name: /✕ delete/i }));
+    expect(onStaleEntryChange).toHaveBeenCalledWith(entry().id);
+    view.rerender(
+      <SignPdfSettings
+        signProps={{
+          canvasRef: { current: canvas },
+          hasSelection: false,
+          placementCount: 1,
+          staleEntryId: currentStaleId,
+          onStaleEntryChange,
+        }}
+      />,
+    );
+
+    act(() => {
+      FakeEventSource.instances[0].onmessage?.({
+        data: JSON.stringify({
+          type: "single",
+          phase: "complete",
+          result: { downloadUrl: DOWNLOAD_URL },
+        }),
+      });
+    });
+
+    expect(screen.queryByRole("link", { name: /download signed pdf/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /apply & download/i })).toBeEnabled();
+
+    // A failed re-sign clears signingEntryIdRef on teardown so a subsequent edit
+    // on the unsigned entry does not re-mark it stale.
+    FakeXhr.instances = [];
+    onStaleEntryChange.mockClear();
+    (await apply()).respond(422, { error: "Processing failed" });
+    expect(onStaleEntryChange).toHaveBeenCalledWith(null);
+    onStaleEntryChange.mockClear();
+    view.rerender(
+      <SignPdfSettings
+        signProps={{
+          canvasRef: { current: canvas },
+          hasSelection: true,
+          placementCount: 1,
+          staleEntryId: currentStaleId,
+          onStaleEntryChange,
+        }}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /✕ delete/i }));
+    expect(onStaleEntryChange).not.toHaveBeenCalled();
+  });
+
+  it("keeps Apply & Download visible when saving a new signature from the pad while a sign request is in flight (#3100)", async () => {
+    renderPanel();
+    const xhr = await apply();
+
+    fireEvent.click(screen.getByRole("button", { name: /\+ new/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^upload$/i }));
+    const fileInput = document.querySelector(
+      'input[accept="image/png,image/jpeg"]',
+    ) as HTMLInputElement;
+    fireEvent.change(fileInput, {
+      target: { files: [new File(["png"], "sig.png", { type: "image/png" })] },
+    });
+    const saveBtn = await screen.findByRole("button", { name: /save & place/i });
+    await waitFor(() => expect(saveBtn).toBeEnabled());
+    fireEvent.click(saveBtn);
+
+    xhr.respond(200, { downloadUrl: DOWNLOAD_URL });
+
+    expect(screen.queryByRole("link", { name: /download signed pdf/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /apply & download/i })).toBeEnabled();
+    expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+  });
+
   it("scopes the download link, error, and edited state to the selected entry", async () => {
     useFileStore.getState().setFiles([pdf("contract.pdf"), pdf("lease.pdf")]);
     renderPanel(fakeCanvas(), true);
