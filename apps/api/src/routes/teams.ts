@@ -181,7 +181,13 @@ export async function teamsRoutes(app: FastifyInstance): Promise<void> {
         // onto the same name both pass it before either UPDATE commits
         // (issue #968), so the loser's 23505 maps to the pre-check's 409.
         try {
-          await db.update(schema.teams).set(updateFields).where(eq(schema.teams.id, id));
+          const updated = await db
+            .update(schema.teams)
+            .set(updateFields)
+            .where(eq(schema.teams.id, id));
+          if (!updated.rowCount) {
+            return reply.status(404).send({ error: "Team not found", code: "NOT_FOUND" });
+          }
         } catch (err) {
           if (isUniqueViolation(err)) {
             return reply.status(409).send({ error: "Team name already exists", code: "CONFLICT" });

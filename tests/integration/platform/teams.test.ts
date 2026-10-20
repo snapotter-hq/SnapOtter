@@ -418,6 +418,36 @@ describe("PUT /api/v1/teams/:id", () => {
     expect(JSON.parse(res.body).code).toBe("NOT_FOUND");
   });
 
+  it.each([
+    { label: "rename", payload: { name: "Renamed" } },
+    { label: "quota and retention update", payload: { storageQuota: 1024, retentionHours: 24 } },
+  ])(
+    "returns 404 when a team is deleted between the pre-checks and UPDATE on $label (#3159)",
+    async ({ payload }) => {
+      const res = await raceRowLocks(
+        "teams",
+        1,
+        () =>
+          app.inject({
+            method: "PUT",
+            url: `/api/v1/teams/${teamId}`,
+            headers: { authorization: `Bearer ${adminToken}` },
+            payload,
+          }),
+        (tx) => tx.delete(schema.teams).where(eq(schema.teams.id, teamId)),
+      );
+
+      expect(res.statusCode).toBe(404);
+      expect(JSON.parse(res.body)).toEqual({
+        error: "Team not found",
+        code: "NOT_FOUND",
+      });
+
+      const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
+      expect(team).toBeUndefined();
+    },
+  );
+
   it("concurrent renames onto one name return one 200 and one 409, never 500", async () => {
     // Issue #968: both renames pass the duplicate pre-check before either
     // UPDATE commits; the loser used to surface the 23505 as a 500.
