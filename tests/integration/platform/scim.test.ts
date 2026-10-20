@@ -1597,6 +1597,41 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(row?.email).toBe("put-primary@example.com");
     });
 
+    it.each([
+      ["an empty emails array", []],
+      ["a null emails field", null],
+    ] as const)(
+      "clears the stored email to NULL when PUT sends %s, and keeps it when emails is omitted (#3157)",
+      async (_label, emails) => {
+        const { id, userName } = await createScimUser({
+          userName: uniqueName("scim-put-clear-email"),
+          emails: [{ value: "before-put@example.com", primary: true }],
+        });
+
+        const omitted = await crudApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/scim/v2/Users/${id}`,
+          headers: authHeaders(),
+          payload: { userName, active: true },
+        });
+        expect(omitted.statusCode, omitted.body).toBe(200);
+        expect(JSON.parse(omitted.body).emails).toEqual([
+          { value: "before-put@example.com", primary: true },
+        ]);
+        expect((await userRow(id))?.email).toBe("before-put@example.com");
+
+        const cleared = await crudApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/scim/v2/Users/${id}`,
+          headers: authHeaders(),
+          payload: { userName, active: true, emails },
+        });
+        expect(cleared.statusCode, cleared.body).toBe(200);
+        expect(JSON.parse(cleared.body).emails).toEqual([]);
+        expect((await userRow(id))?.email).toBeNull();
+      },
+    );
+
     it("clears externalId to NULL when PUT sends a blank one, for more than one user", async () => {
       // Issue #1008: a stored "" held the identity index, so the second user
       // to receive a blank externalId collided with the first.
@@ -1978,6 +2013,76 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         { value: "work@example.com", primary: true },
       ]);
     });
+
+    it.each([
+      ["path emails with []", { op: "replace", path: "emails", value: [] }],
+      ["path emails with null", { op: "replace", path: "emails", value: null }],
+      [
+        'path emails[type eq "work"].value with []',
+        { op: "replace", path: 'emails[type eq "work"].value', value: [] },
+      ],
+      ["path-less value with emails: []", { op: "replace", value: { emails: [] } }],
+      ["path-less value with emails: null", { op: "replace", value: { emails: null } }],
+      ["path-less value with cased Emails: null", { op: "Replace", value: { Emails: null } }],
+    ])(
+      "clears the stored email to NULL when PATCH replace sends %s (#3157)",
+      async (_label, op) => {
+        const { id, userName } = await createScimUser({
+          userName: uniqueName("scim-patch-clear-email"),
+          emails: [{ value: "before-patch@example.com", primary: true }],
+        });
+
+        const res = await crudApp.app.inject({
+          method: "PATCH",
+          url: `/api/v1/scim/v2/Users/${id}`,
+          headers: authHeaders(),
+          payload: { Operations: [op] },
+        });
+        expect(res.statusCode, res.body).toBe(200);
+        expect(JSON.parse(res.body).emails).toEqual([]);
+        expect((await userRow(id))?.email).toBeNull();
+
+        // Restore email and confirm an add with empty/null emails or a path-less
+        // replace that omits emails leaves both an earlier in-batch email update
+        // and the already-persisted email intact.
+        const inBatchRes = await crudApp.app.inject({
+          method: "PATCH",
+          url: `/api/v1/scim/v2/Users/${id}`,
+          headers: authHeaders(),
+          payload: {
+            Operations: [
+              { op: "replace", path: "emails", value: "restored@example.com" },
+              { op: "replace", value: { userName } },
+              { op: "add", path: "emails", value: [] },
+              { op: "add", value: { emails: null } },
+            ],
+          },
+        });
+        expect(inBatchRes.statusCode, inBatchRes.body).toBe(200);
+        expect(JSON.parse(inBatchRes.body).emails).toEqual([
+          { value: "restored@example.com", primary: true },
+        ]);
+        expect((await userRow(id))?.email).toBe("restored@example.com");
+
+        const keepRes = await crudApp.app.inject({
+          method: "PATCH",
+          url: `/api/v1/scim/v2/Users/${id}`,
+          headers: authHeaders(),
+          payload: {
+            Operations: [
+              { op: "replace", value: { userName } },
+              { op: "add", path: "emails", value: [] },
+              { op: "add", value: { emails: null } },
+            ],
+          },
+        });
+        expect(keepRes.statusCode, keepRes.body).toBe(200);
+        expect(JSON.parse(keepRes.body).emails).toEqual([
+          { value: "restored@example.com", primary: true },
+        ]);
+        expect((await userRow(id))?.email).toBe("restored@example.com");
+      },
+    );
 
     it("treats name.formatted as a no-op", async () => {
       // An unknown op used to be skipped here too. It's refused now, applying

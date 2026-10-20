@@ -279,6 +279,11 @@ function scimExternalId(value: string | null | undefined): string | null {
   return value ?? null;
 }
 
+function scimPrimaryEmail(emails: ScimEmail[] | null | undefined): string | null {
+  if (!emails) return null;
+  return emails.find((e) => e.primary)?.value ?? emails[0]?.value ?? null;
+}
+
 const DISABLED_ROLE_PREFIX = "disabled:";
 
 function restoredScimRole(role: string): string {
@@ -619,7 +624,6 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
       const userName = body.userName ?? undefined;
       const externalId = scimExternalId(body.externalId);
       const active = body.active ?? true;
-      const emails = body.emails ?? undefined;
       if (!userName?.trim()) {
         return scimInvalid(request, reply, {
           detail: "userName is required",
@@ -644,7 +648,7 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const id = randomUUID();
-      const email = emails?.find((e) => e.primary)?.value ?? emails?.[0]?.value ?? null;
+      const email = scimPrimaryEmail(body.emails);
 
       // Resolve default team
       const [defaultTeam] = await db
@@ -832,10 +836,9 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
       const parsed = parseScimBody(scimUserBody, request.body);
       if (!parsed.ok) return scimInvalid(request, reply, parsed);
       const body = parsed.data;
-      // Null is unassigned (RFC 7643 2.5): the same as not sending it.
+      // Null on userName or active is unassigned (RFC 7643 2.5): the same as not sending it.
       const userName = body.userName ?? undefined;
       const active = body.active ?? true;
-      const emails = body.emails ?? undefined;
 
       const updates: Record<string, unknown> = { updatedAt: new Date() };
 
@@ -868,9 +871,8 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
         updates.scimExternalId = scimExternalId(body.externalId);
       }
 
-      const email = emails?.find((e) => e.primary)?.value ?? emails?.[0]?.value;
-      if (email !== undefined) {
-        updates.email = email;
+      if (body.emails !== undefined) {
+        updates.email = scimPrimaryEmail(body.emails);
       }
 
       // The pre-check above can't close the race: two concurrent renames
@@ -975,10 +977,11 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
           } else if (op.path === "externalId") {
             updates.scimExternalId = scimExternalId(op.value as string | null);
           } else if (op.path === "emails" || op.path === 'emails[type eq "work"].value') {
-            // Null clears the address; a list sets the primary (or first) one.
-            const emails = op.value as ScimEmail[] | null;
-            updates.email =
-              emails === null ? null : (emails.find((e) => e.primary)?.value ?? emails[0]?.value);
+            // Null or an empty list clears the address on replace; a non-empty list sets the primary (or first) one.
+            const email = scimPrimaryEmail(op.value as ScimEmail[] | null);
+            if (email !== null || opType === "replace") {
+              updates.email = email;
+            }
           } else if (op.path === "name.formatted" || op.path === "displayName") {
             // No column holds these, so they're accepted and ignored on purpose.
           }
@@ -999,9 +1002,11 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
             if (valObj.externalId !== undefined) {
               updates.scimExternalId = scimExternalId(valObj.externalId as string | null);
             }
-            if (valObj.emails) {
-              const emails = valObj.emails as ScimEmail[];
-              updates.email = emails.find((e) => e.primary)?.value ?? emails[0]?.value;
+            if (valObj.emails !== undefined) {
+              const email = scimPrimaryEmail(valObj.emails as ScimEmail[] | null);
+              if (email !== null || opType === "replace") {
+                updates.email = email;
+              }
             }
           }
         } else if (opType === "remove") {
