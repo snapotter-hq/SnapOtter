@@ -5422,6 +5422,13 @@ export const uk: TranslationKeys = {
     couldNotRead: "Не вдалося прочитати файл Pipeline",
     importListRefreshFailed:
       "Pipeline імпортовано, але список збережених не оновився. Оновіть сторінку, щоб його побачити.",
+    saveFailed: "Не вдалося зберегти Pipeline",
+    deleteFailed: "Не вдалося видалити Pipeline",
+    loadFailed: "Не вдалося завантажити збережені Pipeline.",
+    saveListRefreshFailed:
+      "Pipeline збережено, але список збережених не оновився. Оновіть сторінку, щоб його побачити.",
+    deleteListRefreshFailed:
+      "Pipeline видалено, але список збережених не оновився. Оновіть сторінку, щоб побачити зміни.",
     fileCount: "{count} файл",
     fileCountPlural: "{count} файлів",
     importFromLibrary: "Імпорт із бібліотеки",

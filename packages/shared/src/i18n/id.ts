@@ -5411,6 +5411,13 @@ export const id: TranslationKeys = {
     couldNotRead: "Tidak dapat membaca file Pipeline",
     importListRefreshFailed:
       "Pipeline berhasil diimpor, tetapi daftar tersimpan tidak diperbarui. Muat ulang halaman untuk melihatnya.",
+    saveFailed: "Gagal menyimpan Pipeline",
+    deleteFailed: "Gagal menghapus Pipeline",
+    loadFailed: "Gagal memuat Pipeline tersimpan.",
+    saveListRefreshFailed:
+      "Pipeline berhasil disimpan, tetapi daftar tersimpan tidak diperbarui. Muat ulang halaman untuk melihatnya.",
+    deleteListRefreshFailed:
+      "Pipeline berhasil dihapus, tetapi daftar tersimpan tidak diperbarui. Muat ulang halaman untuk melihat perubahannya.",
     fileCount: "{count} file",
     fileCountPlural: "{count} file",
     importFromLibrary: "Impor dari Perpustakaan",

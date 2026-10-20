@@ -5409,6 +5409,13 @@ export const sv: TranslationKeys = {
     couldNotRead: "Kunde inte läsa pipelinefil",
     importListRefreshFailed:
       "Pipelinen importerades, men den sparade listan uppdaterades inte. Ladda om sidan för att se den.",
+    saveFailed: "Kunde inte spara pipeline",
+    deleteFailed: "Kunde inte radera pipeline",
+    loadFailed: "Kunde inte läsa in sparade pipelines.",
+    saveListRefreshFailed:
+      "Pipelinen sparades, men den sparade listan uppdaterades inte. Ladda om sidan för att se den.",
+    deleteListRefreshFailed:
+      "Pipelinen raderades, men den sparade listan uppdaterades inte. Ladda om sidan för att se ändringen.",
     fileCount: "{count} fil",
     fileCountPlural: "{count} filer",
     importFromLibrary: "Importera från bibliotek",

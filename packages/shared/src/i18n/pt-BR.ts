@@ -5428,6 +5428,13 @@ export const ptBR: TranslationKeys = {
     couldNotRead: "Não foi possível ler o arquivo Pipeline",
     importListRefreshFailed:
       "Pipeline importado, mas a lista salva não foi atualizada. Recarregue a página para vê-lo.",
+    saveFailed: "Falha ao salvar o Pipeline",
+    deleteFailed: "Falha ao excluir o Pipeline",
+    loadFailed: "Não foi possível carregar os Pipelines salvos.",
+    saveListRefreshFailed:
+      "Pipeline salvo, mas a lista salva não foi atualizada. Recarregue a página para vê-lo.",
+    deleteListRefreshFailed:
+      "Pipeline excluído, mas a lista salva não foi atualizada. Recarregue a página para ver a alteração.",
     fileCount: "{count} arquivo",
     fileCountPlural: "{count} arquivos",
     importFromLibrary: "Importar da biblioteca",

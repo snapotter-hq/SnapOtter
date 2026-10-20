@@ -5362,6 +5362,13 @@ export const ja: TranslationKeys = {
     couldNotRead: "Pipelineファイルを読み取れませんでした",
     importListRefreshFailed:
       "Pipelineをインポートしましたが、保存済みリストが更新されませんでした。ページを再読み込みすると表示されます。",
+    saveFailed: "Pipelineの保存に失敗しました",
+    deleteFailed: "Pipelineの削除に失敗しました",
+    loadFailed: "保存されたPipelineを読み込めませんでした。",
+    saveListRefreshFailed:
+      "Pipelineを保存しましたが、保存済みリストが更新されませんでした。ページを再読み込みすると表示されます。",
+    deleteListRefreshFailed:
+      "Pipelineを削除しましたが、保存済みリストが更新されませんでした。ページを再読み込みすると変更が反映されます。",
     fileCount: "{count}ファイル",
     fileCountPlural: "{count}ファイル",
     importFromLibrary: "ライブラリからインポート",

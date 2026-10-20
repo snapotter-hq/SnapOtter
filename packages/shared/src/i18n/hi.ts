@@ -5193,6 +5193,13 @@ export const hi: TranslationKeys = {
     couldNotRead: "Pipeline फाइल नहीं पढ़ी जा सकी",
     importListRefreshFailed:
       "Pipeline इम्पोर्ट हो गया, लेकिन सहेजी गई सूची रीफ्रेश नहीं हुई। देखने के लिए पेज रीलोड करें।",
+    saveFailed: "Pipeline सहेजने में विफल",
+    deleteFailed: "Pipeline हटाने में विफल",
+    loadFailed: "सहेजे गए Pipeline लोड नहीं हो सके।",
+    saveListRefreshFailed:
+      "Pipeline सहेज लिया गया, लेकिन सहेजी गई सूची रीफ्रेश नहीं हुई। देखने के लिए पेज रीलोड करें।",
+    deleteListRefreshFailed:
+      "Pipeline हटा दिया गया, लेकिन सहेजी गई सूची रीफ्रेश नहीं हुई। बदलाव देखने के लिए पेज रीलोड करें।",
     fileCount: "{count} फाइल",
     fileCountPlural: "{count} फाइलें",
     importFromLibrary: "लाइब्रेरी से इम्पोर्ट करें",

@@ -5454,6 +5454,13 @@ export const de: TranslationKeys = {
     couldNotRead: "Pipeline-Datei konnte nicht gelesen werden",
     importListRefreshFailed:
       "Pipeline importiert, aber die gespeicherte Liste wurde nicht aktualisiert. Laden Sie die Seite neu, um sie zu sehen.",
+    saveFailed: "Speichern der Pipeline fehlgeschlagen",
+    deleteFailed: "Löschen der Pipeline fehlgeschlagen",
+    loadFailed: "Gespeicherte Pipelines konnten nicht geladen werden.",
+    saveListRefreshFailed:
+      "Pipeline gespeichert, aber die gespeicherte Liste wurde nicht aktualisiert. Laden Sie die Seite neu, um sie zu sehen.",
+    deleteListRefreshFailed:
+      "Pipeline gelöscht, aber die gespeicherte Liste wurde nicht aktualisiert. Laden Sie die Seite neu, um die Änderung zu sehen.",
     fileCount: "{count} Datei",
     fileCountPlural: "{count} Dateien",
     importFromLibrary: "Aus Bibliothek importieren",

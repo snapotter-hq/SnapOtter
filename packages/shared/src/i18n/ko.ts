@@ -5324,6 +5324,13 @@ export const ko: TranslationKeys = {
     couldNotRead: "Pipeline 파일을 읽을 수 없습니다",
     importListRefreshFailed:
       "Pipeline을 가져왔지만 저장된 목록이 새로고침되지 않았습니다. 페이지를 새로고침하면 표시됩니다.",
+    saveFailed: "Pipeline 저장 실패",
+    deleteFailed: "Pipeline 삭제 실패",
+    loadFailed: "저장된 Pipeline을 불러오지 못했습니다.",
+    saveListRefreshFailed:
+      "Pipeline을 저장했지만 저장된 목록이 새로고침되지 않았습니다. 페이지를 새로고침하면 표시됩니다.",
+    deleteListRefreshFailed:
+      "Pipeline을 삭제했지만 저장된 목록이 새로고침되지 않았습니다. 페이지를 새로고침하면 변경 사항이 표시됩니다.",
     fileCount: "{count}개 파일",
     fileCountPlural: "{count}개 파일",
     importFromLibrary: "라이브러리에서 가져오기",

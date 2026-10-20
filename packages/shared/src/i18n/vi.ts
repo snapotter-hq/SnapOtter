@@ -5397,6 +5397,13 @@ export const vi: TranslationKeys = {
     couldNotRead: "Không thể đọc tệp Pipeline",
     importListRefreshFailed:
       "Đã nhập Pipeline, nhưng danh sách đã lưu không được làm mới. Hãy tải lại trang để xem.",
+    saveFailed: "Lưu Pipeline thất bại",
+    deleteFailed: "Xóa Pipeline thất bại",
+    loadFailed: "Không thể tải các Pipeline đã lưu.",
+    saveListRefreshFailed:
+      "Đã lưu Pipeline, nhưng danh sách đã lưu không được làm mới. Hãy tải lại trang để xem.",
+    deleteListRefreshFailed:
+      "Đã xóa Pipeline, nhưng danh sách đã lưu không được làm mới. Hãy tải lại trang để xem thay đổi.",
     fileCount: "{count} tệp",
     fileCountPlural: "{count} tệp",
     importFromLibrary: "Nhập từ thư viện",

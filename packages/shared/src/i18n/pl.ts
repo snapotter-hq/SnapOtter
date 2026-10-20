@@ -5430,6 +5430,13 @@ export const pl: TranslationKeys = {
     couldNotRead: "Nie udało się odczytać pliku Pipeline",
     importListRefreshFailed:
       "Zaimportowano Pipeline, ale lista zapisanych się nie odświeżyła. Odśwież stronę, aby go zobaczyć.",
+    saveFailed: "Nie udało się zapisać Pipeline",
+    deleteFailed: "Nie udało się usunąć Pipeline",
+    loadFailed: "Nie udało się wczytać zapisanych Pipeline.",
+    saveListRefreshFailed:
+      "Zapisano Pipeline, ale lista zapisanych się nie odświeżyła. Odśwież stronę, aby go zobaczyć.",
+    deleteListRefreshFailed:
+      "Usunięto Pipeline, ale lista zapisanych się nie odświeżyła. Odśwież stronę, aby zobaczyć zmianę.",
     fileCount: "{count} plik",
     fileCountPlural: "{count} plików",
     importFromLibrary: "Importuj z biblioteki",

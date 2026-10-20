@@ -169,6 +169,10 @@ function AutomatePageContent() {
   const [previewCollapsed, setPreviewCollapsed] = useState(false);
   const [mobileToolPaletteOpen, setMobileToolPaletteOpen] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [listLoadFailed, setListLoadFailed] = useState(false);
+  const listFetchSeqRef = useRef(0);
+  const deletingIdsRef = useRef<Set<string>>(new Set());
 
   const hasFile = files.length > 0;
   const hasProcessed = !!processedUrl || currentEntry?.status === "completed";
@@ -183,20 +187,52 @@ function AutomatePageContent() {
     : null;
 
   useEffect(() => {
+    let cancelled = false;
+    const seq = ++listFetchSeqRef.current;
     (async () => {
+      let res: Response;
       try {
-        const res = await fetch(appUrl("/api/v1/pipeline/list"), {
+        res = await fetch(appUrl("/api/v1/pipeline/list"), {
           headers: formatHeaders(),
         });
-        if (res.ok) {
-          const data = await res.json();
-          setSavedPipelines(data.pipelines || []);
-        }
       } catch {
-        // Silently fail
+        if (cancelled || seq !== listFetchSeqRef.current) return;
+        setListLoadFailed(true);
+        setImportError(t.errors.networkError);
+        return;
+      }
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        if (cancelled || seq !== listFetchSeqRef.current) return;
+        setListLoadFailed(true);
+        setImportError(failedAnswerMessage(t, body, res.status, t.automate.loadFailed));
+        return;
+      }
+
+      try {
+        const data: unknown = await res.json();
+        const pipelines = (data as { pipelines?: unknown } | null)?.pipelines;
+        if (!Array.isArray(pipelines)) {
+          if (cancelled || seq !== listFetchSeqRef.current) return;
+          setListLoadFailed(true);
+          setImportError(t.automate.loadFailed);
+          return;
+        }
+        if (cancelled || seq !== listFetchSeqRef.current) return;
+        setListLoadFailed(false);
+        setImportError(null);
+        setSavedPipelines(pipelines);
+      } catch {
+        if (cancelled || seq !== listFetchSeqRef.current) return;
+        setListLoadFailed(true);
+        setImportError(t.automate.loadFailed);
       }
     })();
-  }, [setSavedPipelines]);
+    return () => {
+      cancelled = true;
+    };
+  }, [setSavedPipelines, t]);
 
   useEffect(() => {
     const state = location.state as { libraryFileIds?: string[] } | null;
@@ -288,57 +324,118 @@ function AutomatePageContent() {
   const handleSave = useCallback(async () => {
     if (!saveName.trim() || steps.length === 0) return;
     setSaving(true);
+    setSaveError(null);
     try {
-      const res = await fetch(appUrl("/api/v1/pipeline/save"), {
-        method: "POST",
-        headers: formatHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({
-          name: saveName.trim(),
-          description: saveDescription.trim() || undefined,
-          steps: steps.map((s) => ({ toolId: s.toolId, settings: s.settings })),
-        }),
-      });
-      if (res.ok) {
-        import("@/lib/analytics").then(({ track }) =>
-          track(ANALYTICS_EVENTS.PIPELINE_SAVED, { step_count: steps.length }),
-        );
+      let res: Response;
+      try {
+        res = await fetch(appUrl("/api/v1/pipeline/save"), {
+          method: "POST",
+          headers: formatHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({
+            name: saveName.trim(),
+            description: saveDescription.trim() || undefined,
+            steps: steps.map((s) => ({ toolId: s.toolId, settings: s.settings })),
+          }),
+        });
+      } catch {
+        setSaveError(t.errors.networkError);
+        return;
+      }
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        setSaveError(failedAnswerMessage(t, body, res.status, t.automate.saveFailed));
+        return;
+      }
+
+      import("@/lib/analytics").then(({ track }) =>
+        track(ANALYTICS_EVENTS.PIPELINE_SAVED, { step_count: steps.length }),
+      );
+      setSaveName("");
+      setSaveDescription("");
+      setShowSaveForm(false);
+      listFetchSeqRef.current += 1;
+
+      try {
         const listRes = await fetch(appUrl("/api/v1/pipeline/list"), {
           headers: formatHeaders(),
         });
-        if (listRes.ok) {
-          const data = await listRes.json();
-          setSavedPipelines(data.pipelines || []);
+        if (!listRes.ok) {
+          setListLoadFailed(true);
+          setSaveError(t.automate.saveListRefreshFailed);
+          return;
         }
-        setSaveName("");
-        setSaveDescription("");
-        setShowSaveForm(false);
+        const listData: unknown = await listRes.json();
+        const pipelines = (listData as { pipelines?: unknown } | null)?.pipelines;
+        if (!Array.isArray(pipelines)) {
+          setListLoadFailed(true);
+          setSaveError(t.automate.saveListRefreshFailed);
+          return;
+        }
+        setListLoadFailed(false);
+        setImportError(null);
+        setSavedPipelines(pipelines);
+      } catch {
+        setListLoadFailed(true);
+        setSaveError(t.automate.saveListRefreshFailed);
       }
-    } catch {
-      // Save failed silently
     } finally {
       setSaving(false);
     }
-  }, [saveName, saveDescription, steps, setSavedPipelines]);
+  }, [saveName, saveDescription, steps, setSavedPipelines, t]);
 
   const handleDeletePipeline = useCallback(
     async (id: string) => {
+      if (deletingIdsRef.current.has(id)) return;
+      deletingIdsRef.current.add(id);
+      setImportError(null);
       try {
-        await fetch(appUrl(`/api/v1/pipeline/${id}`), {
-          method: "DELETE",
-          headers: formatHeaders(),
-        });
-        const listRes = await fetch(appUrl("/api/v1/pipeline/list"), {
-          headers: formatHeaders(),
-        });
-        if (listRes.ok) {
-          const data = await listRes.json();
-          setSavedPipelines(data.pipelines || []);
+        let res: Response;
+        try {
+          res = await fetch(appUrl(`/api/v1/pipeline/${id}`), {
+            method: "DELETE",
+            headers: formatHeaders(),
+          });
+        } catch {
+          setImportError(t.errors.networkError);
+          return;
         }
-      } catch {
-        // ignore
+
+        if (!res.ok) {
+          const body = await res.json().catch(() => null);
+          setImportError(failedAnswerMessage(t, body, res.status, t.automate.deleteFailed));
+          return;
+        }
+
+        listFetchSeqRef.current += 1;
+        try {
+          const listRes = await fetch(appUrl("/api/v1/pipeline/list"), {
+            headers: formatHeaders(),
+          });
+          if (!listRes.ok) {
+            setListLoadFailed(true);
+            setImportError(t.automate.deleteListRefreshFailed);
+            return;
+          }
+          const listData: unknown = await listRes.json();
+          const pipelines = (listData as { pipelines?: unknown } | null)?.pipelines;
+          if (!Array.isArray(pipelines)) {
+            setListLoadFailed(true);
+            setImportError(t.automate.deleteListRefreshFailed);
+            return;
+          }
+          setListLoadFailed(false);
+          setImportError(null);
+          setSavedPipelines(pipelines);
+        } catch {
+          setListLoadFailed(true);
+          setImportError(t.automate.deleteListRefreshFailed);
+        }
+      } finally {
+        deletingIdsRef.current.delete(id);
       }
     },
-    [setSavedPipelines],
+    [setSavedPipelines, t],
   );
 
   const handleLoadPipeline = useCallback(
@@ -448,11 +545,13 @@ function AutomatePageContent() {
         return;
       }
 
+      listFetchSeqRef.current += 1;
       try {
         const listRes = await fetch(appUrl("/api/v1/pipeline/list"), {
           headers: formatHeaders(),
         });
         if (!listRes.ok) {
+          setListLoadFailed(true);
           setImportError(t.automate.importListRefreshFailed);
           return;
         }
@@ -460,22 +559,20 @@ function AutomatePageContent() {
         const pipelines = (listData as { pipelines?: unknown } | null)?.pipelines;
         if (!Array.isArray(pipelines)) {
           // An OK answer without the list (a proxy's `{}`) must not blank it.
+          setListLoadFailed(true);
           setImportError(t.automate.importListRefreshFailed);
           return;
         }
+        setListLoadFailed(false);
+        setImportError(null);
         setSavedPipelines(pipelines);
       } catch {
+        setListLoadFailed(true);
         setImportError(t.automate.importListRefreshFailed);
       }
     };
     input.click();
   }, [setSavedPipelines, t]);
-
-  useEffect(() => {
-    if (!importError) return;
-    const timer = setTimeout(() => setImportError(null), 5000);
-    return () => clearTimeout(timer);
-  }, [importError]);
 
   const handleDownloadAll = useCallback(() => {
     if (!batchZipBlob) return;
@@ -913,12 +1010,23 @@ function AutomatePageContent() {
             </div>
             {importError && (
               <div className="text-xs text-destructive-ink bg-red-50 dark:bg-red-950/30 rounded px-2 py-1.5 mb-1.5 flex items-start gap-1.5">
-                <X className="h-3 w-3 shrink-0 mt-0.5" />
+                <button
+                  type="button"
+                  onClick={() => setImportError(null)}
+                  aria-label={t.common.close}
+                  className="shrink-0 mt-0.5 hover:opacity-80"
+                >
+                  <X className="h-3 w-3" />
+                </button>
                 <span>{importError}</span>
               </div>
             )}
             {savedPipelines.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic">{t.automate.noSavedPipelines}</p>
+              !listLoadFailed && (
+                <p className="text-xs text-muted-foreground italic">
+                  {t.automate.noSavedPipelines}
+                </p>
+              )
             ) : showAllSaved ? (
               <div className="space-y-1 max-h-36 overflow-y-auto">
                 {savedPipelines.map((p) => (
@@ -1156,10 +1264,27 @@ function AutomatePageContent() {
 
               <span className="flex-1" />
 
+              {saveError && (
+                <div className="text-xs text-destructive-ink bg-red-50 dark:bg-red-950/30 rounded px-2 py-1.5 flex items-start gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSaveError(null)}
+                    aria-label={t.common.close}
+                    className="shrink-0 mt-0.5 hover:opacity-80"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                  <span>{saveError}</span>
+                </div>
+              )}
+
               {steps.length > 0 && !showSaveForm && (
                 <button
                   type="button"
-                  onClick={() => setShowSaveForm(true)}
+                  onClick={() => {
+                    setSaveError(null);
+                    setShowSaveForm(true);
+                  }}
                   className="px-4 py-2 rounded-lg border border-border text-muted-foreground font-medium flex items-center gap-2 hover:bg-muted hover:text-foreground text-sm"
                 >
                   <Save className="h-4 w-4" />
@@ -1172,14 +1297,20 @@ function AutomatePageContent() {
                   <input
                     type="text"
                     value={saveName}
-                    onChange={(e) => setSaveName(e.target.value)}
+                    onChange={(e) => {
+                      setSaveName(e.target.value);
+                      setSaveError(null);
+                    }}
                     placeholder={t.automate.pipelineName}
                     className="text-sm px-2.5 py-1.5 rounded border border-border bg-background text-foreground placeholder:text-muted-foreground w-36"
                   />
                   <input
                     type="text"
                     value={saveDescription}
-                    onChange={(e) => setSaveDescription(e.target.value)}
+                    onChange={(e) => {
+                      setSaveDescription(e.target.value);
+                      setSaveError(null);
+                    }}
                     placeholder={t.automate.descriptionPlaceholder}
                     className="text-sm px-2.5 py-1.5 rounded border border-border bg-background text-foreground placeholder:text-muted-foreground w-36"
                   />
@@ -1197,6 +1328,7 @@ function AutomatePageContent() {
                       setShowSaveForm(false);
                       setSaveName("");
                       setSaveDescription("");
+                      setSaveError(null);
                     }}
                     className="px-2 py-1.5 rounded text-sm text-muted-foreground hover:bg-muted"
                   >

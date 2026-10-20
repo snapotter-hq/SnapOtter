@@ -5423,6 +5423,13 @@ export const ru: TranslationKeys = {
     couldNotRead: "Не удалось прочитать файл Pipeline",
     importListRefreshFailed:
       "Pipeline импортирован, но список сохранённых не обновился. Обновите страницу, чтобы увидеть его.",
+    saveFailed: "Не удалось сохранить Pipeline",
+    deleteFailed: "Не удалось удалить Pipeline",
+    loadFailed: "Не удалось загрузить сохранённые Pipeline.",
+    saveListRefreshFailed:
+      "Pipeline сохранён, но список сохранённых не обновился. Обновите страницу, чтобы увидеть его.",
+    deleteListRefreshFailed:
+      "Pipeline удалён, но список сохранённых не обновился. Обновите страницу, чтобы увидеть изменение.",
     fileCount: "{count} файл",
     fileCountPlural: "{count} файлов",
     importFromLibrary: "Импорт из библиотеки",

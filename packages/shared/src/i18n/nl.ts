@@ -5432,6 +5432,13 @@ export const nl: TranslationKeys = {
     couldNotRead: "Pipelinebestand kon niet worden gelezen",
     importListRefreshFailed:
       "Pipeline geïmporteerd, maar de opgeslagen lijst is niet vernieuwd. Laad de pagina opnieuw om hem te zien.",
+    saveFailed: "Pipeline opslaan mislukt",
+    deleteFailed: "Pipeline verwijderen mislukt",
+    loadFailed: "Opgeslagen pipelines laden mislukt.",
+    saveListRefreshFailed:
+      "Pipeline opgeslagen, maar de opgeslagen lijst is niet vernieuwd. Laad de pagina opnieuw om hem te zien.",
+    deleteListRefreshFailed:
+      "Pipeline verwijderd, maar de opgeslagen lijst is niet vernieuwd. Laad de pagina opnieuw om de wijziging te zien.",
     fileCount: "{count} bestand",
     fileCountPlural: "{count} bestanden",
     importFromLibrary: "Importeren uit bibliotheek",

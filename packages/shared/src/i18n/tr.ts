@@ -5420,6 +5420,13 @@ export const tr: TranslationKeys = {
     couldNotRead: "Pipeline dosyası okunamadı",
     importListRefreshFailed:
       "Pipeline içe aktarıldı ancak kayıtlı liste yenilenmedi. Görmek için sayfayı yenileyin.",
+    saveFailed: "Pipeline kaydedilemedi",
+    deleteFailed: "Pipeline silinemedi",
+    loadFailed: "Kayıtlı Pipeline'lar yüklenemedi.",
+    saveListRefreshFailed:
+      "Pipeline kaydedildi ancak kayıtlı liste yenilenmedi. Görmek için sayfayı yenileyin.",
+    deleteListRefreshFailed:
+      "Pipeline silindi ancak kayıtlı liste yenilenmedi. Değişikliği görmek için sayfayı yenileyin.",
     fileCount: "{count} dosya",
     fileCountPlural: "{count} dosya",
     importFromLibrary: "Kitaplıktan İçe Aktar",

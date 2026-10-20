@@ -5338,6 +5338,13 @@ export const en = {
     couldNotRead: "Could not read pipeline file",
     importListRefreshFailed:
       "Pipeline imported, but the saved list didn't refresh. Reload the page to see it.",
+    saveFailed: "Failed to save pipeline",
+    deleteFailed: "Failed to delete pipeline",
+    loadFailed: "Couldn't load saved pipelines.",
+    saveListRefreshFailed:
+      "Pipeline saved, but the saved list didn't refresh. Reload the page to see it.",
+    deleteListRefreshFailed:
+      "Pipeline deleted, but the saved list didn't refresh. Reload the page to see the change.",
     fileCount: "{count} file",
     fileCountPlural: "{count} files",
     importFromLibrary: "Import from Library",

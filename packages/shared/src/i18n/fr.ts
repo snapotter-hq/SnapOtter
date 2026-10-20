@@ -5447,6 +5447,13 @@ export const fr: TranslationKeys = {
     couldNotRead: "Impossible de lire le fichier Pipeline",
     importListRefreshFailed:
       "Pipeline importé, mais la liste enregistrée ne s'est pas actualisée. Rechargez la page pour le voir.",
+    saveFailed: "Échec de l'enregistrement du Pipeline",
+    deleteFailed: "Échec de la suppression du Pipeline",
+    loadFailed: "Impossible de charger les Pipelines enregistrés.",
+    saveListRefreshFailed:
+      "Pipeline enregistré, mais la liste enregistrée ne s'est pas actualisée. Rechargez la page pour le voir.",
+    deleteListRefreshFailed:
+      "Pipeline supprimé, mais la liste enregistrée ne s'est pas actualisée. Rechargez la page pour voir le changement.",
     fileCount: "{count} fichier",
     fileCountPlural: "{count} fichiers",
     importFromLibrary: "Importer depuis la bibliothèque",

@@ -5364,6 +5364,13 @@ export const ar: TranslationKeys = {
     couldNotRead: "تعذرت قراءة ملف Pipeline",
     importListRefreshFailed:
       "تم استيراد Pipeline، لكن القائمة المحفوظة لم تتحدّث. أعد تحميل الصفحة لرؤيته.",
+    saveFailed: "فشل حفظ Pipeline",
+    deleteFailed: "فشل حذف Pipeline",
+    loadFailed: "تعذّر تحميل Pipeline المحفوظة.",
+    saveListRefreshFailed:
+      "تم حفظ Pipeline، لكن القائمة المحفوظة لم تتحدّث. أعد تحميل الصفحة لرؤيته.",
+    deleteListRefreshFailed:
+      "تم حذف Pipeline، لكن القائمة المحفوظة لم تتحدّث. أعد تحميل الصفحة لرؤية التغيير.",
     fileCount: "{count} ملف",
     fileCountPlural: "{count} ملفات",
     importFromLibrary: "استيراد من المكتبة",

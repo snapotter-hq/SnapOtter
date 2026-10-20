@@ -5423,6 +5423,13 @@ export const es: TranslationKeys = {
     couldNotRead: "No se pudo leer el archivo de Pipeline",
     importListRefreshFailed:
       "Pipeline importado, pero la lista guardada no se actualizó. Recarga la página para verlo.",
+    saveFailed: "Error al guardar el Pipeline",
+    deleteFailed: "Error al eliminar el Pipeline",
+    loadFailed: "No se pudieron cargar los Pipelines guardados.",
+    saveListRefreshFailed:
+      "Pipeline guardado, pero la lista guardada no se actualizó. Recarga la página para verlo.",
+    deleteListRefreshFailed:
+      "Pipeline eliminado, pero la lista guardada no se actualizó. Recarga la página para ver el cambio.",
     fileCount: "{count} archivo",
     fileCountPlural: "{count} archivos",
     importFromLibrary: "Importar desde la biblioteca",
