@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { SafeError } from "@snapotter/shared";
+import { type Permission, SafeError } from "@snapotter/shared";
 import { and, eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import * as OTPAuth from "otpauth";
@@ -106,6 +106,17 @@ async function restoreMfaChallenge(
         "mfa: failed to restore challenge key after error",
       );
     }
+  }
+}
+
+async function clearMfaAttempts(
+  redis: ReturnType<typeof sharedRedis>,
+  attemptsKey: string,
+): Promise<void> {
+  try {
+    await redis.del(attemptsKey);
+  } catch (err) {
+    logger.warn({ err, attemptsKey }, "mfa: failed to delete attempts key");
   }
 }
 
@@ -790,7 +801,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         [dbUser] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
 
         if (!dbUser) {
-          await redis.del(attemptsKey);
+          await clearMfaAttempts(redis, attemptsKey);
           return reply.status(401).send({
             error: "MFA challenge expired or invalid",
             code: "MFA_EXPIRED",
@@ -804,7 +815,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
             .digest("hex")
             .substring(0, 16);
           if (currentFingerprint !== hashFingerprint) {
-            await redis.del(attemptsKey);
+            await clearMfaAttempts(redis, attemptsKey);
             const audit = auditFromRequest(request);
             await audit("MFA_VERIFY_FAILED", {
               userId: dbUser.id,
@@ -818,7 +829,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           }
         }
         if (isDisabledRole(dbUser.role)) {
-          await redis.del(attemptsKey);
+          await clearMfaAttempts(redis, attemptsKey);
           const audit = auditFromRequest(request);
           await audit("MFA_VERIFY_FAILED", {
             userId: dbUser.id,
@@ -831,7 +842,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           });
         }
         if (hashFingerprint && !dbUser.passwordHash) {
-          await redis.del(attemptsKey);
+          await clearMfaAttempts(redis, attemptsKey);
           const audit = auditFromRequest(request);
           await audit("MFA_VERIFY_FAILED", {
             userId: dbUser.id,
@@ -844,7 +855,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           });
         }
         if (!dbUser.totpSecret) {
-          await redis.del(attemptsKey);
+          await clearMfaAttempts(redis, attemptsKey);
           return reply.status(401).send({
             error: "User not found or MFA not configured",
             code: "MFA_NOT_CONFIGURED",
@@ -932,7 +943,12 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
 
       let inserted:
-        | { status: "success"; role: string }
+        | {
+            status: "success";
+            role: string;
+            permissions: Permission[];
+            teamName: string;
+          }
         | {
             status:
               | "password_changed"
@@ -944,7 +960,11 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       try {
         inserted = await db.transaction(async (tx) => {
           const [lockedUser] = await tx
-            .select({ passwordHash: schema.users.passwordHash, role: schema.users.role })
+            .select({
+              passwordHash: schema.users.passwordHash,
+              role: schema.users.role,
+              team: schema.users.team,
+            })
             .from(schema.users)
             .where(eq(schema.users.id, verifiedUser.id))
             .for(recoveryCandidate ? "no key update" : "share");
@@ -990,7 +1010,18 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
 
           await evictExcessUserSessions(tx, verifiedUser.id, maxSessions, token);
 
-          return { status: "success" as const, role: lockedUser.role };
+          const [teamRow] = await tx
+            .select()
+            .from(schema.teams)
+            .where(eq(schema.teams.id, lockedUser.team));
+          const permissions = await getPermissions(lockedUser.role);
+
+          return {
+            status: "success" as const,
+            role: lockedUser.role,
+            permissions,
+            teamName: teamRow?.name ?? lockedUser.team,
+          };
         });
       } catch (err) {
         if (claimedStep) {
@@ -1007,7 +1038,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
 
       // Clear any failed-attempt counter once the transaction finishes (the
       // challenge key was deleted on claim).
-      await redis.del(attemptsKey);
+      await clearMfaAttempts(redis, attemptsKey);
 
       if (inserted.status !== "success") {
         if (claimedStep) {
@@ -1040,11 +1071,6 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         username: verifiedUser.username,
       });
 
-      const [teamRow] = await db
-        .select()
-        .from(schema.teams)
-        .where(eq(schema.teams.id, verifiedUser.team));
-
       setSessionCookie(request, reply, token);
 
       return reply.send({
@@ -1056,8 +1082,8 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           mustChangePassword: env.SKIP_MUST_CHANGE_PASSWORD
             ? false
             : verifiedUser.mustChangePassword,
-          permissions: await getPermissions(inserted.role),
-          teamName: teamRow?.name ?? verifiedUser.team,
+          permissions: inserted.permissions,
+          teamName: inserted.teamName,
         },
         expiresAt: expiresAt.toISOString(),
       });
@@ -1113,7 +1139,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
         [dbUser] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
 
         if (!dbUser) {
-          await redis.del(attemptsKey);
+          await clearMfaAttempts(redis, attemptsKey);
           return reply.status(401).send({
             error: "Enrollment challenge expired or invalid",
             code: "MFA_EXPIRED",
@@ -1127,7 +1153,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
             .digest("hex")
             .substring(0, 16);
           if (currentFingerprint !== hashFingerprint) {
-            await redis.del(attemptsKey);
+            await clearMfaAttempts(redis, attemptsKey);
             const audit = auditFromRequest(request);
             await audit("MFA_VERIFY_FAILED", {
               userId: dbUser.id,
@@ -1141,7 +1167,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           }
         }
         if (isDisabledRole(dbUser.role)) {
-          await redis.del(attemptsKey);
+          await clearMfaAttempts(redis, attemptsKey);
           const audit = auditFromRequest(request);
           await audit("MFA_VERIFY_FAILED", {
             userId: dbUser.id,
@@ -1154,7 +1180,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           });
         }
         if (hashFingerprint && !dbUser.passwordHash) {
-          await redis.del(attemptsKey);
+          await clearMfaAttempts(redis, attemptsKey);
           const audit = auditFromRequest(request);
           await audit("MFA_VERIFY_FAILED", {
             userId: dbUser.id,
@@ -1167,14 +1193,14 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           });
         }
         if (!dbUser.totpSecret) {
-          await redis.del(attemptsKey);
+          await clearMfaAttempts(redis, attemptsKey);
           return reply.status(401).send({
             error: "User not found or MFA not configured",
             code: "MFA_NOT_CONFIGURED",
           });
         }
         if (dbUser.totpEnabled) {
-          await redis.del(attemptsKey);
+          await clearMfaAttempts(redis, attemptsKey);
           // Defensive: the pending secret should be inactive at this point.
           return reply.status(409).send({
             error: "MFA is already verified and active",
@@ -1236,12 +1262,21 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       const verifiedUser = dbUser;
 
       let inserted:
-        | { status: "success"; role: string }
+        | {
+            status: "success";
+            role: string;
+            permissions: Permission[];
+            teamName: string;
+          }
         | { status: "password_changed" | "password_removed" | "user_disabled" | "user_deleted" };
       try {
         inserted = await db.transaction(async (tx) => {
           const [lockedUser] = await tx
-            .select({ passwordHash: schema.users.passwordHash, role: schema.users.role })
+            .select({
+              passwordHash: schema.users.passwordHash,
+              role: schema.users.role,
+              team: schema.users.team,
+            })
             .from(schema.users)
             .where(eq(schema.users.id, verifiedUser.id))
             .for("share");
@@ -1285,7 +1320,18 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
 
           await evictExcessUserSessions(tx, verifiedUser.id, maxSessions, token);
 
-          return { status: "success" as const, role: lockedUser.role };
+          const [teamRow] = await tx
+            .select()
+            .from(schema.teams)
+            .where(eq(schema.teams.id, lockedUser.team));
+          const permissions = await getPermissions(lockedUser.role);
+
+          return {
+            status: "success" as const,
+            role: lockedUser.role,
+            permissions,
+            teamName: teamRow?.name ?? lockedUser.team,
+          };
         });
       } catch (err) {
         await restoreTotpStep(redis, claimedStep);
@@ -1295,7 +1341,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
 
       // Clear any failed-attempt counter once the transaction finishes (the
       // challenge key was deleted on claim).
-      await redis.del(attemptsKey);
+      await clearMfaAttempts(redis, attemptsKey);
 
       if (inserted.status !== "success") {
         await restoreTotpStep(redis, claimedStep);
@@ -1324,11 +1370,6 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       await audit("MFA_ENROLLED", { userId: verifiedUser.id, username: verifiedUser.username });
       await audit("LOGIN_SUCCESS", { userId: verifiedUser.id, username: verifiedUser.username });
 
-      const [teamRow] = await db
-        .select()
-        .from(schema.teams)
-        .where(eq(schema.teams.id, verifiedUser.team));
-
       setSessionCookie(request, reply, token);
 
       return reply.send({
@@ -1340,8 +1381,8 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
           mustChangePassword: env.SKIP_MUST_CHANGE_PASSWORD
             ? false
             : verifiedUser.mustChangePassword,
-          permissions: await getPermissions(inserted.role),
-          teamName: teamRow?.name ?? verifiedUser.team,
+          permissions: inserted.permissions,
+          teamName: inserted.teamName,
         },
         expiresAt: expiresAt.toISOString(),
       });

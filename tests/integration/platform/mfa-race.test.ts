@@ -669,4 +669,319 @@ describe("MFA Race Condition #2328", () => {
       .where(eq(schema.sessions.userId, userId));
     expect(sessionsAfter).toHaveLength(sessionsBefore.length + 1);
   });
+
+  it("does not strand a committed session when schema.teams select or redis.del(attemptsKey) fails on /mfa/complete or /mfa/enroll-complete (#2603)", async () => {
+    const remainingMs = OTPAuth.TOTP.remaining({ period: 30 });
+    if (remainingMs < 5_000) {
+      await new Promise((r) => setTimeout(r, remainingMs + 50));
+    }
+
+    function faultTeamsSelectOnce() {
+      const state = { faulted: false };
+      // biome-ignore lint/suspicious/noExplicitAny: wrap Drizzle select builder on both db and tx
+      const wrapSelect = (origSelect: (...args: any[]) => any) => {
+        return (...args: unknown[]) => {
+          const builder = origSelect(...args);
+          const origFrom = builder.from.bind(builder);
+          builder.from = (table: unknown, ...fromArgs: unknown[]) => {
+            if (!state.faulted && table === schema.teams) {
+              state.faulted = true;
+              throw new Error("simulated transient teams lookup failure");
+            }
+            return origFrom(table, ...fromArgs);
+          };
+          return builder;
+        };
+      };
+
+      const origDbSelect = db.select.bind(db);
+      const selectSpy = vi.spyOn(db, "select").mockImplementation(wrapSelect(origDbSelect));
+      const realTransaction = db.transaction.bind(db) as (
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) => Promise<unknown>;
+      const txSpy = vi.spyOn(db, "transaction").mockImplementation(((
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) =>
+        realTransaction((tx) => {
+          // biome-ignore lint/suspicious/noExplicitAny: proxy tx.select to fault schema.teams inside transaction
+          const origTxSelect = (tx as any).select.bind(tx);
+          const wrappedTx = new Proxy(tx, {
+            get(target, prop, receiver) {
+              if (prop === "select") {
+                return wrapSelect(origTxSelect);
+              }
+              return Reflect.get(target, prop, receiver);
+            },
+          });
+          return cb(wrappedTx);
+        }, config)) as unknown as typeof db.transaction);
+
+      return {
+        state,
+        restore: () => {
+          txSpy.mockRestore();
+          selectSpy.mockRestore();
+        },
+      };
+    }
+
+    // 1. /mfa/complete: teams lookup failure rolls back the session and recovery code,
+    // preserves the challenge and attemptsKey, and restores the TOTP step so retry succeeds.
+    const { userId, username, password, uri, recoveryCodes } = await createEnrolledUser();
+    const sessionsBeforeComplete = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, userId));
+
+    const loginRes1 = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username, password },
+    });
+    const { mfaToken: mfaToken1 } = JSON.parse(loginRes1.body);
+
+    const badComplete1 = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken: mfaToken1, code: "000000" },
+    });
+    expect(badComplete1.statusCode).toBe(401);
+    expect(await sharedRedis().get(`mfa:attempts:${mfaToken1}`)).toBe("1");
+
+    const totpCode1 = generateTotpCode(uri);
+    const teamsFault1 = faultTeamsSelectOnce();
+    try {
+      const errCompleteRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken: mfaToken1, code: totpCode1 },
+      });
+      expect(errCompleteRes.statusCode).toBe(500);
+      expect(teamsFault1.state.faulted).toBe(true);
+    } finally {
+      teamsFault1.restore();
+    }
+
+    const sessionsAfterCompleteFault = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, userId));
+    expect(sessionsAfterCompleteFault).toHaveLength(sessionsBeforeComplete.length);
+    expect(await sharedRedis().get(`mfa:${mfaToken1}`)).toBeTruthy();
+    expect(await sharedRedis().get(`mfa:attempts:${mfaToken1}`)).toBe("1");
+
+    // Also verify recovery code is rolled back on teams lookup failure before retry succeeds.
+    const teamsFaultRecovery = faultTeamsSelectOnce();
+    try {
+      const errRecoveryRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken: mfaToken1, code: recoveryCodes[0] },
+      });
+      expect(errRecoveryRes.statusCode).toBe(500);
+      expect(teamsFaultRecovery.state.faulted).toBe(true);
+    } finally {
+      teamsFaultRecovery.restore();
+    }
+    const [userAfterRecoveryFault] = await db
+      .select({ recoveryCodesHash: schema.users.recoveryCodesHash })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId));
+    expect(
+      verifyRecoveryCode(recoveryCodes[0], userAfterRecoveryFault.recoveryCodesHash ?? "").valid,
+    ).toBe(true);
+
+    // Retrying with the same mfaToken and TOTP code succeeds cleanly.
+    const retryCompleteRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken: mfaToken1, code: totpCode1 },
+    });
+    expect(retryCompleteRes.statusCode).toBe(200);
+    const retryCompleteBody = JSON.parse(retryCompleteRes.body);
+    expect(typeof retryCompleteBody.token).toBe("string");
+    expect(retryCompleteBody.user.teamName).toBe("Default");
+    expect(retryCompleteBody.user.permissions).toContain("tools:use");
+    expect(String(retryCompleteRes.headers["set-cookie"])).toContain(
+      `snapotter-session=${retryCompleteBody.token}`,
+    );
+    expect(await sharedRedis().get(`mfa:${mfaToken1}`)).toBeNull();
+    expect(await sharedRedis().get(`mfa:attempts:${mfaToken1}`)).toBeNull();
+
+    const sessionsAfterCompleteRetry = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, userId));
+    expect(sessionsAfterCompleteRetry).toHaveLength(sessionsBeforeComplete.length + 1);
+
+    // 2. /mfa/complete: redis.del(attemptsKey) failure after commit degrades gracefully
+    // and still returns 200 with the committed session token and cookie.
+    const loginRes2 = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username, password },
+    });
+    const { mfaToken: mfaToken2 } = JSON.parse(loginRes2.body);
+
+    await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/complete",
+      payload: { mfaToken: mfaToken2, code: "000000" },
+    });
+    expect(await sharedRedis().get(`mfa:attempts:${mfaToken2}`)).toBe("1");
+
+    const delSpy1 = vi
+      .spyOn(sharedRedis(), "del")
+      .mockRejectedValueOnce(new Error("simulated transient Redis DEL error"));
+    try {
+      const delFaultRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken: mfaToken2, code: recoveryCodes[0] },
+      });
+      expect(delFaultRes.statusCode).toBe(200);
+      const delFaultBody = JSON.parse(delFaultRes.body);
+      expect(typeof delFaultBody.token).toBe("string");
+      expect(delFaultBody.user.teamName).toBe("Default");
+      expect(delFaultBody.user.permissions).toContain("tools:use");
+      expect(String(delFaultRes.headers["set-cookie"])).toContain(
+        `snapotter-session=${delFaultBody.token}`,
+      );
+    } finally {
+      delSpy1.mockRestore();
+      await sharedRedis().del(`mfa:attempts:${mfaToken2}`);
+    }
+
+    // 2b. /mfa/complete: redis.del(attemptsKey) failure on a pre-transaction terminal rejection
+    // (disabled user) still returns 403 USER_DISABLED and leaves the challenge burned.
+    const loginResDisabled = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username, password },
+    });
+    const { mfaToken: mfaTokenDisabled } = JSON.parse(loginResDisabled.body);
+    await db
+      .update(schema.users)
+      .set({ role: "disabled:user", updatedAt: new Date() })
+      .where(eq(schema.users.id, userId));
+    const delSpyDisabled = vi
+      .spyOn(sharedRedis(), "del")
+      .mockRejectedValueOnce(new Error("simulated transient Redis DEL error on disabled exit"));
+    try {
+      const disabledRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken: mfaTokenDisabled, code: recoveryCodes[1] },
+      });
+      expect(disabledRes.statusCode).toBe(403);
+      expect(JSON.parse(disabledRes.body).code).toBe("USER_DISABLED");
+      expect(await sharedRedis().get(`mfa:${mfaTokenDisabled}`)).toBeNull();
+    } finally {
+      delSpyDisabled.mockRestore();
+      await db
+        .update(schema.users)
+        .set({ role: "user", updatedAt: new Date() })
+        .where(eq(schema.users.id, userId));
+    }
+
+    // 3. /mfa/enroll-complete: teams lookup failure rolls back totpEnabled and session,
+    // preserves enrollmentToken and attemptsKey, and restores the TOTP step so retry succeeds.
+    const enrollUsername = `mfa_enroll_2603_${Date.now()}`;
+    const { userId: enrollUserId } = await createUserAndLogin(
+      testApp.app,
+      enrollUsername,
+      "user",
+      password,
+    );
+    const sessionsBeforeEnroll = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, enrollUserId));
+
+    await db
+      .insert(schema.settings)
+      .values({ key: "mfaPolicy", value: "required" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "required" } });
+
+    const enrollLoginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: enrollUsername, password },
+    });
+    const { enrollmentToken, uri: enrollUri } = JSON.parse(enrollLoginRes.body);
+
+    const badEnroll = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/mfa/enroll-complete",
+      payload: { enrollmentToken, code: "000000" },
+    });
+    expect(badEnroll.statusCode).toBe(401);
+    expect(await sharedRedis().get(`mfa:enroll:attempts:${enrollmentToken}`)).toBe("1");
+
+    const enrollCode = generateTotpCode(enrollUri);
+    const teamsFault2 = faultTeamsSelectOnce();
+    try {
+      const errEnrollRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/enroll-complete",
+        payload: { enrollmentToken, code: enrollCode },
+      });
+      expect(errEnrollRes.statusCode).toBe(500);
+      expect(teamsFault2.state.faulted).toBe(true);
+    } finally {
+      teamsFault2.restore();
+    }
+
+    const [enrollUserAfterFault] = await db
+      .select({ totpEnabled: schema.users.totpEnabled })
+      .from(schema.users)
+      .where(eq(schema.users.id, enrollUserId));
+    expect(enrollUserAfterFault.totpEnabled).toBe(false);
+
+    const sessionsAfterEnrollFault = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, enrollUserId));
+    expect(sessionsAfterEnrollFault).toHaveLength(sessionsBeforeEnroll.length);
+    expect(await sharedRedis().get(`mfa:enroll:${enrollmentToken}`)).toBeTruthy();
+    expect(await sharedRedis().get(`mfa:enroll:attempts:${enrollmentToken}`)).toBe("1");
+
+    // 4. /mfa/enroll-complete: retrying with the same enrollmentToken and TOTP code succeeds even
+    // when redis.del(attemptsKey) rejects on the post-commit cleanup.
+    const delSpy2 = vi
+      .spyOn(sharedRedis(), "del")
+      .mockRejectedValueOnce(new Error("simulated transient Redis DEL error on enroll-complete"));
+    try {
+      const retryEnrollRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/enroll-complete",
+        payload: { enrollmentToken, code: enrollCode },
+      });
+      expect(retryEnrollRes.statusCode).toBe(200);
+      const retryEnrollBody = JSON.parse(retryEnrollRes.body);
+      expect(typeof retryEnrollBody.token).toBe("string");
+      expect(retryEnrollBody.user.teamName).toBe("Default");
+      expect(retryEnrollBody.user.permissions).toContain("tools:use");
+      expect(String(retryEnrollRes.headers["set-cookie"])).toContain(
+        `snapotter-session=${retryEnrollBody.token}`,
+      );
+    } finally {
+      delSpy2.mockRestore();
+      await sharedRedis().del(`mfa:enroll:attempts:${enrollmentToken}`);
+    }
+
+    const [enrollUserAfterRetry] = await db
+      .select({ totpEnabled: schema.users.totpEnabled })
+      .from(schema.users)
+      .where(eq(schema.users.id, enrollUserId));
+    expect(enrollUserAfterRetry.totpEnabled).toBe(true);
+
+    const sessionsAfterEnrollRetry = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, enrollUserId));
+    expect(sessionsAfterEnrollRetry).toHaveLength(sessionsBeforeEnroll.length + 1);
+  });
 });
