@@ -95,6 +95,18 @@ vi.mock("../../../apps/api/src/routes/progress.js", async (importOriginal) => {
       }
       return actual.updateSingleFileProgress(progress);
     },
+    updateSingleFileProgressAtomically: async (
+      progress: Parameters<typeof actual.updateSingleFileProgressAtomically>[0],
+      mutateAuthoritative: Parameters<typeof actual.updateSingleFileProgressAtomically>[1],
+    ) => {
+      if (progressMock.failUpdateSingleFor === progress.jobId) {
+        return actual.updateSingleFileProgressAtomically(progress, async (tx) => {
+          await mutateAuthoritative(tx);
+          throw new Error("injected update single progress outage");
+        });
+      }
+      return actual.updateSingleFileProgressAtomically(progress, mutateAuthoritative);
+    },
   };
 });
 
@@ -1315,11 +1327,158 @@ describe("pipeline finalize", () => {
 
       const flowRow = await terminalRow(jobId);
       expect(flowRow.status).toBe("failed");
-      expect(flowRow.error?.message).toBe("Step 1: boom");
+      expect(flowRow.error?.message).toBe("Pipeline processing failed");
 
       const aliasRow = await terminalRow(clientJobId);
       expect(aliasRow.status).toBe("failed");
       expect(aliasRow.error?.message).toBe("Pipeline processing failed");
+    } finally {
+      progressMock.failUpdateSingleFor = null;
+    }
+  }, 30_000);
+
+  it("commits the failed pipeline row and clientJobId alias row atomically and survives a terminal write fault on a pipeline-batch child (#3167)", async () => {
+    const singleJobId = `pf-${randomUUID()}`;
+    const clientJobId = `pfc-${randomUUID()}`;
+    await db.insert(schema.jobs).values([
+      {
+        id: `${singleJobId}-s0`,
+        type: "pipeline-step",
+        status: "failed",
+        toolId: "pdf-compress",
+        pool: "image",
+        inputRefs: [],
+        error: {
+          message: "qpdf is not installed",
+          code: "ENGINE_UNAVAILABLE",
+          details: "Check QPDF_PATH",
+          httpStatus: 503,
+        },
+      },
+      {
+        id: singleJobId,
+        type: "pipeline",
+        status: "processing",
+        toolId: "pipeline",
+        pool: "image",
+        inputRefs: [],
+      },
+      {
+        id: clientJobId,
+        type: "single",
+        status: "processing",
+        inputRefs: [],
+        progress: { percent: 0, stage: "Preparing pipeline..." },
+      },
+    ]);
+
+    await getQueue("image").add(
+      "pipeline-finalize",
+      toolJob({
+        jobId: singleJobId,
+        toolId: "pipeline",
+        kind: "pipeline-finalize",
+        totalSteps: 1,
+        filename: "doc.pdf",
+        clientJobId,
+      }),
+      { jobId: singleJobId, attempts: 1 },
+    );
+
+    const frame = await terminalFrame(clientJobId);
+    expect(frame).toMatchObject({
+      jobId: clientJobId,
+      type: "single",
+      phase: "failed",
+      percent: 0,
+      error: "Step 1: qpdf is not installed",
+      code: "ENGINE_UNAVAILABLE",
+      details: "Check QPDF_PATH",
+      httpStatus: 503,
+    });
+
+    const flowRow = await terminalRow(singleJobId);
+    expect(flowRow.status).toBe("failed");
+    expect(flowRow.error).toEqual({
+      message: "Step 1: qpdf is not installed",
+      code: "ENGINE_UNAVAILABLE",
+      details: "Check QPDF_PATH",
+      httpStatus: 503,
+    });
+
+    const aliasRow = await terminalRow(clientJobId);
+    expect(aliasRow.status).toBe("failed");
+    expect(aliasRow.error).toEqual({
+      message: "Step 1: qpdf is not installed",
+      code: "ENGINE_UNAVAILABLE",
+      details: "Check QPDF_PATH",
+      httpStatus: 503,
+    });
+
+    // Pipeline-batch child: a terminal DB write fault rolls back the transaction
+    // without aborting recordChildOutcome, analytics, or the returned failure
+    // marker that lets batch-finalize run.
+    const batchChildId = `pf-${randomUUID()}`;
+    const batchParent = `bp-${randomUUID()}`;
+    await db.insert(schema.jobs).values({
+      id: `${batchChildId}-s0`,
+      type: "pipeline-step",
+      status: "failed",
+      toolId: "pdf-compress",
+      pool: "image",
+      inputRefs: [],
+      error: {
+        message: "qpdf is not installed",
+        code: "ENGINE_UNAVAILABLE",
+        details: "Check QPDF_PATH",
+        httpStatus: 503,
+      },
+    });
+
+    progressMock.failUpdateSingleFor = batchChildId;
+    reported.errors.length = 0;
+    try {
+      await enqueueToolJob(
+        toolJob({
+          jobId: batchChildId,
+          toolId: "pipeline",
+          kind: "pipeline-finalize",
+          totalSteps: 1,
+          filename: "doc.pdf",
+          parentId: batchParent,
+          totalFiles: 1,
+        }),
+      );
+
+      const settledJob = await settledQueueJob("image", batchChildId);
+      expect(settledJob.state).toBe("completed");
+      expect(settledJob.returnvalue?.resultPayload).toMatchObject({
+        error: "Step 1: qpdf is not installed",
+        code: "ENGINE_UNAVAILABLE",
+        details: "Check QPDF_PATH",
+        httpStatus: 503,
+        stepsCompleted: 0,
+        steps: [],
+      });
+
+      const outcome = await batchOutcome(batchParent, "failed");
+      expect(outcome.count).toBe("1");
+      expect(outcome.errors).toEqual([
+        { filename: "doc.pdf", error: "Step 1: qpdf is not installed" },
+      ]);
+
+      const events = await emittedEvents(ANALYTICS_EVENTS.PIPELINE_EXECUTED, batchChildId);
+      expect(events[0].status).toBe("failed");
+
+      const childRow = await jobRow(batchChildId);
+      expect(childRow?.status).toBe("queued");
+      expect(await sharedRedis().get(`${bullPrefix()}:terminal:${batchChildId}`)).toBeNull();
+
+      expect(
+        reported.errors.some(
+          (e) => e instanceof Error && e.message === "injected update single progress outage",
+        ),
+      ).toBe(true);
     } finally {
       progressMock.failUpdateSingleFor = null;
     }

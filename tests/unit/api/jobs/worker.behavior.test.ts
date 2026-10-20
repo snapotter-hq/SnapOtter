@@ -2264,3 +2264,308 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
     });
   });
 });
+
+describe("processPipelineFinalize atomic failure commits (#3167)", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  async function setupPipelineFinalizeProcessor(
+    rowsById: Record<string, Record<string, unknown> | undefined>,
+  ) {
+    const dbUpdateMock = vi.fn(() => ({
+      set: vi.fn(() => ({
+        where: vi.fn().mockResolvedValue(undefined),
+      })),
+    }));
+    const updateSingleFileProgressMock = vi.fn().mockResolvedValue(undefined);
+    const updateSingleFileProgressAtomicallyMock = vi.fn();
+    const recordChildOutcomeMock = vi.fn().mockResolvedValue(undefined);
+    const reportErrorMock = vi.fn();
+    const trackEventMock = vi.fn();
+
+    const actualErrors = await vi.importActual<
+      typeof import("../../../../apps/api/src/lib/errors.js")
+    >("../../../../apps/api/src/lib/errors.js");
+
+    const workerMod = await loadWorker("", () => {
+      vi.doMock("../../../../apps/api/src/db/index.js", () => ({
+        db: {
+          select: vi.fn(() => ({
+            from: vi.fn(() => ({
+              where: vi.fn(async (cond: { val?: string }) => {
+                const row = cond?.val ? rowsById[cond.val] : undefined;
+                return row ? [row] : [];
+              }),
+            })),
+          })),
+          update: dbUpdateMock,
+        },
+        schema: { jobs: { id: "jobs.id" } },
+      }));
+      vi.doMock("../../../../apps/api/src/lib/errors.js", () => ({
+        friendlyError: vi.fn(actualErrors.friendlyError),
+        sharedFailureReason: vi.fn(actualErrors.sharedFailureReason),
+        stripInternalPaths: vi.fn(actualErrors.stripInternalPaths),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/error-report.js", () => ({
+        classifyError: vi.fn(() => "operational"),
+        reportError: reportErrorMock,
+        safeFormatTag: vi.fn(() => undefined),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/analytics.js", () => ({
+        captureException: vi.fn(),
+        trackEvent: trackEventMock,
+      }));
+      vi.doMock("../../../../apps/api/src/lib/analytics-gate.js", () => ({
+        analyticsEnabled: vi.fn(() => true),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/batch-progress.js", () => ({
+        isBatchCanceled: vi.fn(async () => false),
+        readBatchCounters: vi.fn(),
+        recordChildOutcome: recordChildOutcomeMock,
+      }));
+      vi.doMock("../../../../apps/api/src/routes/progress.js", () => ({
+        cancelBatchJob: vi.fn(),
+        cancelSingleJobGuarded: vi.fn(),
+        completeBatchJob: vi.fn(),
+        failBatchJob: vi.fn(),
+        failSingleJobGuarded: vi.fn(),
+        publishEphemeral: vi.fn(),
+        updateSingleFileProgress: updateSingleFileProgressMock,
+        updateSingleFileProgressAtomically: updateSingleFileProgressAtomicallyMock,
+      }));
+      vi.doMock("@snapotter/media-engine", () => ({
+        HW_ACCEL_FAMILIES: [],
+        hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+        softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+        binaryOverrideWarning: vi.fn(),
+        checkBinaryOverrides: vi.fn(() => []),
+        probeFailureLevel: vi.fn(() => "warn"),
+      }));
+    });
+
+    const { Worker } = await import("bullmq");
+    const { logger } = await import("../../../../apps/api/src/lib/logger.js");
+    workerMod.startWorkers();
+    const workerCalls = (Worker as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    const imageCall = workerCalls.find(([queue]) => String(queue).endsWith("image"));
+    if (!imageCall) throw new Error("image pool worker not registered");
+    const processor = imageCall[1] as (job: unknown) => Promise<unknown>;
+
+    return {
+      processor,
+      dbUpdateMock,
+      updateSingleFileProgressMock,
+      updateSingleFileProgressAtomicallyMock,
+      recordChildOutcomeMock,
+      reportErrorMock,
+      trackEventMock,
+      logger,
+    };
+  }
+
+  it("commits the authoritative pipeline row and clientJobId replay row in one transaction via updateSingleFileProgressAtomically", async () => {
+    const {
+      processor,
+      dbUpdateMock,
+      updateSingleFileProgressMock,
+      updateSingleFileProgressAtomicallyMock,
+    } = await setupPipelineFinalizeProcessor({
+      "pf-1-s0": {
+        id: "pf-1-s0",
+        status: "failed",
+        toolId: "pdf-compress",
+        error: {
+          message: "qpdf is not installed",
+          code: "ENGINE_UNAVAILABLE",
+          details: "Check QPDF_PATH",
+          httpStatus: 503,
+        },
+      },
+    });
+
+    const txWhereMock = vi.fn().mockResolvedValue(undefined);
+    const txSetMock = vi.fn(() => ({ where: txWhereMock }));
+    const txStub = { update: vi.fn(() => ({ set: txSetMock })) };
+    updateSingleFileProgressAtomicallyMock.mockImplementationOnce(
+      async (_progress: unknown, mutate: (tx: unknown) => Promise<void>) => {
+        await mutate(txStub);
+      },
+    );
+
+    const res = await processor({
+      id: "pf-1",
+      name: "pipeline-finalize",
+      data: {
+        kind: "pipeline-finalize",
+        jobId: "pf-1",
+        clientJobId: "pfc-1",
+        toolId: "pipeline",
+        userId: null,
+        pool: "image",
+        totalSteps: 1,
+        inputRefs: [],
+        filename: "doc.pdf",
+        settings: {},
+      },
+    });
+
+    expect(dbUpdateMock).not.toHaveBeenCalled();
+    expect(updateSingleFileProgressMock).not.toHaveBeenCalled();
+    expect(updateSingleFileProgressAtomicallyMock).toHaveBeenCalledTimes(1);
+    expect(updateSingleFileProgressAtomicallyMock).toHaveBeenCalledWith(
+      {
+        jobId: "pfc-1",
+        phase: "failed",
+        percent: 0,
+        error: "Step 1: qpdf is not installed",
+        code: "ENGINE_UNAVAILABLE",
+        details: "Check QPDF_PATH",
+        httpStatus: 503,
+      },
+      expect.any(Function),
+    );
+    expect(txSetMock).toHaveBeenCalledWith({
+      status: "failed",
+      completedAt: expect.any(Date),
+      error: {
+        message: "Step 1: qpdf is not installed",
+        code: "ENGINE_UNAVAILABLE",
+        details: "Check QPDF_PATH",
+        httpStatus: 503,
+      },
+    });
+    expect(txWhereMock).toHaveBeenCalledWith({
+      op: "eq",
+      col: "jobs.id",
+      val: "pf-1",
+    });
+    expect(res).toMatchObject({
+      outputRefs: [],
+      filename: "doc.pdf",
+      resultPayload: {
+        error: "Step 1: qpdf is not installed",
+        code: "ENGINE_UNAVAILABLE",
+        details: "Check QPDF_PATH",
+        httpStatus: 503,
+        stepsCompleted: 0,
+        steps: [],
+      },
+    });
+  });
+
+  it("rethrows an atomic failure-write fault on a single-file pipeline so the failed-handler safety net runs", async () => {
+    const { processor, updateSingleFileProgressAtomicallyMock, reportErrorMock } =
+      await setupPipelineFinalizeProcessor({
+        "pf-single-s0": {
+          id: "pf-single-s0",
+          status: "failed",
+          toolId: "resize",
+          error: { message: "boom" },
+        },
+      });
+
+    const dbErr = new Error("connection terminated unexpectedly");
+    updateSingleFileProgressAtomicallyMock.mockRejectedValueOnce(dbErr);
+
+    await expect(
+      processor({
+        id: "pf-single",
+        name: "pipeline-finalize",
+        data: {
+          kind: "pipeline-finalize",
+          jobId: "pf-single",
+          clientJobId: "pfc-single",
+          toolId: "pipeline",
+          userId: null,
+          pool: "image",
+          totalSteps: 1,
+          inputRefs: [],
+          filename: "chain.png",
+          settings: {},
+        },
+      }),
+    ).rejects.toBe(dbErr);
+    expect(reportErrorMock).not.toHaveBeenCalled();
+  });
+
+  it("catches, logs, and reports a terminal write fault on a pipeline-batch child so recordChildOutcome and batch-finalize still run", async () => {
+    const {
+      processor,
+      updateSingleFileProgressAtomicallyMock,
+      recordChildOutcomeMock,
+      reportErrorMock,
+      trackEventMock,
+      logger,
+    } = await setupPipelineFinalizeProcessor({
+      "pf-batch-f0-s0": {
+        id: "pf-batch-f0-s0",
+        status: "failed",
+        toolId: "pdf-compress",
+        error: {
+          message: "qpdf is not installed",
+          code: "ENGINE_UNAVAILABLE",
+          details: "Check QPDF_PATH",
+          httpStatus: 503,
+        },
+      },
+    });
+
+    const dbErr = new Error("postgres write failed");
+    updateSingleFileProgressAtomicallyMock.mockRejectedValueOnce(dbErr);
+
+    const res = await processor({
+      id: "pf-batch-f0",
+      name: "pipeline-finalize",
+      data: {
+        kind: "pipeline-finalize",
+        jobId: "pf-batch-f0",
+        parentId: "bp-1",
+        totalFiles: 2,
+        toolId: "pipeline",
+        userId: null,
+        pool: "image",
+        totalSteps: 1,
+        inputRefs: [],
+        filename: "doc.pdf",
+        settings: {},
+      },
+    });
+
+    expect(logger.error).toHaveBeenCalledWith(
+      { err: dbErr, jobId: "pf-batch-f0", parentId: "bp-1" },
+      "failed pipeline terminal write failed",
+    );
+    expect(reportErrorMock).toHaveBeenCalledWith(dbErr, {
+      source: "worker",
+      pool: "image",
+      jobId: "pf-batch-f0",
+    });
+    expect(recordChildOutcomeMock).toHaveBeenCalledWith(
+      "bp-1",
+      2,
+      "doc.pdf",
+      "Step 1: qpdf is not installed",
+    );
+    expect(trackEventMock).toHaveBeenCalledTimes(1);
+    expect(res).toEqual({
+      outputRefs: [],
+      filename: "doc.pdf",
+      contentType: "",
+      originalSize: 0,
+      processedSize: 0,
+      resultPayload: {
+        error: "Step 1: qpdf is not installed",
+        code: "ENGINE_UNAVAILABLE",
+        details: "Check QPDF_PATH",
+        httpStatus: 503,
+        stepsCompleted: 0,
+        steps: [],
+      },
+    });
+  });
+});

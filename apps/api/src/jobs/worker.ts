@@ -1534,23 +1534,40 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
   if (failedAtStep !== null) {
     const errorMsg = `Step ${failedAtStep + 1}: ${friendlyError(failError)}`;
 
-    await db
-      .update(schema.jobs)
-      .set({
-        status: "failed",
-        completedAt: new Date(),
-        error: { message: errorMsg, ...failFault },
-      })
-      .where(eq(schema.jobs.id, data.jobId));
-
-    // The failed frame rewrites the row's error, so it carries the fault too.
-    await updateSingleFileProgress({
-      jobId: progressJobId,
-      phase: "failed",
-      percent: 0,
-      error: errorMsg,
-      ...failFault,
-    });
+    // Commit the authoritative pipeline row and clientJobId replay row in one
+    // transaction before announcing (#3167). For a pipeline-batch child
+    // (parentId set), catch a terminal write fault so recordChildOutcome and
+    // the returned failure marker still complete for batch-finalize; a
+    // single-file pipeline rethrows so the worker failed-handler safety net can
+    // settle both rows.
+    try {
+      await updateSingleFileProgressAtomically(
+        {
+          jobId: progressJobId,
+          phase: "failed",
+          percent: 0,
+          error: errorMsg,
+          ...failFault,
+        },
+        async (tx) => {
+          await tx
+            .update(schema.jobs)
+            .set({
+              status: "failed",
+              completedAt: new Date(),
+              error: { message: errorMsg, ...failFault },
+            })
+            .where(eq(schema.jobs.id, data.jobId));
+        },
+      );
+    } catch (err) {
+      if (!data.parentId) throw err;
+      logger.error(
+        { err, jobId: data.jobId, parentId: data.parentId },
+        "failed pipeline terminal write failed",
+      );
+      void reportError(err, { source: "worker", pool: data.pool, jobId: data.jobId });
+    }
 
     // Batch progress (pipeline-batch only): guarded like the cancel branch
     // (#836, #2620) so a Redis counter blip after the terminal write does not
