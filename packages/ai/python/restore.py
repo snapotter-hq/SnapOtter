@@ -33,6 +33,11 @@ def emit_progress(percent, stage):
     print(json.dumps({"progress": percent, "stage": stage}), file=sys.stderr, flush=True)
 
 
+def emit_warning(message):
+    """Emit structured warning to stderr for bridge.ts to forward to aiLog.warn."""
+    print(json.dumps({"warning": message}), file=sys.stderr, flush=True)
+
+
 # ── Model paths ───────────────────────────────────────────────────────
 
 _MODELS_BASE = os.environ.get("MODELS_PATH", "/opt/models")
@@ -806,8 +811,11 @@ def main():
                     emit_progress(65, f"Enhanced {faces_found} face{'s' if faces_found != 1 else ''}")
                 else:
                     emit_progress(65, "No faces detected")
+            except MemoryError:
+                raise
             except Exception as e:
                 detail = str(e).strip() or type(e).__name__
+                emit_warning(f"[restore] Face enhancement skipped: {detail}")
                 emit_progress(65, f"Face enhancement skipped: {detail[:40]}")
         else:
             emit_progress(65, "Face enhancement disabled")
@@ -834,11 +842,17 @@ def main():
             has_gpu = device == "cuda"
             max_pixels = 8_000_000 if has_gpu else 2_000_000
 
-            if total_pixels > max_pixels and not has_gpu:
+            if total_pixels > max_pixels:
                 mp = total_pixels / 1_000_000
-                emit_progress(92, f"Colorization skipped: image too large for CPU ({mp:.1f}MP, max 2MP)")
+                max_mp = max_pixels // 1_000_000
+                target = "GPU" if has_gpu else "CPU"
+                skip_msg = f"Colorization skipped: image too large for {target} ({mp:.1f}MP, max {max_mp}MP)"
+                emit_warning(f"[restore] {skip_msg}")
+                emit_progress(92, skip_msg)
             elif not os.path.exists(DDCOLOR_MODEL_PATH):
-                emit_progress(92, "Colorization skipped: DDColor model not installed")
+                skip_msg = "Colorization skipped: DDColor model not installed"
+                emit_warning(f"[restore] {skip_msg}")
+                emit_progress(92, skip_msg)
             else:
                 emit_progress(82, "Colorizing B&W photo")
                 try:
@@ -847,9 +861,13 @@ def main():
                         steps_applied.append("colorize")
                         emit_progress(92, "Colorization complete")
                     else:
+                        emit_warning("[restore] Colorization skipped: Colorization model not available")
                         emit_progress(92, "Colorization model not available")
+                except MemoryError:
+                    raise
                 except Exception as e:
                     detail = str(e).strip() or type(e).__name__
+                    emit_warning(f"[restore] Colorization skipped: {detail}")
                     emit_progress(92, f"Colorization skipped: {detail[:40]}")
         else:
             emit_progress(92, "Colorization skipped")

@@ -827,6 +827,193 @@ print("RESTORE_ONNX_GPU_GATE_OK")
         expect(res.status, res.stderr).toBe(0);
         expect(res.stdout).toContain("RESTORE_ONNX_GPU_GATE_OK");
       });
+
+      it("enforces the 8 MP GPU colorization ceiling and emits structured stderr warnings on step skips and failures (issue #3078)", () => {
+        const res = runPy(`
+import contextlib, importlib.util, io, json, os, sys, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+import gpu
+
+spec = importlib.util.spec_from_file_location("restore_mod", os.path.join(py_dir, "restore.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+current_shape = (3000, 4000, 3)
+
+class FakeImg:
+    def __init__(self, shape):
+        self.shape = shape
+    def copy(self):
+        return self
+
+mod._IMPORT_ERROR = None
+mod.cv2 = types.SimpleNamespace(
+    IMREAD_COLOR=1,
+    imread=lambda _p, _f: FakeImg(current_shape),
+    imwrite=lambda _p, _img: True,
+)
+mod.is_grayscale = lambda _img: True
+mod.DDCOLOR_MODEL_PATH = os.path.join(py_dir, "restore.py")
+
+colorize_calls = []
+def ok_colorize_bw(img, intensity=0.85):
+    colorize_calls.append(intensity)
+    return img, True
+
+def parse_stderr_events(raw):
+    return [json.loads(line) for line in raw.strip().splitlines() if line.strip()]
+
+# 1. 12 MP (3000x4000) grayscale image on GPU (> 8 MP GPU ceiling): must skip colorization and emit warning + progress
+gpu.onnx_gpu_available = lambda: True
+mod.colorize_bw = ok_colorize_bw
+settings_colorize_only = json.dumps({
+    "scratchRemoval": False,
+    "faceEnhancement": False,
+    "denoise": False,
+    "colorize": True,
+})
+sys.argv = ["restore.py", "/tmp/in.png", "/tmp/out.png", settings_colorize_only]
+out_buf, err_buf = io.StringIO(), io.StringIO()
+with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+    mod.main()
+
+payload_12mp = json.loads(out_buf.getvalue().strip())
+events_12mp = parse_stderr_events(err_buf.getvalue())
+assert payload_12mp["success"] is True, payload_12mp
+assert payload_12mp["device"] == "cuda", payload_12mp
+assert payload_12mp["colorized"] is False, payload_12mp
+assert "colorize" not in payload_12mp["steps"], payload_12mp
+assert colorize_calls == [], colorize_calls
+assert {"warning": "[restore] Colorization skipped: image too large for GPU (12.0MP, max 8MP)"} in events_12mp, events_12mp
+assert {"progress": 92, "stage": "Colorization skipped: image too large for GPU (12.0MP, max 8MP)"} in events_12mp, events_12mp
+
+# 2. Exact 8 MP boundary (2000x4000 = 8,000,000 px) on GPU and exact 2 MP boundary (1000x2000 = 2,000,000 px) on CPU are allowed without warnings
+current_shape = (2000, 4000, 3)
+out_buf, err_buf = io.StringIO(), io.StringIO()
+with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+    mod.main()
+payload_8mp = json.loads(out_buf.getvalue().strip())
+events_8mp = parse_stderr_events(err_buf.getvalue())
+assert payload_8mp["colorized"] is True, payload_8mp
+assert len(colorize_calls) == 1, colorize_calls
+assert not any("warning" in e for e in events_8mp), events_8mp
+
+colorize_calls.clear()
+current_shape = (1000, 2000, 3)
+gpu.onnx_gpu_available = lambda: False
+out_buf, err_buf = io.StringIO(), io.StringIO()
+with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+    mod.main()
+payload_2mp = json.loads(out_buf.getvalue().strip())
+events_2mp = parse_stderr_events(err_buf.getvalue())
+assert payload_2mp["colorized"] is True, payload_2mp
+assert len(colorize_calls) == 1, colorize_calls
+assert not any("warning" in e for e in events_2mp), events_2mp
+
+# 3. 5 MP (2000x2500) on CPU (> 2 MP CPU ceiling) emits structured warning + progress
+colorize_calls.clear()
+current_shape = (2000, 2500, 3)
+gpu.onnx_gpu_available = lambda: False
+out_buf, err_buf = io.StringIO(), io.StringIO()
+with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+    mod.main()
+events_5mp_cpu = parse_stderr_events(err_buf.getvalue())
+assert colorize_calls == [], colorize_calls
+assert {"warning": "[restore] Colorization skipped: image too large for CPU (5.0MP, max 2MP)"} in events_5mp_cpu, events_5mp_cpu
+assert {"progress": 92, "stage": "Colorization skipped: image too large for CPU (5.0MP, max 2MP)"} in events_5mp_cpu, events_5mp_cpu
+
+# 4. Missing DDCOLOR_MODEL_PATH emits structured warning + progress
+current_shape = (1000, 1000, 3)
+mod.DDCOLOR_MODEL_PATH = "/tmp/nonexistent-ddcolor-model-3078.onnx"
+out_buf, err_buf = io.StringIO(), io.StringIO()
+with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+    mod.main()
+events_missing_model = parse_stderr_events(err_buf.getvalue())
+assert {"warning": "[restore] Colorization skipped: DDColor model not installed"} in events_missing_model, events_missing_model
+assert {"progress": 92, "stage": "Colorization skipped: DDColor model not installed"} in events_missing_model, events_missing_model
+
+# 5. enhance_faces and colorize_bw exceptions emit full detail in structured stderr warnings and truncated detail[:40] in progress
+mod.DDCOLOR_MODEL_PATH = os.path.join(py_dir, "restore.py")
+long_face_err = "CodeFormer ONNX Runtime execution provider failed on node_42_conv"
+long_color_err = "DDColor ONNX Runtime kernel launch error: invalid configuration argument"
+def fail_faces(_img, _fidelity=0.7):
+    raise RuntimeError(long_face_err)
+def fail_colorize(_img, intensity=0.85):
+    raise ValueError(long_color_err)
+mod.enhance_faces = fail_faces
+mod.colorize_bw = fail_colorize
+
+settings_both = json.dumps({
+    "scratchRemoval": False,
+    "faceEnhancement": True,
+    "denoise": False,
+    "colorize": True,
+})
+sys.argv = ["restore.py", "/tmp/in.png", "/tmp/out.png", settings_both]
+out_buf, err_buf = io.StringIO(), io.StringIO()
+with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+    mod.main()
+
+payload_err = json.loads(out_buf.getvalue().strip())
+events_err = parse_stderr_events(err_buf.getvalue())
+assert payload_err["success"] is True, payload_err
+assert payload_err["facesEnhanced"] == 0, payload_err
+assert payload_err["colorized"] is False, payload_err
+assert {"warning": f"[restore] Face enhancement skipped: {long_face_err}"} in events_err, events_err
+assert {"progress": 65, "stage": f"Face enhancement skipped: {long_face_err[:40]}"} in events_err, events_err
+assert {"warning": f"[restore] Colorization skipped: {long_color_err}"} in events_err, events_err
+assert {"progress": 92, "stage": f"Colorization skipped: {long_color_err[:40]}"} in events_err, events_err
+
+# 6. Empty exception messages fall back to exception class name in both warning and progress
+mod.enhance_faces = lambda _img, _fidelity=0.7: (_ for _ in ()).throw(RuntimeError())
+mod.colorize_bw = lambda _img, intensity=0.85: (_ for _ in ()).throw(KeyError())
+out_buf, err_buf = io.StringIO(), io.StringIO()
+with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+    mod.main()
+events_empty_err = parse_stderr_events(err_buf.getvalue())
+assert {"warning": "[restore] Face enhancement skipped: RuntimeError"} in events_empty_err, events_empty_err
+assert {"progress": 65, "stage": "Face enhancement skipped: RuntimeError"} in events_empty_err, events_empty_err
+assert {"warning": "[restore] Colorization skipped: KeyError"} in events_empty_err, events_empty_err
+assert {"progress": 92, "stage": "Colorization skipped: KeyError"} in events_empty_err, events_empty_err
+
+# 7. colorize_bw returning (img, False) emits structured warning + progress
+mod.enhance_faces = lambda img, _fidelity=0.7: (img, 0)
+mod.colorize_bw = lambda img, intensity=0.85: (img, False)
+out_buf, err_buf = io.StringIO(), io.StringIO()
+with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+    mod.main()
+events_not_avail = parse_stderr_events(err_buf.getvalue())
+assert {"warning": "[restore] Colorization skipped: Colorization model not available"} in events_not_avail, events_not_avail
+assert {"progress": 92, "stage": "Colorization model not available"} in events_not_avail, events_not_avail
+
+# 8. MemoryError from enhance_faces or colorize_bw propagates to the outer handler instead of being swallowed
+for step_kind in ("faces", "colorize"):
+    if step_kind == "faces":
+        mod.enhance_faces = lambda _img, _fidelity=0.7: (_ for _ in ()).throw(MemoryError("ONNX arena OOM"))
+        mod.colorize_bw = ok_colorize_bw
+    else:
+        mod.enhance_faces = lambda img, _fidelity=0.7: (img, 0)
+        mod.colorize_bw = lambda _img, intensity=0.85: (_ for _ in ()).throw(MemoryError())
+    out_buf, err_buf = io.StringIO(), io.StringIO()
+    try:
+        with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+            mod.main()
+    except SystemExit as exc:
+        assert exc.code == 1, exc.code
+        payload_oom = json.loads(out_buf.getvalue().strip())
+        assert payload_oom["success"] is False, payload_oom
+        expected_err = "ONNX arena OOM" if step_kind == "faces" else "MemoryError"
+        assert payload_oom["error"] == expected_err, payload_oom
+    else:
+        raise AssertionError(f"Expected SystemExit(1) for MemoryError in {step_kind}")
+
+print("RESTORE_3078_OK")
+`);
+        expect(res.status, res.stderr).toBe(0);
+        expect(res.stdout).toContain("RESTORE_3078_OK");
+      });
     },
   );
 });
