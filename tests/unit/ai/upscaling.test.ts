@@ -659,6 +659,8 @@ assert mod.fallback_tile_size(512) == 256
 assert mod.fallback_tile_size(256) == 128
 assert mod.is_oom_error(RuntimeError("DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes.")) is True
 assert mod.is_oom_error(MemoryError("unable to allocate array")) is True
+assert mod.is_oom_error(RuntimeError("Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 30) and data type float32")) is True
+assert "out of memory" in mod.realesrgan_failure_message(RuntimeError("Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 30) and data type float32")).lower()
 
 with tempfile.TemporaryDirectory() as tmp:
     weights_path = os.path.join(tmp, "RealESRGAN_x4plus.pth")

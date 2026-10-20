@@ -20,6 +20,7 @@ _OOM_MARKERS = (
     "not enough memory",
     "can't allocate memory",
     "cannot allocate memory",
+    "unable to allocate",
     "failed to allocate",
     "cudaerrormemoryallocation",
     "cublas_status_alloc_failed",

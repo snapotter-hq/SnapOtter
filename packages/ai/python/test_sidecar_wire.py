@@ -97,6 +97,9 @@ for cpu_oom_err in (
     OSError(12, "Cannot allocate memory"),
     RuntimeError("DefaultCPUAllocator: NOT ENOUGH MEMORY"),
     RuntimeError("DefaultCPUAllocator: CAN'T ALLOCATE MEMORY"),
+    RuntimeError(
+        "Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 30) and data type float32"
+    ),
 ):
     assert gif_remove_bg._is_oom(cpu_oom_err) is True, (
         f"gif_remove_bg._is_oom must recognize CPU allocator OOM: {cpu_oom_err!r}"
@@ -145,6 +148,7 @@ def _verify_gif_cpu_oom_handling():
             "[enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes.",
             "DefaultCPUAllocator: can't allocate memory: you tried to allocate 104857600 bytes.",
             "[Errno 12] Cannot allocate memory",
+            "Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 30) and data type float32",
         ):
             rembg_calls.clear()
             active_err[0] = RuntimeError(oom_msg)
@@ -240,6 +244,7 @@ def _verify_gif_cpu_oom_handling():
                     "[enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes.",
                     "DefaultCPUAllocator: can't allocate memory: you tried to allocate 104857600 bytes.",
                     "[Errno 12] Cannot allocate memory",
+                    "Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 30) and data type float32",
                 ):
                     probe_err[0] = ({"session:birefnet-general"}, RuntimeError(oom_msg))
                     probe_payload = _run_main({"model": "birefnet-general", "outputFormat": "webp"})

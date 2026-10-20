@@ -40,6 +40,7 @@ describe("toSidecarError", () => {
       "RuntimeError: [enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes.",
       "DefaultCPUAllocator: can't allocate memory: you tried to allocate 104857600 bytes.",
       "cannot allocate memory",
+      "Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 30) and data type float32",
     ]) {
       const err = toSidecarError(reason, "Upscaling failed") as SafeError;
       expect(err.kind).toBe("operational");

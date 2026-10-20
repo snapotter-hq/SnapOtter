@@ -48,6 +48,7 @@ OOM_ERROR_PATTERNS = (
     "not enough memory",
     "can't allocate memory",
     "cannot allocate memory",
+    "unable to allocate",
     "failed to allocate",
 )
 

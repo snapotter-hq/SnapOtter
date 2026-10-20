@@ -83,6 +83,11 @@ def test_oom_errors_report_memory_remedy_rather_than_reinstall():
     )
     assert upscale.is_oom_error(cpu_oom) is True
     assert upscale.is_oom_error(MemoryError("unable to allocate array")) is True
+    numpy_oom = RuntimeError(
+        "Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 30) and data type float32"
+    )
+    assert upscale.is_oom_error(numpy_oom) is True
+    assert "out of memory" in upscale.realesrgan_failure_message(numpy_oom).lower()
     assert upscale.is_oom_error(RuntimeError("CUDA error: no kernel image")) is False
 
     message = upscale.realesrgan_failure_message(cpu_oom)
