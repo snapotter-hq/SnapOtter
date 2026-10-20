@@ -90,7 +90,12 @@ import {
   useAutosave,
 } from "@/components/editor/common/export-dialog";
 import { captureHandledError } from "@/lib/analytics";
-import { useEditorStore } from "@/stores/editor-store";
+import {
+  createDefaultAdjustments,
+  createDefaultFilters,
+  createDefaultLayers,
+  useEditorStore,
+} from "@/stores/editor-store";
 
 const markClean = vi.fn();
 const TOO_LARGE = en.editor.ui.exportDialog.tooLarge;
@@ -114,7 +119,11 @@ beforeEach(() => {
     canvasSize: { width: 1920, height: 1080 },
     sourceImageUrl: null,
     sourceImageSize: null,
+    layers: createDefaultLayers(),
+    activeLayerId: "layer-1",
     objects: [],
+    adjustments: createDefaultAdjustments(),
+    filters: createDefaultFilters(),
     levels: defaultLevelsState(),
     curves: defaultCurvesState(),
   });
@@ -1027,6 +1036,22 @@ describe("Load Project (#1622)", () => {
     useEditorStore.setState({
       isDirty: false,
       activeLayerId: "kept-layer",
+      adjustments: {
+        ...useEditorStore.getState().adjustments,
+        contrast: 45,
+        saturation: -30,
+      },
+      filters: useEditorStore
+        .getState()
+        .filters.map((f) =>
+          f.type === "grayscale"
+            ? { ...f, enabled: true }
+            : f.type === "sharpen"
+              ? { ...f, enabled: false, params: { amount: 60 } }
+              : f.type === "vignette"
+                ? { ...f, enabled: true, params: { ...f.params, amount: 90, feather: 12 } }
+                : f,
+        ),
     });
     render(<ExportDialog onClose={onClose} />);
 
@@ -1055,7 +1080,10 @@ describe("Load Project (#1622)", () => {
           },
         ],
         adjustments: { brightness: 25 },
-        filters: [{ type: "blur", enabled: true, params: { radius: 8 } }],
+        filters: [
+          { type: "blur", enabled: true, params: { radius: 8 } },
+          { type: "vignette", enabled: true, params: { amount: 75 } },
+        ],
       }),
       "good.snapotter",
     );
@@ -1065,12 +1093,112 @@ describe("Load Project (#1622)", () => {
     expect(state.activeLayerId).toBe("kept-layer");
     expect(state.adjustments.brightness).toBe(25);
     expect(state.adjustments.contrast).toBe(0);
+    expect(state.adjustments.saturation).toBe(0);
     expect(state.filters.length).toBeGreaterThan(1);
     expect(state.filters.find((f) => f.type === "blur")).toEqual({
       type: "blur",
       enabled: true,
       params: { radius: 8 },
     });
+    expect(state.filters.find((f) => f.type === "grayscale")).toEqual({
+      type: "grayscale",
+      enabled: false,
+      params: {},
+    });
+    expect(state.filters.find((f) => f.type === "sharpen")).toEqual({
+      type: "sharpen",
+      enabled: false,
+      params: { amount: 0 },
+    });
+    expect(state.filters.find((f) => f.type === "vignette")).toEqual({
+      type: "vignette",
+      enabled: true,
+      params: { amount: 75, midpoint: 50, roundness: 0, feather: 50 },
+    });
+  });
+
+  it("resets adjustments, filters, and layers to clean defaults when loading a project that omits them (#2676)", async () => {
+    const onClose = vi.fn();
+    useEditorStore.setState({
+      isDirty: false,
+      layers: [
+        {
+          id: "stale-layer-1",
+          name: "Stale Layer",
+          visible: false,
+          locked: true,
+          opacity: 0.4,
+          blendMode: "multiply",
+          thumbnail: "data:image/png;base64,AA==",
+        },
+        {
+          id: "stale-layer-2",
+          name: "Second Stale Layer",
+          visible: true,
+          locked: false,
+          opacity: 0.9,
+          blendMode: "screen",
+          thumbnail: null,
+        },
+      ],
+      activeLayerId: "stale-layer-2",
+      adjustments: {
+        brightness: 60,
+        contrast: -40,
+        hue: 120,
+        saturation: 35,
+        luminance: -15,
+        exposure: 25,
+        vibrance: -20,
+        warmth: 50,
+      },
+      filters: useEditorStore
+        .getState()
+        .filters.map((f) =>
+          f.type === "grayscale"
+            ? { ...f, enabled: true }
+            : f.type === "blur"
+              ? { ...f, enabled: true, params: { radius: 24 } }
+              : f,
+        ),
+    });
+    render(<ExportDialog onClose={onClose} />);
+
+    pickProjectFile(
+      JSON.stringify({
+        version: 1,
+        canvasSize: { width: 800, height: 600 },
+      }),
+      "minimal.snapotter",
+    );
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    const state = useEditorStore.getState();
+    expect(state.canvasSize).toEqual({ width: 800, height: 600 });
+    expect(state.layers).toEqual([
+      {
+        id: "layer-1",
+        name: "Layer 1",
+        visible: true,
+        locked: false,
+        opacity: 1,
+        blendMode: "source-over",
+        thumbnail: null,
+      },
+    ]);
+    expect(state.activeLayerId).toBe("layer-1");
+    expect(state.adjustments).toEqual({
+      brightness: 0,
+      contrast: 0,
+      hue: 0,
+      saturation: 0,
+      luminance: 0,
+      exposure: 0,
+      vibrance: 0,
+      warmth: 0,
+    });
+    expect(state.filters.every((f) => f.enabled === false)).toBe(true);
+    expect(state.filters.find((f) => f.type === "blur")?.params).toEqual({ radius: 0 });
   });
 
   it("cancels an earlier in-flight FileReader when a second project file is selected", async () => {

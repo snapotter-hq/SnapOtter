@@ -506,6 +506,21 @@ function createDefaultLayer(id: string, name: string): EditorLayer {
   };
 }
 
+export function createDefaultAdjustments(): AdjustmentValues {
+  return { ...DEFAULT_ADJUSTMENTS };
+}
+
+export function createDefaultFilters(): FilterConfig[] {
+  return DEFAULT_FILTERS.map((f) => ({
+    ...f,
+    params: { ...f.params },
+  }));
+}
+
+export function createDefaultLayers(): EditorLayer[] {
+  return [createDefaultLayer(DEFAULT_LAYER_ID, "Layer 1")];
+}
+
 function nextLayerNumber(layers: EditorLayer[]): number {
   let max = 0;
   for (const l of layers) {
@@ -549,7 +564,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
       recentColors: [],
 
       // --- Layers ---
-      layers: [createDefaultLayer(DEFAULT_LAYER_ID, "Layer 1")],
+      layers: createDefaultLayers(),
       activeLayerId: DEFAULT_LAYER_ID,
 
       // --- Objects ---
@@ -569,11 +584,8 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
       rebaking: false,
 
       // --- Adjustments ---
-      adjustments: { ...DEFAULT_ADJUSTMENTS },
-      filters: DEFAULT_FILTERS.map((f) => ({
-        ...f,
-        params: { ...f.params },
-      })),
+      adjustments: createDefaultAdjustments(),
+      filters: createDefaultFilters(),
 
       // --- Levels / Curves (LUT-based tone adjustments) ---
       levels: defaultLevelsState(),
@@ -704,16 +716,13 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
           cropApplying: false,
           rebaking: false,
           eyedropperSampledColor: null,
-          adjustments: { ...DEFAULT_ADJUSTMENTS },
-          filters: DEFAULT_FILTERS.map((f) => ({
-            ...f,
-            params: { ...f.params },
-          })),
+          adjustments: createDefaultAdjustments(),
+          filters: createDefaultFilters(),
           levels: defaultLevelsState(),
           curves: defaultCurvesState(),
           clipboard: null,
           editingTextId: null,
-          layers: [createDefaultLayer(DEFAULT_LAYER_ID, "Layer 1")],
+          layers: createDefaultLayers(),
           activeLayerId: DEFAULT_LAYER_ID,
           lastAction: { id: "loadImage" },
           _historyVersion: get()._historyVersion + 1,

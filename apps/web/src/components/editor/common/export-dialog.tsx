@@ -58,7 +58,13 @@ import {
 } from "@/lib/progress-frames";
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { cn, copyImageToClipboard } from "@/lib/utils";
-import { isHexColor, useEditorStore } from "@/stores/editor-store";
+import {
+  createDefaultAdjustments,
+  createDefaultFilters,
+  createDefaultLayers,
+  isHexColor,
+  useEditorStore,
+} from "@/stores/editor-store";
 import type {
   AdjustmentValues,
   CanvasObject,
@@ -943,15 +949,17 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
         try {
           const store = useEditorStore.getState();
           const setState = useEditorStore.setState;
-          const layers = data.layers || store.layers;
+          const layers = data.layers || createDefaultLayers();
           const activeLayerId = layers.some((l) => l.id === store.activeLayerId)
             ? store.activeLayerId
             : (layers[0]?.id ?? store.activeLayerId);
+          const defaultAdjustments = createDefaultAdjustments();
           const adjustments = data.adjustments
-            ? { ...store.adjustments, ...data.adjustments }
-            : store.adjustments;
+            ? { ...defaultAdjustments, ...data.adjustments }
+            : defaultAdjustments;
+          const defaultFilters = createDefaultFilters();
           const filters = data.filters
-            ? store.filters.map((existing) => {
+            ? defaultFilters.map((existing) => {
                 const match = data.filters?.find((f) => f.type === existing.type);
                 return match
                   ? {
@@ -961,7 +969,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
                     }
                   : existing;
               })
-            : store.filters;
+            : defaultFilters;
           const levels = resolveLoadedLevels(data.levels);
           const curves = resolveLoadedCurves(data.curves);
 

@@ -13,6 +13,9 @@ vi.mock("zustand/middleware", async (importOriginal) => {
 
 import { defaultCurvesState, defaultLevelsState } from "@/components/editor/adjustment-lut";
 import {
+  createDefaultAdjustments,
+  createDefaultFilters,
+  createDefaultLayers,
   jumpEditorToHistoryState,
   redoEditor,
   undoEditor,
@@ -107,7 +110,15 @@ function makeText(
 const INITIAL = useEditorStore.getState();
 
 beforeEach(() => {
-  useEditorStore.setState({ ...INITIAL }, true);
+  useEditorStore.setState(
+    {
+      ...INITIAL,
+      layers: createDefaultLayers(),
+      adjustments: createDefaultAdjustments(),
+      filters: createDefaultFilters(),
+    },
+    true,
+  );
   // Rotate, flip and crop rebuild the source bitmap before committing (#2070).
   stubRaster();
 });
@@ -151,6 +162,32 @@ describe("Tool Management", () => {
 
   it("previousTool starts as null", () => {
     expect(state().previousTool).toBeNull();
+  });
+
+  it("createDefaultAdjustments, createDefaultFilters, and createDefaultLayers return fresh copies of clean document defaults (#2676)", () => {
+    const adj1 = createDefaultAdjustments();
+    const adj2 = createDefaultAdjustments();
+    expect(adj1).toEqual(INITIAL.adjustments);
+    expect(adj1).not.toBe(adj2);
+    adj1.brightness = 50;
+    expect(adj2.brightness).toBe(0);
+
+    const filters1 = createDefaultFilters();
+    const filters2 = createDefaultFilters();
+    expect(filters1).toEqual(INITIAL.filters);
+    expect(filters1).not.toBe(filters2);
+    filters1[0].enabled = true;
+    filters1[0].params.radius = 99;
+    expect(filters2[0].enabled).toBe(false);
+    expect(filters2[0].params.radius).toBe(0);
+
+    const layers1 = createDefaultLayers();
+    const layers2 = createDefaultLayers();
+    expect(layers1).toEqual(INITIAL.layers);
+    expect(layers1).not.toBe(layers2);
+    expect(layers1[0]).not.toBe(INITIAL.layers[0]);
+    layers1[0].name = "Mutated";
+    expect(layers2[0].name).toBe("Layer 1");
   });
 });
 
