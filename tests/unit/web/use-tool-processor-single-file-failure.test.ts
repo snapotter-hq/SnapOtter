@@ -397,6 +397,7 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
     expect(useFileStore.getState().entries[0]).toMatchObject({
       status: "failed",
       error: "boom",
+      errorCategory: null,
     });
     expect(useFileStore.getState().error).toBe("boom");
     expect(useFileStore.getState().processing).toBe(false);
@@ -416,6 +417,7 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
     expect(useFileStore.getState().entries[0]).toMatchObject({
       status: "failed",
       error: "Invalid response from server",
+      errorCategory: "processing_error",
     });
     expect(useFileStore.getState().processing).toBe(false);
 
@@ -756,6 +758,7 @@ describe("useToolProcessor sync result handling errors (#1354)", () => {
     expect(useFileStore.getState().entries[0]).toMatchObject({
       status: "failed",
       error: "Invalid response from server",
+      errorCategory: "processing_error",
     });
     expect(useFileStore.getState().processing).toBe(false);
 
@@ -826,6 +829,7 @@ describe("useToolProcessor malformed 2xx results (#1740)", () => {
     expect(useFileStore.getState().entries[0]).toMatchObject({
       status: "failed",
       error: "Invalid response from server",
+      errorCategory: "processing_error",
       processedUrl: null,
     });
     expect(useFileStore.getState().error).toBe("Invalid response from server");
@@ -844,6 +848,7 @@ describe("useToolProcessor malformed 2xx results (#1740)", () => {
     expect(useFileStore.getState().entries[0]).toMatchObject({
       status: "failed",
       error: "Invalid response from server",
+      errorCategory: "processing_error",
     });
     expectReported("Tool result body is not a JSON object");
 
@@ -909,6 +914,7 @@ describe("useToolProcessor malformed completed frames (#1794)", () => {
     expect(useFileStore.getState().entries[0]).toMatchObject({
       status: "failed",
       error: "Invalid response from server",
+      errorCategory: "processing_error",
       processedUrl: null,
     });
     expect(useFileStore.getState().error).toBe("Invalid response from server");
@@ -1411,7 +1417,7 @@ describe("useToolProcessor ends a sync run whose error write throws (#1791)", ()
       "a 2xx body that does not parse",
       respond(200, "<html>not json</html>"),
       "Invalid response from server",
-      null,
+      "processing_error",
     ],
     [
       "a pre-upload 502 with a non-JSON body",

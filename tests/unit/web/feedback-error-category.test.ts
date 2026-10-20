@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { de } from "@snapotter/shared/i18n/de.js";
 import { en } from "@snapotter/shared/i18n/en.js";
+import { fr } from "@snapotter/shared/i18n/fr.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/image-preview", () => ({
@@ -31,6 +32,15 @@ describe("classifyFeedbackError", () => {
     );
     expect(classifyFeedbackError(de.errors.processingInterruptedUnconfirmed, "upload_error")).toBe(
       "upload_error",
+    );
+    expect(classifyFeedbackError(en.errors.invalidServerResponse, "processing_error")).toBe(
+      "processing_error",
+    );
+    expect(classifyFeedbackError(fr.errors.invalidServerResponse, "processing_error")).toBe(
+      "processing_error",
+    );
+    expect(classifyFeedbackError(de.errors.invalidServerResponse, "processing_error")).toBe(
+      "processing_error",
     );
   });
 

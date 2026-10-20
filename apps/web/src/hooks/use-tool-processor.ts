@@ -844,7 +844,7 @@ export function useToolProcessor(toolId: string) {
 
             // Ends the run on the server's word: a failed frame, or a
             // completed one with nothing to download.
-            const endFailedRun = (message: string) => {
+            const endFailedRun = (message: string, category?: FeedbackErrorCategory) => {
               clearStallTimer();
               if (elapsedRef.current) clearInterval(elapsedRef.current);
               es.close();
@@ -866,7 +866,7 @@ export function useToolProcessor(toolId: string) {
                 () => setError(message),
                 () => setProcessing(false),
               ]);
-              settleProcessingEntries(message);
+              settleProcessingEntries(message, category);
               if (teardownError) throw teardownError.cause;
             };
 
@@ -880,7 +880,7 @@ export function useToolProcessor(toolId: string) {
                 result = checkToolResult<ProcessResult>(data.result);
               } catch (err) {
                 reportMalformedResult(err, { toolId });
-                endFailedRun(tRef.current.errors.invalidServerResponse);
+                endFailedRun(tRef.current.errors.invalidServerResponse, "processing_error");
                 return;
               }
               clearStallTimer();
@@ -1504,7 +1504,7 @@ export function useToolProcessor(toolId: string) {
             try {
               result = parseResultBody<ProcessResult>(xhr.responseText);
             } catch (err) {
-              failure = { message: t.errors.invalidServerResponse };
+              failure = { message: t.errors.invalidServerResponse, category: "processing_error" };
               reportMalformedResult(err, { status: xhr.status, toolId });
             }
             if (result) {
