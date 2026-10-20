@@ -551,6 +551,7 @@ function ToolPageContent({
   useEffect(() => {
     if (currentEntry?.id !== prevEntryIdRef.current) {
       prevEntryIdRef.current = currentEntry?.id || null;
+      setSignStaleEntryId(null);
       if (currentEntry && perFileCropState[currentEntry.id]) {
         const state = perFileCropState[currentEntry.id];
         setCropCrop(state.crop);
@@ -585,6 +586,13 @@ function ToolPageContent({
   const signCanvasRef = useRef<SignCanvasRef | null>(null);
   const [signHasSelection, setSignHasSelection] = useState(false);
   const [signPlacementCount, setSignPlacementCount] = useState(0);
+  const [signStaleEntryId, setSignStaleEntryId] = useState<string | null>(null);
+  const handleSignPlacementsChange = useCallback(() => {
+    const entry = useFileStore.getState().currentEntry;
+    if (entry?.processedUrl) {
+      setSignStaleEntryId(entry.id);
+    }
+  }, []);
 
   // Page-level drag overlay state
   const [isDraggingOver, setIsDraggingOver] = useState(false);
@@ -614,6 +622,7 @@ function ToolPageContent({
     setEraserMaskedCount(0);
     setEraserBrushSize(30);
     setEraserSliderInitPos(null);
+    setSignStaleEntryId(null);
     setMobileSettingsOpen(false);
   }, [toolId]);
 
@@ -968,6 +977,8 @@ function ToolPageContent({
             canvasRef: signCanvasRef,
             hasSelection: signHasSelection,
             placementCount: signPlacementCount,
+            staleEntryId: signStaleEntryId,
+            onStaleEntryChange: setSignStaleEntryId,
           }
         : undefined,
   };
@@ -1260,6 +1271,7 @@ function ToolPageContent({
           fileUrl={originalBlobUrl}
           onSelectionChange={setSignHasSelection}
           onCountChange={setSignPlacementCount}
+          onPlacementsChange={handleSignPlacementsChange}
         />
       );
     }

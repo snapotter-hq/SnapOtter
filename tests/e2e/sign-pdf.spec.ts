@@ -126,6 +126,30 @@ test.describe("Sign PDF tool", () => {
     // the signed PDF download link must stay visible in the desktop sidebar.
     await page.setViewportSize({ width: 844, height: 390 });
     await expect(page.getByRole("link", { name: /Download signed PDF/ })).toBeVisible();
+
+    // #2535: dragging the placed signature on the Konva stage invalidates the
+    // prior download link and swaps the panel back to Apply & Download.
+    const canvasBox = await page.getByTestId("sign-pdf-canvas").boundingBox();
+    expect(canvasBox).not.toBeNull();
+    if (canvasBox) {
+      const startX = canvasBox.x + canvasBox.width * 0.5;
+      const startY = canvasBox.y + canvasBox.height * 0.5;
+      await page.mouse.move(startX, startY);
+      await page.mouse.down();
+      await page.mouse.move(startX + 40, startY + 20, { steps: 5 });
+      await page.mouse.up();
+    }
+    await expect(page.getByRole("link", { name: /Download signed PDF/ })).toHaveCount(0);
+    await expect(apply).toBeEnabled();
+
+    // Rotating across 768px after a placement edit keeps Apply & Download visible.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByRole("link", { name: /Download signed PDF/ })).toHaveCount(0);
+    await expect(apply).toBeEnabled();
+
+    // Re-signing clears the stale state and shows Download signed PDF again.
+    await apply.click();
+    await expect(page.getByRole("link", { name: /Download signed PDF/ })).toBeVisible();
   });
 
   // #1969: a failed sign marks its entry failed, which turns on the page's

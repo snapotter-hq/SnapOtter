@@ -216,6 +216,8 @@ export interface SignProps {
   canvasRef: React.RefObject<SignCanvasRef | null>;
   hasSelection: boolean;
   placementCount: number;
+  staleEntryId?: string | null;
+  onStaleEntryChange?: (entryId: string | null) => void;
 }
 
 export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
@@ -234,7 +236,13 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     entryId: string | undefined;
     url: string;
   } | null>(null);
-  const [staleEntryId, setStaleEntryId] = useState<string | null>(null);
+  const [localStaleEntryId, setLocalStaleEntryId] = useState<string | null>(null);
+  const staleEntryId =
+    signProps?.staleEntryId !== undefined ? signProps.staleEntryId : localStaleEntryId;
+  const setStaleEntryId = (entryId: string | null) => {
+    setLocalStaleEntryId(entryId);
+    signProps?.onStaleEntryChange?.(entryId);
+  };
   const stopRunRef = useRef<() => void>(() => {});
   /** Set while this panel owns the store's processing flag; see endRun. */
   const runOwnedRef = useRef(false);
@@ -269,7 +277,12 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
 
   const markPlacementsEdited = () => {
     setDownloadUrl(null);
-    setStaleEntryId(currentEntry?.id ?? null);
+    if (
+      signProps?.onStaleEntryChange === undefined &&
+      (currentEntry?.processedUrl || (localDownload && localDownload.entryId === currentEntry?.id))
+    ) {
+      setLocalStaleEntryId(currentEntry?.id ?? null);
+    }
   };
 
   const handleSavePad = (dataUrl: string, remember: boolean) => {
@@ -402,7 +415,9 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
         });
         if (!runOwnedRef.current) return;
       }
-      setStaleEntryId(null);
+      if (staleEntryId === capturedEntryId) {
+        setStaleEntryId(null);
+      }
     } catch (err) {
       if (runOwnedRef.current) {
         try {

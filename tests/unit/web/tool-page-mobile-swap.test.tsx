@@ -19,6 +19,9 @@ vi.mock("@/lib/image-preview", () => ({
 const getDocumentSpy = vi.hoisted(() => vi.fn());
 const stageDestroySpy = vi.hoisted(() => vi.fn());
 const nodeDestroySpy = vi.hoisted(() => vi.fn());
+const konvaImages = vi.hoisted(
+  () => [] as Array<{ fire: (event: string) => void; handlers: Map<string, Array<() => void>> }>,
+);
 
 vi.mock("pdfjs-dist", () => ({
   GlobalWorkerOptions: {},
@@ -74,7 +77,20 @@ vi.mock("../../../apps/web/node_modules/konva", () => {
     }
   }
   class Image {
-    on() {}
+    handlers = new Map<string, Array<() => void>>();
+    constructor() {
+      konvaImages.push(this);
+    }
+    on(events: string, cb: () => void) {
+      for (const evt of events.split(/\s+/).filter(Boolean)) {
+        const list = this.handlers.get(evt) ?? [];
+        list.push(cb);
+        this.handlers.set(evt, list);
+      }
+    }
+    fire(event: string) {
+      for (const cb of this.handlers.get(event) ?? []) cb();
+    }
     dragBoundFunc() {}
     remove() {}
     destroy() {
@@ -139,6 +155,7 @@ beforeEach(() => {
   getDocumentSpy.mockClear();
   stageDestroySpy.mockClear();
   nodeDestroySpy.mockClear();
+  konvaImages.length = 0;
 
   vi.stubGlobal("localStorage", localStorageMock);
   vi.stubGlobal(
@@ -307,6 +324,136 @@ describe("ToolPage interactive canvases across the 768px breakpoint (#2248)", ()
     const desktopLink = screen.getByRole("link", { name: /Download signed PDF/i });
     expect(desktopLink).toHaveAttribute("href", "/api/v1/download/job-1/contract_signed.pdf");
     expect(screen.queryByRole("button", { name: /Apply & Download/i })).not.toBeInTheDocument();
+  });
+
+  it.each(["dragend", "transformend"] as const)(
+    "swaps Download signed PDF back to Apply & Download when a placed signature fires %s and keeps it across 768px (#2535)",
+    async (konvaEvent) => {
+      addSignature("data:image/png;base64,sig");
+      renderToolPage("/pdf/sign-pdf");
+
+      await act(async () => {
+        useFileStore
+          .getState()
+          .setFiles([new File(["%PDF-1.4"], "contract.pdf", { type: "application/pdf" })]);
+      });
+
+      const canvas = (await screen.findByTestId("sign-pdf-canvas")) as HTMLCanvasElement;
+      await waitFor(() => expect(canvas.getAttribute("width")).not.toBeNull());
+
+      fireEvent.click(screen.getByRole("button", { name: "Process" }));
+      const savedSigImg = await screen.findByAltText(/saved signature/i);
+      fireEvent.click(savedSigImg.closest("button") as HTMLButtonElement);
+      await waitFor(() => expect(konvaImages).toHaveLength(1));
+
+      await act(async () => {
+        useFileStore.getState().updateEntry(0, {
+          processedUrl: "/api/v1/download/job-1/contract_signed.pdf",
+          processedFilename: "contract_signed.pdf",
+          status: "completed",
+        });
+      });
+
+      expect(screen.getByRole("link", { name: /Download signed PDF/i })).toBeInTheDocument();
+
+      act(() => {
+        konvaImages[0].fire(konvaEvent);
+      });
+
+      expect(screen.queryByRole("link", { name: /Download signed PDF/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Apply & Download/i })).toBeEnabled();
+
+      setMobileViewport(false);
+
+      expect(screen.queryByRole("link", { name: /Download signed PDF/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Apply & Download/i })).toBeEnabled();
+    },
+  );
+
+  it("keeps Apply & Download after adding a signature on a signed entry and rotating across 768px (#2535)", async () => {
+    addSignature("data:image/png;base64,sig");
+    renderToolPage("/pdf/sign-pdf");
+
+    await act(async () => {
+      useFileStore
+        .getState()
+        .setFiles([new File(["%PDF-1.4"], "contract.pdf", { type: "application/pdf" })]);
+      useFileStore.getState().updateEntry(0, {
+        processedUrl: "/api/v1/download/job-1/contract_signed.pdf",
+        processedFilename: "contract_signed.pdf",
+        status: "completed",
+      });
+    });
+
+    const canvas = (await screen.findByTestId("sign-pdf-canvas")) as HTMLCanvasElement;
+    await waitFor(() => expect(canvas.getAttribute("width")).not.toBeNull());
+
+    fireEvent.click(screen.getByRole("button", { name: "Process" }));
+    expect(await screen.findByRole("link", { name: /Download signed PDF/i })).toBeInTheDocument();
+
+    const savedSigImg = await screen.findByAltText(/saved signature/i);
+    fireEvent.click(savedSigImg.closest("button") as HTMLButtonElement);
+
+    expect(screen.queryByRole("link", { name: /Download signed PDF/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Apply & Download/i })).toBeEnabled();
+
+    // Rotating to desktop (>= 768px) remounts SignPdfSettings; Apply & Download must stay visible.
+    setMobileViewport(false);
+
+    expect(screen.queryByRole("link", { name: /Download signed PDF/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Apply & Download/i })).toBeEnabled();
+  });
+
+  it("keeps Apply & Download after deleting a signature on a signed entry and rotating across 768px (#2535)", async () => {
+    addSignature("data:image/png;base64,sig");
+    renderToolPage("/pdf/sign-pdf");
+
+    await act(async () => {
+      useFileStore
+        .getState()
+        .setFiles([new File(["%PDF-1.4"], "contract.pdf", { type: "application/pdf" })]);
+    });
+
+    const canvas = (await screen.findByTestId("sign-pdf-canvas")) as HTMLCanvasElement;
+    await waitFor(() => expect(canvas.getAttribute("width")).not.toBeNull());
+
+    fireEvent.click(screen.getByRole("button", { name: "Process" }));
+    const savedSigImg = await screen.findByAltText(/saved signature/i);
+    fireEvent.click(savedSigImg.closest("button") as HTMLButtonElement);
+    fireEvent.click(savedSigImg.closest("button") as HTMLButtonElement);
+    await waitFor(() => expect(konvaImages).toHaveLength(2));
+
+    await act(async () => {
+      useFileStore.getState().updateEntry(0, {
+        processedUrl: "/api/v1/download/job-1/contract_signed.pdf",
+        processedFilename: "contract_signed.pdf",
+        status: "completed",
+      });
+    });
+    expect(screen.getByRole("link", { name: /Download signed PDF/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /✕ Delete/i }));
+    expect(screen.queryByRole("link", { name: /Download signed PDF/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Apply & Download/i })).toBeEnabled();
+
+    // Rotating to desktop (>= 768px) remounts SignPdfSettings; Apply & Download must stay visible.
+    setMobileViewport(false);
+
+    expect(screen.queryByRole("link", { name: /Download signed PDF/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Apply & Download/i })).toBeEnabled();
+
+    // Selecting and deleting the remaining signature disables Apply & Download while keeping
+    // Download signed PDF hidden across 768px.
+    act(() => {
+      konvaImages[0].fire("click");
+    });
+    fireEvent.click(screen.getByRole("button", { name: /✕ Delete/i }));
+    expect(screen.queryByRole("link", { name: /Download signed PDF/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Apply & Download/i })).toBeDisabled();
+
+    setMobileViewport(true);
+    expect(screen.queryByRole("link", { name: /Download signed PDF/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Apply & Download/i })).toBeDisabled();
   });
 
   it("keeps the failed-run error message in Sign PDF when rotating across 768px (#2512)", async () => {

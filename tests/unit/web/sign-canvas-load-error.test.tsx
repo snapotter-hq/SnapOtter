@@ -35,8 +35,19 @@ vi.mock("../../../apps/web/node_modules/konva", () => {
     parent: Node | null = null;
     children: Node[] = [];
     selectedNodes: Node[] = [];
+    handlers = new Map<string, Array<() => void>>();
     batchDraw = vi.fn();
-    on() {}
+    on(events: string, cb?: () => void) {
+      if (!cb) return;
+      for (const evt of events.split(/\s+/).filter(Boolean)) {
+        const list = this.handlers.get(evt) ?? [];
+        list.push(cb);
+        this.handlers.set(evt, list);
+      }
+    }
+    fire(event: string) {
+      for (const cb of this.handlers.get(event) ?? []) cb();
+    }
     add(child: Node) {
       child.parent = this;
       if (!this.children.includes(child)) {
@@ -460,5 +471,64 @@ describe("SignCanvas load and page-render failures (#2249)", () => {
     expect(layer.children).toHaveLength(2); // transformer + current page's Konva.Image
     expect(tr.selectedNodes).toHaveLength(1);
     expect(layer.batchDraw).toHaveBeenCalled();
+  });
+
+  it("notifies onPlacementsChange on addSignature, dragend, transformend, and deleteSelected (#2535)", async () => {
+    vi.stubGlobal("Image", ImmediateImage);
+    getDocument.mockReturnValue({
+      promise: Promise.resolve({
+        numPages: 1,
+        loadingTask: { destroy: vi.fn() },
+        getPage: async () => ({
+          getViewport: ({ scale }: { scale: number }) => ({
+            width: 595 * scale,
+            height: 842 * scale,
+          }),
+          render: () => ({ promise: Promise.resolve() }),
+        }),
+      }),
+    });
+
+    const onPlacementsChange = vi.fn();
+    const ref = createRef<SignCanvasRef>();
+    render(
+      <SignCanvas ref={ref} fileUrl="blob:one-page" onPlacementsChange={onPlacementsChange} />,
+    );
+
+    await waitFor(() => expect(konvaState.layers).toHaveLength(1));
+    expect(onPlacementsChange).not.toHaveBeenCalled();
+
+    act(() => {
+      ref.current?.addSignature({
+        id: "sig-1",
+        dataUrl: "data:image/png;base64,AAA=",
+        createdAt: 1,
+      });
+    });
+    expect(onPlacementsChange).toHaveBeenCalledTimes(1);
+
+    const placedNode = konvaState.transformers[0].selectedNodes[0] as {
+      fire: (event: string) => void;
+    };
+    act(() => {
+      placedNode.fire("dragend");
+    });
+    expect(onPlacementsChange).toHaveBeenCalledTimes(2);
+
+    act(() => {
+      placedNode.fire("transformend");
+    });
+    expect(onPlacementsChange).toHaveBeenCalledTimes(3);
+
+    act(() => {
+      ref.current?.deleteSelected();
+    });
+    expect(onPlacementsChange).toHaveBeenCalledTimes(4);
+
+    // Calling deleteSelected when nothing is selected is a no-op.
+    act(() => {
+      ref.current?.deleteSelected();
+    });
+    expect(onPlacementsChange).toHaveBeenCalledTimes(4);
   });
 });

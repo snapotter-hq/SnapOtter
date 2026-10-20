@@ -50,10 +50,11 @@ interface Props {
   fileUrl: string;
   onSelectionChange?: (hasSelection: boolean) => void;
   onCountChange?: (count: number) => void;
+  onPlacementsChange?: () => void;
 }
 
 export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
-  { fileUrl, onSelectionChange, onCountChange },
+  { fileUrl, onSelectionChange, onCountChange, onPlacementsChange },
   ref,
 ) {
   const { t } = useTranslation();
@@ -272,7 +273,10 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
     };
   }, []);
 
+  const onPlacementsChangeRef = useRef(onPlacementsChange);
+  onPlacementsChangeRef.current = onPlacementsChange;
   const emitCount = () => onCountChange?.(placementsRef.current.length);
+  const emitPlacementsChange = () => onPlacementsChangeRef.current?.();
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the handle reads page/size snapshots; parent callbacks are stable and deliberately excluded to avoid rebuilding the handle every render
   useImperativeHandle(
@@ -313,12 +317,15 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
             tr.nodes([node]);
             onSelectionChange?.(true);
           });
+          node.on("dragend", emitPlacementsChange);
+          node.on("transformend", emitPlacementsChange);
           layer.add(node);
           tr.nodes([node]);
           layer.batchDraw();
           placementsRef.current.push({ id: safeRandomUUID(), page, node });
           onSelectionChange?.(true);
           emitCount();
+          emitPlacementsChange();
         };
         img.src = sig.dataUrl;
       },
@@ -326,7 +333,9 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
         const tr = trRef.current;
         const layer = layerRef.current;
         if (!tr || !layer) return;
-        for (const n of tr.nodes()) {
+        const selected = tr.nodes();
+        if (selected.length === 0) return;
+        for (const n of selected) {
           placementsRef.current = placementsRef.current.filter((p) => p.node !== n);
           n.destroy();
         }
@@ -334,6 +343,7 @@ export const SignCanvas = forwardRef<SignCanvasRef, Props>(function SignCanvas(
         layer.batchDraw();
         onSelectionChange?.(false);
         emitCount();
+        emitPlacementsChange();
       },
       hasPlacements() {
         return placementsRef.current.length > 0;

@@ -299,6 +299,71 @@ describe("sign-pdf reports its run to the file store", () => {
     expect(entry().processedUrl).toBe(DOWNLOAD_URL);
   });
 
+  it("hides localDownload when controlled staleEntryId matches the active entry and clears it on re-sign (#2535)", async () => {
+    const secondUrl = "/api/v1/download/job-2/contract_signed.pdf";
+    const canvas = fakeCanvas();
+    let currentStaleId: string | null = null;
+    const onStaleEntryChange = vi.fn((next: string | null) => {
+      currentStaleId = next;
+    });
+    const view = render(
+      <SignPdfSettings
+        signProps={{
+          canvasRef: { current: canvas },
+          hasSelection: true,
+          placementCount: 1,
+          staleEntryId: currentStaleId,
+          onStaleEntryChange,
+        }}
+      />,
+    );
+
+    (await apply()).respond(200, { downloadUrl: DOWNLOAD_URL });
+    expect(screen.getByRole("link", { name: /download signed pdf/i })).toHaveAttribute(
+      "href",
+      DOWNLOAD_URL,
+    );
+
+    // SignCanvas fires onPlacementsChange on dragend/transformend, which updates
+    // ToolPage's signStaleEntryId while SignPdfSettings still holds localDownload.
+    currentStaleId = entry().id;
+    view.rerender(
+      <SignPdfSettings
+        signProps={{
+          canvasRef: { current: canvas },
+          hasSelection: true,
+          placementCount: 1,
+          staleEntryId: currentStaleId,
+          onStaleEntryChange,
+        }}
+      />,
+    );
+    expect(screen.queryByRole("link", { name: /download signed pdf/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /apply & download/i })).toBeEnabled();
+
+    // Re-signing clears staleEntryId via onStaleEntryChange(null) and shows the new download link.
+    FakeXhr.instances = [];
+    const secondXhr = await apply();
+    expect(onStaleEntryChange).toHaveBeenCalledWith(null);
+    view.rerender(
+      <SignPdfSettings
+        signProps={{
+          canvasRef: { current: canvas },
+          hasSelection: true,
+          placementCount: 1,
+          staleEntryId: currentStaleId,
+          onStaleEntryChange,
+        }}
+      />,
+    );
+    secondXhr.respond(200, { downloadUrl: secondUrl });
+
+    expect(screen.getByRole("link", { name: /download signed pdf/i })).toHaveAttribute(
+      "href",
+      secondUrl,
+    );
+  });
+
   it("scopes the download link, error, and edited state to the selected entry", async () => {
     useFileStore.getState().setFiles([pdf("contract.pdf"), pdf("lease.pdf")]);
     renderPanel(fakeCanvas(), true);
