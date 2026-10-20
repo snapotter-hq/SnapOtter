@@ -108,6 +108,64 @@ describe("chart-maker counts the rows it leaves out (#2060)", () => {
     parseInput(Buffer.from("k,v\na,1\nb,2\n"), skipped);
     expect(skipped.unreadable).toBe(0);
   });
+
+  it("counts a headerless first row whose value is unreadable instead of taking it as the header (#2260)", () => {
+    for (const csv of [
+      "Jan,n/a\nFeb,10\nMar,20\n",
+      "Jan,lots\nFeb,10\nMar,20\n",
+      "January,unreadable\nFebruary,10\nMarch,20\n",
+      "2026-01,pending\n2026-02,10\n2026-03,20\n",
+      "2026-01,EMEA,n/a\n2026-02,EMEA,10\n2026-03,APAC,20\n",
+      "Q1,TBD\nQ2,10\nQ3,20\n",
+      "Mon,closed\nTue,10\nWed,20\n",
+      "Monday,closed\nTuesday,10\nWednesday,20\n",
+      "Item 1,err\nItem 2,10\nItem 3,20\n",
+      "Apples,n/a\nBananas,10\nCherries,20\n",
+      "Apples,#DIV/0!\nBananas,10\nCherries,20\n",
+      "EMEA,-\nAPAC,10\nAMER,20\n",
+      "n/a\n10\n20\n",
+    ]) {
+      const skipped = { unreadable: 0 };
+      const points = parseInput(Buffer.from(csv, "utf8"), skipped);
+      expect(
+        points.map((p) => p.value),
+        csv,
+      ).toEqual([10, 20]);
+      expect(skipped.unreadable, csv).toBe(1);
+    }
+
+    const partialSkipped = { unreadable: 0 };
+    const partialPoints = parseInput(
+      Buffer.from("Jan,pending\nFeb,10\nMar,20\nTotal,30\n", "utf8"),
+      partialSkipped,
+    );
+    expect(partialPoints.map((p) => p.value)).toEqual([10, 20, 30]);
+    expect(partialSkipped.unreadable).toBe(1);
+  });
+
+  it("still treats genuine headers above temporal or coded rows as headers (#2260)", () => {
+    for (const csv of [
+      "month,sales\nJan,10\nFeb,20\n",
+      "date,revenue\n2026-01,10\n2026-02,20\n",
+      "quarter,sales\nQ1,10\nQ2,20\n",
+      "day,visits\nMon,10\nTue,20\n",
+      "item,count\nItem 1,10\nItem 2,20\n",
+      "Item #,sales\nItem 1,10\nItem 2,20\n",
+      "service,error\napi,10\nweb,20\n",
+      "category,Assigned,TBD\nEngineering,40,10\nSales,20,20\n",
+      "GEO,sales\nEMEA,10\nAPAC,20\n",
+      "sales\n10\n20\n",
+      "Sales 2026\n10\n20\n",
+    ]) {
+      const skipped = { unreadable: 0 };
+      const points = parseInput(Buffer.from(csv, "utf8"), skipped);
+      expect(
+        points.map((p) => p.value),
+        csv,
+      ).toEqual([10, 20]);
+      expect(skipped.unreadable, csv).toBe(0);
+    }
+  });
 });
 
 describe("chart-maker year column headers (#1199)", () => {

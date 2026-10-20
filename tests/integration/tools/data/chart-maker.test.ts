@@ -370,6 +370,15 @@ describe("Chart Maker column detection", () => {
     expect(JSON.parse(res.body).chartRows).toEqual({ charted: 3, skipped: 1 });
   });
 
+  it("counts a headerless first row with an unreadable value as skipped rather than the header (#2260)", async () => {
+    const res = await postChart("Jan,n/a\nFeb,10\nMar,20\n");
+
+    expect(res.statusCode, res.body).toBe(200);
+    expect(JSON.parse(res.body).chartRows).toEqual({ charted: 2, skipped: 1 });
+    const dl = await app.inject({ method: "GET", url: JSON.parse(res.body).downloadUrl });
+    expect(dl.rawPayload.equals(await renderChart("month,sales\nFeb,10\nMar,20\n"))).toBe(true);
+  });
+
   it("adds no row count when every row made the chart", async () => {
     const res = await postChart("month,sales\nJan,100\nFeb,200\n");
 

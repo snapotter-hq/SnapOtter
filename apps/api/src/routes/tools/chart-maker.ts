@@ -99,6 +99,12 @@ const SPACE_GROUP = /(?<=(?<!\d)\d{1,3})[\s'](?=\d{3}(?!\d))/g;
 const GROUPED_DOT_DECIMAL = /^(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d*)?$|^\.\d+$/;
 const GROUPED_COMMA_DECIMAL = /^(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d*)?$|^,\d+$/;
 const YEAR_HEADER = /^(?:19\d{2}|20\d{2}|2100)$/;
+const MISSING_VALUE_CELL =
+  /^(?:n\/a|n\.a\.|nan|#n\/a|#value!|#ref!|#div\/0!|#name\?|#num!|#null!|[-–—]+)$/i;
+const MONTH_NAMES =
+  /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/gi;
+const WEEKDAY_NAMES =
+  /\b(?:mon(?:day)?|tue(?:s(?:day)?)?|wed(?:nesday)?|thu(?:r(?:s(?:day)?)?)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)\b/gi;
 
 function isMinus(sign: string | undefined): boolean {
   return sign === "-" || sign === "−";
@@ -222,12 +228,17 @@ export interface SkippedRows {
  * leading-id shape instead.
  */
 
-function tableToPoints({ header, rows }: Table, skipped?: SkippedRows): DataPoint[] {
-  if (rows.length === 0) return [];
+interface ColumnLayout {
+  decimals: Decimal[];
+  labelCol: number;
+  valueCol: number;
+  width: number;
+}
 
+function detectColumns(rows: string[][], headerWidth = 0): ColumnLayout {
   // Counted in a loop, not Math.max(...spread): the row cap is applied after
   // parsing, so a large CSV reaches here and would blow the argument limit.
-  let width = header?.length ?? 0;
+  let width = headerWidth;
   for (const row of rows) {
     if (row.length > width) width = row.length;
   }
@@ -246,7 +257,7 @@ function tableToPoints({ header, rows }: Table, skipped?: SkippedRows): DataPoin
       numeric += 1;
       if (cell < 0) negative = true;
     }
-    numericShare.push(numeric / rows.length);
+    numericShare.push(rows.length > 0 ? numeric / rows.length : 0);
     hasNegative.push(negative);
   }
 
@@ -266,7 +277,6 @@ function tableToPoints({ header, rows }: Table, skipped?: SkippedRows): DataPoin
     }
   }
   if (valueCol < 0) valueCol = negativeCol;
-  if (valueCol < 0) throw new ToolInputError(noNumericColumnMessage(header, width));
 
   let labelCol = -1;
   for (let col = 0; col < width; col++) {
@@ -279,6 +289,15 @@ function tableToPoints({ header, rows }: Table, skipped?: SkippedRows): DataPoin
   // the leftmost column that is not the value, and to row numbers when the
   // file has only the one column.
   if (labelCol < 0 && width > 1) labelCol = valueCol === 0 ? 1 : 0;
+
+  return { decimals, labelCol, valueCol, width };
+}
+
+function tableToPoints({ header, rows }: Table, skipped?: SkippedRows): DataPoint[] {
+  if (rows.length === 0) return [];
+
+  const { decimals, labelCol, valueCol, width } = detectColumns(rows, header?.length ?? 0);
+  if (valueCol < 0) throw new ToolInputError(noNumericColumnMessage(header, width));
 
   const points: DataPoint[] = [];
   for (const row of rows) {
@@ -297,15 +316,43 @@ function tableToPoints({ header, rows }: Table, skipped?: SkippedRows): DataPoin
   return points;
 }
 
+function labelShape(cell: string): string | null {
+  const trimmed = cell.trim();
+  if (trimmed === "") return null;
+  const shaped = trimmed
+    .toLowerCase()
+    .replace(MONTH_NAMES, "\0month")
+    .replace(WEEKDAY_NAMES, "\0weekday")
+    .replace(/\d+/g, "\0num");
+  return shaped.includes("\0") ? shaped : null;
+}
+
 /**
- * The first row is a header when nothing in it is a number, or when a leading
- * label column (named or left blank in the top-left corner) is followed by at
- * least two bare four-digit year columns (`region,2023,2024,2025`, #1199).
- * Requiring two year columns keeps a headerless two-column row whose value
- * happens to fall in 1900..2100 (`EMEA,2025`) from being eaten as the header.
+ * The first row is a header when nothing in it is a number (and it does not
+ * look like a data row whose value cell is unreadable, #2260), or when a
+ * leading label column (named or left blank in the top-left corner) is
+ * followed by at least two bare four-digit year columns (`region,2023,2024,2025`,
+ * #1199). Requiring two year columns keeps a headerless two-column row whose
+ * value happens to fall in 1900..2100 (`EMEA,2025`) from being eaten as the
+ * header.
  */
-function isHeaderRow(row: string[]): boolean {
-  if (row.every((cell) => numericCell(cell) === null)) return true;
+function isHeaderRow(rows: string[][]): boolean {
+  if (rows.length <= 1) return false;
+  const row = rows[0];
+  if (row.every((cell) => numericCell(cell) === null)) {
+    const rest = rows.slice(1);
+    const { labelCol, valueCol } = detectColumns(rest, row.length);
+    if (valueCol < 0 || detectColumns(rows).valueCol !== valueCol) return true;
+    if (MISSING_VALUE_CELL.test(toCell(row[valueCol]).trim())) return false;
+    if (labelCol < 0) return true;
+    const firstShape = labelShape(toCell(row[labelCol]));
+    if (firstShape === null) return true;
+    let matching = 0;
+    for (const r of rest) {
+      if (labelShape(toCell(r[labelCol])) === firstShape) matching += 1;
+    }
+    return matching <= rest.length * NUMERIC_MAJORITY;
+  }
   if (row.length < 3 || numericCell(row[0]) !== null) return false;
   let years = 0;
   for (const cell of row) {
@@ -336,7 +383,7 @@ function parseCsv(text: string): Table {
   if (fatal.length > 0) {
     throw new ToolInputError(`CSV parse failed: ${fatal[0].message}`);
   }
-  const hasHeader = rows.length > 1 && isHeaderRow(rows[0]);
+  const hasHeader = isHeaderRow(rows);
   return hasHeader ? { header: rows[0], rows: rows.slice(1) } : { rows };
 }
 
