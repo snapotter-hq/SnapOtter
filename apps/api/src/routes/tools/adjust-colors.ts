@@ -126,12 +126,24 @@ async function processColorAdjustments(
   filename: string,
 ) {
   const outputFormat = await resolveOutputFormat(inputBuffer, filename);
+  const hasRecomb =
+    settings.temperature !== 0 ||
+    settings.tint !== 0 ||
+    settings.red !== 100 ||
+    settings.green !== 100 ||
+    settings.blue !== 100 ||
+    settings.effect === "sepia";
+  const needsRecombMaterialize =
+    hasRecomb &&
+    (settings.exposure > 0 || settings.effect === "grayscale" || settings.effect === "invert");
 
   // Everything here works pixel by pixel except sharpening, which samples
   // neighbouring rows and so reaches into the next frame of Sharp's stacked
-  // strip. That one setting goes frame by frame; the rest keep the cheaper
-  // single pass over the whole animation (#1083).
-  if (settings.sharpness > 0) {
+  // strip, and intermediate PNG materialisation (needsRecombMaterialize), which
+  // would flatten a multi-frame strip into a single tall frame. Those go frame
+  // by frame; the rest keep the cheaper single pass over the whole animation
+  // (#1083, #3120).
+  if (settings.sharpness > 0 || needsRecombMaterialize) {
     try {
       const perFrame = await runPerFrame(inputBuffer, outputFormat.format, async (frame) => {
         const result = await processColorAdjustments(frame, settings, filename);
@@ -145,78 +157,85 @@ async function processColorAdjustments(
     }
   }
 
-  let image = openAnimated(inputBuffer, await readAnimationFor(inputBuffer, outputFormat.format));
-
-  // Light
-  if (settings.brightness !== 0) {
-    image = await adjustBrightness(image, { value: settings.brightness });
-  }
-  if (settings.contrast !== 0) {
-    image = await adjustContrast(image, { value: settings.contrast });
-  }
-  if (settings.exposure !== 0) {
-    // Sharp's gamma() accepts values between 1.0 and 3.0.
-    // Positive exposure → brighten midtones → apply gamma > 1.0 on output.
-    // Negative exposure → darken midtones → apply gamma > 1.0 on input.
-    // Map -100..+100 to a gamma range of 1.0..3.0 applied on the correct side.
-    const strength = Math.abs(settings.exposure) / 100;
-    const g = 1 + strength * 2; // 1.0..3.0
-    if (settings.exposure > 0) {
-      // Brighten: linearize at gamma 1.0, encode at higher gamma
-      image = image.gamma(1, g);
-    } else {
-      // Darken: linearize at higher gamma, encode at gamma 1.0
-      image = image.gamma(g, 1);
-    }
-  }
-
-  // Color
-  if (settings.saturation !== 0 || settings.hue !== 0) {
-    const modOpts: { saturation?: number; hue?: number } = {};
-    if (settings.saturation !== 0) modOpts.saturation = 1 + settings.saturation / 100;
-    if (settings.hue !== 0) modOpts.hue = settings.hue;
-    image = image.modulate(modOpts);
-  }
-  if (settings.temperature !== 0 || settings.tint !== 0) {
-    image = image.recomb(colorTempTintMatrix(settings.temperature, settings.tint));
-  }
-
-  // Detail
-  if (settings.sharpness > 0) {
-    image = await adjustSharpen(image, { value: settings.sharpness });
-  }
-
-  // Channels
-  if (settings.red !== 100 || settings.green !== 100 || settings.blue !== 100) {
-    image = await chainRecomb(image, (img) =>
-      colorChannels(img, {
-        red: settings.red,
-        green: settings.green,
-        blue: settings.blue,
-      }),
-    );
-  }
-
-  // Effects
-  switch (settings.effect) {
-    case "grayscale":
-      image = await grayscale(image);
-      break;
-    case "sepia":
-      image = await chainRecomb(image, (img) => sepia(img));
-      break;
-    case "invert":
-      image = await invert(image);
-      break;
-  }
-
-  // vips_recomb (temperature/tint, colorChannels, sepia) outputs 32-bit float
-  // bands (0..255), which LZW tiffsave writes as a float scRGB TIFF where
-  // values >= 1.0 clamp to white. Materialising through PNG casts back to
-  // 8-bit uchar first (#2586).
   let buffer: Buffer;
   try {
-    const finalImage = outputFormat.format === "tiff" ? sharp(await image.png().toBuffer()) : image;
+    let image = openAnimated(inputBuffer, await readAnimationFor(inputBuffer, outputFormat.format));
+
+    // Light
+    if (settings.brightness !== 0) {
+      image = await adjustBrightness(image, { value: settings.brightness });
+    }
+    if (settings.exposure < 0) {
+      // Sharp's gamma() accepts values between 1.0 and 3.0.
+      // Negative exposure -> darken midtones -> apply gamma > 1.0 on input.
+      const strength = Math.abs(settings.exposure) / 100;
+      const g = 1 + strength * 2; // 1.0..3.0
+      image = image.gamma(g, 1);
+    }
+
+    // Color
+    if (settings.saturation !== 0 || settings.hue !== 0) {
+      const modOpts: { saturation?: number; hue?: number } = {};
+      if (settings.saturation !== 0) modOpts.saturation = 1 + settings.saturation / 100;
+      if (settings.hue !== 0) modOpts.hue = settings.hue;
+      image = image.modulate(modOpts);
+    }
+    if (settings.temperature !== 0 || settings.tint !== 0) {
+      image = image.recomb(colorTempTintMatrix(settings.temperature, settings.tint));
+    }
+
+    // Detail
+    if (settings.sharpness > 0) {
+      image = await adjustSharpen(image, { value: settings.sharpness });
+    }
+
+    // Channels
+    if (settings.red !== 100 || settings.green !== 100 || settings.blue !== 100) {
+      image = await chainRecomb(image, (img) =>
+        colorChannels(img, {
+          red: settings.red,
+          green: settings.green,
+          blue: settings.blue,
+        }),
+      );
+    }
+
+    if (settings.effect === "sepia") {
+      image = await chainRecomb(image, (img) => sepia(img));
+    }
+
+    // vips_recomb (temperature/tint, colorChannels, sepia) outputs 32-bit float
+    // bands (0..255) and runs after .grayscale() in Sharp's internal pipeline.
+    // Materialising through PNG casts back to 8-bit uchar before gammaOut
+    // (positive exposure), grayscale, invert, or LZW TIFF output (#2586, #3120).
+    if (needsRecombMaterialize) {
+      image = sharp(await image.png().toBuffer());
+    }
+
+    if (settings.exposure > 0) {
+      // Positive exposure -> brighten midtones -> apply gamma > 1.0 on output.
+      const strength = settings.exposure / 100;
+      const g = 1 + strength * 2; // 1.0..3.0
+      image = image.gamma(1, g);
+    }
+    if (settings.contrast !== 0) {
+      image = await adjustContrast(image, { value: settings.contrast });
+    }
+
+    // Effects
+    switch (settings.effect) {
+      case "grayscale":
+        image = await grayscale(image);
+        break;
+      case "invert":
+        image = await invert(image);
+        break;
+    }
+
+    const finalImage =
+      outputFormat.format === "tiff" && !needsRecombMaterialize
+        ? sharp(await image.png().toBuffer())
+        : image;
     buffer = await finalImage.toFormat(outputFormat.format, outputFormat.encoderOptions).toBuffer();
   } catch (err) {
     throw await asInputErrorIfUndecodable(inputBuffer, err);

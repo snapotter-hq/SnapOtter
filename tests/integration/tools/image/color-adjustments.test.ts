@@ -116,14 +116,33 @@ describe("Multiple adjustments", () => {
   });
 
   it("applies exposure + temperature + tint", async () => {
-    const res = await postTool("adjust-colors", {
-      exposure: 25,
-      temperature: 40,
-      tint: -20,
-    });
+    const sample = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 100, g: 50, b: 20 } },
+    })
+      .png()
+      .toBuffer();
+    const res = await postTool(
+      "adjust-colors",
+      {
+        exposure: 25,
+        temperature: 40,
+        tint: -20,
+      },
+      sample,
+      "sample.png",
+      "image/png",
+    );
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();
+    const dl = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dl.statusCode).toBe(200);
+    const raw = await sharp(dl.rawPayload).raw().toBuffer();
+    expect([raw[0], raw[1], raw[2]]).toEqual([140, 88, 43]);
   });
 
   it("applies hue shift + sharpness + channel adjustments", async () => {
@@ -688,15 +707,65 @@ describe("Effect combined with adjustments", () => {
   });
 
   it("applies invert effect with channel adjustments", async () => {
-    const res = await postTool("adjust-colors", {
-      effect: "invert",
-      red: 120,
-      green: 80,
-      blue: 100,
-    });
+    const sample = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 100, g: 50, b: 20 } },
+    })
+      .png()
+      .toBuffer();
+    const res = await postTool(
+      "adjust-colors",
+      {
+        effect: "invert",
+        red: 120,
+        green: 80,
+        blue: 100,
+      },
+      sample,
+      "sample.png",
+      "image/png",
+    );
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();
+    const dl = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dl.statusCode).toBe(200);
+    const raw = await sharp(dl.rawPayload).raw().toBuffer();
+    expect([raw[0], raw[1], raw[2]]).toEqual([135, 215, 235]);
+  });
+
+  it("applies grayscale effect after channel multipliers (#3120)", async () => {
+    const sample = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 100, g: 50, b: 20 } },
+    })
+      .png()
+      .toBuffer();
+    const res = await postTool(
+      "adjust-colors",
+      {
+        effect: "grayscale",
+        red: 0,
+        green: 100,
+        blue: 100,
+      },
+      sample,
+      "sample.png",
+      "image/png",
+    );
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+    const dl = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dl.statusCode).toBe(200);
+    const raw = await sharp(dl.rawPayload).raw().toBuffer();
+    expect([raw[0], raw[1], raw[2]]).toEqual([42, 42, 42]);
   });
 
   it("composes temperature/tint, channel multipliers, and sepia in a single request (#2608)", async () => {

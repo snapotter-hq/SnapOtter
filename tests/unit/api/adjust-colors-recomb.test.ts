@@ -199,4 +199,140 @@ describe("adjust-colors combined recomb matrices (#2608)", () => {
       [223, 280, 346],
     ]);
   });
+
+  it("scales channels or temperature/tint before inverting instead of clamping float bands to black (#3120)", async () => {
+    const sample = await makeSolidPng(100, 50, 20);
+
+    const channelsInverted = await runAdjustColors(sample, {
+      red: 120,
+      green: 80,
+      blue: 100,
+      effect: "invert",
+    });
+    const tempTintInverted = await runAdjustColors(sample, {
+      temperature: 40,
+      tint: -20,
+      effect: "invert",
+    });
+    const chainedInverted = await runAdjustColors(sample, {
+      temperature: 40,
+      tint: -20,
+      red: 120,
+      green: 80,
+      blue: 100,
+      effect: "invert",
+    });
+
+    // [100 * 1.2, 50 * 0.8, 20 * 1.0] = [120, 40, 20] -> inverted: [135, 215, 235]
+    expect(await firstPixel(channelsInverted)).toEqual([135, 215, 235]);
+    // [100 * 1.04, 50 * 1.05, 20 * 0.92] = [104, 52, 18] -> inverted: [151, 203, 237]
+    expect(await firstPixel(tempTintInverted)).toEqual([151, 203, 237]);
+    // [100 * 1.04 * 1.2, 50 * 1.05 * 0.8, 20 * 0.92 * 1.0] = [124, 42, 18] -> inverted: [131, 213, 237]
+    expect(await firstPixel(chainedInverted)).toEqual([131, 213, 237]);
+  });
+
+  it("brightens midtones when positive exposure is combined with temperature/tint, channels, or sepia (#3120)", async () => {
+    const sample = await makeSolidPng(100, 50, 20);
+    const rgbaSample = await makeSolidPng(100, 50, 20, 0.5);
+
+    const exposureTempTint = await runAdjustColors(sample, {
+      exposure: 25,
+      temperature: 40,
+      tint: -20,
+    });
+    const exposureChannels = await runAdjustColors(rgbaSample, {
+      exposure: 25,
+      red: 120,
+      green: 80,
+      blue: 100,
+    });
+    const exposureSepia = await runAdjustColors(sample, {
+      exposure: 25,
+      effect: "sepia",
+    });
+
+    // Recomb [104, 52, 18] brightened by gammaOut=1.5 -> [140, 88, 43]
+    expect(await firstPixel(exposureTempTint)).toEqual([140, 88, 43]);
+    // Recomb [120, 40, 20] brightened by gammaOut=1.5 -> [154, 74, 46], preserving RGBA alpha=128
+    expect(await firstPixel(exposureChannels)).toEqual([154, 74, 46, 128]);
+    // Sepia [81, 72, 56] brightened by gammaOut=1.5 -> [118, 109, 92]
+    expect(await firstPixel(exposureSepia)).toEqual([118, 109, 92]);
+  });
+
+  it("applies channel multipliers and temperature/tint before converting to grayscale (#3120)", async () => {
+    const sample = await makeSolidPng(100, 50, 20);
+
+    const plainGray = await runAdjustColors(sample, {
+      effect: "grayscale",
+    });
+    const zeroRedGray = await runAdjustColors(sample, {
+      red: 0,
+      green: 100,
+      blue: 100,
+      effect: "grayscale",
+    });
+    const warmGray = await runAdjustColors(sample, {
+      temperature: 100,
+      tint: 100,
+      effect: "grayscale",
+    });
+
+    expect(await firstPixel(plainGray)).toEqual([64, 64, 64]);
+    // Zeroing red yields [0, 50, 20] whose grayscale luminance is [42, 42, 42] with R === G === B
+    expect(await firstPixel(zeroRedGray)).toEqual([42, 42, 42]);
+    const warmGrayPx = await firstPixel(warmGray);
+    expect(warmGrayPx[0]).toBe(warmGrayPx[1]);
+    expect(warmGrayPx[1]).toBe(warmGrayPx[2]);
+    expect(warmGrayPx[0]).toBeGreaterThan(64);
+  });
+
+  it("preserves animation frames, contrast, negative exposure, and TIFF uchar depth across needsRecombMaterialize (#3120)", async () => {
+    const animGif = readFixture(fixtures.image.animated.gif);
+    const inMeta = await sharp(animGif, { animated: true }).metadata();
+
+    const [baseGif, brightGif] = await Promise.all([
+      runAdjustColors(
+        animGif,
+        { exposure: 0, red: 120, green: 80, blue: 100, effect: "grayscale" },
+        "anim.gif",
+      ),
+      runAdjustColors(
+        animGif,
+        { exposure: 25, red: 120, green: 80, blue: 100, effect: "grayscale" },
+        "anim.gif",
+      ),
+    ]);
+    const outMeta = await sharp(brightGif, { animated: true }).metadata();
+    expect(outMeta.format).toBe("gif");
+    expect(outMeta.pages).toBe(inMeta.pages);
+    expect(outMeta.width).toBe(inMeta.width);
+    expect(outMeta.pageHeight).toBe(inMeta.pageHeight);
+    const basePx0 = await firstPixel(baseGif);
+    const brightPx0 = await firstPixel(brightGif);
+    expect(brightPx0[0]).toBe(brightPx0[1]);
+    expect(brightPx0[1]).toBe(brightPx0[2]);
+    expect(brightPx0[0]).toBeGreaterThan(basePx0[0]);
+    const frame1Raw = await sharp(brightGif, { page: 1, pages: 1 })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    expect(frame1Raw.data[0]).toBe(frame1Raw.data[1]);
+    expect(frame1Raw.data[1]).toBe(frame1Raw.data[2]);
+    expect(frame1Raw.data[0]).toBeGreaterThan(0);
+
+    const sampleTiff = await sharp(await makeSolidPng(100, 50, 20))
+      .tiff({ compression: "lzw" })
+      .toBuffer();
+    const outTiff = await runAdjustColors(
+      sampleTiff,
+      { exposure: -50, contrast: 20, red: 120, green: 80, blue: 100, effect: "invert" },
+      "sample.tiff",
+    );
+    const tiffMeta = await sharp(outTiff).metadata();
+    expect(tiffMeta.format).toBe("tiff");
+    expect(tiffMeta.depth).toBe("uchar");
+    const tiffPx = await firstPixel(outTiff);
+    expect(tiffPx[0]).toBeGreaterThan(100);
+    expect(tiffPx[1]).toBeGreaterThan(200);
+    expect(tiffPx[2]).toBe(255);
+  });
 });
