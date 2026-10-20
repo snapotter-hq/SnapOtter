@@ -69,7 +69,7 @@ function isS3Enabled(): boolean {
 }
 
 import type { S3StorageModule } from "@snapotter/enterprise";
-import { connectivityClass, SafeError } from "@snapotter/shared";
+import { connectivityClass, isClientAbort, SafeError } from "@snapotter/shared";
 
 let s3Mod: S3StorageModule | null = null;
 // Concurrent first calls may double-configure; configureS3 is idempotent.
@@ -518,6 +518,26 @@ function isS3MissingShape(error: unknown): boolean {
   const e = error as { name?: string; $metadata?: { httpStatusCode?: number } };
   if (e.name === "NoSuchBucket") return false;
   return e.name === "NoSuchKey" || e.$metadata?.httpStatusCode === 404;
+}
+
+/**
+ * Normalize an S3 read or probe rejection (a service error carrying
+ * `$metadata`, an unreachable endpoint, or a reset/prematurely closed S3
+ * response stream) into a status-bearing 503 SafeError (#2808). Errors that
+ * already carry a status, belong to the client, report a missing object, or
+ * come from an unexpected code defect pass through.
+ */
+export function normalizeS3ReadFault(error: unknown): unknown {
+  if (alreadyClassified(error)) return error;
+  const s3Answered = typeof error === "object" && error !== null && "$metadata" in error;
+  if ((s3Answered && !isS3MissingShape(error)) || connectivityClass(error) === "net-unavailable") {
+    return storageFault(STORAGE_UNAVAILABLE_MESSAGE, "storage-unavailable", error);
+  }
+  const code = (error as NodeJS.ErrnoException | null)?.code;
+  if (code === "EIO" || isClientAbort(error)) {
+    return storageFault(STORAGE_UNAVAILABLE_MESSAGE, "storage-unavailable", error);
+  }
+  return error;
 }
 
 /**

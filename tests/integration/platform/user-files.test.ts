@@ -468,6 +468,44 @@ describe("Thumbnail generation", () => {
 
     expect(res.statusCode).toBe(404);
   });
+
+  const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
+  it.skipIf(isRoot)(
+    "returns 500, not 422, when the backing blob is unreadable (#2808)",
+    async () => {
+      const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+        { name: "file", filename: "locked-thumb.png", contentType: "image/png", content: PNG },
+      ]);
+
+      const uploadRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/files/upload",
+        headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+        body: uploadBody,
+      });
+
+      const fileId = JSON.parse(uploadRes.body).files[0].id;
+
+      const [row] = await db
+        .select({ storedName: schema.userFiles.storedName })
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.id, fileId));
+      const blobPath = getStoredFilePath(row.storedName);
+      await chmod(blobPath, 0o000);
+
+      try {
+        const res = await app.inject({
+          method: "GET",
+          url: `/api/v1/files/${fileId}/thumbnail`,
+          headers: { authorization: `Bearer ${adminToken}` },
+        });
+
+        expect(res.statusCode).toBe(500);
+      } finally {
+        await chmod(blobPath, 0o644);
+      }
+    },
+  );
 });
 
 // ── Bulk delete ──────────────────────────────────────────────────

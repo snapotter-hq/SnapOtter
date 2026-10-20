@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
   deletePrefix: vi.fn(() => Promise.resolve()),
   getObjectSize: vi.fn(),
   getObjectStream: vi.fn(),
-  isStorageServiceFault: vi.fn(() => false),
+  isStorageServiceFault: vi.fn<(_e: unknown) => boolean>(() => false),
   isValidObjectKey: vi.fn(() => true),
   putObject: vi.fn(() => Promise.resolve()),
   reportError: vi.fn(() => Promise.resolve()),
@@ -29,18 +29,27 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
   schema: {},
 }));
 
-vi.mock("../../../apps/api/src/lib/object-storage.js", () => ({
-  deletePrefix: mocks.deletePrefix,
-  getObjectSize: mocks.getObjectSize,
-  getObjectStream: mocks.getObjectStream,
-  isStorageServiceFault: mocks.isStorageServiceFault,
-  isValidObjectKey: mocks.isValidObjectKey,
-  putObject: mocks.putObject,
-}));
+vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>();
+  return {
+    ...actual,
+    deletePrefix: mocks.deletePrefix,
+    getObjectSize: mocks.getObjectSize,
+    getObjectStream: mocks.getObjectStream,
+    isStorageServiceFault: mocks.isStorageServiceFault,
+    isValidObjectKey: mocks.isValidObjectKey,
+    putObject: mocks.putObject,
+  };
+});
 
-vi.mock("../../../apps/api/src/lib/error-report.js", () => ({
-  reportError: mocks.reportError,
-}));
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
+  return {
+    ...actual,
+    reportError: mocks.reportError,
+  };
+});
 
 vi.mock("../../../apps/api/src/permissions.js", () => ({
   requireFileAccess: mocks.requireFileAccess,
@@ -384,6 +393,116 @@ describe("files route logic", () => {
         expect(reply.statusCode).toBe(200);
         expect(reply.headers["Content-Type"]).toBe(expectedType);
       }
+    });
+
+    it("normalizes S3 size-probe and stream-open faults into a 503 storage-unavailable SafeError classified as operational (#2808)", async () => {
+      const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+      mocks.isStorageServiceFault.mockReturnValue(true);
+
+      const s3Reset = Object.assign(new Error("read ECONNRESET"), {
+        name: "TimeoutError",
+        code: "ECONNRESET",
+        syscall: "read",
+        $metadata: { attempts: 3 },
+      });
+      const accessDenied = Object.assign(new Error("Access Denied"), {
+        name: "AccessDenied",
+        $metadata: { httpStatusCode: 403 },
+      });
+      const slowDown = Object.assign(new Error("Please reduce your request rate."), {
+        name: "SlowDown",
+        $metadata: { httpStatusCode: 503 },
+      });
+
+      // 1. outputs/ size probe fails with S3 ECONNRESET (with syscall: "read")
+      mocks.getObjectSize.mockRejectedValueOnce(s3Reset);
+      const outputsErr = await downloadHandler(
+        {
+          params: { jobId: "job-1", filename: "result.png" },
+          headers: {},
+          log: { warn: vi.fn(), error: vi.fn() },
+        },
+        makeDownloadReply(),
+      ).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(outputsErr).toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause: s3Reset,
+      });
+      expect(classifyError(outputsErr, "http")).toBe("operational");
+
+      // 2. outputs/ misses (404), uploads/ size probe fails with AccessDenied
+      const notFound = Object.assign(new Error("NotFound"), {
+        name: "NotFound",
+        $metadata: { httpStatusCode: 404 },
+      });
+      mocks.isStorageServiceFault.mockImplementation((e: unknown) => e !== notFound);
+      mocks.getObjectSize.mockRejectedValueOnce(notFound).mockRejectedValueOnce(accessDenied);
+      const uploadsErr = await downloadHandler(
+        {
+          params: { jobId: "job-1", filename: "input.png" },
+          headers: {},
+          log: { warn: vi.fn(), error: vi.fn() },
+        },
+        makeDownloadReply(),
+      ).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(uploadsErr).toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause: accessDenied,
+      });
+      expect(classifyError(uploadsErr, "http")).toBe("operational");
+
+      // 3. getObjectStream fails with SlowDown
+      mocks.isStorageServiceFault.mockReturnValue(true);
+      mocks.getObjectSize.mockResolvedValueOnce(128);
+      mocks.getObjectStream.mockRejectedValueOnce(slowDown);
+      const streamErr = await downloadHandler(
+        {
+          params: { jobId: "job-1", filename: "result.png" },
+          headers: {},
+          log: { warn: vi.fn(), error: vi.fn() },
+        },
+        makeDownloadReply(),
+      ).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(streamErr).toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause: slowDown,
+      });
+      expect(classifyError(streamErr, "http")).toBe("operational");
+
+      // 4. unexpected S3 client bug rethrows unwrapped as "bug"
+      const unexpectedBug = new TypeError("unexpected S3 client defect");
+      mocks.getObjectSize.mockRejectedValueOnce(unexpectedBug);
+      const bugErr = await downloadHandler(
+        {
+          params: { jobId: "job-1", filename: "result.png" },
+          headers: {},
+          log: { warn: vi.fn(), error: vi.fn() },
+        },
+        makeDownloadReply(),
+      ).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(bugErr).toBe(unexpectedBug);
+      expect(classifyError(bugErr, "http")).toBe("bug");
     });
   });
 

@@ -18,9 +18,13 @@ const mocks = vi.hoisted(() => ({
   parentRows: [] as unknown[],
   insertedValues: undefined as Record<string, unknown> | undefined,
   getCachedThumbnail: vi.fn<() => Promise<Buffer | null>>(() => Promise.resolve(null)),
+  isStorageServiceFault: vi.fn<(_e: unknown) => boolean>(() => false),
   saveFile: vi.fn(() => Promise.resolve("stored-result.png")),
   saveThumbnail: vi.fn<() => Promise<void>>(() => Promise.resolve()),
   readStoredFile: vi.fn<() => Promise<Buffer>>(() => Promise.resolve(Buffer.alloc(0))),
+  streamStoredFile: vi.fn<() => Promise<Readable>>(() =>
+    Promise.resolve(Readable.from([Buffer.from("bytes")])),
+  ),
   videoPosterPreview: vi.fn<() => Promise<Buffer | null>>(() =>
     Promise.resolve(Buffer.from("webp-poster")),
   ),
@@ -118,11 +122,11 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
 vi.mock("../../../apps/api/src/lib/file-storage.js", () => ({
   deleteStoredFile: vi.fn(() => Promise.resolve()),
   getCachedThumbnail: mocks.getCachedThumbnail,
-  isStorageServiceFault: vi.fn(() => false),
+  isStorageServiceFault: mocks.isStorageServiceFault,
   readStoredFile: mocks.readStoredFile,
   saveFile: mocks.saveFile,
   saveThumbnail: mocks.saveThumbnail,
-  streamStoredFile: vi.fn(),
+  streamStoredFile: mocks.streamStoredFile,
 }));
 
 vi.mock("../../../apps/api/src/modality/preview.js", () => ({
@@ -422,6 +426,7 @@ describe("user files route logic", () => {
     let listHandler: RouteHandler;
     let deleteHandler: RouteHandler;
     let saveResultHandler: RouteHandler;
+    let downloadHandler: RouteHandler;
     let thumbnailHandler: RouteHandler;
 
     beforeAll(async () => {
@@ -429,6 +434,7 @@ describe("user files route logic", () => {
         get: vi.fn((path: string, arg2: unknown, arg3?: unknown) => {
           const handler = (typeof arg2 === "function" ? arg2 : arg3) as RouteHandler;
           if (path === "/api/v1/files") listHandler = handler;
+          if (path === "/api/v1/files/:id/download") downloadHandler = handler;
           if (path === "/api/v1/files/:id/thumbnail") thumbnailHandler = handler;
         }),
         post: vi.fn((path: string, arg2: unknown, arg3?: unknown) => {
@@ -452,8 +458,10 @@ describe("user files route logic", () => {
       mocks.hasEffectivePermission.mockResolvedValue(true);
       mocks.quotaRefusal.mockResolvedValue(null);
       mocks.getCachedThumbnail.mockResolvedValue(null);
+      mocks.isStorageServiceFault.mockReturnValue(false);
       mocks.saveFile.mockResolvedValue("stored-result.png");
       mocks.saveThumbnail.mockResolvedValue();
+      mocks.streamStoredFile.mockImplementation(async () => Readable.from([Buffer.from("bytes")]));
       mocks.videoPosterPreview.mockResolvedValue(Buffer.from("webp-poster"));
       mocks.pdfFirstPagePreview.mockResolvedValue(Buffer.from("png-page"));
       mocks.validateImageBuffer.mockResolvedValue({
@@ -789,13 +797,14 @@ describe("user files route logic", () => {
         }
       });
 
-      it("does not read the source file or regenerate the thumbnail when getCachedThumbnail rejects (#976)", async () => {
+      it("does not read the source file or regenerate the thumbnail when getCachedThumbnail rejects (#976, #2808)", async () => {
         const row = makeFileRow({
           id: "file-s3-denied",
           storedName: "stored-s3-denied.png",
           mimeType: "image/png",
         });
         mocks.parentRows = [row];
+        mocks.isStorageServiceFault.mockReturnValue(true);
         const denied = Object.assign(new Error("AccessDenied"), {
           name: "AccessDenied",
           $metadata: { httpStatusCode: 403 },
@@ -808,9 +817,265 @@ describe("user files route logic", () => {
             { params: { id: row.id }, log: { warn: vi.fn(), error: vi.fn() } },
             reply,
           ),
-        ).rejects.toBe(denied);
+        ).rejects.toMatchObject({
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-unavailable",
+          statusCode: 503,
+          cause: denied,
+        });
         expect(mocks.readStoredFile).not.toHaveBeenCalled();
         expect(mocks.saveThumbnail).not.toHaveBeenCalled();
+
+        mocks.isStorageServiceFault.mockReturnValue(false);
+        const invalidName = Object.assign(new Error("Invalid stored file name"), {
+          statusCode: 400,
+          code: "INVALID_STORED_NAME",
+        });
+        mocks.getCachedThumbnail.mockRejectedValueOnce(invalidName);
+        await expect(
+          thumbnailHandler(
+            { params: { id: row.id }, log: { warn: vi.fn(), error: vi.fn() } },
+            makeReply(),
+          ),
+        ).rejects.toBe(invalidName);
+        expect(mocks.readStoredFile).not.toHaveBeenCalled();
+      });
+
+      it("normalizes S3 read faults from getCachedThumbnail and readStoredFile into a 503 storage-unavailable SafeError (#2808)", async () => {
+        const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+        const row = makeFileRow({
+          id: "file-s3-thumb",
+          storedName: "stored-s3-thumb.png",
+          mimeType: "image/png",
+        });
+        mocks.parentRows = [row];
+        mocks.isStorageServiceFault.mockReturnValue(true);
+
+        const s3Faults = [
+          Object.assign(new Error("Access Denied"), {
+            name: "AccessDenied",
+            $metadata: { httpStatusCode: 403 },
+          }),
+          Object.assign(new Error("Please reduce your request rate."), {
+            name: "SlowDown",
+            $metadata: { httpStatusCode: 503 },
+          }),
+          Object.assign(new Error("read ECONNRESET"), {
+            name: "TimeoutError",
+            code: "ECONNRESET",
+            syscall: "read",
+            $metadata: { attempts: 3 },
+          }),
+          Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), {
+            code: "ECONNREFUSED",
+            syscall: "connect",
+          }),
+          Object.assign(new Error("Premature close"), {
+            code: "ERR_STREAM_PREMATURE_CLOSE",
+          }),
+        ];
+
+        for (const fault of s3Faults) {
+          mocks.readStoredFile.mockClear();
+          mocks.getCachedThumbnail.mockRejectedValueOnce(fault);
+          const cacheErr = await thumbnailHandler(
+            { params: { id: row.id }, log: { warn: vi.fn(), error: vi.fn() } },
+            makeReply(),
+          ).then(
+            () => null,
+            (e: unknown) => e,
+          );
+          expect(cacheErr).toMatchObject({
+            isSafeMessage: true,
+            kind: "operational",
+            code: "storage-unavailable",
+            statusCode: 503,
+            cause: fault,
+          });
+          expect(classifyError(cacheErr, "http")).toBe("operational");
+          expect(mocks.readStoredFile).not.toHaveBeenCalled();
+
+          mocks.readStoredFile.mockRejectedValueOnce(fault);
+          const readErr = await thumbnailHandler(
+            { params: { id: row.id }, log: { warn: vi.fn(), error: vi.fn() } },
+            makeReply(),
+          ).then(
+            () => null,
+            (e: unknown) => e,
+          );
+          expect(readErr).toMatchObject({
+            isSafeMessage: true,
+            kind: "operational",
+            code: "storage-unavailable",
+            statusCode: 503,
+            cause: fault,
+          });
+          expect(classifyError(readErr, "http")).toBe("operational");
+        }
+
+        const unexpectedBug = new TypeError("unexpected S3 client defect");
+        mocks.readStoredFile.mockRejectedValueOnce(unexpectedBug);
+        const bugErr = await thumbnailHandler(
+          { params: { id: row.id }, log: { warn: vi.fn(), error: vi.fn() } },
+          makeReply(),
+        ).then(
+          () => null,
+          (e: unknown) => e,
+        );
+        expect(bugErr).toBe(unexpectedBug);
+        expect(classifyError(bugErr, "http")).toBe("bug");
+      });
+
+      it("rethrows a local EACCES fault from readStoredFile instead of swallowing it as 422 (#2808)", async () => {
+        const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+        const row = makeFileRow({
+          id: "file-local-eacces",
+          storedName: "stored-local-eacces.png",
+          mimeType: "image/png",
+        });
+        mocks.parentRows = [row];
+        const eacces = Object.assign(new Error("EACCES: permission denied, open"), {
+          code: "EACCES",
+          syscall: "open",
+        });
+        mocks.readStoredFile.mockRejectedValueOnce(eacces);
+
+        const reply = makeReply();
+        const err = await thumbnailHandler(
+          { params: { id: row.id }, log: { warn: vi.fn(), error: vi.fn() } },
+          reply,
+        ).then(
+          () => null,
+          (e: unknown) => e,
+        );
+        expect(err).toBe(eacces);
+        expect(classifyError(err, "http")).toBe("operational");
+        expect(reply.send).not.toHaveBeenCalled();
+      });
+
+      it("logs a warning and returns 422 when readStoredFile rejects with a missing blob (ENOENT or NoSuchKey)", async () => {
+        const row = makeFileRow({
+          id: "file-missing-blob",
+          storedName: "stored-missing-blob.png",
+          mimeType: "image/png",
+        });
+        mocks.parentRows = [row];
+        const enoent = Object.assign(new Error("ENOENT: no such file or directory, open"), {
+          code: "ENOENT",
+          syscall: "open",
+        });
+        mocks.readStoredFile.mockRejectedValueOnce(enoent);
+
+        const warn1 = vi.fn();
+        const reply1 = makeReply();
+        await thumbnailHandler(
+          { params: { id: row.id }, log: { warn: warn1, error: vi.fn() } },
+          reply1,
+        );
+        expect(reply1.statusCode).toBe(422);
+        expect(reply1.payload).toEqual({ error: "Could not generate thumbnail" });
+        expect(warn1).toHaveBeenCalledWith(
+          { fileId: row.id, storedName: row.storedName },
+          "library thumbnail: stored blob missing",
+        );
+
+        const noSuchKey = Object.assign(new Error("NoSuchKey"), {
+          name: "NoSuchKey",
+          $metadata: { httpStatusCode: 404 },
+        });
+        mocks.isStorageServiceFault.mockReturnValue(false);
+        mocks.readStoredFile.mockRejectedValueOnce(noSuchKey);
+
+        const warn2 = vi.fn();
+        const reply2 = makeReply();
+        await thumbnailHandler(
+          { params: { id: row.id }, log: { warn: warn2, error: vi.fn() } },
+          reply2,
+        );
+        expect(reply2.statusCode).toBe(422);
+        expect(reply2.payload).toEqual({ error: "Could not generate thumbnail" });
+        expect(warn2).toHaveBeenCalledWith(
+          { fileId: row.id, storedName: row.storedName },
+          "library thumbnail: stored blob missing",
+        );
+      });
+    });
+
+    describe("GET /api/v1/files/:id/download S3 fault classification (#2808)", () => {
+      it("normalizes S3 streamStoredFile faults into a 503 storage-unavailable SafeError classified as operational", async () => {
+        const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+        mocks.parentRows = [
+          {
+            id: "file-dl-1",
+            userId: "user-1",
+            originalName: "photo.png",
+            storedName: "stored-dl.png",
+            mimeType: "image/png",
+            size: 128,
+            width: 10,
+            height: 10,
+            version: 1,
+            parentId: null,
+            toolChain: null,
+            createdAt: new Date("2025-06-01T12:00:00Z"),
+          },
+        ];
+        mocks.isStorageServiceFault.mockReturnValue(true);
+
+        const s3Faults = [
+          Object.assign(new Error("Access Denied"), {
+            name: "AccessDenied",
+            $metadata: { httpStatusCode: 403 },
+          }),
+          Object.assign(new Error("Please reduce your request rate."), {
+            name: "SlowDown",
+            $metadata: { httpStatusCode: 503 },
+          }),
+          Object.assign(new Error("read ECONNRESET"), {
+            name: "TimeoutError",
+            code: "ECONNRESET",
+            syscall: "read",
+            $metadata: { attempts: 3 },
+          }),
+          Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), {
+            code: "ECONNREFUSED",
+            syscall: "connect",
+          }),
+        ];
+
+        for (const fault of s3Faults) {
+          mocks.streamStoredFile.mockRejectedValueOnce(fault);
+          const reply = makeReply();
+          const err = await downloadHandler(
+            { params: { id: "file-dl-1" }, log: { warn: vi.fn(), error: vi.fn() } },
+            reply,
+          ).then(
+            () => null,
+            (e: unknown) => e,
+          );
+          expect(err).toMatchObject({
+            isSafeMessage: true,
+            kind: "operational",
+            code: "storage-unavailable",
+            statusCode: 503,
+            cause: fault,
+          });
+          expect(classifyError(err, "http")).toBe("operational");
+          expect(reply.send).not.toHaveBeenCalled();
+        }
+
+        const unexpectedBug = new TypeError("unexpected S3 client defect");
+        mocks.streamStoredFile.mockRejectedValueOnce(unexpectedBug);
+        const bugErr = await downloadHandler(
+          { params: { id: "file-dl-1" }, log: { warn: vi.fn(), error: vi.fn() } },
+          makeReply(),
+        ).then(
+          () => null,
+          (e: unknown) => e,
+        );
+        expect(bugErr).toBe(unexpectedBug);
+        expect(classifyError(bugErr, "http")).toBe("bug");
       });
     });
   });

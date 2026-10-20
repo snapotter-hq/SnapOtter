@@ -21,6 +21,7 @@ import {
   getObjectStream,
   isStorageServiceFault,
   isValidObjectKey,
+  normalizeS3ReadFault,
   putObject,
 } from "../lib/object-storage.js";
 import { decompressSvgz, isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
@@ -260,9 +261,9 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
       // up to maxParamLength: 500 exceed the 255-byte filename limit), so
       // long garbage must stay 404 instead of paging Sentry.
       const rethrowIfStorageFault = (e: unknown): void => {
-        const { code, syscall } = e as NodeJS.ErrnoException;
+        if (isStorageServiceFault(e)) throw normalizeS3ReadFault(e);
+        const { code, syscall } = (e ?? {}) as NodeJS.ErrnoException;
         if (syscall && code !== "ENOENT" && code !== "ENAMETOOLONG") throw e;
-        if (isStorageServiceFault(e)) throw e;
       };
 
       // Resolve from object storage: outputs/ first, then uploads/

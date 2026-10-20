@@ -71,8 +71,10 @@ import {
   isMissingObjectError,
   listJobDirs,
   listObjects,
+  normalizeS3ReadFault,
   putObject,
   putObjectStream,
+  STORAGE_UNAVAILABLE_MESSAGE,
 } from "../../../apps/api/src/lib/object-storage.js";
 
 beforeEach(() => {
@@ -552,5 +554,100 @@ describe("isMissingObjectError with the S3 module loaded (#901)", () => {
     expect(isMissingObjectError(Object.assign(new Error("ENOENT"), { code: "ENOENT" }))).toBe(
       false,
     );
+  });
+});
+
+describe("normalizeS3ReadFault (#2808)", () => {
+  it.each([
+    [
+      "AccessDenied",
+      Object.assign(new Error("Access Denied"), {
+        name: "AccessDenied",
+        $metadata: { httpStatusCode: 403 },
+      }),
+    ],
+    [
+      "SlowDown",
+      Object.assign(new Error("Please reduce your request rate."), {
+        name: "SlowDown",
+        $metadata: { httpStatusCode: 503 },
+      }),
+    ],
+    [
+      "NoSuchBucket",
+      Object.assign(new Error("The specified bucket does not exist"), {
+        name: "NoSuchBucket",
+        $metadata: { httpStatusCode: 404 },
+      }),
+    ],
+    [
+      "TimeoutError with ECONNRESET and $metadata",
+      Object.assign(new Error("read ECONNRESET"), {
+        name: "TimeoutError",
+        code: "ECONNRESET",
+        syscall: "read",
+        $metadata: { attempts: 3 },
+      }),
+    ],
+    [
+      "network connectivity error (ECONNREFUSED)",
+      Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), {
+        code: "ECONNREFUSED",
+        syscall: "connect",
+      }),
+    ],
+    [
+      "mid-stream premature close",
+      Object.assign(new Error("Premature close"), { code: "ERR_STREAM_PREMATURE_CLOSE" }),
+    ],
+    ["mid-stream EIO", Object.assign(new Error("S3 stream reset"), { code: "EIO" })],
+    ["mid-stream aborted message", new Error("aborted")],
+  ])("wraps %s in a 503 storage-unavailable SafeError", (_label, cause) => {
+    expect(normalizeS3ReadFault(cause)).toMatchObject({
+      message: STORAGE_UNAVAILABLE_MESSAGE,
+      isSafeMessage: true,
+      kind: "operational",
+      code: "storage-unavailable",
+      statusCode: 503,
+      cause,
+    });
+  });
+
+  it.each([
+    [
+      "NoSuchKey missing object",
+      Object.assign(new Error("NoSuchKey"), {
+        name: "NoSuchKey",
+        $metadata: { httpStatusCode: 404 },
+      }),
+    ],
+    [
+      "NotFound 404 missing object",
+      Object.assign(new Error("NotFound"), {
+        name: "NotFound",
+        $metadata: { httpStatusCode: 404 },
+      }),
+    ],
+    ["already classified 503 error", Object.assign(new Error("circuit open"), { statusCode: 503 })],
+    ["client 400 error", Object.assign(new Error("Invalid stored file name"), { statusCode: 400 })],
+    [
+      "AbortError with $metadata",
+      Object.assign(new Error("Request aborted"), { name: "AbortError", $metadata: {} }),
+    ],
+    [
+      "outer $metadata error with AbortError cause",
+      Object.assign(new Error("S3 wrapper"), {
+        $metadata: {},
+        cause: Object.assign(new Error("The operation was aborted"), { name: "AbortError" }),
+      }),
+    ],
+    [
+      "redis connectivity error",
+      Object.assign(new Error("MaxRetriesPerRequestError"), { name: "MaxRetriesPerRequestError" }),
+    ],
+    ["pg connectivity error", Object.assign(new Error("connection failure"), { code: "08006" })],
+    ["unexpected TypeError bug", new TypeError("unexpected S3 client defect")],
+  ])("passes %s through unchanged", (_label, original) => {
+    expect(normalizeS3ReadFault(original)).toBe(original);
   });
 });

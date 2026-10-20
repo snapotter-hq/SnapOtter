@@ -127,10 +127,11 @@ describe.skipIf(!minioAvailable)("S3-mode tool-result download fault classificat
     expect(missing.statusCode).toBe(404);
   });
 
-  // #974: an S3 service fault while resolving the object is a storage
-  // outage, not a missing result. It must reach the error handler as a 500
-  // instead of presenting every job result as deleted.
-  it("returns 500, not 404, when S3 rejects the size probe with an auth fault", async () => {
+  // #974, #2808: an S3 service fault while resolving the object is a storage
+  // outage, not a missing result. It must reach the error handler as a 503
+  // storage-unavailable SafeError instead of presenting every job result as
+  // deleted.
+  it("returns 503, not 404, when S3 rejects the size probe with an auth fault", async () => {
     s3Storage.configureS3(s3Config({ secretAccessKey: "rotated-away" }));
 
     try {
@@ -140,7 +141,7 @@ describe.skipIf(!minioAvailable)("S3-mode tool-result download fault classificat
         headers: { authorization: `Bearer ${adminToken}` },
       });
 
-      expect(res.statusCode).toBe(500);
+      expect(res.statusCode).toBe(503);
       expect(JSON.parse(res.body).error).not.toMatch(/not found/i);
     } finally {
       s3Storage.configureS3(s3Config());

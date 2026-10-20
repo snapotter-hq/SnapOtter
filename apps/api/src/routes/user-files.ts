@@ -44,6 +44,7 @@ import {
 import { decodeHeic } from "../lib/heic-converter.js";
 import { deleteLibraryFileStorage } from "../lib/library-cleanup.js";
 import { readFilePart } from "../lib/multipart-parts.js";
+import { normalizeS3ReadFault } from "../lib/object-storage.js";
 import { quotaRefusal } from "../lib/quota.js";
 import { decompressSvgz, isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { engineUnavailable } from "../modality/image-input.js";
@@ -186,6 +187,12 @@ function isSvgzClientError(err: unknown): boolean {
     (err as { code?: string }).code === "Z_BUF_ERROR" ||
     err instanceof RangeError
   );
+}
+
+function rethrowIfLibraryStorageFault(e: unknown): void {
+  if (isStorageServiceFault(e)) throw normalizeS3ReadFault(e);
+  const { code, syscall } = (e ?? {}) as NodeJS.ErrnoException;
+  if (syscall && code !== "ENOENT") throw e;
 }
 
 // ── Route registration ─────────────────────────────────────────────
@@ -595,11 +602,9 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
         // missing blob. A syscall failure other than ENOENT (EACCES, ENOTDIR)
         // and an S3 service fault other than a missing object (AccessDenied,
         // rotated credentials, S3 5xx) are storage faults that must keep
-        // reaching the global handler and Sentry (#937). A missing blob and a
-        // poisoned stored_name keep their long-standing 404 mapping.
-        const { code, syscall } = e as NodeJS.ErrnoException;
-        if (syscall && code !== "ENOENT") throw e;
-        if (isStorageServiceFault(e)) throw e;
+        // reaching the global handler and Sentry (#937, #2808). A missing blob
+        // and a poisoned stored_name keep their long-standing 404 mapping.
+        rethrowIfLibraryStorageFault(e);
         request.log.warn(
           { fileId: id, storedName: file.storedName },
           "library download: stored blob missing",
@@ -641,7 +646,13 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       }
 
       // Serve from disk cache if available
-      const cached = await getCachedThumbnail(file.storedName);
+      let cached: Buffer | null;
+      try {
+        cached = await getCachedThumbnail(file.storedName);
+      } catch (e) {
+        rethrowIfLibraryStorageFault(e);
+        throw e;
+      }
       if (cached) {
         return reply
           .header("Content-Type", "image/jpeg")
@@ -658,9 +669,19 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
         });
       };
 
+      let rawBuffer: Buffer;
       try {
-        const rawBuffer = await readStoredFile(file.storedName);
+        rawBuffer = await readStoredFile(file.storedName);
+      } catch (e) {
+        rethrowIfLibraryStorageFault(e);
+        request.log.warn(
+          { fileId: id, storedName: file.storedName },
+          "library thumbnail: stored blob missing",
+        );
+        return reply.status(422).send({ error: "Could not generate thumbnail" });
+      }
 
+      try {
         // Video thumbnail via ffmpeg poster frame
         if (file.mimeType.startsWith("video/")) {
           const poster = await videoPosterPreview(rawBuffer);

@@ -129,7 +129,7 @@ describe.skipIf(!minioAvailable)("S3-mode download fault classification", () => 
     return { id, storedName: row.storedName };
   }
 
-  it("keeps the 404 mapping when S3 reports the object missing", async () => {
+  it("keeps the 404/422 mapping when S3 reports the object missing", async () => {
     const { id, storedName } = await uploadLibraryFile("s3-gone.png");
     await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: `files/${storedName}` }));
 
@@ -141,13 +141,22 @@ describe.skipIf(!minioAvailable)("S3-mode download fault classification", () => 
 
     expect(res.statusCode).toBe(404);
     expect(JSON.parse(res.body).error).toMatch(/not found in storage/i);
+
+    const thumbRes = await testApp.app.inject({
+      method: "GET",
+      url: `/api/v1/files/${id}/thumbnail`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+
+    expect(thumbRes.statusCode).toBe(422);
+    expect(JSON.parse(thumbRes.body)).toEqual({ error: "Could not generate thumbnail" });
   });
 
-  // #937: an S3 service fault (rotated credentials, bucket-policy change,
-  // S3 5xx) is a storage outage, not a missing file. It must keep reaching
-  // the error handler as a 500, never fold into the missing-blob 404 that
-  // presents an outage as everyone's files being deleted.
-  it("returns 500, not 404, when S3 rejects the read with an auth fault", async () => {
+  // #937, #2808: an S3 service fault (rotated credentials, bucket-policy
+  // change, S3 5xx) is a storage outage, not a missing file or a bad image. It
+  // must reach the error handler as a 503 storage-unavailable SafeError, never
+  // fold into the missing-blob 404 or thumbnail 422.
+  it("returns 503, not 404 or 422, when S3 rejects the read with an auth fault", async () => {
     const { id } = await uploadLibraryFile("s3-denied.png");
     s3Storage.configureS3(s3Config({ secretAccessKey: "rotated-away" }));
 
@@ -158,8 +167,17 @@ describe.skipIf(!minioAvailable)("S3-mode download fault classification", () => 
         headers: { authorization: `Bearer ${adminToken}` },
       });
 
-      expect(res.statusCode).toBe(500);
+      expect(res.statusCode).toBe(503);
       expect(JSON.parse(res.body).error).not.toMatch(/not found/i);
+
+      const thumbRes = await testApp.app.inject({
+        method: "GET",
+        url: `/api/v1/files/${id}/thumbnail`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+
+      expect(thumbRes.statusCode).toBe(503);
+      expect(JSON.parse(thumbRes.body).error).not.toMatch(/could not generate thumbnail/i);
     } finally {
       s3Storage.configureS3(s3Config());
     }
@@ -169,7 +187,7 @@ describe.skipIf(!minioAvailable)("S3-mode download fault classification", () => 
   // in a config edit) is the same outage class: NoSuchBucket arrives as HTTP
   // 404 but must not read as per-file deletion. Kept last in the file because
   // it destroys the bucket; afterAll tolerates the missing bucket.
-  it("returns 500 when the whole bucket is gone", async () => {
+  it("returns 503 when the whole bucket is gone", async () => {
     const { id } = await uploadLibraryFile("s3-bucket-gone.png");
     const objects = await s3Client.send(new ListObjectsV2Command({ Bucket: BUCKET }));
     for (const obj of objects.Contents ?? []) {
@@ -183,7 +201,7 @@ describe.skipIf(!minioAvailable)("S3-mode download fault classification", () => 
       headers: { authorization: `Bearer ${adminToken}` },
     });
 
-    expect(res.statusCode).toBe(500);
+    expect(res.statusCode).toBe(503);
     expect(JSON.parse(res.body).error).not.toMatch(/not found/i);
   });
 });
