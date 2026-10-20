@@ -727,4 +727,55 @@ describe("batch route spooled multipart ingress (#1239)", () => {
       expect.stringContaining("no terminal frame announced"),
     );
   });
+
+  it.each([
+    [
+      "503 storage fault",
+      Object.assign(new Error("The server's storage is full."), {
+        statusCode: 503,
+        code: "storage-full",
+      }),
+    ],
+    ["500 server fault", Object.assign(new Error("storage exploded"), { statusCode: 500 })],
+  ])(
+    "rethrows a %s from spoolMultipartFile instead of answering locally (#1642)",
+    async (_label, fault) => {
+      mocks.spoolMultipartFile.mockRejectedValueOnce(fault);
+
+      await expect(
+        invokeBatchRoute({
+          section: "image",
+          toolId: "compress",
+          parts: [{ type: "file", filename: "first.png", content: Buffer.from("a") }],
+        }),
+      ).rejects.toBe(fault);
+    },
+  );
+
+  it.each([
+    [
+      "Error instance",
+      Object.assign(new Error("Unexpected end of form at /tmp/snapotter-scratch/secret/0-a.png"), {
+        statusCode: 400,
+      }),
+    ],
+    ["non-Error value", "Unexpected end of form at /tmp/snapotter-scratch/secret/0-a.png"],
+  ])(
+    "strips internal paths from details on a 400 multipart parse failure (%s) (#1642)",
+    async (_label, thrown) => {
+      mocks.spoolMultipartFile.mockRejectedValueOnce(thrown);
+
+      const reply = await invokeBatchRoute({
+        section: "image",
+        toolId: "compress",
+        parts: [{ type: "file", filename: "first.png", content: Buffer.from("a") }],
+      });
+
+      expect(reply.statusCode).toBe(400);
+      expect(reply.payload).toEqual({
+        error: "Failed to parse multipart request",
+        details: "Unexpected end of form at [internal]",
+      });
+    },
+  );
 });

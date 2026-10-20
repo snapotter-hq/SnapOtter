@@ -204,13 +204,53 @@ describe("OCR route enqueue safety", () => {
     });
   });
 
-  it("preserves storage-pressure failures as a truthful 503 response", async () => {
-    mocks.receiveUpload.mockRejectedValueOnce(
+  it.each([
+    [
+      "503 storage fault",
       Object.assign(new Error("Upload storage is below its free-space reserve"), {
         statusCode: 503,
+        code: "disk-free-floor",
       }),
-    );
+    ],
+    ["500 server fault", Object.assign(new Error("storage exploded"), { statusCode: 500 })],
+  ])(
+    "rethrows a %s during multipart upload instead of answering locally (#1642)",
+    async (_label, fault) => {
+      mocks.receiveUpload.mockRejectedValueOnce(fault);
 
+      let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+      registerOcr({
+        post: vi.fn((_path, handler) => {
+          routeHandler = handler;
+        }),
+      } as never);
+
+      const request = {
+        headers: {},
+        log: { error: vi.fn(), info: vi.fn() },
+        parts: async function* () {
+          yield { type: "file", filename: "scan.png", file: {} };
+        },
+      };
+      const reply = {
+        statusCode: 200,
+        payload: undefined as unknown,
+        status(code: number) {
+          this.statusCode = code;
+          return this;
+        },
+        send(payload: unknown) {
+          this.payload = payload;
+          return payload;
+        },
+      };
+
+      await expect(routeHandler?.(request, reply)).rejects.toBe(fault);
+      expect(reply.payload).toBeUndefined();
+    },
+  );
+
+  it("deletes a staged upload before rethrowing when a subsequent multipart part fails with 5xx (#1642)", async () => {
     let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
     registerOcr({
       post: vi.fn((_path, handler) => {
@@ -218,11 +258,13 @@ describe("OCR route enqueue safety", () => {
       }),
     } as never);
 
+    const fault = Object.assign(new Error("storage exploded"), { statusCode: 500 });
     const request = {
       headers: {},
       log: { error: vi.fn(), info: vi.fn() },
       parts: async function* () {
         yield { type: "file", filename: "scan.png", file: {} };
+        throw fault;
       },
     };
     const reply = {
@@ -238,13 +280,51 @@ describe("OCR route enqueue safety", () => {
       },
     };
 
-    await expect(routeHandler?.(request, reply)).resolves.toBeDefined();
+    await expect(routeHandler?.(request, reply)).rejects.toBe(fault);
+    expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/ocr-job/scan.png");
+    expect(reply.payload).toBeUndefined();
+  });
 
-    expect(reply.statusCode).toBe(503);
-    expect(reply.payload).toMatchObject({
-      error: "Upload storage unavailable",
-      details: "Upload storage is below its free-space reserve",
+  it("answers 400 with stripped internal paths on a client multipart parse failure (#1642)", async () => {
+    let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+    registerOcr({
+      post: vi.fn((_path, handler) => {
+        routeHandler = handler;
+      }),
+    } as never);
+
+    const request = {
+      headers: {},
+      log: { error: vi.fn(), info: vi.fn() },
+      parts: async function* () {
+        yield { type: "file", filename: "scan.png", file: {} };
+        throw Object.assign(
+          new Error("Unexpected end of form at /tmp/snapotter-scratch/secret/scan.png"),
+          { statusCode: 400 },
+        );
+      },
+    };
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      send(payload: unknown) {
+        this.payload = payload;
+        return payload;
+      },
+    };
+
+    await routeHandler?.(request, reply);
+
+    expect(reply.statusCode).toBe(400);
+    expect(reply.payload).toEqual({
+      error: "Failed to parse multipart request",
+      details: "Unexpected end of form at [internal]",
     });
+    expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/ocr-job/scan.png");
   });
 
   it("cleans up a bounded upload when enqueueing fails", async () => {

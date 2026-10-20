@@ -16,6 +16,7 @@ const reportErrorMock = vi.hoisted(() => vi.fn());
 const readFileSpy = vi.hoisted(() => vi.fn());
 const rmSpy = vi.hoisted(() => vi.fn());
 const spoolMultipartFileSpy = vi.hoisted(() => vi.fn());
+const storeValidatedOcrPdfSpy = vi.hoisted(() => vi.fn());
 const recordChildOutcomeMock = vi.hoisted(() => vi.fn(async () => {}));
 const failBatchJobMock = vi.hoisted(() => vi.fn(async () => true));
 const updateJobProgressMock = vi.hoisted(() => vi.fn());
@@ -152,6 +153,12 @@ vi.mock("../../../apps/api/src/lib/ocr-pdf-ingress.js", async (importOriginal) =
       const res = await actual.spoolMultipartFile(...args);
       spoolMultipartFileSpy(...args);
       return res;
+    },
+    storeValidatedOcrPdf: async (...args: Parameters<typeof actual.storeValidatedOcrPdf>) => {
+      if (storeValidatedOcrPdfSpy.getMockImplementation()) {
+        return storeValidatedOcrPdfSpy(...args);
+      }
+      return actual.storeValidatedOcrPdf(...args);
     },
   };
 });
@@ -902,4 +909,254 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685)", () => {
       envMock.MAX_UPLOAD_SIZE_MB = prevMaxUpload;
     }
   });
+
+  it.each([
+    [
+      "503 storage fault",
+      Object.assign(new Error("The server's storage is full."), {
+        statusCode: 503,
+        code: "storage-full",
+      }),
+    ],
+    ["500 server fault", Object.assign(new Error("storage exploded"), { statusCode: 500 })],
+  ])(
+    "rethrows a %s from spoolMultipartFile on /api/v1/pipeline/batch instead of answering locally (#1642)",
+    async (_label, fault) => {
+      vi.clearAllMocks();
+      spoolMultipartFileSpy.mockReset();
+      spoolMultipartFileSpy.mockRejectedValueOnce(fault);
+      try {
+        await expect(
+          invokePipelineBatchRoute([
+            { type: "file", filename: "first.png", content: Buffer.from("a") },
+          ]),
+        ).rejects.toBe(fault);
+      } finally {
+        spoolMultipartFileSpy.mockReset();
+      }
+    },
+  );
+
+  it.each([
+    [
+      "Error instance",
+      Object.assign(new Error("Unexpected end of form at /tmp/snapotter-scratch/secret/0-a.png"), {
+        statusCode: 400,
+      }),
+    ],
+    ["non-Error value", "Unexpected end of form at /tmp/snapotter-scratch/secret/0-a.png"],
+  ])(
+    "strips internal paths from details on a 400 multipart parse failure (%s) in /api/v1/pipeline/batch (#1642)",
+    async (_label, thrown) => {
+      vi.clearAllMocks();
+      spoolMultipartFileSpy.mockReset();
+      spoolMultipartFileSpy.mockRejectedValueOnce(thrown);
+      try {
+        const reply = await invokePipelineBatchRoute([
+          { type: "file", filename: "first.png", content: Buffer.from("a") },
+        ]);
+        expect(reply.statusCode).toBe(400);
+        expect(reply.payload).toEqual({
+          error: "Failed to parse multipart request",
+          details: "Unexpected end of form at [internal]",
+        });
+      } finally {
+        spoolMultipartFileSpy.mockReset();
+      }
+    },
+  );
+});
+
+describe("POST /api/v1/pipeline/execute upload faults (#1642)", () => {
+  registerToolProcessFn({
+    toolId: "ocr-pdf",
+    settingsSchema: {
+      safeParse: (d: unknown) => ({ success: true, data: d ?? {} }),
+      parse: (d: unknown) => d ?? {},
+    } as never,
+    process: async () => {
+      throw new Error("unused");
+    },
+  });
+
+  async function invokePipelineExecuteRoute(
+    parts: Array<
+      | { type: "file"; filename: string; content: Buffer }
+      | { type: "field"; fieldname: string; value: string }
+    >,
+  ) {
+    let handler: ((req: unknown, rep: unknown) => Promise<unknown>) | undefined;
+    await registerPipelineRoutes({
+      post: vi.fn((url: string, _opts: unknown, fn: typeof handler) => {
+        if (url === "/api/v1/pipeline/execute") handler = fn;
+      }),
+      get: vi.fn(),
+      delete: vi.fn(),
+      log: { info: vi.fn() },
+    } as never);
+
+    const request = {
+      headers: {},
+      log: { error: vi.fn(), warn: vi.fn() },
+      raw: {
+        aborted: false,
+        once: vi.fn(),
+        removeListener: vi.fn(),
+      },
+      parts: async function* () {
+        for (const p of parts) {
+          if (p.type === "file") {
+            yield {
+              type: "file" as const,
+              fieldname: "file",
+              filename: p.filename,
+              file: Readable.from([p.content]),
+            };
+          } else {
+            yield p;
+          }
+        }
+      },
+    };
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      send(payload: unknown) {
+        this.payload = payload;
+        return payload;
+      },
+    };
+
+    await handler?.(request, reply);
+    return reply;
+  }
+
+  it.each([
+    [
+      "503 storage fault",
+      Object.assign(new Error("The server's storage is full."), {
+        statusCode: 503,
+        code: "storage-full",
+      }),
+    ],
+    ["500 server fault", Object.assign(new Error("storage exploded"), { statusCode: 500 })],
+  ])(
+    "rethrows a %s from spoolMultipartFile on /api/v1/pipeline/execute (#1642)",
+    async (_label, fault) => {
+      vi.clearAllMocks();
+      spoolMultipartFileSpy.mockReset();
+      spoolMultipartFileSpy.mockRejectedValueOnce(fault);
+      try {
+        await expect(
+          invokePipelineExecuteRoute([
+            { type: "file", filename: "first.png", content: Buffer.from("a") },
+          ]),
+        ).rejects.toBe(fault);
+      } finally {
+        spoolMultipartFileSpy.mockReset();
+      }
+    },
+  );
+
+  it.each([
+    [
+      "503 storage fault",
+      Object.assign(new Error("Workspace storage limit reached"), {
+        statusCode: 503,
+        code: "workspace-cap",
+      }),
+    ],
+    ["500 server fault", Object.assign(new Error("storage exploded"), { statusCode: 500 })],
+  ])(
+    "rethrows a %s from storeValidatedOcrPdf on /api/v1/pipeline/execute and cleans up the scratch file (#1642)",
+    async (_label, fault) => {
+      vi.clearAllMocks();
+      spoolMultipartFileSpy.mockReset();
+      storeValidatedOcrPdfSpy.mockReset();
+      storeValidatedOcrPdfSpy.mockRejectedValueOnce(fault);
+      try {
+        await expect(
+          invokePipelineExecuteRoute([
+            { type: "file", filename: "scan.pdf", content: Buffer.from("%PDF-1.4") },
+            {
+              type: "field",
+              fieldname: "pipeline",
+              value: JSON.stringify({
+                steps: [{ toolId: "ocr-pdf", settings: { quality: "fast", pages: "1" } }],
+              }),
+            },
+          ]),
+        ).rejects.toBe(fault);
+        expect(
+          rmSpy.mock.calls.some((call: unknown[]) => String(call[0]).endsWith("/0-scan.pdf")),
+        ).toBe(true);
+      } finally {
+        storeValidatedOcrPdfSpy.mockReset();
+      }
+    },
+  );
+
+  it("answers 413 naming the limit when storeValidatedOcrPdf exceeds the OCR cap on /api/v1/pipeline/execute (#1642)", async () => {
+    vi.clearAllMocks();
+    spoolMultipartFileSpy.mockReset();
+    storeValidatedOcrPdfSpy.mockReset();
+    storeValidatedOcrPdfSpy.mockRejectedValueOnce(
+      Object.assign(new Error("Object exceeds the maximum allowed size (536870912 bytes)"), {
+        statusCode: 413,
+        limitBytes: 512 * 1024 * 1024,
+      }),
+    );
+    try {
+      const reply = await invokePipelineExecuteRoute([
+        { type: "file", filename: "scan.pdf", content: Buffer.from("%PDF-1.4") },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: "ocr-pdf", settings: { quality: "fast", pages: "1" } }],
+          }),
+        },
+      ]);
+      expect(reply.statusCode).toBe(413);
+      expect(reply.payload).toEqual({ error: "File exceeds the 512 MB upload limit" });
+      expect(
+        rmSpy.mock.calls.some((call: unknown[]) => String(call[0]).endsWith("/0-scan.pdf")),
+      ).toBe(true);
+    } finally {
+      storeValidatedOcrPdfSpy.mockReset();
+    }
+  });
+
+  it.each([
+    [
+      "Error instance",
+      Object.assign(new Error("Unexpected end of form at /tmp/snapotter-scratch/secret/0-a.png"), {
+        statusCode: 400,
+      }),
+    ],
+    ["non-Error value", "Unexpected end of form at /tmp/snapotter-scratch/secret/0-a.png"],
+  ])(
+    "strips internal paths from details on a 400 multipart parse failure (%s) in /api/v1/pipeline/execute (#1642)",
+    async (_label, thrown) => {
+      vi.clearAllMocks();
+      spoolMultipartFileSpy.mockReset();
+      spoolMultipartFileSpy.mockRejectedValueOnce(thrown);
+      try {
+        const reply = await invokePipelineExecuteRoute([
+          { type: "file", filename: "first.png", content: Buffer.from("a") },
+        ]);
+        expect(reply.statusCode).toBe(400);
+        expect(reply.payload).toEqual({
+          error: "Failed to parse multipart request",
+          details: "Unexpected end of form at [internal]",
+        });
+      } finally {
+        spoolMultipartFileSpy.mockReset();
+      }
+    },
+  );
 });

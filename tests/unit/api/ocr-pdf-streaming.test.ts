@@ -274,6 +274,197 @@ describe("OCR PDF path-backed processing", () => {
     expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/ocr-pdf-job/scan.pdf");
   });
 
+  it.each([
+    [
+      "503 storage fault",
+      Object.assign(new Error("Workspace storage limit reached"), {
+        statusCode: 503,
+        code: "workspace-cap",
+      }),
+    ],
+    ["500 server fault", Object.assign(new Error("storage exploded"), { statusCode: 500 })],
+  ])(
+    "rethrows a %s during multipart upload instead of answering locally (#1642)",
+    async (_label, fault) => {
+      let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+      registerOcrPdf({
+        post: vi.fn((_path, handler) => {
+          routeHandler = handler;
+        }),
+      } as never);
+
+      mocks.receiveUpload.mockRejectedValueOnce(fault);
+
+      const request = {
+        headers: {},
+        log: { error: vi.fn(), warn: vi.fn() },
+        raw: {
+          aborted: false,
+          once: vi.fn(),
+          removeListener: vi.fn(),
+        },
+        parts: async function* () {
+          yield { type: "file", filename: "scan.pdf", file: {} };
+        },
+      };
+      const reply = {
+        statusCode: 200,
+        payload: undefined as unknown,
+        status(code: number) {
+          this.statusCode = code;
+          return this;
+        },
+        send(payload: unknown) {
+          this.payload = payload;
+          return payload;
+        },
+      };
+
+      await expect(routeHandler?.(request, reply)).rejects.toBe(fault);
+      expect(reply.payload).toBeUndefined();
+    },
+  );
+
+  it("deletes a staged upload before rethrowing when a subsequent multipart part fails with 5xx (#1642)", async () => {
+    let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+    registerOcrPdf({
+      post: vi.fn((_path, handler) => {
+        routeHandler = handler;
+      }),
+    } as never);
+
+    const fault = Object.assign(new Error("storage exploded"), { statusCode: 500 });
+    const request = {
+      headers: {},
+      log: { error: vi.fn(), warn: vi.fn() },
+      raw: {
+        aborted: false,
+        once: vi.fn(),
+        removeListener: vi.fn(),
+      },
+      parts: async function* () {
+        yield { type: "file", filename: "scan.pdf", file: {} };
+        throw fault;
+      },
+    };
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      send(payload: unknown) {
+        this.payload = payload;
+        return payload;
+      },
+    };
+
+    await expect(routeHandler?.(request, reply)).rejects.toBe(fault);
+    expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/ocr-pdf-job/scan.pdf");
+    expect(reply.payload).toBeUndefined();
+  });
+
+  it("answers 400 with stripped internal paths on a client multipart parse failure (#1642)", async () => {
+    let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+    registerOcrPdf({
+      post: vi.fn((_path, handler) => {
+        routeHandler = handler;
+      }),
+    } as never);
+
+    const request = {
+      headers: {},
+      log: { error: vi.fn(), warn: vi.fn() },
+      raw: {
+        aborted: false,
+        once: vi.fn(),
+        removeListener: vi.fn(),
+      },
+      parts: async function* () {
+        yield { type: "file", filename: "scan.pdf", file: {} };
+        throw Object.assign(
+          new Error("Unexpected end of form at /tmp/snapotter-scratch/secret/scan.pdf"),
+          { statusCode: 400 },
+        );
+      },
+    };
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      send(payload: unknown) {
+        this.payload = payload;
+        return payload;
+      },
+    };
+
+    await routeHandler?.(request, reply);
+
+    expect(reply.statusCode).toBe(400);
+    expect(reply.payload).toEqual({
+      error: "Failed to parse multipart request",
+      details: "Unexpected end of form at [internal]",
+    });
+    expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/ocr-pdf-job/scan.pdf");
+  });
+
+  it.each([
+    [
+      "503 storage fault",
+      Object.assign(new Error("The server's storage is full."), {
+        statusCode: 503,
+        code: "storage-full",
+      }),
+    ],
+    ["500 server fault", Object.assign(new Error("storage exploded"), { statusCode: 500 })],
+  ])(
+    "deletes the uploaded object and rethrows a %s when validation copy fails (#1642)",
+    async (_label, fault) => {
+      let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+      registerOcrPdf({
+        post: vi.fn((_path, handler) => {
+          routeHandler = handler;
+        }),
+      } as never);
+
+      mocks.copyObjectToFile.mockRejectedValueOnce(fault);
+
+      const request = {
+        headers: {},
+        log: { error: vi.fn(), warn: vi.fn() },
+        raw: {
+          aborted: false,
+          once: vi.fn(),
+          removeListener: vi.fn(),
+        },
+        parts: async function* () {
+          yield { type: "file", filename: "scan.pdf", file: {} };
+          yield { type: "field", fieldname: "settings", value: '{"quality":"fast"}' };
+        },
+      };
+      const reply = {
+        statusCode: 200,
+        payload: undefined as unknown,
+        status(code: number) {
+          this.statusCode = code;
+          return this;
+        },
+        send(payload: unknown) {
+          this.payload = payload;
+          return payload;
+        },
+      };
+
+      await expect(routeHandler?.(request, reply)).rejects.toBe(fault);
+      expect(reply.payload).toBeUndefined();
+      expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/ocr-pdf-job/scan.pdf");
+    },
+  );
+
   it("discards the upload, settles the alias, and skips enqueueing when the client closes after the body was read (#2238)", async () => {
     let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
     registerOcrPdf({

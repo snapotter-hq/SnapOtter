@@ -265,16 +265,9 @@ export function registerOcrPdf(app: FastifyInstance) {
             ...(err.code && { code: err.code }),
           });
         }
-        const statusCode = ocrUploadErrorStatus(err);
-        if (statusCode === 413) {
+        if (ocrUploadErrorStatus(err) === 413) {
           const failure = multipartFailure(err);
           return reply.status(failure.status).send(failure.body);
-        }
-        if (statusCode === 503) {
-          return reply.status(statusCode).send({
-            error: ocrUploadErrorMessage(statusCode),
-            details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-          });
         }
         throw err;
       }

@@ -45,7 +45,7 @@ type Handled = { how: "ocrUploadErrorStatus" } | { how: "error handler"; reads: 
 
 const HANDLED_ELSEWHERE: Record<string, Handled> = {
   // Map the error through ocrUploadErrorStatus (lib/ocr-limits.ts), which
-  // already answers 413 for an over-limit read and 503 for storage faults.
+  // answers 413 for an over-limit read and rethrows 5xx faults to the error handler.
   "pipeline.ts": { how: "ocrUploadErrorStatus" },
   "batch.ts": { how: "ocrUploadErrorStatus" },
   "tools/ocr.ts": { how: "ocrUploadErrorStatus" },

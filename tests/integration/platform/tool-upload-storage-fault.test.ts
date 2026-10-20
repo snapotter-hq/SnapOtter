@@ -51,6 +51,32 @@ const ROUTES = {
     url: "/api/v1/tools/pdf/sign-pdf",
     fields: [{ name: "file", filename: "a.pdf", contentType: "application/pdf", content: PDF }],
   },
+  "the OCR route (ocr)": {
+    url: "/api/v1/tools/image/ocr",
+    fields: [
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ quality: "fast" }) },
+    ],
+  },
+  "the PDF OCR route (ocr-pdf)": {
+    url: "/api/v1/tools/pdf/ocr-pdf",
+    fields: [
+      { name: "file", filename: "a.pdf", contentType: "application/pdf", content: PDF },
+      { name: "settings", content: JSON.stringify({ quality: "fast", pages: "1" }) },
+    ],
+  },
+  "the pipeline execute route with ocr-pdf": {
+    url: "/api/v1/pipeline/execute",
+    fields: [
+      { name: "file", filename: "a.pdf", contentType: "application/pdf", content: PDF },
+      {
+        name: "pipeline",
+        content: JSON.stringify({
+          steps: [{ toolId: "ocr-pdf", settings: { quality: "fast", pages: "1" } }],
+        }),
+      },
+    ],
+  },
 };
 
 function upload(route: keyof typeof ROUTES) {

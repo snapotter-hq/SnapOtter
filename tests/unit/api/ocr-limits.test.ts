@@ -1,3 +1,4 @@
+import { SafeError } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
 import {
   findOcrEncodedInputViolation,
@@ -55,9 +56,17 @@ describe("OCR ingress limits", () => {
     expect(ocrUploadErrorStatus(new Error("malformed multipart"))).toBe(400);
   });
 
-  it("preserves service-unavailable storage failures with a truthful client message", () => {
-    expect(ocrUploadErrorStatus({ statusCode: 503 })).toBe(503);
-    expect(ocrUploadErrorMessage(503)).toBe("Upload storage unavailable");
+  it("rethrows 5xx storage and server faults so the global error handler reports them (#1642)", () => {
+    const cap = new SafeError("Workspace storage limit reached", {
+      kind: "operational",
+      code: "workspace-cap",
+      statusCode: 503,
+    });
+    expect(() => ocrUploadErrorStatus(cap)).toThrow(cap);
+
+    const serverFault = Object.assign(new Error("storage exploded"), { statusCode: 500 });
+    expect(() => ocrUploadErrorStatus(serverFault)).toThrow(serverFault);
+
     expect(ocrUploadErrorMessage(413)).toBe("Upload exceeds the allowed size");
     expect(ocrUploadErrorMessage(400)).toBe("Failed to parse multipart request");
   });

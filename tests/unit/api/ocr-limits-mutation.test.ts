@@ -97,35 +97,37 @@ describe("findOcrEncodedInputViolation aggregate boundary (line 47)", () => {
   });
 });
 
-describe("ocrUploadErrorStatus 503 branch (lines 57-58)", () => {
-  it("returns 503 only for an object carrying statusCode === 503", () => {
-    expect(ocrUploadErrorStatus({ statusCode: 503 })).toBe(503);
+describe("ocrUploadErrorStatus 5xx rethrow branch (lines 55-58)", () => {
+  it("rethrows an error carrying statusCode === 503", () => {
+    const err = Object.assign(new Error("storage unavailable"), { statusCode: 503 });
+    expect(() => ocrUploadErrorStatus(err)).toThrow(err);
   });
 
-  it("does not return 503 for an object with a different statusCode", () => {
-    // Kills the whole-condition `true` mutant on the 503 block (which would make
-    // every input 503) and the equality/logical mutants on that block.
-    expect(ocrUploadErrorStatus({ statusCode: 500 })).toBe(400);
+  it("rethrows an error at the 500 boundary (statusCode === 500)", () => {
+    const err = Object.assign(new Error("server fault"), { statusCode: 500 });
+    expect(() => ocrUploadErrorStatus(err)).toThrow(err);
   });
 
-  it("does not return 503 for null", () => {
-    // `error !== null` guards a null deref. Forcing that sub-condition true (or
-    // dropping the &&) would try `null.statusCode` / `"in" null` and throw or
-    // misroute; the original cleanly returns 400.
+  it("does not rethrow an object just below the 500 boundary (statusCode === 499)", () => {
+    expect(ocrUploadErrorStatus({ statusCode: 499 })).toBe(400);
+  });
+
+  it("does not rethrow an object whose statusCode is a string rather than a number", () => {
+    expect(ocrUploadErrorStatus({ statusCode: "503" })).toBe(400);
+  });
+
+  it("does not rethrow null or undefined", () => {
     expect(ocrUploadErrorStatus(null)).toBe(400);
     expect(ocrUploadErrorStatus(undefined)).toBe(400);
   });
 
-  it("does not return 503 for a non-object (string) error", () => {
-    // A string has no statusCode. Any logical mutant that reorders the guards so
-    // `"statusCode" in error` runs against a string throws a TypeError; the
-    // original returns 400. Asserting exactly 400 kills those.
+  it("does not rethrow a non-object (string or number) error", () => {
     expect(ocrUploadErrorStatus("some string error")).toBe(400);
     expect(ocrUploadErrorStatus(42)).toBe(400);
   });
 });
 
-describe("ocrUploadErrorStatus 413 branch (lines 65-68)", () => {
+describe("ocrUploadErrorStatus 413 branch (lines 60-68)", () => {
   it("returns 413 for an object with statusCode === 413", () => {
     expect(ocrUploadErrorStatus({ statusCode: 413 })).toBe(413);
   });
@@ -136,8 +138,8 @@ describe("ocrUploadErrorStatus 413 branch (lines 65-68)", () => {
     expect(ocrUploadErrorStatus(new Error("upload exceeds the configured limit"))).toBe(413);
   });
 
-  it("returns 400 for an object whose statusCode is neither 413 nor 503", () => {
-    // Object path, no regex match: kills the `error.statusCode === 413`
+  it("returns 400 for an object whose statusCode is neither 413 nor 5xx", () => {
+    // Object path, no regex match: kills the `status === 413`
     // condition-forcing mutant (which would report 413 for any object).
     expect(ocrUploadErrorStatus({ statusCode: 418 })).toBe(400);
   });
@@ -152,8 +154,11 @@ describe("ocrUploadErrorStatus 413 branch (lines 65-68)", () => {
     expect(ocrUploadErrorStatus("plain string")).toBe(400);
   });
 
-  it("prefers 503 over 413 when both would nominally apply", () => {
-    // A 503 object never reaches the 413 block; confirms ordering.
-    expect(ocrUploadErrorStatus({ statusCode: 503, message: "file too large" })).toBe(503);
+  it("rethrows 5xx before checking 413 when both would nominally apply", () => {
+    // A 5xx object never reaches the 413 block; confirms ordering.
+    const err503 = Object.assign(new Error("file too large"), { statusCode: 503 });
+    expect(() => ocrUploadErrorStatus(err503)).toThrow(err503);
+    const err500 = Object.assign(new Error("file too large"), { statusCode: 500 });
+    expect(() => ocrUploadErrorStatus(err500)).toThrow(err500);
   });
 });

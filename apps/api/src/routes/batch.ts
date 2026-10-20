@@ -36,7 +36,12 @@ import {
   reportEngineUnavailable,
   sharedServerFault,
 } from "../lib/engine-unavailable.js";
-import { formatZodErrors, friendlyError, sharedFailureReason } from "../lib/errors.js";
+import {
+  formatZodErrors,
+  friendlyError,
+  sharedFailureReason,
+  stripInternalPaths,
+} from "../lib/errors.js";
 import { getFirstMissingBundleForTool } from "../lib/feature-status.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import {
@@ -241,7 +246,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             }
             return reply.status(statusCode).send({
               error: ocrUploadErrorMessage(statusCode),
-              details: err instanceof Error ? err.message : String(err),
+              details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
             });
           }
 

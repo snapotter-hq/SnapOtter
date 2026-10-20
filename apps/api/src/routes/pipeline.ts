@@ -370,7 +370,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             }
             return reply.status(statusCode).send({
               error: ocrUploadErrorMessage(statusCode),
-              details: err instanceof Error ? err.message : String(err),
+              details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
             });
           }
 
@@ -647,16 +647,9 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                 if (err.code) body.code = err.code;
                 return reply.status(err.statusCode).send(body);
               }
-              const statusCode = ocrUploadErrorStatus(err);
-              if (statusCode === 413) {
+              if (ocrUploadErrorStatus(err) === 413) {
                 const failure = multipartFailure(err);
                 return reply.status(failure.status).send(failure.body);
-              }
-              if (statusCode === 503) {
-                return reply.status(statusCode).send({
-                  error: ocrUploadErrorMessage(statusCode),
-                  details: err instanceof Error ? err.message : String(err),
-                });
               }
               throw err;
             } finally {
@@ -1132,7 +1125,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             }
             return reply.status(statusCode).send({
               error: ocrUploadErrorMessage(statusCode),
-              details: err instanceof Error ? err.message : String(err),
+              details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
             });
           }
 
