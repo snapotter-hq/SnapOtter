@@ -517,6 +517,37 @@ describe("Bulk Rename", () => {
     expect(filenames).toContain("static-name.jpg");
   });
 
+  it("deduplicates colliding ZIP entry names when a static pattern or {{original}} produces duplicates (#3024)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.png", contentType: "image/png", content: TINY_PNG },
+      { name: "file", filename: "A.PNG", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ pattern: "static-name" }) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/bulk-rename",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const zip = new AdmZip(res.rawPayload);
+    const entries = zip.getEntries();
+    expect(entries.map((e) => e.entryName)).toEqual([
+      "static-name.png",
+      "static-name_1.png",
+      "static-name_2.PNG",
+    ]);
+    expect(entries[0].getData().equals(PNG)).toBe(true);
+    expect(entries[1].getData().equals(TINY_PNG)).toBe(true);
+    expect(entries[2].getData().equals(PNG)).toBe(true);
+  });
+
   // ── All three placeholders together ─────────────────────────────
 
   it("uses all three placeholders in one pattern", async () => {

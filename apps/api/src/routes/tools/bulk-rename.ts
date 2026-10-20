@@ -5,7 +5,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { getSecurityHeaders } from "../../lib/csp.js";
 import { formatZodErrors } from "../../lib/errors.js";
-import { sanitizeFilename } from "../../lib/filename.js";
+import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 
 const settingsSchema = z.object({
@@ -78,6 +78,8 @@ export function registerBulkRename(app: FastifyInstance) {
       const archive = archiver("zip", { zlib: { level: 5 } });
       archive.pipe(reply.raw);
 
+      const uniqueName = createUniqueNamer();
+
       for (let i = 0; i < files.length; i++) {
         const ext = extname(files[i].filename);
         const index = settings.startIndex + i;
@@ -91,7 +93,7 @@ export function registerBulkRename(app: FastifyInstance) {
             .replace(/\{\{padded\}\}/g, padded)
             .replace(/\{\{original\}\}/g, files[i].filename.replace(ext, "")) + ext;
 
-        archive.append(files[i].buffer, { name: sanitizeFilename(newName) });
+        archive.append(files[i].buffer, { name: uniqueName(sanitizeFilename(newName)) });
       }
 
       await archive.finalize();
