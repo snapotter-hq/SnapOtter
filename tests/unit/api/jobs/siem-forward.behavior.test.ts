@@ -223,13 +223,112 @@ describe("SIEM forwarding behavior", () => {
           },
         ]),
       );
-    deliverWebhookMock.mockResolvedValue({ success: false, error: "downstream 500" });
+    deliverWebhookMock.mockResolvedValue({
+      success: false,
+      statusCode: 503,
+      error: "downstream 500",
+      attempts: 4,
+    });
     const error = loggerCalls("error");
 
     await expect(runSiemForward()).resolves.toBeUndefined();
 
     expect(upsertSettingMock).toHaveBeenCalledWith("siem_consecutive_failures", "5");
-    expect(error).toHaveBeenCalledWith("SIEM forwarding failed (attempt 5/5): downstream 500");
+    expect(error).toHaveBeenCalledWith(
+      { statusCode: 503, error: "downstream 500", attempts: 4 },
+      "SIEM forwarding failed (attempt 5/5): downstream 500",
+    );
+  });
+
+  it("warns on a corrupt siem_consecutive_failures value, resets it on success, and increments from 0 on failure (#3105)", async () => {
+    const { runSiemForward } = await loadSiemForward();
+    readSiemConfigMock.mockResolvedValue({
+      enabled: true,
+      webhookUrl: "https://siem.test/events",
+      authHeader: "",
+    });
+    selectMock
+      .mockReturnValueOnce(queryChain([{ value: "corrupt" }], true))
+      .mockReturnValueOnce(queryChain([], true))
+      .mockReturnValueOnce(
+        queryChain([
+          {
+            createdAt: new Date("2026-06-29T12:00:00.000Z"),
+            action: "LOGIN_FAILED",
+          },
+        ]),
+      );
+    deliverWebhookMock.mockResolvedValueOnce({ success: true, statusCode: 200, attempts: 1 });
+    const warn = loggerCalls("warn");
+
+    await expect(runSiemForward()).resolves.toEqual({ forwarded: 1 });
+
+    expect(warn).toHaveBeenCalledWith(
+      { key: "siem_consecutive_failures" },
+      "siem-forward: stored siem_consecutive_failures is not a valid non-negative integer",
+    );
+    expect(upsertSettingMock).toHaveBeenCalledWith("siem_consecutive_failures", "0");
+
+    upsertSettingMock.mockClear();
+    warn.mockClear();
+    selectMock
+      .mockReturnValueOnce(queryChain([{ value: "corrupt" }], true))
+      .mockReturnValueOnce(queryChain([], true))
+      .mockReturnValueOnce(
+        queryChain([
+          {
+            createdAt: new Date("2026-06-29T12:05:00.000Z"),
+            action: "FILE_DELETED",
+          },
+        ]),
+      );
+    deliverWebhookMock.mockResolvedValueOnce({
+      success: false,
+      statusCode: 502,
+      error: "HTTP 502",
+      attempts: 4,
+    });
+
+    await expect(runSiemForward()).resolves.toBeUndefined();
+
+    expect(warn).toHaveBeenCalledWith(
+      { key: "siem_consecutive_failures" },
+      "siem-forward: stored siem_consecutive_failures is not a valid non-negative integer",
+    );
+    expect(upsertSettingMock).toHaveBeenCalledWith("siem_consecutive_failures", "1");
+  });
+
+  it("warns and falls back to an unbounded cursor when siem_last_forwarded_at is invalid (#3105)", async () => {
+    const { runSiemForward } = await loadSiemForward();
+    readSiemConfigMock.mockResolvedValue({
+      enabled: true,
+      webhookUrl: "https://siem.test/events",
+      authHeader: "",
+    });
+    const auditChain = queryChain([
+      {
+        createdAt: new Date("2026-06-29T12:00:00.000Z"),
+        action: "LOGIN_FAILED",
+      },
+    ]);
+    selectMock
+      .mockReturnValueOnce(queryChain([{ value: "0" }], true))
+      .mockReturnValueOnce(queryChain([{ value: "not-a-date" }], true))
+      .mockReturnValueOnce(auditChain);
+    deliverWebhookMock.mockResolvedValueOnce({ success: true, statusCode: 200, attempts: 1 });
+    const warn = loggerCalls("warn");
+
+    await expect(runSiemForward()).resolves.toEqual({ forwarded: 1 });
+
+    expect(warn).toHaveBeenCalledWith(
+      { key: "siem_last_forwarded_at" },
+      "siem-forward: stored siem_last_forwarded_at is not a valid timestamp",
+    );
+    expect(auditChain.where).toHaveBeenCalledWith(undefined);
+    expect(upsertSettingMock).toHaveBeenCalledWith(
+      "siem_last_forwarded_at",
+      "2026-06-29T12:00:00.000Z",
+    );
   });
 
   it("re-encrypts a rotated siem_config authHeader with a compare-and-swap (#2843)", async () => {

@@ -261,6 +261,80 @@ describe("siem-forward.ts mutation coverage", () => {
       await runWithFailureCount("10", [auditRow()]);
       expect(deliverWebhookMock).not.toHaveBeenCalled();
     });
+
+    it("warns and treats a negative failure count as 0 without falsely warning on 0 (#3105)", async () => {
+      const { runSiemForward } = await loadSiemForward();
+      readSiemConfigMock.mockResolvedValue({
+        enabled: true,
+        webhookUrl: "https://siem.test",
+        authHeader: "",
+      });
+      selectMock
+        .mockReturnValueOnce(queryChain([{ value: "-1" }], true))
+        .mockReturnValueOnce(queryChain([], true))
+        .mockReturnValueOnce(queryChain([auditRow()]));
+      deliverWebhookMock.mockResolvedValue({ success: true });
+
+      await expect(runSiemForward()).resolves.toEqual({ forwarded: 1 });
+      expect(loggerMock.warn).toHaveBeenCalledWith(
+        { key: "siem_consecutive_failures" },
+        "siem-forward: stored siem_consecutive_failures is not a valid non-negative integer",
+      );
+      expect(upsertSettingMock).toHaveBeenCalledWith("siem_consecutive_failures", "0");
+    });
+
+    it("warns and treats an empty or partially numeric failure count as 0 (#3105)", async () => {
+      const { runSiemForward } = await loadSiemForward();
+      readSiemConfigMock.mockResolvedValue({
+        enabled: true,
+        webhookUrl: "https://siem.test",
+        authHeader: "",
+      });
+      selectMock
+        .mockReturnValueOnce(queryChain([{ value: "" }], true))
+        .mockReturnValueOnce(queryChain([], true))
+        .mockReturnValueOnce(queryChain([auditRow()]))
+        .mockReturnValueOnce(queryChain([{ value: "5corrupt" }], true))
+        .mockReturnValueOnce(queryChain([], true))
+        .mockReturnValueOnce(queryChain([auditRow()]));
+      deliverWebhookMock.mockResolvedValue({ success: true });
+
+      await expect(runSiemForward()).resolves.toEqual({ forwarded: 1 });
+      expect(loggerMock.warn).toHaveBeenCalledWith(
+        { key: "siem_consecutive_failures" },
+        "siem-forward: stored siem_consecutive_failures is not a valid non-negative integer",
+      );
+
+      loggerMock.warn.mockClear();
+      await expect(runSiemForward()).resolves.toEqual({ forwarded: 1 });
+      expect(loggerMock.warn).toHaveBeenCalledWith(
+        { key: "siem_consecutive_failures" },
+        "siem-forward: stored siem_consecutive_failures is not a valid non-negative integer",
+      );
+    });
+
+    it("does not warn when failureCountStr is '0' or missing (#3105)", async () => {
+      const { runSiemForward } = await loadSiemForward();
+      readSiemConfigMock.mockResolvedValue({
+        enabled: true,
+        webhookUrl: "https://siem.test",
+        authHeader: "",
+      });
+      selectMock
+        .mockReturnValueOnce(queryChain([{ value: "0" }], true))
+        .mockReturnValueOnce(queryChain([], true))
+        .mockReturnValueOnce(queryChain([auditRow()]))
+        .mockReturnValueOnce(queryChain([], true))
+        .mockReturnValueOnce(queryChain([], true))
+        .mockReturnValueOnce(queryChain([auditRow()]));
+      deliverWebhookMock.mockResolvedValue({ success: true });
+
+      await runSiemForward();
+      await runSiemForward();
+
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+      expect(upsertSettingMock).not.toHaveBeenCalledWith("siem_consecutive_failures", "0");
+    });
   });
 
   describe("cursor read and audit query", () => {
@@ -303,6 +377,54 @@ describe("siem-forward.ts mutation coverage", () => {
 
       await runSiemForward();
 
+      expect(gteMock).not.toHaveBeenCalled();
+      expect(auditChain.calls.whereArg).toBeUndefined();
+    });
+
+    it("warns and passes an undefined condition when the stored cursor is not a valid timestamp (#3105)", async () => {
+      const { runSiemForward } = await loadSiemForward();
+      readSiemConfigMock.mockResolvedValue({
+        enabled: true,
+        webhookUrl: "https://siem.test",
+        authHeader: "",
+      });
+      const auditChain = queryChain([auditRow()]);
+      selectMock
+        .mockReturnValueOnce(queryChain([{ value: "0" }], true))
+        .mockReturnValueOnce(queryChain([{ value: "not-a-timestamp" }], true))
+        .mockReturnValueOnce(auditChain);
+      deliverWebhookMock.mockResolvedValue({ success: true });
+
+      await runSiemForward();
+
+      expect(loggerMock.warn).toHaveBeenCalledWith(
+        { key: "siem_last_forwarded_at" },
+        "siem-forward: stored siem_last_forwarded_at is not a valid timestamp",
+      );
+      expect(gteMock).not.toHaveBeenCalled();
+      expect(auditChain.calls.whereArg).toBeUndefined();
+    });
+
+    it("warns and passes an undefined condition when the stored cursor is an empty string (#3105)", async () => {
+      const { runSiemForward } = await loadSiemForward();
+      readSiemConfigMock.mockResolvedValue({
+        enabled: true,
+        webhookUrl: "https://siem.test",
+        authHeader: "",
+      });
+      const auditChain = queryChain([auditRow()]);
+      selectMock
+        .mockReturnValueOnce(queryChain([{ value: "0" }], true))
+        .mockReturnValueOnce(queryChain([{ value: "" }], true))
+        .mockReturnValueOnce(auditChain);
+      deliverWebhookMock.mockResolvedValue({ success: true });
+
+      await runSiemForward();
+
+      expect(loggerMock.warn).toHaveBeenCalledWith(
+        { key: "siem_last_forwarded_at" },
+        "siem-forward: stored siem_last_forwarded_at is not a valid timestamp",
+      );
       expect(gteMock).not.toHaveBeenCalled();
       expect(auditChain.calls.whereArg).toBeUndefined();
     });
@@ -623,6 +745,32 @@ describe("siem-forward.ts mutation coverage", () => {
       await runSiemForward();
 
       expect(upsertSettingMock).toHaveBeenCalledWith("siem_consecutive_failures", "1");
+    });
+
+    it("logs structured statusCode, error, and attempts fields when delivery fails (#3105)", async () => {
+      const { runSiemForward } = await loadSiemForward();
+      readSiemConfigMock.mockResolvedValue({
+        enabled: true,
+        webhookUrl: "https://siem.test",
+        authHeader: "",
+      });
+      selectMock
+        .mockReturnValueOnce(queryChain([{ value: "1" }], true))
+        .mockReturnValueOnce(queryChain([], true))
+        .mockReturnValueOnce(queryChain([auditRow()]));
+      deliverWebhookMock.mockResolvedValue({
+        success: false,
+        statusCode: 503,
+        error: "HTTP 503",
+        attempts: 4,
+      });
+
+      await runSiemForward();
+
+      expect(loggerMock.error).toHaveBeenCalledWith(
+        { statusCode: 503, error: "HTTP 503", attempts: 4 },
+        "SIEM forwarding failed (attempt 2/5): HTTP 503",
+      );
     });
   });
 });

@@ -59,7 +59,20 @@ export async function runSiemForward(): Promise<{ forwarded: number } | undefine
 
   // 2. Circuit breaker check
   const failureCountStr = await readSettingValue(FAILURES_KEY);
-  const failureCount = failureCountStr ? parseInt(failureCountStr, 10) : 0;
+  let failureCount = 0;
+  if (failureCountStr !== null) {
+    const parsedFailures = /^\d+$/.test(failureCountStr)
+      ? parseInt(failureCountStr, 10)
+      : Number.NaN;
+    if (!Number.isSafeInteger(parsedFailures)) {
+      logger.warn(
+        { key: FAILURES_KEY },
+        "siem-forward: stored siem_consecutive_failures is not a valid non-negative integer",
+      );
+    } else {
+      failureCount = parsedFailures;
+    }
+  }
   if (failureCount >= CIRCUIT_BREAKER_THRESHOLD) {
     logger.warn(
       `SIEM forwarding circuit breaker open: ${failureCount} consecutive failures. ` +
@@ -73,7 +86,14 @@ export async function runSiemForward(): Promise<{ forwarded: number } | undefine
 
   // 4. Query audit_log for new rows (createdAt-based cursor; may re-deliver
   //    boundary events on restart, but SIEMs handle idempotent ingestion)
-  const cursorDate = cursor ? new Date(cursor) : null;
+  let cursorDate = cursor !== null ? new Date(cursor) : null;
+  if (cursorDate && !Number.isFinite(cursorDate.getTime())) {
+    logger.warn(
+      { key: CURSOR_KEY },
+      "siem-forward: stored siem_last_forwarded_at is not a valid timestamp",
+    );
+    cursorDate = null;
+  }
   const conditions = cursorDate ? gte(schema.auditLog.createdAt, cursorDate) : undefined;
   const rows = await db
     .select()
@@ -159,7 +179,7 @@ export async function runSiemForward(): Promise<{ forwarded: number } | undefine
   if (result.success) {
     const lastRow = rows[rows.length - 1];
     await upsertSetting(CURSOR_KEY, lastRow.createdAt.toISOString());
-    if (failureCount > 0) {
+    if (failureCountStr !== null && failureCountStr !== "0") {
       await upsertSetting(FAILURES_KEY, "0");
     }
     return { forwarded: rows.length };
@@ -168,6 +188,7 @@ export async function runSiemForward(): Promise<{ forwarded: number } | undefine
   // Failure: increment circuit breaker
   await upsertSetting(FAILURES_KEY, String(failureCount + 1));
   logger.error(
+    { statusCode: result.statusCode, error: result.error, attempts: result.attempts },
     `SIEM forwarding failed (attempt ${failureCount + 1}/${CIRCUIT_BREAKER_THRESHOLD}): ${result.error}`,
   );
 }
