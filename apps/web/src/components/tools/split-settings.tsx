@@ -2,7 +2,7 @@ import { Download, Loader2, PackageOpen } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
 import { useTranslation } from "@/contexts/i18n-context";
-import { formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
@@ -162,11 +162,11 @@ export function SplitSettings() {
           signal: controller.signal,
         });
         if (!res.ok) {
-          const text = await res.text();
+          const body = await res.json().catch(() => null);
           throw new Error(
             format(t.toolSettings.split.failedToSplit, {
               name: file.name,
-              detail: text || res.status,
+              detail: failedAnswerMessage(t, body, res.status, String(res.status)),
             }),
           );
         }

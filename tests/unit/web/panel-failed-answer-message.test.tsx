@@ -12,6 +12,8 @@ vi.mock("@/lib/analytics", async () => {
   return analyticsModuleMock();
 });
 
+vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ hasPermission: () => true }) }));
+
 // The panels render in German, so every fallback check proves which key the
 // panel used: in English "Failed: 422" reads the same from the translated key
 // and from a hard-coded literal, and "Processing failed: 422" is also
@@ -34,15 +36,23 @@ vi.mock("@/contexts/i18n-context", async (importOriginal) => {
 import { BarcodeGenerateSettings } from "@/components/tools/barcode-generate-settings";
 import { BarcodeReadSettings } from "@/components/tools/barcode-read-settings";
 import { BeautifySettings } from "@/components/tools/beautify-settings";
+import { BulkRenameSettings } from "@/components/tools/bulk-rename-settings";
 import { CollageSettings } from "@/components/tools/collage-settings";
 import { ColorPaletteSettings } from "@/components/tools/color-palette-settings";
 import { CompareSettings } from "@/components/tools/compare-settings";
 import { ComposeSettings } from "@/components/tools/compose-settings";
+import { EraseObjectSettings } from "@/components/tools/erase-object-settings";
+import type { EraserCanvasRef } from "@/components/tools/eraser-canvas";
+import { FaviconSettings } from "@/components/tools/favicon-settings";
 import { FindDuplicatesSettings } from "@/components/tools/find-duplicates-settings";
 import { ImageToBase64Settings } from "@/components/tools/image-to-base64-settings";
 import { ImageToPdfSettings } from "@/components/tools/image-to-pdf-settings";
 import { InfoSettings } from "@/components/tools/info-settings";
 import { ocrOneFile } from "@/components/tools/ocr-settings";
+import { PassportPhotoSettings } from "@/components/tools/passport-photo-settings";
+import type { SignCanvasRef } from "@/components/tools/sign-canvas";
+import { SignPdfSettings } from "@/components/tools/sign-pdf-settings";
+import { SplitSettings } from "@/components/tools/split-settings";
 import { StitchSettings } from "@/components/tools/stitch-settings";
 import { StripMetadataSettings } from "@/components/tools/strip-metadata-settings";
 import { WatermarkImageSettings } from "@/components/tools/watermark-image-settings";
@@ -51,6 +61,8 @@ import { format } from "@/lib/format";
 import { useBase64Store } from "@/stores/base64-store";
 import { useCollageStore } from "@/stores/collage-store";
 import { useFileStore } from "@/stores/file-store";
+import { type AnalyzeResult, usePassportPhotoStore } from "@/stores/passport-photo-store";
+import { useSplitStore } from "@/stores/split-store";
 
 /**
  * Tool panels that post with their own XHR or fetch used to read a failed
@@ -144,10 +156,12 @@ describe("parseApiError and failedAnswerMessage", () => {
 class FakeXhr {
   static instances: FakeXhr[] = [];
 
+  responseType = "";
   timeout = 0;
   status = 0;
   readyState = 0;
-  responseText = "";
+  response: unknown = null;
+  #responseText = "";
   onload: (() => void) | null = null;
   onerror: (() => void) | null = null;
   ontimeout: (() => void) | null = null;
@@ -156,6 +170,20 @@ class FakeXhr {
 
   constructor() {
     FakeXhr.instances.push(this);
+  }
+
+  get responseText(): string {
+    if (this.responseType === "blob") {
+      throw new DOMException(
+        "The value is only accessible if the object's 'responseType' is '' or 'text' (was 'blob').",
+        "InvalidStateError",
+      );
+    }
+    return this.#responseText;
+  }
+
+  set responseText(value: string) {
+    this.#responseText = value;
   }
 
   open() {}
@@ -167,7 +195,9 @@ class FakeXhr {
     act(() => {
       this.status = status;
       this.readyState = 4;
-      this.responseText = body === NOT_JSON ? PROXY_PAGE : JSON.stringify(body);
+      const text = body === NOT_JSON ? PROXY_PAGE : JSON.stringify(body);
+      this.#responseText = text;
+      this.response = this.responseType === "blob" ? new Blob([text]) : text;
       this.onload?.();
     });
   }
@@ -225,6 +255,49 @@ interface PanelRow {
   /** How the panel frames the message, when it adds to it. */
   framed?: (message: string) => string;
 }
+
+function fakeSignCanvas(): SignCanvasRef {
+  return {
+    addSignature: vi.fn(),
+    deleteSelected: vi.fn(),
+    hasPlacements: () => true,
+    exportPlacements: async () => ({
+      pngs: [new Blob(["png"], { type: "image/png" })],
+      placements: [{ sig: 0, page: 0, x: 0.1, y: 0.1, w: 0.2, h: 0.1 }],
+    }),
+  };
+}
+
+function fakeEraserCanvas(): EraserCanvasRef {
+  const mask = () => new Blob(["mask"], { type: "image/png" });
+  return {
+    exportMask: async () => mask(),
+    exportAllMasks: async () =>
+      new Map(useFileStore.getState().entries.map((e) => [e.blobUrl, mask()] as const)),
+    getMaskCenter: () => null,
+    clear: vi.fn(),
+    clearAll: vi.fn(),
+    undo: vi.fn(),
+  };
+}
+
+const PASSPORT_ANALYZE_RESULT: AnalyzeResult = {
+  preview: "",
+  landmarks: {
+    leftEye: { x: 0.42, y: 0.4 },
+    rightEye: { x: 0.58, y: 0.4 },
+    eyeCenter: { x: 0.5, y: 0.4 },
+    chin: { x: 0.5, y: 0.62 },
+    forehead: { x: 0.5, y: 0.25 },
+    crown: { x: 0.5, y: 0.18 },
+    nose: { x: 0.5, y: 0.5 },
+    faceCenterX: 0.5,
+  },
+  imageWidth: 900,
+  imageHeight: 1200,
+  jobId: "passport-job-1",
+  filename: "photo.png",
+};
 
 const failedWithStatus = format(de.errors.failedWithStatus, { status: STATUS });
 const processingFailedWithStatus = format(de.errors.processingFailedWithStatus, {
@@ -396,6 +469,126 @@ const PANELS: PanelRow[] = [
       fireEvent.click(screen.getByTestId("image-to-pdf-submit"));
     },
   },
+  {
+    panel: "sign-pdf",
+    transport: "xhr",
+    fallback: failedWithStatus,
+    nonJsonFallback: processingFailedWithStatus,
+    start: () => {
+      useFileStore
+        .getState()
+        .setFiles([new File(["%PDF-1.4"], "doc.pdf", { type: "application/pdf" })]);
+      render(
+        <SignPdfSettings
+          signProps={{
+            canvasRef: { current: fakeSignCanvas() },
+            hasSelection: false,
+            placementCount: 1,
+          }}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: de.toolPage.applyAndDownload }));
+    },
+  },
+  {
+    panel: "erase-object (one file)",
+    transport: "xhr",
+    fallback: failedWithStatus,
+    nonJsonFallback: processingFailedWithStatus,
+    start: () => {
+      useFileStore.getState().setFiles([image("photo.png")]);
+      render(
+        <EraseObjectSettings
+          eraserRef={{ current: fakeEraserCanvas() }}
+          hasStrokes
+          brushSize={30}
+          onBrushSizeChange={vi.fn()}
+          mode="brush"
+          onModeChange={vi.fn()}
+          maskedFileCount={1}
+        />,
+      );
+      fireEvent.click(screen.getByTestId("erase-object-submit"));
+    },
+  },
+  {
+    panel: "erase-object (several files)",
+    transport: "xhr",
+    fallback: failedWithStatus,
+    nonJsonFallback: processingFailedWithStatus,
+    start: () => {
+      useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+      render(
+        <EraseObjectSettings
+          eraserRef={{ current: fakeEraserCanvas() }}
+          hasStrokes
+          brushSize={30}
+          onBrushSizeChange={vi.fn()}
+          mode="brush"
+          onModeChange={vi.fn()}
+          maskedFileCount={2}
+        />,
+      );
+      fireEvent.click(screen.getByTestId("erase-object-submit"));
+    },
+    shown: () => useFileStore.getState().entries[0]?.error,
+  },
+  {
+    panel: "passport-photo (analyze)",
+    transport: "fetch",
+    fallback: format(de.toolSettings["passport-photo"].analysisFailedWithStatus, {
+      status: STATUS,
+    }),
+    start: () => {
+      useFileStore.getState().setFiles([image("photo.png")]);
+      render(<PassportPhotoSettings />);
+    },
+  },
+  {
+    panel: "passport-photo (generate)",
+    transport: "fetch",
+    fallback: format(de.toolSettings["passport-photo"].generationFailedWithStatus, {
+      status: STATUS,
+    }),
+    start: () => {
+      useFileStore.getState().setFiles([image("photo.png")]);
+      usePassportPhotoStore.getState().setAnalyzeResult(PASSPORT_ANALYZE_RESULT);
+      render(<PassportPhotoSettings />);
+      fireEvent.click(screen.getByTestId("passport-photo-generate"));
+    },
+  },
+  {
+    panel: "favicon",
+    transport: "xhr",
+    fallback: format(de.toolSettings.favicon.generationFailed, { status: STATUS }),
+    start: () => {
+      useFileStore.getState().setFiles([image("logo.png")]);
+      render(<FaviconSettings />);
+      fireEvent.click(screen.getByTestId("favicon-submit"));
+    },
+  },
+  {
+    panel: "bulk-rename",
+    transport: "fetch",
+    fallback: failedWithStatus,
+    start: () => {
+      useFileStore.getState().setFiles([image("photo.png")]);
+      render(<BulkRenameSettings />);
+      fireEvent.click(screen.getByTestId("bulk-rename-submit"));
+    },
+  },
+  {
+    panel: "split",
+    transport: "fetch",
+    fallback: String(STATUS),
+    start: () => {
+      useFileStore.getState().setFiles([image("grid.png")]);
+      render(<SplitSettings />);
+      fireEvent.click(screen.getByTestId("split-submit"));
+    },
+    framed: (message) =>
+      format(de.toolSettings.split.failedToSplit, { name: "grid.png", detail: message }),
+  },
 ];
 
 /** Answers a few panel shapes a real server sends, with what the panel should end on. */
@@ -403,7 +596,13 @@ function answers(fallback: string): Array<[string, unknown, string]> {
   return [
     ["an object error", { error: { reason: "x" } }, fallback],
     ["details alone", { details: "Not enough memory" }, "Not enough memory"],
+    ["array details", { details: ["bad field"] }, "bad field"],
     ["a string error", { error: "Bad file" }, "Bad file"],
+    [
+      "error and different details",
+      { error: "Invalid settings", details: "x: too big" },
+      "Invalid settings: x: too big",
+    ],
     [
       "the error handler's echo of one message",
       { error: "Bad file", details: "Bad file" },
@@ -423,6 +622,8 @@ beforeEach(() => {
   useFileStore.getState().reset();
   useCollageStore.getState().reset();
   useBase64Store.getState().reset();
+  usePassportPhotoStore.getState().reset();
+  useSplitStore.getState().reset();
 });
 
 afterEach(() => {
@@ -432,6 +633,8 @@ afterEach(() => {
   useFileStore.getState().reset();
   useCollageStore.getState().reset();
   useBase64Store.getState().reset();
+  usePassportPhotoStore.getState().reset();
+  useSplitStore.getState().reset();
 });
 
 describe.each(PANELS)("$panel: a failed answer", (row) => {
@@ -561,17 +764,23 @@ describe("no panel reads a failed answer's body by hand", () => {
     "barcode-generate",
     "barcode-read",
     "beautify",
+    "bulk-rename",
     "collage",
     "color-palette",
     "compare",
     "compose",
     "edit-metadata",
+    "erase-object",
+    "favicon",
     "find-duplicates",
     "image-to-base64",
     "image-to-pdf",
     "info",
     "ocr",
+    "passport-photo",
     "remove-bg",
+    "sign-pdf",
+    "split",
     "stitch",
     "strip-metadata",
     "watermark-image",
@@ -584,6 +793,7 @@ describe("no panel reads a failed answer's body by hand", () => {
     );
     expect(source).toContain("failedAnswerMessage(");
     expect(source).not.toMatch(/body\??\.(error|details)\s*\|\|/);
+    expect(source).not.toMatch(/typeof\s+\w+\.(error|details)\s*===\s*"string"\s*\?/);
   });
 
   it("watermark-image multi-file loop lands each file's outcome on its own entry after a reorder (#1114)", async () => {

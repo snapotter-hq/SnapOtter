@@ -2,7 +2,7 @@ import { Download, Loader2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
-import { formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
@@ -55,8 +55,15 @@ export function BulkRenameSettings() {
       });
 
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || format(t.errors.failedWithStatus, { status: res.status }));
+        const body = await res.json().catch(() => null);
+        throw new Error(
+          failedAnswerMessage(
+            t,
+            body,
+            res.status,
+            format(t.errors.failedWithStatus, { status: res.status }),
+          ),
+        );
       }
 
       const blob = await res.blob();

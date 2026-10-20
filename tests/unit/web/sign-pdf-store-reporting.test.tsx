@@ -499,7 +499,7 @@ describe("sign-pdf marks its entry failed on every failure path", () => {
     });
 
     expect(entry().status).toBe("failed");
-    expect(entry().error).toBe(en.errors.processingFailedWithStatus.replace("{status}", "413"));
+    expect(entry().error).toBe(en.errors.fileTooLarge);
     expect(entry().errorCategory).toBe("upload_error");
   });
 

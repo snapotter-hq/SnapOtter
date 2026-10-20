@@ -5,7 +5,7 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { captureHandledError } from "@/lib/analytics";
-import { formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { type AbandonedJobTracker, trackAbandonedJob } from "@/lib/cancel-abandoned-job";
 import { format } from "@/lib/format";
@@ -629,17 +629,22 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       let message: string;
       try {
         const b = JSON.parse(xhr.responseText);
-        message =
-          typeof b.error === "string"
-            ? b.error
-            : typeof b.details === "string"
-              ? b.details
-              : format(t.errors.failedWithStatus, { status: xhr.status });
+        message = failedAnswerMessage(
+          t,
+          b,
+          xhr.status,
+          format(t.errors.failedWithStatus, { status: xhr.status }),
+        );
       } catch {
-        message = format(t.errors.processingFailedWithStatus, { status: xhr.status });
+        message = failedAnswerMessage(
+          t,
+          null,
+          xhr.status,
+          format(t.errors.processingFailedWithStatus, { status: xhr.status }),
+        );
       }
-      // A proxy's 413 has no JSON body, so its message is the translated
-      // status line; the category is what says the upload was too big.
+      // A 413 message is translated, so the category is what says the upload
+      // was too big.
       failRun(message, xhr.status === 413 ? "upload_error" : undefined);
     };
     xhr.onerror = () => {

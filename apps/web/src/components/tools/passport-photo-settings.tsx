@@ -21,7 +21,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
-import { formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { passportCountryName, passportDocLabel } from "@/lib/passport-i18n";
@@ -357,18 +357,16 @@ export function PassportPhotoSettings() {
 
         if (!response.ok) {
           const body = await response.json().catch(() => null);
-          const msg = body
-            ? typeof body.details === "string"
-              ? body.details
-              : typeof body.error === "string"
-                ? body.error
-                : format(t.toolSettings["passport-photo"].analysisFailedWithStatus, {
-                    status: response.status,
-                  })
-            : format(t.toolSettings["passport-photo"].analysisFailedWithStatus, {
+          throw new Error(
+            failedAnswerMessage(
+              t,
+              body,
+              response.status,
+              format(t.toolSettings["passport-photo"].analysisFailedWithStatus, {
                 status: response.status,
-              });
-          throw new Error(msg);
+              }),
+            ),
+          );
         }
 
         const result = resolveServerUrls(await response.json());
@@ -459,18 +457,16 @@ export function PassportPhotoSettings() {
           });
           return;
         }
-        const msg = errBody
-          ? typeof errBody.details === "string"
-            ? errBody.details
-            : typeof errBody.error === "string"
-              ? errBody.error
-              : format(t.toolSettings["passport-photo"].generationFailedWithStatus, {
-                  status: response.status,
-                })
-          : format(t.toolSettings["passport-photo"].generationFailedWithStatus, {
+        throw new Error(
+          failedAnswerMessage(
+            t,
+            errBody,
+            response.status,
+            format(t.toolSettings["passport-photo"].generationFailedWithStatus, {
               status: response.status,
-            });
-        throw new Error(msg);
+            }),
+          ),
+        );
       }
 
       const result: GenerateResult = resolveServerUrls(await response.json());

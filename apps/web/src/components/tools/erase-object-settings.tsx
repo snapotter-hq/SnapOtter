@@ -5,7 +5,7 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
-import { formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { bundleName } from "@/lib/bundle-i18n";
 import { cancelAbandonedJob, trackAbandonedJob } from "@/lib/cancel-abandoned-job";
@@ -401,16 +401,24 @@ export function EraseObjectSettings({
             const body = JSON.parse(xhr.responseText);
             rejectOnce(
               new Error(
-                typeof body.error === "string"
-                  ? body.error
-                  : typeof body.details === "string"
-                    ? body.details
-                    : format(t.errors.failedWithStatus, { status: xhr.status }),
+                failedAnswerMessage(
+                  t,
+                  body,
+                  xhr.status,
+                  format(t.errors.failedWithStatus, { status: xhr.status }),
+                ),
               ),
             );
           } catch {
             rejectOnce(
-              new Error(format(t.errors.processingFailedWithStatus, { status: xhr.status })),
+              new Error(
+                failedAnswerMessage(
+                  t,
+                  null,
+                  xhr.status,
+                  format(t.errors.processingFailedWithStatus, { status: xhr.status }),
+                ),
+              ),
             );
           }
         }
@@ -727,14 +735,19 @@ export function EraseObjectSettings({
         let message: string;
         try {
           const body = JSON.parse(xhr.responseText);
-          message =
-            typeof body.error === "string"
-              ? body.error
-              : typeof body.details === "string"
-                ? body.details
-                : format(t.errors.failedWithStatus, { status: xhr.status });
+          message = failedAnswerMessage(
+            t,
+            body,
+            xhr.status,
+            format(t.errors.failedWithStatus, { status: xhr.status }),
+          );
         } catch {
-          message = format(t.errors.processingFailedWithStatus, { status: xhr.status });
+          message = failedAnswerMessage(
+            t,
+            null,
+            xhr.status,
+            format(t.errors.processingFailedWithStatus, { status: xhr.status }),
+          );
         }
         endRunWithError(message);
         return;

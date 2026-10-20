@@ -4,7 +4,7 @@ import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
-import { formatHeaders } from "@/lib/api";
+import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format, plural } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
@@ -58,14 +58,22 @@ export function FaviconSettings() {
   // be ended here, or `processing` stays set for good (#2304).
   useSettleOnUnmount(
     () => xhrRef.current !== null,
-    () => xhrRef.current?.abort(),
+    () => {
+      const xhr = xhrRef.current;
+      xhrRef.current = null;
+      xhr?.abort();
+    },
   );
 
-  const cleanup = () => {
+  const stopTimers = () => {
     if (elapsedRef.current) clearInterval(elapsedRef.current);
     if (processingTimerRef.current) clearInterval(processingTimerRef.current);
     elapsedRef.current = null;
     processingTimerRef.current = null;
+  };
+
+  const cleanup = () => {
+    stopTimers();
     xhrRef.current = null;
     setBusy(false);
     setProcessing(false);
@@ -170,8 +178,10 @@ export function FaviconSettings() {
     };
 
     xhr.onload = () => {
-      try {
-        if (xhr.status >= 200 && xhr.status < 300) {
+      if (xhrRef.current !== xhr) return;
+      stopTimers();
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
           const blob = xhr.response as Blob;
           const url = URL.createObjectURL(blob);
           try {
@@ -188,20 +198,46 @@ export function FaviconSettings() {
             setError(t.errors.jobTrackingFailed);
             throw err;
           }
-        } else {
-          setError(format(t.toolSettings.favicon.generationFailed, { status: xhr.status }));
+        } finally {
+          cleanup();
         }
-      } finally {
-        cleanup();
+        return;
       }
+
+      void (async () => {
+        try {
+          let body: unknown = null;
+          try {
+            const text = xhr.response instanceof Blob ? await xhr.response.text() : "";
+            body = JSON.parse(text);
+          } catch {
+            body = null;
+          }
+          if (xhrRef.current !== xhr) return;
+          setError(
+            failedAnswerMessage(
+              t,
+              body,
+              xhr.status,
+              format(t.toolSettings.favicon.generationFailed, { status: xhr.status }),
+            ),
+          );
+        } finally {
+          if (xhrRef.current === xhr) {
+            cleanup();
+          }
+        }
+      })();
     };
 
     xhr.onerror = () => {
+      if (xhrRef.current !== xhr) return;
       setError(t.toolSettings.favicon.networkError);
       cleanup();
     };
 
     xhr.ontimeout = () => {
+      if (xhrRef.current !== xhr) return;
       setError(t.toolSettings.favicon.timeout);
       cleanup();
     };

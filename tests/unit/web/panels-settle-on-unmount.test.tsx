@@ -264,10 +264,10 @@ describe.each(xhrPanels)("%s panel (#2304, #2636)", (_name, Panel, submitId, fil
     expect(FakeXhr.instances).toHaveLength(0);
   });
 
-  it("leaves a finished run's outcome alone when it unmounts afterwards", () => {
+  it("leaves a finished run's outcome alone when it unmounts afterwards", async () => {
     const { unmount } = render(<Panel />);
     fireEvent.click(screen.getByTestId(submitId));
-    act(() => {
+    await act(async () => {
       const xhr = FakeXhr.instances[0];
       xhr.status = 500;
       xhr.response = new Blob(["x"]);
@@ -283,6 +283,32 @@ describe.each(xhrPanels)("%s panel (#2304, #2636)", (_name, Panel, submitId, fil
     // Its own failure message stands; the unmount adds nothing and aborts nothing.
     expect(useFileStore.getState().error).toBe(errorAfterRun);
     expect(useFileStore.getState().error).not.toBe(INTERRUPTED);
+  });
+});
+
+describe("favicon panel async error body read after unmount (#2516)", () => {
+  it("ignores a non-2xx blob body that finishes reading after the panel unmounted", async () => {
+    const { unmount } = render(<FaviconSettings />);
+    fireEvent.click(screen.getByTestId("favicon-submit"));
+    const xhr = FakeXhr.instances[0];
+
+    act(() => {
+      xhr.status = 500;
+      xhr.response = new Blob([JSON.stringify({ error: "Stale server error" })]);
+      xhr.onload?.();
+    });
+    // Unmount before the async Blob.text() promise resolves, then start a new run.
+    unmount();
+    act(() => {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("next.png")]);
+      useFileStore.getState().setProcessing(true);
+    });
+
+    await act(async () => {});
+
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().error).toBeNull();
   });
 });
 
