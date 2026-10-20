@@ -373,23 +373,22 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
         // Keep settings, roles, and teams in one transaction so any database
         // conflict rolls back the complete imported configuration.
         if (preparedSettings.length > 0) {
-          const existingSettings = await tx.select().from(schema.settings);
-          const existingKeys = new Set(existingSettings.map((setting) => setting.key));
+          const sortedSettings = [...preparedSettings].sort((a, b) =>
+            a.key < b.key ? -1 : a.key > b.key ? 1 : 0,
+          );
 
-          for (const { key, value } of preparedSettings) {
-            if (existingKeys.has(key)) {
-              await tx
-                .update(schema.settings)
-                .set({ value, updatedAt: now })
-                .where(eq(schema.settings.key, key));
-            } else {
-              await tx.insert(schema.settings).values({ key, value });
-            }
-            if (key === "passwordRequireDigit" && existingKeys.has("passwordRequireNumber")) {
+          for (const { key, value } of sortedSettings) {
+            await tx
+              .insert(schema.settings)
+              .values({ key, value, updatedAt: now })
+              .onConflictDoUpdate({
+                target: schema.settings.key,
+                set: { value, updatedAt: now },
+              });
+            if (key === "passwordRequireDigit") {
               await tx
                 .delete(schema.settings)
                 .where(eq(schema.settings.key, "passwordRequireNumber"));
-              existingKeys.delete("passwordRequireNumber");
             }
           }
         }

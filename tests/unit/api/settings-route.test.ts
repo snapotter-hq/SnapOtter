@@ -841,3 +841,272 @@ describe("settingsRoutes PUT /api/v1/settings transactional upsert (#2502)", () 
     }
   });
 });
+
+describe("registerConfigRoutes POST /api/v1/enterprise/config/import settings upsert (#3014)", () => {
+  it("writes settings in sorted key order via tx.insert(...).onConflictDoUpdate(...) inside db.transaction, deletes passwordRequireNumber unconditionally, and preserves dry-run order", async () => {
+    vi.resetModules();
+    const operations: Array<Record<string, unknown>> = [];
+    const auditCalls: Array<{ event: string; details: Record<string, unknown> }> = [];
+    let transactionCount = 0;
+
+    vi.doMock("drizzle-orm", () => ({
+      and: (...args: unknown[]) => ({ op: "and", args }),
+      eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+    }));
+    vi.doMock("../../../apps/api/src/config.js", () => ({
+      env: {
+        DATA_ENCRYPTION_KEY: "",
+        DATA_ENCRYPTION_KEY_PREVIOUS: "",
+        OIDC_ENABLED: false,
+        SAML_ENABLED: false,
+      },
+    }));
+    vi.doMock("../../../apps/api/src/lib/enterprise-feature.js", () => ({
+      isEnterpriseFeatureEnabled: async () => true,
+    }));
+
+    const txHandle = {
+      insert: (table: unknown) => ({
+        values: (vals: Record<string, unknown>) => ({
+          onConflictDoUpdate: (conflict: Record<string, unknown>) => {
+            operations.push({ op: "upsert", table, vals, conflict });
+            return Promise.resolve();
+          },
+        }),
+      }),
+      delete: (table: unknown) => ({
+        where: (whereArg: unknown) => {
+          operations.push({ op: "delete", table, where: whereArg });
+          return Promise.resolve();
+        },
+      }),
+    };
+
+    vi.doMock("../../../apps/api/src/db/index.js", () => ({
+      db: {
+        select: () => ({
+          from: () => Promise.resolve([{ key: "defaultTheme", value: "system" }]),
+        }),
+        transaction: async (cb: (tx: typeof txHandle) => Promise<unknown>) => {
+          transactionCount += 1;
+          return cb(txHandle);
+        },
+      },
+      schema: {
+        settings: { key: "settings.key", value: "settings.value" },
+        roles: { id: "roles.id", name: "roles.name", isBuiltin: "roles.isBuiltin" },
+        teams: { id: "teams.id", name: "teams.name" },
+      },
+    }));
+    vi.doMock("../../../apps/api/src/permissions.js", () => ({
+      requireFullAdmin: async () => ({ id: "admin-1", username: "admin", role: "admin" }),
+    }));
+    vi.doMock("../../../apps/api/src/lib/audit.js", () => ({
+      auditFromRequest: () => async (event: string, details: Record<string, unknown>) => {
+        auditCalls.push({ event, details });
+      },
+    }));
+
+    const { registerConfigRoutes } = await import(
+      "../../../apps/api/src/routes/enterprise/config.js"
+    );
+    const app = Fastify();
+    await registerConfigRoutes(app);
+    await app.ready();
+
+    try {
+      const dryRunRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        payload: {
+          dryRun: true,
+          config: {
+            configSchemaVersion: 1,
+            settings: {
+              passwordRequireNumber: "false",
+              defaultTheme: "dark",
+              defaultLocale: "de",
+            },
+          },
+        },
+      });
+
+      expect(dryRunRes.statusCode).toBe(200);
+      expect(dryRunRes.json()).toEqual({
+        dryRun: true,
+        changes: { settings: 3, roles: 0, teams: 0 },
+        details: {
+          settings: [
+            { key: "passwordRequireDigit", action: "create" },
+            { key: "defaultTheme", action: "update" },
+            { key: "defaultLocale", action: "create" },
+          ],
+          roles: [],
+          teams: [],
+        },
+      });
+      expect(transactionCount).toBe(0);
+
+      const applyRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        payload: {
+          dryRun: false,
+          config: {
+            configSchemaVersion: 1,
+            settings: {
+              passwordRequireNumber: "false",
+              defaultTheme: "dark",
+              defaultLocale: "de",
+            },
+          },
+        },
+      });
+
+      expect(applyRes.statusCode).toBe(200);
+      expect(applyRes.json()).toEqual({
+        applied: true,
+        changes: { settings: 3, roles: 0, teams: 0 },
+      });
+      expect(transactionCount).toBe(1);
+      expect(operations).toEqual([
+        {
+          op: "upsert",
+          table: { key: "settings.key", value: "settings.value" },
+          vals: { key: "defaultLocale", value: "de", updatedAt: expect.any(Date) },
+          conflict: {
+            target: "settings.key",
+            set: { value: "de", updatedAt: expect.any(Date) },
+          },
+        },
+        {
+          op: "upsert",
+          table: { key: "settings.key", value: "settings.value" },
+          vals: { key: "defaultTheme", value: "dark", updatedAt: expect.any(Date) },
+          conflict: {
+            target: "settings.key",
+            set: { value: "dark", updatedAt: expect.any(Date) },
+          },
+        },
+        {
+          op: "upsert",
+          table: { key: "settings.key", value: "settings.value" },
+          vals: { key: "passwordRequireDigit", value: "false", updatedAt: expect.any(Date) },
+          conflict: {
+            target: "settings.key",
+            set: { value: "false", updatedAt: expect.any(Date) },
+          },
+        },
+        {
+          op: "delete",
+          table: { key: "settings.key", value: "settings.value" },
+          where: { op: "eq", col: "settings.key", val: "passwordRequireNumber" },
+        },
+      ]);
+      expect(auditCalls).toEqual([
+        {
+          event: "CONFIG_IMPORTED",
+          details: {
+            adminId: "admin-1",
+            username: "admin",
+            dryRun: false,
+            changes: { settings: 3, roles: 0, teams: 0 },
+          },
+        },
+      ]);
+    } finally {
+      await app.close();
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("propagates a mid-transaction settings upsert failure and skips CONFIG_IMPORTED audit log (#3014)", async () => {
+    vi.resetModules();
+    const upsertedKeys: string[] = [];
+    const auditSpy = vi.fn();
+
+    vi.doMock("drizzle-orm", () => ({
+      and: (...args: unknown[]) => ({ op: "and", args }),
+      eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+    }));
+    vi.doMock("../../../apps/api/src/config.js", () => ({
+      env: {
+        DATA_ENCRYPTION_KEY: "",
+        DATA_ENCRYPTION_KEY_PREVIOUS: "",
+        OIDC_ENABLED: false,
+        SAML_ENABLED: false,
+      },
+    }));
+    vi.doMock("../../../apps/api/src/lib/enterprise-feature.js", () => ({
+      isEnterpriseFeatureEnabled: async () => true,
+    }));
+
+    const txHandle = {
+      insert: () => ({
+        values: (vals: { key: string }) => ({
+          onConflictDoUpdate: () => {
+            upsertedKeys.push(vals.key);
+            if (upsertedKeys.length === 2) {
+              return Promise.reject(new Error("simulated db failure on second setting upsert"));
+            }
+            return Promise.resolve();
+          },
+        }),
+      }),
+      delete: () => ({
+        where: () => Promise.resolve(),
+      }),
+    };
+
+    vi.doMock("../../../apps/api/src/db/index.js", () => ({
+      db: {
+        select: () => ({
+          from: () => Promise.resolve([]),
+        }),
+        transaction: async (cb: (tx: typeof txHandle) => Promise<unknown>) => cb(txHandle),
+      },
+      schema: {
+        settings: { key: "settings.key", value: "settings.value" },
+        roles: { id: "roles.id", name: "roles.name", isBuiltin: "roles.isBuiltin" },
+        teams: { id: "teams.id", name: "teams.name" },
+      },
+    }));
+    vi.doMock("../../../apps/api/src/permissions.js", () => ({
+      requireFullAdmin: async () => ({ id: "admin-1", username: "admin", role: "admin" }),
+    }));
+    vi.doMock("../../../apps/api/src/lib/audit.js", () => ({
+      auditFromRequest: () => auditSpy,
+    }));
+
+    const { registerConfigRoutes } = await import(
+      "../../../apps/api/src/routes/enterprise/config.js"
+    );
+    const app = Fastify();
+    await registerConfigRoutes(app);
+    await app.ready();
+
+    try {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        payload: {
+          dryRun: false,
+          config: {
+            configSchemaVersion: 1,
+            settings: {
+              defaultTheme: "dark",
+              defaultLocale: "de",
+            },
+          },
+        },
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(upsertedKeys).toEqual(["defaultLocale", "defaultTheme"]);
+      expect(auditSpy).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+      vi.restoreAllMocks();
+    }
+  });
+});

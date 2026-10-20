@@ -1269,6 +1269,109 @@ describe("config import with enterprise license", () => {
       await db.delete(schema.settings).where(eq(schema.settings.key, insertSettingKey));
     }
   });
+
+  it("upserts concurrent first-time setting imports in deterministic key order without a primary-key collision and preserves dry-run setting order (#3014)", async () => {
+    const keys = [
+      "defaultLocale",
+      "defaultToolView",
+      "passwordRequireDigit",
+      "passwordRequireNumber",
+    ];
+    const originalRows = await db.select().from(schema.settings);
+    const originals = new Map(
+      originalRows.filter((row) => keys.includes(row.key)).map((row) => [row.key, row.value]),
+    );
+
+    try {
+      for (const key of keys) {
+        await db.delete(schema.settings).where(eq(schema.settings.key, key));
+      }
+      await db
+        .insert(schema.settings)
+        .values({ key: "passwordRequireNumber", value: "true" })
+        .onConflictDoUpdate({ target: schema.settings.key, set: { value: "true" } });
+
+      const dryRunRes = await licensedApp.app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        headers: { authorization: `Bearer ${licensedToken}` },
+        payload: {
+          dryRun: true,
+          config: {
+            configSchemaVersion: 1,
+            settings: {
+              passwordRequireDigit: "false",
+              defaultToolView: "fullscreen",
+              defaultLocale: "de",
+            },
+          },
+        },
+      });
+      expect(dryRunRes.statusCode, dryRunRes.body).toBe(200);
+      expect(JSON.parse(dryRunRes.body).details.settings).toEqual([
+        { key: "passwordRequireDigit", action: "update" },
+        { key: "defaultToolView", action: "create" },
+        { key: "defaultLocale", action: "create" },
+      ]);
+
+      const [first, second] = await Promise.all([
+        licensedApp.app.inject({
+          method: "POST",
+          url: "/api/v1/enterprise/config/import",
+          headers: { authorization: `Bearer ${licensedToken}` },
+          payload: {
+            dryRun: false,
+            config: {
+              configSchemaVersion: 1,
+              settings: {
+                passwordRequireDigit: "false",
+                defaultToolView: "fullscreen",
+                defaultLocale: "de",
+              },
+            },
+          },
+        }),
+        licensedApp.app.inject({
+          method: "POST",
+          url: "/api/v1/enterprise/config/import",
+          headers: { authorization: `Bearer ${licensedToken}` },
+          payload: {
+            dryRun: false,
+            config: {
+              configSchemaVersion: 1,
+              settings: {
+                defaultLocale: "fr",
+                defaultToolView: "sidebar",
+                passwordRequireNumber: "false",
+              },
+            },
+          },
+        }),
+      ]);
+
+      expect(first.statusCode, first.body).toBe(200);
+      expect(second.statusCode, second.body).toBe(200);
+
+      const rows = await db.select().from(schema.settings);
+      const map = new Map(rows.map((r) => [r.key, r.value]));
+      expect(["de", "fr"]).toContain(map.get("defaultLocale"));
+      expect(["fullscreen", "sidebar"]).toContain(map.get("defaultToolView"));
+      expect(map.get("passwordRequireDigit")).toBe("false");
+      expect(map.has("passwordRequireNumber")).toBe(false);
+    } finally {
+      for (const key of keys) {
+        const original = originals.get(key);
+        if (original === undefined) {
+          await db.delete(schema.settings).where(eq(schema.settings.key, key));
+        } else {
+          await db
+            .insert(schema.settings)
+            .values({ key, value: original })
+            .onConflictDoUpdate({ target: schema.settings.key, set: { value: original } });
+        }
+      }
+    }
+  });
 });
 
 describe("config round-trip", () => {
