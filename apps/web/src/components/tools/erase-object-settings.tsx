@@ -173,8 +173,14 @@ export function subscribeEraseObjectJobProgress(
         cleanup();
         try {
           handlers.onFailed({ reason: "trackingFailed" });
-        } catch {
+        } catch (teardownErr) {
           // onFailed may be what threw; the original error is rethrown below.
+          console.error("Ending the run after a stream handling error failed", teardownErr);
+          reportRunEndFailure(
+            "Ending an Erase Object run after a stream handling error failed",
+            teardownErr,
+            "erase-object",
+          );
         }
         throw err;
       }
@@ -511,7 +517,7 @@ export function EraseObjectSettings({
     // tracking failure when the first call throws, and that retry must neither
     // replace the server's message nor report the same ending a second time.
     let runEndedWithError = false;
-    const endRunWithError = (message: string, before?: () => void) => {
+    const endRunWithError = (message: string, before?: () => void, reportedByCaller = false) => {
       if (runEndedWithError) return;
       runEndedWithError = true;
       settled = true;
@@ -522,14 +528,19 @@ export function EraseObjectSettings({
           step();
         } catch (err) {
           if (first) {
-            console.error("Ending the run with an error failed", err);
+            console.error(
+              reportedByCaller
+                ? "Ending the run after a stream handling error failed"
+                : "Ending the run with an error failed",
+              err,
+            );
             second ??= { cause: err };
           } else {
             first = { cause: err };
           }
         }
       }
-      if (second) {
+      if (second && !reportedByCaller) {
         reportRunEndFailure(
           "Ending an Erase Object run with an error failed",
           second.cause,
@@ -574,12 +585,13 @@ export function EraseObjectSettings({
       onFailed: (failure) => {
         endWatch();
         if (runEndedWithError) return;
-        if (settled && !("reason" in failure && failure.reason === "trackingFailed")) return;
+        const isTrackingFailure = "reason" in failure && failure.reason === "trackingFailed";
+        if (settled && !isTrackingFailure) return;
         cancelIfHandlingFailed(failure, clientJobId);
         // The stream has already let go of the run, so a throw from the abort or
         // the message write must not skip finishUi and leave the run at
         // processing for good (#1830, #1961). It still surfaces, after the teardown.
-        endRunWithError(jobFailureMessage(failure, t.errors), abandonRequest);
+        endRunWithError(jobFailureMessage(failure, t.errors), abandonRequest, isTrackingFailure);
       },
       onStall: () => {
         if (abandoned || settled || runEndedWithError) return;

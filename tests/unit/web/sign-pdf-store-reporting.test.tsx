@@ -1003,6 +1003,52 @@ describe("sign-pdf tells its own failures apart from a bad response", () => {
     }
   });
 
+  it("rethrows the root cause and reports the teardown failure when ending a streamed run throws too", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    renderPanel();
+    const xhr = await apply();
+    xhr.respond(202, { jobId: "job-1", async: true });
+    let writes = 0;
+    const unsubscribe = useFileStore.subscribe(() => {
+      writes++;
+      throw new Error(writes === 1 ? "root cause" : "teardown broke");
+    });
+
+    try {
+      expect(() =>
+        act(() => {
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({
+              type: "single",
+              phase: "complete",
+              result: { downloadUrl: DOWNLOAD_URL },
+            }),
+          });
+        }),
+      ).toThrow("root cause");
+      await act(async () => {});
+
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run after a stream handling error failed",
+        expect.objectContaining({ message: "teardown broke" }),
+      );
+      expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument();
+      expect(useFileStore.getState().processing).toBe(false);
+      const reports = vi
+        .mocked(captureHandledError)
+        .mock.calls.filter(
+          ([e]) => e.message === "Ending a Sign PDF run after a stream handling error failed",
+        );
+      expect(reports).toHaveLength(1);
+      expect(reports[0][0].cause).toMatchObject({ message: "teardown broke" });
+      expect(reports[0][1]).toEqual({ error_class: "bug", tool_id: "sign-pdf" });
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    } finally {
+      unsubscribe();
+      consoleError.mockRestore();
+    }
+  });
+
   // A fast sign answers twice. Once the streamed answer has failed to land,
   // the 200 behind it must not land it again or replace the error.
   it("ignores the sync answer after the streamed one failed to land", async () => {

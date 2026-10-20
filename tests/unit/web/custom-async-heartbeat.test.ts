@@ -120,24 +120,40 @@ describe.each(subscribers)("%s async progress", (_name, subscribe) => {
   });
 
   it("rethrows the original error when onFailed itself throws", () => {
-    const onFailed = vi
-      .fn()
-      .mockImplementationOnce(() => {
-        throw new Error("onFailed broke");
-      })
-      .mockImplementation(() => {
-        throw new Error("second onFailed");
-      });
-    subscribe("job-failed-throw", { onComplete: vi.fn(), onFailed, onStall: vi.fn() });
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const onFailed = vi
+        .fn()
+        .mockImplementationOnce(() => {
+          throw new Error("onFailed broke");
+        })
+        .mockImplementation(() => {
+          throw new Error("second onFailed");
+        });
+      subscribe("job-failed-throw", { onComplete: vi.fn(), onFailed, onStall: vi.fn() });
 
-    expect(() =>
-      FakeEventSource.instances[0].onmessage?.({
-        data: JSON.stringify({ type: "single", phase: "failed", error: "server said no" }),
-      }),
-    ).toThrow("onFailed broke");
-    expect(onFailed).toHaveBeenNthCalledWith(1, { message: "server said no" });
-    expect(onFailed).toHaveBeenNthCalledWith(2, { reason: "trackingFailed" });
-    expect(FakeEventSource.instances[0].readyState).toBe(2);
+      expect(() =>
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "failed", error: "server said no" }),
+        }),
+      ).toThrow("onFailed broke");
+      expect(onFailed).toHaveBeenNthCalledWith(1, { message: "server said no" });
+      expect(onFailed).toHaveBeenNthCalledWith(2, { reason: "trackingFailed" });
+      expect(FakeEventSource.instances[0].readyState).toBe(2);
+      if (_name === "erase-object" || _name === "sign-pdf") {
+        expect(vi.mocked(captureHandledError)).toHaveBeenCalledOnce();
+        const [reported, tags] = vi.mocked(captureHandledError).mock.calls[0];
+        expect(reported.message).toBe(
+          _name === "erase-object"
+            ? "Ending an Erase Object run after a stream handling error failed"
+            : "Ending a Sign PDF run after a stream handling error failed",
+        );
+        expect(reported.cause).toMatchObject({ message: "second onFailed" });
+        expect(tags).toEqual({ error_class: "bug", tool_id: _name });
+      }
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 
   it("passes the server's own error through as the failure message", () => {
@@ -278,6 +294,65 @@ describe.each([
     expect(onFailed).not.toHaveBeenCalled();
     expect(onStall).not.toHaveBeenCalled();
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+});
+
+describe.each([
+  ["erase-object", subscribeEraseObjectJobProgress],
+  ["sign-pdf", subscribeSignPdfJobProgress],
+] as const)("%s async progress: stream teardown failure (#1951)", (_name, subscribe) => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    FakeEventSource.instances = [];
+    vi.stubGlobal("EventSource", FakeEventSource);
+    vi.mocked(captureHandledError).mockClear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("reports a teardown failure when onFailed throws after a stream handling error (#1951)", () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const onFailed = vi.fn(() => {
+        throw new Error("teardown broke");
+      });
+      subscribe("job-teardown-throw", {
+        onComplete: () => {
+          throw new Error("root cause");
+        },
+        onFailed,
+        onStall: vi.fn(),
+      });
+
+      expect(() =>
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({
+            type: "single",
+            phase: "complete",
+            result: { downloadUrl: "/api/v1/download/job-teardown-throw/out.png" },
+          }),
+        }),
+      ).toThrow("root cause");
+
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run after a stream handling error failed",
+        expect.objectContaining({ message: "teardown broke" }),
+      );
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledOnce();
+      const [reported, tags] = vi.mocked(captureHandledError).mock.calls[0];
+      expect(reported.message).toBe(
+        _name === "erase-object"
+          ? "Ending an Erase Object run after a stream handling error failed"
+          : "Ending a Sign PDF run after a stream handling error failed",
+      );
+      expect(reported.cause).toMatchObject({ message: "teardown broke" });
+      expect(tags).toEqual({ error_class: "bug", tool_id: _name });
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 });
 

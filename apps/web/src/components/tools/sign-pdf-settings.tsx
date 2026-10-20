@@ -160,8 +160,14 @@ export function subscribeSignPdfJobProgress(
         cleanup();
         try {
           handlers.onFailed({ reason: "trackingFailed" });
-        } catch {
+        } catch (teardownErr) {
           // onFailed may be what threw; the original error is rethrown below.
+          console.error("Ending the run after a stream handling error failed", teardownErr);
+          reportRunEndFailure(
+            "Ending a Sign PDF run after a stream handling error failed",
+            teardownErr,
+            "sign-pdf",
+          );
         }
         throw err;
       }

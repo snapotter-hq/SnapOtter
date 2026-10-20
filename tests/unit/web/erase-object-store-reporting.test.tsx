@@ -405,6 +405,50 @@ describe("erase-object batch: its own failures apart from a bad response", () =>
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
   });
 
+  it("rethrows the root cause and reports the teardown failure when ending a streamed batch file throws too", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      renderPanel(2);
+      const first = await submit(1);
+      first.respond(202, { jobId: "job-1", async: true });
+      breakNextEntryWrite();
+      vi.spyOn(first, "abort").mockImplementation(() => {
+        throw new Error("abort broke");
+      });
+
+      expect(() =>
+        act(() => {
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+          });
+        }),
+      ).toThrow("boom");
+      await act(async () => {});
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+      FakeXhr.instances[1].respond(200, GOOD_BODY);
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run after a stream handling error failed",
+        expect.objectContaining({ message: "abort broke" }),
+      );
+      expect(entry(0).status).toBe("failed");
+      expect(entry(0).error).toBe(en.errors.jobTrackingFailed);
+      expect(entry(1).status).toBe("completed");
+      const reports = vi
+        .mocked(captureHandledError)
+        .mock.calls.filter(
+          ([e]) => e.message === "Ending an Erase Object run after a stream handling error failed",
+        );
+      expect(reports).toHaveLength(1);
+      expect(reports[0][0].cause).toMatchObject({ message: "abort broke" });
+      expect(reports[0][1]).toEqual({ error_class: "bug", tool_id: "erase-object" });
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it("fails the entry as an invalid response, and reports it, for a body with no result", async () => {
     renderPanel(2);
 
@@ -934,6 +978,56 @@ describe("erase-object single file: a completed frame with nothing to download (
 
     expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument();
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+
+  it("rethrows the root cause and reports the teardown failure once when ending a streamed run throws too", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    renderPanel();
+    const xhr = await submit();
+    xhr.respond(202, { jobId: "job-1", async: true });
+    let writes = 0;
+    const unsubscribe = useFileStore.subscribe(() => {
+      writes++;
+      if (writes === 1) throw new Error("root cause");
+      throw new Error(writes === 2 ? "teardown broke" : "later teardown broke");
+    });
+    const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
+
+    try {
+      expect(() =>
+        act(() => {
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+          });
+        }),
+      ).toThrow("root cause");
+      await act(async () => {});
+
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run after a stream handling error failed",
+        expect.objectContaining({ message: "teardown broke" }),
+      );
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run after a stream handling error failed",
+        expect.objectContaining({ message: "later teardown broke" }),
+      );
+      expect(useFileStore.getState().error).toBe(en.errors.jobTrackingFailed);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(clearIntervalSpy).toHaveBeenCalled();
+      const reports = vi
+        .mocked(captureHandledError)
+        .mock.calls.filter(
+          ([e]) => e.message === "Ending an Erase Object run after a stream handling error failed",
+        );
+      expect(reports).toHaveLength(1);
+      expect(reports[0][0].cause).toMatchObject({ message: "teardown broke" });
+      expect(reports[0][1]).toEqual({ error_class: "bug", tool_id: "erase-object" });
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    } finally {
+      clearIntervalSpy.mockRestore();
+      unsubscribe();
+      consoleError.mockRestore();
+    }
   });
 
   it("reports once when both the streamed frame and a queued 200 are malformed (#2931)", async () => {
