@@ -166,9 +166,9 @@ export function HistoryPanel() {
 
     const result: HistoryEntry[] = [];
 
-    // Future states (dimmed, above current in reverse order)
-    for (let i = future.length - 1; i >= 0; i--) {
-      result.push({ index: -(i + 1), action: future[i]?.lastAction, state: future[i] });
+    // Future states (dimmed, above current from furthest redo down to next redo)
+    for (let i = 0; i < future.length; i++) {
+      result.push({ index: -(future.length - i), action: future[i]?.lastAction, state: future[i] });
     }
 
     // Current state (highlighted)

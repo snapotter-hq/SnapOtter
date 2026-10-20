@@ -14,12 +14,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  */
 
 const storage = vi.hoisted(() => new Map<string, string>());
-vi.stubGlobal("localStorage", {
+const localStorageStub = {
   getItem: (k: string) => storage.get(k) ?? null,
   setItem: (k: string, v: string) => void storage.set(k, v),
   removeItem: (k: string) => void storage.delete(k),
   clear: () => storage.clear(),
-});
+};
+vi.stubGlobal("localStorage", localStorageStub);
 
 import { HistoryPanel, historyActionLabel } from "@/components/editor/panels/history-panel";
 import { I18nProvider, useTranslation } from "@/contexts/i18n-context";
@@ -41,6 +42,7 @@ function renderIn(locale: "de" | "en") {
 }
 
 beforeEach(() => {
+  vi.stubGlobal("localStorage", localStorageStub);
   storage.clear();
   useEditorStore.setState(INITIAL_STATE, true);
   useEditorStore.temporal.getState().clear();
@@ -213,5 +215,50 @@ describe("History panel row clicks (#2070)", () => {
       vi.restoreAllMocks();
       vi.unstubAllGlobals();
     }
+  });
+
+  it("lists redo steps from furthest at the top down to the next redo above the current row (#2131)", async () => {
+    const s = useEditorStore.getState();
+    s.addObject({
+      id: "r1",
+      type: "rect",
+      layerId: s.activeLayerId,
+      attrs: { x: 0, y: 0, width: 10, height: 10 },
+    } as Parameters<typeof s.addObject>[0]);
+    s.setAdjustment("brightness", 10);
+    await s.flipCanvasHorizontal();
+    useEditorStore.temporal.getState().undo(3);
+    renderIn("en");
+
+    const rows = screen.getAllByRole("button").filter((b) => b.className.includes("w-full"));
+    expect(rows.map((r) => r.textContent)).toEqual([
+      "Flip Horizontal",
+      "Adjust Brightness",
+      "Add Rect",
+      "Initial State",
+    ]);
+
+    // Clicking the row directly above the current step jumps to the next redo (Add Rect).
+    await act(async () => {
+      fireEvent.click(rows[2]);
+    });
+    expect(useEditorStore.getState().lastAction).toEqual({ id: "addObject", objectType: "rect" });
+    expect(useEditorStore.getState().objects.map((o: { id: string }) => o.id)).toEqual(["r1"]);
+
+    // With two redo steps above and one undo step below, the top-to-bottom order holds,
+    // and clicking the top row jumps to the furthest redo (Flip Horizontal).
+    const rowsAfterOneRedo = screen
+      .getAllByRole("button")
+      .filter((b) => b.className.includes("w-full"));
+    expect(rowsAfterOneRedo.map((r) => r.textContent)).toEqual([
+      "Flip Horizontal",
+      "Adjust Brightness",
+      "Add Rect",
+      "Initial State",
+    ]);
+    await act(async () => {
+      fireEvent.click(rowsAfterOneRedo[0]);
+    });
+    expect(useEditorStore.getState().lastAction).toEqual({ id: "flipHorizontal" });
   });
 });
