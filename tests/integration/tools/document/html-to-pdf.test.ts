@@ -16,6 +16,8 @@ import {
 } from "../../test-server.js";
 
 const HTML = readFixture(fixtures.document.tiny("html"));
+const PNG_1X1_B64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
 const hasWeasyprint = pythonWith("weasyprint");
 
@@ -88,6 +90,24 @@ describe.skipIf(!hasWeasyprint)("html-to-pdf (requires weasyprint)", () => {
     } finally {
       await remote.close();
     }
+  }, 90_000);
+
+  it("embeds an uppercase DATA: image identically to a lowercase data: image", async () => {
+    const lowerPage = Buffer.from(
+      `<!doctype html><html><body><img src="data:image/png;base64,${PNG_1X1_B64}" alt="dot"></body></html>`,
+    );
+    const upperPage = Buffer.from(
+      `<!doctype html><html><body><img src="DATA:image/png;base64,${PNG_1X1_B64}" alt="dot"></body></html>`,
+    );
+    const [lowerPdf, upperPdf] = await Promise.all([
+      convertToPdf("lower.html", lowerPage),
+      convertToPdf("upper.html", upperPage),
+    ]);
+    const imageObjRe = /<<[^\n]*\/Subtype \/Image[\s\S]*?\nendobj/g;
+    const lowerImages = lowerPdf.buffer.toString("latin1").match(imageObjRe);
+    const upperImages = upperPdf.buffer.toString("latin1").match(imageObjRe);
+    expect(lowerImages).not.toBeNull();
+    expect(upperImages).toEqual(lowerImages);
   }, 90_000);
 });
 

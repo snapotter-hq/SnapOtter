@@ -14,8 +14,9 @@ def _make_url_fetcher(default_fetcher):
     """Build the url_fetcher: serve data: URIs, refuse every other scheme.
 
     This is the single network chokepoint for the three tools that reach
-    WeasyPrint. Scheme matching is case-sensitive, so an unrecognised spelling
-    fails closed rather than open.
+    WeasyPrint. The 5-character scheme prefix is matched case-insensitively
+    per RFC 3986 without lowercasing the rest of the URI (#1205); every other
+    scheme fails closed.
 
     main() passes the delegate in rather than this importing weasyprint itself,
     because WeasyPrint turns any exception a fetcher raises into an omitted
@@ -25,7 +26,7 @@ def _make_url_fetcher(default_fetcher):
     """
 
     def fetch(url, *args, **kwargs):
-        if url.startswith("data:"):
+        if url[:5].lower() == "data:":
             return default_fetcher(url, *args, **kwargs)
         raise ValueError(f"remote resources are disabled: {url[:120]}")
 

@@ -48,7 +48,7 @@ class FakeHTML:
 weasyprint = types.ModuleType("weasyprint")
 weasyprint.HTML = FakeHTML
 weasyprint_urls = types.ModuleType("weasyprint.urls")
-weasyprint_urls.default_url_fetcher = lambda url, *a, **k: {"string": b"DELEGATED"}
+weasyprint_urls.default_url_fetcher = lambda url, *a, **k: {"string": b"DELEGATED", "url": url}
 weasyprint.urls = weasyprint_urls
 sys.modules["weasyprint"] = weasyprint
 sys.modules["weasyprint.urls"] = weasyprint_urls
@@ -86,20 +86,23 @@ def serves_data(fetcher):
     if fetcher is None:
         return False
     try:
-        return fetcher("data:image/png;base64,AA==")["string"] == b"DELEGATED"
+        return (
+            fetcher("data:image/png;base64,AA==")["string"] == b"DELEGATED"
+            and fetcher("DATA:image/png;base64,AA==")["string"] == b"DELEGATED"
+        )
     except Exception:
         return False
 
 
-result = {"fetcher": {}}
+result = {"fetcher": {}, "dataUris": {}}
 for url in [
     "https://example.com/x.png",
+    "HTTPS://example.com/x.png",
     "http://example.com/x.png",
     "http:/example.com/x.png",
     "file:///etc/passwd",
     "ftp://example.com/x.png",
     "//example.com/x.png",
-    "DATA:image/png;base64,AA==",
 ]:
     try:
         probe_fetcher(url)
@@ -109,10 +112,20 @@ for url in [
     except Exception as exc:
         result["fetcher"][url] = "OTHER:" + type(exc).__name__
 
-try:
-    result["dataUri"] = probe_fetcher("data:image/png;base64,AA==")["string"].decode()
-except Exception as exc:
-    result["dataUri"] = "RAISED:" + type(exc).__name__
+for url in [
+    "data:image/png;base64,AA==",
+    "DATA:image/png;base64,AA==",
+    "DaTa:image/png;base64,AA==",
+]:
+    try:
+        delegated = probe_fetcher(url)
+        result["dataUris"][url] = (
+            "DELEGATED"
+            if delegated["string"] == b"DELEGATED" and delegated["url"] == url
+            else "MUTATED:" + str(delegated.get("url"))
+        )
+    except Exception as exc:
+        result["dataUris"][url] = "RAISED:" + type(exc).__name__
 
 
 def run_main(name, text, mode):
@@ -197,7 +210,7 @@ interface MainRun {
 
 interface DriverResult {
   fetcher: Record<string, string>;
-  dataUri: string;
+  dataUris: Record<string, string>;
   html: MainRun;
   markdown: MainRun;
   markdownSaw: string;
@@ -228,21 +241,25 @@ describe.skipIf(!hasPython)("doc_html_pdf.py url_fetcher (the SSRF chokepoint)",
 
   it.each([
     "https://example.com/x.png",
+    "HTTPS://example.com/x.png",
     "http://example.com/x.png",
     // pandoc rewrites http:// to http:/ in some epub spines
     "http:/example.com/x.png",
     "file:///etc/passwd",
     "ftp://example.com/x.png",
     "//example.com/x.png",
-    // scheme matching is case-sensitive, so an unrecognised spelling fails
-    // closed. That costs the document a resource, never an egress hole.
-    "DATA:image/png;base64,AA==",
   ])("refuses %s", (url) => {
     expect(result.fetcher[url]).toBe("REFUSED");
   });
 
-  it("serves data: URIs through WeasyPrint's own fetcher", () => {
-    expect(result.dataUri).toBe("DELEGATED");
+  // RFC 3986 makes URI schemes case-insensitive, so data: URIs in any casing
+  // are forwarded unchanged to WeasyPrint's own fetcher (#1205).
+  it.each([
+    "data:image/png;base64,AA==",
+    "DATA:image/png;base64,AA==",
+    "DaTa:image/png;base64,AA==",
+  ])("serves %s through WeasyPrint's own fetcher without mutating the URI", (url) => {
+    expect(result.dataUris[url]).toBe("DELEGATED");
   });
 
   it("imports on an interpreter where weasyprint is unusable", () => {
