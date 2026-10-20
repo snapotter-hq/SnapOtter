@@ -21,10 +21,10 @@
  * are deferred until the final attempt so intermediate retries stay
  * invisible to the client. A user cancel is also recorded on its own
  * signal (cancel.ts userCancelSignal): the streamed uploads after the
- * handler take that signal and the buffered writes re-check
- * wasUserCanceled, since a cancel that lands after the deadline can't
- * re-abort the job's controller, and a deadline alone must not discard a
- * result the handler went on to return (#2144).
+ * handler combine that signal with a fresh upload timeout (#2295) and the
+ * buffered writes re-check wasUserCanceled, since a cancel that lands
+ * after the deadline can't re-abort the job's controller, and a deadline
+ * alone must not discard a result the handler went on to return (#2144).
  */
 import { createReadStream } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
@@ -444,7 +444,8 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
     const ac = registerCancelable(jobId);
     const signal = ac.signal;
     // Fires on a user cancel only, never on the deadline (#2144). The streamed
-    // uploads and the library auto-save after the handler take this signal (the
+    // uploads combine this with a fresh upload budget once the handler returns
+    // (#2295), and the library auto-save after the handler takes this signal (the
     // other buffered writes re-check wasUserCanceled instead): a handler that
     // ignored the signal and returned after the deadline has a finished result
     // worth keeping, while a user cancel still has to stop the upload.
@@ -659,13 +660,29 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         }
       }
 
+      // Give streamed output uploads a fresh budget from the moment the first
+      // streamed upload begins after the handler returned (#2295). Starting this
+      // before the handler would reintroduce #2144's discarded-result bug when
+      // the job deadline fires under a handler that finishes anyway, and lazy
+      // creation avoids arming an unused timer on buffered jobs. A tripped
+      // upload budget surfaces through putObjectStream as a storage fault
+      // (logged, reported, and retried).
+      let uploadSignal: AbortSignal | undefined;
+      const getUploadSignal = (): AbortSignal => {
+        uploadSignal ??=
+          timeoutMs > 0
+            ? AbortSignal.any([userCancel, AbortSignal.timeout(timeoutMs)])
+            : userCancel;
+        return uploadSignal;
+      };
+
       // Write primary output to object storage
       const primaryKey = `outputs/${jobId}/${outName}`;
       if (resultBuffer) {
         await putObject(primaryKey, resultBuffer);
       } else if (resultStreamPath) {
         resultSize = await putObjectStream(primaryKey, createReadStream(resultStreamPath), {
-          signal: userCancel,
+          signal: getUploadSignal(),
         });
       }
       const outputRefs: string[] = [primaryKey];
@@ -684,7 +701,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
             // Over-cap extra: streamed as-is. The producer scrub needs bytes in
             // memory, and no real PDF reaches the buffering cap.
             await putObjectStream(extraKey, createReadStream(extra.scratchPath), {
-              signal: userCancel,
+              signal: getUploadSignal(),
             });
           }
           outputRefs.push(extraKey);

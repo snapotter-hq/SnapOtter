@@ -9,6 +9,7 @@ const objectStorageMocks = vi.hoisted(() => ({
   // local-backend semantics, where a missing object is a bare ENOENT.
   isMissingObjectError: vi.fn((err: unknown) => (err as { code?: string })?.code === "ENOENT"),
   putObject: vi.fn(),
+  putObjectStream: vi.fn(),
 }));
 
 function enoent(path: string): NodeJS.ErrnoException {
@@ -726,6 +727,236 @@ describe("worker result payload behavior", () => {
     ).rejects.toThrow("commit after save failed");
     expect(claimFinalizeMock).not.toHaveBeenCalled();
     expect(releaseFinalizeMock).not.toHaveBeenCalled();
+  });
+
+  it("arms a fresh upload timeout signal after the handler returns for streamed primary and extra outputs (#2295)", async () => {
+    const processV2Mock = vi.fn();
+    const dbSetMock = vi.fn(() => ({
+      where: vi.fn().mockResolvedValue(undefined),
+    }));
+    const userCancelAc = new AbortController();
+    const timeoutControllers: AbortController[] = [];
+    let handlerDoneAtCall = false;
+    const timeoutSpy = vi.spyOn(AbortSignal, "timeout").mockImplementation((ms: number) => {
+      expect(handlerDoneAtCall).toBe(true);
+      expect(ms).toBe(15_000);
+      const ac = new AbortController();
+      timeoutControllers.push(ac);
+      return ac.signal;
+    });
+
+    try {
+      const workerMod = await loadWorker("", () => {
+        vi.doMock("node:fs", () => ({
+          createReadStream: vi.fn((p: string) => ({ path: p })),
+        }));
+        vi.doMock("node:fs/promises", () => ({
+          mkdir: vi.fn().mockResolvedValue(undefined),
+          readFile: vi.fn(),
+          rm: vi.fn().mockResolvedValue(undefined),
+          stat: vi.fn().mockResolvedValue({ size: 2 * 1024 ** 3 }),
+        }));
+        vi.doMock("../../../../apps/api/src/db/index.js", () => ({
+          db: {
+            update: vi.fn(() => ({
+              set: dbSetMock,
+            })),
+          },
+          schema: { jobs: { id: "jobs.id" } },
+        }));
+        vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+          getToolConfig: vi.fn(() => ({ processV2: processV2Mock })),
+        }));
+        vi.doMock("../../../../apps/api/src/jobs/ai-handlers.js", () => ({
+          hasAiJobHandler: vi.fn(() => false),
+          hasAiPathJobHandler: vi.fn(() => false),
+          runAiToolJob: vi.fn(),
+          runAiPathToolJob: vi.fn(),
+        }));
+        vi.doMock("../../../../apps/api/src/jobs/cancel.js", () => ({
+          claimFinalize: vi.fn(async () => true),
+          registerCancelable: vi.fn(() => new AbortController()),
+          releaseFinalize: vi.fn(async () => {}),
+          unregisterCancelable: vi.fn(),
+          userCancelSignal: vi.fn(() => userCancelAc.signal),
+          wasUserCanceled: vi.fn(() => false),
+        }));
+        vi.doMock("../../../../apps/api/src/jobs/postprocess.js", () => ({
+          autoSaveToLibrary: vi.fn().mockResolvedValue({}),
+          buildOutputName: vi.fn((out: string) => out),
+          generatePreview: vi.fn().mockResolvedValue(undefined),
+        }));
+        vi.doMock("@snapotter/media-engine", () => ({
+          HW_ACCEL_FAMILIES: [],
+          hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+          softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+        }));
+        vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+          binaryOverrideWarning: vi.fn(),
+          checkBinaryOverrides: vi.fn(() => []),
+          probeFailureLevel: vi.fn(() => "warn"),
+        }));
+      });
+
+      objectStorageMocks.getObjectBuffer.mockResolvedValue(Buffer.from("input-bytes"));
+      objectStorageMocks.putObject.mockResolvedValue(undefined);
+      objectStorageMocks.putObjectStream.mockResolvedValue(2 * 1024 ** 3);
+
+      const { Worker } = await import("bullmq");
+      workerMod.startWorkers();
+      const workerCalls = (Worker as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+      const imageCall = workerCalls.find(([queue]) => String(queue).endsWith("image"));
+      if (!imageCall) throw new Error("image pool worker not registered");
+      const processor = imageCall[1] as (job: unknown) => Promise<unknown>;
+
+      // Buffered outputs never arm AbortSignal.timeout.
+      processV2Mock.mockResolvedValueOnce({
+        buffer: Buffer.from("small-bytes"),
+        filename: "small.jpg",
+        contentType: "image/jpeg",
+      });
+      await processor({
+        id: "job-buffered-only",
+        attemptsMade: 0,
+        opts: { attempts: 1 },
+        updateProgress: vi.fn(),
+        data: {
+          jobId: "job-buffered-only",
+          toolId: "compress",
+          userId: null,
+          pool: "image",
+          inputRefs: ["uploads/job-buffered-only/in.jpg"],
+          filename: "in.jpg",
+          settings: {},
+          kind: "tool",
+        },
+      });
+      expect(timeoutSpy).not.toHaveBeenCalled();
+
+      processV2Mock.mockImplementationOnce(async () => {
+        expect(timeoutSpy).not.toHaveBeenCalled();
+        handlerDoneAtCall = true;
+        return {
+          scratchPath: "/tmp/job-stream/primary.bin",
+          filename: "primary.bin",
+          contentType: "application/octet-stream",
+          extraOutputs: [
+            {
+              name: "extra.bin",
+              scratchPath: "/tmp/job-stream/extra.bin",
+              contentType: "application/octet-stream",
+            },
+          ],
+        };
+      });
+
+      await processor({
+        id: "job-stream",
+        attemptsMade: 0,
+        opts: { attempts: 1 },
+        updateProgress: vi.fn(),
+        data: {
+          jobId: "job-stream",
+          toolId: "compress",
+          userId: null,
+          pool: "image",
+          inputRefs: ["uploads/job-stream/in.jpg"],
+          filename: "in.jpg",
+          settings: {},
+          kind: "tool",
+        },
+      });
+
+      expect(timeoutSpy).toHaveBeenCalledTimes(1);
+      expect(objectStorageMocks.putObjectStream).toHaveBeenCalledTimes(2);
+      const primaryOpts = objectStorageMocks.putObjectStream.mock.calls[0]?.[2] as {
+        signal?: AbortSignal;
+      };
+      const extraOpts = objectStorageMocks.putObjectStream.mock.calls[1]?.[2] as {
+        signal?: AbortSignal;
+      };
+      expect(primaryOpts.signal).toBeInstanceOf(AbortSignal);
+      expect(primaryOpts.signal).not.toBe(userCancelAc.signal);
+      expect(extraOpts.signal).toBe(primaryOpts.signal);
+      expect(primaryOpts.signal?.aborted).toBe(false);
+      const timeoutReason = new DOMException(
+        "The operation was aborted due to timeout",
+        "TimeoutError",
+      );
+      timeoutControllers[0]?.abort(timeoutReason);
+      expect(primaryOpts.signal?.aborted).toBe(true);
+      expect(primaryOpts.signal?.reason).toBe(timeoutReason);
+
+      // Verify userCancel also aborts the composite uploadSignal.
+      objectStorageMocks.putObjectStream.mockClear();
+      processV2Mock.mockResolvedValueOnce({
+        scratchPath: "/tmp/job-stream-cancel/primary.bin",
+        filename: "primary.bin",
+        contentType: "application/octet-stream",
+      });
+      await processor({
+        id: "job-stream-cancel",
+        attemptsMade: 0,
+        opts: { attempts: 1 },
+        updateProgress: vi.fn(),
+        data: {
+          jobId: "job-stream-cancel",
+          toolId: "compress",
+          userId: null,
+          pool: "image",
+          inputRefs: ["uploads/job-stream-cancel/in.jpg"],
+          filename: "in.jpg",
+          settings: {},
+          kind: "tool",
+        },
+      });
+      const cancelOpts = objectStorageMocks.putObjectStream.mock.calls[0]?.[2] as {
+        signal?: AbortSignal;
+      };
+      expect(cancelOpts.signal?.aborted).toBe(false);
+      userCancelAc.abort();
+      expect(cancelOpts.signal?.aborted).toBe(true);
+
+      // When the pool timeout is 0 (unlimited), putObjectStream receives
+      // userCancel directly without arming AbortSignal.timeout.
+      timeoutSpy.mockClear();
+      objectStorageMocks.putObjectStream.mockClear();
+      const { env } = await import("../../../../apps/api/src/config.js");
+      (env as { JOB_TIMEOUT_FAST_S: number }).JOB_TIMEOUT_FAST_S = 0;
+      const unlimitedCancelAc = new AbortController();
+      const cancelMod = await import("../../../../apps/api/src/jobs/cancel.js");
+      (cancelMod.userCancelSignal as ReturnType<typeof vi.fn>).mockReturnValueOnce(
+        unlimitedCancelAc.signal,
+      );
+      processV2Mock.mockResolvedValueOnce({
+        scratchPath: "/tmp/job-stream-unlimited/primary.bin",
+        filename: "primary.bin",
+        contentType: "application/octet-stream",
+      });
+      await processor({
+        id: "job-stream-unlimited",
+        attemptsMade: 0,
+        opts: { attempts: 1 },
+        updateProgress: vi.fn(),
+        data: {
+          jobId: "job-stream-unlimited",
+          toolId: "compress",
+          userId: null,
+          pool: "image",
+          inputRefs: ["uploads/job-stream-unlimited/in.jpg"],
+          filename: "in.jpg",
+          settings: {},
+          kind: "tool",
+        },
+      });
+      expect(timeoutSpy).not.toHaveBeenCalled();
+      expect(objectStorageMocks.putObjectStream).toHaveBeenCalledTimes(1);
+      expect(objectStorageMocks.putObjectStream.mock.calls[0]?.[2]).toEqual({
+        signal: unlimitedCancelAc.signal,
+      });
+    } finally {
+      timeoutSpy.mockRestore();
+    }
   });
 });
 
