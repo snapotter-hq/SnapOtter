@@ -109,3 +109,67 @@ describe("chart-maker counts the rows it leaves out (#2060)", () => {
     expect(skipped.unreadable).toBe(0);
   });
 });
+
+describe("chart-maker year column headers (#1199)", () => {
+  it("treats a first row of text and four-digit years as the header", () => {
+    expect(parse("region,2023,2024,2025\nEMEA,10,20,30\nAPAC,5,6,7\n")).toEqual([
+      { label: "EMEA", value: 30 },
+      { label: "APAC", value: 7 },
+    ]);
+    expect(parse("region, 2023, 2024, 2025\nEMEA, 10, 20, 30\nAPAC, 5, 6, 7\n")).toEqual([
+      { label: "EMEA", value: 30 },
+      { label: "APAC", value: 7 },
+    ]);
+    expect(parse(",2023,2024,2025\nEMEA,10,20,30\nAPAC,5,6,7\n")).toEqual([
+      { label: "EMEA", value: 30 },
+      { label: "APAC", value: 7 },
+    ]);
+    expect(parse("region,country,2024,2025\nEMEA,DE,20,30\nAPAC,SG,6,7\n")).toEqual([
+      { label: "EMEA", value: 30 },
+      { label: "APAC", value: 7 },
+    ]);
+  });
+
+  it("keeps year headers out of the numeric column vote and error message", () => {
+    // Column 2025 has only 1 of 2 data rows numeric, so 2024 wins once the
+    // header row stops voting as a third numeric row.
+    expect(parse("region,2023,2024,2025\nEMEA,10,20,n/a\nAPAC,5,6,7\n")).toEqual([
+      { label: "EMEA", value: 20 },
+      { label: "APAC", value: 6 },
+    ]);
+    expect(() => parse("region,2023,2024,2025\nEMEA,n/a,n/a,n/a\n")).toThrow(
+      /region, 2023, 2024, 2025/,
+    );
+    expect(() => parse(",2023,2024,2025\nEMEA,n/a,n/a,n/a\n")).toThrow(
+      /none of these have numbers: 2023, 2024, 2025\./,
+    );
+  });
+
+  it("still charts a headerless first row whose numbers are not year headers", () => {
+    expect(parse("2020,5,100\n2021,7,150\n")).toEqual([
+      { label: "2020", value: 100 },
+      { label: "2021", value: 150 },
+    ]);
+    expect(parse("2020,2021\n2022,2023\n")).toEqual([
+      { label: "2020", value: 2021 },
+      { label: "2022", value: 2023 },
+    ]);
+    expect(values("2020,2021,\n2022,2023,\n")).toEqual([2021, 2023]);
+    expect(values("2023\n2024\n2025\n")).toEqual([2023, 2024, 2025]);
+    expect(values("EMEA,4400\nAPAC,3610\n")).toEqual([4400, 3610]);
+    expect(values("EMEA,1800\nAPAC,1500\n")).toEqual([1800, 1500]);
+    expect(values("EMEA,2025\nAPAC,1800\n")).toEqual([2025, 1800]);
+    expect(values("EMEA,2025\nAPAC,n/a\nAMER,1800\n")).toEqual([2025, 1800]);
+    expect(() => parse("EMEA,2025\nAPAC,n/a\n")).toThrow(/none of the 2 columns/);
+    expect(values("EMEA,$2025\nAPAC,$1800\n")).toEqual([2025, 1800]);
+    expect(values('EMEA,"2,025"\nAPAC,"1,800"\n')).toEqual([2025, 1800]);
+    expect(parse("2023,EMEA,30\n2024,APAC,7\n")).toEqual([
+      { label: "EMEA", value: 30 },
+      { label: "APAC", value: 7 },
+    ]);
+    expect(parse("2023,EMEA,1950\n2024,APAC,1800\n")).toEqual([
+      { label: "EMEA", value: 1950 },
+      { label: "APAC", value: 1800 },
+    ]);
+  });
+});

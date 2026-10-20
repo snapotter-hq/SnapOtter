@@ -345,6 +345,12 @@ describe("Chart Maker column detection", () => {
     expect(png.equals(await renderChart("label,value\n2020,100\n2021,150\n"))).toBe(true);
   });
 
+  it("treats a first row with year column names as the header (#1199)", async () => {
+    const png = await renderChart("region,2023,2024,2025\nEMEA,10,20,30\nAPAC,5,6,7\n");
+
+    expect(png.equals(await renderChart("region,value\nEMEA,30\nAPAC,7\n"))).toBe(true);
+  });
+
   it("charts a single-column CSV, numbering the rows", async () => {
     const png = await renderChart("10\n20\n30\n");
 

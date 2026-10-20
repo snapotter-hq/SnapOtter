@@ -67,9 +67,10 @@ const NUMERIC_MAJORITY = 0.5;
  */
 function noNumericColumnMessage(header: string[] | undefined, width: number): string {
   const lead = "Chart Maker needs a numeric column to plot, and ";
-  if (header?.length) {
-    const shown = header.slice(0, 6).map((name) => name.trim().slice(0, 24));
-    const rest = header.length - shown.length;
+  const named = header?.map((name) => name.trim().slice(0, 24)).filter((name) => name !== "");
+  if (named?.length) {
+    const shown = named.slice(0, 6);
+    const rest = named.length - shown.length;
     const names = shown.join(", ") + (rest > 0 ? `, and ${rest} more` : "");
     const message = `${lead}none of these have numbers: ${names}.`;
     if (message.length <= 260) return message;
@@ -97,6 +98,7 @@ const SCIENTIFIC = /^[+-]?(?:\d+\.?\d*|\.\d+)[eE][+-]?\d+$/;
 const SPACE_GROUP = /(?<=(?<!\d)\d{1,3})[\s'](?=\d{3}(?!\d))/g;
 const GROUPED_DOT_DECIMAL = /^(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d*)?$|^\.\d+$/;
 const GROUPED_COMMA_DECIMAL = /^(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d*)?$|^,\d+$/;
+const YEAR_HEADER = /^(?:19\d{2}|20\d{2}|2100)$/;
 
 function isMinus(sign: string | undefined): boolean {
   return sign === "-" || sign === "−";
@@ -295,6 +297,25 @@ function tableToPoints({ header, rows }: Table, skipped?: SkippedRows): DataPoin
   return points;
 }
 
+/**
+ * The first row is a header when nothing in it is a number, or when a leading
+ * label column (named or left blank in the top-left corner) is followed by at
+ * least two bare four-digit year columns (`region,2023,2024,2025`, #1199).
+ * Requiring two year columns keeps a headerless two-column row whose value
+ * happens to fall in 1900..2100 (`EMEA,2025`) from being eaten as the header.
+ */
+function isHeaderRow(row: string[]): boolean {
+  if (row.every((cell) => numericCell(cell) === null)) return true;
+  if (row.length < 3 || numericCell(row[0]) !== null) return false;
+  let years = 0;
+  for (const cell of row) {
+    if (numericCell(cell) === null) continue;
+    if (!YEAR_HEADER.test(cell.trim())) return false;
+    years += 1;
+  }
+  return years >= 2;
+}
+
 function parseCsv(text: string): Table {
   // "greedy" also drops rows of bare commas, which every spreadsheet export
   // trails. Plain `true` keeps them as [""] cells that drag the numeric vote
@@ -315,10 +336,7 @@ function parseCsv(text: string): Table {
   if (fatal.length > 0) {
     throw new ToolInputError(`CSV parse failed: ${fatal[0].message}`);
   }
-  // The first row is a header when nothing in it is a number. This replaces
-  // the old probe, which asked only whether column 2 was numeric and so read
-  // the wrong thing for every file whose numbers live elsewhere.
-  const hasHeader = rows.length > 1 && rows[0].every((cell) => numericCell(cell) === null);
+  const hasHeader = rows.length > 1 && isHeaderRow(rows[0]);
   return hasHeader ? { header: rows[0], rows: rows.slice(1) } : { rows };
 }
 
