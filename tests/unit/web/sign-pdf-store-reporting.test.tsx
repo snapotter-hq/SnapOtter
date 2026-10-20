@@ -1151,6 +1151,96 @@ describe("sign-pdf tells its own failures apart from a bad response", () => {
     expect(entry().processedUrl).toBeNull();
   });
 
+  it("ignores a queued malformed or failed SSE frame after a sync 200 settled the run (#2932)", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await apply();
+      xhr.respond(200, { downloadUrl: DOWNLOAD_URL });
+
+      act(() => {
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "processing", percent: 50 }),
+        });
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
+        });
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "failed", error: "late error" }),
+        });
+      });
+      stalls.fireLatest();
+
+      expect(screen.getByRole("link", { name: /download signed pdf/i })).toHaveAttribute(
+        "href",
+        DOWNLOAD_URL,
+      );
+      expect(screen.queryByText(en.errors.invalidResponse)).not.toBeInTheDocument();
+      expect(screen.queryByText("late error")).not.toBeInTheDocument();
+      expect(screen.queryByText(en.toolSettings["sign-pdf"].stall)).not.toBeInTheDocument();
+      expect(entry().status).toBe("completed");
+      expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+      expect(entry().error).toBeNull();
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it.each([
+    ["a malformed 200", (xhr: FakeXhr) => xhr.respond(200, {}), en.errors.invalidResponse, 1],
+    [
+      "a failed 422",
+      (xhr: FakeXhr) => xhr.respond(422, { error: "Processing failed" }),
+      "Processing failed",
+      0,
+    ],
+  ])(
+    "ignores a queued SSE complete, failed, or stall after %s settled the run (#2932)",
+    async (_label, respondSync, expectedError, expectedReports) => {
+      const stalls = captureStallTimers();
+      try {
+        renderPanel();
+        const xhr = await apply();
+        respondSync(xhr);
+        expect(screen.getByText(expectedError)).toBeInTheDocument();
+        expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(expectedReports);
+
+        act(() => {
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "processing", percent: 50 }),
+          });
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({
+              type: "single",
+              phase: "complete",
+              result: { downloadUrl: DOWNLOAD_URL },
+            }),
+          });
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
+          });
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "failed", error: "late stream error" }),
+          });
+        });
+        stalls.fireLatest();
+
+        expect(screen.getByText(expectedError)).toBeInTheDocument();
+        expect(screen.queryByText("late stream error")).not.toBeInTheDocument();
+        expect(
+          screen.queryByRole("link", { name: /download signed pdf/i }),
+        ).not.toBeInTheDocument();
+        expect(entry().status).toBe("failed");
+        expect(entry().error).toBe(expectedError);
+        expect(entry().processedUrl).toBeNull();
+        expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(expectedReports);
+      } finally {
+        stalls.restore();
+      }
+    },
+  );
+
   it.each([
     ["a JSON null body", null],
     ["a JSON string body", "ok"],

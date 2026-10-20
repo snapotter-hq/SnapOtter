@@ -767,6 +767,82 @@ describe("erase-object single file: every other way the request ends", () => {
     expect(useFileStore.getState().processing).toBe(false);
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
+
+  it("ignores a queued malformed or failed SSE frame after a sync 200 settled the run (#2932)", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel();
+      const xhr = await submit();
+      xhr.respond(200, GOOD_BODY);
+
+      act(() => {
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "processing", percent: 50 }),
+        });
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
+        });
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "failed", error: "late error" }),
+        });
+      });
+      stalls.fireLatest();
+
+      expect(entry().status).toBe("completed");
+      expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+      expect(useFileStore.getState().error).toBeNull();
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it.each([
+    ["a malformed 200", (xhr: FakeXhr) => xhr.respond(200, {}), en.errors.invalidResponse, 1],
+    [
+      "a failed 422",
+      (xhr: FakeXhr) => xhr.respond(422, { error: "Object erasing failed" }),
+      "Object erasing failed",
+      0,
+    ],
+  ])(
+    "ignores a queued SSE complete, failed, or stall after %s settled the run (#2932)",
+    async (_label, respondSync, expectedError, expectedReports) => {
+      const stalls = captureStallTimers();
+      try {
+        renderPanel();
+        const xhr = await submit();
+        respondSync(xhr);
+        expect(screen.getByText(expectedError)).toBeInTheDocument();
+        expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(expectedReports);
+
+        act(() => {
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "processing", percent: 50 }),
+          });
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+          });
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
+          });
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "failed", error: "late stream error" }),
+          });
+        });
+        stalls.fireLatest();
+
+        expect(screen.getByText(expectedError)).toBeInTheDocument();
+        expect(screen.queryByText("late stream error")).not.toBeInTheDocument();
+        expect(entry().status).not.toBe("completed");
+        expect(entry().processedUrl).toBeNull();
+        expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(expectedReports);
+      } finally {
+        stalls.restore();
+      }
+    },
+  );
 });
 
 /** Answer the request with a 202, then send one frame on the progress stream. */
@@ -965,6 +1041,90 @@ describe("erase-object batch: a completed frame with nothing to download (#1830)
     expect(entry(1).status).toBe("completed");
     expectReported("Tool result has no download URL", undefined);
   });
+
+  it("ignores a queued malformed or failed SSE frame or stall after a batch file's sync 200 settled it (#2932)", async () => {
+    const stalls = captureStallTimers();
+    try {
+      renderPanel(2);
+      const first = await submit(1);
+      first.respond(200, GOOD_BODY);
+      act(() => useFileStore.getState().markClaimed(0));
+
+      act(() => {
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "processing", percent: 50 }),
+        });
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
+        });
+        FakeEventSource.instances[0].onmessage?.({
+          data: JSON.stringify({ type: "single", phase: "failed", error: "late error" }),
+        });
+      });
+      act(() => stalls.all()[0]?.fire());
+
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+      FakeXhr.instances[1].respond(200, GOOD_BODY);
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+      expect(entry(0).status).toBe("completed");
+      expect(entry(0).processedUrl).toBe(DOWNLOAD_URL);
+      expect(entry(0).claimed).toBe(true);
+      expect(entry(1).status).toBe("completed");
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      stalls.restore();
+    }
+  });
+
+  it.each([
+    ["a malformed 200", (xhr: FakeXhr) => xhr.respond(200, {}), en.errors.invalidResponse, 1],
+    [
+      "a failed 422",
+      (xhr: FakeXhr) => xhr.respond(422, { error: "Object erasing failed" }),
+      "Object erasing failed",
+      0,
+    ],
+  ])(
+    "ignores a queued SSE complete, failed, or stall after a batch file's sync response was %s (#2932)",
+    async (_label, respondSync, expectedError, expectedReports) => {
+      const stalls = captureStallTimers();
+      try {
+        renderPanel(2);
+        const first = await submit(1);
+        respondSync(first);
+        expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(expectedReports);
+
+        act(() => {
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "processing", percent: 50 }),
+          });
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "complete", result: GOOD_BODY }),
+          });
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
+          });
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({ type: "single", phase: "failed", error: "late stream error" }),
+          });
+        });
+        act(() => stalls.all()[0]?.fire());
+
+        await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+        FakeXhr.instances[1].respond(200, GOOD_BODY);
+        await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+        expect(entry(0).status).toBe("failed");
+        expect(entry(0).error).toBe(expectedError);
+        expect(entry(0).processedUrl).toBeNull();
+        expect(entry(1).status).toBe("completed");
+        expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(expectedReports);
+      } finally {
+        stalls.restore();
+      }
+    },
+  );
 
   it("lands each batch file's result on its own entry when reordered mid-batch (#1114)", async () => {
     renderPanel(2);

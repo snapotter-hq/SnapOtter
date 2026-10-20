@@ -222,6 +222,65 @@ describe.each(subscribers)("%s async progress", (_name, subscribe) => {
   });
 });
 
+describe.each([
+  ["erase-object", subscribeEraseObjectJobProgress],
+  ["sign-pdf", subscribeSignPdfJobProgress],
+] as const)("%s async progress: stop (#2932)", (_name, subscribe) => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    FakeEventSource.instances = [];
+    vi.stubGlobal("EventSource", FakeEventSource);
+    vi.mocked(captureHandledError).mockClear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("ignores queued messages arriving after stop()", () => {
+    const onProgress = vi.fn();
+    const onComplete = vi.fn();
+    const onFailed = vi.fn();
+    const onStall = vi.fn();
+    const { stop } = subscribe("job-stopped-message", {
+      onProgress,
+      onComplete,
+      onFailed,
+      onStall,
+    });
+
+    stop();
+
+    FakeEventSource.instances[0].onmessage?.({
+      data: JSON.stringify({ type: "heartbeat" }),
+    });
+    FakeEventSource.instances[0].onmessage?.({
+      data: JSON.stringify({ type: "single", phase: "processing", percent: 50 }),
+    });
+    FakeEventSource.instances[0].onmessage?.({
+      data: JSON.stringify({
+        type: "single",
+        phase: "complete",
+        result: { downloadUrl: "/api/v1/download/job-stopped-message/out.png" },
+      }),
+    });
+    FakeEventSource.instances[0].onmessage?.({
+      data: JSON.stringify({ type: "single", phase: "complete", result: {} }),
+    });
+    FakeEventSource.instances[0].onmessage?.({
+      data: JSON.stringify({ type: "single", phase: "failed", error: "late error" }),
+    });
+    vi.advanceTimersByTime(10 * 60_000);
+
+    expect(onProgress).not.toHaveBeenCalled();
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(onFailed).not.toHaveBeenCalled();
+    expect(onStall).not.toHaveBeenCalled();
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+});
+
 // #1830 and #1885: both subscribers check a completed frame's result the way
 // the shared hooks do since #1794, so a frame with nothing to download ends the
 // run at once instead of waiting out the stall timer.

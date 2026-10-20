@@ -108,6 +108,7 @@ export function subscribeEraseObjectJobProgress(
     if (done) return;
     if (stall) clearTimeout(stall);
     stall = setTimeout(() => {
+      if (done) return;
       cleanup();
       handlers.onStall();
     }, SSE_STALL_TIMEOUT_MS);
@@ -123,6 +124,7 @@ export function subscribeEraseObjectJobProgress(
       return;
     }
     es.onmessage = (event) => {
+      if (done) return;
       // Only an unparseable frame is ignorable. A throw past the parse is our
       // own handling failing, and it must end the run (#1287).
       let data: ProgressFrame;
@@ -307,21 +309,23 @@ export function EraseObjectSettings({
 
       const subscription = subscribeEraseObjectJobProgress(clientJobId, {
         onProgress: (percent) => {
+          if (abandoned || settled) return;
           abandonedJob.onAccepted();
           onProgress(percent);
         },
         onComplete: (r) => {
+          if (abandoned || settled) return;
           applyResult(r);
           resolveOnce();
         },
         onFailed: (failure) => {
-          if (abandoned) return;
+          if (abandoned || settled) return;
           abandoned = true;
           cancelIfHandlingFailed(failure, clientJobId);
           abandon(new Error(jobFailureMessage(failure, t.errors)));
         },
         onStall: () => {
-          if (abandoned) return;
+          if (abandoned || settled) return;
           abandoned = true;
           abandonedJob.cancelOnStall();
           abandon(new FeedbackCategoryError(t.toolSettings["erase-object"].stallBatch, "timeout"));
@@ -556,11 +560,13 @@ export function EraseObjectSettings({
 
     const subscription = subscribeEraseObjectJobProgress(clientJobId, {
       onProgress: (percent) => {
+        if (abandoned || settled) return;
         abandonedJob.onAccepted();
         setProgressPhase("processing");
         setProgressPercent(15 + (percent / 100) * 85);
       },
       onComplete: (r) => {
+        if (abandoned || settled) return;
         endWatch();
         applyResult(r);
         finishUi();
@@ -568,6 +574,7 @@ export function EraseObjectSettings({
       onFailed: (failure) => {
         endWatch();
         if (runEndedWithError) return;
+        if (settled && !("reason" in failure && failure.reason === "trackingFailed")) return;
         cancelIfHandlingFailed(failure, clientJobId);
         // The stream has already let go of the run, so a throw from the abort or
         // the message write must not skip finishUi and leave the run at
@@ -575,8 +582,8 @@ export function EraseObjectSettings({
         endRunWithError(jobFailureMessage(failure, t.errors), abandonRequest);
       },
       onStall: () => {
+        if (abandoned || settled || runEndedWithError) return;
         endWatch();
-        if (runEndedWithError) return;
         abandonedJob.cancelOnStall();
         endRunWithError(t.toolSettings["erase-object"].stall, abandonRequest);
       },

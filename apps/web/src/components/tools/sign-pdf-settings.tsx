@@ -94,6 +94,7 @@ export function subscribeSignPdfJobProgress(
     if (done) return;
     if (stall) clearTimeout(stall);
     stall = setTimeout(() => {
+      if (done) return;
       cleanup();
       handlers.onStall();
     }, SSE_STALL_TIMEOUT_MS);
@@ -109,6 +110,7 @@ export function subscribeSignPdfJobProgress(
       return;
     }
     es.onmessage = (event) => {
+      if (done) return;
       // Only an unparseable frame is ignorable. A throw past the parse is our
       // own handling failing, and it must end the run (#1287).
       let data: ProgressFrame;
@@ -367,9 +369,11 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
      * must not replace the server's message (#2498).
      */
     let runFailed = false;
+    let settled = false;
     const failRun = (message: string, category?: FeedbackErrorCategory) => {
       if (runFailed) return;
       runFailed = true;
+      settled = true;
       let teardown: { cause: unknown } | null = null;
       for (const write of [() => setError(message, capturedEntryId), endRun]) {
         try {
@@ -408,7 +412,6 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
      * the claim the first one earned, and a result landing after the stream
      * failed the run would put the link up beside that error (#1885).
      */
-    let settled = false;
     const landResult = (r: SignResult) => {
       if (settled) return;
       settled = true;
@@ -458,6 +461,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
 
     const subscription = subscribeSignPdfJobProgress(clientJobId, {
       onProgress: (percent) => {
+        if (settled && !abandoned) return;
         abandonedJob.onAccepted();
         if (abandoned) {
           stopProgress();
@@ -471,6 +475,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
           abandonRequest();
           return;
         }
+        if (settled) return;
         landResult(r);
         endRun();
       },
@@ -479,6 +484,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
           abandonRequest();
           return;
         }
+        if (settled && !("reason" in failure && failure.reason === "trackingFailed")) return;
         cancelIfHandlingFailed(failure, abandonedJob);
         abandonRequest();
         // A failure with a reason shows one of our translated messages; a
@@ -493,6 +499,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
           abandonRequest();
           return;
         }
+        if (settled) return;
         abandonedJob.cancelOnStall();
         abandonRequest();
         failRun(sp.stall, "timeout");
