@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { en } from "@snapotter/shared";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Dropzone, isImageFile } from "@/components/common/dropzone";
 import { toolAcceptsCameraPhotos } from "@/lib/camera-capture";
@@ -42,14 +43,18 @@ function pasteViaItems(files: File[]) {
     getAsFile: () => f,
   }));
   const event = makePasteEvent({ items, files: [] as unknown as File[] });
-  document.dispatchEvent(event);
+  act(() => {
+    document.dispatchEvent(event);
+  });
   return event;
 }
 
 /** Simulate paste via clipboardData.files (e.g. Cmd+C files from Finder on macOS). */
 function pasteViaFiles(files: File[]) {
   const event = makePasteEvent({ items: [], files });
-  document.dispatchEvent(event);
+  act(() => {
+    document.dispatchEvent(event);
+  });
   return event;
 }
 
@@ -308,6 +313,27 @@ describe("Dropzone", () => {
       input.onchange?.({ target: input } as unknown as Event);
 
       expect(onFiles).not.toHaveBeenCalled();
+      expect(screen.queryByText(en.dropzone.unsupportedFileType)).toBeNull();
+    });
+
+    it("shows unsupportedFileType when all picked files fail fileFilter (#2842)", () => {
+      const onFiles = vi.fn();
+      const getInput = spyFileInput();
+      render(<Dropzone onFiles={onFiles} accept="image/*" fileFilter={isImageFile} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Upload from computer" }));
+      const input = getInput();
+      if (!input) throw new Error("expected file input");
+
+      const txt = makeFile("notes.txt", "text/plain");
+      Object.defineProperty(input, "files", { value: [txt], configurable: true });
+      act(() => {
+        input.onchange?.({ target: input } as unknown as Event);
+      });
+
+      expect(onFiles).not.toHaveBeenCalled();
+      expect(screen.getByText(en.dropzone.unsupportedFileType)).toBeDefined();
+      expect(screen.queryByText(/This tool accepts/)).toBeNull();
     });
   });
 
@@ -340,13 +366,27 @@ describe("Dropzone", () => {
 
     it("does not call onFiles when all dropped files are non-image", () => {
       const onFiles = vi.fn();
-      render(<Dropzone onFiles={onFiles} fileFilter={isImageFile} />);
+      render(<Dropzone onFiles={onFiles} accept="image/*" fileFilter={isImageFile} />);
       const zone = screen.getByLabelText("File drop zone");
 
       const pdf = makeFile("doc.pdf", "application/pdf");
       fireEvent.drop(zone, { dataTransfer: makeDataTransfer([pdf]) });
 
       expect(onFiles).not.toHaveBeenCalled();
+      expect(screen.getByText(en.dropzone.unsupportedFileType)).toBeDefined();
+      expect(screen.queryByText(/This tool accepts/)).toBeNull();
+    });
+
+    it("shows acceptDescription when all dropped files fail fileFilter and acceptDescription is set (#2842)", () => {
+      const onFiles = vi.fn();
+      render(<Dropzone onFiles={onFiles} fileFilter={isImageFile} acceptDescription="PNG, JPG" />);
+      const zone = screen.getByLabelText("File drop zone");
+
+      const pdf = makeFile("doc.pdf", "application/pdf");
+      fireEvent.drop(zone, { dataTransfer: makeDataTransfer([pdf]) });
+
+      expect(onFiles).not.toHaveBeenCalled();
+      expect(screen.getAllByText("PNG, JPG")).toHaveLength(2);
     });
 
     it("handles multiple image files on drop", () => {
@@ -474,13 +514,53 @@ describe("Dropzone", () => {
       expect(onFiles).toHaveBeenCalledWith([png]);
     });
 
-    it("does not call onFiles when pasted content has no image files", () => {
+    it("does not call onFiles when pasted content has no image files and shows unsupportedFileType (#2842)", () => {
       const onFiles = vi.fn();
       render(<Dropzone onFiles={onFiles} fileFilter={isImageFile} />);
 
       pasteViaItems([makeFile("doc.pdf", "application/pdf")]);
 
       expect(onFiles).not.toHaveBeenCalled();
+      expect(screen.getByText(en.dropzone.unsupportedFileType)).toBeDefined();
+
+      const png = makeFile("valid.png", "image/png");
+      pasteViaItems([png]);
+
+      expect(onFiles).toHaveBeenCalledWith([png]);
+      expect(screen.queryByText(en.dropzone.unsupportedFileType)).toBeNull();
+    });
+
+    it("shows acceptDescription when pasted content fails fileFilter and acceptDescription is set (#2842)", () => {
+      const onFiles = vi.fn();
+      render(
+        <Dropzone onFiles={onFiles} fileFilter={isImageFile} acceptDescription="SVG files only" />,
+      );
+
+      pasteViaItems([makeFile("notes.txt", "text/plain")]);
+
+      expect(onFiles).not.toHaveBeenCalled();
+      expect(screen.getAllByText("SVG files only")).toHaveLength(2);
+    });
+
+    it("shows unsupportedFileType when clipboardData.items mixes a string item and a rejected file item (#2842)", () => {
+      const onFiles = vi.fn();
+      render(<Dropzone onFiles={onFiles} fileFilter={isImageFile} />);
+
+      const txt = makeFile("notes.txt", "text/plain");
+      const event = makePasteEvent({
+        files: [],
+        items: [
+          { kind: "string", type: "text/plain", getAsFile: () => null },
+          { kind: "file", type: "text/plain", getAsFile: () => txt },
+        ],
+      });
+      act(() => {
+        document.dispatchEvent(event);
+      });
+
+      expect(event.defaultPrevented).toBe(false);
+      expect(onFiles).not.toHaveBeenCalled();
+      expect(screen.getByText(en.dropzone.unsupportedFileType)).toBeDefined();
     });
 
     it("ignores paste with no clipboardData items and no files", () => {
@@ -585,6 +665,7 @@ describe("Dropzone", () => {
       document.dispatchEvent(event);
 
       expect(onFiles).not.toHaveBeenCalled();
+      expect(screen.queryByText(en.dropzone.unsupportedFileType)).toBeNull();
     });
   });
 
@@ -627,13 +708,14 @@ describe("Dropzone", () => {
       expect(onFiles).toHaveBeenCalledWith([png]);
     });
 
-    it("ignores Finder paste with only non-image files", () => {
+    it("ignores Finder paste with only non-image files and shows unsupportedFileType (#2842)", () => {
       const onFiles = vi.fn();
       render(<Dropzone onFiles={onFiles} fileFilter={isImageFile} />);
 
       pasteViaFiles([makeFile("doc.pdf", "application/pdf")]);
 
       expect(onFiles).not.toHaveBeenCalled();
+      expect(screen.getByText(en.dropzone.unsupportedFileType)).toBeDefined();
     });
 
     it("accepts RAW and HEIC files from Finder", () => {
@@ -795,6 +877,198 @@ describe("Dropzone", () => {
       input.onchange?.({ target: input } as unknown as Event);
 
       expect(onFiles).toHaveBeenCalledWith([photo]);
+    });
+
+    it("shows unsupportedFileType when a captured file fails fileFilter (#2842)", () => {
+      stubPointer(true);
+      const onFiles = vi.fn();
+      const getInput = spyFileInput();
+      render(<Dropzone cameraCapture onFiles={onFiles} fileFilter={isImageFile} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Take photo" }));
+      const input = getInput();
+      if (!input) throw new Error("expected file input");
+
+      const txt = makeFile("notes.txt", "text/plain");
+      Object.defineProperty(input, "files", { value: [txt], configurable: true });
+      act(() => {
+        input.onchange?.({ target: input } as unknown as Event);
+      });
+
+      expect(onFiles).not.toHaveBeenCalled();
+      expect(screen.getByText(en.dropzone.unsupportedFileType)).toBeDefined();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Bulk URL import modal filtering (#2842)
+  // ---------------------------------------------------------------------------
+  describe("bulk URL import modal filtering (#2842)", () => {
+    it("shows unsupportedFileType when all bulk-imported URL files fail fileFilter", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.endsWith("/api/v1/fetch-urls")) {
+            return Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  results: [
+                    {
+                      success: true,
+                      url: "https://example.com/notes.txt",
+                      filename: "notes.txt",
+                      size: 12,
+                      downloadUrl: "https://example.com/dl/notes.txt",
+                    },
+                  ],
+                }),
+                { status: 200, headers: { "Content-Type": "application/json" } },
+              ),
+            );
+          }
+          return Promise.resolve(
+            new Response("hello world", {
+              status: 200,
+              headers: { "Content-Type": "text/plain" },
+            }),
+          );
+        }),
+      );
+
+      const onUrlImport = vi.fn();
+      render(<Dropzone onUrlImport={onUrlImport} fileFilter={isImageFile} />);
+
+      fireEvent.click(screen.getByRole("button", { name: en.dropzone.importMultipleUrls }));
+      const dialog = screen.getByRole("dialog");
+      fireEvent.change(within(dialog).getByRole("textbox"), {
+        target: { value: "https://example.com/notes.txt" },
+      });
+      fireEvent.click(within(dialog).getByRole("button", { name: en.urlImport.importButton }));
+
+      const addBtn = await within(dialog).findByRole("button", { name: "Add 1 Files" });
+      fireEvent.click(addBtn);
+
+      await waitFor(() => {
+        expect(screen.getByText(en.dropzone.unsupportedFileType)).toBeDefined();
+      });
+      expect(onUrlImport).not.toHaveBeenCalled();
+    });
+
+    it("imports valid files from UrlImportModal and clears a prior unsupported error", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.endsWith("/api/v1/fetch-urls")) {
+            return Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  results: [
+                    {
+                      success: true,
+                      url: "https://example.com/photo.png",
+                      filename: "photo.png",
+                      size: 16,
+                      downloadUrl: "https://example.com/dl/photo.png",
+                    },
+                    {
+                      success: true,
+                      url: "https://example.com/notes.txt",
+                      filename: "notes.txt",
+                      size: 12,
+                      downloadUrl: "https://example.com/dl/notes.txt",
+                    },
+                  ],
+                }),
+                { status: 200, headers: { "Content-Type": "application/json" } },
+              ),
+            );
+          }
+          if (url.endsWith("/dl/photo.png")) {
+            return Promise.resolve(
+              new Response("png-data", {
+                status: 200,
+                headers: { "Content-Type": "image/png" },
+              }),
+            );
+          }
+          return Promise.resolve(
+            new Response("hello world", {
+              status: 200,
+              headers: { "Content-Type": "text/plain" },
+            }),
+          );
+        }),
+      );
+
+      const onUrlImport = vi.fn();
+      render(<Dropzone onUrlImport={onUrlImport} fileFilter={isImageFile} />);
+
+      pasteViaFiles([makeFile("bad.pdf", "application/pdf")]);
+      expect(screen.getByText(en.dropzone.unsupportedFileType)).toBeDefined();
+
+      fireEvent.click(screen.getByRole("button", { name: en.dropzone.importMultipleUrls }));
+      const dialog = screen.getByRole("dialog");
+      fireEvent.change(within(dialog).getByRole("textbox"), {
+        target: { value: "https://example.com/photo.png\nhttps://example.com/notes.txt" },
+      });
+      fireEvent.click(within(dialog).getByRole("button", { name: en.urlImport.importButton }));
+
+      const addBtn = await within(dialog).findByRole("button", { name: "Add 2 Files" });
+      fireEvent.click(addBtn);
+
+      await waitFor(() => {
+        expect(onUrlImport).toHaveBeenCalledTimes(1);
+      });
+      expect(onUrlImport.mock.calls[0][0].name).toBe("photo.png");
+      expect(screen.queryByText(en.dropzone.unsupportedFileType)).toBeNull();
+    });
+
+    it("shows unsupportedMessage on single-URL submit when the fetched file fails fileFilter", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.endsWith("/api/v1/fetch-urls")) {
+            return Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  results: [
+                    {
+                      success: true,
+                      url: "https://example.com/notes.txt",
+                      filename: "notes.txt",
+                      size: 12,
+                      downloadUrl: "https://example.com/dl/notes.txt",
+                    },
+                  ],
+                }),
+                { status: 200, headers: { "Content-Type": "application/json" } },
+              ),
+            );
+          }
+          return Promise.resolve(
+            new Response("hello world", {
+              status: 200,
+              headers: { "Content-Type": "text/plain" },
+            }),
+          );
+        }),
+      );
+
+      const onUrlImport = vi.fn();
+      render(<Dropzone onUrlImport={onUrlImport} fileFilter={isImageFile} acceptDescription="" />);
+
+      fireEvent.change(screen.getByPlaceholderText(en.dropzone.urlPlaceholder), {
+        target: { value: "https://example.com/notes.txt" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: en.dropzone.addUrlButton }));
+
+      await waitFor(() => {
+        expect(screen.getByText(en.dropzone.unsupportedFileType)).toBeDefined();
+      });
+      expect(onUrlImport).not.toHaveBeenCalled();
     });
   });
 });

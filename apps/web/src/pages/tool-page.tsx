@@ -688,11 +688,23 @@ function ToolPageContent({
     }
     input.onchange = (e) => {
       const selected = Array.from((e.target as HTMLInputElement).files || []);
+      if (selected.length === 0) return;
       const newFiles = toolFileFilter ? selected.filter(toolFileFilter) : selected;
-      if (newFiles.length > 0) addFiles(newFiles);
+      if (newFiles.length > 0) {
+        addFiles(newFiles);
+      } else {
+        showUnsupportedFileType(t.dropzone.unsupportedFileType);
+      }
     };
     input.click();
-  }, [addFiles, toolAccept, toolFileFilter, acceptsAnyFile, allowIntake]);
+  }, [
+    addFiles,
+    toolAccept,
+    toolFileFilter,
+    acceptsAnyFile,
+    allowIntake,
+    t.dropzone.unsupportedFileType,
+  ]);
 
   // Page-level drag handlers (active when a file is already loaded)
   const handleDragEnter = useCallback(

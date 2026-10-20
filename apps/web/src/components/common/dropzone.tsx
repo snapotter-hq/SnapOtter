@@ -127,8 +127,7 @@ export function Dropzone({
   const checkFile = fileFilter ?? (() => true);
   const resolvedAccept = expandAccept(accept);
   const isTouchDevice = useTouchDevice();
-  const unsupportedMessage =
-    acceptDescription || `This tool accepts ${accept || "the supported file types"}`;
+  const unsupportedMessage = acceptDescription || t.dropzone.unsupportedFileType;
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [urlInput, setUrlInput] = useState("");
@@ -153,7 +152,7 @@ export function Dropzone({
     const file = await importSingleUrl(url);
     if (file) {
       if (!checkFile(file)) {
-        setUrlError(acceptDescription ?? t.dropzone.unsupportedFileType);
+        setUrlError(unsupportedMessage);
       } else {
         setUrlInput("");
         onUrlImport?.(file);
@@ -162,7 +161,7 @@ export function Dropzone({
       setUrlError(t.dropzone.urlFetchFailed);
     }
     setUrlLoading(false);
-  }, [urlInput, importSingleUrl, onUrlImport, checkFile, acceptDescription, t]);
+  }, [urlInput, importSingleUrl, onUrlImport, checkFile, unsupportedMessage, t]);
 
   const handleDrag = useCallback((e: DragEvent) => {
     e.preventDefault();
@@ -232,8 +231,10 @@ export function Dropzone({
       if (!clip) return;
 
       const files: File[] = [];
+      let hadCandidateFiles = false;
 
       if (clip.files.length > 0) {
+        hadCandidateFiles = true;
         for (const file of clip.files) {
           if (checkFile(file)) files.push(file);
         }
@@ -241,19 +242,25 @@ export function Dropzone({
         for (const item of clip.items) {
           if (item.kind === "file") {
             const file = item.getAsFile();
-            if (file && checkFile(file)) files.push(file);
+            if (file) {
+              hadCandidateFiles = true;
+              if (checkFile(file)) files.push(file);
+            }
           }
         }
       }
 
       if (files.length > 0) {
         e.preventDefault();
+        setError(null);
         onFiles?.(files);
+      } else if (hadCandidateFiles) {
+        setError(unsupportedMessage);
       }
     };
     document.addEventListener("paste", handlePaste);
     return () => document.removeEventListener("paste", handlePaste);
-  }, [enablePaste, onFiles, checkFile]);
+  }, [enablePaste, onFiles, checkFile, unsupportedMessage]);
 
   const hasMultipleFiles = currentFiles.length > 1;
 
@@ -412,8 +419,14 @@ export function Dropzone({
         <UrlImportModal
           onClose={() => setShowBulkModal(false)}
           onImport={(files) => {
-            for (const file of files) {
-              if (checkFile(file)) onUrlImport?.(file);
+            const validFiles = files.filter(checkFile);
+            if (validFiles.length > 0) {
+              setError(null);
+              for (const file of validFiles) {
+                onUrlImport?.(file);
+              }
+            } else if (files.length > 0) {
+              setError(unsupportedMessage);
             }
             setShowBulkModal(false);
           }}

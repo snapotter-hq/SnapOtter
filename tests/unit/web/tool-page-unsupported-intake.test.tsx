@@ -379,3 +379,104 @@ describe("ToolPage file paste intake (#2841)", () => {
     expect(revokeSpy).not.toHaveBeenCalled();
   });
 });
+
+describe("ToolPage handleAddMore unsupported file intake (#2842)", () => {
+  it("shows the unsupported-type toast when all files selected via + Add more fail toolFileFilter", async () => {
+    let capturedInput: HTMLInputElement | null = null;
+    vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(function (
+      this: HTMLInputElement,
+    ) {
+      if (this.type === "file") capturedInput = this;
+    });
+
+    renderToolPage("/image/resize");
+
+    const initialPng = new File(["png-bytes"], "photo.png", { type: "image/png" });
+    await act(async () => {
+      useFileStore.getState().setFiles([initialPng]);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: en.toolPage.addMore }));
+    const input = capturedInput as HTMLInputElement | null;
+    if (!input) throw new Error("expected file input");
+
+    const txtFile = new File(["hello"], "notes.txt", { type: "text/plain" });
+    Object.defineProperty(input, "files", {
+      value: [txtFile],
+      configurable: true,
+    });
+    act(() => {
+      input.onchange?.({ target: input } as unknown as Event);
+    });
+
+    expect(toastErrorSpy).toHaveBeenCalledTimes(1);
+    expect(toastErrorSpy).toHaveBeenCalledWith(en.dropzone.unsupportedFileType, {
+      id: "intake-unsupported-file-type",
+    });
+    expect(useFileStore.getState().files).toEqual([initialPng]);
+  });
+
+  it("does not show the unsupported-type toast when the + Add more file dialog is cancelled", async () => {
+    let capturedInput: HTMLInputElement | null = null;
+    vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(function (
+      this: HTMLInputElement,
+    ) {
+      if (this.type === "file") capturedInput = this;
+    });
+
+    renderToolPage("/image/resize");
+
+    const initialPng = new File(["png-bytes"], "photo.png", { type: "image/png" });
+    await act(async () => {
+      useFileStore.getState().setFiles([initialPng]);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: en.toolPage.addMore }));
+    const input = capturedInput as HTMLInputElement | null;
+    if (!input) throw new Error("expected file input");
+
+    Object.defineProperty(input, "files", {
+      value: [],
+      configurable: true,
+    });
+    act(() => {
+      input.onchange?.({ target: input } as unknown as Event);
+    });
+
+    expect(toastErrorSpy).not.toHaveBeenCalled();
+    expect(useFileStore.getState().files).toEqual([initialPng]);
+  });
+
+  it("appends supported files and does not show the unsupported-type toast when + Add more receives a mixed selection", async () => {
+    let capturedInput: HTMLInputElement | null = null;
+    vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(function (
+      this: HTMLInputElement,
+    ) {
+      if (this.type === "file") capturedInput = this;
+    });
+
+    renderToolPage("/image/resize");
+
+    const initialPng = new File(["png-bytes"], "photo.png", { type: "image/png" });
+    await act(async () => {
+      useFileStore.getState().setFiles([initialPng]);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: en.toolPage.addMore }));
+    const input = capturedInput as HTMLInputElement | null;
+    if (!input) throw new Error("expected file input");
+
+    const secondPng = new File(["png-bytes-2"], "second.png", { type: "image/png" });
+    const txtFile = new File(["hello"], "notes.txt", { type: "text/plain" });
+    Object.defineProperty(input, "files", {
+      value: [secondPng, txtFile],
+      configurable: true,
+    });
+    act(() => {
+      input.onchange?.({ target: input } as unknown as Event);
+    });
+
+    expect(toastErrorSpy).not.toHaveBeenCalled();
+    expect(useFileStore.getState().files).toEqual([initialPng, secondPng]);
+  });
+});
