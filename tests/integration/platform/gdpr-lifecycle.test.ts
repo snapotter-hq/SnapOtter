@@ -855,14 +855,41 @@ describe("GDPR purge role hierarchy", () => {
       expect(startRes.statusCode, startRes.body).toBe(202);
       exportJobId = JSON.parse(startRes.body).jobId as string;
 
-      await vi.waitFor(
-        async () => {
-          const job = await systemQueue.getJob(exportJobId);
-          expect(await job?.getState()).toBe("failed");
-          expect(job?.attemptsMade).toBe(2);
-        },
-        { timeout: 15_000, interval: 100 },
-      );
+      // Pin #2900: if moveToFailed on attempt 2 lands between getJob() and
+      // getState(), the Job instance on which getState() was called still holds
+      // the pre-script attemptsMade=1 snapshot.
+      const realGetJob = systemQueue.getJob.bind(systemQueue);
+      let injectedSplitRead = false;
+      const getJobSpy = vi.spyOn(systemQueue, "getJob").mockImplementation(async (id) => {
+        const job = await realGetJob(id);
+        if (job && id === exportJobId && !injectedSplitRead) {
+          const realGetState = job.getState.bind(job);
+          job.getState = async () => {
+            const state = await realGetState();
+            if (state === "failed" && !injectedSplitRead) {
+              injectedSplitRead = true;
+              job.attemptsMade = 1;
+            }
+            return state;
+          };
+        }
+        return job;
+      });
+      const failedJob = await vi
+        .waitFor(
+          async () => {
+            const job = await systemQueue.getJob(exportJobId);
+            expect(await job?.getState()).toBe("failed");
+            const settled = await systemQueue.getJob(exportJobId);
+            expect(settled).toBeDefined();
+            return settled;
+          },
+          { timeout: 15_000, interval: 100 },
+        )
+        .finally(() => {
+          getJobSpy.mockRestore();
+        });
+      expect(failedJob?.attemptsMade).toBe(2);
       expect(writeAttempts).toBe(2);
 
       await vi.waitFor(

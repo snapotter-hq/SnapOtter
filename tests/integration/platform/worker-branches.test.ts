@@ -356,6 +356,40 @@ async function batchOutcome(
   }, 10_000);
 }
 
+/**
+ * Re-reads the BullMQ job hash after getState() reports a terminal ZSET
+ * membership (#2900). BullMQ's moveToFailed / moveToCompleted Lua script
+ * updates attemptsMade, failedReason, and returnvalue atomically with the
+ * state transition, so a getJob() call that ran before getState() can hold a
+ * pre-transition snapshot if the script lands between the two Redis calls.
+ */
+async function failedQueueJob(
+  pool: Parameters<typeof getQueue>[0],
+  jobId: string,
+  timeoutMs = 10_000,
+) {
+  return waitFor(async () => {
+    const queueJob = await getQueue(pool).getJob(jobId);
+    if (!queueJob || (await queueJob.getState()) !== "failed") return undefined;
+    return await getQueue(pool).getJob(jobId);
+  }, timeoutMs);
+}
+
+async function settledQueueJob(
+  pool: Parameters<typeof getQueue>[0],
+  jobId: string,
+  timeoutMs = 20_000,
+) {
+  return waitFor(async () => {
+    const job = await getQueue(pool).getJob(jobId);
+    if (!job) return undefined;
+    const state = await job.getState();
+    if (state !== "completed" && state !== "failed") return undefined;
+    const settled = await getQueue(pool).getJob(jobId);
+    return settled ? { state, returnvalue: settled.returnvalue } : undefined;
+  }, timeoutMs);
+}
+
 /** Poll the mocked trackEvent until minCount events for this distinctId exist. */
 async function emittedEvents(
   event: string,
@@ -575,11 +609,7 @@ describe("tool job failure paths", () => {
     // failed-handler on the final attempt). Poll for it: the durable row and
     // analytics flip inside the processor's failure handling, before the
     // rejection propagates into BullMQ's own active -> failed move.
-    await waitFor(async () => {
-      const queueJob = await getQueue("image").getJob(jobId);
-      if (!queueJob) return undefined;
-      return (await queueJob.getState()) === "failed" ? queueJob : undefined;
-    }, 10_000);
+    await failedQueueJob("image", jobId);
   }, 30_000);
 
   it("fails when an extra output has neither buffer nor scratchPath", async () => {
@@ -625,12 +655,8 @@ describe("tool job failure paths", () => {
       expect(row.attempts).toBe(1);
       expect(row.error).toMatchObject({ message: "That file looks wrong", httpStatus: 422 });
 
-      const failedQueueJob = await waitFor(async () => {
-        const queueJob = await getQueue("image").getJob(jobId);
-        if (!queueJob) return undefined;
-        return (await queueJob.getState()) === "failed" ? queueJob : undefined;
-      }, 10_000);
-      expect(failedQueueJob.attemptsMade).toBe(1);
+      const failedJob = await failedQueueJob("image", jobId);
+      expect(failedJob.attemptsMade).toBe(1);
 
       const events = await emittedEvents(ANALYTICS_EVENTS.TOOL_USED, jobId);
       expect(events).toHaveLength(1);
@@ -682,12 +708,32 @@ describe("tool job failure paths", () => {
         httpStatus: 400,
       });
 
-      const failedQueueJob = await waitFor(async () => {
-        const queueJob = await getQueue("docs").getJob(jobId);
-        if (!queueJob) return undefined;
-        return (await queueJob.getState()) === "failed" ? queueJob : undefined;
-      }, 10_000);
-      expect(failedQueueJob.attemptsMade).toBe(1);
+      // Pin #2900: if moveToFailed lands between getJob() and getState(), the
+      // Job instance on which getState() was called still holds the pre-script
+      // attemptsMade=0 snapshot. failedQueueJob must re-read getJob() after
+      // getState() reports "failed".
+      const docsQueue = getQueue("docs");
+      const realGetJob = docsQueue.getJob.bind(docsQueue);
+      let injectedSplitRead = false;
+      const getJobSpy = vi.spyOn(docsQueue, "getJob").mockImplementation(async (id) => {
+        const job = await realGetJob(id);
+        if (job && id === jobId && !injectedSplitRead) {
+          const realGetState = job.getState.bind(job);
+          job.getState = async () => {
+            const state = await realGetState();
+            if (state === "failed" && !injectedSplitRead) {
+              injectedSplitRead = true;
+              job.attemptsMade = 0;
+            }
+            return state;
+          };
+        }
+        return job;
+      });
+      const failedJob = await failedQueueJob("docs", jobId).finally(() => {
+        getJobSpy.mockRestore();
+      });
+      expect(failedJob.attemptsMade).toBe(1);
 
       const events = await emittedEvents(ANALYTICS_EVENTS.TOOL_USED, jobId);
       expect(events).toHaveLength(1);
@@ -744,12 +790,8 @@ describe("tool job failure paths", () => {
       error_kind: "operational",
     });
 
-    const failedQueueJob = await waitFor(async () => {
-      const queueJob = await getQueue("image").getJob(jobId);
-      if (!queueJob) return undefined;
-      return (await queueJob.getState()) === "failed" ? queueJob : undefined;
-    }, 10_000);
-    expect(failedQueueJob.attemptsMade).toBe(1);
+    const failedJob = await failedQueueJob("image", jobId);
+    expect(failedJob.attemptsMade).toBe(1);
 
     const missingReports = reported.errors.filter(
       (e) => (e as { code?: string } | null)?.code === "INPUT_MISSING",
@@ -1112,11 +1154,7 @@ describe("pipeline finalize", () => {
 
     // This branch throws instead of writing a failure row, so the BullMQ job
     // itself fails after the pool's retry budget.
-    const failedJob = await waitFor(async () => {
-      const job = await getQueue("image").getJob(jobId);
-      if (!job) return undefined;
-      return (await job.getState()) === "failed" ? job : undefined;
-    }, 25_000);
+    const failedJob = await failedQueueJob("image", jobId, 25_000);
     expect(failedJob.failedReason).toContain("Last step has no output");
 
     // A degraded or 202 client is riding the SSE under clientJobId; without
@@ -1370,14 +1408,7 @@ describe("pipeline finalize", () => {
       expect(row.status).toBe("failed");
       expect(row.error?.message).toBe("Step 1: kaboom");
 
-      const settledJob = await waitFor(async () => {
-        const job = await getQueue("image").getJob(jobId);
-        if (!job) return undefined;
-        const state = await job.getState();
-        return state === "completed" || state === "failed"
-          ? { state, returnvalue: job.returnvalue }
-          : undefined;
-      });
+      const settledJob = await settledQueueJob("image", jobId);
       expect(settledJob.state).toBe("completed");
       expect(settledJob.returnvalue?.resultPayload).toMatchObject({
         error: "Step 1: kaboom",
@@ -1433,14 +1464,7 @@ describe("pipeline finalize", () => {
       expect(row.status).toBe("completed");
       expect(row.outputRefs).toEqual([`outputs/${jobId}/final.png`]);
 
-      const settledJob = await waitFor(async () => {
-        const job = await getQueue("image").getJob(jobId);
-        if (!job) return undefined;
-        const state = await job.getState();
-        return state === "completed" || state === "failed"
-          ? { state, returnvalue: job.returnvalue }
-          : undefined;
-      });
+      const settledJob = await settledQueueJob("image", jobId);
       expect(settledJob.state).toBe("completed");
       expect(settledJob.returnvalue?.outputRefs).toEqual([`outputs/${jobId}/final.png`]);
       expect(settledJob.returnvalue?.resultPayload).toMatchObject({
@@ -1613,13 +1637,29 @@ describe("batch children and finalize", () => {
       expect(okRow.status).toBe("completed");
       expect(okRow.outputRefs).toEqual([`outputs/${okId}/a_wt-echo.png`]);
 
-      const okSettled = await waitFor(async () => {
-        const job = await getQueue("image").getJob(okId);
-        if (!job) return undefined;
-        const state = await job.getState();
-        return state === "completed" || state === "failed"
-          ? { state, returnvalue: job.returnvalue }
-          : undefined;
+      // Pin #2900: if moveToCompleted lands between getJob() and getState(),
+      // the Job instance on which getState() was called still holds the
+      // pre-script returnvalue=null snapshot.
+      const imageQueue = getQueue("image");
+      const realGetJob = imageQueue.getJob.bind(imageQueue);
+      let injectedSplitRead = false;
+      const getJobSpy = vi.spyOn(imageQueue, "getJob").mockImplementation(async (id) => {
+        const job = await realGetJob(id);
+        if (job && id === okId && !injectedSplitRead) {
+          const realGetState = job.getState.bind(job);
+          job.getState = async () => {
+            const state = await realGetState();
+            if (state === "completed" && !injectedSplitRead) {
+              injectedSplitRead = true;
+              job.returnvalue = null as never;
+            }
+            return state;
+          };
+        }
+        return job;
+      });
+      const okSettled = await settledQueueJob("image", okId).finally(() => {
+        getJobSpy.mockRestore();
       });
       expect(okSettled.state).toBe("completed");
       expect(okSettled.returnvalue?.outputRefs).toEqual([`outputs/${okId}/a_wt-echo.png`]);
@@ -1629,14 +1669,7 @@ describe("batch children and finalize", () => {
       expect(boomRow.status).toBe("failed");
       expect(boomRow.error?.message).toBe("boom");
 
-      const boomSettled = await waitFor(async () => {
-        const job = await getQueue("image").getJob(boomId);
-        if (!job) return undefined;
-        const state = await job.getState();
-        return state === "completed" || state === "failed"
-          ? { state, returnvalue: job.returnvalue }
-          : undefined;
-      });
+      const boomSettled = await settledQueueJob("image", boomId);
       expect(boomSettled.state).toBe("completed");
       expect(boomSettled.returnvalue?.resultPayload).toEqual({ failed: true, error: "boom" });
 
@@ -1903,11 +1936,7 @@ describe("batch children and finalize", () => {
       toolJob({ jobId, toolId: "wt-not-a-system-job", pool: "system", filename: "none" }),
     );
 
-    const failedJob = await waitFor(async () => {
-      const job = await getQueue("system").getJob(jobId);
-      if (!job) return undefined;
-      return (await job.getState()) === "failed" ? job : undefined;
-    }, 25_000);
+    const failedJob = await failedQueueJob("system", jobId, 25_000);
     expect(failedJob.failedReason).toContain("Unknown system job: wt-not-a-system-job");
   }, 30_000);
 });
