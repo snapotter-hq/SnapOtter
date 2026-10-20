@@ -1,6 +1,6 @@
 import { en, type LibrarySaveMode, type TranslationKeys } from "@snapotter/shared";
 import { Check, CheckCircle2, ChevronDown, ChevronRight, Copy, Download, Info } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
@@ -11,6 +11,7 @@ import { trackAbandonedJob } from "@/lib/cancel-abandoned-job";
 import { format } from "@/lib/format";
 import { failedFrameMessage, type ProgressFrame } from "@/lib/progress-frames";
 import { reportRunEndFailure } from "@/lib/run-end-report";
+import { useRunProgress } from "@/lib/run-progress";
 import { copyToClipboard, generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 import { type OcrQuality, OcrQualityControl, useOcrQuality } from "./ocr-quality-control";
@@ -279,20 +280,20 @@ export function OcrSettings() {
   const [savedLibraryFileId, setSavedLibraryFileId] = useState<string | null>(null);
   const [copyStatus, setCopyStatus] = useState<"copied" | "failed" | null>(null);
   const later = useTimeouts();
-  const [progressPhase, setProgressPhase] = useState<"idle" | "uploading" | "processing">("idle");
-  const [progressPercent, setProgressPercent] = useState(0);
-  const [progressStage, setProgressStage] = useState<string | undefined>();
-  const [elapsed, setElapsed] = useState(0);
-  const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   // Unmounting stops the elapsed counter. The scan itself stops only once its
-  // files leave the store (see handleProcess).
-  useEffect(
-    () => () => {
-      if (elapsedRef.current) clearInterval(elapsedRef.current);
-    },
-    [],
-  );
+  // files leave the store (see handleProcess), and shared progress state lets a
+  // remounted panel show the live phase, percent, stage, and elapsed counter (#2315).
+  const {
+    progressPhase,
+    progressPercent,
+    progressStage,
+    elapsed,
+    startRunProgress,
+    clearRunProgressTimer,
+    setProgressPhase,
+    setProgressPercent,
+    setProgressStage,
+  } = useRunProgress();
 
   useEffect(() => {
     if (!enhanceManuallySet) setEnhance(ENHANCE_DEFAULTS[quality]);
@@ -315,15 +316,7 @@ export function OcrSettings() {
     setText(null);
     setSavedLibraryFileId(null);
     setProcessing(true);
-    setProgressPhase("uploading");
-    setProgressPercent(0);
-    setProgressStage(undefined);
-    setElapsed(0);
-
-    const startTime = Date.now();
-    elapsedRef.current = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - startTime) / 1000));
-    }, 1000);
+    const runTimer = startRunProgress();
 
     const settings = { quality, language, enhance };
     const total = files.length;
@@ -356,6 +349,7 @@ export function OcrSettings() {
         () => {
           if (useFileStore.getState().processing) setProcessing(false);
         },
+        () => setProgressPhase("idle"),
       ]) {
         try {
           step();
@@ -391,11 +385,13 @@ export function OcrSettings() {
             settings,
             {
               onUploadProgress: (pct) => {
+                if (filesGone) return;
                 setProgressPhase("uploading");
                 setProgressPercent(fileBase + (pct / 100) * fileShare * 0.15);
                 setProgressStage(`${prefix}Uploading...`);
               },
               onProcessingProgress: (pct, stage) => {
+                if (filesGone) return;
                 setProgressPhase("processing");
                 setProgressPercent(fileBase + fileShare * 0.15 + (pct / 100) * fileShare * 0.85);
                 setProgressStage(`${prefix}${stage}`);
@@ -438,14 +434,14 @@ export function OcrSettings() {
       }
     } finally {
       unsubscribe();
-      if (elapsedRef.current) clearInterval(elapsedRef.current);
+      clearRunProgressTimer(runTimer);
+      if (!filesGone) setProgressPhase("idle");
     }
 
     // The text and errors belong to a scan that was stopped. Its store watch
     // already cleared processing when the stop fired, so don't write it again
     // after the await where a next run may have started (#1994).
     if (filesGone) {
-      setProgressPhase("idle");
       return;
     }
 
@@ -457,7 +453,6 @@ export function OcrSettings() {
 
     setText(results.join("\n\n"));
     setProcessing(false);
-    setProgressPhase("idle");
   };
 
   const handleCopy = async () => {

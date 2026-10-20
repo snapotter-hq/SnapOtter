@@ -1,6 +1,6 @@
 import type { TranslationKeys } from "@snapotter/shared";
 import { Check, Copy, Download, Search, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useTimeouts } from "@/hooks/use-timeouts";
@@ -13,6 +13,7 @@ import {
   reportMalformedResult,
 } from "@/lib/progress-frames";
 import { reportRunEndFailure } from "@/lib/run-end-report";
+import { useRunProgress } from "@/lib/run-progress";
 import { copyToClipboard } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
 
@@ -138,13 +139,13 @@ function scanOneFile(
     const xhr = new XMLHttpRequest();
     xhr.timeout = 300_000;
 
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) onUploadProgress((e.loaded / e.total) * 100);
-    };
-
     // Set once the scan stops: an answer arriving after that, from a request
     // the abort didn't reach, must not land on entries that aren't ours.
     let stopped = false;
+
+    xhr.upload.onprogress = (e) => {
+      if (!stopped && e.lengthComputable) onUploadProgress((e.loaded / e.total) * 100);
+    };
 
     xhr.onload = () => {
       if (stopped) return;
@@ -220,20 +221,20 @@ export function BarcodeReadSettings() {
   const [rowCopy, setRowCopy] = useState<{ idx: number; ok: boolean } | null>(null);
   const [allCopy, setAllCopy] = useState<"copied" | "failed" | null>(null);
   const later = useTimeouts();
-  const [progressPhase, setProgressPhase] = useState<"idle" | "uploading" | "processing">("idle");
-  const [progressPercent, setProgressPercent] = useState(0);
-  const [progressStage, setProgressStage] = useState<string | undefined>();
-  const [elapsed, setElapsed] = useState(0);
-  const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   // Unmounting stops the elapsed counter. The scan itself stops only once its
-  // files leave the store (see handleProcess).
-  useEffect(
-    () => () => {
-      if (elapsedRef.current) clearInterval(elapsedRef.current);
-    },
-    [],
-  );
+  // files leave the store (see handleProcess), and shared progress state lets a
+  // remounted panel show the live phase, percent, stage, and elapsed counter (#2315).
+  const {
+    progressPhase,
+    progressPercent,
+    progressStage,
+    elapsed,
+    startRunProgress,
+    clearRunProgressTimer,
+    setProgressPhase,
+    setProgressPercent,
+    setProgressStage,
+  } = useRunProgress();
 
   const handleProcess = async () => {
     if (files.length === 0) return;
@@ -241,15 +242,7 @@ export function BarcodeReadSettings() {
     setError(null);
     setResults([]);
     setProcessing(true);
-    setProgressPhase("uploading");
-    setProgressPercent(0);
-    setProgressStage(undefined);
-    setElapsed(0);
-
-    const startTime = Date.now();
-    elapsedRef.current = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - startTime) / 1000));
-    }, 1000);
+    const runTimer = startRunProgress();
 
     const total = files.length;
     const allResults: FileResult[] = [];
@@ -284,6 +277,7 @@ export function BarcodeReadSettings() {
         () => {
           if (useFileStore.getState().processing) setProcessing(false);
         },
+        () => setProgressPhase("idle"),
       ]) {
         try {
           step();
@@ -318,10 +312,12 @@ export function BarcodeReadSettings() {
             file,
             tryHarder,
             (pct) => {
+              if (filesGone) return;
               setProgressPhase("uploading");
               setProgressPercent(fileBase + (pct / 100) * fileShare * 0.5);
             },
             (answer) => {
+              if (filesGone) return;
               setProgressPhase("processing");
               setProgressPercent(fileBase + fileShare);
 
@@ -358,14 +354,14 @@ export function BarcodeReadSettings() {
       }
     } finally {
       unsubscribe();
-      if (elapsedRef.current) clearInterval(elapsedRef.current);
+      clearRunProgressTimer(runTimer);
+      if (!filesGone) setProgressPhase("idle");
     }
 
     // The results and errors belong to a scan that was stopped. Its store watch
     // already cleared processing when the stop fired, so don't write it again
     // after the await where a next run may have started (#1994).
     if (filesGone) {
-      setProgressPhase("idle");
       return;
     }
 
@@ -377,7 +373,6 @@ export function BarcodeReadSettings() {
 
     setResults(allResults);
     setProcessing(false);
-    setProgressPhase("idle");
   };
 
   // Total barcode count across all files

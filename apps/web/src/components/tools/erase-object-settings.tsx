@@ -1,5 +1,5 @@
 import { Download, Lasso, Loader2, Paintbrush, Redo, Sparkles, Trash2, Zap } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
@@ -21,6 +21,7 @@ import {
   reportMalformedResult,
 } from "@/lib/progress-frames";
 import { reportRunEndFailure } from "@/lib/run-end-report";
+import { useRunProgress } from "@/lib/run-progress";
 import { generateId } from "@/lib/utils";
 import { useFeaturesStore } from "@/stores/features-store";
 import { useFileStore } from "@/stores/file-store";
@@ -221,22 +222,22 @@ export function EraseObjectSettings({
 }: EraseObjectSettingsProps) {
   const { t } = useTranslation();
   const { files, processing, error, setProcessing, setError, currentEntry } = useFileStore();
-  const [progressPhase, setProgressPhase] = useState<"idle" | "uploading" | "processing">("idle");
-  const [progressPercent, setProgressPercent] = useState(0);
-  const [progressStage, setProgressStage] = useState<string | null>(null);
-  const [elapsed, setElapsed] = useState(0);
-  const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   // A bare unmount leaves a run to finish, as the batch always has: the panel also
   // unmounts when the window crosses the layout breakpoint, and closing the stream
   // then left a 202 run that could never end, with `processing` set for good
-  // (#2304). The run's own store watch ends it when its file leaves, and the stall
-  // timer bounds one nobody is listening to.
-  useEffect(() => {
-    return () => {
-      if (elapsedRef.current) clearInterval(elapsedRef.current);
-    };
-  }, []);
+  // (#2304). Keeping progress in shared state lets a remounted panel show the live
+  // phase, percent, stage, and elapsed counter (#2315).
+  const {
+    progressPhase,
+    progressPercent,
+    progressStage,
+    elapsed,
+    startRunProgress,
+    clearRunProgressTimer,
+    setProgressPhase,
+    setProgressPercent,
+    setProgressStage,
+  } = useRunProgress();
 
   const [outputFormat, setOutputFormat] = useState("png");
   const [quality, setQuality] = useState(95);
@@ -455,14 +456,7 @@ export function EraseObjectSettings({
 
     setError(null);
     setProcessing(true);
-    setProgressPhase("uploading");
-    setProgressPercent(0);
-    setElapsed(0);
-
-    const startTime = Date.now();
-    elapsedRef.current = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - startTime) / 1000));
-    }, 1000);
+    const runTimer = startRunProgress();
 
     const clientJobId = generateId();
 
@@ -496,7 +490,7 @@ export function EraseObjectSettings({
     };
     const finishUi = () => {
       endWatch();
-      if (elapsedRef.current) clearInterval(elapsedRef.current);
+      clearRunProgressTimer(runTimer);
       setProcessing(false);
       setProgressPhase("idle");
       setProgressStage(null);
@@ -786,6 +780,7 @@ export function EraseObjectSettings({
         () => {
           if (useFileStore.getState().processing) setProcessing(false);
         },
+        () => setProgressPhase("idle"),
         () => {
           for (const { entryId } of work) {
             if (
@@ -816,17 +811,13 @@ export function EraseObjectSettings({
     // The teardown below runs whatever threw, so the run can't stay at
     // processing with its elapsed counter ticking (#1810).
     let batchError: { cause: unknown } | null = null;
+    let runTimer: ReturnType<typeof setInterval> | null = null;
     try {
       setError(null);
-      if (!filesGone) setProcessing(true);
-      setProgressPhase("uploading");
-      setProgressPercent(0);
-      setElapsed(0);
-
-      const startTime = Date.now();
-      elapsedRef.current = setInterval(() => {
-        setElapsed(Math.floor((Date.now() - startTime) / 1000));
-      }, 1000);
+      if (!filesGone) {
+        setProcessing(true);
+        runTimer = startRunProgress();
+      }
 
       for (let wi = 0; wi < work.length; wi++) {
         if (filesGone) break;
@@ -882,7 +873,7 @@ export function EraseObjectSettings({
     for (const teardown of [
       unsubscribe,
       () => {
-        if (elapsedRef.current) clearInterval(elapsedRef.current);
+        clearRunProgressTimer(runTimer);
       },
       // A stopped batch's store watch already cleared processing when the stop
       // fired, so don't write it again after the await where a next run may
@@ -890,8 +881,12 @@ export function EraseObjectSettings({
       () => {
         if (!filesGone) setProcessing(false);
       },
-      () => setProgressPhase("idle"),
-      () => setProgressStage(null),
+      () => {
+        if (!filesGone) setProgressPhase("idle");
+      },
+      () => {
+        if (!filesGone) setProgressStage(null);
+      },
       // A batch that stopped early says so, as the single-file run does.
       () => {
         if (batchError) setError(trackingFailed);
