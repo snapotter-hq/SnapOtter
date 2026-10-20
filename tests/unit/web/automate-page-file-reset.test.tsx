@@ -440,6 +440,157 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
     expect(useFileStore.getState().processing).toBe(false);
   });
 
+  it("aborts in-flight libraryFileIds downloads on unmount and does not overwrite files loaded on the next page (#2669)", async () => {
+    let capturedSignal: AbortSignal | undefined;
+    let resolveDownload: (res: Response) => void = () => {};
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/files/file-1/download")) {
+        capturedSignal = init?.signal ?? undefined;
+        return new Promise<Response>((resolve) => {
+          resolveDownload = resolve;
+        });
+      }
+      if (url.includes("/pipeline/list")) {
+        return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+      );
+    });
+
+    arrive({ libraryFileIds: ["file-1"] }, true);
+    expect(capturedSignal).toBeInstanceOf(AbortSignal);
+    expect(capturedSignal?.aborted).toBe(false);
+
+    fireEvent.click(screen.getByTestId("go-files"));
+    expect(await screen.findByTestId("files-page")).toBeInTheDocument();
+
+    expect(capturedSignal?.aborted).toBe(true);
+
+    act(() => {
+      useFileStore.getState().setFiles([png("destination.png")]);
+    });
+
+    await act(async () => {
+      resolveDownload(
+        new Response("late-library-bytes", {
+          headers: { "content-disposition": 'attachment; filename="from-library.png"' },
+        }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
+    const entries = useFileStore.getState().entries;
+    expect(entries).toHaveLength(1);
+    expect(entries[0].file.name).toBe("destination.png");
+  });
+
+  it("drops a libraryFileIds download whose response body resolves after unmount (#2669)", async () => {
+    let blobCalled = false;
+    let resolveBlob: (blob: Blob) => void = () => {};
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/files/file-1/download")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({
+            "content-disposition": 'attachment; filename="from-library.png"',
+          }),
+          blob: () => {
+            blobCalled = true;
+            return new Promise<Blob>((resolve) => {
+              resolveBlob = resolve;
+            });
+          },
+        } as unknown as Response);
+      }
+      if (url.includes("/pipeline/list")) {
+        return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+      );
+    });
+
+    arrive({ libraryFileIds: ["file-1"] });
+    await waitFor(() => expect(blobCalled).toBe(true));
+
+    fireEvent.click(screen.getByTestId("go-files"));
+    expect(await screen.findByTestId("files-page")).toBeInTheDocument();
+
+    act(() => {
+      useFileStore.getState().setFiles([png("destination.png")]);
+    });
+
+    await act(async () => {
+      resolveBlob(new Blob(["late-library-bytes"], { type: "image/png" }));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
+    const entries = useFileStore.getState().entries;
+    expect(entries).toHaveLength(1);
+    expect(entries[0].file.name).toBe("destination.png");
+  });
+
+  it("drops a multi-file libraryFileIds import when one file finished before unmount and the remaining fetch fails after unmount (#2669)", async () => {
+    let firstFileFinished = false;
+    let secondSignal: AbortSignal | undefined;
+    let rejectSecondDownload: (err: Error) => void = () => {};
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/files/file-1/download")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: {
+            get: (name: string) => {
+              if (name.toLowerCase() === "content-disposition") {
+                firstFileFinished = true;
+                return 'attachment; filename="first-library.png"';
+              }
+              return null;
+            },
+          },
+          blob: () => Promise.resolve(new Blob(["first-file-bytes"], { type: "image/png" })),
+        } as unknown as Response);
+      }
+      if (url.includes("/files/file-2/download")) {
+        secondSignal = init?.signal ?? undefined;
+        return new Promise<Response>((_, reject) => {
+          rejectSecondDownload = reject;
+        });
+      }
+      if (url.includes("/pipeline/list")) {
+        return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+      );
+    });
+
+    arrive({ libraryFileIds: ["file-1", "file-2"] }, true);
+    await waitFor(() => expect(firstFileFinished).toBe(true));
+
+    fireEvent.click(screen.getByTestId("go-files"));
+    expect(await screen.findByTestId("files-page")).toBeInTheDocument();
+    expect(secondSignal?.aborted).toBe(true);
+
+    act(() => {
+      useFileStore.getState().setFiles([png("destination.png")]);
+    });
+
+    await act(async () => {
+      rejectSecondDownload(new DOMException("Aborted", "AbortError"));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
+    const entries = useFileStore.getState().entries;
+    expect(entries).toHaveLength(1);
+    expect(entries[0].file.name).toBe("destination.png");
+  });
+
   it("guards the file store reset on unmount so a throwing reset reports and does not crash unmount", () => {
     const view = arrive();
 

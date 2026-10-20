@@ -21,7 +21,7 @@ import {
   Workflow,
   X,
 } from "lucide-react";
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, type RefObject, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { TemplatesSection } from "@/components/automate/templates-section";
 import { BeforeAfterSlider } from "@/components/common/before-after-slider";
@@ -79,12 +79,19 @@ function previewIcon(kind: string) {
  * while the DOM node is still connected; skipping that simulated pass
  * preserves files being imported via `state: { libraryFileIds }`.
  */
-function AutomatePageUnmountReset() {
+function AutomatePageUnmountReset({
+  libraryImportAbortRef,
+}: {
+  libraryImportAbortRef: RefObject<AbortController | null>;
+}) {
   const probeRef = useRef<HTMLSpanElement | null>(null);
   useEffect(
     () => () => {
       if (probeRef.current?.isConnected) return;
-      const teardownError = runEndWrites([() => useFileStore.getState().reset()]);
+      const teardownError = runEndWrites([
+        () => libraryImportAbortRef.current?.abort(),
+        () => useFileStore.getState().reset(),
+      ]);
       if (teardownError) {
         reportRunEndFailure(
           "Ending a pipeline run after its panel unmounted failed",
@@ -92,7 +99,7 @@ function AutomatePageUnmountReset() {
         );
       }
     },
-    [],
+    [libraryImportAbortRef],
   );
   return (
     <span
@@ -105,15 +112,20 @@ function AutomatePageUnmountReset() {
 }
 
 export function AutomatePage() {
+  const libraryImportAbortRef = useRef<AbortController | null>(null);
   return (
     <>
-      <AutomatePageContent />
-      <AutomatePageUnmountReset />
+      <AutomatePageContent libraryImportAbortRef={libraryImportAbortRef} />
+      <AutomatePageUnmountReset libraryImportAbortRef={libraryImportAbortRef} />
     </>
   );
 }
 
-function AutomatePageContent() {
+function AutomatePageContent({
+  libraryImportAbortRef,
+}: {
+  libraryImportAbortRef: RefObject<AbortController | null>;
+}) {
   const { t } = useTranslation();
   usePageTitle(t.sidebar.automate);
 
@@ -239,15 +251,22 @@ function AutomatePageContent() {
     if (!state?.libraryFileIds || libraryImportHandled.current) return;
     const fileIds = state.libraryFileIds;
     libraryImportHandled.current = true;
+    const controller = new AbortController();
+    libraryImportAbortRef.current = controller;
+    const { signal } = controller;
     navigate(location.pathname, { replace: true, state: null });
 
     (async () => {
       const downloaded = await Promise.all(
         fileIds.map(async (id) => {
           try {
-            const res = await fetch(getFileDownloadUrl(id), { headers: formatHeaders() });
+            const res = await fetch(getFileDownloadUrl(id), {
+              headers: formatHeaders(),
+              signal,
+            });
             if (!res.ok) return null;
             const blob = await res.blob();
+            if (signal.aborted) return null;
             const name =
               res.headers.get("content-disposition")?.match(/filename="?(.+?)"?$/)?.[1] ??
               `file-${id}`;
@@ -257,13 +276,14 @@ function AutomatePageContent() {
           }
         }),
       );
+      if (signal.aborted) return;
       const valid = downloaded.filter((f): f is File => f !== null);
       if (valid.length > 0) {
         resetFiles();
         setFiles(valid);
       }
     })();
-  }, [location.state, location.pathname, navigate, resetFiles, setFiles]);
+  }, [location.state, location.pathname, navigate, resetFiles, setFiles, libraryImportAbortRef]);
 
   // Arrive with a clean file store, the way tool-page does on every tool change.
   //
