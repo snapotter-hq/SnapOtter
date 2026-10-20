@@ -718,6 +718,16 @@ describe("Roles", () => {
     expect(apiPut).not.toHaveBeenCalled();
   });
 
+  it("asks for a permission before saving an edited role with none (#2887)", async () => {
+    renderDe(<RolesSection />);
+    fireEvent.click(await screen.findByRole("button", { name: de.a11y.editRole }));
+    fireEvent.click(screen.getByLabelText("audit:read"));
+    fireEvent.click(screen.getByRole("button", { name: de.common.save }));
+    await expectShown(s.roles.permissionsRequired);
+    expect(apiPut).not.toHaveBeenCalled();
+    expect(screen.getByDisplayValue("auditor")).toBeInTheDocument();
+  });
+
   it("deleting a role asks and reports in the UI language", async () => {
     const confirm = vi.fn(() => true);
     vi.stubGlobal("confirm", confirm);

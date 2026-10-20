@@ -5,6 +5,7 @@
  * permission validation, and user reassignment on role deletion.
  */
 import { describe, expect, it } from "vitest";
+import { updateRoleSchema } from "../../../apps/api/src/routes/roles.js";
 
 // ── Reproduce validation logic from roles.ts ────────────────────────────
 
@@ -85,12 +86,12 @@ function validateUpdateRole(body: {
   description?: string;
   permissions?: string[];
 }): { success: boolean; error?: string } {
-  if (body.name !== undefined) {
-    const nameResult = validateRoleName(body.name);
-    if (!nameResult.success) return nameResult;
-  }
-  if (body.description !== undefined && body.description.length > 500) {
-    return { success: false, error: "Description too long" };
+  const parsed = updateRoleSchema.safeParse(body);
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: parsed.error.issues.map((i) => i.message).join("; "),
+    };
   }
   return { success: true };
 }
@@ -243,6 +244,12 @@ describe("roles route logic", () => {
         permissions: ["tools:use"],
       });
       expect(result.success).toBe(true);
+    });
+
+    it("rejects empty permissions array (#2887)", () => {
+      const result = validateUpdateRole({ permissions: [] });
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("At least one permission is required");
     });
   });
 

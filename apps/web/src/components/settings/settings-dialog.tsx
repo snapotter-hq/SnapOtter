@@ -3155,8 +3155,13 @@ export function RolesSection() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!editingRole) return;
-      if (!isValidRoleName(editName)) {
-        setActionMsg({ type: "error", text: t.settings.roles.nameInvalid });
+      const invalid = !isValidRoleName(editName)
+        ? t.settings.roles.nameInvalid
+        : editPermissions.length === 0
+          ? t.settings.roles.permissionsRequired
+          : null;
+      if (invalid) {
+        setActionMsg({ type: "error", text: invalid });
         later(() => setActionMsg(null), 3000, "actionMsg");
         return;
       }
