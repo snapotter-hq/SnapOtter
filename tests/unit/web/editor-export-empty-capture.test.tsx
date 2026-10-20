@@ -1834,6 +1834,22 @@ describe("Autosave validation and state reconciliation (#2658)", () => {
 
   it("normalizes partial adjustments, partial filters, omitted optional fields, and ignores unknown state keys in restoreAutosave", () => {
     useEditorStore.setState({
+      adjustments: {
+        ...useEditorStore.getState().adjustments,
+        contrast: 45,
+        saturation: -30,
+      },
+      filters: useEditorStore
+        .getState()
+        .filters.map((f) =>
+          f.type === "grayscale"
+            ? { ...f, enabled: true }
+            : f.type === "sharpen"
+              ? { ...f, enabled: false, params: { amount: 60 } }
+              : f.type === "vignette"
+                ? { ...f, enabled: true, params: { ...f.params, amount: 90, feather: 12 } }
+                : f,
+        ),
       objects: [
         {
           id: "stale-obj",
@@ -1863,7 +1879,10 @@ describe("Autosave validation and state reconciliation (#2658)", () => {
         state: {
           canvasSize: { width: 640, height: 480 },
           adjustments: { brightness: 30 },
-          filters: [{ type: "blur", enabled: true, params: { radius: 12 } }],
+          filters: [
+            { type: "blur", enabled: true, params: { radius: 12 } },
+            { type: "vignette", enabled: true, params: { amount: 75 } },
+          ],
           unexpectedKey: "should-not-leak",
         } as unknown as Parameters<typeof restoreAutosave>[0]["state"],
       });
@@ -1877,13 +1896,112 @@ describe("Autosave validation and state reconciliation (#2658)", () => {
     expect(state.backgroundColor).toBe("#ffffff");
     expect(useEditorStore.getState().adjustments.brightness).toBe(30);
     expect(useEditorStore.getState().adjustments.contrast).toBe(0);
+    expect(useEditorStore.getState().adjustments.saturation).toBe(0);
     expect(useEditorStore.getState().filters.length).toBeGreaterThan(1);
     expect(useEditorStore.getState().filters.find((f) => f.type === "blur")).toEqual({
       type: "blur",
       enabled: true,
       params: { radius: 12 },
     });
+    expect(useEditorStore.getState().filters.find((f) => f.type === "grayscale")).toEqual({
+      type: "grayscale",
+      enabled: false,
+      params: {},
+    });
+    expect(useEditorStore.getState().filters.find((f) => f.type === "sharpen")).toEqual({
+      type: "sharpen",
+      enabled: false,
+      params: { amount: 0 },
+    });
+    expect(useEditorStore.getState().filters.find((f) => f.type === "vignette")).toEqual({
+      type: "vignette",
+      enabled: true,
+      params: { amount: 75, midpoint: 50, roundness: 0, feather: 50 },
+    });
     expect(state.unexpectedKey).toBeUndefined();
+  });
+
+  it("resets adjustments, filters, and layers to clean defaults when restoring an autosave that omits them (#3161)", () => {
+    useEditorStore.setState({
+      isDirty: false,
+      layers: [
+        {
+          id: "stale-layer-1",
+          name: "Stale Layer",
+          visible: false,
+          locked: true,
+          opacity: 0.4,
+          blendMode: "multiply",
+          thumbnail: "data:image/png;base64,AA==",
+        },
+        {
+          id: "stale-layer-2",
+          name: "Second Stale Layer",
+          visible: true,
+          locked: false,
+          opacity: 0.9,
+          blendMode: "screen",
+          thumbnail: null,
+        },
+      ],
+      activeLayerId: "stale-layer-2",
+      adjustments: {
+        brightness: 60,
+        contrast: -40,
+        hue: 120,
+        saturation: 35,
+        luminance: -15,
+        exposure: 25,
+        vibrance: -20,
+        warmth: 50,
+      },
+      filters: useEditorStore
+        .getState()
+        .filters.map((f) =>
+          f.type === "grayscale"
+            ? { ...f, enabled: true }
+            : f.type === "blur"
+              ? { ...f, enabled: true, params: { radius: 24 } }
+              : f,
+        ),
+    });
+
+    act(() => {
+      restoreAutosave({
+        version: 1,
+        timestamp: 1700000000000,
+        state: {
+          canvasSize: { width: 800, height: 600 },
+        } as unknown as Parameters<typeof restoreAutosave>[0]["state"],
+      });
+    });
+
+    const state = useEditorStore.getState();
+    expect(state.canvasSize).toEqual({ width: 800, height: 600 });
+    expect(state.layers).toEqual([
+      {
+        id: "layer-1",
+        name: "Layer 1",
+        visible: true,
+        locked: false,
+        opacity: 1,
+        blendMode: "source-over",
+        thumbnail: null,
+      },
+    ]);
+    expect(state.activeLayerId).toBe("layer-1");
+    expect(state.adjustments).toEqual({
+      brightness: 0,
+      contrast: 0,
+      hue: 0,
+      saturation: 0,
+      luminance: 0,
+      exposure: 0,
+      vibrance: 0,
+      warmth: 0,
+    });
+    expect(state.filters.every((f) => f.enabled === false)).toBe(true);
+    expect(state.filters.find((f) => f.type === "blur")?.params).toEqual({ radius: 0 });
   });
 });
 

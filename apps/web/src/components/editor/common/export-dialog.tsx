@@ -2207,15 +2207,17 @@ export function restoreAutosave(data: AutosaveData): void {
   const store = useEditorStore.getState();
   const state = data.state;
   const needsHydration = neededAutosaveBlobKeys(data).length > 0;
-  const layers = state.layers || store.layers;
+  const layers = state.layers || createDefaultLayers();
   const activeLayerId = layers.some((l) => l.id === store.activeLayerId)
     ? store.activeLayerId
     : (layers[0]?.id ?? store.activeLayerId);
+  const defaultAdjustments = createDefaultAdjustments();
   const adjustments = state.adjustments
-    ? { ...store.adjustments, ...state.adjustments }
-    : store.adjustments;
+    ? { ...defaultAdjustments, ...state.adjustments }
+    : defaultAdjustments;
+  const defaultFilters = createDefaultFilters();
   const filters = state.filters
-    ? store.filters.map((existing) => {
+    ? defaultFilters.map((existing) => {
         const match = state.filters?.find((f) => f.type === existing.type);
         return match
           ? {
@@ -2225,7 +2227,7 @@ export function restoreAutosave(data: AutosaveData): void {
             }
           : existing;
       })
-    : store.filters;
+    : defaultFilters;
   const initialObjects = (state.objects || []).filter(
     (obj) =>
       !(
