@@ -1209,6 +1209,101 @@ describe("image-to-pdf", () => {
     expect(json.pages).toBe(2);
     expect(json.collated).toBe(false);
     expect(json.compression).toBeDefined();
+    expect(json.compression.targetMet).toBe(true);
+    expect(json.processedSize).toBeLessThanOrEqual(5_000_000);
+  });
+
+  it("returns targetMet=false when collate=false PDFs exceed targetSize (#2519)", async () => {
+    const w = 800;
+    const h = 800;
+    const raw = Buffer.alloc(w * h * 3);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const idx = (y * w + x) * 3;
+        raw[idx] = (x * 7 + y * 13) % 256;
+        raw[idx + 1] = (x * 11 + y * 3) % 256;
+        raw[idx + 2] = (x * 5 + y * 17) % 256;
+      }
+    }
+    const sharp = (await import("sharp")).default;
+    const largePng = await sharp(raw, { raw: { width: w, height: h, channels: 3 } })
+      .png()
+      .toBuffer();
+
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "big1.png", contentType: "image/png", content: largePng },
+      { name: "file", filename: "big2.png", contentType: "image/png", content: largePng },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          collate: false,
+          targetSize: { value: 50, unit: "KB" },
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-to-pdf",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.collated).toBe(false);
+    expect(json.processedSize).toBeGreaterThan(50_000);
+    expect(json.compression).toEqual({
+      targetRequested: 50_000,
+      targetMet: false,
+      jpegQuality: 10,
+    });
+
+    // Also verify the 10-file uncollated case (at MAX_BATCH_SIZE=10) where
+    // budgeting single-PDF overhead (7,048 B) instead of per-file PDF overhead
+    // (10 * 2548 = 25,480 B) picked a JPEG quality whose 10 single-page PDFs
+    // exceeded 50,000 B (#2519).
+    const mw = 160;
+    const mh = 160;
+    const mraw = Buffer.alloc(mw * mh * 3);
+    for (let y = 0; y < mh; y++) {
+      for (let x = 0; x < mw; x++) {
+        const idx = (y * mw + x) * 3;
+        mraw[idx] = (x * 17 + y * 31) % 256;
+        mraw[idx + 1] = (x * 23 + y * 11) % 256;
+        mraw[idx + 2] = (x * 7 + y * 43) % 256;
+      }
+    }
+    const mediumPng = await sharp(mraw, { raw: { width: mw, height: mh, channels: 3 } })
+      .png()
+      .toBuffer();
+    const tenPayload = createMultipartPayload([
+      ...Array.from({ length: 10 }, (_, i) => ({
+        name: "file",
+        filename: `med-${i}.png`,
+        contentType: "image/png",
+        content: mediumPng,
+      })),
+      {
+        name: "settings",
+        content: JSON.stringify({
+          collate: false,
+          targetSize: { value: 50, unit: "KB" },
+        }),
+      },
+    ]);
+    const tenRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-to-pdf",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": tenPayload.contentType },
+      body: tenPayload.body,
+    });
+    expect(tenRes.statusCode).toBe(200);
+    const tenJson = JSON.parse(tenRes.body);
+    expect(tenJson.collated).toBe(false);
+    expect(tenJson.processedSize).toBeLessThanOrEqual(50_000);
+    expect(tenJson.compression.targetRequested).toBe(50_000);
+    expect(tenJson.compression.targetMet).toBe(true);
   });
 
   // ── collate=false with all settings ─────────────────────────────

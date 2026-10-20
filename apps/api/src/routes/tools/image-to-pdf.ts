@@ -286,7 +286,7 @@ export function registerImageToPdfRoute(
 
       if (targetBytes !== null) {
         const flattened = await Promise.all(preparedBuffers.map(flattenAlpha));
-        const pdfOverhead = 2048 + files.length * 500;
+        const pdfOverhead = settings.collate ? 2048 + files.length * 500 : files.length * 2548;
         const result = await compressImagesForTarget(flattened, targetBytes, pdfOverhead);
         imageBuffers = result.buffers;
         compression = {
@@ -367,6 +367,10 @@ export function registerImageToPdfRoute(
         await putObject(`outputs/${jobId}/${pdfName}`, pdfBuffer);
         pdfNames.push(pdfName);
         totalProcessedSize += pdfBuffer.length;
+      }
+
+      if (compression && targetBytes !== null) {
+        compression.targetMet = totalProcessedSize <= targetBytes;
       }
 
       // Build ZIP by streaming each entry from object storage (O(1-entry) peak)

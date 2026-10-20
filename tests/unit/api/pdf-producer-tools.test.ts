@@ -273,4 +273,171 @@ describe("image-to-pdf custom route Producer scrub (#2501)", () => {
 
     await app.close();
   });
+
+  it("evaluates targetMet against the post-scrub PDF size sum when collate is false (#2519)", async () => {
+    const app = await buildApp();
+    const png = await makePng();
+
+    // First call: two scrubbed single-page PDFs sum to 50,000 bytes (exact targetBytes boundary) -> targetMet: true.
+    for (const targetLen of [25_000, 25_000]) {
+      pdfScrubProducerPy.mockImplementationOnce(async (inPath: string, outPath: string) => {
+        const raw = await readFile(inPath);
+        expect(raw.length).toBeLessThanOrEqual(targetLen);
+        const pad = Buffer.alloc(targetLen - raw.length, 0x20);
+        await writeFile(outPath, Buffer.concat([raw, pad]));
+      });
+    }
+
+    const metRes = await app.inject({
+      method: "POST",
+      url: apiToolPath("image-to-pdf"),
+      ...multipartBody(
+        [
+          { name: "first.png", type: "image/png", data: png },
+          { name: "second.png", type: "image/png", data: png },
+        ],
+        {
+          collate: false,
+          targetSize: { value: 50, unit: "KB" },
+        },
+      ),
+    });
+
+    expect(metRes.statusCode).toBe(200);
+    expect(metRes.json()).toMatchObject({
+      processedSize: 50_000,
+      collated: false,
+      compression: {
+        targetRequested: 50_000,
+        targetMet: true,
+        jpegQuality: expect.any(Number),
+      },
+    });
+
+    // Second call: compressed JPEGs fit the pre-PDF budget, but the two scrubbed
+    // single-page PDFs sum to 50,001 bytes (1 byte over targetBytes) -> targetMet: false.
+    for (const targetLen of [25_000, 25_001]) {
+      pdfScrubProducerPy.mockImplementationOnce(async (inPath: string, outPath: string) => {
+        const raw = await readFile(inPath);
+        expect(raw.length).toBeLessThanOrEqual(targetLen);
+        const pad = Buffer.alloc(targetLen - raw.length, 0x20);
+        await writeFile(outPath, Buffer.concat([raw, pad]));
+      });
+    }
+
+    const missedRes = await app.inject({
+      method: "POST",
+      url: apiToolPath("image-to-pdf"),
+      ...multipartBody(
+        [
+          { name: "first.png", type: "image/png", data: png },
+          { name: "second.png", type: "image/png", data: png },
+        ],
+        {
+          collate: false,
+          targetSize: { value: 50, unit: "KB" },
+        },
+      ),
+    });
+
+    expect(missedRes.statusCode).toBe(200);
+    expect(missedRes.json()).toMatchObject({
+      processedSize: 50_001,
+      collated: false,
+      compression: {
+        targetRequested: 50_000,
+        targetMet: false,
+        jpegQuality: expect.any(Number),
+      },
+    });
+
+    await app.close();
+  });
+
+  it("budgets per-file PDF overhead when collate is false so multi-image runs meet targetSize (#2519)", async () => {
+    const app = await buildApp();
+    // Create a 160x160 detailed image whose JPEG size ranges from ~1.5 KB (q=10)
+    // to ~4.2 KB (q=74). With 10 copies and a 50 KB target:
+    // - collate=true overhead (2048 + 10 * 500 = 7,048 B) leaves a 42,952 B JPEG budget (~4.2 KB/image).
+    // - collate=false wraps each image in its own PDF (~1 KB each), so budgeting single-PDF
+    //   overhead picks a quality whose 10 PDFs exceed 50,000 B unless per-file overhead
+    //   (10 * 2548 = 25,480 B, leaving 24,520 B for JPEGs) is reserved up front.
+    const w = 160;
+    const h = 160;
+    const raw = Buffer.alloc(w * h * 3);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const idx = (y * w + x) * 3;
+        raw[idx] = (x * 17 + y * 31) % 256;
+        raw[idx + 1] = (x * 23 + y * 11) % 256;
+        raw[idx + 2] = (x * 7 + y * 43) % 256;
+      }
+    }
+    const noisyPng = await sharp(raw, { raw: { width: w, height: h, channels: 3 } })
+      .png()
+      .toBuffer();
+    const tenFiles = Array.from({ length: 10 }, (_, i) => ({
+      name: `img-${i}.png`,
+      type: "image/png",
+      data: noisyPng,
+    }));
+
+    const collatedRes = await app.inject({
+      method: "POST",
+      url: apiToolPath("image-to-pdf"),
+      ...multipartBody(tenFiles, {
+        collate: true,
+        targetSize: { value: 50, unit: "KB" },
+      }),
+    });
+    expect(collatedRes.statusCode).toBe(200);
+    const collatedBody = collatedRes.json();
+
+    const uncollatedRes = await app.inject({
+      method: "POST",
+      url: apiToolPath("image-to-pdf"),
+      ...multipartBody(tenFiles, {
+        collate: false,
+        targetSize: { value: 50, unit: "KB" },
+      }),
+    });
+    expect(uncollatedRes.statusCode).toBe(200);
+    const uncollatedBody = uncollatedRes.json();
+
+    expect(uncollatedBody.compression.jpegQuality).toBeLessThan(
+      collatedBody.compression.jpegQuality,
+    );
+    expect(uncollatedBody.processedSize).toBeLessThanOrEqual(50_000);
+    expect(uncollatedBody.compression.targetMet).toBe(true);
+
+    // When 20 files are converted with collate=false and a 50 KB target, the
+    // conservative per-file overhead estimate (20 * 2548 = 50,960 B) exceeds
+    // targetBytes (budget <= 0 -> quality 10, pre-PDF targetMet false), and
+    // post-loop re-evaluation flips targetMet back to true when the actual
+    // scrubbed single-page PDFs sum below 50,000 B.
+    const tinyPng = await makePng();
+    const twentyTinyFiles = Array.from({ length: 20 }, (_, i) => ({
+      name: `tiny-${i}.png`,
+      type: "image/png",
+      data: tinyPng,
+    }));
+    const twentyRes = await app.inject({
+      method: "POST",
+      url: apiToolPath("image-to-pdf"),
+      ...multipartBody(twentyTinyFiles, {
+        collate: false,
+        targetSize: { value: 50, unit: "KB" },
+      }),
+    });
+    expect(twentyRes.statusCode).toBe(200);
+    const twentyBody = twentyRes.json();
+    expect(twentyBody.processedSize).toBeLessThanOrEqual(50_000);
+    expect(twentyBody.compression).toEqual({
+      targetRequested: 50_000,
+      targetMet: true,
+      jpegQuality: 10,
+    });
+
+    await app.close();
+  });
 });
