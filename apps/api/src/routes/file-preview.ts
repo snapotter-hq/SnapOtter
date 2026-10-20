@@ -94,7 +94,7 @@ export function ensurePreviewDir(): Promise<void> {
     await sweepOrphanedPreviewWork(dir);
   })().catch((err) => {
     previewDirReady = undefined;
-    throw err;
+    throw normalizeOperationalWriteError(err);
   });
   return previewDirReady;
 }

@@ -3,9 +3,11 @@ import { existsSync } from "node:fs";
 import { chmod, mkdir, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import Fastify from "fastify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const fsState = vi.hoisted(() => ({
+  failMkdirWith: "",
   failRmWith: "",
   failRmSuffix: "",
 }));
@@ -15,6 +17,13 @@ vi.mock("node:fs/promises", async (importOriginal) => {
   const errno = (code: string) => Object.assign(new Error(`${code}: simulated`), { code });
   return {
     ...actual,
+    mkdir: async (...args: Parameters<typeof actual.mkdir>) => {
+      const target = String(args[0]);
+      if (fsState.failMkdirWith && target.endsWith(".previews")) {
+        throw errno(fsState.failMkdirWith);
+      }
+      return actual.mkdir(...args);
+    },
     rm: async (...args: Parameters<typeof actual.rm>) => {
       const target = String(args[0]);
       if (fsState.failRmWith && (!fsState.failRmSuffix || target.endsWith(fsState.failRmSuffix))) {
@@ -38,18 +47,64 @@ vi.mock("../../../apps/api/src/config.js", () => ({
 const loggerMock = vi.hoisted(() => ({ warn: vi.fn(), error: vi.fn(), info: vi.fn() }));
 vi.mock("../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
 
-vi.mock("../../../apps/api/src/db/index.js", () => ({
-  db: { select: vi.fn() },
-  schema: { userFiles: {} },
+interface FileRow {
+  id: string;
+  userId: string;
+  originalName: string;
+  storedName: string;
+  mimeType: string;
+}
+
+const fileRows = vi.hoisted(() => new Map<string, FileRow>());
+const previewMocks = vi.hoisted(() => ({
+  convertDocument: vi.fn(),
+  sofficeAvailable: vi.fn(() => true),
+  runFfmpeg: vi.fn(),
+  reportError: vi.fn(),
 }));
 
+vi.mock("drizzle-orm", () => ({
+  eq: (_col: unknown, val: string) => val,
+}));
+
+vi.mock("../../../apps/api/src/db/index.js", () => ({
+  db: {
+    select: () => ({
+      from: () => ({
+        where: (id: string) => {
+          const row = fileRows.get(id);
+          return Promise.resolve(row ? [row] : []);
+        },
+      }),
+    }),
+  },
+  schema: { userFiles: { id: "id" } },
+}));
+
+vi.mock("../../../apps/api/src/plugins/auth.js", () => ({
+  requireAuth: () => ({ id: "user-1", role: "admin" }),
+}));
+
+vi.mock("../../../apps/api/src/permissions.js", () => ({
+  hasEffectivePermission: async () => true,
+  requirePermission: () => async () => true,
+}));
+
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
+  return {
+    ...actual,
+    reportError: previewMocks.reportError,
+  };
+});
+
 vi.mock("@snapotter/doc-engine", () => ({
-  convertDocument: vi.fn(),
-  sofficeAvailable: vi.fn(),
+  convertDocument: previewMocks.convertDocument,
+  sofficeAvailable: previewMocks.sofficeAvailable,
 }));
 
 vi.mock("@snapotter/media-engine", () => ({
-  runFfmpeg: vi.fn(),
+  runFfmpeg: previewMocks.runFfmpeg,
   softwareEncoder: vi.fn((x) => x),
 }));
 
@@ -61,10 +116,16 @@ beforeEach(async () => {
   previewDir = join(testDir, ".previews");
   await mkdir(previewDir, { recursive: true });
   config.FILES_STORAGE_PATH = testDir;
+  fileRows.clear();
+  previewMocks.convertDocument.mockReset();
+  previewMocks.sofficeAvailable.mockReset().mockReturnValue(true);
+  previewMocks.runFfmpeg.mockReset();
+  previewMocks.reportError.mockReset();
   vi.resetModules();
 });
 
 afterEach(async () => {
+  fsState.failMkdirWith = "";
   fsState.failRmWith = "";
   fsState.failRmSuffix = "";
   await rm(testDir, { recursive: true, force: true });
@@ -242,5 +303,198 @@ describe("ensurePreviewDir startup sweep (#1320)", () => {
     await makeStale(join(previewDir, "doc-after1"));
     await ensurePreviewDir();
     expect(existsSync(join(previewDir, "doc-after1"))).toBe(true);
+  });
+
+  it.each(["EACCES", "EPERM", "EROFS"] as const)(
+    "maps %s from mkdir to a 503 storage-not-writable SafeError with cause and resets previewDirReady (#3146)",
+    async (code) => {
+      await rm(previewDir, { recursive: true, force: true });
+      fsState.failMkdirWith = code;
+      const { ensurePreviewDir } = await import("../../../apps/api/src/routes/file-preview.js");
+      const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+
+      const rejected = await ensurePreviewDir().then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(rejected).toMatchObject({
+        message: NOT_WRITABLE_MSG,
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-not-writable",
+        statusCode: 503,
+        cause: expect.objectContaining({ code }),
+      });
+      expect(classifyError(rejected, "http")).toBe("operational");
+
+      fsState.failMkdirWith = "";
+      await expect(ensurePreviewDir()).resolves.toBeUndefined();
+      expect(existsSync(previewDir)).toBe(true);
+    },
+  );
+
+  it.each(["ENOSPC", "EDQUOT"] as const)(
+    "maps %s from mkdir to a 503 storage-full SafeError with cause and resets previewDirReady (#3146)",
+    async (code) => {
+      await rm(previewDir, { recursive: true, force: true });
+      fsState.failMkdirWith = code;
+      const { ensurePreviewDir } = await import("../../../apps/api/src/routes/file-preview.js");
+      const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+
+      const rejected = await ensurePreviewDir().then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(rejected).toMatchObject({
+        message: FULL_MSG,
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-full",
+        statusCode: 503,
+        cause: expect.objectContaining({ code }),
+      });
+      expect(classifyError(rejected, "http")).toBe("operational");
+
+      fsState.failMkdirWith = "";
+      await expect(ensurePreviewDir()).resolves.toBeUndefined();
+      expect(existsSync(previewDir)).toBe(true);
+    },
+  );
+
+  it("rethrows non-operational mkdir errors untouched while resetting previewDirReady (#3146)", async () => {
+    await rm(previewDir, { recursive: true, force: true });
+    fsState.failMkdirWith = "EBUSY";
+    const { ensurePreviewDir } = await import("../../../apps/api/src/routes/file-preview.js");
+
+    const err = (await ensurePreviewDir().then(
+      () => null,
+      (e: unknown) => e,
+    )) as { code?: string; isSafeMessage?: unknown; statusCode?: number } | null;
+    expect(err?.code).toBe("EBUSY");
+    expect(err?.isSafeMessage).toBeUndefined();
+    expect(err?.statusCode).toBeUndefined();
+
+    fsState.failMkdirWith = "";
+    await expect(ensurePreviewDir()).resolves.toBeUndefined();
+    expect(existsSync(previewDir)).toBe(true);
+  });
+
+  const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
+  it.skipIf(isRoot)(
+    "throws a 503 storage-not-writable SafeError when FILES_STORAGE_PATH is read-only and retries after chmod (#3146)",
+    async () => {
+      await rm(previewDir, { recursive: true, force: true });
+      const { ensurePreviewDir } = await import("../../../apps/api/src/routes/file-preview.js");
+      await chmod(testDir, 0o555);
+      try {
+        await expect(ensurePreviewDir()).rejects.toMatchObject({
+          message: NOT_WRITABLE_MSG,
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-not-writable",
+          statusCode: 503,
+          cause: expect.objectContaining({
+            code: expect.stringMatching(/^(EACCES|EPERM)$/),
+          }),
+        });
+      } finally {
+        await chmod(testDir, 0o755).catch(() => {});
+      }
+
+      await expect(ensurePreviewDir()).resolves.toBeUndefined();
+      expect(existsSync(previewDir)).toBe(true);
+    },
+  );
+
+  it("answers GET /api/v1/files/:id/preview with 503 SafeError for office docs and media when ensurePreviewDir fails, then recovers (#3146)", async () => {
+    await rm(previewDir, { recursive: true, force: true });
+    await writeFile(join(testDir, "stored-doc.docx"), "PK-docx");
+    await writeFile(join(testDir, "stored-vid.mp4"), "mp4-bytes");
+
+    fileRows.set("doc-1", {
+      id: "doc-1",
+      userId: "user-1",
+      originalName: "report.docx",
+      storedName: "stored-doc.docx",
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+    fileRows.set("vid-1", {
+      id: "vid-1",
+      userId: "user-1",
+      originalName: "clip.mp4",
+      storedName: "stored-vid.mp4",
+      mimeType: "video/mp4",
+    });
+
+    previewMocks.convertDocument.mockImplementation(async (_in: string, outDir: string) => {
+      await writeFile(join(outDir, "input.pdf"), "%PDF-1.4 doc");
+    });
+    previewMocks.runFfmpeg.mockImplementation(async (args: string[]) => {
+      const outPath = args.at(-1) ?? "";
+      await writeFile(outPath, "encoded-mp4");
+    });
+
+    const { filePreviewRoutes } = await import("../../../apps/api/src/routes/file-preview.js");
+    const { registerErrorHandler } = await import("../../../apps/api/src/plugins/error-handler.js");
+    const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+
+    const app = Fastify();
+    registerErrorHandler(app);
+    await filePreviewRoutes(app);
+    await app.ready();
+
+    try {
+      fsState.failMkdirWith = "EPERM";
+      const docFail = await app.inject({ method: "GET", url: "/api/v1/files/doc-1/preview" });
+      expect(docFail.statusCode).toBe(503);
+      expect(docFail.json()).toEqual({
+        error: NOT_WRITABLE_MSG,
+        code: "storage-not-writable",
+      });
+      expect(previewMocks.convertDocument).not.toHaveBeenCalled();
+      expect(previewMocks.reportError).toHaveBeenCalledTimes(1);
+      expect(previewMocks.reportError.mock.calls[0][1]).toMatchObject({
+        source: "http",
+        statusCode: 503,
+      });
+      expect(
+        classifyError(
+          previewMocks.reportError.mock.calls[0][0],
+          previewMocks.reportError.mock.calls[0][1].source,
+        ),
+      ).toBe("operational");
+
+      previewMocks.reportError.mockReset();
+      fsState.failMkdirWith = "EDQUOT";
+      const vidFail = await app.inject({ method: "GET", url: "/api/v1/files/vid-1/preview" });
+      expect(vidFail.statusCode).toBe(503);
+      expect(vidFail.json()).toEqual({
+        error: FULL_MSG,
+        code: "storage-full",
+      });
+      expect(previewMocks.runFfmpeg).not.toHaveBeenCalled();
+      expect(previewMocks.reportError).toHaveBeenCalledTimes(1);
+      expect(previewMocks.reportError.mock.calls[0][1]).toMatchObject({
+        source: "http",
+        statusCode: 503,
+      });
+      expect(
+        classifyError(
+          previewMocks.reportError.mock.calls[0][0],
+          previewMocks.reportError.mock.calls[0][1].source,
+        ),
+      ).toBe("operational");
+
+      fsState.failMkdirWith = "";
+      const docOk = await app.inject({ method: "GET", url: "/api/v1/files/doc-1/preview" });
+      expect(docOk.statusCode).toBe(200);
+      expect(docOk.body).toBe("%PDF-1.4 doc");
+
+      const vidOk = await app.inject({ method: "GET", url: "/api/v1/files/vid-1/preview" });
+      expect(vidOk.statusCode).toBe(200);
+      expect(vidOk.body).toBe("encoded-mp4");
+    } finally {
+      await app.close();
+    }
   });
 });
