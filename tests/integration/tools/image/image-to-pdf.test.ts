@@ -1158,6 +1158,50 @@ describe("image-to-pdf", () => {
     }
   });
 
+  it("deduplicates PDF names when collate=false uploads share a filename stem (#2520)", async () => {
+    const WEBP = readFixture(fixtures.image.base.webp50);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "photo.jpg", contentType: "image/jpeg", content: JPG },
+      { name: "file", filename: "Photo.webp", contentType: "image/webp", content: WEBP },
+      {
+        name: "settings",
+        content: JSON.stringify({ collate: false }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-to-pdf",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.pages).toBe(3);
+    expect(json.collated).toBe(false);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: json.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dlRes.statusCode).toBe(200);
+    const zip = new AdmZip(Buffer.from(dlRes.rawPayload));
+    const entries = zip.getEntries();
+    expect(entries.map((e) => e.entryName)).toEqual(["photo.pdf", "photo_1.pdf", "Photo_2.pdf"]);
+    const pdfBuffers = entries.map((e) => e.getData());
+    for (let i = 0; i < pdfBuffers.length; i++) {
+      expect(pdfBuffers[i].subarray(0, 5).toString("ascii")).toBe("%PDF-");
+      for (let j = i + 1; j < pdfBuffers.length; j++) {
+        expect(pdfBuffers[i].equals(pdfBuffers[j])).toBe(false);
+      }
+    }
+    const sumBytes = pdfBuffers.reduce((sum, buf) => sum + buf.length, 0);
+    expect(json.processedSize).toBe(sumBytes);
+  });
+
   // ── collate=false with single image returns single PDF in ZIP ────
 
   it("creates single PDF in ZIP when collate is false with one image", async () => {

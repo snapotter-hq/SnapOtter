@@ -8,7 +8,7 @@ import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
-import { sanitizeFilename } from "../../lib/filename.js";
+import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
 import {
   DecoderOutOfMemoryError,
   decodeToSharpCompat,
@@ -358,11 +358,12 @@ export function registerImageToPdfRoute(
 
       let totalProcessedSize = 0;
       const pdfNames: string[] = [];
+      const uniquePdfName = createUniqueNamer();
 
       for (let i = 0; i < imageBuffers.length; i++) {
         const pdfBuffer = await buildPdf([imageBuffers[i]]);
-        const baseName = files[i].filename.replace(/\.[^.]+$/, "");
-        const pdfName = `${baseName}.pdf`;
+        const baseName = files[i].filename.replace(/\.[^.]+$/, "") || "image";
+        const pdfName = uniquePdfName(`${baseName}.pdf`);
         wroteOutput = true;
         await putObject(`outputs/${jobId}/${pdfName}`, pdfBuffer);
         pdfNames.push(pdfName);

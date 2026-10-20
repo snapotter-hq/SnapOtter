@@ -16,6 +16,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import multipart from "@fastify/multipart";
 import { apiToolPath, SafeError } from "@snapotter/shared";
+import AdmZip from "adm-zip";
 import Fastify from "fastify";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -63,6 +64,8 @@ import { registerImageToPdf } from "../../../apps/api/src/routes/tools/image-to-
 
 const PNG = readFileSync(join(__dirname, "../../fixtures/image/valid/test-200x150.png"));
 const JPG = readFileSync(join(__dirname, "../../fixtures/image/valid/test-100x100.jpg"));
+const WEBP = readFileSync(join(__dirname, "../../fixtures/image/valid/test-50x50.webp"));
+const TINY = readFileSync(join(__dirname, "../../fixtures/image/edge/test-1x1.png"));
 const HEIC = readFileSync(join(__dirname, "../../fixtures/image/valid/test-200x150.heic"));
 const PSD = readFileSync(join(__dirname, "../../fixtures/image/formats/sample.psd"));
 const DNG = readFileSync(join(__dirname, "../../fixtures/image/formats/sample.dng"));
@@ -400,6 +403,104 @@ describe("image-to-pdf collate=false clears what a failed run wrote (#2785)", ()
     expect(res.statusCode).toBe(422);
     expect(putObject).not.toHaveBeenCalled();
     expect(deletePrefix).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
+describe("image-to-pdf collate=false deduplicates colliding PDF filenames (#2520)", () => {
+  beforeEach(() => {
+    putObject.mockReset();
+    getObjectBuffer.mockReset();
+    deletePrefix.mockReset().mockResolvedValue(undefined);
+  });
+
+  it("writes distinct storage keys and ZIP entries when uploads share a stem, differ by case, or collide with a generated suffix", async () => {
+    const stored = new Map<string, Buffer>();
+    putObject.mockImplementation(async (key: string, buf: Buffer) => {
+      stored.set(key.normalize("NFC").toLowerCase(), buf);
+    });
+    getObjectBuffer.mockImplementation(async (key: string) => {
+      const buf = stored.get(key.normalize("NFC").toLowerCase());
+      if (!buf) throw new Error(`missing key ${key}`);
+      return buf;
+    });
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "POST",
+      url: apiToolPath("image-to-pdf"),
+      ...multipartBody(
+        [
+          { filename: "photo.png", contentType: "image/png", content: PNG },
+          { filename: "photo.jpg", contentType: "image/jpeg", content: JPG },
+          { filename: "PHOTO.webp", contentType: "image/webp", content: WEBP },
+          { filename: "photo_1.png", contentType: "image/png", content: TINY },
+        ],
+        { collate: false },
+      ),
+    });
+
+    expect(res.statusCode, res.body).toBe(200);
+    expect(deletePrefix).not.toHaveBeenCalled();
+    const { jobId } = res.json() as { jobId: string };
+    expect(putObject.mock.calls.map(([k]) => k)).toEqual([
+      `outputs/${jobId}/photo.pdf`,
+      `outputs/${jobId}/photo_1.pdf`,
+      `outputs/${jobId}/PHOTO_2.pdf`,
+      `outputs/${jobId}/photo_1_1.pdf`,
+      `outputs/${jobId}/images.zip`,
+    ]);
+    const zipBuf = stored.get(`outputs/${jobId}/images.zip`.toLowerCase());
+    expect(zipBuf).toBeDefined();
+
+    const zip = new AdmZip(zipBuf as Buffer);
+    const entries = zip.getEntries();
+    expect(entries.map((e) => e.entryName)).toEqual([
+      "photo.pdf",
+      "photo_1.pdf",
+      "PHOTO_2.pdf",
+      "photo_1_1.pdf",
+    ]);
+
+    const pdfBuffers = entries.map((e) => e.getData());
+    for (let i = 0; i < pdfBuffers.length; i++) {
+      expect(pdfBuffers[i].subarray(0, 5).toString("ascii")).toBe("%PDF-");
+      for (let j = i + 1; j < pdfBuffers.length; j++) {
+        expect(pdfBuffers[i].equals(pdfBuffers[j])).toBe(false);
+      }
+    }
+    await app.close();
+  });
+
+  it("falls back to a non-empty stem when an upload filename is a dotfile like .png", async () => {
+    const stored = new Map<string, Buffer>();
+    putObject.mockImplementation(async (key: string, buf: Buffer) => {
+      stored.set(key, buf);
+    });
+    getObjectBuffer.mockImplementation(async (key: string) => {
+      const buf = stored.get(key);
+      if (!buf) throw new Error(`missing key ${key}`);
+      return buf;
+    });
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "POST",
+      url: apiToolPath("image-to-pdf"),
+      ...multipartBody(
+        [
+          { filename: ".png", contentType: "image/png", content: PNG },
+          { filename: ".jpg", contentType: "image/jpeg", content: JPG },
+        ],
+        { collate: false },
+      ),
+    });
+
+    expect(res.statusCode, res.body).toBe(200);
+    expect(deletePrefix).not.toHaveBeenCalled();
+    const { jobId } = res.json() as { jobId: string };
+    const zip = new AdmZip(stored.get(`outputs/${jobId}/images.zip`) as Buffer);
+    expect(zip.getEntries().map((e) => e.entryName)).toEqual(["image.pdf", "image_1.pdf"]);
     await app.close();
   });
 });
