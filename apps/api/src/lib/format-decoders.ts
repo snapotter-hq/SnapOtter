@@ -944,9 +944,12 @@ async function decodeExr(buffer: Buffer, options: DecodeSafetyOptions): Promise<
         ),
         commandOptions(options, 120_000),
       );
-      return await readFile(outputPath);
+      return await readFile(outputPath).catch((err: unknown) => {
+        throw asDecoderOutOfMemory(err);
+      });
     } catch (error) {
       options.signal?.throwIfAborted();
+      if (error instanceof DecoderOutOfMemoryError) throw error;
       // ImageMagick failed, try ffmpeg
       magickFailure = error;
     }
@@ -1028,9 +1031,12 @@ async function decodeJxl(buffer: Buffer, options: DecodeSafetyOptions): Promise<
     let djxlFailure: unknown;
     try {
       await execFileAsync("djxl", [inputPath, outputPath], commandOptions(options, 120_000));
-      return await readFile(outputPath);
+      return await readFile(outputPath).catch((err: unknown) => {
+        throw asDecoderOutOfMemory(err);
+      });
     } catch (error) {
       options.signal?.throwIfAborted();
+      if (error instanceof DecoderOutOfMemoryError) throw error;
       // djxl not available, fall back to ImageMagick
       djxlFailure = error;
     }
@@ -1067,9 +1073,12 @@ async function decodeJp2(buffer: Buffer, options: DecodeSafetyOptions): Promise<
         timeout: 60_000,
         signal: options.signal,
       });
-      return await readFile(outputPath);
+      return await readFile(outputPath).catch((err: unknown) => {
+        throw asDecoderOutOfMemory(err);
+      });
     } catch (error) {
       options.signal?.throwIfAborted();
+      if (error instanceof DecoderOutOfMemoryError) throw error;
       // opj_decompress not available, fall back to ImageMagick
       opjFailure = error;
     }
@@ -1248,8 +1257,11 @@ async function decodeNetpbm(
   options.signal?.throwIfAborted();
   try {
     return await sharp(buffer, { limitInputPixels: options.maxPixels }).png().toBuffer();
-  } catch {
+  } catch (error) {
     options.signal?.throwIfAborted();
+    if (isImageSafetyError(error)) throw error;
+    const outOfMemory = asDecoderOutOfMemory(error);
+    if (outOfMemory !== error) throw outOfMemory;
     const cmd = await findMagickCmd(options);
     const id = randomUUID();
     const ext = format === "pgm" ? "pgm" : format === "pbm" ? "pbm" : "ppm";

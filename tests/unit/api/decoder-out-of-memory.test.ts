@@ -19,7 +19,46 @@ const failures = vi.hoisted(() => ({
   open: null as Error | null,
   read: null as Error | null,
   writeOutput: null as Buffer | null,
+  sharpToBuffer: null as Error | null,
+  spawned: [] as string[],
 }));
+
+type SharpPngChain = {
+  toBuffer: (...args: unknown[]) => Promise<Buffer>;
+};
+type SharpInstance = {
+  png: (...args: unknown[]) => SharpPngChain;
+};
+type SharpModule = {
+  default: (...args: unknown[]) => SharpInstance;
+};
+
+vi.mock("sharp", async (importOriginal) => {
+  const actual = await importOriginal<SharpModule>();
+  const realSharp = actual.default;
+  const wrapped = ((...args: unknown[]) => {
+    const instance = realSharp(...args);
+    if (failures.sharpToBuffer) {
+      const origPng = instance.png.bind(instance);
+      instance.png = (...pngArgs: unknown[]) => {
+        const pngInstance = origPng(...pngArgs);
+        const origToBuffer = pngInstance.toBuffer.bind(pngInstance);
+        pngInstance.toBuffer = async (...bufArgs: unknown[]) => {
+          if (failures.sharpToBuffer) {
+            const err = failures.sharpToBuffer;
+            failures.sharpToBuffer = null;
+            throw err;
+          }
+          return origToBuffer(...bufArgs);
+        };
+        return pngInstance;
+      };
+    }
+    return instance;
+  }) as SharpModule["default"];
+  Object.assign(wrapped, realSharp);
+  return { ...actual, default: wrapped };
+});
 
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
@@ -34,7 +73,10 @@ vi.mock("node:fs/promises", async (importOriginal) => {
       return (actual.open as (...args: unknown[]) => unknown)(path, ...rest);
     }) as typeof actual.open,
     readFile: (async (path: unknown, ...rest: unknown[]) => {
-      if (failures.read && /(any-out-[^/\\]*\.png|raw-in-[^/\\]*\.tiff)$/.test(String(path))) {
+      if (
+        failures.read &&
+        /((?:any|exr|jxl|jp2)-out-[^/\\]*\.png|raw-in-[^/\\]*\.tiff)$/.test(String(path))
+      ) {
         const err = failures.read;
         failures.read = null;
         throw err;
@@ -60,6 +102,7 @@ vi.mock("node:child_process", async (importOriginal) => {
       }
       const decoding = !argv.includes("--version");
       const binary = String(file).split(/[/\\]/).pop() as string;
+      if (decoding) failures.spawned.push(binary);
       const taggedKey = argv.includes("-PreviewImage") ? `${binary}:-PreviewImage` : binary;
       const chained = failures.byCommand[taggedKey] ?? failures.byCommand[binary];
       if (decoding && chained) {
@@ -103,6 +146,8 @@ afterEach(() => {
   failures.open = null;
   failures.read = null;
   failures.writeOutput = null;
+  failures.sharpToBuffer = null;
+  failures.spawned = [];
 });
 
 const LIBHEIF_ALLOCATION =
@@ -525,4 +570,85 @@ describe("decodeRaw and preflight/post-decode fault handling (#1758)", () => {
     }).catch((e: unknown) => e)) as Error;
     expect(dimErr.message).toMatch(/pixel dimension safety limit.*200x150/i);
   });
+});
+
+describe("decodeNetpbm and EXR/JXL/JP2 primary readFile fault handling (#2884)", () => {
+  it("rethrows Sharp's limitInputPixels error in decodeNetpbm without spawning ImageMagick", async () => {
+    const { fixtures, readFixture } = await import("../../fixtures/index.js");
+    failures.sharpToBuffer = new Error("Input image exceeds pixel limit");
+
+    const err = (await decodeToSharpCompat(readFixture(fixtures.image.formats("ppm")), "ppm").catch(
+      (e: unknown) => e,
+    )) as Error;
+
+    expect(isDecoderUnavailable(err)).toBe(false);
+    expect(err.message).toBe("Input image exceeds pixel limit");
+    expect(failures.spawned).toEqual([]);
+  });
+
+  it("surfaces a V8 buffer allocation failure from Sharp in decodeNetpbm as a 503 without spawning ImageMagick", async () => {
+    const { fixtures, readFixture } = await import("../../fixtures/index.js");
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    failures.sharpToBuffer = v8Oom;
+
+    const err = (await decodeToSharpCompat(readFixture(fixtures.image.formats("ppm")), "ppm").catch(
+      (e: unknown) => e,
+    )) as Error;
+
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect(err.name).toBe("DecoderOutOfMemoryError");
+    expect(err.cause).toBe(v8Oom);
+    expect(failures.spawned).toEqual([]);
+  });
+
+  it("surfaces a V8 buffer allocation failure reading ImageMagick's EXR output as a 503 without falling back to ffmpeg", async () => {
+    const { fixtures, readFixture } = await import("../../fixtures/index.js");
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    failures.writeOutput = readFixture(fixtures.image.base.png200);
+    failures.read = v8Oom;
+    failures.byCommand.ffmpeg = {
+      code: 1,
+      signal: null,
+      stderr: "exr: unsupported compression\n",
+    };
+
+    const err = (await decodeToSharpCompat(readFixture(fixtures.image.formats("exr")), "exr").catch(
+      (e: unknown) => e,
+    )) as Error;
+
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect(err.name).toBe("DecoderOutOfMemoryError");
+    expect(err.cause).toBe(v8Oom);
+    expect(failures.spawned).not.toContain("ffmpeg");
+  });
+
+  it.each([
+    ["jxl", "djxl"],
+    ["jp2", "opj_decompress"],
+  ] as const)(
+    "surfaces a V8 buffer allocation failure reading %s primary output (%s) as a 503 without falling back to ImageMagick",
+    async (format, primaryBinary) => {
+      const { fixtures, readFixture } = await import("../../fixtures/index.js");
+      const v8Oom = new RangeError("Array buffer allocation failed");
+      failures.writeOutput = readFixture(fixtures.image.base.png200);
+      failures.read = v8Oom;
+      const corrupt = {
+        code: 1,
+        signal: null,
+        stderr: `magick: improper image header \`x.${format}'\n`,
+      };
+      failures.byCommand.magick = corrupt;
+      failures.byCommand.convert = corrupt;
+
+      const err = (await decodeToSharpCompat(
+        readFixture(fixtures.image.formats(format)),
+        format,
+      ).catch((e: unknown) => e)) as Error;
+
+      expect(isDecoderUnavailable(err)).toBe(true);
+      expect(err.name).toBe("DecoderOutOfMemoryError");
+      expect(err.cause).toBe(v8Oom);
+      expect(failures.spawned).toEqual([primaryBinary]);
+    },
+  );
 });
