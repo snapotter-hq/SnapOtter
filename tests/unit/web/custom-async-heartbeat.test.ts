@@ -50,6 +50,12 @@ const subscribers = [
   ],
 ] as const;
 
+const STREAM_TEARDOWN_MESSAGES = {
+  "erase-object": "Ending an Erase Object run after a stream handling error failed",
+  "sign-pdf": "Ending a Sign PDF run after a stream handling error failed",
+  "editor-export": "Ending an editor export after a stream handling error failed",
+} as const;
+
 describe.each(subscribers)("%s async progress", (_name, subscribe) => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -140,17 +146,15 @@ describe.each(subscribers)("%s async progress", (_name, subscribe) => {
       expect(onFailed).toHaveBeenNthCalledWith(1, { message: "server said no" });
       expect(onFailed).toHaveBeenNthCalledWith(2, { reason: "trackingFailed" });
       expect(FakeEventSource.instances[0].readyState).toBe(2);
-      if (_name === "erase-object" || _name === "sign-pdf") {
-        expect(vi.mocked(captureHandledError)).toHaveBeenCalledOnce();
-        const [reported, tags] = vi.mocked(captureHandledError).mock.calls[0];
-        expect(reported.message).toBe(
-          _name === "erase-object"
-            ? "Ending an Erase Object run after a stream handling error failed"
-            : "Ending a Sign PDF run after a stream handling error failed",
-        );
-        expect(reported.cause).toMatchObject({ message: "second onFailed" });
-        expect(tags).toEqual({ error_class: "bug", tool_id: _name });
-      }
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run after a stream handling error failed",
+        expect.objectContaining({ message: "second onFailed" }),
+      );
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledOnce();
+      const [reported, tags] = vi.mocked(captureHandledError).mock.calls[0];
+      expect(reported.message).toBe(STREAM_TEARDOWN_MESSAGES[_name]);
+      expect(reported.cause).toMatchObject({ message: "second onFailed" });
+      expect(tags).toEqual({ error_class: "bug", tool_id: _name });
     } finally {
       consoleError.mockRestore();
     }
@@ -297,10 +301,65 @@ describe.each([
   });
 });
 
-describe.each([
-  ["erase-object", subscribeEraseObjectJobProgress],
-  ["sign-pdf", subscribeSignPdfJobProgress],
-] as const)("%s async progress: stream teardown failure (#1951)", (_name, subscribe) => {
+describe.each(subscribers)(
+  "%s async progress: stream teardown failure (#1951, #3010)",
+  (_name, subscribe) => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      FakeEventSource.instances = [];
+      vi.stubGlobal("EventSource", FakeEventSource);
+      vi.mocked(captureHandledError).mockClear();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    });
+
+    it("reports a teardown failure when onFailed throws after a stream handling error (#1951, #3010)", () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        const onFailed = vi.fn(() => {
+          throw new Error("teardown broke");
+        });
+        subscribe("job-teardown-throw", {
+          onComplete: () => {
+            throw new Error("root cause");
+          },
+          onFailed,
+          onStall: vi.fn(),
+        });
+
+        expect(() =>
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({
+              type: "single",
+              phase: "complete",
+              result: { downloadUrl: "/api/v1/download/job-teardown-throw/out.png" },
+            }),
+          }),
+        ).toThrow("root cause");
+
+        expect(onFailed).toHaveBeenCalledOnce();
+        expect(onFailed).toHaveBeenCalledWith({ reason: "trackingFailed" });
+        expect(FakeEventSource.instances[0].readyState).toBe(2);
+        expect(consoleError).toHaveBeenCalledWith(
+          "Ending the run after a stream handling error failed",
+          expect.objectContaining({ message: "teardown broke" }),
+        );
+        expect(vi.mocked(captureHandledError)).toHaveBeenCalledOnce();
+        const [reported, tags] = vi.mocked(captureHandledError).mock.calls[0];
+        expect(reported.message).toBe(STREAM_TEARDOWN_MESSAGES[_name]);
+        expect(reported.cause).toMatchObject({ message: "teardown broke" });
+        expect(tags).toEqual({ error_class: "bug", tool_id: _name });
+      } finally {
+        consoleError.mockRestore();
+      }
+    });
+  },
+);
+
+describe("subscribeExportJobProgress custom toolId teardown failure (#3010)", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     FakeEventSource.instances = [];
@@ -313,43 +372,46 @@ describe.each([
     vi.unstubAllGlobals();
   });
 
-  it("reports a teardown failure when onFailed throws after a stream handling error (#1951)", () => {
+  it("tags reportRunEndFailure with the custom toolId when onFailed throws during recovery", () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       const onFailed = vi.fn(() => {
-        throw new Error("teardown broke");
+        throw new Error("open teardown broke");
       });
-      subscribe("job-teardown-throw", {
-        onComplete: () => {
-          throw new Error("root cause");
+      subscribeExportJobProgress(
+        "job-open-teardown-throw",
+        {
+          onComplete: () => {
+            throw new Error("open root cause");
+          },
+          onFailed,
+          onStall: vi.fn(),
         },
-        onFailed,
-        onStall: vi.fn(),
-      });
+        "editor-open",
+      );
 
       expect(() =>
         FakeEventSource.instances[0].onmessage?.({
           data: JSON.stringify({
             type: "single",
             phase: "complete",
-            result: { downloadUrl: "/api/v1/download/job-teardown-throw/out.png" },
+            result: { downloadUrl: "/api/v1/download/job-open-teardown-throw/out.png" },
           }),
         }),
-      ).toThrow("root cause");
+      ).toThrow("open root cause");
 
+      expect(onFailed).toHaveBeenCalledOnce();
+      expect(onFailed).toHaveBeenCalledWith({ reason: "trackingFailed" });
+      expect(FakeEventSource.instances[0].readyState).toBe(2);
       expect(consoleError).toHaveBeenCalledWith(
         "Ending the run after a stream handling error failed",
-        expect.objectContaining({ message: "teardown broke" }),
+        expect.objectContaining({ message: "open teardown broke" }),
       );
       expect(vi.mocked(captureHandledError)).toHaveBeenCalledOnce();
       const [reported, tags] = vi.mocked(captureHandledError).mock.calls[0];
-      expect(reported.message).toBe(
-        _name === "erase-object"
-          ? "Ending an Erase Object run after a stream handling error failed"
-          : "Ending a Sign PDF run after a stream handling error failed",
-      );
-      expect(reported.cause).toMatchObject({ message: "teardown broke" });
-      expect(tags).toEqual({ error_class: "bug", tool_id: _name });
+      expect(reported.message).toBe("Ending an editor export after a stream handling error failed");
+      expect(reported.cause).toMatchObject({ message: "open teardown broke" });
+      expect(tags).toEqual({ error_class: "bug", tool_id: "editor-open" });
     } finally {
       consoleError.mockRestore();
     }

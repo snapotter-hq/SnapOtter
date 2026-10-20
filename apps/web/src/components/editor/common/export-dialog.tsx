@@ -56,6 +56,7 @@ import {
   type ProgressFrame,
   reportMalformedResult,
 } from "@/lib/progress-frames";
+import { reportRunEndFailure } from "@/lib/run-end-report";
 import { cn, copyImageToClipboard } from "@/lib/utils";
 import { isHexColor, useEditorStore } from "@/stores/editor-store";
 import type {
@@ -249,8 +250,14 @@ export function subscribeExportJobProgress(
         cleanup();
         try {
           handlers.onFailed({ reason: "trackingFailed" });
-        } catch {
+        } catch (teardownErr) {
           // onFailed may be what threw; the original error is rethrown below.
+          console.error("Ending the run after a stream handling error failed", teardownErr);
+          reportRunEndFailure(
+            "Ending an editor export after a stream handling error failed",
+            teardownErr,
+            toolId,
+          );
         }
         throw err;
       }

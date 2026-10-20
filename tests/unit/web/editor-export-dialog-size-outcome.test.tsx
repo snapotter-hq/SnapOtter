@@ -1285,4 +1285,55 @@ describe("server-converted formats follow 202 progress and surface errors (#2171
     expect(captureHandledError).toHaveBeenCalledTimes(1);
     expect(await exported()).toEqual([{ output_format: "avif", status: "failed", reason: "bug" }]);
   });
+
+  it("reports a stream teardown failure and clears exporting when onFailed throws after download() throws on a 202 completion frame (#3010)", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      markClean.mockImplementationOnce(() => {
+        throw new Error("store subscriber broke");
+      });
+      toastError.mockImplementationOnce(() => {
+        throw new Error("toast broke");
+      });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({
+          ok: true,
+          status: 202,
+          json: async () => ({ jobId: "job-track-teardown-err", async: true }),
+        })),
+      );
+      render(<ExportDialog onClose={() => {}} />);
+      pickFormat("AVIF");
+      clickExport();
+
+      await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+      await act(async () => {
+        expect(() =>
+          FakeEventSource.instances[0].onmessage?.({
+            data: JSON.stringify({
+              type: "single",
+              phase: "complete",
+              result: { downloadUrl: "/api/v1/download/job-track-teardown-err/export.avif" },
+            }),
+          }),
+        ).toThrow("store subscriber broke");
+      });
+
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run after a stream handling error failed",
+        expect.objectContaining({ message: "toast broke" }),
+      );
+      expect(captureHandledError).toHaveBeenCalledTimes(1);
+      const [reported, tags] = vi.mocked(captureHandledError).mock.calls[0];
+      expect(reported.message).toBe("Ending an editor export after a stream handling error failed");
+      expect(reported.cause).toMatchObject({ message: "toast broke" });
+      expect(tags).toEqual({ error_class: "bug", tool_id: "editor-export" });
+      expect(
+        screen.getByRole("button", { name: en.editor.ui.exportDialog.exportButton }),
+      ).not.toBeDisabled();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
 });

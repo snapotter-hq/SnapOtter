@@ -32,6 +32,7 @@ export type RunEndFailure =
   | "Ending an Erase Object run after a result handling error failed"
   | "Ending an Erase Object run after a stream handling error failed"
   | "Ending an Erase Object run with an error failed"
+  | "Ending an editor export after a stream handling error failed"
   | "Failing a Sign PDF run's entry failed";
 
 /**
