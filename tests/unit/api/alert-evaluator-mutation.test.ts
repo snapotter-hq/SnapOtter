@@ -372,6 +372,60 @@ describe("alert-evaluator.ts mutation coverage", () => {
 
       expect(getSettingStringMock).toHaveBeenNthCalledWith(2, "backup_last_completed", "");
     });
+
+    it("logs a warning and emits backup_never_run on malformed backup_last_completed JSON (#3039)", async () => {
+      vi.spyOn(Date, "now").mockReturnValue(NOW);
+      const { evaluateAlerts } = await loadAlertEvaluator();
+      getSettingStringMock
+        .mockResolvedValueOnce(healthyDestinations())
+        .mockResolvedValueOnce("{corrupt");
+      statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
+      selectMock.mockReturnValue(queryChain([{ count: 0 }]));
+      getActiveLicenseMock.mockReturnValue(null);
+      deliverWebhookMock.mockResolvedValue({ success: true });
+
+      await evaluateAlerts();
+
+      expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+      expect(loggerMock.warn).toHaveBeenCalledWith(
+        { err: expect.any(SyntaxError), key: "backup_last_completed" },
+        "alert-evaluator: failed to parse stored backup_last_completed JSON",
+      );
+      expect(deliveredAlerts()).toEqual([{ condition: "backup_never_run" }]);
+    });
+
+    it("logs a warning and emits backup_never_run when backup_last_completed JSON is not a valid backup record (#3039)", async () => {
+      vi.spyOn(Date, "now").mockReturnValue(NOW);
+      const { evaluateAlerts } = await loadAlertEvaluator();
+      for (const invalidPayload of [
+        "null",
+        "42",
+        "[]",
+        '"str"',
+        "{}",
+        '{"timestamp":123}',
+        '{"timestamp":"invalid"}',
+      ]) {
+        loggerMock.warn.mockClear();
+        deliverWebhookMock.mockClear();
+        getSettingStringMock
+          .mockResolvedValueOnce(healthyDestinations())
+          .mockResolvedValueOnce(invalidPayload);
+        statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
+        selectMock.mockReturnValue(queryChain([{ count: 0 }]));
+        getActiveLicenseMock.mockReturnValue(null);
+        deliverWebhookMock.mockResolvedValue({ success: true });
+
+        await evaluateAlerts();
+
+        expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+        expect(loggerMock.warn).toHaveBeenCalledWith(
+          { key: "backup_last_completed" },
+          "alert-evaluator: stored backup_last_completed is not a valid backup record",
+        );
+        expect(deliveredAlerts()).toEqual([{ condition: "backup_never_run" }]);
+      }
+    });
   });
 
   describe("license expiry threshold (< 30 days)", () => {

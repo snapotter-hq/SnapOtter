@@ -32,6 +32,43 @@ async function alertsLicensed(): Promise<boolean> {
   return isEnterpriseFeatureEnabled("admin_alerts", "worker");
 }
 
+function parseBackupTimestampMs(raw: string): number | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    logger.warn(
+      { err, key: "backup_last_completed" },
+      "alert-evaluator: failed to parse stored backup_last_completed JSON",
+    );
+    return null;
+  }
+
+  if (
+    !parsed ||
+    typeof parsed !== "object" ||
+    Array.isArray(parsed) ||
+    typeof (parsed as Record<string, unknown>).timestamp !== "string"
+  ) {
+    logger.warn(
+      { key: "backup_last_completed" },
+      "alert-evaluator: stored backup_last_completed is not a valid backup record",
+    );
+    return null;
+  }
+
+  const tsMs = new Date((parsed as Record<string, unknown>).timestamp as string).getTime();
+  if (!Number.isFinite(tsMs)) {
+    logger.warn(
+      { key: "backup_last_completed" },
+      "alert-evaluator: stored backup_last_completed is not a valid backup record",
+    );
+    return null;
+  }
+
+  return tsMs;
+}
+
 export async function evaluateAlerts(): Promise<void> {
   if (!(await alertsLicensed())) return;
 
@@ -105,9 +142,9 @@ export async function evaluateAlerts(): Promise<void> {
   // c. Backup staleness (> 48 hours)
   try {
     const backupResult = await getSettingString("backup_last_completed", "");
-    if (backupResult) {
-      const lastBackup = JSON.parse(backupResult);
-      const ageHours = (Date.now() - new Date(lastBackup.timestamp).getTime()) / 3_600_000;
+    const backupTsMs = backupResult ? parseBackupTimestampMs(backupResult) : null;
+    if (backupTsMs !== null) {
+      const ageHours = (Date.now() - backupTsMs) / 3_600_000;
       if (ageHours > 48) {
         alerts.push({ condition: "backup_stale", ageHours, threshold: 48 });
       }

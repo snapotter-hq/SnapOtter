@@ -15,6 +15,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../db/index.js";
 import { formatZodErrors } from "../lib/errors.js";
+import { logger } from "../lib/logger.js";
 import { metricsText } from "../lib/metrics.js";
 import { buildSupportBundle } from "../lib/support-bundle.js";
 import { requirePermission } from "../permissions.js";
@@ -207,6 +208,46 @@ export async function adminOpsRoutes(app: FastifyInstance): Promise<void> {
 
   const BACKUP_KEY = "backup_last_completed";
 
+  function parseBackupRecord(
+    raw: string,
+  ): { record: Record<string, unknown>; timestampMs: number } | null {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err) {
+      logger.warn(
+        { err, key: BACKUP_KEY },
+        "admin-ops: failed to parse stored backup_last_completed JSON",
+      );
+      return null;
+    }
+
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      Array.isArray(parsed) ||
+      typeof (parsed as Record<string, unknown>).timestamp !== "string"
+    ) {
+      logger.warn(
+        { key: BACKUP_KEY },
+        "admin-ops: stored backup_last_completed is not a valid backup record",
+      );
+      return null;
+    }
+
+    const record = parsed as Record<string, unknown>;
+    const timestampMs = new Date(record.timestamp as string).getTime();
+    if (!Number.isFinite(timestampMs)) {
+      logger.warn(
+        { key: BACKUP_KEY },
+        "admin-ops: stored backup_last_completed is not a valid backup record",
+      );
+      return null;
+    }
+
+    return { record, timestampMs };
+  }
+
   // POST /api/v1/admin/backup-status -- record backup completion
   app.post("/api/v1/admin/backup-status", async (request: FastifyRequest, reply: FastifyReply) => {
     const admin = await requirePermission("system:health")(request, reply);
@@ -257,19 +298,13 @@ export async function adminOpsRoutes(app: FastifyInstance): Promise<void> {
       .where(eq(schema.settings.key, BACKUP_KEY))
       .limit(1);
 
-    if (result.length === 0) {
+    const parsedBackup = result.length > 0 ? parseBackupRecord(result[0].value) : null;
+    if (!parsedBackup) {
       return { lastBackup: null, status: "critical", ageHours: null };
     }
 
-    let lastBackup: Record<string, unknown>;
-    try {
-      lastBackup = JSON.parse(result[0].value);
-    } catch {
-      return { lastBackup: null, status: "critical", ageHours: null };
-    }
-
-    const ts = new Date(lastBackup.timestamp as string);
-    const ageMs = Date.now() - ts.getTime();
+    const { record: lastBackup, timestampMs } = parsedBackup;
+    const ageMs = Date.now() - timestampMs;
     const ageHours = Math.round((ageMs / 3_600_000) * 10) / 10;
 
     let status: "ok" | "warning" | "critical";

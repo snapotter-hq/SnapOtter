@@ -267,6 +267,7 @@ describe("alert evaluator behavior", () => {
     expect(statfsMock).toHaveBeenCalledTimes(1);
     expect(selectMock).toHaveBeenCalledTimes(1);
     expect(getActiveLicenseMock).toHaveBeenCalledTimes(1);
+    expect(loggerMock.warn).not.toHaveBeenCalled();
     expect(deliverWebhookMock).not.toHaveBeenCalled();
   });
 
@@ -289,12 +290,13 @@ describe("alert evaluator behavior", () => {
 
     await evaluateAlerts();
 
+    expect(loggerMock.warn).not.toHaveBeenCalled();
     expect(deliverWebhookMock).toHaveBeenCalledTimes(1);
     const [, , alertsArg] = deliverWebhookMock.mock.calls[0];
     expect(alertsArg).toEqual([{ condition: "backup_never_run" }]);
   });
 
-  it("swallows a malformed backup timestamp payload and skips the backup alert", async () => {
+  it("logs a warning and emits backup_never_run when backup_last_completed is malformed JSON (#3039)", async () => {
     vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
     const { evaluateAlerts } = await loadAlertEvaluator();
 
@@ -304,16 +306,64 @@ describe("alert evaluator behavior", () => {
           { url: "https://example.test/alerts", authHeader: "", enabled: true, type: "alerts" },
         ]),
       )
-      // backup_last_completed is present but not valid JSON -> JSON.parse throws, caught
       .mockResolvedValueOnce("{not-json");
     statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
     selectMock.mockReturnValue(queryChain([{ count: 0 }]));
     getActiveLicenseMock.mockReturnValue(null);
+    deliverWebhookMock.mockResolvedValue({ success: true });
 
     await evaluateAlerts();
 
-    // Only trip was a parse error which is swallowed; nothing else fired, so no delivery.
-    expect(deliverWebhookMock).not.toHaveBeenCalled();
+    expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      { err: expect.any(SyntaxError), key: "backup_last_completed" },
+      "alert-evaluator: failed to parse stored backup_last_completed JSON",
+    );
+    expect(deliverWebhookMock).toHaveBeenCalledTimes(1);
+    const [, , alertsArg] = deliverWebhookMock.mock.calls[0];
+    expect(alertsArg).toEqual([{ condition: "backup_never_run" }]);
+  });
+
+  it("logs a warning and emits backup_never_run when backup_last_completed is non-object JSON or has an invalid timestamp (#3039)", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
+    const { evaluateAlerts } = await loadAlertEvaluator();
+
+    for (const invalidPayload of [
+      "null",
+      "42",
+      "[]",
+      '"str"',
+      "{}",
+      '{"timestamp":null}',
+      '{"timestamp":123}',
+      '{"timestamp":""}',
+      '{"timestamp":"not-a-date"}',
+    ]) {
+      loggerMock.warn.mockClear();
+      deliverWebhookMock.mockClear();
+      getSettingStringMock
+        .mockResolvedValueOnce(
+          JSON.stringify([
+            { url: "https://example.test/alerts", authHeader: "", enabled: true, type: "alerts" },
+          ]),
+        )
+        .mockResolvedValueOnce(invalidPayload);
+      statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
+      selectMock.mockReturnValue(queryChain([{ count: 0 }]));
+      getActiveLicenseMock.mockReturnValue(null);
+      deliverWebhookMock.mockResolvedValue({ success: true });
+
+      await evaluateAlerts();
+
+      expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+      expect(loggerMock.warn).toHaveBeenCalledWith(
+        { key: "backup_last_completed" },
+        "alert-evaluator: stored backup_last_completed is not a valid backup record",
+      );
+      expect(deliverWebhookMock).toHaveBeenCalledTimes(1);
+      const [, , alertsArg] = deliverWebhookMock.mock.calls[0];
+      expect(alertsArg).toEqual([{ condition: "backup_never_run" }]);
+    }
   });
 
   it("skips checks that throw and still delivers the surviving alert", async () => {
