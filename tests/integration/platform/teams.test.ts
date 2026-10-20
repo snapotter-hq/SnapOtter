@@ -9,7 +9,12 @@ import { randomUUID } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
-import { raceInserts, raceUpdates } from "../../helpers/pg-race.js";
+import {
+  raceInserts,
+  raceRowLocks,
+  raceUpdates,
+  waitForLockWaiters,
+} from "../../helpers/pg-race.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 let testApp: TestApp;
@@ -691,5 +696,165 @@ describe("DELETE /api/v1/teams/:id", () => {
     });
     expect(res.statusCode).toBe(404);
     expect(JSON.parse(res.body).code).toBe("NOT_FOUND");
+  });
+
+  it("serializes DELETE /api/v1/teams/:id with PUT /api/auth/users/:id so a member assignment is never orphaned (#2662)", async () => {
+    const putTeamId = randomUUID();
+    await db.insert(schema.teams).values({ id: putTeamId, name: "DesignPut" });
+
+    const userId = randomUUID();
+    await db.insert(schema.users).values({
+      id: userId,
+      username: `design-member-${Date.now()}`,
+      passwordHash: "dummy:hash",
+      role: "user",
+      team: defaultTeamId,
+    });
+
+    try {
+      const [assignRes, deletePutRes] = await raceRowLocks("users", 2, async () => {
+        const assigning = app.inject({
+          method: "PUT",
+          url: `/api/auth/users/${userId}`,
+          headers: { authorization: `Bearer ${adminToken}` },
+          payload: { team: putTeamId },
+        });
+        await waitForLockWaiters(1);
+        const deleting = app.inject({
+          method: "DELETE",
+          url: `/api/v1/teams/${putTeamId}`,
+          headers: { authorization: `Bearer ${adminToken}` },
+        });
+        return Promise.all([assigning, deleting]);
+      });
+
+      expect(assignRes.statusCode).toBe(200);
+      expect(deletePutRes.statusCode).toBe(400);
+      expect(JSON.parse(deletePutRes.body)).toEqual({
+        error: "Cannot delete a team that has members",
+        code: "VALIDATION_ERROR",
+      });
+
+      const [putTeam] = await db.select().from(schema.teams).where(eq(schema.teams.id, putTeamId));
+      expect(putTeam).toBeDefined();
+      const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
+      expect(user?.team).toBe(putTeamId);
+    } finally {
+      await db.delete(schema.users).where(eq(schema.users.id, userId));
+      await db.delete(schema.teams).where(eq(schema.teams.id, putTeamId));
+    }
+  });
+
+  it("serializes DELETE /api/v1/teams/:id with POST /api/auth/register so a newly registered member is never orphaned (#2662)", async () => {
+    const regTeamId = randomUUID();
+    await db.insert(schema.teams).values({ id: regTeamId, name: "DesignReg" });
+    const regUsername = `design-reg-${Date.now()}`;
+
+    try {
+      const [registerRes, deleteRegRes] = await raceRowLocks("users", 2, async () => {
+        const registering = app.inject({
+          method: "POST",
+          url: "/api/auth/register",
+          headers: { authorization: `Bearer ${adminToken}` },
+          payload: {
+            username: regUsername,
+            password: "ValidPass1",
+            role: "user",
+            team: "DesignReg",
+          },
+        });
+        await waitForLockWaiters(1);
+        const deleting = app.inject({
+          method: "DELETE",
+          url: `/api/v1/teams/${regTeamId}`,
+          headers: { authorization: `Bearer ${adminToken}` },
+        });
+        return Promise.all([registering, deleting]);
+      });
+
+      expect(registerRes.statusCode).toBe(201);
+      expect(deleteRegRes.statusCode).toBe(400);
+      expect(JSON.parse(deleteRegRes.body)).toEqual({
+        error: "Cannot delete a team that has members",
+        code: "VALIDATION_ERROR",
+      });
+
+      const [regTeam] = await db.select().from(schema.teams).where(eq(schema.teams.id, regTeamId));
+      expect(regTeam).toBeDefined();
+      const [regUser] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.username, regUsername));
+      expect(regUser?.team).toBe(regTeamId);
+    } finally {
+      await db.delete(schema.users).where(eq(schema.users.username, regUsername));
+      await db.delete(schema.teams).where(eq(schema.teams.id, regTeamId));
+    }
+  });
+
+  it("rejects deleting a team renamed to Default before the row lock is acquired (#2662)", async () => {
+    const teamId = randomUUID();
+    await db.insert(schema.teams).values({ id: teamId, name: "Design" });
+    await db
+      .update(schema.teams)
+      .set({ name: "OriginalDefault" })
+      .where(eq(schema.teams.id, defaultTeamId));
+
+    try {
+      const res = await raceRowLocks(
+        "teams",
+        1,
+        () =>
+          app.inject({
+            method: "DELETE",
+            url: `/api/v1/teams/${teamId}`,
+            headers: { authorization: `Bearer ${adminToken}` },
+          }),
+        (tx) => tx.update(schema.teams).set({ name: "Default" }).where(eq(schema.teams.id, teamId)),
+      );
+
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({
+        error: "Cannot delete the Default team",
+        code: "VALIDATION_ERROR",
+      });
+
+      const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, teamId));
+      expect(team?.name).toBe("Default");
+    } finally {
+      await db.delete(schema.teams).where(eq(schema.teams.id, teamId));
+      await db
+        .update(schema.teams)
+        .set({ name: "Default" })
+        .where(eq(schema.teams.id, defaultTeamId));
+    }
+  });
+
+  it("returns 404 when a team is deleted before the row lock is acquired (#2662)", async () => {
+    const teamId = randomUUID();
+    await db.insert(schema.teams).values({ id: teamId, name: "ConcurrentDelete" });
+
+    const results = await raceRowLocks("teams", 2, () =>
+      Promise.all([
+        app.inject({
+          method: "DELETE",
+          url: `/api/v1/teams/${teamId}`,
+          headers: { authorization: `Bearer ${adminToken}` },
+        }),
+        app.inject({
+          method: "DELETE",
+          url: `/api/v1/teams/${teamId}`,
+          headers: { authorization: `Bearer ${adminToken}` },
+        }),
+      ]),
+    );
+
+    const statuses = results.map((r) => r.statusCode).sort();
+    expect(statuses).toEqual([200, 404]);
+    const notFound = results.find((r) => r.statusCode === 404);
+    expect(JSON.parse(notFound?.body ?? "{}")).toEqual({
+      error: "Team not found",
+      code: "NOT_FOUND",
+    });
   });
 });

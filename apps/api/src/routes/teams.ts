@@ -203,33 +203,55 @@ export async function teamsRoutes(app: FastifyInstance): Promise<void> {
 
       const { id } = request.params;
 
-      const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
-      if (!team) {
+      // Lock the team row before checking its name and member count (#2662).
+      // POST /api/auth/register and PUT /api/auth/users/:id take FOR SHARE on
+      // schema.teams before writing schema.users (#2646), so taking FOR UPDATE
+      // here serializes team deletion against member assignment and renames in
+      // teams -> users order.
+      const outcome = await db.transaction(async (tx) => {
+        const [locked] = await tx
+          .select()
+          .from(schema.teams)
+          .where(eq(schema.teams.id, id))
+          .for("update");
+        if (!locked) {
+          return "not-found" as const;
+        }
+
+        // Cannot delete the Default team
+        if (locked.name === "Default") {
+          return "default-team" as const;
+        }
+
+        // Cannot delete a team that has members
+        const [memberCount] = await tx
+          .select({ count: sql<number>`COUNT(*)::int` })
+          .from(schema.users)
+          .where(eq(schema.users.team, id));
+
+        if (memberCount && memberCount.count > 0) {
+          return "has-members" as const;
+        }
+
+        await tx.delete(schema.teams).where(eq(schema.teams.id, id));
+        return "deleted" as const;
+      });
+
+      if (outcome === "not-found") {
         return reply.status(404).send({ error: "Team not found", code: "NOT_FOUND" });
       }
-
-      // Cannot delete the Default team
-      if (team.name === "Default") {
+      if (outcome === "default-team") {
         return reply.status(400).send({
           error: "Cannot delete the Default team",
           code: "VALIDATION_ERROR",
         });
       }
-
-      // Cannot delete a team that has members
-      const [memberCount] = await db
-        .select({ count: sql<number>`COUNT(*)::int` })
-        .from(schema.users)
-        .where(eq(schema.users.team, id));
-
-      if (memberCount && memberCount.count > 0) {
+      if (outcome === "has-members") {
         return reply.status(400).send({
           error: "Cannot delete a team that has members",
           code: "VALIDATION_ERROR",
         });
       }
-
-      await db.delete(schema.teams).where(eq(schema.teams.id, id));
 
       return reply.send({ ok: true });
     },
