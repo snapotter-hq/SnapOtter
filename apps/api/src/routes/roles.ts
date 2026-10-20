@@ -33,7 +33,7 @@ async function resolveTransactionActor(tx: Tx, user: AuthUser): Promise<AuthUser
     if (!currentActorRow) return null;
     currentActor = { ...user, role: currentActorRow.role };
   }
-  if (!(await hasEffectivePermission(currentActor, "security:manage"))) {
+  if (!(await hasEffectivePermission(currentActor, "security:manage", tx))) {
     return null;
   }
   return currentActor;
@@ -302,6 +302,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
               locked.name,
               locked.permissions,
               locked.toolPermissions,
+              tx,
             ))
           ) {
             return "manage-denied" as const;
@@ -316,6 +317,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
               currentActor,
               lockedProspectivePermissions,
               lockedProspectiveToolPermissions,
+              tx,
             ))
           ) {
             return "grant-denied" as const;
@@ -427,11 +429,12 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
             locked.name,
             locked.permissions,
             locked.toolPermissions,
+            tx,
           ))
         ) {
           return "denied" as const;
         }
-        if (!(await canAssignRole(currentActor, "user"))) {
+        if (!(await canAssignRole(currentActor, "user", tx))) {
           return "reassign-denied" as const;
         }
         await tx

@@ -69,7 +69,12 @@ function isValidRoleToolPermissions(value: unknown): value is ValidRoleToolPermi
   );
 }
 
-async function getRoleDefinition(role: string): Promise<RoleDefinition | null> {
+type RoleQueryRunner = Pick<typeof db, "select">;
+
+async function getRoleDefinition(
+  role: string,
+  conn: RoleQueryRunner = db,
+): Promise<RoleDefinition | null> {
   if (isDisabledRole(role)) return null;
   if (role in ROLE_PERMISSIONS) {
     return {
@@ -78,42 +83,45 @@ async function getRoleDefinition(role: string): Promise<RoleDefinition | null> {
     };
   }
 
-  try {
-    const [customRole] = await db
-      .select({
-        permissions: schema.roles.permissions,
-        toolPermissions: schema.roles.toolPermissions,
-      })
-      .from(schema.roles)
-      .where(eq(schema.roles.name, role))
-      .limit(1);
-    if (!customRole) return null;
-    if (!isValidRoleToolPermissions(customRole.toolPermissions)) return null;
+  const [customRole] = await conn
+    .select({
+      permissions: schema.roles.permissions,
+      toolPermissions: schema.roles.toolPermissions,
+    })
+    .from(schema.roles)
+    .where(eq(schema.roles.name, role))
+    .limit(1);
+  if (!customRole) return null;
+  if (!isValidRoleToolPermissions(customRole.toolPermissions)) return null;
 
-    return {
-      permissions: customRole.permissions as Permission[],
-      toolPermissions: customRole.toolPermissions,
-    };
-  } catch {
-    // Fail closed when role data is unavailable.
-    return null;
-  }
+  return {
+    permissions: customRole.permissions as Permission[],
+    toolPermissions: customRole.toolPermissions,
+  };
 }
 
-export async function getPermissions(role: Role | string): Promise<Permission[]> {
+export async function getPermissions(
+  role: Role | string,
+  conn: RoleQueryRunner = db,
+): Promise<Permission[]> {
   if (typeof role !== "string") return [];
-  return (await getRoleDefinition(role))?.permissions ?? [];
+  return (await getRoleDefinition(role, conn))?.permissions ?? [];
 }
 
-export async function hasPermission(role: Role | string, permission: Permission): Promise<boolean> {
-  return (await getPermissions(role)).includes(permission);
+export async function hasPermission(
+  role: Role | string,
+  permission: Permission,
+  conn: RoleQueryRunner = db,
+): Promise<boolean> {
+  return (await getPermissions(role, conn)).includes(permission);
 }
 
 export async function hasEffectivePermission(
   user: AuthUser,
   permission: Permission,
+  conn: RoleQueryRunner = db,
 ): Promise<boolean> {
-  if (!(await hasPermission(user.role, permission))) return false;
+  if (!(await hasPermission(user.role, permission, conn))) return false;
   if (user.apiKeyPermissions) {
     return user.apiKeyPermissions.includes(permission);
   }
@@ -124,8 +132,11 @@ export function isDisabledRole(role: string | null | undefined): boolean {
   return role === "disabled" || role?.startsWith("disabled:") === true;
 }
 
-export async function getEffectivePermissions(user: AuthUser): Promise<Permission[]> {
-  const rolePermissions = await getPermissions(user.role);
+export async function getEffectivePermissions(
+  user: AuthUser,
+  conn: RoleQueryRunner = db,
+): Promise<Permission[]> {
+  const rolePermissions = await getPermissions(user.role, conn);
   if (!user.apiKeyPermissions) return rolePermissions;
 
   const scoped = new Set(user.apiKeyPermissions);
@@ -135,8 +146,9 @@ export async function getEffectivePermissions(user: AuthUser): Promise<Permissio
 export async function permissionsNotHeldBy(
   user: AuthUser,
   requestedPermissions: string[],
+  conn: RoleQueryRunner = db,
 ): Promise<string[]> {
-  const effectivePermissions = new Set(await getEffectivePermissions(user));
+  const effectivePermissions = new Set(await getEffectivePermissions(user, conn));
   return requestedPermissions.filter(
     (permission) => !effectivePermissions.has(permission as Permission),
   );
@@ -224,11 +236,12 @@ async function canControlRoleDefinition(
   actor: AuthUser,
   targetRole: string,
   targetDefinition: RoleDefinition,
+  conn: RoleQueryRunner = db,
 ): Promise<boolean> {
   if (isDisabledRole(actor.role)) return false;
   if (getRoleLevel(targetRole) > getRoleLevel(actor.role)) return false;
 
-  const actorDefinition = await getRoleDefinition(actor.role);
+  const actorDefinition = await getRoleDefinition(actor.role, conn);
   if (!actorDefinition) return false;
 
   const actorPermissions = new Set(
@@ -252,17 +265,25 @@ async function canControlRoleDefinition(
   return true;
 }
 
-export async function canAssignRole(actor: AuthUser, targetRole: string): Promise<boolean> {
+export async function canAssignRole(
+  actor: AuthUser,
+  targetRole: string,
+  conn: RoleQueryRunner = db,
+): Promise<boolean> {
   if (isDisabledRole(targetRole)) return false;
-  const targetDefinition = await getRoleDefinition(targetRole);
+  const targetDefinition = await getRoleDefinition(targetRole, conn);
   if (!targetDefinition || targetDefinition.permissions.length === 0) return false;
 
-  return canControlRoleDefinition(actor, targetRole, targetDefinition);
+  return canControlRoleDefinition(actor, targetRole, targetDefinition, conn);
 }
 
-export async function canManageTargetRole(actor: AuthUser, targetRole: string): Promise<boolean> {
+export async function canManageTargetRole(
+  actor: AuthUser,
+  targetRole: string,
+  conn: RoleQueryRunner = db,
+): Promise<boolean> {
   const managedRole = normalizeManagedRole(targetRole);
-  const targetDefinition = await getRoleDefinition(managedRole);
+  const targetDefinition = await getRoleDefinition(managedRole, conn);
   if (!targetDefinition) return false;
 
   return canManageRoleDefinition(
@@ -270,6 +291,7 @@ export async function canManageTargetRole(actor: AuthUser, targetRole: string): 
     managedRole,
     targetDefinition.permissions,
     targetDefinition.toolPermissions,
+    conn,
   );
 }
 
@@ -278,24 +300,36 @@ export async function canManageRoleDefinition(
   targetRole: string,
   permissions: readonly string[],
   toolPermissions: RoleToolPermissions | null,
+  conn: RoleQueryRunner = db,
 ): Promise<boolean> {
   if (!isValidRoleToolPermissions(toolPermissions)) return false;
-  return canControlRoleDefinition(actor, targetRole, {
-    permissions: permissions as Permission[],
-    toolPermissions,
-  });
+  return canControlRoleDefinition(
+    actor,
+    targetRole,
+    {
+      permissions: permissions as Permission[],
+      toolPermissions,
+    },
+    conn,
+  );
 }
 
 export async function canGrantRoleDefinition(
   actor: AuthUser,
   permissions: readonly string[],
   toolPermissions: RoleToolPermissions | null,
+  conn: RoleQueryRunner = db,
 ): Promise<boolean> {
   if (!isValidRoleToolPermissions(toolPermissions)) return false;
-  return canControlRoleDefinition(actor, "custom", {
-    permissions: permissions as Permission[],
-    toolPermissions,
-  });
+  return canControlRoleDefinition(
+    actor,
+    "custom",
+    {
+      permissions: permissions as Permission[],
+      toolPermissions,
+    },
+    conn,
+  );
 }
 
 /**
@@ -303,9 +337,12 @@ export async function canGrantRoleDefinition(
  * effective permission set. API-key scopes are part of the containment check,
  * so a key that omits any admin permission cannot cross this boundary.
  */
-export async function isFullEffectiveAdmin(actor: AuthUser): Promise<boolean> {
+export async function isFullEffectiveAdmin(
+  actor: AuthUser,
+  conn: RoleQueryRunner = db,
+): Promise<boolean> {
   if (actor.role !== "admin") return false;
-  return canManageTargetRole(actor, "admin");
+  return canManageTargetRole(actor, "admin", conn);
 }
 
 export async function requireFullAdmin(
@@ -344,8 +381,12 @@ export function requirePermission(
   };
 }
 
-export async function hasToolAccess(role: string, toolId: string): Promise<boolean> {
-  const roleDefinition = await getRoleDefinition(role);
+export async function hasToolAccess(
+  role: string,
+  toolId: string,
+  conn: RoleQueryRunner = db,
+): Promise<boolean> {
+  const roleDefinition = await getRoleDefinition(role, conn);
   if (!roleDefinition) return false;
   if (!roleDefinition.toolPermissions) return true;
 
@@ -356,9 +397,13 @@ export async function hasToolAccess(role: string, toolId: string): Promise<boole
   );
 }
 
-export async function hasEffectiveToolAccess(user: AuthUser, toolId: string): Promise<boolean> {
-  if (!(await hasEffectivePermission(user, "tools:use"))) return false;
-  return hasToolAccess(user.role, toolId);
+export async function hasEffectiveToolAccess(
+  user: AuthUser,
+  toolId: string,
+  conn: RoleQueryRunner = db,
+): Promise<boolean> {
+  if (!(await hasEffectivePermission(user, "tools:use", conn))) return false;
+  return hasToolAccess(user.role, toolId, conn);
 }
 
 export async function requireToolAccess(

@@ -1434,4 +1434,355 @@ describe("API-key-scoped role authority", () => {
     expect(after.passwordHash).toBe(before.passwordHash);
     expect(after.mustChangePassword).toBe(false);
   });
+
+  it("queries schema.roles via tx inside transactions and returns 500 instead of 403/empty-permissions on DB errors (#2672)", async () => {
+    const managerRole = uniqueName("tx-mgr-role");
+    await createRoleAsAdmin(managerRole, [
+      "users:manage",
+      "security:manage",
+      "tools:use",
+      "files:own",
+      "apikeys:own",
+      "pipelines:own",
+      "settings:read",
+    ]);
+    const managerUsername = uniqueName("tx-mgr-user");
+    const managerToken = await createUserAndLogin(managerUsername, managerRole);
+
+    const subordinateRole = uniqueName("tx-sub-role");
+    const subordinateRoleId = await createRoleAsAdmin(subordinateRole, ["tools:use"]);
+    const targetUsername = uniqueName("tx-target-user");
+    await createUserAndLogin(targetUsername, subordinateRole);
+    const [targetBefore] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, targetUsername));
+
+    function interceptTransactionRoleLookups(
+      mode: "forbid-top-level-db" | "fault-tx-role-select",
+      beforeTx?: () => Promise<void>,
+    ) {
+      let activeTx = 0;
+      let txRoleLookups = 0;
+      let pendingBeforeTx = beforeTx;
+      // biome-ignore lint/suspicious/noExplicitAny: wrap Drizzle select builder on both db and tx
+      const wrapRoleSelect = (origSelect: (...args: any[]) => any, isTx: boolean) => {
+        return (...selectArgs: unknown[]) => {
+          if (!isTx && activeTx > 0 && mode === "forbid-top-level-db") {
+            throw new Error("top-level db.select called inside db.transaction");
+          }
+          const builder = origSelect(...selectArgs);
+          const origFrom = builder.from.bind(builder);
+          builder.from = (table: unknown, ...fromArgs: unknown[]) => {
+            const fromBuilder = origFrom(table, ...fromArgs);
+            if (table === schema.roles && (isTx || activeTx > 0)) {
+              const origWhere = fromBuilder.where.bind(fromBuilder);
+              fromBuilder.where = (...whereArgs: unknown[]) => {
+                const whereBuilder = origWhere(...whereArgs);
+                // Hook .limit() specifically so getRoleDefinition is intercepted while
+                // skipping the route's own .for("share" | "update") lock queries on schema.roles.
+                const origLimit = whereBuilder.limit?.bind(whereBuilder);
+                if (origLimit) {
+                  whereBuilder.limit = (...limitArgs: unknown[]) => {
+                    if (isTx) {
+                      txRoleLookups += 1;
+                    }
+                    if (mode === "fault-tx-role-select") {
+                      return Promise.reject(
+                        new Error("simulated in-transaction roles lookup failure"),
+                      );
+                    }
+                    return origLimit(...limitArgs);
+                  };
+                }
+                return whereBuilder;
+              };
+            }
+            return fromBuilder;
+          };
+          return builder;
+        };
+      };
+
+      const origDbSelect = db.select.bind(db);
+      const selectSpy = vi
+        .spyOn(db, "select")
+        .mockImplementation(wrapRoleSelect(origDbSelect, false) as typeof db.select);
+
+      const realTransaction = db.transaction.bind(db) as (
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) => Promise<unknown>;
+      const txSpy = vi.spyOn(db, "transaction").mockImplementation(((
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) =>
+        realTransaction(async (tx) => {
+          if (pendingBeforeTx) {
+            const hook = pendingBeforeTx;
+            pendingBeforeTx = undefined;
+            await hook();
+          }
+          // biome-ignore lint/suspicious/noExplicitAny: wrap tx.select to observe and fault custom-role lookups
+          const origTxSelect = (tx as any).select.bind(tx);
+          const wrappedTx = new Proxy(tx, {
+            get(target, prop, receiver) {
+              if (prop === "select") {
+                return wrapRoleSelect(origTxSelect, true);
+              }
+              return Reflect.get(target, prop, receiver);
+            },
+          });
+          activeTx += 1;
+          try {
+            return await cb(wrappedTx);
+          } finally {
+            activeTx -= 1;
+          }
+        }, config)) as unknown as typeof db.transaction);
+
+      return {
+        getTxRoleLookups: () => txRoleLookups,
+        restore: () => {
+          txSpy.mockRestore();
+          selectSpy.mockRestore();
+        },
+      };
+    }
+
+    // 1. When getRoleDefinition fails inside db.transaction, routes abort with 500
+    // (rolling back mutations) instead of returning 403 ESCALATION_DENIED or 200 with [].
+    const [managerRow] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, managerUsername));
+    const managerSessionsBefore = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, managerRow.id));
+    const faultRegUsername = uniqueName("tx-fault-reg");
+    const faultAdminRegUsername = uniqueName("tx-fault-admin-reg");
+    const faultGuard = interceptTransactionRoleLookups("fault-tx-role-select");
+    try {
+      const regFault = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/register",
+        headers: { authorization: `Bearer ${managerToken}` },
+        payload: {
+          username: faultRegUsername,
+          password: "RoleAuthority1!",
+          role: subordinateRole,
+        },
+      });
+      expect(regFault.statusCode).toBe(500);
+
+      // Also test built-in admin actor against custom subordinateRole so
+      // hasEffectivePermission resolves in-memory and the fault hits canAssignRole
+      // and canManageTargetRole directly inside db.transaction.
+      const adminRegFault = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/register",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: {
+          username: faultAdminRegUsername,
+          password: "RoleAuthority1!",
+          role: subordinateRole,
+        },
+      });
+      expect(adminRegFault.statusCode).toBe(500);
+
+      const putUserFault = await testApp.app.inject({
+        method: "PUT",
+        url: `/api/auth/users/${targetBefore.id}`,
+        headers: { authorization: `Bearer ${managerToken}` },
+        payload: { role: subordinateRole },
+      });
+      expect(putUserFault.statusCode).toBe(500);
+
+      const adminPutUserFault = await testApp.app.inject({
+        method: "PUT",
+        url: `/api/auth/users/${targetBefore.id}`,
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { role: "editor" },
+      });
+      expect(adminPutUserFault.statusCode).toBe(500);
+
+      const resetFault = await testApp.app.inject({
+        method: "POST",
+        url: `/api/auth/users/${targetBefore.id}/reset-password`,
+        headers: { authorization: `Bearer ${managerToken}` },
+        payload: { newPassword: "NewResetPassword1!" },
+      });
+      expect(resetFault.statusCode).toBe(500);
+
+      const delUserFault = await testApp.app.inject({
+        method: "DELETE",
+        url: `/api/auth/users/${targetBefore.id}`,
+        headers: { authorization: `Bearer ${managerToken}` },
+      });
+      expect(delUserFault.statusCode).toBe(500);
+
+      const putRoleFault = await testApp.app.inject({
+        method: "PUT",
+        url: `/api/v1/roles/${subordinateRoleId}`,
+        headers: { authorization: `Bearer ${managerToken}` },
+        payload: { description: "should roll back on role lookup fault" },
+      });
+      expect(putRoleFault.statusCode).toBe(500);
+
+      const loginFault = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username: managerUsername, password: "RoleAuthority1!" },
+      });
+      expect(loginFault.statusCode).toBe(500);
+    } finally {
+      faultGuard.restore();
+    }
+
+    // For DELETE /api/v1/roles/:id, pass the pre-lock built-in "user" fallback check as
+    // admin, then move the actor onto managerRole as the transaction starts so
+    // resolveTransactionActor and canManageRoleDefinition query managerRole on tx.
+    await db
+      .update(schema.users)
+      .set({ role: "admin" })
+      .where(eq(schema.users.username, managerUsername));
+    const delRoleFaultGuard = interceptTransactionRoleLookups("fault-tx-role-select", async () => {
+      await db
+        .update(schema.users)
+        .set({ role: managerRole })
+        .where(eq(schema.users.username, managerUsername));
+    });
+    try {
+      const delRoleFault = await testApp.app.inject({
+        method: "DELETE",
+        url: `/api/v1/roles/${subordinateRoleId}`,
+        headers: { authorization: `Bearer ${managerToken}` },
+      });
+      expect(delRoleFault.statusCode).toBe(500);
+    } finally {
+      delRoleFaultGuard.restore();
+      await db
+        .update(schema.users)
+        .set({ role: managerRole })
+        .where(eq(schema.users.username, managerUsername));
+    }
+
+    const [notCreated1] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, faultRegUsername));
+    expect(notCreated1).toBeUndefined();
+    const [notCreated2] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, faultAdminRegUsername));
+    expect(notCreated2).toBeUndefined();
+    const managerSessionsAfterFault = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, managerRow.id));
+    expect(managerSessionsAfterFault).toHaveLength(managerSessionsBefore.length);
+    const [targetAfterFaults] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, targetBefore.id));
+    expect(targetAfterFaults?.role).toBe(subordinateRole);
+    expect(targetAfterFaults?.passwordHash).toBe(targetBefore.passwordHash);
+    const [subRoleAfterFaults] = await db
+      .select()
+      .from(schema.roles)
+      .where(eq(schema.roles.id, subordinateRoleId));
+    expect(subRoleAfterFaults?.description).toBe("");
+
+    // 2. While inside db.transaction, all custom-role lookups use tx.select rather than
+    // checking out a second connection via top-level db.select.
+    const txOnlyGuard = interceptTransactionRoleLookups("forbid-top-level-db");
+    try {
+      const createdUsername = uniqueName("tx-created-user");
+      const regOk = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/register",
+        headers: { authorization: `Bearer ${managerToken}` },
+        payload: {
+          username: createdUsername,
+          password: "RoleAuthority1!",
+          role: subordinateRole,
+        },
+      });
+      expect(regOk.statusCode, regOk.body).toBe(201);
+      const createdUserId = JSON.parse(regOk.body).id as string;
+
+      const putUserOk = await testApp.app.inject({
+        method: "PUT",
+        url: `/api/auth/users/${createdUserId}`,
+        headers: { authorization: `Bearer ${managerToken}` },
+        payload: { role: subordinateRole },
+      });
+      expect(putUserOk.statusCode, putUserOk.body).toBe(200);
+
+      const resetOk = await testApp.app.inject({
+        method: "POST",
+        url: `/api/auth/users/${createdUserId}/reset-password`,
+        headers: { authorization: `Bearer ${managerToken}` },
+        payload: { newPassword: "UpdatedPassword1!" },
+      });
+      expect(resetOk.statusCode, resetOk.body).toBe(200);
+
+      const putRoleOk = await testApp.app.inject({
+        method: "PUT",
+        url: `/api/v1/roles/${subordinateRoleId}`,
+        headers: { authorization: `Bearer ${managerToken}` },
+        payload: { description: "updated via tx runner" },
+      });
+      expect(putRoleOk.statusCode, putRoleOk.body).toBe(200);
+
+      const delUserOk = await testApp.app.inject({
+        method: "DELETE",
+        url: `/api/auth/users/${createdUserId}`,
+        headers: { authorization: `Bearer ${managerToken}` },
+      });
+      expect(delUserOk.statusCode, delUserOk.body).toBe(200);
+
+      const loginOk = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username: managerUsername, password: "RoleAuthority1!" },
+      });
+      expect(loginOk.statusCode, loginOk.body).toBe(200);
+      expect(JSON.parse(loginOk.body).user.permissions).toContain("users:manage");
+
+      expect(txOnlyGuard.getTxRoleLookups()).toBeGreaterThanOrEqual(10);
+    } finally {
+      txOnlyGuard.restore();
+    }
+
+    // Also verify DELETE /api/v1/roles/:id uses tx.select (not top-level db.select)
+    // when currentActor has a custom role inside the transaction.
+    await db
+      .update(schema.users)
+      .set({ role: "admin" })
+      .where(eq(schema.users.username, managerUsername));
+    const delRoleTxGuard = interceptTransactionRoleLookups("forbid-top-level-db", async () => {
+      await db
+        .update(schema.users)
+        .set({ role: managerRole })
+        .where(eq(schema.users.username, managerUsername));
+    });
+    try {
+      const delRoleRes = await testApp.app.inject({
+        method: "DELETE",
+        url: `/api/v1/roles/${subordinateRoleId}`,
+        headers: { authorization: `Bearer ${managerToken}` },
+      });
+      expect(delRoleRes.statusCode, delRoleRes.body).toBe(403);
+      expect(JSON.parse(delRoleRes.body)).toEqual({
+        error: "Cannot reassign role members beyond your role authority",
+        code: "ESCALATION_DENIED",
+      });
+      expect(delRoleTxGuard.getTxRoleLookups()).toBeGreaterThanOrEqual(2);
+    } finally {
+      delRoleTxGuard.restore();
+    }
+  });
 });

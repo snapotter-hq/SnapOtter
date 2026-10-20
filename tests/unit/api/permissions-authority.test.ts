@@ -671,3 +671,148 @@ describe("requireToolAccess guard", () => {
     expect(result).toEqual(user);
   });
 });
+
+// ── Custom query runner + DB error propagation (#2672) ───────────────
+
+describe("custom query runner and database error propagation (#2672)", () => {
+  it("uses the provided conn runner instead of top-level db.select for custom role lookups", async () => {
+    const {
+      canAssignRole,
+      canGrantRoleDefinition,
+      canManageRoleDefinition,
+      canManageTargetRole,
+      getEffectivePermissions,
+      getPermissions,
+      hasEffectivePermission,
+      hasEffectiveToolAccess,
+      hasPermission,
+      hasToolAccess,
+      permissionsNotHeldBy,
+    } = await loadPermissions();
+
+    const txSelect = vi.fn(() =>
+      selectChain([
+        {
+          permissions: ["tools:use", "users:manage", "security:manage"],
+          toolPermissions: { mode: "category", allowed: ["image"] },
+        },
+      ]),
+    );
+    const txConn = { select: txSelect } as never;
+    const customActor = makeUser({ role: "custom-manager", id: "u-mgr" });
+
+    expect(await getPermissions("custom-manager", txConn)).toEqual([
+      "tools:use",
+      "users:manage",
+      "security:manage",
+    ]);
+    expect(await hasPermission("custom-manager", "users:manage", txConn)).toBe(true);
+    expect(await hasEffectivePermission(customActor, "users:manage", txConn)).toBe(true);
+    expect(await getEffectivePermissions(customActor, txConn)).toEqual([
+      "tools:use",
+      "users:manage",
+      "security:manage",
+    ]);
+    expect(await permissionsNotHeldBy(customActor, ["tools:use", "files:all"], txConn)).toEqual([
+      "files:all",
+    ]);
+    expect(
+      await canManageRoleDefinition(
+        customActor,
+        "subordinate",
+        ["tools:use"],
+        { mode: "category", allowed: ["image"] },
+        txConn,
+      ),
+    ).toBe(true);
+    expect(
+      await canGrantRoleDefinition(
+        customActor,
+        ["tools:use"],
+        { mode: "category", allowed: ["image"] },
+        txConn,
+      ),
+    ).toBe(true);
+    expect(await canAssignRole(customActor, "custom-manager", txConn)).toBe(true);
+    expect(await canManageTargetRole(customActor, "custom-manager", txConn)).toBe(true);
+    expect(await hasToolAccess("custom-manager", "resize", txConn)).toBe(true);
+    expect(await hasEffectiveToolAccess(customActor, "resize", txConn)).toBe(true);
+
+    expect(selectMock).not.toHaveBeenCalled();
+    expect(txSelect).toHaveBeenCalled();
+  });
+
+  it("propagates database errors from custom-role lookups instead of returning null/false (#2672)", async () => {
+    const {
+      canAssignRole,
+      canGrantRoleDefinition,
+      canManageRoleDefinition,
+      canManageTargetRole,
+      getEffectivePermissions,
+      getPermissions,
+      hasEffectivePermission,
+      hasEffectiveToolAccess,
+      hasPermission,
+      hasToolAccess,
+      permissionsNotHeldBy,
+    } = await loadPermissions();
+
+    const dbError = new Error("connection terminated unexpectedly");
+    const failingConn = {
+      select: vi.fn(() => ({
+        from: () => ({
+          where: () => ({
+            limit: () => Promise.reject(dbError),
+          }),
+        }),
+      })),
+    } as never;
+    const customActor = makeUser({ role: "custom-manager", id: "u-mgr" });
+
+    // Default conn = db also propagates DB errors when selectMock rejects.
+    selectMock.mockReturnValueOnce({
+      from: () => ({
+        where: () => ({
+          limit: () => Promise.reject(dbError),
+        }),
+      }),
+    });
+    await expect(getPermissions("custom-manager")).rejects.toThrow(
+      "connection terminated unexpectedly",
+    );
+
+    await expect(getPermissions("custom-manager", failingConn)).rejects.toThrow(
+      "connection terminated unexpectedly",
+    );
+    await expect(hasPermission("custom-manager", "users:manage", failingConn)).rejects.toThrow(
+      "connection terminated unexpectedly",
+    );
+    await expect(hasEffectivePermission(customActor, "users:manage", failingConn)).rejects.toThrow(
+      "connection terminated unexpectedly",
+    );
+    await expect(getEffectivePermissions(customActor, failingConn)).rejects.toThrow(
+      "connection terminated unexpectedly",
+    );
+    await expect(permissionsNotHeldBy(customActor, ["tools:use"], failingConn)).rejects.toThrow(
+      "connection terminated unexpectedly",
+    );
+    await expect(canAssignRole(customActor, "subordinate", failingConn)).rejects.toThrow(
+      "connection terminated unexpectedly",
+    );
+    await expect(canManageTargetRole(customActor, "subordinate", failingConn)).rejects.toThrow(
+      "connection terminated unexpectedly",
+    );
+    await expect(
+      canManageRoleDefinition(customActor, "sub", ["tools:use"], null, failingConn),
+    ).rejects.toThrow("connection terminated unexpectedly");
+    await expect(
+      canGrantRoleDefinition(customActor, ["tools:use"], null, failingConn),
+    ).rejects.toThrow("connection terminated unexpectedly");
+    await expect(hasToolAccess("custom-manager", "resize", failingConn)).rejects.toThrow(
+      "connection terminated unexpectedly",
+    );
+    await expect(hasEffectiveToolAccess(customActor, "resize", failingConn)).rejects.toThrow(
+      "connection terminated unexpectedly",
+    );
+  });
+});

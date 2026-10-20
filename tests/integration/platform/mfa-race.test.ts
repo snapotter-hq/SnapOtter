@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import * as OTPAuth from "otpauth";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -983,5 +984,215 @@ describe("MFA Race Condition #2328", () => {
       .from(schema.sessions)
       .where(eq(schema.sessions.userId, enrollUserId));
     expect(sessionsAfterEnrollRetry).toHaveLength(sessionsBeforeEnroll.length + 1);
+  });
+
+  it("queries schema.roles via tx and rolls back with 500 on role lookup failure in /mfa/complete and /mfa/enroll-complete (#2672)", async () => {
+    const remainingMs = OTPAuth.TOTP.remaining({ period: 30 });
+    if (remainingMs < 5_000) {
+      await new Promise((r) => setTimeout(r, remainingMs + 50));
+    }
+
+    const customRoleName = `mfa-role-${Date.now().toString(36)}`;
+    await db.insert(schema.roles).values({
+      id: randomUUID(),
+      name: customRoleName,
+      description: "MFA custom role",
+      permissions: ["tools:use", "files:own"],
+      isBuiltin: false,
+    });
+
+    function interceptMfaRoleSelect(mode: "forbid-top-level-db" | "fault-tx-role-select") {
+      let activeTx = 0;
+      let txRoleLookups = 0;
+      // biome-ignore lint/suspicious/noExplicitAny: wrap Drizzle select builder on both db and tx
+      const wrapRoleSelect = (origSelect: (...args: any[]) => any, isTx: boolean) => {
+        return (...selectArgs: unknown[]) => {
+          if (!isTx && activeTx > 0 && mode === "forbid-top-level-db") {
+            throw new Error("top-level db.select called inside mfa db.transaction");
+          }
+          const builder = origSelect(...selectArgs);
+          const origFrom = builder.from.bind(builder);
+          builder.from = (table: unknown, ...fromArgs: unknown[]) => {
+            const fromBuilder = origFrom(table, ...fromArgs);
+            if (table === schema.roles && (isTx || activeTx > 0)) {
+              const origWhere = fromBuilder.where.bind(fromBuilder);
+              fromBuilder.where = (...whereArgs: unknown[]) => {
+                const whereBuilder = origWhere(...whereArgs);
+                // Hook .limit() specifically so getRoleDefinition is intercepted while
+                // skipping any non-limit queries in the same transaction.
+                const origLimit = whereBuilder.limit?.bind(whereBuilder);
+                if (origLimit) {
+                  whereBuilder.limit = (...limitArgs: unknown[]) => {
+                    if (isTx) {
+                      txRoleLookups += 1;
+                    }
+                    if (mode === "fault-tx-role-select") {
+                      return Promise.reject(new Error("simulated mfa custom role lookup failure"));
+                    }
+                    return origLimit(...limitArgs);
+                  };
+                }
+                return whereBuilder;
+              };
+            }
+            return fromBuilder;
+          };
+          return builder;
+        };
+      };
+
+      const origDbSelect = db.select.bind(db);
+      const selectSpy = vi
+        .spyOn(db, "select")
+        .mockImplementation(wrapRoleSelect(origDbSelect, false) as typeof db.select);
+
+      const realTransaction = db.transaction.bind(db) as (
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) => Promise<unknown>;
+      const txSpy = vi.spyOn(db, "transaction").mockImplementation(((
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) =>
+        realTransaction(async (tx) => {
+          // biome-ignore lint/suspicious/noExplicitAny: wrap tx.select to observe and fault schema.roles inside transaction
+          const origTxSelect = (tx as any).select.bind(tx);
+          const wrappedTx = new Proxy(tx, {
+            get(target, prop, receiver) {
+              if (prop === "select") {
+                return wrapRoleSelect(origTxSelect, true);
+              }
+              return Reflect.get(target, prop, receiver);
+            },
+          });
+          activeTx += 1;
+          try {
+            return await cb(wrappedTx);
+          } finally {
+            activeTx -= 1;
+          }
+        }, config)) as unknown as typeof db.transaction);
+
+      return {
+        getTxRoleLookups: () => txRoleLookups,
+        restore: () => {
+          txSpy.mockRestore();
+          selectSpy.mockRestore();
+        },
+      };
+    }
+
+    // 1. /mfa/complete with custom role
+    const { userId, username, password, uri } = await createEnrolledUser();
+    await db
+      .update(schema.users)
+      .set({ role: customRoleName, updatedAt: new Date() })
+      .where(eq(schema.users.id, userId));
+    const completeSessionsBefore = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, userId));
+
+    const loginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username, password },
+    });
+    const { mfaToken } = JSON.parse(loginRes.body);
+    const totpCode = generateTotpCode(uri);
+
+    const faultComplete = interceptMfaRoleSelect("fault-tx-role-select");
+    try {
+      const faultRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code: totpCode },
+      });
+      expect(faultRes.statusCode).toBe(500);
+    } finally {
+      faultComplete.restore();
+    }
+    const completeSessionsAfterFault = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, userId));
+    expect(completeSessionsAfterFault).toHaveLength(completeSessionsBefore.length);
+    expect(await sharedRedis().get(`mfa:${mfaToken}`)).toBeTruthy();
+
+    const txOnlyComplete = interceptMfaRoleSelect("forbid-top-level-db");
+    try {
+      const okRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/complete",
+        payload: { mfaToken, code: totpCode },
+      });
+      expect(okRes.statusCode, okRes.body).toBe(200);
+      expect(JSON.parse(okRes.body).user.permissions).toEqual(["tools:use", "files:own"]);
+      expect(txOnlyComplete.getTxRoleLookups()).toBe(1);
+    } finally {
+      txOnlyComplete.restore();
+    }
+
+    // 2. /mfa/enroll-complete with custom role
+    const enrollUsername = `mfa_enroll_2672_${Date.now()}`;
+    const { userId: enrollUserId } = await createUserAndLogin(
+      testApp.app,
+      enrollUsername,
+      customRoleName,
+      password,
+    );
+    const enrollSessionsBefore = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, enrollUserId));
+    await db
+      .insert(schema.settings)
+      .values({ key: "mfaPolicy", value: "required" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "required" } });
+
+    const enrollLoginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username: enrollUsername, password },
+    });
+    const { enrollmentToken, uri: enrollUri } = JSON.parse(enrollLoginRes.body);
+    const enrollCode = generateTotpCode(enrollUri);
+
+    const faultEnroll = interceptMfaRoleSelect("fault-tx-role-select");
+    try {
+      const faultEnrollRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/enroll-complete",
+        payload: { enrollmentToken, code: enrollCode },
+      });
+      expect(faultEnrollRes.statusCode).toBe(500);
+    } finally {
+      faultEnroll.restore();
+    }
+    const [enrollUserAfterFault] = await db
+      .select({ totpEnabled: schema.users.totpEnabled })
+      .from(schema.users)
+      .where(eq(schema.users.id, enrollUserId));
+    expect(enrollUserAfterFault.totpEnabled).toBe(false);
+    const enrollSessionsAfterFault = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, enrollUserId));
+    expect(enrollSessionsAfterFault).toHaveLength(enrollSessionsBefore.length);
+    expect(await sharedRedis().get(`mfa:enroll:${enrollmentToken}`)).toBeTruthy();
+
+    const txOnlyEnroll = interceptMfaRoleSelect("forbid-top-level-db");
+    try {
+      const okEnrollRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/mfa/enroll-complete",
+        payload: { enrollmentToken, code: enrollCode },
+      });
+      expect(okEnrollRes.statusCode, okEnrollRes.body).toBe(200);
+      expect(JSON.parse(okEnrollRes.body).user.permissions).toEqual(["tools:use", "files:own"]);
+      expect(txOnlyEnroll.getTxRoleLookups()).toBe(1);
+    } finally {
+      txOnlyEnroll.restore();
+    }
   });
 });

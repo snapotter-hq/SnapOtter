@@ -1014,7 +1014,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
             .select()
             .from(schema.teams)
             .where(eq(schema.teams.id, lockedUser.team));
-          const permissions = await getPermissions(lockedUser.role);
+          const permissions = await getPermissions(lockedUser.role, tx);
 
           return {
             status: "success" as const,
@@ -1324,7 +1324,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
             .select()
             .from(schema.teams)
             .where(eq(schema.teams.id, lockedUser.team));
-          const permissions = await getPermissions(lockedUser.role);
+          const permissions = await getPermissions(lockedUser.role, tx);
 
           return {
             status: "success" as const,

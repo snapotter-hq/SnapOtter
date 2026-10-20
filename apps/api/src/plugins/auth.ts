@@ -945,7 +945,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           .select()
           .from(schema.teams)
           .where(eq(schema.teams.id, lockedUser.team));
-        const permissions = await getPermissions(lockedUser.role);
+        const permissions = await getPermissions(lockedUser.role, tx);
 
         return {
           status: "ok" as const,
@@ -1448,11 +1448,11 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       if (!currentAdmin) return "escalation-denied" as const;
 
       const currentActor = { ...admin, role: currentAdmin.role };
-      if (!(await hasEffectivePermission(currentActor, "users:manage"))) {
+      if (!(await hasEffectivePermission(currentActor, "users:manage", tx))) {
         return "escalation-denied" as const;
       }
       if (!roleExists) return "unknown-role" as const;
-      if (!(await canAssignRole(currentActor, role))) {
+      if (!(await canAssignRole(currentActor, role, tx))) {
         return "escalation-denied" as const;
       }
       if (!teamExists) return "unknown-team" as const;
@@ -1653,7 +1653,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
           const currentActor = { ...admin, role: currentAdmin.role };
 
-          if (!(await hasEffectivePermission(currentActor, "users:manage"))) {
+          if (!(await hasEffectivePermission(currentActor, "users:manage", tx))) {
             throw new EscalationDeniedError();
           }
 
@@ -1661,7 +1661,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
             throw new Error("NOT_FOUND");
           }
 
-          if (!(await canManageTargetRole(currentActor, currentUser.role))) {
+          if (!(await canManageTargetRole(currentActor, currentUser.role, tx))) {
             throw new EscalationDeniedError();
           }
 
@@ -1669,7 +1669,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
             throw new Error("UNKNOWN_ROLE");
           }
 
-          if (updates.role && !(await canAssignRole(currentActor, updates.role))) {
+          if (updates.role && !(await canAssignRole(currentActor, updates.role, tx))) {
             throw new EscalationDeniedError();
           }
 
@@ -1800,7 +1800,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
           const currentActor = { ...admin, role: currentAdmin.role };
 
-          if (!(await hasEffectivePermission(currentActor, "users:manage"))) {
+          if (!(await hasEffectivePermission(currentActor, "users:manage", tx))) {
             throw new EscalationDeniedError();
           }
 
@@ -1808,7 +1808,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
             throw new Error("NOT_FOUND");
           }
 
-          if (!(await canManageTargetRole(currentActor, currentUser.role))) {
+          if (!(await canManageTargetRole(currentActor, currentUser.role, tx))) {
             throw new EscalationDeniedError();
           }
 
@@ -1943,7 +1943,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
           const currentActor = { ...admin, role: currentAdmin.role };
 
-          if (!(await hasEffectivePermission(currentActor, "users:manage"))) {
+          if (!(await hasEffectivePermission(currentActor, "users:manage", tx))) {
             throw new EscalationDeniedError();
           }
 
@@ -1951,7 +1951,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
             throw new Error("NOT_FOUND");
           }
 
-          if (!(await canManageTargetRole(currentActor, currentUser.role))) {
+          if (!(await canManageTargetRole(currentActor, currentUser.role, tx))) {
             throw new EscalationDeniedError();
           }
 
