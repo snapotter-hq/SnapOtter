@@ -9,6 +9,7 @@ import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerColorAdjustments } from "../../../apps/api/src/routes/tools/adjust-colors.js";
 import { registerBorder } from "../../../apps/api/src/routes/tools/border.js";
 import { registerCompress } from "../../../apps/api/src/routes/tools/compress.js";
+import { registerContentAwareResize } from "../../../apps/api/src/routes/tools/content-aware-resize.js";
 import { registerConvert } from "../../../apps/api/src/routes/tools/convert.js";
 import { registerGifTools } from "../../../apps/api/src/routes/tools/gif-tools.js";
 import { registerLqipPlaceholder } from "../../../apps/api/src/routes/tools/lqip-placeholder.js";
@@ -27,6 +28,7 @@ const app = {
 beforeAll(() => {
   registerConvert(app);
   registerCompress(app);
+  registerContentAwareResize(app);
   registerOptimizeForWeb(app);
   registerResize(app);
   registerSplit(app);
@@ -55,6 +57,10 @@ describe("Sharp-backed image settings schemas", () => {
   });
 
   it.each([
+    ["content-aware-resize", { width: 100.5 }],
+    ["content-aware-resize", { height: 80.25 }],
+    ["content-aware-resize", { blurRadius: 2.5 }],
+    ["content-aware-resize", { sobelThreshold: 10.5 }],
     ["optimize-for-web", { maxWidth: 640.5 }],
     ["optimize-for-web", { maxHeight: Number.POSITIVE_INFINITY }],
     ["split", { columns: 2.5 }],
@@ -78,6 +84,21 @@ describe("Sharp-backed image settings schemas", () => {
     expect(parses("optimize-for-web", { maxWidth: MAX_RESIZE_OUTPUT_DIMENSION + 1 })).toBe(false);
     expect(parses("optimize-for-web", { maxHeight: MAX_RESIZE_OUTPUT_DIMENSION + 1 })).toBe(false);
     expect(parses("optimize-for-web", { maxWidth: 100_000_001 })).toBe(false);
+  });
+
+  it("bounds content-aware-resize dimensions by the resize ceiling (#2204)", () => {
+    expect(parses("content-aware-resize", { width: MAX_RESIZE_OUTPUT_DIMENSION })).toBe(true);
+    expect(parses("content-aware-resize", { height: MAX_RESIZE_OUTPUT_DIMENSION })).toBe(true);
+    expect(
+      parses("content-aware-resize", {
+        width: MAX_RESIZE_OUTPUT_DIMENSION,
+        height: MAX_RESIZE_OUTPUT_DIMENSION,
+      }),
+    ).toBe(true);
+    expect(parses("content-aware-resize", { width: MAX_RESIZE_OUTPUT_DIMENSION + 1 })).toBe(false);
+    expect(parses("content-aware-resize", { height: MAX_RESIZE_OUTPUT_DIMENSION + 1 })).toBe(false);
+    expect(parses("content-aware-resize", { width: 100_000_000 })).toBe(false);
+    expect(parses("content-aware-resize", { height: 100_000_000 })).toBe(false);
   });
 
   it("rejects a non-finite resize percentage", () => {

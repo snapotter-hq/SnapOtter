@@ -3,7 +3,11 @@ import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { seamCarve } from "@snapotter/ai";
-import { hasServerErrorStatus, isToolInputError } from "@snapotter/shared";
+import {
+  hasServerErrorStatus,
+  isToolInputError,
+  MAX_RESIZE_OUTPUT_DIMENSION,
+} from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
@@ -23,8 +27,8 @@ import { registerToolProcessFn } from "../tool-factory.js";
 // caire's -width/-height/-blur/-sobel flags are integer-only; a fractional
 // value makes the binary exit with a flag parse error.
 const settingsSchema = z.object({
-  width: z.number().int().positive().optional(),
-  height: z.number().int().positive().optional(),
+  width: z.number().int().positive().max(MAX_RESIZE_OUTPUT_DIMENSION).optional(),
+  height: z.number().int().positive().max(MAX_RESIZE_OUTPUT_DIMENSION).optional(),
   protectFaces: z.boolean().default(false),
   blurRadius: z.number().int().min(0).max(20).default(4),
   sobelThreshold: z.number().int().min(1).max(20).default(2),

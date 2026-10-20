@@ -6,6 +6,7 @@
  * while still verifying route existence and input validation.
  */
 
+import { MAX_RESIZE_OUTPUT_DIMENSION } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -631,6 +632,35 @@ describe("Content-Aware Resize", () => {
     });
 
     expect(res.statusCode).toBe(400);
+  });
+
+  it.each([
+    ["width past the resize ceiling", { width: MAX_RESIZE_OUTPUT_DIMENSION + 1 }],
+    ["height past the resize ceiling", { height: MAX_RESIZE_OUTPUT_DIMENSION + 1 }],
+    [
+      "both dimensions past the resize ceiling",
+      { width: MAX_RESIZE_OUTPUT_DIMENSION + 1, height: MAX_RESIZE_OUTPUT_DIMENSION + 1 },
+    ],
+    ["huge width", { width: 100_000_000 }],
+    ["huge height", { height: 100_000_000 }],
+  ])("rejects %s with 400 (#2204)", async (_label, settings) => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG_200x150 },
+      { name: "settings", content: JSON.stringify(settings) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/content-aware-resize",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/invalid settings/i);
   });
 
   it("handles square mode with width also specified", async () => {
