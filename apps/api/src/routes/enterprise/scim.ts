@@ -1591,20 +1591,22 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(400).send(scimError(400, "Cannot delete the Default team"));
       }
 
-      // Move members to default team
-      const [defaultTeam] = await db
-        .select()
-        .from(schema.teams)
-        .where(eq(schema.teams.name, "Default"));
-      const fallbackTeamId = defaultTeam?.id ?? "default-team-00000000";
+      // Move members to the Default team and delete the group in one
+      // transaction so a failed delete never leaves the group emptied (#2914).
+      await db.transaction(async (tx) => {
+        const [defaultTeam] = await tx
+          .select()
+          .from(schema.teams)
+          .where(eq(schema.teams.name, "Default"));
+        const fallbackTeamId = defaultTeam?.id ?? "default-team-00000000";
 
-      await db
-        .update(schema.users)
-        .set({ team: fallbackTeamId, updatedAt: new Date() })
-        .where(eq(schema.users.team, id));
+        await tx
+          .update(schema.users)
+          .set({ team: fallbackTeamId, updatedAt: new Date() })
+          .where(eq(schema.users.team, id));
 
-      // Delete the team
-      await db.delete(schema.teams).where(eq(schema.teams.id, id));
+        await tx.delete(schema.teams).where(eq(schema.teams.id, id));
+      });
 
       await auditLog(
         request.log,

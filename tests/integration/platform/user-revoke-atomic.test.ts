@@ -1,17 +1,18 @@
 /**
- * A role change and a SCIM deprovision are all-or-nothing (#2126). Both used
- * to write the user row and then revoke sessions (and, for deprovision, API
- * keys) as separate statements, so a failure on a later one answered an
- * error with the row already changed: a demoted user kept sessions holding
- * the old permissions, and a deprovisioned user kept live API keys.
+ * A role change, a SCIM deprovision (#2126), and a SCIM group delete (#2914)
+ * are all-or-nothing. Each used to update `users` and then run its DELETE as
+ * separate statements, so a failure on the DELETE answered an error with the
+ * user rows already changed: a demoted user kept sessions holding the old
+ * permissions, a deprovisioned user kept live API keys, and a group whose
+ * delete failed lost its members to the Default team.
  *
- * The failure is injected at the revoke DELETEs on the plain `db` handle and
- * on the handle a transaction passes to its callback, as in
+ * The failure is injected at the DELETEs on the plain `db` handle and on the
+ * handle a transaction passes to its callback, as in
  * password-change-atomic.test.ts, so the test is meaningful whichever way the
  * handler runs.
  */
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { TestApp } from "../test-server.js";
 
@@ -198,4 +199,86 @@ describe("a SCIM deprovision is all-or-nothing (#2126)", () => {
       expect(await apiKeyCount(userId)).toBe(0);
     });
   }
+});
+
+describe("a SCIM group delete is all-or-nothing (#2914)", () => {
+  it("keeps the group and its members when the team delete fails, then succeeds on retry", async () => {
+    const createUser = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/scim/v2/Users",
+      headers: { authorization: `Bearer ${SCIM_TOKEN}` },
+      payload: { userName: `scim_grp_del_atomic_${Date.now().toString(36)}`, active: true },
+    });
+    expect(createUser.statusCode, createUser.body).toBe(201);
+    const userId = JSON.parse(createUser.body).id as string;
+
+    const createGroup = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/scim/v2/Groups",
+      headers: { authorization: `Bearer ${SCIM_TOKEN}` },
+      payload: {
+        displayName: `scim_grp_del_${Date.now().toString(36)}`,
+        members: [{ value: userId }],
+      },
+    });
+    expect(createGroup.statusCode, createGroup.body).toBe(201);
+    const groupId = JSON.parse(createGroup.body).id as string;
+    expect((await userRow(userId))?.team).toBe(groupId);
+
+    failDeleteOn = schema.teams;
+    const failed = await testApp.app.inject({
+      method: "DELETE",
+      url: `/api/v1/scim/v2/Groups/${groupId}`,
+      headers: { authorization: `Bearer ${SCIM_TOKEN}` },
+    });
+    failDeleteOn = null;
+
+    expect(failed.statusCode).toBe(500);
+    expect(JSON.parse(failed.body)).toEqual({
+      schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+      status: 500,
+      detail: "Internal server error",
+    });
+    const [teamStillThere] = await db
+      .select()
+      .from(schema.teams)
+      .where(eq(schema.teams.id, groupId));
+    expect(teamStillThere?.id).toBe(groupId);
+    expect((await userRow(userId))?.team).toBe(groupId);
+    const deletedAuditAfterFail = await db
+      .select()
+      .from(schema.auditLog)
+      .where(
+        and(
+          eq(schema.auditLog.action, "SCIM_GROUP_SYNCED"),
+          sql`${schema.auditLog.details}->>'teamId' = ${groupId}`,
+          sql`${schema.auditLog.details}->>'action' = 'deleted'`,
+        ),
+      );
+    expect(deletedAuditAfterFail).toHaveLength(0);
+
+    const retry = await testApp.app.inject({
+      method: "DELETE",
+      url: `/api/v1/scim/v2/Groups/${groupId}`,
+      headers: { authorization: `Bearer ${SCIM_TOKEN}` },
+    });
+    expect(retry.statusCode, retry.body).toBe(204);
+    const [teamAfterRetry] = await db
+      .select()
+      .from(schema.teams)
+      .where(eq(schema.teams.id, groupId));
+    expect(teamAfterRetry).toBeUndefined();
+    expect((await userRow(userId))?.team).toBe(schema.DEFAULT_TEAM_ID);
+    const deletedAuditAfterRetry = await db
+      .select()
+      .from(schema.auditLog)
+      .where(
+        and(
+          eq(schema.auditLog.action, "SCIM_GROUP_SYNCED"),
+          sql`${schema.auditLog.details}->>'teamId' = ${groupId}`,
+          sql`${schema.auditLog.details}->>'action' = 'deleted'`,
+        ),
+      );
+    expect(deletedAuditAfterRetry).toHaveLength(1);
+  });
 });
