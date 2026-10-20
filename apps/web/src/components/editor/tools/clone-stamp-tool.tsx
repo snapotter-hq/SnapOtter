@@ -54,6 +54,7 @@ export function useCloneStampTool(stageRef: React.RefObject<Konva.Stage | null>)
 
       const x = Math.floor((pointer.x - panOffset.x) / zoom);
       const y = Math.floor((pointer.y - panOffset.y) / zoom);
+      if (x < 0 || x >= canvasSize.width || y < 0 || y >= canvasSize.height) return;
 
       // Alt+click sets the clone source
       if (e.evt.altKey) {

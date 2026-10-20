@@ -49,9 +49,13 @@ function fakeContext() {
   };
 }
 
+const captureDocumentContextSpy = vi.hoisted(() =>
+  vi.fn(() => ({ ok: true as const, ctx: fakeContext() })),
+);
+
 vi.mock("@/components/editor/stage-capture", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/components/editor/stage-capture")>()),
-  captureDocumentContext: () => ({ ok: true, ctx: fakeContext() }),
+  captureDocumentContext: captureDocumentContextSpy,
 }));
 
 import { useCloneStampTool } from "@/components/editor/tools/clone-stamp-tool";
@@ -75,6 +79,7 @@ beforeEach(() => {
   state.pointer = { x: 50, y: 50 };
   state.fills = 0;
   toastError.mockClear();
+  captureDocumentContextSpy.mockClear();
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
     () => fakeContext() as unknown as CanvasRenderingContext2D,
   );
@@ -152,6 +157,130 @@ describe("clone stamp: an aborted first click", () => {
     // The next click sets its own offset, (50, 50), and clones from inside the document.
     state.pointer = { x: 50, y: 50 };
     state.dataUrl = "data:image/png;base64,AAAA";
+    state.fills = 0;
+    result.current.handleMouseDown(event);
+    expect(objects()).toHaveLength(1);
+    expect(state.fills).toBeGreaterThan(0);
+  });
+});
+
+describe("clone stamp: out-of-bounds clicks in the viewport margin (#2988)", () => {
+  const outOfBoundsCoords = [
+    ["left of canvas", { x: -1, y: 50 }],
+    ["sub-pixel left of canvas", { x: -0.1, y: 50 }],
+    ["above canvas", { x: 50, y: -1 }],
+    ["sub-pixel above canvas", { x: 50, y: -0.1 }],
+    ["right of canvas", { x: DOC.width, y: 50 }],
+    ["below canvas", { x: 50, y: DOC.height }],
+  ] as const;
+
+  it.each(outOfBoundsCoords)(
+    "ignores Alt+click (%s) without updating cloneSource or resetting aligned offset",
+    (_label, pos) => {
+      const initialSource = { x: 25, y: 35, aligned: true };
+      useEditorStore.setState({
+        activeTool: "clone-stamp",
+        cloneAligned: true,
+        cloneSource: initialSource,
+      });
+      const { result } = renderHook(() => useCloneStampTool(stageRef));
+
+      // First valid click at (50, 50) latches aligned offset (-25, -15).
+      state.pointer = { x: 50, y: 50 };
+      result.current.handleMouseDown(event);
+      result.current.handleMouseUp();
+      expect(objects()).toHaveLength(1);
+
+      // Out-of-bounds Alt+click in the margin must be ignored completely.
+      state.pointer = pos;
+      captureDocumentContextSpy.mockClear();
+      result.current.handleMouseDown({
+        target: stage,
+        evt: { altKey: true },
+      } as unknown as Konva.KonvaEventObject<MouseEvent>);
+
+      expect(useEditorStore.getState().cloneSource).toEqual(initialSource);
+      expect(captureDocumentContextSpy).not.toHaveBeenCalled();
+
+      // Next valid click at (10, 10): with preserved aligned offset (-25, -15),
+      // source is (-15, -5) outside DOC (0 fills), whereas a reset offset would
+      // recompute (25 - 10, 35 - 10) = (15, 25) and sample (25, 35) inside DOC (>0 fills).
+      state.pointer = { x: 10, y: 10 };
+      state.fills = 0;
+      result.current.handleMouseDown(event);
+      expect(state.fills).toBe(0);
+    },
+  );
+
+  it.each(outOfBoundsCoords)(
+    "ignores normal click (%s) without capturing, adding an object, or toasting",
+    (_label, pos) => {
+      useEditorStore.setState({
+        activeTool: "clone-stamp",
+        cloneAligned: true,
+        cloneSource: { x: 100, y: 100, aligned: true },
+      });
+      const { result } = renderHook(() => useCloneStampTool(stageRef));
+      state.pointer = pos;
+      state.bigReadsFail = true;
+
+      result.current.handleMouseDown(event);
+      state.pointer = { x: 50, y: 50 };
+      result.current.handleMouseMove(event);
+      result.current.handleMouseUp();
+
+      expect(captureDocumentContextSpy).not.toHaveBeenCalled();
+      expect(toastError).not.toHaveBeenCalled();
+      expect(objects()).toHaveLength(0);
+    },
+  );
+
+  it("ignores clicks in the panned/zoomed margin without latching aligned offset", () => {
+    useEditorStore.setState({
+      activeTool: "clone-stamp",
+      zoom: 2,
+      panOffset: { x: 10, y: 20 },
+      cloneAligned: true,
+      cloneSource: { x: 100, y: 100, aligned: true },
+    });
+    const { result } = renderHook(() => useCloneStampTool(stageRef));
+
+    // Pointer at (9, 19) with pan (10, 20) and zoom 2 => canvas (-0.5, -0.5), floor (-1, -1).
+    state.pointer = { x: 9, y: 19 };
+    result.current.handleMouseDown(event);
+    expect(captureDocumentContextSpy).not.toHaveBeenCalled();
+    expect(objects()).toHaveLength(0);
+
+    // Subsequent in-bounds click at pointer (110, 120) => canvas (50, 50)
+    // sets aligned offset (50, 50) and clones from (100, 100).
+    state.pointer = { x: 110, y: 120 };
+    state.fills = 0;
+    result.current.handleMouseDown(event);
+    expect(objects()).toHaveLength(1);
+    expect(state.fills).toBeGreaterThan(0);
+  });
+
+  it("accepts clicks on the final bottom-right pixel (DOC.width - 1, DOC.height - 1)", () => {
+    useEditorStore.setState({
+      activeTool: "clone-stamp",
+      cloneAligned: true,
+      cloneSource: null,
+    });
+    const { result } = renderHook(() => useCloneStampTool(stageRef));
+
+    // Sub-pixel coordinates inside the bottom-right pixel floor to (199, 199).
+    state.pointer = { x: DOC.width - 0.01, y: DOC.height - 0.01 };
+    result.current.handleMouseDown({
+      target: stage,
+      evt: { altKey: true },
+    } as unknown as Konva.KonvaEventObject<MouseEvent>);
+
+    expect(useEditorStore.getState().cloneSource).toEqual({
+      x: DOC.width - 1,
+      y: DOC.height - 1,
+      aligned: true,
+    });
+
     state.fills = 0;
     result.current.handleMouseDown(event);
     expect(objects()).toHaveLength(1);
