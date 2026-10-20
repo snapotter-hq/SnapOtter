@@ -7,6 +7,8 @@ import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format, plural } from "@/lib/format";
+import { reportRunEndFailure } from "@/lib/run-end-report";
+import { runEndWrites } from "@/lib/run-teardown";
 import { useFileStore } from "@/stores/file-store";
 
 const SIZE_OPTIONS = [
@@ -222,26 +224,37 @@ export function FaviconSettings() {
         stopTimers();
         if (xhr.status >= 200 && xhr.status < 300) {
           endSubscription();
+          let url: string | null = null;
           try {
             const blob = xhr.response as Blob;
-            const url = URL.createObjectURL(blob);
-            try {
-              if (capturedEntryId) {
-                useFileStore.getState().updateEntryById(capturedEntryId, {
-                  processedUrl: url,
-                  processedFilename: "favicons.zip",
-                  status: "completed",
-                });
-              }
-              setDownloadUrl(url);
-              setProgress((prev) => ({ ...prev, phase: "complete", percent: 100 }));
-            } catch (err) {
-              setError(t.errors.jobTrackingFailed);
-              throw err;
+            url = URL.createObjectURL(blob);
+            if (capturedEntryId) {
+              useFileStore.getState().updateEntryById(capturedEntryId, {
+                processedUrl: url,
+                processedFilename: "favicons.zip",
+                status: "completed",
+              });
             }
-          } finally {
-            cleanup();
+            setDownloadUrl(url);
+            setProgress((prev) => ({ ...prev, phase: "complete", percent: 100 }));
+          } catch (err) {
+            if (url && !useFileStore.getState().entries.some((e) => e.processedUrl === url)) {
+              URL.revokeObjectURL(url);
+            }
+            const teardownError = runEndWrites([
+              () => setError(t.errors.jobTrackingFailed),
+              cleanup,
+            ]);
+            if (teardownError) {
+              reportRunEndFailure(
+                "Ending a sync tool run after a result handling error failed",
+                teardownError.cause,
+                "favicon",
+              );
+            }
+            throw err;
           }
+          cleanup();
           return;
         }
 

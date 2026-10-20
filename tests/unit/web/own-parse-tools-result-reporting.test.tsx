@@ -11,6 +11,8 @@ vi.mock("@/lib/analytics", async () => {
 
 import { BarcodeReadSettings } from "@/components/tools/barcode-read-settings";
 import { CollageSettings } from "@/components/tools/collage-settings";
+import { FaviconSettings } from "@/components/tools/favicon-settings";
+import { ImageToPdfSettings } from "@/components/tools/image-to-pdf-settings";
 import { StitchSettings } from "@/components/tools/stitch-settings";
 import { captureHandledError } from "@/lib/analytics";
 import { format } from "@/lib/format";
@@ -18,13 +20,13 @@ import { useCollageStore } from "@/stores/collage-store";
 import { useFileStore } from "@/stores/file-store";
 
 /**
- * Stitch, Collage and Barcode Read post with their own XHR and read the sync
- * 2xx answer themselves, so nothing in useToolProcessor answers for them
- * (#1795). These pin the split #1740 and #1734 made for the other callers: a
- * body that isn't a result is the server's fault, fails the run as an invalid
- * response and is reported without any of its text; a throw while landing a
- * good one is ours, ends the run with the tracking message and is rethrown,
- * never reported as a malformed answer.
+ * Stitch, Collage, Barcode Read, Image to PDF, and Favicon post with their own
+ * XHR and read the sync 2xx answer themselves, so nothing in useToolProcessor
+ * answers for them (#1795, #3072). These pin the split #1740 and #1734 made
+ * for the other callers: a body that isn't a result is the server's fault,
+ * fails the run as an invalid response and is reported without any of its
+ * text; a throw while landing a good one is ours, ends the run with the
+ * tracking message and is rethrown, never reported as a malformed answer.
  */
 
 const NOT_AN_OBJECT = "Tool result body is not a JSON object";
@@ -61,16 +63,20 @@ class FakeXhr {
 
   timeout = 0;
   status = 0;
+  responseType = "";
+  response: unknown = null;
   responseText = "";
   onload: (() => void) | null = null;
   onerror: (() => void) | null = null;
   ontimeout: (() => void) | null = null;
-  upload: { onprogress: unknown } = { onprogress: null };
+  upload: { onprogress: unknown; onload: unknown } = { onprogress: null, onload: null };
   url = "";
 
   constructor() {
     FakeXhr.instances.push(this);
   }
+
+  abort() {}
 
   open(_method: string, url: string) {
     this.url = url;
@@ -88,6 +94,14 @@ class FakeXhr {
     act(() => {
       this.status = status;
       this.responseText = text;
+      this.onload?.();
+    });
+  }
+
+  respondBlob(status: number, blob: Blob) {
+    act(() => {
+      this.status = status;
+      this.response = blob;
       this.onload?.();
     });
   }
@@ -708,5 +722,264 @@ describe("barcode read: a malformed sync answer apart from our own store write",
 
     expect(useFileStore.getState().error).toBe("photo.png: Barcode detection failed");
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+});
+
+describe("image-to-pdf: a malformed sync answer apart from our own store write (#3072)", () => {
+  const DOWNLOAD_URL = "/api/v1/download/job-1/images.pdf";
+  const GOOD_BODY = {
+    jobId: "job-1",
+    downloadUrl: DOWNLOAD_URL,
+    originalSize: 2000,
+    processedSize: 1500,
+  };
+
+  beforeEach(() => {
+    useFileStore.getState().setFiles([image("page1.png")]);
+  });
+
+  it("lands a good result", async () => {
+    render(<ImageToPdfSettings />);
+
+    (await submit("image-to-pdf-submit")).respond(200, GOOD_BODY);
+
+    await waitFor(() => expect(screen.getByTestId("image-to-pdf-download")).toBeInTheDocument());
+    expect(screen.getByTestId("image-to-pdf-download")).toHaveAttribute("href", DOWNLOAD_URL);
+    expect(useFileStore.getState().entries[0].processedUrl).toBe(DOWNLOAD_URL);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["a body that does not parse", HTML_BODY, NOT_AN_OBJECT],
+    ["a JSON null body", "null", NOT_AN_OBJECT],
+    ["a JSON array body", "[]", NOT_AN_OBJECT],
+    ["an empty object", "{}", NO_DOWNLOAD_URL],
+    ["a blank download URL", JSON.stringify({ downloadUrl: "" }), NO_DOWNLOAD_URL],
+  ])("fails as a parse response error, and reports it, for %s", async (_label, text, message) => {
+    render(<ImageToPdfSettings />);
+
+    (await submit("image-to-pdf-submit")).respondRaw(200, text);
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(en.toolSettings["image-to-pdf"].parseResponseFailed),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("image-to-pdf-download")).not.toBeInTheDocument();
+    expect(useFileStore.getState().entries[0].processedUrl).toBeNull();
+    expect(useFileStore.getState().processing).toBe(false);
+    expectReported(message, "image-to-pdf");
+  });
+
+  it("reports the status the answer came with", async () => {
+    render(<ImageToPdfSettings />);
+
+    (await submit("image-to-pdf-submit")).respondRaw(201, "{}");
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(en.toolSettings["image-to-pdf"].parseResponseFailed),
+      ).toBeInTheDocument(),
+    );
+    expectReported(NO_DOWNLOAD_URL, "image-to-pdf", 201);
+  });
+
+  it("reports a malformed body and rethrows the first teardown error when showing the error throws", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(<ImageToPdfSettings />);
+    const xhr = await submit("image-to-pdf-submit");
+    let writes = 0;
+    const unsubscribe = useFileStore.subscribe(() => {
+      writes++;
+      throw new Error(writes === 1 ? "teardown broke" : "later teardown broke");
+    });
+
+    try {
+      expect(() => xhr.respondRaw(200, "{}")).toThrow("teardown broke");
+      await act(async () => {});
+
+      expect(useFileStore.getState().error).toBe(
+        en.toolSettings["image-to-pdf"].parseResponseFailed,
+      );
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByTestId("image-to-pdf-submit")).toBeEnabled();
+      expectReported(NO_DOWNLOAD_URL, "image-to-pdf");
+    } finally {
+      unsubscribe();
+      consoleError.mockRestore();
+    }
+  });
+
+  it("ends the run with the tracking message when landing the result throws", async () => {
+    render(<ImageToPdfSettings />);
+    const xhr = await submit("image-to-pdf-submit");
+    let thrown = false;
+    const unsubscribe = useFileStore.subscribe((s) => {
+      if (s.entries[0]?.processedUrl && !thrown) {
+        thrown = true;
+        throw new Error("boom");
+      }
+    });
+
+    try {
+      expect(() => xhr.respond(200, GOOD_BODY)).toThrow("boom");
+      await act(async () => {});
+
+      await waitFor(() =>
+        expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByText(en.toolSettings["image-to-pdf"].parseResponseFailed),
+      ).not.toBeInTheDocument();
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByTestId("image-to-pdf-submit")).toBeEnabled();
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it("rethrows the root cause and reports the teardown failure when ending the run throws too", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(<ImageToPdfSettings />);
+    const xhr = await submit("image-to-pdf-submit");
+    let writes = 0;
+    const unsubscribe = useFileStore.subscribe(() => {
+      writes++;
+      if (writes === 1) throw new Error("root cause");
+      throw new Error(writes === 2 ? "teardown broke" : "later teardown broke");
+    });
+
+    try {
+      expect(() => xhr.respond(200, GOOD_BODY)).toThrow("root cause");
+      await act(async () => {});
+
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run failed",
+        expect.objectContaining({ message: "teardown broke" }),
+      );
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run failed",
+        expect.objectContaining({ message: "later teardown broke" }),
+      );
+      expect(useFileStore.getState().error).toBe(en.errors.jobTrackingFailed);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByTestId("image-to-pdf-submit")).toBeEnabled();
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+      const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+      expect(error.message).toBe("Ending a sync tool run after a result handling error failed");
+      expect(error.cause).toMatchObject({ message: "teardown broke" });
+      expect(tags).toEqual({ error_class: "bug", tool_id: "image-to-pdf" });
+    } finally {
+      unsubscribe();
+      consoleError.mockRestore();
+    }
+  });
+});
+
+describe("favicon: our own store write failure when landing a sync 2xx answer (#3072)", () => {
+  const GOOD_BLOB = new Blob(["zip-bytes"], { type: "application/zip" });
+
+  beforeEach(() => {
+    useFileStore.getState().setFiles([image("logo.png")]);
+  });
+
+  it("lands a good result", async () => {
+    render(<FaviconSettings />);
+
+    (await submit("favicon-submit")).respondBlob(200, GOOD_BLOB);
+
+    await waitFor(() => expect(screen.getByTestId("favicon-download")).toBeInTheDocument());
+    expect(useFileStore.getState().entries[0].processedUrl).toMatch(/^blob:mock-/);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+
+  it("ends the run with the tracking message when landing the result throws", async () => {
+    render(<FaviconSettings />);
+    const xhr = await submit("favicon-submit");
+    let thrown = false;
+    const unsubscribe = useFileStore.subscribe((s) => {
+      if (s.entries[0]?.processedUrl && !thrown) {
+        thrown = true;
+        throw new Error("boom");
+      }
+    });
+
+    try {
+      expect(() => xhr.respondBlob(200, GOOD_BLOB)).toThrow("boom");
+      await act(async () => {});
+
+      await waitFor(() =>
+        expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument(),
+      );
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByTestId("favicon-submit")).toBeEnabled();
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it("rethrows the root cause and reports the teardown failure when ending the run throws too", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(<FaviconSettings />);
+    const xhr = await submit("favicon-submit");
+    let writes = 0;
+    const unsubscribe = useFileStore.subscribe(() => {
+      writes++;
+      if (writes === 1) throw new Error("root cause");
+      throw new Error(writes === 2 ? "teardown broke" : "later teardown broke");
+    });
+
+    try {
+      expect(() => xhr.respondBlob(200, GOOD_BLOB)).toThrow("root cause");
+      await act(async () => {});
+
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run failed",
+        expect.objectContaining({ message: "teardown broke" }),
+      );
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run failed",
+        expect.objectContaining({ message: "later teardown broke" }),
+      );
+      expect(useFileStore.getState().error).toBe(en.errors.jobTrackingFailed);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByTestId("favicon-submit")).toBeEnabled();
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+      const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+      expect(error.message).toBe("Ending a sync tool run after a result handling error failed");
+      expect(error.cause).toMatchObject({ message: "teardown broke" });
+      expect(tags).toEqual({ error_class: "bug", tool_id: "favicon" });
+    } finally {
+      unsubscribe();
+      consoleError.mockRestore();
+    }
+  });
+
+  it("revokes the blob URL and settles the run when updateEntryById throws before storing it", async () => {
+    const realUpdateEntryById = useFileStore.getState().updateEntryById;
+    vi.spyOn(useFileStore.getState(), "updateEntryById")
+      .mockImplementationOnce(() => {
+        throw new Error("entry write failed");
+      })
+      .mockImplementation(realUpdateEntryById);
+    render(<FaviconSettings />);
+    const xhr = await submit("favicon-submit");
+
+    try {
+      expect(() => xhr.respondBlob(200, GOOD_BLOB)).toThrow("entry write failed");
+      await act(async () => {});
+
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:mock-2");
+      expect(useFileStore.getState().error).toBe(en.errors.jobTrackingFailed);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByTestId("favicon-submit")).toBeEnabled();
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      useFileStore.setState({ updateEntryById: realUpdateEntryById });
+    }
   });
 });

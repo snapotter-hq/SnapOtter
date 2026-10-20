@@ -5,9 +5,17 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
-import { appUrl, resolveServerUrls } from "@/lib/app-url";
+import { appUrl } from "@/lib/app-url";
 import { format, plural } from "@/lib/format";
+import { parseResultBody, reportMalformedResult } from "@/lib/progress-frames";
+import { reportRunEndFailure } from "@/lib/run-end-report";
+import { runEndWrites } from "@/lib/run-teardown";
 import { useFileStore } from "@/stores/file-store";
+
+interface ImageToPdfResult {
+  downloadUrl: string;
+  compression?: { targetMet: boolean; jpegQuality: number; targetRequested: number };
+}
 
 const PAGE_SIZES: Record<string, [number, number]> = {
   A4: [595.28, 841.89],
@@ -301,69 +309,68 @@ export function ImageToPdfSettings() {
         endSubscription();
         if (xhrRef.current !== xhr || storeReset) return;
         stopTimers();
-        try {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            let result: {
-              downloadUrl?: unknown;
-              compression?: { targetMet: boolean; jpegQuality: number; targetRequested: number };
-            } | null = null;
-            try {
-              result = resolveServerUrls(JSON.parse(xhr.responseText));
-            } catch {
-              setError(t.toolSettings["image-to-pdf"].parseResponseFailed);
-            }
-            if (result) {
-              const url =
-                typeof result.downloadUrl === "string" && result.downloadUrl
-                  ? result.downloadUrl
-                  : null;
-              if (!url) {
-                setError(t.toolSettings["image-to-pdf"].parseResponseFailed);
-              } else {
-                try {
-                  if (capturedEntryId) {
-                    useFileStore.getState().updateEntryById(capturedEntryId, {
-                      processedUrl: url,
-                      processedFilename: pdfResultFilenameFrom(url),
-                      status: "completed",
-                    });
-                  }
-                  setDownloadUrl(url);
-                  setCompressionResult(result.compression ?? null);
-                  setProgress((prev) => ({ ...prev, phase: "complete", percent: 100 }));
-                } catch (err) {
-                  setError(t.errors.jobTrackingFailed);
-                  throw err;
-                }
-              }
-            }
-          } else {
-            try {
-              const body = JSON.parse(xhr.responseText);
-              setError(
-                failedAnswerMessage(
-                  t,
-                  body,
-                  xhr.status,
-                  format(t.errors.failedWithStatus, { status: xhr.status }),
-                ),
-              );
-            } catch {
-              setError(
-                failedAnswerMessage(
-                  t,
-                  null,
-                  xhr.status,
-                  format(t.toolSettings["image-to-pdf"].creationFailedWithStatus, {
-                    status: xhr.status,
-                  }),
-                ),
-              );
-            }
+        if (xhr.status >= 200 && xhr.status < 300) {
+          let result: ImageToPdfResult;
+          try {
+            result = parseResultBody<ImageToPdfResult>(xhr.responseText);
+          } catch (err) {
+            reportMalformedResult(err, { status: xhr.status, toolId: "image-to-pdf" });
+            const teardownError = runEndWrites([
+              () => setError(t.toolSettings["image-to-pdf"].parseResponseFailed),
+              cleanup,
+            ]);
+            if (teardownError) throw teardownError.cause;
+            return;
           }
-        } finally {
+          try {
+            if (capturedEntryId) {
+              useFileStore.getState().updateEntryById(capturedEntryId, {
+                processedUrl: result.downloadUrl,
+                processedFilename: pdfResultFilenameFrom(result.downloadUrl),
+                status: "completed",
+              });
+            }
+            setDownloadUrl(result.downloadUrl);
+            setCompressionResult(result.compression ?? null);
+            setProgress((prev) => ({ ...prev, phase: "complete", percent: 100 }));
+          } catch (err) {
+            const teardownError = runEndWrites([
+              () => setError(t.errors.jobTrackingFailed),
+              cleanup,
+            ]);
+            if (teardownError) {
+              reportRunEndFailure(
+                "Ending a sync tool run after a result handling error failed",
+                teardownError.cause,
+                "image-to-pdf",
+              );
+            }
+            throw err;
+          }
           cleanup();
+          return;
         }
+        let message: string;
+        try {
+          const body = JSON.parse(xhr.responseText);
+          message = failedAnswerMessage(
+            t,
+            body,
+            xhr.status,
+            format(t.errors.failedWithStatus, { status: xhr.status }),
+          );
+        } catch {
+          message = failedAnswerMessage(
+            t,
+            null,
+            xhr.status,
+            format(t.toolSettings["image-to-pdf"].creationFailedWithStatus, {
+              status: xhr.status,
+            }),
+          );
+        }
+        const teardownError = runEndWrites([() => setError(message), cleanup]);
+        if (teardownError) throw teardownError.cause;
       };
 
       xhr.onerror = () => {
