@@ -5,6 +5,7 @@
  * with results/errors arrays rather than a file download.
  */
 
+import { gzipSync } from "node:zlib";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -1246,5 +1247,144 @@ describe("image-to-base64", () => {
     expect(res.statusCode).toBe(200);
     const json = JSON.parse(res.body);
     expect(json.results[0].mimeType).toBe("image/jpeg");
+  });
+
+  // ── SVG and SVGZ sanitization in original mode (#2594) ───────
+  it("returns sanitized SVG XML for .svg inputs when outputFormat is original", async () => {
+    const rawSvg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" onload="alert(1)"><script>alert(1)</script><rect width="10" height="10"/></svg>',
+    );
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "xss.svg", contentType: "image/svg+xml", content: rawSvg },
+      {
+        name: "settings",
+        content: JSON.stringify({ outputFormat: "original", maxWidth: 0, maxHeight: 0 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.errors).toEqual([]);
+    expect(json.results).toHaveLength(1);
+
+    const result = json.results[0];
+    expect(result.mimeType).toBe("image/svg+xml");
+    expect(result.dataUri).toBe(`data:image/svg+xml;base64,${result.base64}`);
+
+    const decodedXml = Buffer.from(result.base64, "base64").toString("utf-8");
+    expect(decodedXml).toContain("<svg");
+    expect(decodedXml).toContain("<rect");
+    expect(decodedXml).not.toContain("<script");
+    expect(decodedXml).not.toContain("alert(1)");
+    expect(decodedXml).not.toContain("onload=");
+  });
+
+  it("returns decompressed, sanitized SVG XML for .svgz inputs when outputFormat is original", async () => {
+    const rawSvg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><script>alert(1)</script><rect width="10" height="10"/></svg>',
+    );
+    const svgz = gzipSync(rawSvg);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "xss.svgz", contentType: "image/svg+xml", content: svgz },
+      {
+        name: "settings",
+        content: JSON.stringify({ outputFormat: "original", maxWidth: 0, maxHeight: 0 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.errors).toEqual([]);
+    expect(json.results).toHaveLength(1);
+
+    const result = json.results[0];
+    expect(result.mimeType).toBe("image/svg+xml");
+    expect(result.dataUri).toBe(`data:image/svg+xml;base64,${result.base64}`);
+
+    const decodedBytes = Buffer.from(result.base64, "base64");
+    expect(decodedBytes[0]).not.toBe(0x1f);
+    expect(decodedBytes[1]).not.toBe(0x8b);
+
+    const decodedXml = decodedBytes.toString("utf-8");
+    expect(decodedXml.trimStart().startsWith("<svg")).toBe(true);
+    expect(decodedXml).not.toContain("<script");
+    expect(decodedXml).not.toContain("alert(1)");
+  });
+
+  it("keeps decompressed, sanitized SVG XML when maxWidth or maxHeight is set with outputFormat original", async () => {
+    const rawSvg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="80"><script>alert(1)</script><rect width="100" height="80"/></svg>',
+    );
+    const svgz = gzipSync(rawSvg);
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "icon.svg", contentType: "image/svg+xml", content: rawSvg },
+      { name: "file", filename: "icon.svgz", contentType: "image/svg+xml", content: svgz },
+      { name: "file", filename: "vector.png", contentType: "image/png", content: rawSvg },
+      {
+        name: "settings",
+        content: JSON.stringify({ outputFormat: "original", maxWidth: 40, maxHeight: 40 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.errors).toEqual([]);
+    expect(json.results).toHaveLength(3);
+
+    for (const result of json.results) {
+      expect(result.mimeType).toBe("image/svg+xml");
+      expect(result.width).toBe(100);
+      expect(result.height).toBe(80);
+      const decodedXml = Buffer.from(result.base64, "base64").toString("utf-8");
+      expect(decodedXml.trimStart().startsWith("<svg")).toBe(true);
+      expect(decodedXml).not.toContain("<script");
+      expect(decodedXml).not.toContain("alert(1)");
+    }
+  });
+
+  it("preserves raster MIME type and resize when a PNG file has a .svg extension", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "misnamed.svg", contentType: "image/svg+xml", content: PNG },
+      {
+        name: "settings",
+        content: JSON.stringify({ outputFormat: "original", maxWidth: 50, maxHeight: 0 }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-to-base64",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.errors).toEqual([]);
+    expect(json.results).toHaveLength(1);
+    expect(json.results[0].mimeType).toBe("image/png");
+    expect(json.results[0].width).toBeLessThanOrEqual(50);
+    expect(json.results[0].dataUri).toMatch(/^data:image\/png;base64,/);
   });
 });

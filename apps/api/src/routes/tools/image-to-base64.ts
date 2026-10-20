@@ -135,7 +135,8 @@ export function registerImageToBase64(app: FastifyInstance) {
               }
             }
           }
-          if (validation.valid && validation.format === "svg") {
+          let isSvg = validation.valid && validation.format === "svg";
+          if (isSvg) {
             decoded = decompressSvgz(decoded);
             decoded = sanitizeSvg(decoded);
           }
@@ -143,6 +144,12 @@ export function registerImageToBase64(app: FastifyInstance) {
 
           // Get original metadata for dimensions
           const metadata = await pipeline.metadata();
+          if (!isSvg && metadata.format === "svg") {
+            isSvg = true;
+            decoded = decompressSvgz(decoded);
+            decoded = sanitizeSvg(decoded);
+            pipeline = sharp(decoded);
+          }
           let width = metadata.width ?? 0;
           let height = metadata.height ?? 0;
 
@@ -193,8 +200,8 @@ export function registerImageToBase64(app: FastifyInstance) {
           } else if (isHeic) {
             outputBuffer = await pipeline.jpeg({ quality: opts.quality }).toBuffer();
             mimeType = "image/jpeg";
-          } else if (ext === "svg" || ext === "svgz") {
-            outputBuffer = buffer;
+          } else if (isSvg) {
+            outputBuffer = decoded;
             mimeType = "image/svg+xml";
           } else if (opts.maxWidth > 0 || opts.maxHeight > 0) {
             // Resize requested - must go through Sharp pipeline
