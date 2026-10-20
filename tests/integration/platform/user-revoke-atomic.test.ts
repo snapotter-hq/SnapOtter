@@ -177,7 +177,12 @@ describe("a SCIM deprovision is all-or-nothing (#2126)", () => {
       });
       failDeleteOn = null;
 
-      expect(failed.statusCode).toBeGreaterThanOrEqual(500);
+      expect(failed.statusCode).toBe(500);
+      expect(JSON.parse(failed.body)).toEqual({
+        schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+        status: 500,
+        detail: "Internal server error",
+      });
       expect((await userRow(userId))?.role).toBe(before?.role);
       expect(await sessionCount(userId)).toBe(1);
       expect(await apiKeyCount(userId)).toBe(1);

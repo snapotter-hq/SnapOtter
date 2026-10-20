@@ -3657,6 +3657,11 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         });
 
         expect(res.statusCode, res.body).toBe(500);
+        expect(JSON.parse(res.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 500,
+          detail: "Internal server error",
+        });
         expect(await groupState(group.id, [kept.id, incoming.id])).toEqual({
           name: group.displayName,
           teams: [group.id, DEFAULT_TEAM_ID],
@@ -3684,6 +3689,11 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         });
 
         expect(res.statusCode, res.body).toBe(500);
+        expect(JSON.parse(res.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 500,
+          detail: "Internal server error",
+        });
         const teams = await db
           .select()
           .from(schema.teams)

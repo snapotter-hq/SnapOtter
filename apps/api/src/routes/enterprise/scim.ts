@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
+import { isSafeMessageError } from "@snapotter/shared";
 import { and, eq, inArray } from "drizzle-orm";
 import type { FastifyBaseLogger, FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../../config.js";
@@ -6,12 +7,14 @@ import { db, schema } from "../../db/index.js";
 import { sharedRedis } from "../../jobs/connection.js";
 import { auditLog } from "../../lib/audit.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
+import { stripInternalPaths } from "../../lib/errors.js";
 import { assertNotLastAdmin, LastAdminError } from "../../lib/last-admin.js";
 import { isUniqueViolation, uniqueViolationConstraint } from "../../lib/pg-errors.js";
 import { getSettingString, upsertSetting } from "../../lib/settings-helpers.js";
 import { userLimitReached } from "../../lib/user-limit.js";
 import { isDisabledRole, requireFullAdmin } from "../../permissions.js";
 import { hashPassword, verifyPassword } from "../../plugins/auth.js";
+import { logAndReportRequestError } from "../../plugins/error-handler.js";
 import {
   normalizeGroupOps,
   normalizeUserOps,
@@ -508,6 +511,23 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(204).send();
     },
   );
+
+  await app.register(registerScimProtocolRoutes);
+
+  app.log.info("Enterprise SCIM 2.0 routes registered");
+}
+
+async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
+  // Scoped to /api/v1/scim/v2/* so an unhandled throw answers the RFC 7644
+  // Error envelope Okta and Entra ID expect rather than the app's { error }
+  // shape, while still logging and reporting to Sentry (#2230).
+  app.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => {
+    const statusCode = logAndReportRequestError(error, request);
+    const safe = isSafeMessageError(error) && error.statusCode !== undefined;
+    const detail =
+      statusCode >= 500 && !safe ? "Internal server error" : stripInternalPaths(error.message);
+    reply.status(statusCode).send(scimError(statusCode, detail));
+  });
 
   // ── Discovery Endpoints (no auth required) ─────────────────────
 
@@ -1601,8 +1621,6 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(204).send();
     },
   );
-
-  app.log.info("Enterprise SCIM 2.0 routes registered");
 }
 
 // ── SCIM Schema Definitions ──────────────────────────────────────

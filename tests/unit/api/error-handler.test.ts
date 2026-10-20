@@ -13,6 +13,7 @@ import { env } from "../../../apps/api/src/config.js";
 import { readFilePart } from "../../../apps/api/src/lib/multipart-parts.js";
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
 import { registerUpload } from "../../../apps/api/src/plugins/upload.js";
+import { registerScimRoutes } from "../../../apps/api/src/routes/enterprise/scim.js";
 
 beforeEach(() => {
   reportError.mockReset();
@@ -285,5 +286,118 @@ describe("an over-limit multipart file reaching the handler", () => {
         env.MAX_UPLOAD_SIZE_MB = configured;
       }
     });
+  });
+});
+
+// #2230: an unhandled error from a /api/v1/scim/v2/* route used to reach the
+// root error handler and answer { error: "Internal server error" } instead of
+// the RFC 7644 Error envelope SCIM clients expect.
+describe("an unhandled error on a SCIM route (#2230)", () => {
+  const SCIM_ERROR_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:Error";
+
+  async function scimAppThrowing(makeError: () => Error) {
+    const app = Fastify({ logger: false });
+    registerErrorHandler(app);
+    app.addHook("preHandler", async () => {
+      throw makeError();
+    });
+    await registerScimRoutes(app);
+    await app.ready();
+    return app;
+  }
+
+  it("answers a SCIM 500 envelope and reports the fault with the route's context", async () => {
+    const fault = new Error("connection terminated unexpectedly");
+    const app = await scimAppThrowing(() => fault);
+    try {
+      const res = await app.inject({ method: "GET", url: "/api/v1/scim/v2/Users" });
+
+      expect(res.statusCode).toBe(500);
+      expect(JSON.parse(res.body)).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 500,
+        detail: "Internal server error",
+      });
+      expect(reportError).toHaveBeenCalledTimes(1);
+      expect(reportError).toHaveBeenCalledWith(
+        fault,
+        expect.objectContaining({
+          source: "http",
+          route: "/api/v1/scim/v2/Users",
+          method: "GET",
+          statusCode: 500,
+        }),
+      );
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("preserves a SafeError's message on a 5xx SCIM response and strips internal paths", async () => {
+    const fault = new SafeError("Insufficient disk space on /data/files/scim", { statusCode: 503 });
+    const app = await scimAppThrowing(() => fault);
+    try {
+      const res = await app.inject({ method: "POST", url: "/api/v1/scim/v2/Groups" });
+
+      expect(res.statusCode).toBe(503);
+      expect(JSON.parse(res.body)).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 503,
+        detail: "Insufficient disk space on [internal]",
+      });
+      expect(reportError).toHaveBeenCalledTimes(1);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("masks a SafeError that carries no HTTP status on a SCIM route", async () => {
+    const fault = new SafeError("Traceback: /opt/venv/lib/rembg.py", { code: "exit-1" });
+    const app = await scimAppThrowing(() => fault);
+    try {
+      const res = await app.inject({ method: "GET", url: "/api/v1/scim/v2/Groups" });
+
+      expect(res.statusCode).toBe(500);
+      expect(JSON.parse(res.body)).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 500,
+        detail: "Internal server error",
+      });
+      expect(reportError).toHaveBeenCalledTimes(1);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("formats a 4xx error on a SCIM route as a SCIM error without reporting it", async () => {
+    const app = await scimAppThrowing(() =>
+      Object.assign(new Error("Malformed JSON in request body"), { statusCode: 400 }),
+    );
+    try {
+      const res = await app.inject({ method: "POST", url: "/api/v1/scim/v2/Users" });
+
+      expect(res.statusCode).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 400,
+        detail: "Malformed JSON in request body",
+      });
+      expect(reportError).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("leaves the admin token endpoints on the app's own error shape", async () => {
+    const app = await scimAppThrowing(() => new Error("database unavailable"));
+    try {
+      const res = await app.inject({ method: "POST", url: "/api/v1/enterprise/scim/token" });
+
+      expect(res.statusCode).toBe(500);
+      expect(JSON.parse(res.body)).toEqual({ error: "Internal server error" });
+      expect(reportError).toHaveBeenCalledTimes(1);
+    } finally {
+      await app.close();
+    }
   });
 });
