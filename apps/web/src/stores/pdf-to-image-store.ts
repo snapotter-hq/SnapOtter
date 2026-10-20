@@ -21,6 +21,72 @@ interface Thumbnail {
   height: number;
 }
 
+interface PreviewResponse {
+  pageCount: number;
+  thumbnails: Thumbnail[];
+}
+
+interface ConvertResponse {
+  pages: PageResult[];
+  zipUrl?: string | null;
+  zipSize?: number | null;
+}
+
+function isThumbnail(value: unknown): value is Thumbnail {
+  if (!value || typeof value !== "object") return false;
+  const thumb = value as Record<string, unknown>;
+  return (
+    typeof thumb.page === "number" &&
+    Number.isInteger(thumb.page) &&
+    thumb.page >= 1 &&
+    typeof thumb.dataUrl === "string" &&
+    thumb.dataUrl.length > 0
+  );
+}
+
+function isPreviewResponse(value: unknown): value is PreviewResponse {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return (
+    typeof data.pageCount === "number" &&
+    Number.isInteger(data.pageCount) &&
+    data.pageCount >= 1 &&
+    Array.isArray(data.thumbnails) &&
+    data.thumbnails.every(isThumbnail)
+  );
+}
+
+function isPageResult(value: unknown): value is PageResult {
+  if (!value || typeof value !== "object") return false;
+  const page = value as Record<string, unknown>;
+  return (
+    typeof page.page === "number" &&
+    Number.isInteger(page.page) &&
+    page.page >= 1 &&
+    typeof page.downloadUrl === "string" &&
+    page.downloadUrl.length > 0 &&
+    typeof page.size === "number" &&
+    Number.isFinite(page.size) &&
+    page.size >= 0
+  );
+}
+
+function isConvertResponse(value: unknown): value is ConvertResponse {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return (
+    Array.isArray(data.pages) &&
+    data.pages.length > 0 &&
+    data.pages.every(isPageResult) &&
+    (data.zipUrl === undefined ||
+      data.zipUrl === null ||
+      (typeof data.zipUrl === "string" && data.zipUrl.length > 0)) &&
+    (data.zipSize === undefined ||
+      data.zipSize === null ||
+      (typeof data.zipSize === "number" && Number.isFinite(data.zipSize) && data.zipSize >= 0))
+  );
+}
+
 type ColorMode = "color" | "grayscale" | "bw";
 
 interface PdfToImageState {
@@ -255,6 +321,7 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
     // overwrite the newer request's pages, error, or spinner.
     const isLatest = () => request === latestPreviewRequest && !controller.signal.aborted;
     set({ loadingPreview: true, error: null });
+    let data: PreviewResponse;
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -268,13 +335,16 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
         const body = await res.json().catch(() => null);
         throw new Error(failedAnswerMessage(t, body, res.status, `Failed: ${res.status}`));
       }
-      const data = resolveServerUrls(await res.json());
-      if (!isLatest()) return;
-      set({
-        pageCount: data.pageCount,
-        thumbnails: data.thumbnails,
-        selectedPages: new Set(Array.from({ length: data.pageCount }, (_, i) => i + 1)),
+      const raw = await res.json().catch((err: unknown) => {
+        if (err instanceof SyntaxError) return null;
+        throw err;
       });
+      if (!isLatest()) return;
+      const resolved = resolveServerUrls(raw);
+      if (!isPreviewResponse(resolved)) {
+        throw new Error(t.errors.invalidServerResponse);
+      }
+      data = resolved;
     } catch (err) {
       if (!isLatest() || (err instanceof DOMException && err.name === "AbortError")) return;
       // `file` stays: the panel asks for a preview whenever the selected file
@@ -284,11 +354,19 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
         error: err instanceof Error ? err.message : "Failed to read PDF",
         pageCount: null,
         thumbnails: [],
+        selectedPages: new Set(),
+        loadingPreview: false,
       });
+      return;
     } finally {
       if (previewController === controller) previewController = null;
-      if (isLatest()) set({ loadingPreview: false });
     }
+    set({
+      pageCount: data.pageCount,
+      thumbnails: data.thumbnails,
+      selectedPages: new Set(Array.from({ length: data.pageCount }, (_, i) => i + 1)),
+      loadingPreview: false,
+    });
   },
 
   convert: async (t = en) => {
@@ -305,6 +383,7 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
     const request = ++latestConvertRequest;
     const isLatest = () => request === latestConvertRequest && !controller.signal.aborted;
     set({ processing: true, error: null, results: null, zipUrl: null, zipSize: null });
+    let data: ConvertResponse;
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -328,18 +407,32 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
           failedAnswerMessage(t, body, res.status, `Conversion failed: ${res.status}`),
         );
       }
-      const data = resolveServerUrls(await res.json());
+      const raw = await res.json().catch((err: unknown) => {
+        if (err instanceof SyntaxError) return null;
+        throw err;
+      });
       if (!isLatest()) return;
-      set({ results: data.pages, zipUrl: data.zipUrl, zipSize: data.zipSize });
+      const resolved = resolveServerUrls(raw);
+      if (!isConvertResponse(resolved)) {
+        throw new Error(t.errors.invalidServerResponse);
+      }
+      data = resolved;
     } catch (err) {
       if (!isLatest() || (err instanceof DOMException && err.name === "AbortError")) return;
       set({
         error: err instanceof Error ? err.message : "Conversion failed",
+        processing: false,
       });
+      return;
     } finally {
       if (convertController === controller) convertController = null;
-      if (isLatest()) set({ processing: false });
     }
+    set({
+      results: data.pages,
+      zipUrl: data.zipUrl ?? null,
+      zipSize: data.zipSize ?? null,
+      processing: false,
+    });
   },
 
   reset: () => {

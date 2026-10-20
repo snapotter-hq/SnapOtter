@@ -15,6 +15,8 @@ vi.mock("@/lib/image-preview", () => ({
   revokePreviewUrl: vi.fn(),
 }));
 
+import { en } from "@snapotter/shared";
+import { PdfToImagePreview } from "@/components/tools/pdf-to-image-preview";
 import { PdfToImageSettings } from "@/components/tools/pdf-to-image-settings";
 import { I18nProvider } from "@/contexts/i18n-context";
 import { ToolPage } from "@/pages/tool-page";
@@ -422,5 +424,140 @@ describe("pdf-to-image panel: a failed preview", () => {
     expect(usePdfToImageStore.getState().file).toBeNull();
     expect(usePdfToImageStore.getState().pageCount).toBeNull();
     expect(usePdfToImageStore.getState().error).toBeNull();
+  });
+
+  it("rejects malformed 2xx preview payloads without crashing PdfToImagePreview (#2644)", async () => {
+    const malformedBodies = [
+      () => new Response(JSON.stringify({}), { status: 200 }),
+      () => new Response(JSON.stringify(null), { status: 200 }),
+      () => new Response(JSON.stringify([]), { status: 200 }),
+      () => new Response(JSON.stringify({ pageCount: 2, thumbnails: null }), { status: 200 }),
+      () => new Response(JSON.stringify({ pageCount: "2", thumbnails: [] }), { status: 200 }),
+      () => new Response(JSON.stringify({ pageCount: 0, thumbnails: [] }), { status: 200 }),
+      () => new Response(JSON.stringify({ pageCount: -1, thumbnails: [] }), { status: 200 }),
+      () =>
+        new Response(JSON.stringify({ pageCount: 1, thumbnails: [{ page: 1 }] }), {
+          status: 200,
+        }),
+      () => new Response("<html>proxy gateway ok</html>", { status: 200 }),
+    ];
+
+    let callIndex = 0;
+    vi.stubGlobal(
+      "fetch",
+      previewServer(() => malformedBodies[callIndex++]?.() ?? failed("done")),
+    );
+
+    render(
+      <I18nProvider>
+        <PdfToImageSettings />
+        <PdfToImagePreview />
+      </I18nProvider>,
+    );
+
+    for (let i = 0; i < malformedBodies.length; i++) {
+      act(() => {
+        useFileStore.getState().setFiles([pdf(`bad-${i}.pdf`)]);
+      });
+      await waitFor(() => expect(asked).toHaveLength(i + 1));
+      await settle(50);
+
+      const state = usePdfToImageStore.getState();
+      expect(state.error).toBe(en.errors.invalidServerResponse);
+      expect(state.pageCount).toBeNull();
+      expect(state.thumbnails).toEqual([]);
+      expect(state.selectedPages.size).toBe(0);
+      expect(state.loadingPreview).toBe(false);
+      expect(screen.getByText(en.errors.invalidServerResponse)).toBeInTheDocument();
+      expect(screen.getByTestId("pdf-to-image-submit")).toBeDisabled();
+    }
+  });
+
+  it("rejects malformed 2xx convert payloads and keeps PdfToImagePreview mounted (#2644)", async () => {
+    const malformedConvertBodies = [
+      () => new Response(JSON.stringify({}), { status: 200 }),
+      () => new Response(JSON.stringify(null), { status: 200 }),
+      () => new Response(JSON.stringify([]), { status: 200 }),
+      () => new Response(JSON.stringify({ pages: null }), { status: 200 }),
+      () => new Response(JSON.stringify({ pages: [] }), { status: 200 }),
+      () => new Response(JSON.stringify({ pages: "not-an-array" }), { status: 200 }),
+      () =>
+        new Response(JSON.stringify({ pages: [{ page: 1, downloadUrl: "", size: 100 }] }), {
+          status: 200,
+        }),
+      () =>
+        new Response(
+          JSON.stringify({
+            pages: [{ page: 1, downloadUrl: "/dl/p1.png", size: 100 }],
+            zipUrl: 123,
+          }),
+          { status: 200 },
+        ),
+      () =>
+        new Response(
+          JSON.stringify({
+            pages: [{ page: 1, downloadUrl: "/dl/p1.png", size: 100 }],
+            zipUrl: "/dl/pages.zip",
+            zipSize: -5,
+          }),
+          { status: 200 },
+        ),
+      () => new Response("<html>proxy gateway ok</html>", { status: 200 }),
+    ];
+
+    let convertCallIndex = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/api/v1/config/auth")) {
+          return new Response(JSON.stringify({ authEnabled: false }), { status: 200 });
+        }
+        if (url.includes("/preview")) {
+          return new Response(
+            JSON.stringify({
+              pageCount: 2,
+              thumbnails: [
+                { page: 1, dataUrl: "data:image/jpeg;base64,AA==", width: 100, height: 140 },
+              ],
+            }),
+            { status: 200 },
+          );
+        }
+        if (!url.endsWith("/api/v1/tools/pdf/pdf-to-image")) {
+          throw new Error(`unexpected fetch url: ${url}`);
+        }
+        return malformedConvertBodies[convertCallIndex++]?.() ?? failed("done");
+      }),
+    );
+
+    useFileStore.getState().setFiles([pdf("convert-bad.pdf")]);
+    render(
+      <I18nProvider>
+        <PdfToImageSettings />
+        <PdfToImagePreview />
+      </I18nProvider>,
+    );
+
+    await waitFor(() => expect(usePdfToImageStore.getState().pageCount).toBe(2));
+    expect(screen.getByTestId("pdf-to-image-submit")).toBeEnabled();
+
+    for (let i = 0; i < malformedConvertBodies.length; i++) {
+      act(() => {
+        usePdfToImageStore.setState({ error: null });
+      });
+      fireEvent.click(screen.getByTestId("pdf-to-image-submit"));
+      await waitFor(() =>
+        expect(usePdfToImageStore.getState().error).toBe(en.errors.invalidServerResponse),
+      );
+
+      const state = usePdfToImageStore.getState();
+      expect(state.results).toBeNull();
+      expect(state.zipUrl).toBeNull();
+      expect(state.zipSize).toBeNull();
+      expect(state.processing).toBe(false);
+      expect(state.thumbnails).toHaveLength(1);
+      expect(screen.getByText(en.errors.invalidServerResponse)).toBeInTheDocument();
+    }
   });
 });

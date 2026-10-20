@@ -960,10 +960,12 @@ describe("useThemeStore", () => {
 // PdfToImageStore (synchronous state operations only)
 // ==========================================================================
 
+import { en, type TranslationKeys } from "@snapotter/shared";
 import { usePdfToImageStore } from "@/stores/pdf-to-image-store";
 
 describe("usePdfToImageStore", () => {
   beforeEach(() => {
+    fetchMock.mockReset();
     usePdfToImageStore.getState().reset();
   });
 
@@ -1228,6 +1230,63 @@ describe("usePdfToImageStore", () => {
     expect(usePdfToImageStore.getState().error).toBe("Failed to read PDF");
   });
 
+  it("loadPreview rejects malformed 2xx responses and clears prior preview state", async () => {
+    const file = new File(["pdf"], "doc.pdf", { type: "application/pdf" });
+    const badPayloads: unknown[] = [
+      null,
+      [],
+      {},
+      { pageCount: 2 },
+      { thumbnails: [] },
+      { pageCount: 0, thumbnails: [] },
+      { pageCount: -1, thumbnails: [] },
+      { pageCount: 1.5, thumbnails: [] },
+      { pageCount: 1, thumbnails: [null] },
+      { pageCount: 1, thumbnails: [{ page: 0, dataUrl: "data:x" }] },
+      { pageCount: 1, thumbnails: [{ page: 1, dataUrl: "" }] },
+    ];
+
+    for (const payload of badPayloads) {
+      usePdfToImageStore.setState({
+        pageCount: 3,
+        thumbnails: [{ page: 1, dataUrl: "data:ok", width: 50, height: 50 }],
+        selectedPages: new Set([1, 2, 3]),
+        error: null,
+      });
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(payload),
+      });
+
+      await usePdfToImageStore.getState().loadPreview(file);
+
+      const s = usePdfToImageStore.getState();
+      expect(s.error).toBe("Invalid response from server");
+      expect(s.pageCount).toBeNull();
+      expect(s.thumbnails).toEqual([]);
+      expect(s.selectedPages.size).toBe(0);
+      expect(s.loadingPreview).toBe(false);
+    }
+
+    const customT: TranslationKeys = {
+      ...en,
+      errors: { ...en.errors, invalidServerResponse: "Ungültige Antwort vom Server" },
+    };
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.reject(new SyntaxError("Unexpected token <")),
+    });
+    await usePdfToImageStore.getState().loadPreview(file, customT);
+    expect(usePdfToImageStore.getState().error).toBe("Ungültige Antwort vom Server");
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.reject(new TypeError("Failed to fetch body stream")),
+    });
+    await usePdfToImageStore.getState().loadPreview(file);
+    expect(usePdfToImageStore.getState().error).toBe("Failed to fetch body stream");
+  });
+
   // -- convert --------------------------------------------------------------
 
   it("convert sends file with settings and stores results", async () => {
@@ -1324,7 +1383,12 @@ describe("usePdfToImageStore", () => {
       capturedFormData = opts.body;
       return Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ pages: [], zipUrl: null, zipSize: null }),
+        json: () =>
+          Promise.resolve({
+            pages: [{ page: 1, downloadUrl: "/dl/1", size: 10 }],
+            zipUrl: null,
+            zipSize: null,
+          }),
       });
     });
 
@@ -1352,7 +1416,12 @@ describe("usePdfToImageStore", () => {
       capturedFormData = opts.body;
       return Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ pages: [], zipUrl: null, zipSize: null }),
+        json: () =>
+          Promise.resolve({
+            pages: [{ page: 1, downloadUrl: "/dl/1", size: 10 }],
+            zipUrl: null,
+            zipSize: null,
+          }),
       });
     });
 
@@ -1378,6 +1447,79 @@ describe("usePdfToImageStore", () => {
     await usePdfToImageStore.getState().convert();
 
     expect(usePdfToImageStore.getState().error).toBe("Conversion failed: 500");
+  });
+
+  it("convert rejects malformed 2xx responses and normalizes omitted zip fields to null", async () => {
+    const file = new File(["pdf"], "doc.pdf", { type: "application/pdf" });
+    usePdfToImageStore.setState({ file, pageCount: 2, selectedPages: new Set([1, 2]) });
+
+    const badPayloads: unknown[] = [
+      null,
+      [],
+      {},
+      { pages: null },
+      { pages: [] },
+      { pages: [null] },
+      { pages: [{ page: 0, downloadUrl: "/dl/1", size: 10 }] },
+      { pages: [{ page: 1.5, downloadUrl: "/dl/1", size: 10 }] },
+      { pages: [{ page: 1, downloadUrl: "", size: 10 }] },
+      { pages: [{ page: 1, downloadUrl: "/dl/1" }] },
+      { pages: [{ page: 1, downloadUrl: "/dl/1", size: "10" }] },
+      { pages: [{ page: 1, downloadUrl: "/dl/1", size: -1 }] },
+      { pages: [{ page: 1, downloadUrl: "/dl/1", size: 10 }], zipUrl: "" },
+      { pages: [{ page: 1, downloadUrl: "/dl/1", size: 10 }], zipSize: -1 },
+    ];
+
+    for (const payload of badPayloads) {
+      usePdfToImageStore.setState({
+        results: [{ page: 1, downloadUrl: "/dl/old", size: 50 }],
+        zipUrl: "/dl/old.zip",
+        zipSize: 50,
+        error: null,
+      });
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(payload),
+      });
+
+      await usePdfToImageStore.getState().convert();
+
+      const s = usePdfToImageStore.getState();
+      expect(s.error).toBe("Invalid response from server");
+      expect(s.results).toBeNull();
+      expect(s.zipUrl).toBeNull();
+      expect(s.zipSize).toBeNull();
+      expect(s.processing).toBe(false);
+    }
+
+    const customT: TranslationKeys = {
+      ...en,
+      errors: { ...en.errors, invalidServerResponse: "Ungültige Antwort vom Server" },
+    };
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.reject(new SyntaxError("Unexpected token <")),
+    });
+    await usePdfToImageStore.getState().convert(customT);
+    expect(usePdfToImageStore.getState().error).toBe("Ungültige Antwort vom Server");
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.reject(new TypeError("Stream disconnected")),
+    });
+    await usePdfToImageStore.getState().convert();
+    expect(usePdfToImageStore.getState().error).toBe("Stream disconnected");
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ pages: [{ page: 1, downloadUrl: "/dl/1", size: 0 }] }),
+    });
+    await usePdfToImageStore.getState().convert();
+    const okState = usePdfToImageStore.getState();
+    expect(okState.error).toBeNull();
+    expect(okState.results).toEqual([{ page: 1, downloadUrl: "/dl/1", size: 0 }]);
+    expect(okState.zipUrl).toBeNull();
+    expect(okState.zipSize).toBeNull();
   });
 });
 
