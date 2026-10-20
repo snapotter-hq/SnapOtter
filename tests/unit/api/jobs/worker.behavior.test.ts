@@ -119,7 +119,14 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
   vi.doMock("../../../../apps/api/src/routes/progress.js", () => ({
     publishEphemeral: vi.fn(),
     updateSingleFileProgress: vi.fn(),
-    updateSingleFileProgressAtomically: vi.fn(),
+    updateSingleFileProgressAtomically: vi.fn(
+      async (_progress: unknown, mutate?: (tx: unknown) => Promise<void>) => {
+        const { db } = await import("../../../../apps/api/src/db/index.js");
+        if (mutate && "update" in db) {
+          await mutate(db);
+        }
+      },
+    ),
   }));
 
   vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
@@ -849,14 +856,56 @@ describe("worker result payload behavior", () => {
     );
 
     releaseFinalizeMock.mockClear();
-    atomicCommitMock.mockRejectedValueOnce(new Error("final commit failed"));
+    atomicCommitMock.mockClear();
+    dbSetMock.mockClear();
+    (progressMod.updateSingleFileProgress as ReturnType<typeof vi.fn>).mockClear();
+    (logger.error as ReturnType<typeof vi.fn>).mockClear();
+    const failureWriteErr = new Error("postgres still unreachable");
+    let capturedFailureMutate: ((tx: unknown) => Promise<void>) | undefined;
+    atomicCommitMock
+      .mockRejectedValueOnce(new Error("final commit failed"))
+      .mockImplementationOnce(async (_frame: unknown, mutate: (tx: unknown) => Promise<void>) => {
+        capturedFailureMutate = mutate;
+        throw failureWriteErr;
+      });
     processV2Mock.mockResolvedValueOnce({
       buffer: Buffer.from("out-bytes"),
       filename: "out.jpg",
       contentType: "image/jpeg",
     });
-    await expect(processor(makeJob("job-final-fault"))).rejects.toThrow("final commit failed");
+    const finalFaultJob = makeJob("job-final-fault");
+    (finalFaultJob.data as { clientJobId?: string }).clientJobId = "client-final-fault";
+    await expect(processor(finalFaultJob)).rejects.toThrow("final commit failed");
     expect(releaseFinalizeMock).not.toHaveBeenCalled();
+    expect(atomicCommitMock).toHaveBeenCalledTimes(2);
+    expect(atomicCommitMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        jobId: "client-final-fault",
+        phase: "failed",
+        percent: 0,
+        error: "final commit failed",
+      }),
+      expect.any(Function),
+    );
+    expect(progressMod.updateSingleFileProgress).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith(
+      { err: failureWriteErr, jobId: "job-final-fault", toolId: "compress" },
+      "terminal status write failed",
+    );
+    const failureWhereMock = vi.fn().mockResolvedValue(undefined);
+    const failureSetMock = vi.fn(() => ({ where: failureWhereMock }));
+    await capturedFailureMutate?.({ update: vi.fn(() => ({ set: failureSetMock })) });
+    expect(failureSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "failed",
+        error: { message: "final commit failed" },
+      }),
+    );
+    expect(failureWhereMock).toHaveBeenCalledWith({
+      op: "eq",
+      col: "jobs.id",
+      val: "job-final-fault",
+    });
 
     const postprocessMod = await import("../../../../apps/api/src/jobs/postprocess.js");
     const stageAutoSaveMock = postprocessMod.stageAutoSaveToLibrary as ReturnType<typeof vi.fn>;

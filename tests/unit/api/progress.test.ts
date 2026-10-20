@@ -11,6 +11,17 @@ const dbMocks = vi.hoisted(() => ({
   inserted: [] as Array<Record<string, unknown>>,
 }));
 
+const redisMocks = vi.hoisted(() => ({
+  setex: vi.fn(async () => "OK"),
+  publish: vi.fn(async () => 1),
+  del: vi.fn(async () => 1),
+}));
+
+vi.mock("../../../apps/api/src/jobs/connection.js", () => ({
+  sharedRedis: () => redisMocks,
+  createRedisSubscriberConnection: vi.fn(),
+}));
+
 // Mock DB
 vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: (() => {
@@ -57,6 +68,7 @@ import type { JobProgress } from "../../../apps/api/src/routes/progress.js";
 import {
   buildPersistedSingleFileProgress,
   buildSingleFileReplayEvent,
+  clearTerminalReplayKey,
   updateJobProgress,
   updateSingleFileProgress,
   updateSingleFileProgressAtomically,
@@ -134,7 +146,10 @@ describe("durable batch terminal progress (#1688)", () => {
     dbMocks.failure = null;
   });
 
-  it("returns a persistence promise that terminal producers can await", async () => {
+  it("returns a persistence promise that terminal producers can await and announces after persistence", async () => {
+    redisMocks.setex.mockClear();
+    redisMocks.publish.mockClear();
+
     const persisted = updateJobProgress({
       jobId: "batch-awaitable",
       status: "completed",
@@ -145,11 +160,17 @@ describe("durable batch terminal progress (#1688)", () => {
     });
 
     expect(persisted).toBeInstanceOf(Promise);
+    expect(redisMocks.setex).not.toHaveBeenCalled();
+    expect(redisMocks.publish).not.toHaveBeenCalled();
     await expect(persisted).resolves.toBeUndefined();
+    expect(redisMocks.setex).toHaveBeenCalledTimes(1);
+    expect(redisMocks.publish).toHaveBeenCalledTimes(1);
   });
 
   it("propagates a durable persistence failure instead of swallowing it", async () => {
     dbMocks.failure = new Error("database unavailable");
+    redisMocks.setex.mockClear();
+    redisMocks.publish.mockClear();
 
     await expect(
       updateJobProgress({
@@ -161,10 +182,24 @@ describe("durable batch terminal progress (#1688)", () => {
         errors: [],
       }),
     ).rejects.toThrow("database unavailable");
+    await expect(
+      updateJobProgress({
+        jobId: "batch-durable-failed-status",
+        status: "failed",
+        totalFiles: 1,
+        completedFiles: 0,
+        failedFiles: 1,
+        errors: [{ filename: "a.png", error: "corrupt" }],
+      }),
+    ).rejects.toThrow("database unavailable");
+    expect(redisMocks.setex).not.toHaveBeenCalled();
+    expect(redisMocks.publish).not.toHaveBeenCalled();
   });
 
   it("does not leave a nonterminal producer's failure unhandled", async () => {
     dbMocks.failure = new Error("database unavailable");
+    redisMocks.setex.mockClear();
+    redisMocks.publish.mockClear();
     const unhandled = vi.fn();
     process.on("unhandledRejection", unhandled);
     try {
@@ -178,6 +213,8 @@ describe("durable batch terminal progress (#1688)", () => {
       });
       await new Promise((resolve) => setTimeout(resolve, 10));
       expect(unhandled).not.toHaveBeenCalled();
+      expect(redisMocks.setex).not.toHaveBeenCalled();
+      expect(redisMocks.publish).toHaveBeenCalledTimes(1);
     } finally {
       process.off("unhandledRejection", unhandled);
     }
@@ -239,6 +276,9 @@ describe("updateSingleFileProgress", () => {
   });
 
   it("returns a persistence promise that terminal producers can await", async () => {
+    redisMocks.setex.mockClear();
+    redisMocks.publish.mockClear();
+
     const persisted = updateSingleFileProgress({
       jobId: "single-awaitable",
       phase: "complete",
@@ -247,7 +287,11 @@ describe("updateSingleFileProgress", () => {
     });
 
     expect(persisted).toBeInstanceOf(Promise);
+    expect(redisMocks.setex).not.toHaveBeenCalled();
+    expect(redisMocks.publish).not.toHaveBeenCalled();
     await expect(persisted).resolves.toBeUndefined();
+    expect(redisMocks.setex).toHaveBeenCalledTimes(1);
+    expect(redisMocks.publish).toHaveBeenCalledTimes(1);
   });
 
   it("keeps a rejected input's HTTP status on the persisted failure row", async () => {
@@ -273,8 +317,10 @@ describe("updateSingleFileProgress", () => {
     ]);
   });
 
-  it("propagates a durable persistence failure to an awaiting terminal producer", async () => {
+  it("propagates a durable persistence failure to an awaiting terminal producer without caching a Redis terminal key (#2699)", async () => {
     dbMocks.failure = new Error("database unavailable");
+    redisMocks.setex.mockClear();
+    redisMocks.publish.mockClear();
 
     await expect(
       updateSingleFileProgress({
@@ -284,9 +330,36 @@ describe("updateSingleFileProgress", () => {
         result: { text: "must not be reported durable" },
       }),
     ).rejects.toThrow("database unavailable");
+    await expect(
+      updateSingleFileProgress({
+        jobId: "single-durable-failed-phase",
+        phase: "failed",
+        percent: 0,
+        error: "An unexpected error occurred during processing. Please try again.",
+      }),
+    ).rejects.toThrow("database unavailable");
+
+    expect(redisMocks.setex).not.toHaveBeenCalled();
+    expect(redisMocks.publish).not.toHaveBeenCalled();
   });
 
-  it("commits authoritative completion and replay state in one awaited transaction", async () => {
+  it("clears cached terminal replay keys in Redis and skips empty calls (#2699)", async () => {
+    redisMocks.del.mockClear();
+
+    await clearTerminalReplayKey();
+    expect(redisMocks.del).not.toHaveBeenCalled();
+
+    await clearTerminalReplayKey("job-1", "alias-1");
+    expect(redisMocks.del).toHaveBeenCalledTimes(1);
+    expect(redisMocks.del).toHaveBeenCalledWith(
+      expect.stringMatching(/:terminal:job-1$/),
+      expect.stringMatching(/:terminal:alias-1$/),
+    );
+  });
+
+  it("commits authoritative completion and replay state in one awaited transaction and suppresses announcement on failure (#2699)", async () => {
+    redisMocks.setex.mockClear();
+    redisMocks.publish.mockClear();
     const mutateAuthoritative = vi.fn().mockResolvedValue(undefined);
 
     await updateSingleFileProgressAtomically(
@@ -300,6 +373,26 @@ describe("updateSingleFileProgress", () => {
     );
 
     expect(mutateAuthoritative).toHaveBeenCalledTimes(1);
+    expect(redisMocks.setex).toHaveBeenCalledTimes(1);
+    await Promise.resolve();
+    expect(redisMocks.publish).toHaveBeenCalledTimes(1);
+
+    redisMocks.setex.mockClear();
+    redisMocks.publish.mockClear();
+    const failingMutate = vi.fn().mockRejectedValue(new Error("tx aborted"));
+    await expect(
+      updateSingleFileProgressAtomically(
+        {
+          jobId: "single-atomic-fail",
+          phase: "failed",
+          percent: 0,
+          error: "boom",
+        },
+        failingMutate,
+      ),
+    ).rejects.toThrow("tx aborted");
+    expect(redisMocks.setex).not.toHaveBeenCalled();
+    expect(redisMocks.publish).not.toHaveBeenCalled();
   });
 });
 

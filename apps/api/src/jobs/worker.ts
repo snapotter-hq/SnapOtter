@@ -975,34 +975,35 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         jobsTotal.inc({ pool: data.pool, status: isCanceled ? "canceled" : "failed" });
         jobDuration.observe({ pool: data.pool }, durationMs / 1000);
 
-        // Swallowed so the rethrow below stays authoritative, but logged:
-        // for a canceled child or step this row is the only evidence the
-        // finalize reads when it labels the run (#809), so a dropped write
-        // here must be visible somewhere.
-        await db
-          .update(schema.jobs)
-          .set({
-            status: isCanceled ? "canceled" : "failed",
-            completedAt: new Date(),
-            durationMs,
-            error: {
-              message: friendlyError(finalError),
-              // The fault's own code and status belong on a job that failed
-              // on it; a timeout or a cancel that one raced is not that
-              // failure, and its row says so (#2210).
-              ...(!isCanceled && !isTimeout && validationErrorFields(err)),
-              ...(!isCanceled && !isTimeout && failureStatus(err)),
-            },
-          })
-          .where(eq(schema.jobs.id, jobId))
-          .catch((writeErr) => {
-            logger.error(
-              { err: writeErr, jobId, toolId: data.toolId },
-              "terminal status write failed",
-            );
-          });
-
         if (isCanceled) {
+          // Swallowed so the rethrow below stays authoritative, but logged:
+          // for a canceled child or step this row is the only evidence the
+          // finalize reads when it labels the run (#809), so a dropped write
+          // here must be visible somewhere.
+          await db
+            .update(schema.jobs)
+            .set({
+              status: "canceled",
+              completedAt: new Date(),
+              durationMs,
+              error: {
+                message: friendlyError(finalError),
+              },
+            })
+            .where(eq(schema.jobs.id, jobId))
+            .catch((writeErr) => {
+              logger.error(
+                { err: writeErr, jobId, toolId: data.toolId },
+                "terminal status write failed",
+              );
+              void reportError(writeErr, {
+                source: "worker",
+                pool: data.pool,
+                toolId: data.toolId,
+                jobId,
+              });
+            });
+
           if (progressJobId !== jobId) {
             // Alias dual write (#808), the finalize's #766 pattern: a
             // reconnecting client replays from the alias row, so it needs
@@ -1051,13 +1052,51 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
             error: "Canceled",
           });
         } else {
-          await updateSingleFileProgress({
-            jobId: progressJobId,
-            phase: "failed",
-            percent: 0,
-            error: friendlyError(finalError),
+          // Commit the authoritative failure row and the client replay alias
+          // in one transaction before announcing (#2699). Swallowed so the
+          // rethrow below stays authoritative, and so a Postgres outage never
+          // caches a failed Redis replay frame over a finished output that
+          // stranded-job reconciliation will recover.
+          const errorFields = {
             ...(!isTimeout && validationErrorFields(err)),
             ...(!isTimeout && failureStatus(err)),
+          };
+          await updateSingleFileProgressAtomically(
+            {
+              jobId: progressJobId,
+              phase: "failed",
+              percent: 0,
+              error: friendlyError(finalError),
+              ...errorFields,
+            },
+            async (tx) => {
+              await tx
+                .update(schema.jobs)
+                .set({
+                  status: "failed",
+                  completedAt: new Date(),
+                  durationMs,
+                  error: {
+                    message: friendlyError(finalError),
+                    // The fault's own code and status belong on a job that failed
+                    // on it; a timeout or a cancel that one raced is not that
+                    // failure, and its row says so (#2210).
+                    ...errorFields,
+                  },
+                })
+                .where(eq(schema.jobs.id, jobId));
+            },
+          ).catch((writeErr) => {
+            logger.error(
+              { err: writeErr, jobId, toolId: data.toolId },
+              "terminal status write failed",
+            );
+            void reportError(writeErr, {
+              source: "worker",
+              pool: data.pool,
+              toolId: data.toolId,
+              jobId,
+            });
           });
         }
       }

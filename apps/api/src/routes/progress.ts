@@ -401,12 +401,23 @@ async function persistDurable(
 
 // ── Publish (Redis pub/sub + terminal cache + durable persist) ──
 
+function isTerminalPayload(
+  payload: (JobProgress & { type: "batch" }) | SingleFileProgress,
+): boolean {
+  return payload.type === "single"
+    ? payload.phase === "complete" || payload.phase === "failed"
+    : payload.status === "completed" || payload.status === "failed";
+}
+
+/** Delete cached terminal replay frames so SSE reconnects consult the durable DB row. */
+export async function clearTerminalReplayKey(...jobIds: string[]): Promise<void> {
+  if (jobIds.length === 0) return;
+  await sharedRedis().del(...jobIds.map(terminalKey));
+}
+
 function announce(payload: (JobProgress & { type: "batch" }) | SingleFileProgress): void {
   const json = JSON.stringify(payload);
-  const isTerminal =
-    payload.type === "single"
-      ? payload.phase === "complete" || payload.phase === "failed"
-      : payload.status === "completed" || payload.status === "failed";
+  const isTerminal = isTerminalPayload(payload);
 
   // Terminal events write the replay cache BEFORE publishing, so a client
   // connecting right after the live event always finds the terminal key.
@@ -427,9 +438,17 @@ function announce(payload: (JobProgress & { type: "batch" }) | SingleFileProgres
 }
 
 function publish(payload: (JobProgress & { type: "batch" }) | SingleFileProgress): Promise<void> {
-  announce(payload);
+  const isTerminal = isTerminalPayload(payload);
+  if (!isTerminal) {
+    announce(payload);
+  }
 
-  const durable = enqueuePersist(payload.jobId, () => persistDurable(payload));
+  const persisted = enqueuePersist(payload.jobId, () => persistDurable(payload));
+  const durable = isTerminal
+    ? persisted.then(() => {
+        announce(payload);
+      })
+    : persisted;
   // Nonterminal producers intentionally ignore best-effort persistence. Attach
   // a rejection observer so those calls never become unhandled; terminal
   // producers can still await the original promise and fail closed.
@@ -762,10 +781,7 @@ export function publishEphemeral(
   payload: (JobProgress & { type: "batch" }) | SingleFileProgress,
 ): void {
   const json = JSON.stringify(payload);
-  const isTerminal =
-    payload.type === "single"
-      ? payload.phase === "complete" || payload.phase === "failed"
-      : payload.status === "completed" || payload.status === "failed";
+  const isTerminal = isTerminalPayload(payload);
 
   const announce = isTerminal
     ? sharedRedis()

@@ -43,6 +43,7 @@ import {
   listObjects,
   type ObjectInfo,
 } from "../lib/object-storage.js";
+import { clearTerminalReplayKey } from "../routes/progress.js";
 import { getQueue } from "./queues.js";
 import { POOLS, type Pool, RESULT_PAYLOAD_FILENAME } from "./types.js";
 
@@ -334,7 +335,7 @@ async function recoverFromOutputs(
       .returning({ id: schema.jobs.id });
 
     if (settled.length > 0) {
-      await tx
+      const aliases = await tx
         .update(schema.jobs)
         .set({
           status: "completed",
@@ -342,14 +343,22 @@ async function recoverFromOutputs(
           progress,
           error: null,
         })
-        .where(reconcilableAliasRows(row.id));
+        .where(reconcilableAliasRows(row.id))
+        .returning({ id: schema.jobs.id });
+      return [...settled.map((r) => r.id), ...aliases.map((r) => r.id)];
     }
-    return settled;
+    return [];
   });
 
   if (updated.length === 0) {
     return { jobId: row.id, toolId: row.toolId, previousStatus: row.status, resolution: "raced" };
   }
+  await clearTerminalReplayKey(...updated).catch((err) => {
+    logger.warn(
+      { err, jobId: row.id, settledIds: updated },
+      "Failed to clear terminal replay cache after job reconciliation",
+    );
+  });
   return {
     jobId: row.id,
     toolId: row.toolId,
@@ -374,7 +383,7 @@ async function failWithoutOutput(row: StrandedRow): Promise<StrandedJobOutcome> 
       .returning({ id: schema.jobs.id });
 
     if (settled.length > 0) {
-      await tx
+      const aliases = await tx
         .update(schema.jobs)
         .set({
           status: "failed",
@@ -382,14 +391,22 @@ async function failWithoutOutput(row: StrandedRow): Promise<StrandedJobOutcome> 
           progress: { percent: 0 },
           error,
         })
-        .where(reconcilableAliasRows(row.id));
+        .where(reconcilableAliasRows(row.id))
+        .returning({ id: schema.jobs.id });
+      return [...settled.map((r) => r.id), ...aliases.map((r) => r.id)];
     }
-    return settled;
+    return [];
   });
 
   if (updated.length === 0) {
     return { jobId: row.id, toolId: row.toolId, previousStatus: row.status, resolution: "raced" };
   }
+  await clearTerminalReplayKey(...updated).catch((err) => {
+    logger.warn(
+      { err, jobId: row.id, settledIds: updated },
+      "Failed to clear terminal replay cache after job reconciliation",
+    );
+  });
   return { jobId: row.id, toolId: row.toolId, previousStatus: row.status, resolution: "failed" };
 }
 

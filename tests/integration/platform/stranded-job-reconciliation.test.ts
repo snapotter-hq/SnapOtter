@@ -28,6 +28,7 @@ import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
+import { sharedRedis } from "../../../apps/api/src/jobs/connection.js";
 import { upsertToolJobAlias } from "../../../apps/api/src/jobs/enqueue.js";
 import {
   reconcileStrandedJobs,
@@ -35,25 +36,30 @@ import {
 } from "../../../apps/api/src/jobs/job-reconciliation.js";
 import { getQueue } from "../../../apps/api/src/jobs/queues.js";
 import { runSystemJob, SYSTEM_JOBS } from "../../../apps/api/src/jobs/system-jobs.js";
+import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
 import { logger } from "../../../apps/api/src/lib/logger.js";
 import * as objectStorage from "../../../apps/api/src/lib/object-storage.js";
 import { deletePrefix, listObjects, putObject } from "../../../apps/api/src/lib/object-storage.js";
 import {
   buildBatchReplayEvent,
   buildSingleFileReplayEvent,
+  publishEphemeral,
 } from "../../../apps/api/src/routes/progress.js";
 import {
   buildTestApp,
   createMultipartPayload,
   createUserAndLogin,
+  loginAsAdmin,
   type TestApp,
 } from "../test-server.js";
 
 let testApp: TestApp;
+let adminToken: string;
 const seededPrefixes: string[] = [];
 
 beforeAll(async () => {
   testApp = await buildTestApp();
+  adminToken = await loginAsAdmin(testApp.app);
 }, 30_000);
 
 afterAll(async () => {
@@ -814,9 +820,111 @@ describe("stranded-job reconciliation", () => {
             targetKb: 2,
           },
         });
+
+        // #2699: Connecting to GET /api/v1/jobs/:clientJobId/progress must
+        // replay the recovered completion rather than a stale Redis failed frame.
+        expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBeNull();
+        const sseRes = await testApp.app.inject({
+          method: "GET",
+          url: `/api/v1/jobs/${clientJobId}/progress`,
+          headers: { authorization: `Bearer ${adminToken}` },
+        });
+        expect(sseRes.statusCode).toBe(200);
+        const dataMatch = sseRes.body.match(/data: (.+)/);
+        expect(dataMatch).not.toBeNull();
+        expect(JSON.parse(dataMatch?.[1] ?? "{}")).toMatchObject({
+          jobId: clientJobId,
+          type: "single",
+          phase: "complete",
+          percent: 100,
+          stage: "complete",
+          result: {
+            jobId: id,
+            downloadUrl: `/api/v1/download/${id}/big_compress.jpg`,
+            reconciled: true,
+            targetKb: 2,
+          },
+        });
       } finally {
         await queue.remove(id).catch(() => {});
       }
+    });
+
+    it("clears stale Redis terminal replay keys when reconciling recovered or failed jobs and their aliases (#2699)", async () => {
+      const recoveredId = await seedJob({ status: "processing" });
+      await seedOutput(recoveredId, "out.avif", Buffer.from("avif-bytes"));
+      const recoveredAlias = randomUUID();
+      await upsertToolJobAlias({
+        jobId: recoveredId,
+        clientJobId: recoveredAlias,
+        userId: null,
+        pool: "image",
+      });
+
+      const failedId = await seedJob({ status: "queued" });
+      const failedAlias = randomUUID();
+      await upsertToolJobAlias({
+        jobId: failedId,
+        clientJobId: failedAlias,
+        userId: null,
+        pool: "image",
+      });
+
+      for (const targetId of [recoveredId, recoveredAlias, failedId, failedAlias]) {
+        publishEphemeral({
+          jobId: targetId,
+          type: "single",
+          phase: "failed",
+          percent: 0,
+          error: "Stale pre-reconciliation frame",
+        });
+      }
+      await vi.waitFor(async () => {
+        expect(
+          await sharedRedis().get(`${bullPrefix()}:terminal:${recoveredAlias}`),
+        ).not.toBeNull();
+        expect(await sharedRedis().get(`${bullPrefix()}:terminal:${failedAlias}`)).not.toBeNull();
+      });
+
+      const summary = await reconcileStrandedJobs({ graceMs: 0 });
+      expect(summary.outcomes.find((o) => o.jobId === recoveredId)?.resolution).toBe("recovered");
+      expect(summary.outcomes.find((o) => o.jobId === failedId)?.resolution).toBe("failed");
+
+      for (const targetId of [recoveredId, recoveredAlias, failedId, failedAlias]) {
+        expect(await sharedRedis().get(`${bullPrefix()}:terminal:${targetId}`)).toBeNull();
+      }
+
+      const recoveredSse = await testApp.app.inject({
+        method: "GET",
+        url: `/api/v1/jobs/${recoveredAlias}/progress`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      const recoveredFrame = JSON.parse(recoveredSse.body.match(/data: (.+)/)?.[1] ?? "{}");
+      expect(recoveredFrame).toMatchObject({
+        jobId: recoveredAlias,
+        type: "single",
+        phase: "complete",
+        percent: 100,
+        result: {
+          jobId: recoveredId,
+          downloadUrl: `/api/v1/download/${recoveredId}/out.avif`,
+          reconciled: true,
+        },
+      });
+
+      const failedSse = await testApp.app.inject({
+        method: "GET",
+        url: `/api/v1/jobs/${failedAlias}/progress`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      const failedFrame = JSON.parse(failedSse.body.match(/data: (.+)/)?.[1] ?? "{}");
+      expect(failedFrame).toEqual({
+        jobId: failedAlias,
+        type: "single",
+        phase: "failed",
+        percent: 0,
+        error: UNRECOVERABLE_STRANDED_JOB_ERROR,
+      });
     });
 
     it("settles the clientJobId alias row as failed when the stranded job produced no output", async () => {

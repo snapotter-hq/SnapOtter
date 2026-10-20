@@ -8,8 +8,10 @@ const isMissingObjectErrorMock = vi.hoisted(() => vi.fn());
 const reportErrorMock = vi.hoisted(() => vi.fn());
 const loggerErrorMock = vi.hoisted(() => vi.fn());
 const loggerWarnMock = vi.hoisted(() => vi.fn());
+const clearTerminalReplayKeyMock = vi.hoisted(() => vi.fn());
 const dbSelectRows = vi.hoisted(() => ({ rows: [] as unknown[] }));
 const dbUpdateSetCalls = vi.hoisted(() => [] as Array<{ values: Record<string, unknown> }>);
+const dbUpdateReturningQueue = vi.hoisted(() => [] as Array<Array<{ id: string }>>);
 
 async function loadJobReconciliation() {
   vi.resetModules();
@@ -21,8 +23,10 @@ async function loadJobReconciliation() {
   reportErrorMock.mockReset();
   loggerErrorMock.mockReset();
   loggerWarnMock.mockReset();
+  clearTerminalReplayKeyMock.mockReset().mockResolvedValue(undefined);
   dbSelectRows.rows = [];
   dbUpdateSetCalls.length = 0;
+  dbUpdateReturningQueue.length = 0;
 
   getQueueMock.mockReturnValue({
     getJob: vi.fn().mockResolvedValue(null),
@@ -34,7 +38,7 @@ async function loadJobReconciliation() {
         dbUpdateSetCalls.push({ values });
         return {
           where: vi.fn(() => ({
-            returning: vi.fn().mockResolvedValue([{ id: "settled" }]),
+            returning: vi.fn(async () => dbUpdateReturningQueue.shift() ?? [{ id: "settled" }]),
           })),
         };
       }),
@@ -107,6 +111,10 @@ async function loadJobReconciliation() {
 
   vi.doMock("../../../../apps/api/src/jobs/queues.js", () => ({
     getQueue: getQueueMock,
+  }));
+
+  vi.doMock("../../../../apps/api/src/routes/progress.js", () => ({
+    clearTerminalReplayKey: clearTerminalReplayKeyMock,
   }));
 
   return import("../../../../apps/api/src/jobs/job-reconciliation.js");
@@ -385,5 +393,87 @@ describe("reconcileStrandedJobs per-row fault isolation (#1498)", () => {
         (ctx as { key?: string } | undefined)?.key?.endsWith("/gone.pdf"),
       ),
     ).toBe(false);
+  });
+
+  it("clears cached terminal replay keys for settled rows and aliases, skips raced rows, and logs a warning if Redis DEL fails (#2699)", async () => {
+    const { reconcileStrandedJobs } = await loadJobReconciliation();
+
+    dbSelectRows.rows = [
+      {
+        id: "job-recovered",
+        toolId: "resize",
+        pool: "image",
+        type: "tool",
+        status: "processing",
+        bytesIn: 100,
+        inputRefs: [],
+        progress: null,
+      },
+      {
+        id: "job-failed",
+        toolId: "rotate",
+        pool: "image",
+        type: "tool",
+        status: "queued",
+        bytesIn: null,
+        inputRefs: [],
+        progress: null,
+      },
+      {
+        id: "job-raced",
+        toolId: "convert",
+        pool: "image",
+        type: "tool",
+        status: "processing",
+        bytesIn: 50,
+        inputRefs: [],
+        progress: null,
+      },
+    ];
+
+    dbUpdateReturningQueue.push(
+      [{ id: "job-recovered" }],
+      [{ id: "alias-recovered" }],
+      [{ id: "job-failed" }],
+      [],
+      [],
+    );
+
+    listObjectsMock.mockImplementation(async (prefix: string) => {
+      if (prefix === "outputs/job-recovered/" || prefix === "outputs/job-raced/") {
+        return [{ key: `${prefix}out.png`, size: 256, mtimeMs: 1_000 }];
+      }
+      return [];
+    });
+
+    const redisDelErr = new Error("READONLY You can't write against a read only replica");
+    clearTerminalReplayKeyMock
+      .mockRejectedValueOnce(redisDelErr)
+      .mockRejectedValueOnce(redisDelErr);
+
+    const summary = await reconcileStrandedJobs({ graceMs: 0 });
+    expect(summary.recovered).toBe(1);
+    expect(summary.failed).toBe(1);
+    expect(summary.raced).toBe(1);
+
+    expect(clearTerminalReplayKeyMock).toHaveBeenCalledTimes(2);
+    expect(clearTerminalReplayKeyMock).toHaveBeenNthCalledWith(
+      1,
+      "job-recovered",
+      "alias-recovered",
+    );
+    expect(clearTerminalReplayKeyMock).toHaveBeenNthCalledWith(2, "job-failed");
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      {
+        err: redisDelErr,
+        jobId: "job-recovered",
+        settledIds: ["job-recovered", "alias-recovered"],
+      },
+      "Failed to clear terminal replay cache after job reconciliation",
+    );
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      { err: redisDelErr, jobId: "job-failed", settledIds: ["job-failed"] },
+      "Failed to clear terminal replay cache after job reconciliation",
+    );
   });
 });
