@@ -259,4 +259,157 @@ describe("PipelineBuilder touch and mouse step reordering (#2596)", () => {
     });
     expect(onToggleStep).not.toHaveBeenCalled();
   });
+
+  it("caps auto-scroll at the end of the step list instead of stretching scrollHeight with the dragged step (#2968)", async () => {
+    const threeSteps: PipelineStep[] = [
+      ...STEPS,
+      { id: "step-3", toolId: "rotate", settings: { angle: 90 } },
+    ];
+    const onReorderSteps = vi.fn();
+    const { container } = render(
+      <div data-testid="automate-scroller" style={{ overflowY: "auto" }}>
+        <PipelineBuilder
+          steps={threeSteps}
+          expandedStepId={null}
+          onRemoveStep={() => {}}
+          onReorderSteps={onReorderSteps}
+          onUpdateSettings={() => {}}
+          onToggleStep={() => {}}
+        />
+      </div>,
+    );
+
+    const scroller = screen.getByTestId("automate-scroller");
+    const handles = Array.from(
+      container.querySelectorAll('span[aria-roledescription="sortable"]'),
+    ) as HTMLElement[];
+    expect(handles).toHaveLength(3);
+    const rows = handles.map((h) => h.closest(".rounded-lg") as HTMLElement);
+
+    const baseBottoms = new Map<HTMLElement, number>([
+      [rows[0], 200],
+      [rows[1], 400],
+      [rows[2], 600],
+    ]);
+    for (const [row, bottom] of baseBottoms) {
+      const top = bottom - 180;
+      vi.spyOn(row, "getBoundingClientRect").mockImplementation(() => ({
+        x: 0,
+        y: top - scroller.scrollTop,
+        left: 0,
+        top: top - scroller.scrollTop,
+        right: 400,
+        bottom: bottom - scroller.scrollTop,
+        width: 400,
+        height: 180,
+        toJSON: () => ({}),
+      }));
+    }
+
+    const baseScrollHeight = 600;
+    const clientHeight = 300;
+    const parseTranslateY = (transform: string) => {
+      const match = /translate3d\([^,]+,\s*(-?\d+(?:\.\d+)?)px/.exec(transform);
+      return match ? Number(match[1]) : 0;
+    };
+    const computeScrollHeight = () => {
+      let maxBottom = baseScrollHeight;
+      for (const [row, baseBottom] of baseBottoms) {
+        const ty = parseTranslateY(row.style.transform);
+        maxBottom = Math.max(maxBottom, baseBottom + ty);
+      }
+      return maxBottom;
+    };
+
+    Object.defineProperty(scroller, "clientHeight", { value: clientHeight, configurable: true });
+    Object.defineProperty(scroller, "clientWidth", { value: 400, configurable: true });
+    Object.defineProperty(scroller, "scrollWidth", { value: 400, configurable: true });
+    Object.defineProperty(scroller, "scrollHeight", {
+      get: computeScrollHeight,
+      configurable: true,
+    });
+    vi.spyOn(scroller, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: 400,
+      bottom: clientHeight,
+      width: 400,
+      height: clientHeight,
+      toJSON: () => ({}),
+    });
+    scroller.scrollBy = vi.fn((_x: number, y: number) => {
+      const maxScroll = scroller.scrollHeight - scroller.clientHeight;
+      scroller.scrollTop = Math.min(maxScroll, Math.max(0, scroller.scrollTop + y));
+      fireEvent.scroll(scroller);
+    }) as unknown as typeof scroller.scrollBy;
+
+    const handle0 = handles[0];
+    act(() => {
+      fireEvent.mouseDown(handle0, { button: 0, clientX: 20, clientY: 100 });
+      fireEvent.mouseMove(document, { clientX: 20, clientY: 110 });
+    });
+    act(() => {
+      fireEvent.mouseMove(document, { clientX: 20, clientY: 290 });
+    });
+
+    for (let i = 0; i < 40; i += 1) {
+      await act(async () => {
+        vi.advanceTimersByTime(10);
+      });
+    }
+
+    expect(scroller.scrollTop).toBeGreaterThan(0);
+    expect(scroller.scrollTop).toBeLessThanOrEqual(baseScrollHeight - clientHeight);
+    expect(scroller.scrollHeight).toBe(baseScrollHeight);
+    expect(screen.getByTestId("pipeline-step-drag-overlay")).toBeInTheDocument();
+    expect(rows[0].className).toContain("opacity-40");
+
+    await act(async () => {
+      fireEvent.mouseUp(document, { clientX: 20, clientY: 290 });
+    });
+
+    expect(screen.queryByTestId("pipeline-step-drag-overlay")).toBeNull();
+    await waitFor(() => {
+      expect(onReorderSteps).toHaveBeenCalledWith("step-1", "step-3");
+    });
+  });
+
+  it("clears the drag overlay without reordering when a drag is cancelled with Escape (#2968)", async () => {
+    const onReorderSteps = vi.fn();
+    const { container } = render(
+      <PipelineBuilder
+        steps={STEPS}
+        expandedStepId={null}
+        onRemoveStep={() => {}}
+        onReorderSteps={onReorderSteps}
+        onUpdateSettings={() => {}}
+        onToggleStep={() => {}}
+      />,
+    );
+
+    const handles = Array.from(
+      container.querySelectorAll('span[aria-roledescription="sortable"]'),
+    ) as HTMLElement[];
+    mockStepRects(handles);
+    const handle0 = handles[0];
+
+    act(() => {
+      fireEvent.mouseDown(handle0, { button: 0, clientX: 20, clientY: 20 });
+      fireEvent.mouseMove(document, { clientX: 20, clientY: 95 });
+    });
+
+    const overlay = screen.getByTestId("pipeline-step-drag-overlay");
+    expect(overlay).toBeInTheDocument();
+    expect(overlay).toHaveTextContent("1");
+    expect(overlay).toHaveTextContent("Resize Image");
+
+    await act(async () => {
+      fireEvent.keyDown(document, { key: "Escape", code: "Escape" });
+    });
+
+    expect(screen.queryByTestId("pipeline-step-drag-overlay")).toBeNull();
+    expect(onReorderSteps).not.toHaveBeenCalled();
+  });
 });

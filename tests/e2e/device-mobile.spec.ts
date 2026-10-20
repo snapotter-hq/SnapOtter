@@ -502,6 +502,81 @@ test.describe("@mobile Organize PDF on a phone", () => {
       .evaluateAll((els) => els.map((el) => el.getAttribute("data-testid")));
     expect(orderedTestIds[orderedTestIds.length - 1]).toBe("organize-page-1");
   });
+
+  test("caps Multi-Tool PDF auto-scroll at the end of the grid when dragging a card to the bottom edge (#2968)", async ({
+    loggedInPage: page,
+  }) => {
+    await page.goto("/pdf/multi-tool-pdf");
+    const chooser = page.waitForEvent("filechooser");
+    await page
+      .getByRole("button", { name: /upload from computer/i })
+      .first()
+      .click();
+    await (await chooser).setFiles(ORGANIZE_PDF_FIXTURE);
+
+    const page0 = page.getByTestId("multi-tool-page-0");
+    await expect(page0).toBeVisible({ timeout: 15_000 });
+    await expect(page0.locator("img")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("multi-tool-page-5")).toBeAttached();
+    const page0Thumb = await page0.locator("img").getAttribute("src");
+    expect(page0Thumb).toBeTruthy();
+
+    const initialMetrics = await page0.evaluate((el) => {
+      const scroller = el.closest(".overflow-auto") as HTMLElement | null;
+      if (!scroller) throw new Error("scroller missing");
+      const rect = scroller.getBoundingClientRect();
+      return {
+        scrollHeight: scroller.scrollHeight,
+        clientHeight: scroller.clientHeight,
+        maxScroll: scroller.scrollHeight - scroller.clientHeight,
+        bottomX: Math.round(rect.left + rect.width / 2),
+        bottomY: Math.round(rect.bottom - 10),
+      };
+    });
+    expect(initialMetrics.maxScroll).toBeGreaterThan(0);
+
+    const box0 = await page0.boundingBox();
+    expect(box0).not.toBeNull();
+    if (!box0) return;
+
+    const startX = Math.round(box0.x + box0.width / 2);
+    const startY = Math.round(box0.y + 60);
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX, startY + 10, { steps: 2 });
+    await page.mouse.move(initialMetrics.bottomX, initialMetrics.bottomY, { steps: 10 });
+    await expect(page.getByTestId("multi-tool-drag-overlay")).toBeVisible();
+
+    await expect
+      .poll(
+        () =>
+          page0.evaluate((el) => {
+            const scroller = el.closest(".overflow-auto") as HTMLElement | null;
+            return scroller ? Math.round(scroller.scrollTop) : 0;
+          }),
+        { timeout: 5_000 },
+      )
+      .toBeGreaterThanOrEqual(initialMetrics.maxScroll - 2);
+    await page.waitForTimeout(250);
+
+    const scrolledMetrics = await page0.evaluate((el) => {
+      const scroller = el.closest(".overflow-auto") as HTMLElement | null;
+      if (!scroller) throw new Error("scroller missing");
+      return {
+        scrollTop: scroller.scrollTop,
+        scrollHeight: scroller.scrollHeight,
+      };
+    });
+    expect(scrolledMetrics.scrollHeight).toBe(initialMetrics.scrollHeight);
+    expect(scrolledMetrics.scrollTop).toBeLessThanOrEqual(initialMetrics.maxScroll + 1);
+
+    await page.mouse.up();
+    await expect(page.getByTestId("multi-tool-drag-overlay")).toHaveCount(0);
+    await expect(page.getByTestId("multi-tool-page-5").locator("img")).toHaveAttribute(
+      "src",
+      page0Thumb ?? "",
+    );
+  });
 });
 
 test.describe("@mobile Automate pipeline on a phone", () => {

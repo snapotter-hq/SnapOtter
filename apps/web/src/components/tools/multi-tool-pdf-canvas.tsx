@@ -2,6 +2,8 @@ import {
   closestCenter,
   DndContext,
   type DragEndEvent,
+  DragOverlay,
+  type DragStartEvent,
   KeyboardSensor,
   MouseSensor,
   TouchSensor,
@@ -179,6 +181,45 @@ interface PlanCardProps {
   scale: number;
 }
 
+/** Shared thumbnail box for an in-grid plan tile and its drag overlay. */
+function PlanCardThumb({
+  page,
+  rot,
+  thumb,
+  scale,
+}: Pick<PlanCardProps, "page" | "rot" | "thumb" | "scale">) {
+  // Rotating the portrait-thumbnail image inside a box of the swapped
+  // dimensions shows the page as it will print, without re-rendering.
+  const landscape = rot === 90 || rot === 270;
+  const tw = Math.round(THUMB_W * scale);
+  const th = Math.round(THUMB_H * scale);
+
+  return (
+    <div
+      className="relative rounded bg-muted overflow-hidden"
+      style={{ width: landscape ? th : tw, height: landscape ? tw : th }}
+    >
+      {thumb ? (
+        <img
+          src={thumb}
+          alt=""
+          draggable={false}
+          className="absolute top-1/2 left-1/2 max-w-none max-h-none object-contain pointer-events-none select-none"
+          style={{
+            width: tw,
+            height: th,
+            transform: `translate(-50%, -50%) rotate(${rot}deg)`,
+          }}
+        />
+      ) : (
+        <span className="absolute inset-0 flex items-center justify-center text-lg font-medium text-muted-foreground">
+          {page}
+        </span>
+      )}
+    </div>
+  );
+}
+
 /**
  * One draggable output tile: the rendered page in its planned rotation.
  * Memoized on primitive props, so a thumbnail flush re-renders only the tiles
@@ -202,43 +243,17 @@ const PlanCard = memo(function PlanCard({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
   });
-  // Rotating the portrait-thumbnail image inside a box of the swapped
-  // dimensions shows the page as it will print, without re-rendering.
-  const landscape = rot === 90 || rot === 270;
-  const tw = Math.round(THUMB_W * scale);
-  const th = Math.round(THUMB_H * scale);
 
   return (
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={`relative rounded-lg border bg-background p-1.5 ${
-        isDragging ? "border-primary shadow-lg z-10 opacity-90" : "border-border"
+        isDragging ? "border-primary opacity-40" : "border-border"
       }`}
       data-testid={`multi-tool-page-${index}`}
     >
-      <div
-        className="relative rounded bg-muted overflow-hidden"
-        style={{ width: landscape ? th : tw, height: landscape ? tw : th }}
-      >
-        {thumb ? (
-          <img
-            src={thumb}
-            alt=""
-            draggable={false}
-            className="absolute top-1/2 left-1/2 max-w-none max-h-none object-contain pointer-events-none select-none"
-            style={{
-              width: tw,
-              height: th,
-              transform: `translate(-50%, -50%) rotate(${rot}deg)`,
-            }}
-          />
-        ) : (
-          <span className="absolute inset-0 flex items-center justify-center text-lg font-medium text-muted-foreground">
-            {page}
-          </span>
-        )}
-      </div>
+      <PlanCardThumb page={page} rot={rot} thumb={thumb} scale={scale} />
       <div className="flex items-center justify-between px-0.5 pt-1">
         <button
           type="button"
@@ -481,6 +496,7 @@ export function MultiToolPdfCanvas() {
   const { files, addFiles, reset: resetFiles, processing } = useFileStore();
   // What the last Add PDF pick left out, so it isn't dropped without a word.
   const [skipped, setSkipped] = useState({ notPdf: 0, overLimit: 0 });
+  const [activeId, setActiveId] = useState<string | null>(null);
   const docs = useMultiToolStore((state) => state.docs);
   const plan = useMultiToolStore((state) => state.plan);
   // A new array every render would re-render every sortable tile on each
@@ -503,7 +519,16 @@ export function MultiToolPdfCanvas() {
 
   // All documents belong to the upload store, including canvas additions.
   // Reconcile by File identity so additions/removals retain the surviving plan.
-  useEffect(() => syncFiles(files), [files, syncFiles]);
+  useEffect(() => {
+    setActiveId(null);
+    syncFiles(files);
+  }, [files, syncFiles]);
+
+  useEffect(() => {
+    if (activeId !== null && (processing || !plan.some((entry) => entry.id === activeId))) {
+      setActiveId(null);
+    }
+  }, [activeId, plan, processing]);
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
@@ -511,10 +536,22 @@ export function MultiToolPdfCanvas() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
+  const handleDragStart = ({ active }: DragStartEvent) => {
+    if (!processing) setActiveId(String(active.id));
+  };
+
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
+    setActiveId(null);
     if (processing || !over || active.id === over.id) return;
     movePage(String(active.id), String(over.id));
   };
+
+  const handleDragCancel = () => {
+    setActiveId(null);
+  };
+
+  const activeEntry =
+    activeId !== null && !processing ? (plan.find((entry) => entry.id === activeId) ?? null) : null;
 
   const primaryDoc = docs[0];
 
@@ -673,7 +710,9 @@ export function MultiToolPdfCanvas() {
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
+              onDragCancel={handleDragCancel}
             >
               <SortableContext items={planIds} strategy={rectSortingStrategy}>
                 <div className="flex flex-wrap items-start gap-3">
@@ -691,6 +730,40 @@ export function MultiToolPdfCanvas() {
                   ))}
                 </div>
               </SortableContext>
+              <DragOverlay dropAnimation={null}>
+                {activeEntry ? (
+                  <div
+                    data-testid="multi-tool-drag-overlay"
+                    className="rounded-lg border border-primary bg-background p-1.5 shadow-lg opacity-90 select-none pointer-events-none cursor-grabbing"
+                  >
+                    <PlanCardThumb
+                      page={activeEntry.page}
+                      rot={activeEntry.rot}
+                      thumb={docs[activeEntry.doc]?.thumbs[activeEntry.page]}
+                      scale={scale}
+                    />
+                    <div
+                      className="flex items-center justify-between px-0.5 pt-1 text-muted-foreground"
+                      aria-hidden="true"
+                    >
+                      <span className="p-1">
+                        <GripHorizontal className="h-3 w-3" />
+                      </span>
+                      <div className="flex gap-0.5">
+                        <span className="p-1">
+                          <RotateCcw className="h-3 w-3" />
+                        </span>
+                        <span className="p-1">
+                          <RotateCw className="h-3 w-3" />
+                        </span>
+                        <span className="p-1">
+                          <X className="h-3 w-3" />
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </DragOverlay>
             </DndContext>
             {plan.length === 0 && (
               <div className="flex items-center justify-center text-sm text-muted-foreground py-12">

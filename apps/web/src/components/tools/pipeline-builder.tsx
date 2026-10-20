@@ -2,6 +2,8 @@ import {
   closestCenter,
   DndContext,
   type DragEndEvent,
+  DragOverlay,
+  type DragStartEvent,
   KeyboardSensor,
   MouseSensor,
   TouchSensor,
@@ -17,6 +19,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { type Modality, TOOLS } from "@snapotter/shared";
 import { AlertTriangle, GripVertical, Workflow, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { format } from "@/lib/format";
 import { ICON_MAP } from "@/lib/icon-map";
@@ -51,6 +54,60 @@ interface SortableStepProps {
   onUpdateSettings: (settings: Record<string, unknown>) => void;
 }
 
+/** Shared step badge, icon, title, warning, and summary for a step row and its drag overlay. */
+function StepHeaderIdentity({
+  step,
+  index,
+  showSummary,
+  warning,
+}: {
+  step: PipelineStep;
+  index: number;
+  showSummary: boolean;
+  warning?: StepWarning | null;
+}) {
+  const { t } = useTranslation();
+  const tool = TOOLS.find((item) => item.id === step.toolId);
+  if (!tool) return null;
+
+  const Icon = (ICON_MAP[tool.icon] as React.ComponentType<{ className?: string }>) ?? Workflow;
+  const summary = showSummary ? getSettingsSummary(step.toolId, step.settings) : null;
+
+  return (
+    <>
+      {/* Step number badge */}
+      <span className="w-6 h-6 rounded-full bg-primary/10 text-primary-ink text-xs font-semibold flex items-center justify-center shrink-0">
+        {index + 1}
+      </span>
+
+      {/* Tool icon + name */}
+      <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+      <span className="text-sm font-medium text-foreground">
+        {getToolName(t, tool.id, tool.name)}
+      </span>
+
+      {/* Modality mismatch warning */}
+      {warning && (
+        <span
+          title={format(t.automate.modalityWarningTooltip, {
+            expected: warning.expects,
+            received: warning.receives,
+          })}
+          className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-400 ms-1"
+        >
+          <AlertTriangle className="h-3 w-3" />
+          {t.automate.modalityWarning}
+        </span>
+      )}
+
+      {/* Settings summary when collapsed */}
+      {summary && <span className="text-xs text-muted-foreground truncate ms-1">{summary}</span>}
+
+      <span className="flex-1" />
+    </>
+  );
+}
+
 function SortableStep({
   step,
   index,
@@ -70,11 +127,7 @@ function SortableStep({
     transition,
   };
 
-  const tool = TOOLS.find((t) => t.id === step.toolId);
-  if (!tool) return null;
-
-  const Icon = (ICON_MAP[tool.icon] as React.ComponentType<{ className?: string }>) ?? Workflow;
-  const summary = getSettingsSummary(step.toolId, step.settings);
+  if (!TOOLS.some((item) => item.id === step.toolId)) return null;
 
   return (
     <div
@@ -82,7 +135,7 @@ function SortableStep({
       style={style}
       className={cn(
         "rounded-lg border bg-background overflow-hidden transition-colors",
-        isDragging && "opacity-50",
+        isDragging && "opacity-40",
         isExpanded ? "border-primary" : "border-border",
       )}
     >
@@ -114,37 +167,12 @@ function SortableStep({
             </span>
           }
 
-          {/* Step number badge */}
-          <span className="w-6 h-6 rounded-full bg-primary/10 text-primary-ink text-xs font-semibold flex items-center justify-center shrink-0">
-            {index + 1}
-          </span>
-
-          {/* Tool icon + name */}
-          <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
-          <span className="text-sm font-medium text-foreground">
-            {getToolName(t, tool.id, tool.name)}
-          </span>
-
-          {/* Modality mismatch warning */}
-          {warning && (
-            <span
-              title={format(t.automate.modalityWarningTooltip, {
-                expected: warning.expects,
-                received: warning.receives,
-              })}
-              className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-400 ms-1"
-            >
-              <AlertTriangle className="h-3 w-3" />
-              {t.automate.modalityWarning}
-            </span>
-          )}
-
-          {/* Settings summary when collapsed */}
-          {!isExpanded && summary && (
-            <span className="text-xs text-muted-foreground truncate ms-1">{summary}</span>
-          )}
-
-          <span className="flex-1" />
+          <StepHeaderIdentity
+            step={step}
+            index={index}
+            showSummary={!isExpanded}
+            warning={warning}
+          />
 
           {/* Remove button */}
           <button
@@ -171,6 +199,35 @@ function SortableStep({
   );
 }
 
+function StepDragOverlay({
+  step,
+  index,
+  warning,
+}: {
+  step: PipelineStep;
+  index: number;
+  warning?: StepWarning | null;
+}) {
+  if (!TOOLS.some((item) => item.id === step.toolId)) return null;
+
+  return (
+    <div
+      data-testid="pipeline-step-drag-overlay"
+      className="rounded-lg border border-primary bg-background overflow-hidden shadow-lg opacity-90 select-none pointer-events-none cursor-grabbing"
+    >
+      <div className="flex items-center gap-2 p-3 w-full text-start">
+        <span className="p-0.5 rounded text-muted-foreground" aria-hidden="true">
+          <GripVertical className="h-4 w-4" />
+        </span>
+        <StepHeaderIdentity step={step} index={index} showSummary warning={warning} />
+        <span className="p-1 rounded text-muted-foreground" aria-hidden="true">
+          <X className="h-4 w-4" />
+        </span>
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  PipelineBuilder                                                    */
 /* ------------------------------------------------------------------ */
@@ -185,6 +242,7 @@ export function PipelineBuilder({
   onToggleStep,
 }: PipelineBuilderProps) {
   const { t } = useTranslation();
+  const [activeId, setActiveId] = useState<string | null>(null);
   const warnings = computeStepWarnings(
     steps.map((s) => s.toolId),
     uploadedModality ?? null,
@@ -195,12 +253,30 @@ export function PipelineBuilder({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
+  useEffect(() => {
+    if (activeId !== null && !steps.some((s) => s.id === activeId)) {
+      setActiveId(null);
+    }
+  }, [activeId, steps]);
+
+  function handleDragStart(event: DragStartEvent) {
+    setActiveId(String(event.active.id));
+  }
+
   function handleDragEnd(event: DragEndEvent) {
+    setActiveId(null);
     const { active, over } = event;
     if (over && active.id !== over.id) {
       onReorderSteps(String(active.id), String(over.id));
     }
   }
+
+  function handleDragCancel() {
+    setActiveId(null);
+  }
+
+  const activeIndex = activeId !== null ? steps.findIndex((s) => s.id === activeId) : -1;
+  const activeStep = activeIndex >= 0 ? steps[activeIndex] : null;
 
   if (steps.length === 0) {
     return (
@@ -215,7 +291,13 @@ export function PipelineBuilder({
   }
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
       <SortableContext items={steps.map((s) => s.id)} strategy={verticalListSortingStrategy}>
         <div className="space-y-2">
           {steps.map((step, idx) => (
@@ -232,6 +314,11 @@ export function PipelineBuilder({
           ))}
         </div>
       </SortableContext>
+      <DragOverlay dropAnimation={null}>
+        {activeStep ? (
+          <StepDragOverlay step={activeStep} index={activeIndex} warning={warnings[activeIndex]} />
+        ) : null}
+      </DragOverlay>
     </DndContext>
   );
 }

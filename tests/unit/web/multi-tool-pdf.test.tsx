@@ -565,5 +565,143 @@ describe("PDF multi-tool editor regressions", () => {
       expect(overlay0.className).toContain("select-none");
       expect(overlay0.className).toContain("[-webkit-touch-callout:none]");
     });
+
+    it("caps auto-scroll at the end of the grid instead of stretching scrollHeight with the dragged tile (#2968)", async () => {
+      const primary = file("primary.pdf");
+      useFileStore.getState().setFiles([primary]);
+      editor();
+      await act(async () => {
+        useMultiToolStore.getState().setPrimary(primary, 3);
+        useMultiToolStore.getState().patchDoc(0, {
+          thumbs: {
+            1: "data:image/jpeg;base64,p1",
+            2: "data:image/jpeg;base64,p2",
+            3: "data:image/jpeg;base64,p3",
+          },
+        });
+      });
+
+      const tile0 = screen.getByTestId("multi-tool-page-0");
+      const tile1 = screen.getByTestId("multi-tool-page-1");
+      const tile2 = screen.getByTestId("multi-tool-page-2");
+      const grip0 = screen.getByTestId("multi-tool-grip-0");
+      const scroller = tile0.closest(".overflow-auto") as HTMLElement;
+      expect(scroller).not.toBeNull();
+      scroller.style.overflow = "auto";
+
+      const baseBottoms = new Map<HTMLElement, number>([
+        [tile0, 200],
+        [tile1, 400],
+        [tile2, 600],
+      ]);
+      for (const [tile, bottom] of baseBottoms) {
+        const top = bottom - 180;
+        vi.spyOn(tile, "getBoundingClientRect").mockImplementation(() => ({
+          x: 16,
+          y: top - scroller.scrollTop,
+          left: 16,
+          top: top - scroller.scrollTop,
+          right: 168,
+          bottom: bottom - scroller.scrollTop,
+          width: 152,
+          height: 180,
+          toJSON: () => ({}),
+        }));
+      }
+
+      const baseScrollHeight = 600;
+      const clientHeight = 300;
+      const parseTranslateY = (transform: string) => {
+        const match = /translate3d\([^,]+,\s*(-?\d+(?:\.\d+)?)px/.exec(transform);
+        return match ? Number(match[1]) : 0;
+      };
+      const computeScrollHeight = () => {
+        let maxBottom = baseScrollHeight;
+        for (const [tile, baseBottom] of baseBottoms) {
+          const ty = parseTranslateY(tile.style.transform);
+          maxBottom = Math.max(maxBottom, baseBottom + ty);
+        }
+        return maxBottom;
+      };
+
+      Object.defineProperty(scroller, "clientHeight", { value: clientHeight, configurable: true });
+      Object.defineProperty(scroller, "clientWidth", { value: 500, configurable: true });
+      Object.defineProperty(scroller, "scrollWidth", { value: 500, configurable: true });
+      Object.defineProperty(scroller, "scrollHeight", {
+        get: computeScrollHeight,
+        configurable: true,
+      });
+      vi.spyOn(scroller, "getBoundingClientRect").mockReturnValue({
+        x: 0,
+        y: 0,
+        left: 0,
+        top: 0,
+        right: 500,
+        bottom: clientHeight,
+        width: 500,
+        height: clientHeight,
+        toJSON: () => ({}),
+      });
+      scroller.scrollBy = vi.fn((_x: number, y: number) => {
+        const maxScroll = scroller.scrollHeight - scroller.clientHeight;
+        scroller.scrollTop = Math.min(maxScroll, Math.max(0, scroller.scrollTop + y));
+        fireEvent.scroll(scroller);
+      }) as unknown as typeof scroller.scrollBy;
+
+      act(() => {
+        fireEvent.mouseDown(grip0, { button: 0, clientX: 70, clientY: 100 });
+        fireEvent.mouseMove(document, { clientX: 70, clientY: 110 });
+      });
+      act(() => {
+        fireEvent.mouseMove(document, { clientX: 70, clientY: 290 });
+      });
+
+      for (let i = 0; i < 40; i += 1) {
+        await act(async () => {
+          vi.advanceTimersByTime(10);
+        });
+      }
+
+      expect(scroller.scrollTop).toBeGreaterThan(0);
+      expect(scroller.scrollTop).toBeLessThanOrEqual(baseScrollHeight - clientHeight);
+      expect(scroller.scrollHeight).toBe(baseScrollHeight);
+      expect(screen.getByTestId("multi-tool-drag-overlay")).toBeInTheDocument();
+      expect(tile0.className).toContain("opacity-40");
+
+      await act(async () => {
+        fireEvent.mouseUp(document, { clientX: 70, clientY: 290 });
+      });
+
+      expect(screen.queryByTestId("multi-tool-drag-overlay")).toBeNull();
+      await waitFor(() => {
+        expect(useMultiToolStore.getState().plan.map((p) => p.page)).toEqual([2, 3, 1]);
+      });
+    });
+
+    it("clears the drag overlay without reordering when a drag is cancelled with Escape (#2968)", async () => {
+      await renderSortablePlan();
+      act(() => {
+        useMultiToolStore.getState().rotatePage(useMultiToolStore.getState().plan[0].id, 90);
+      });
+      const grip0 = screen.getByTestId("multi-tool-grip-0");
+
+      act(() => {
+        fireEvent.mouseDown(grip0, { button: 0, clientX: 70, clientY: 100 });
+        fireEvent.mouseMove(document, { clientX: 230, clientY: 100 });
+      });
+
+      const overlay = screen.getByTestId("multi-tool-drag-overlay");
+      expect(overlay).toBeInTheDocument();
+      const overlayImg = overlay.querySelector("img") as HTMLImageElement;
+      expect(overlayImg).toHaveAttribute("src", "data:image/jpeg;base64,p1");
+      expect(overlayImg.style.transform).toContain("rotate(90deg)");
+
+      await act(async () => {
+        fireEvent.keyDown(document, { key: "Escape", code: "Escape" });
+      });
+
+      expect(screen.queryByTestId("multi-tool-drag-overlay")).toBeNull();
+      expect(useMultiToolStore.getState().plan.map((p) => p.page)).toEqual([1, 2]);
+    });
   });
 });
