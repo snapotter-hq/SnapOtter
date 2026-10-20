@@ -16,7 +16,8 @@ const PYTHON_DIR = path.resolve(__dirname, "../../../packages/ai/python");
 // pdf2docx drives MuPDF internally, so scripts that only import pdf2docx need
 // the redirect too (doc_to_word.py, the #843 incident). `from X import Y`
 // counts the same as `import X`.
-const IMPORTS_PYMUPDF = /^\s*(?:import|from) (?:fitz|pymupdf|pdf2docx)\b/m;
+const IMPORTS_PYMUPDF = /^\s*(?:import|from) (?:fitz|pymupdf|pdf2docx|pdf2docx_layout)\b/m;
+const IMPORTS_FITZ_OR_PDF2DOCX = /^\s*(?:import|from) (?:fitz|pdf2docx|pdf2docx_layout)\b/m;
 const REDIRECT_MARKER = "set_messages(stream=sys.stderr)";
 // Only entrypoints own process-level stream config; helper modules (e.g.
 // pdf2docx_layout.py) run under an entrypoint that already redirected.
@@ -90,6 +91,91 @@ with tempfile.TemporaryDirectory() as scratch:
 print(json.dumps(results))
 `;
 
+const IMPORT_ORDER_DRIVER = `
+import contextlib, importlib.machinery, importlib.util, io, json, os, sys, tempfile, types
+
+PYTHON_DIR = sys.argv[1]
+SCRIPTS = json.loads(sys.argv[2])
+
+pymupdf = types.ModuleType("pymupdf")
+pymupdf._stream = None
+def _set_messages(*, stream=None, **k):
+    pymupdf._stream = stream
+pymupdf.set_messages = _set_messages
+sys.modules["pymupdf"] = pymupdf
+
+def _stop(*a, **k):
+    raise RuntimeError("stop after import")
+
+class _StubLoader:
+    def create_module(self, spec):
+        return None
+    def exec_module(self, module):
+        if module.__name__ == "pdf2docx_layout":
+            import pdf2docx
+            module.install_pdf2docx_layout_fixes = lambda: None
+            return
+        target = pymupdf._stream if pymupdf._stream is not None else sys.stdout
+        print(f"import-time notice from {module.__name__}", file=target)
+        if module.__name__ == "fitz":
+            module.TEXTFLAGS_TEXT = 1
+            module.TEXT_CID_FOR_UNKNOWN_UNICODE = 1
+            module.TEXT_DEHYPHENATE = 1
+            module.open = _stop
+        elif module.__name__ == "pdf2docx":
+            module.Converter = _stop
+
+class _StubFinder:
+    def find_spec(self, fullname, path, target=None):
+        if fullname in ("fitz", "pdf2docx", "pdf2docx_layout"):
+            return importlib.machinery.ModuleSpec(fullname, _StubLoader())
+        return None
+
+sys.meta_path.insert(0, _StubFinder())
+
+results = []
+with tempfile.TemporaryDirectory() as scratch:
+    dummy_in = os.path.join(scratch, "in.pdf")
+    dummy_out = os.path.join(scratch, "out.bin")
+    with open(dummy_in, "wb") as fh:
+        fh.write(b"%PDF-1.4")
+
+    PAYLOADS = {
+        "doc_flatten.py": {"path": dummy_in, "out": dummy_out},
+        "doc_redact.py": {"path": dummy_in, "out": dummy_out, "terms": ["x"], "caseSensitive": False},
+        "doc_scrub_meta.py": {"path": dummy_in, "out": dummy_out},
+        "doc_sign.py": {"input": dummy_in, "output": dummy_out, "signatures": [dummy_in], "placements": [{"sig": 0, "page": 0, "x": 0, "y": 0, "w": 0.1, "h": 0.1}]},
+        "doc_text.py": {"path": dummy_in, "out": dummy_out},
+        "doc_to_word.py": {"path": dummy_in, "out": dummy_out},
+    }
+
+    for filename in SCRIPTS:
+        pymupdf._stream = None
+        sys.modules.pop("fitz", None)
+        sys.modules.pop("pdf2docx", None)
+        sys.modules.pop("pdf2docx_layout", None)
+        script_path = os.path.join(PYTHON_DIR, filename)
+        spec = importlib.util.spec_from_file_location(filename[:-3], script_path)
+        mod = importlib.util.module_from_spec(spec)
+        sys.argv = [filename, json.dumps(PAYLOADS[filename])]
+        out_buf, err_buf = io.StringIO(), io.StringIO()
+        exit_code = 0
+        try:
+            with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+                spec.loader.exec_module(mod)
+                mod.main()
+        except SystemExit as exc:
+            exit_code = exc.code if isinstance(exc.code, int) else 1
+        results.append({
+            "script": filename,
+            "exitCode": exit_code,
+            "stdout": out_buf.getvalue().strip(),
+            "stderr": err_buf.getvalue().strip(),
+        })
+
+print(json.dumps(results))
+`;
+
 describe("PyMuPDF docs scripts keep MuPDF diagnostics off the JSON stdout channel", () => {
   const scripts = readdirSync(PYTHON_DIR).filter((f) => f.endsWith(".py"));
   const pymupdfScripts = scripts.filter((f) => {
@@ -107,6 +193,16 @@ describe("PyMuPDF docs scripts keep MuPDF diagnostics off the JSON stdout channe
       (f) => !readFileSync(path.join(PYTHON_DIR, f), "utf8").includes(REDIRECT_MARKER),
     );
     expect(missingRedirect).toEqual([]);
+  });
+
+  it("every script redirects MuPDF messages to stderr before importing fitz or pdf2docx", () => {
+    const outOfOrder = pymupdfScripts.filter((f) => {
+      const src = readFileSync(path.join(PYTHON_DIR, f), "utf8");
+      const redirectIdx = src.indexOf(REDIRECT_MARKER);
+      const importMatch = IMPORTS_FITZ_OR_PDF2DOCX.exec(src);
+      return redirectIdx === -1 || !importMatch || redirectIdx > importMatch.index;
+    });
+    expect(outOfOrder).toEqual([]);
   });
 
   it("every script importing fitz/pymupdf logs redirect failures to stderr instead of silencing them", () => {
@@ -146,6 +242,38 @@ describe("PyMuPDF docs scripts keep MuPDF diagnostics off the JSON stdout channe
         );
         expect(JSON.parse(row.stdout), `${row.script} stdout`).toEqual({
           error: "stop after redirect",
+        });
+      }
+    },
+  );
+
+  it.skipIf(!hasPython)(
+    "routes import-time notices from fitz or pdf2docx to stderr instead of stdout",
+    () => {
+      const res = spawnSync(
+        pythonBin as string,
+        ["-c", IMPORT_ORDER_DRIVER, PYTHON_DIR, JSON.stringify(pymupdfScripts)],
+        {
+          encoding: "utf8",
+          timeout: 30_000,
+        },
+      );
+      expect(res.status, res.stderr).toBe(0);
+      const rows = JSON.parse(res.stdout.trim()) as Array<{
+        script: string;
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+      }>;
+      expect(rows).toHaveLength(pymupdfScripts.length);
+      for (const row of rows) {
+        const expectedModule = row.script === "doc_to_word.py" ? "pdf2docx" : "fitz";
+        expect(row.exitCode, `${row.script} exitCode`).toBe(1);
+        expect(row.stderr, `${row.script} stderr`).toBe(
+          `import-time notice from ${expectedModule}`,
+        );
+        expect(JSON.parse(row.stdout), `${row.script} stdout`).toEqual({
+          error: "stop after import",
         });
       }
     },
