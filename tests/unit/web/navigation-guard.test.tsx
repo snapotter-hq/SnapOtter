@@ -729,8 +729,7 @@ describe("NavigationGuard download then leave", () => {
   // carry, and is not re-read from the store a tick later. A result that lands
   // in that window was never handed over, so claiming it would silence the
   // warning for a file nobody took, which is the loss this whole dialog exists
-  // to prevent. optimize-for-web writes a live preview into the store as a
-  // finished result with no run in flight, so this window is reachable (#1112).
+  // to prevent.
   it("claims only what it downloaded, not a result that landed since", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     useFileStore.getState().setFiles([makeFile("a.png"), makeFile("b.png")]);

@@ -55,6 +55,15 @@ export interface EraserProps {
   maskedFileCount: number;
 }
 
+export interface ComparisonPreview {
+  entryId: string;
+  url: string;
+  originalSize: number;
+  processedSize: number;
+  /** True when fetched after a committed result was already on the entry. */
+  supersedesResult: boolean;
+}
+
 // ── Registry entry ─────────────────────────────────────────────────
 
 export interface ToolRegistryEntry {
@@ -69,6 +78,7 @@ export interface ToolRegistryEntry {
     onPreviewTransform?: (t: PreviewTransform) => void;
     onPreviewFilter?: (filter: string) => void;
     onBgPreview?: (state: BgPreviewState | null) => void;
+    onComparisonPreview?: (preview: ComparisonPreview | null) => void;
     onImageStyle?: (style: React.CSSProperties | null) => void;
     onImageOverlay?: (children: React.ReactNode) => void;
     cropProps?: CropProps;

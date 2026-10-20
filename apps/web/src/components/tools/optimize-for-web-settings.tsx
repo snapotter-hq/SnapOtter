@@ -8,6 +8,7 @@ import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format as formatMessage } from "@/lib/format";
+import type { ComparisonPreview } from "@/lib/tool-registry";
 import { useFileStore } from "@/stores/file-store";
 
 type WebFormat = "webp" | "jpeg" | "avif" | "png" | "jxl";
@@ -42,7 +43,11 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function OptimizeForWebSettings() {
+interface OptimizeForWebSettingsProps {
+  onComparisonPreview?: (preview: ComparisonPreview | null) => void;
+}
+
+export function OptimizeForWebSettings({ onComparisonPreview }: OptimizeForWebSettingsProps = {}) {
   const { t } = useTranslation();
   const { files, entries, selectedIndex } = useFileStore();
   const { processFiles, processAllFiles, processing, error, downloadUrl, progress } =
@@ -66,24 +71,20 @@ export function OptimizeForWebSettings() {
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevPreviewUrlRef = useRef<string | null>(null);
+  const settingsEditedAfterRunRef = useRef(false);
+  const onComparisonPreviewRef = useRef(onComparisonPreview);
+  onComparisonPreviewRef.current = onComparisonPreview;
 
   const hasFile = files.length > 0;
 
-  // Use a ref for the current file so fetchPreview doesn't depend on the
-  // reactive entry (which changes when we write processedUrl back to the store).
-  const fileRef = useRef<File | null>(null);
-  const fileSizeRef = useRef(0);
-  const entryIdRef = useRef<string | null>(entries[selectedIndex]?.id ?? null);
-  useEffect(() => {
-    const entry = entries[selectedIndex];
-    if (entry) {
-      fileRef.current = entry.file;
-      fileSizeRef.current = entry.file.size;
-      entryIdRef.current = entry.id;
-    } else {
-      entryIdRef.current = null;
-    }
-  }, [entries, selectedIndex]);
+  // Read the selected entry via ref so fetchPreview only re-binds when settings change.
+  const currentSelectedEntry = entries[selectedIndex];
+  const fileRef = useRef<File | null>(currentSelectedEntry?.file ?? null);
+  const fileSizeRef = useRef(currentSelectedEntry?.file.size ?? 0);
+  const entryIdRef = useRef<string | null>(currentSelectedEntry?.id ?? null);
+  fileRef.current = currentSelectedEntry?.file ?? null;
+  fileSizeRef.current = currentSelectedEntry?.file.size ?? 0;
+  entryIdRef.current = currentSelectedEntry?.id ?? null;
 
   // Build settings object
   const buildSettings = useCallback(() => {
@@ -102,8 +103,21 @@ export function OptimizeForWebSettings() {
     return settings;
   }, [format, quality, maxWidth, maxHeight, stripMetadata]);
 
+  const prevBuildSettingsRef = useRef(buildSettings);
+  if (prevBuildSettingsRef.current !== buildSettings) {
+    prevBuildSettingsRef.current = buildSettings;
+    if (
+      useFileStore
+        .getState()
+        .entries.some((e) => e.processedUrl !== null || e.status === "completed")
+    ) {
+      settingsEditedAfterRunRef.current = true;
+    }
+  }
+
   // Live preview - reads file from ref to avoid re-trigger loop
   const fetchPreview = useCallback(() => {
+    debounceRef.current = null;
     const file = fileRef.current;
     if (!file) return;
 
@@ -115,9 +129,10 @@ export function OptimizeForWebSettings() {
     setPreview((prev) => ({ ...prev, loading: true }));
 
     const entryId = entryIdRef.current;
+    const settings = buildSettings();
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("settings", JSON.stringify(buildSettings()));
+    formData.append("settings", JSON.stringify(settings));
 
     fetch(appUrl("/api/v1/tools/image/optimize-for-web/preview"), {
       method: "POST",
@@ -131,6 +146,8 @@ export function OptimizeForWebSettings() {
         const originalSize = Number(response.headers.get("X-Original-Size") ?? "0");
         const processedSize = Number(response.headers.get("X-Processed-Size") ?? "0");
         const blob = await response.blob();
+        if (abortRef.current === controller) abortRef.current = null;
+        if (controller.signal.aborted || entryIdRef.current !== entryId) return;
         const previewUrl = URL.createObjectURL(blob);
 
         // Revoke previous preview URL
@@ -139,16 +156,24 @@ export function OptimizeForWebSettings() {
         }
         prevPreviewUrlRef.current = previewUrl;
 
-        // Write the preview into the file store so BeforeAfterSlider picks it up
-        if (entryId) {
-          useFileStore.getState().updateEntryById(entryId, {
-            processedUrl: previewUrl,
-            processedPreviewUrl: null,
-            processedFilename: null,
-            status: "completed",
+        // Hand the preview to ToolPage's BeforeAfterSlider without writing it as a
+        // completed result on the file-store entry (#1112). Browsers cannot render
+        // image/jxl in <img> tags, so keep JXL size stats in the panel card without
+        // handing an unrenderable blob URL to BeforeAfterSlider.
+        if (entryId && settings.format !== "jxl") {
+          const targetEntry = useFileStore.getState().entries.find((e) => e.id === entryId);
+          const hasResult = Boolean(
+            targetEntry?.processedUrl || targetEntry?.status === "completed",
+          );
+          onComparisonPreviewRef.current?.({
+            entryId,
+            url: previewUrl,
             originalSize,
             processedSize,
+            supersedesResult: hasResult && settingsEditedAfterRunRef.current,
           });
+        } else {
+          onComparisonPreviewRef.current?.(null);
         }
 
         setPreview({
@@ -159,8 +184,19 @@ export function OptimizeForWebSettings() {
         });
       })
       .catch((err) => {
+        if (abortRef.current === controller) abortRef.current = null;
         if (err instanceof Error && err.name === "AbortError") return;
-        setPreview((prev) => ({ ...prev, loading: false }));
+        if (prevPreviewUrlRef.current) {
+          URL.revokeObjectURL(prevPreviewUrlRef.current);
+          prevPreviewUrlRef.current = null;
+        }
+        onComparisonPreviewRef.current?.(null);
+        setPreview({
+          loading: false,
+          previewUrl: null,
+          processedSize: null,
+          originalSize: null,
+        });
       });
   }, [buildSettings]);
 
@@ -175,7 +211,10 @@ export function OptimizeForWebSettings() {
     debounceRef.current = setTimeout(fetchPreview, debounceMs);
 
     return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
     };
   }, [hasFile, fetchPreview]);
 
@@ -186,12 +225,29 @@ export function OptimizeForWebSettings() {
   const selectedEntryId = entries[selectedIndex]?.id ?? null;
   const prevSelectedEntryId = useRef(selectedEntryId);
   useEffect(() => {
-    if (
-      prevSelectedEntryId.current !== selectedEntryId &&
-      prevSelectedEntryId.current !== null &&
-      hasFile
-    ) {
-      fetchPreview();
+    if (prevSelectedEntryId.current !== selectedEntryId && prevSelectedEntryId.current !== null) {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+      if (abortRef.current) {
+        abortRef.current.abort();
+        abortRef.current = null;
+      }
+      if (prevPreviewUrlRef.current) {
+        URL.revokeObjectURL(prevPreviewUrlRef.current);
+        prevPreviewUrlRef.current = null;
+      }
+      onComparisonPreviewRef.current?.(null);
+      setPreview({
+        loading: false,
+        previewUrl: null,
+        processedSize: null,
+        originalSize: null,
+      });
+      if (selectedEntryId !== null && hasFile) {
+        fetchPreview();
+      }
     }
     prevSelectedEntryId.current = selectedEntryId;
   }, [selectedEntryId, hasFile, fetchPreview]);
@@ -202,11 +258,45 @@ export function OptimizeForWebSettings() {
       if (abortRef.current) abortRef.current.abort();
       if (debounceRef.current) clearTimeout(debounceRef.current);
       if (prevPreviewUrlRef.current) URL.revokeObjectURL(prevPreviewUrlRef.current);
+      onComparisonPreviewRef.current?.(null);
     };
   }, []);
 
   // Final process handler (creates workspace + download link)
   const handleProcess = () => {
+    const hadPendingPreview = debounceRef.current !== null || abortRef.current !== null;
+    settingsEditedAfterRunRef.current = false;
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    if (hadPendingPreview) {
+      if (prevPreviewUrlRef.current) {
+        URL.revokeObjectURL(prevPreviewUrlRef.current);
+        prevPreviewUrlRef.current = null;
+      }
+      setPreview({
+        loading: false,
+        previewUrl: null,
+        processedSize: null,
+        originalSize: null,
+      });
+      onComparisonPreviewRef.current?.(null);
+    } else if (preview.previewUrl && entryIdRef.current && format !== "jxl") {
+      onComparisonPreviewRef.current?.({
+        entryId: entryIdRef.current,
+        url: preview.previewUrl,
+        originalSize: preview.originalSize ?? 0,
+        processedSize: preview.processedSize ?? 0,
+        supersedesResult: false,
+      });
+    } else {
+      onComparisonPreviewRef.current?.(null);
+    }
     const settings = buildSettings();
     if (files.length > 1) {
       processAllFiles(files, settings);

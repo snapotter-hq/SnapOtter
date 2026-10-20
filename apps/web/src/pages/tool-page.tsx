@@ -62,7 +62,7 @@ import {
   REORDERABLE_TOOLS,
 } from "@/lib/tool-display-modes";
 import { getToolName } from "@/lib/tool-i18n";
-import { getToolRegistryEntry } from "@/lib/tool-registry";
+import { type ComparisonPreview, getToolRegistryEntry } from "@/lib/tool-registry";
 import { useBase64Store } from "@/stores/base64-store";
 import { useCollageStore } from "@/stores/collage-store";
 import { useDuplicateStore } from "@/stores/duplicate-store";
@@ -498,6 +498,7 @@ function ToolPageContent({
   const [imageWrapperStyle, setImageWrapperStyle] = useState<React.CSSProperties | null>(null);
   const [imageWrapperChildren, setImageWrapperChildren] = useState<React.ReactNode>(null);
   const [bgPreview, setBgPreview] = useState<BgPreviewState | null>(null);
+  const [comparisonPreview, setComparisonPreview] = useState<ComparisonPreview | null>(null);
   const failedFeedbackCategory = classifyFeedbackError(
     currentEntry?.error,
     currentEntry?.errorCategory,
@@ -604,6 +605,7 @@ function ToolPageContent({
     setPreviewTransform(null);
     setPreviewFilter("");
     setBgPreview(null);
+    setComparisonPreview(null);
     setCropCrop({ unit: "%", x: 0, y: 0, width: 100, height: 100 });
     setCropAspect(undefined);
     setCropShowGrid(true);
@@ -922,6 +924,12 @@ function ToolPageContent({
     (isProcessedPreviewable ? processedUrl : null) ??
     originalBlobUrl ??
     processedUrl) as string;
+  const activeComparisonPreview =
+    comparisonPreview && currentEntry?.id === comparisonPreview.entryId ? comparisonPreview : null;
+  const liveComparisonOverride =
+    resultOwnsImageArea && activeComparisonPreview?.supersedesResult
+      ? activeComparisonPreview
+      : null;
 
   // Build settings props
   const settingsProps = {
@@ -930,6 +938,7 @@ function ToolPageContent({
     onImageStyle: isLivePreview ? setImageWrapperStyle : undefined,
     onImageOverlay: isLivePreview ? (c: React.ReactNode) => setImageWrapperChildren(c) : undefined,
     onBgPreview: setBgPreview,
+    onComparisonPreview: setComparisonPreview,
     cropProps:
       displayMode === "interactive-crop"
         ? {
@@ -1007,6 +1016,7 @@ function ToolPageContent({
     // large batch skipped ZIP extraction) would otherwise show the untouched
     // original under the processed filename and size (#746, #1240, #2449).
     if (
+      !liveComparisonOverride &&
       shouldShowConversionCard({
         hasProcessed: resultOwnsImageArea,
         isProcessedPreviewable,
@@ -1351,9 +1361,17 @@ function ToolPageContent({
       return (
         <BeforeAfterSlider
           beforeSrc={originalBlobUrl}
-          afterSrc={displayUrl}
-          beforeSize={showSizeComparison ? (originalSize ?? undefined) : undefined}
-          afterSize={showSizeComparison ? (processedSize ?? undefined) : undefined}
+          afterSrc={liveComparisonOverride?.url ?? displayUrl}
+          beforeSize={
+            showSizeComparison
+              ? (liveComparisonOverride?.originalSize ?? originalSize ?? undefined)
+              : undefined
+          }
+          afterSize={
+            showSizeComparison
+              ? (liveComparisonOverride?.processedSize ?? processedSize ?? undefined)
+              : undefined
+          }
           bgPreview={bgPreview}
         />
       );
@@ -1366,6 +1384,17 @@ function ToolPageContent({
           <p className="text-sm text-muted-foreground">{t.toolPage.generatingPreview}</p>
           <p className="text-xs text-muted-foreground">{selectedFileName}</p>
         </div>
+      );
+    }
+
+    if (hasFile && originalBlobUrl && activeComparisonPreview) {
+      return (
+        <BeforeAfterSlider
+          beforeSrc={originalBlobUrl}
+          afterSrc={activeComparisonPreview.url}
+          beforeSize={showSizeComparison ? activeComparisonPreview.originalSize : undefined}
+          afterSize={showSizeComparison ? activeComparisonPreview.processedSize : undefined}
+        />
       );
     }
 
