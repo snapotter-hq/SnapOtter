@@ -8,6 +8,12 @@ import sharp from "sharp";
 
 const execFileAsync = promisify(execFile);
 
+function formatExceededMp(actual: number, limit: number): string {
+  const oneDec = actual.toFixed(1);
+  if (Number(oneDec) > limit) return oneDec;
+  return Math.max(limit + 0.01, Math.round(actual * 100) / 100).toFixed(2);
+}
+
 export interface SeamCarveOptions {
   width?: number;
   height?: number;
@@ -73,7 +79,7 @@ export async function seamCarve(
     const MAX_MP = 25;
     if (megapixels > MAX_MP) {
       throw new ToolInputError(
-        `Image is too large for content-aware resize (${megapixels.toFixed(1)} MP, max ${MAX_MP} MP). Resize the image to a smaller size first.`,
+        `Image is too large for content-aware resize (${formatExceededMp(megapixels, MAX_MP)} MP, max ${MAX_MP} MP). Resize the image to a smaller size first.`,
       );
     }
 
