@@ -87,8 +87,15 @@ function pointerEvent(stage: Konva.Stage) {
 
 beforeEach(() => {
   reportFailure.mockClear();
-  useEditorStore.setState({ canvasSize: { width: 2, height: 2 }, zoom: 1, selection: null });
+  useEditorStore.setState({
+    canvasSize: { width: 2, height: 2 },
+    zoom: 1,
+    panOffset: { x: 0, y: 0 },
+    selection: null,
+    eyedropperSampleSize: 1,
+  });
   useEditorStore.getState().setForegroundColor("#000000");
+  useEditorStore.getState().setBackgroundColor("#ffffff");
 });
 
 afterEach(() => {
@@ -202,6 +209,136 @@ describe("eyedropper (#2139)", () => {
     });
     act(() => hook.result.current.handleEyedropperMove(pointerEvent(stage)));
     expect(toCanvas).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([
+    ["left of canvas", { x: -1, y: 0 }],
+    ["sub-pixel left of canvas", { x: -0.1, y: 0 }],
+    ["above canvas", { x: 0, y: -1 }],
+    ["sub-pixel above canvas", { x: 0, y: -0.1 }],
+    ["right of canvas", { x: 2, y: 0 }],
+    ["below canvas", { x: 0, y: 2 }],
+  ])(
+    "ignores out-of-bounds hover and click (%s) without capturing or reporting failure (#2987)",
+    (_label, pos) => {
+      const { stage, toCanvas, hook } = setup(fakeContext({ readThrows: tainted() }));
+      (
+        stage as unknown as { getPointerPosition: () => { x: number; y: number } }
+      ).getPointerPosition = () => pos;
+      useEditorStore.setState({ eyedropperSampledColor: "#123456" });
+
+      act(() => hook.result.current.handleEyedropperMove(pointerEvent(stage)));
+      expect(toCanvas).not.toHaveBeenCalled();
+      expect(reportFailure).not.toHaveBeenCalled();
+      expect(hook.result.current.sampledColor).toBeNull();
+
+      useEditorStore.setState({ eyedropperSampledColor: "#123456" });
+      act(() => hook.result.current.handleEyedropperClick(pointerEvent(stage)));
+      expect(toCanvas).not.toHaveBeenCalled();
+      expect(reportFailure).not.toHaveBeenCalled();
+      expect(hook.result.current.sampledColor).toBeNull();
+      expect(useEditorStore.getState().foregroundColor).toBe("#000000");
+    },
+  );
+
+  it("ignores clicks in the panned/zoomed margin without capturing (#2987)", () => {
+    useEditorStore.setState({
+      zoom: 2,
+      panOffset: { x: 10, y: 20 },
+      eyedropperSampledColor: "#123456",
+    });
+    const { stage, toCanvas, hook } = setup(fakeContext({ readThrows: tainted() }));
+    // Pointer at (9, 19) with pan (10, 20) and zoom 2 => canvas (-0.5, -0.5), floor (-1, -1).
+    (
+      stage as unknown as { getPointerPosition: () => { x: number; y: number } }
+    ).getPointerPosition = () => ({ x: 9, y: 19 });
+
+    act(() => hook.result.current.handleEyedropperClick(pointerEvent(stage)));
+
+    expect(toCanvas).not.toHaveBeenCalled();
+    expect(reportFailure).not.toHaveBeenCalled();
+    expect(hook.result.current.sampledColor).toBeNull();
+  });
+
+  it("defers stage capture while hovering in the margin until the pointer enters the canvas (#2987)", () => {
+    const { stage, toCanvas, hook } = setup(fakeContext());
+    let pos = { x: -1, y: 1 };
+    (
+      stage as unknown as { getPointerPosition: () => { x: number; y: number } }
+    ).getPointerPosition = () => pos;
+
+    act(() => hook.result.current.handleEyedropperMove(pointerEvent(stage)));
+    expect(toCanvas).not.toHaveBeenCalled();
+    expect(hook.result.current.sampledColor).toBeNull();
+
+    pos = { x: 1, y: 1 };
+    act(() => hook.result.current.handleEyedropperMove(pointerEvent(stage)));
+    expect(toCanvas).toHaveBeenCalledTimes(1);
+    expect(hook.result.current.sampledColor).toBe("#0a141e");
+
+    // Moving back into the margin clears sampledColor while keeping the cached capture.
+    pos = { x: -1, y: 1 };
+    act(() => hook.result.current.handleEyedropperMove(pointerEvent(stage)));
+    expect(toCanvas).toHaveBeenCalledTimes(1);
+    expect(hook.result.current.sampledColor).toBeNull();
+
+    pos = { x: 1, y: 1 };
+    act(() => hook.result.current.handleEyedropperMove(pointerEvent(stage)));
+    expect(toCanvas).toHaveBeenCalledTimes(1);
+    expect(hook.result.current.sampledColor).toBe("#0a141e");
+
+    // Clicking in the margin invalidates the cache without capturing until the pointer re-enters.
+    pos = { x: -1, y: 1 };
+    act(() => hook.result.current.handleEyedropperClick(pointerEvent(stage)));
+    expect(toCanvas).toHaveBeenCalledTimes(1);
+    expect(hook.result.current.sampledColor).toBeNull();
+
+    pos = { x: 1, y: 1 };
+    act(() => hook.result.current.handleEyedropperMove(pointerEvent(stage)));
+    expect(toCanvas).toHaveBeenCalledTimes(2);
+    expect(hook.result.current.sampledColor).toBe("#0a141e");
+  });
+
+  it("sets foregroundColor on click and backgroundColor on Alt+click", () => {
+    const { stage, hook } = setup(fakeContext());
+
+    act(() => hook.result.current.handleEyedropperClick(pointerEvent(stage)));
+    expect(useEditorStore.getState().foregroundColor).toBe("#0a141e");
+
+    act(() =>
+      hook.result.current.handleEyedropperClick({
+        target: { getStage: () => stage },
+        evt: { altKey: true },
+      } as unknown as Konva.KonvaEventObject<MouseEvent>),
+    );
+    expect(useEditorStore.getState().backgroundColor).toBe("#0a141e");
+  });
+
+  it("reports no-context when sampling throws after capture succeeds on click", () => {
+    act(() => useEditorStore.getState().setEyedropperSampleSize(3));
+    const { stage, hook } = setup(
+      fakeContext({ fullReadThrows: new RangeError("sample read failed") }),
+    );
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      act(() => hook.result.current.handleEyedropperClick(pointerEvent(stage)));
+      expect(reportFailure).toHaveBeenCalledWith("no-context", messages);
+      expect(hook.result.current.sampledColor).toBeNull();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("clears sampledColor without capturing when stageRef.current is null", () => {
+    const { stage, toCanvas } = fakeStage(fakeContext());
+    const hook = renderHook(() => useEyedropperTool({ stageRef: { current: null } }));
+    useEditorStore.setState({ eyedropperSampledColor: "#123456" });
+
+    act(() => hook.result.current.handleEyedropperMove(pointerEvent(stage)));
+
+    expect(toCanvas).not.toHaveBeenCalled();
+    expect(hook.result.current.sampledColor).toBeNull();
   });
 });
 

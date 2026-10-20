@@ -98,18 +98,18 @@ export function useEyedropperTool({ stageRef }: UseEyedropperToolOptions) {
         return null;
       }
 
-      const ctx = contextCache.current ?? getStageContext(report);
-      if (!ctx) {
-        setSampledColor(null);
-        return null;
-      }
-
       // Transform pointer coordinates from screen space to canvas space
       const x = Math.floor((pointer.x - panOffset.x) / zoom);
       const y = Math.floor((pointer.y - panOffset.y) / zoom);
 
       // Bounds check against the actual canvas dimensions (unzoomed)
       if (x < 0 || y < 0 || x >= canvasSize.width || y >= canvasSize.height) {
+        setSampledColor(null);
+        return null;
+      }
+
+      const ctx = contextCache.current ?? getStageContext(report);
+      if (!ctx) {
         setSampledColor(null);
         return null;
       }

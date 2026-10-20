@@ -8,12 +8,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // the canvas passed the eyedropper a literal 1, so every size sampled one pixel
 // (#2300). The choice now lives in the editor store and the tool reads it there.
 const getImageData = vi.hoisted(() => vi.fn());
+const captureDocumentContextMock = vi.hoisted(() =>
+  vi.fn(() => ({
+    ok: true as const,
+    ctx: { canvas: { width: 20, height: 10 }, getImageData },
+  })),
+);
 vi.mock("@/components/editor/stage-capture", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/components/editor/stage-capture")>()),
-  captureDocumentContext: () => ({
-    ok: true,
-    ctx: { canvas: { width: 20, height: 10 }, getImageData },
-  }),
+  captureDocumentContext: captureDocumentContextMock,
 }));
 
 import { EditorOptionsBar } from "@/components/editor/editor-options-bar";
@@ -29,6 +32,7 @@ function pointerEvent(x: number, y: number) {
 }
 
 beforeEach(() => {
+  captureDocumentContextMock.mockClear();
   getImageData.mockReset();
   getImageData.mockImplementation((_x: number, _y: number, w: number, h: number) => {
     const data = new Uint8ClampedArray(w * h * 4);
@@ -125,10 +129,12 @@ describe("eyedropper sample size", () => {
     act(() => useEditorStore.setState({ zoom: 4 }));
 
     getImageData.mockClear();
+    captureDocumentContextMock.mockClear();
     // pointer x=-2, y=-2. canvas x = -2/4 = -0.5.
     // Math.round(-0.5) is 0, which would incorrectly pass the < 0 bounds check.
-    // Math.floor(-0.5) is -1, which correctly fails.
+    // Math.floor(-0.5) is -1, which correctly fails before capturing the stage (#2987).
     act(() => hook.result.current.handleEyedropperClick(pointerEvent(-2, -2)));
+    expect(captureDocumentContextMock).not.toHaveBeenCalled();
     expect(getImageData).not.toHaveBeenCalled();
   });
 });
