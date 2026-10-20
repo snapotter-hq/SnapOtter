@@ -12,11 +12,16 @@ import { createToolRoute } from "../tool-factory.js";
 // into one monotonic quality axis (paramsForQuality). Quality mode runs one
 // pass at the slider value; target-size binary-searches the axis for the
 // largest output that still fits the target.
-const settingsSchema = z.object({
-  mode: z.enum(["quality", "targetSize"]).default("quality"),
-  quality: z.number().int().min(1).max(100).optional(),
-  targetSizeKb: z.number().positive().optional(),
-});
+const settingsSchema = z
+  .object({
+    mode: z.enum(["quality", "targetSize"]).default("quality"),
+    quality: z.number().int().min(1).max(100).optional(),
+    targetSizeKb: z.number().positive().optional(),
+  })
+  .refine((s) => s.mode !== "targetSize" || s.targetSizeKb !== undefined, {
+    message: "targetSizeKb is required when mode is targetSize",
+    path: ["targetSizeKb"],
+  });
 
 const MIN_DPI = 20;
 const MAX_DPI = 300;

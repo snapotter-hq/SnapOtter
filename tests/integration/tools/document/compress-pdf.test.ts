@@ -40,20 +40,32 @@ afterAll(async () => {
   await testApp.cleanup();
 }, 10_000);
 
-describe.skipIf(!gsAvailable())("compress-pdf (requires gs)", () => {
-  function post(pdf: Buffer, filename: string, settings: Record<string, unknown>) {
-    const { body, contentType } = createMultipartPayload([
-      { name: "file", filename, contentType: "application/pdf", content: pdf },
-      { name: "settings", content: JSON.stringify(settings) },
-    ]);
-    return testApp.app.inject({
-      method: "POST",
-      url: "/api/v1/tools/pdf/compress-pdf",
-      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
-      body,
-    });
-  }
+function post(pdf: Buffer, filename: string, settings: Record<string, unknown>) {
+  const { body, contentType } = createMultipartPayload([
+    { name: "file", filename, contentType: "application/pdf", content: pdf },
+    { name: "settings", content: JSON.stringify(settings) },
+  ]);
+  return testApp.app.inject({
+    method: "POST",
+    url: "/api/v1/tools/pdf/compress-pdf",
+    headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+    body,
+  });
+}
 
+describe("compress-pdf settings validation", () => {
+  it("target-size: returns 400 when targetSizeKb is omitted or misspelled (#2615)", async () => {
+    for (const settings of [{ mode: "targetSize" }, { mode: "targetSize", targetKb: 10 }]) {
+      const res = await post(PDF, "test-3page.pdf", settings);
+      expect(res.statusCode).toBe(400);
+      const body = JSON.parse(res.body);
+      expect(body.error).toBe("Invalid settings");
+      expect(body.details).toMatch(/targetSizeKb/);
+    }
+  });
+});
+
+describe.skipIf(!gsAvailable())("compress-pdf (requires gs)", () => {
   // compress-pdf has executionHint "long": 202 + poll the durable job row. The
   // completion payload (including targetMet) lands in jobs.progress.result.
   async function runToCompletion(

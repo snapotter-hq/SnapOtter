@@ -7,11 +7,16 @@ import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/ima
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
-const settingsSchema = z.object({
-  mode: z.enum(["quality", "targetSize"]).default("quality"),
-  quality: z.number().int().min(1).max(100).optional(),
-  targetSizeKb: z.number().positive().optional(),
-});
+const settingsSchema = z
+  .object({
+    mode: z.enum(["quality", "targetSize"]).default("quality"),
+    quality: z.number().int().min(1).max(100).optional(),
+    targetSizeKb: z.number().positive().optional(),
+  })
+  .refine((s) => s.mode !== "targetSize" || s.targetSizeKb !== undefined, {
+    message: "targetSizeKb is required when mode is targetSize",
+    path: ["targetSizeKb"],
+  });
 
 type CompressSettings = z.infer<typeof settingsSchema>;
 
@@ -70,7 +75,11 @@ export function registerCompress(app: FastifyInstance) {
     toolId: "compress",
     settingsSchema,
     process: async (inputBuffer, settings, filename) => {
-      const { buffer, contentType } = await guardedCompress(inputBuffer, settings, filename);
+      const { buffer, contentType } = await guardedCompress(
+        inputBuffer,
+        settingsSchema.parse(settings),
+        filename,
+      );
       return { buffer, filename, contentType };
     },
     // v2 so target-size runs can tell the client whether the image was shrunk to fit.

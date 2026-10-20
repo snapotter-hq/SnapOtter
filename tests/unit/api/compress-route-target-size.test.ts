@@ -15,6 +15,9 @@ vi.mock("@snapotter/image-engine", async (importOriginal) => {
 
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerCompress } from "../../../apps/api/src/routes/tools/compress.js";
+import { pairwise } from "../../helpers/pairwise.js";
+import { pairwiseSettingsFor } from "../../helpers/tool-default-settings.js";
+import { compactCase, deriveAxes } from "../../helpers/zod-pict.js";
 
 const app = { post: () => undefined } as unknown as FastifyInstance;
 registerCompress(app);
@@ -160,5 +163,50 @@ describe("compress route target-size buffer reuse and size guard (#1379)", () =>
 
     expect(toBufferSpy).toHaveBeenCalledTimes(1);
     expect(out.buffer).toBe(encoded);
+  });
+
+  it("rejects mode=targetSize when targetSizeKb is omitted or misspelled (#2615)", async () => {
+    const { config, processV2 } = requireCompressConfig();
+
+    for (const invalidSettings of [
+      { mode: "targetSize" },
+      { mode: "targetSize", targetKb: 10 },
+      { mode: "targetSize", targetSize: 10 },
+    ]) {
+      const parsed = config.settingsSchema.safeParse(invalidSettings);
+      expect(parsed.success).toBe(false);
+      if (!parsed.success) {
+        expect(parsed.error.issues[0]?.path).toEqual(["targetSizeKb"]);
+        expect(parsed.error.issues[0]?.message).toMatch(/targetSizeKb/i);
+      }
+
+      await expect(config.process(sampleJpg, invalidSettings, "photo.jpg")).rejects.toThrow(
+        /targetSizeKb/i,
+      );
+      await expect(
+        processV2({
+          inputs: [{ buffer: sampleJpg, filename: "photo.jpg", ref: "uploads/test/photo.jpg" }],
+          settings: invalidSettings,
+          scratchDir: "/tmp",
+          signal: new AbortController().signal,
+          report: () => undefined,
+        }),
+      ).rejects.toThrow(/targetSizeKb/i);
+    }
+
+    expect(compressDetailedMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps both quality and targetSize modes reachable in pairwise sampling (#2615)", () => {
+    const { config } = requireCompressConfig();
+    const axes = deriveAxes(config.settingsSchema);
+    const base = pairwiseSettingsFor("compress");
+    const cases = pairwise(axes)
+      .map((combo) => ({ ...base, ...compactCase(combo) }))
+      .map((combo) => config.settingsSchema.safeParse(combo))
+      .filter((parsed): parsed is { success: true; data: { mode: string } } => parsed.success);
+
+    const modes = new Set(cases.map((c) => c.data.mode));
+    expect(modes).toEqual(new Set(["quality", "targetSize"]));
   });
 });

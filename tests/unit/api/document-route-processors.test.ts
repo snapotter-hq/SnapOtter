@@ -66,6 +66,9 @@ import { registerMarkdownToPdf } from "../../../apps/api/src/routes/tools/markdo
 import { registerPdfToText } from "../../../apps/api/src/routes/tools/pdf-to-text.js";
 import { registerRedactPdf } from "../../../apps/api/src/routes/tools/redact-pdf.js";
 import { registerToEpub } from "../../../apps/api/src/routes/tools/to-epub.js";
+import { pairwise } from "../../helpers/pairwise.js";
+import { pairwiseSettingsFor } from "../../helpers/tool-default-settings.js";
+import { compactCase, deriveAxes } from "../../helpers/zod-pict.js";
 
 function createMockApp(): FastifyInstance {
   return {
@@ -599,5 +602,49 @@ describe("compress-pdf route processor (#1373)", () => {
     } finally {
       warnSpy.mockRestore();
     }
+  });
+
+  it("rejects mode=targetSize when targetSizeKb is omitted or misspelled instead of falling back to quality mode (#2615)", async () => {
+    registerCompressPdf(createMockApp());
+    const config = getToolConfig("compress-pdf");
+    expect(config).toBeDefined();
+
+    for (const invalidSettings of [
+      { mode: "targetSize" },
+      { mode: "targetSize", targetKb: 10 },
+      { mode: "targetSize", targetSize: 10 },
+    ]) {
+      const parsed = config?.settingsSchema.safeParse(invalidSettings);
+      expect(parsed?.success).toBe(false);
+      if (parsed && !parsed.success) {
+        expect(parsed.error.issues[0]?.path).toEqual(["targetSizeKb"]);
+        expect(parsed.error.issues[0]?.message).toMatch(/targetSizeKb/i);
+      }
+
+      await withScratch(async (scratchDir) => {
+        const input = Buffer.alloc(1000, 0x49);
+        const ctx = createCompressCtx(scratchDir, input, invalidSettings);
+        await expect(config?.processV2?.(ctx)).rejects.toThrow(/targetSizeKb/i);
+      });
+    }
+
+    expect(gsCompressPdfTuned).not.toHaveBeenCalled();
+  });
+
+  it("keeps both quality and targetSize modes reachable in pairwise sampling (#2615)", () => {
+    registerCompressPdf(createMockApp());
+    const schema = getToolConfig("compress-pdf")?.settingsSchema;
+    expect(schema).toBeDefined();
+    if (!schema) return;
+
+    const axes = deriveAxes(schema);
+    const base = pairwiseSettingsFor("compress-pdf");
+    const cases = pairwise(axes)
+      .map((combo) => ({ ...base, ...compactCase(combo) }))
+      .map((combo) => schema.safeParse(combo))
+      .filter((parsed): parsed is { success: true; data: { mode: string } } => parsed.success);
+
+    const modes = new Set(cases.map((c) => c.data.mode));
+    expect(modes).toEqual(new Set(["quality", "targetSize"]));
   });
 });
