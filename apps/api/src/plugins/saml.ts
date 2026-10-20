@@ -334,7 +334,7 @@ export async function registerSaml(app: FastifyInstance): Promise<void> {
           userId: resolvedUser.id,
           expiresAt,
         });
-        await evictExcessUserSessions(tx, resolvedUser.id, maxSessions);
+        await evictExcessUserSessions(tx, resolvedUser.id, maxSessions, token);
       });
 
       authAttempts.inc({ method: "saml", result: "success" });

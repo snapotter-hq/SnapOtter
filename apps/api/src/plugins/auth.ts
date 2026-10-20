@@ -933,7 +933,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
             expiresAt,
           });
 
-          await evictExcessUserSessions(tx, user.id, maxSessions);
+          await evictExcessUserSessions(tx, user.id, maxSessions, token);
 
           return "ok";
         },

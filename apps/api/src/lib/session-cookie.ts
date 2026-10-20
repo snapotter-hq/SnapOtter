@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../config.js";
 import { type db, schema } from "../db/index.js";
@@ -6,6 +6,13 @@ import { isSecureRequest } from "./secure-cookie.js";
 import { getSettingStrict, parseNumericSettingValue } from "./settings-helpers.js";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * Advisory lock namespace for per-user session eviction (`pg_advisory_xact_lock(int4, int4)`).
+ * Scoped per user via `hashtext(userId)` as the second key so concurrent logins for
+ * different users never contend (#3025).
+ */
+const SESSION_EVICT_LOCK_NAMESPACE = 7_421_005;
 
 /**
  * Sets the `snapotter-session` cookie that a browser session rides on, the way
@@ -47,14 +54,24 @@ export async function readMaxSessionsPerUser(): Promise<number> {
 /**
  * Evict a user's oldest sessions in `createdAt` order inside the session-insert
  * transaction when `maxSessions` is positive and the user's session count
- * exceeds the cap (#2517, #2540).
+ * exceeds the cap (#2517, #2540, #3025).
+ *
+ * Takes a per-user transaction advisory lock before reading `schema.sessions`
+ * so concurrent logins for the same user under `READ COMMITTED` serialize their
+ * count-and-evict pass, and keeps `currentSessionId` last when breaking
+ * same-millisecond `createdAt` ties.
  */
 export async function evictExcessUserSessions(
   tx: Tx,
   userId: string,
   maxSessions: number,
+  currentSessionId: string,
 ): Promise<void> {
   if (maxSessions <= 0) return;
+
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock(${SESSION_EVICT_LOCK_NAMESPACE}, hashtext(${userId}))`,
+  );
 
   const sessions = await tx
     .select({ id: schema.sessions.id, createdAt: schema.sessions.createdAt })
@@ -63,7 +80,11 @@ export async function evictExcessUserSessions(
     .orderBy(asc(schema.sessions.createdAt));
 
   if (sessions.length > maxSessions) {
-    const toDelete = sessions.slice(0, sessions.length - maxSessions);
+    const ordered = [
+      ...sessions.filter((s) => s.id !== currentSessionId),
+      ...sessions.filter((s) => s.id === currentSessionId),
+    ];
+    const toDelete = ordered.slice(0, ordered.length - maxSessions);
     for (const s of toDelete) {
       await tx.delete(schema.sessions).where(eq(schema.sessions.id, s.id));
     }

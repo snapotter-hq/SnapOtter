@@ -580,7 +580,7 @@ export async function oidcRoutes(app: FastifyInstance): Promise<void> {
           expiresAt,
           idToken,
         });
-        await evictExcessUserSessions(tx, resolvedUser.id, maxSessions);
+        await evictExcessUserSessions(tx, resolvedUser.id, maxSessions, token);
       });
 
       authAttempts.inc({ method: "oidc", result: "success" });

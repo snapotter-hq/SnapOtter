@@ -973,7 +973,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
             expiresAt,
           });
 
-          await evictExcessUserSessions(tx, verifiedUser.id, maxSessions);
+          await evictExcessUserSessions(tx, verifiedUser.id, maxSessions, token);
 
           return { status: "success" as const, role: lockedUser.role };
         });
@@ -1263,7 +1263,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
             expiresAt,
           });
 
-          await evictExcessUserSessions(tx, verifiedUser.id, maxSessions);
+          await evictExcessUserSessions(tx, verifiedUser.id, maxSessions, token);
 
           return { status: "success" as const, role: lockedUser.role };
         });

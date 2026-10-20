@@ -95,36 +95,51 @@ describe("session-cookie helpers", () => {
   });
 
   describe("evictExcessUserSessions", () => {
-    it("skips querying sessions when maxSessions is 0 or negative", async () => {
+    it("skips locking and querying sessions when maxSessions is 0 or negative", async () => {
+      const execute = vi.fn();
       const select = vi.fn();
       const del = vi.fn();
-      const tx = { select, delete: del } as never;
+      const tx = { execute, select, delete: del } as never;
 
-      await evictExcessUserSessions(tx, "user-1", 0);
-      await evictExcessUserSessions(tx, "user-1", -1);
+      await evictExcessUserSessions(tx, "user-1", 0, "s1");
+      await evictExcessUserSessions(tx, "user-1", -1, "s1");
 
+      expect(execute).not.toHaveBeenCalled();
       expect(select).not.toHaveBeenCalled();
       expect(del).not.toHaveBeenCalled();
     });
 
-    it("does not delete any rows when active sessions do not exceed maxSessions", async () => {
-      const orderBy = vi.fn().mockResolvedValue([
-        { id: "s1", createdAt: new Date(1000) },
-        { id: "s2", createdAt: new Date(2000) },
-      ]);
+    it("takes a per-user advisory lock and does not delete any rows when active sessions do not exceed maxSessions", async () => {
+      const callOrder: string[] = [];
+      const execute = vi.fn(async (_query: SQL) => {
+        callOrder.push("execute");
+      });
+      const orderBy = vi.fn(async () => {
+        callOrder.push("select");
+        return [
+          { id: "s1", createdAt: new Date(1000) },
+          { id: "s2", createdAt: new Date(2000) },
+        ];
+      });
       const where = vi.fn(() => ({ orderBy }));
       const from = vi.fn(() => ({ where }));
       const select = vi.fn(() => ({ from }));
       const del = vi.fn();
-      const tx = { select, delete: del } as never;
+      const tx = { execute, select, delete: del } as never;
 
-      await evictExcessUserSessions(tx, "user-1", 2);
+      await evictExcessUserSessions(tx, "user-1", 2, "s2");
 
+      expect(callOrder).toEqual(["execute", "select"]);
+      const dialect = new PgDialect();
+      const lockQuery = dialect.sqlToQuery(execute.mock.calls[0][0]);
+      expect(lockQuery.sql).toContain("pg_advisory_xact_lock");
+      expect(lockQuery.params).toContain("user-1");
       expect(select).toHaveBeenCalledTimes(1);
       expect(del).not.toHaveBeenCalled();
     });
 
     it("deletes the oldest excess rows in createdAt order when count exceeds maxSessions", async () => {
+      const execute = vi.fn(async () => undefined);
       const orderBy = vi.fn().mockResolvedValue([
         { id: "s1", createdAt: new Date(1000) },
         { id: "s2", createdAt: new Date(2000) },
@@ -135,11 +150,12 @@ describe("session-cookie helpers", () => {
       const select = vi.fn(() => ({ from }));
       const deleteWhere = vi.fn(async (_cond: SQL) => undefined);
       const del = vi.fn(() => ({ where: deleteWhere }));
-      const tx = { select, delete: del } as never;
+      const tx = { execute, select, delete: del } as never;
 
-      await evictExcessUserSessions(tx, "user-1", 1);
+      await evictExcessUserSessions(tx, "user-1", 1, "s3");
 
       const dialect = new PgDialect();
+      expect(execute).toHaveBeenCalledTimes(1);
       expect(dialect.sqlToQuery(selectWhere.mock.calls[0][0]).params).toEqual(["user-1"]);
       expect(del).toHaveBeenCalledTimes(2);
       expect(del).toHaveBeenNthCalledWith(1, schema.sessions);
@@ -148,6 +164,55 @@ describe("session-cookie helpers", () => {
         (call) => dialect.sqlToQuery(call[0]).params[0],
       );
       expect(deletedIds).toEqual(["s1", "s2"]);
+    });
+
+    it("preserves currentSessionId when a same-millisecond createdAt tie returns the new session first (#3025)", async () => {
+      const execute = vi.fn(async () => undefined);
+      const tiedTick = new Date(5000);
+      const orderBy = vi.fn().mockResolvedValue([
+        { id: "s-new", createdAt: tiedTick },
+        { id: "s-prior", createdAt: tiedTick },
+      ]);
+      const selectWhere = vi.fn((_cond: SQL) => ({ orderBy }));
+      const from = vi.fn(() => ({ where: selectWhere }));
+      const select = vi.fn(() => ({ from }));
+      const deleteWhere = vi.fn(async (_cond: SQL) => undefined);
+      const del = vi.fn(() => ({ where: deleteWhere }));
+      const tx = { execute, select, delete: del } as never;
+
+      await evictExcessUserSessions(tx, "user-1", 1, "s-new");
+
+      const dialect = new PgDialect();
+      expect(del).toHaveBeenCalledTimes(1);
+      const deletedIds = deleteWhere.mock.calls.map(
+        (call) => dialect.sqlToQuery(call[0]).params[0],
+      );
+      expect(deletedIds).toEqual(["s-prior"]);
+    });
+
+    it("evicts the oldest session first when maxSessions > 1 and currentSessionId ties with a middle session (#3025)", async () => {
+      const execute = vi.fn(async () => undefined);
+      const tiedTick = new Date(5000);
+      const orderBy = vi.fn().mockResolvedValue([
+        { id: "s-oldest", createdAt: new Date(1000) },
+        { id: "s-new", createdAt: tiedTick },
+        { id: "s-middle", createdAt: tiedTick },
+      ]);
+      const selectWhere = vi.fn((_cond: SQL) => ({ orderBy }));
+      const from = vi.fn(() => ({ where: selectWhere }));
+      const select = vi.fn(() => ({ from }));
+      const deleteWhere = vi.fn(async (_cond: SQL) => undefined);
+      const del = vi.fn(() => ({ where: deleteWhere }));
+      const tx = { execute, select, delete: del } as never;
+
+      await evictExcessUserSessions(tx, "user-1", 2, "s-new");
+
+      const dialect = new PgDialect();
+      expect(del).toHaveBeenCalledTimes(1);
+      const deletedIds = deleteWhere.mock.calls.map(
+        (call) => dialect.sqlToQuery(call[0]).params[0],
+      );
+      expect(deletedIds).toEqual(["s-oldest"]);
     });
   });
 });

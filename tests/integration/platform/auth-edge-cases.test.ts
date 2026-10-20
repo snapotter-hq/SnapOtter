@@ -1024,6 +1024,152 @@ describe("Concurrent session limit", () => {
     }
   });
 
+  it("serializes concurrent logins for the same user and preserves the newly minted session on createdAt ties (#3025)", async () => {
+    const { username, password, id } = await createUser();
+
+    await setSetting("maxSessionsPerUser", "1");
+    try {
+      // 1. Concurrent logins with an older existing session t0: without per-user
+      // serialization in evictExcessUserSessions, both transactions see only [t0, self],
+      // both evict t0, and 2 sessions survive past maxSessionsPerUser = 1.
+      const t0 = await loginAs(username, password);
+      await db
+        .update(schema.sessions)
+        .set({ createdAt: new Date(Date.now() - 60_000) })
+        .where(eq(schema.sessions.id, t0));
+
+      let insertedCount = 0;
+      let releaseBothInserts!: () => void;
+      const bothInserted = new Promise<void>((resolve) => {
+        releaseBothInserts = resolve;
+      });
+
+      const realTransaction = db.transaction.bind(db) as (
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) => Promise<unknown>;
+      const txSpy = vi.spyOn(db, "transaction").mockImplementation(((
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) =>
+        realTransaction((tx) => {
+          const syncedTx = new Proxy(tx, {
+            get(target, prop, receiver) {
+              if (prop === "insert") {
+                const origInsert = Reflect.get(target, prop, receiver) as (table: unknown) => {
+                  values: (vals: Record<string, unknown>) => Promise<unknown>;
+                };
+                return (table: unknown) => {
+                  const builder = origInsert.call(target, table);
+                  if (table !== schema.sessions) return builder;
+                  const origValues = builder.values.bind(builder);
+                  builder.values = async (vals: Record<string, unknown>) => {
+                    try {
+                      const res = await origValues(vals);
+                      insertedCount += 1;
+                      if (insertedCount >= 2) {
+                        releaseBothInserts();
+                      }
+                      await bothInserted;
+                      return res;
+                    } catch (err) {
+                      releaseBothInserts();
+                      throw err;
+                    }
+                  };
+                  return builder;
+                };
+              }
+              return Reflect.get(target, prop, receiver);
+            },
+          });
+          return cb(syncedTx);
+        }, config)) as unknown as typeof db.transaction);
+
+      let t1: string;
+      let t2: string;
+      try {
+        [t1, t2] = await Promise.all([loginAs(username, password), loginAs(username, password)]);
+      } finally {
+        txSpy.mockRestore();
+      }
+
+      const remainingAfterConcurrent = await db
+        .select({ id: schema.sessions.id })
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, id));
+      const concurrentIds = remainingAfterConcurrent.map((r) => r.id);
+
+      expect(concurrentIds).toHaveLength(1);
+      expect(concurrentIds[0]).not.toBe(t0);
+      expect([t1, t2]).toContain(concurrentIds[0]);
+
+      // 2. Same-millisecond createdAt tie: updating the prior surviving session after
+      // inserting t3 places the prior session's tuple after t3 on the heap page, so
+      // ORDER BY created_at ASC returns the newly inserted session t3 first on the tie.
+      const priorSurvivor = concurrentIds[0];
+      const tiedCreatedAt = new Date();
+
+      const tieSpy = vi.spyOn(db, "transaction").mockImplementationOnce(((
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) =>
+        realTransaction((tx) => {
+          const tiedTx = new Proxy(tx, {
+            get(target, prop, receiver) {
+              if (prop === "insert") {
+                const origInsert = Reflect.get(target, prop, receiver) as (table: unknown) => {
+                  values: (vals: Record<string, unknown>) => Promise<unknown>;
+                };
+                return (table: unknown) => {
+                  const builder = origInsert.call(target, table);
+                  if (table !== schema.sessions) return builder;
+                  const origValues = builder.values.bind(builder);
+                  builder.values = async (vals: Record<string, unknown>) => {
+                    const res = await origValues({ ...vals, createdAt: tiedCreatedAt });
+                    await (
+                      tx as unknown as {
+                        update: typeof db.update;
+                      }
+                    )
+                      .update(schema.sessions)
+                      .set({ createdAt: tiedCreatedAt })
+                      .where(eq(schema.sessions.id, priorSurvivor));
+                    return res;
+                  };
+                  return builder;
+                };
+              }
+              return Reflect.get(target, prop, receiver);
+            },
+          });
+          return cb(tiedTx);
+        }, config)) as unknown as typeof db.transaction);
+
+      let t3: string;
+      try {
+        t3 = await loginAs(username, password);
+      } finally {
+        tieSpy.mockRestore();
+      }
+
+      const remainingAfterTie = await db
+        .select({ id: schema.sessions.id })
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, id));
+      expect(remainingAfterTie.map((r) => r.id)).toEqual([t3]);
+
+      const survivingRes = await testApp.app.inject({
+        method: "GET",
+        url: "/api/auth/session",
+        headers: { authorization: `Bearer ${t3}` },
+      });
+      expect(survivingRes.statusCode).toBe(200);
+    } finally {
+      await clearSetting("maxSessionsPerUser");
+    }
+  });
+
   it("fails closed with 500 and creates no session when reading maxSessionsPerUser fails (#2517)", async () => {
     const { username, password, id } = await createUser();
 
