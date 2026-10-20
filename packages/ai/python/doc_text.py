@@ -71,6 +71,64 @@ def has_readable_text(text):
 _REF_RE = re.compile(r"\[?\s*(\d+)\s+\d+\s+R")
 # A CIDToGIDMap that points at a stream rather than being /Identity.
 _CID_TO_GID_STREAM_RE = re.compile(r"/CIDToGIDMap\s*\d+\s+\d+\s+R")
+# ToUnicode written as the name of an identity CMap where a stream belongs.
+_IDENTITY_NAME_RE = re.compile(r"^/Identity-[HV]$")
+# The mapping sections of a ToUnicode CMap, and their entries. A bfrange's
+# destination is a hex string or an array; an array is never identity.
+# Hex strings may hold whitespace (<00 41>), which PDF ignores.
+_BFRANGE_BLOCK_RE = re.compile(rb"beginbfrange(.*?)endbfrange", re.S)
+_BFCHAR_BLOCK_RE = re.compile(rb"beginbfchar(.*?)endbfchar", re.S)
+_CIDRANGE_BLOCK_RE = re.compile(rb"begincidrange(.*?)endcidrange", re.S)
+_HEX = rb"<([0-9A-Fa-f\s]+)>"
+_BFRANGE_ENTRY_RE = re.compile(_HEX + rb"\s*<[0-9A-Fa-f\s]+>\s*(<[0-9A-Fa-f\s]+>|\[)")
+_BFCHAR_ENTRY_RE = re.compile(_HEX + rb"\s*" + _HEX)
+_CIDRANGE_ENTRY_RE = re.compile(_HEX + rb"\s*<[0-9A-Fa-f\s]+>\s*(\d+)")
+# A CMap that only pulls in the predefined identity CMap.
+_USES_IDENTITY_RE = re.compile(rb"/Identity-[HV]\s+usecmap")
+
+
+def _hex_value(text):
+    return int(re.sub(rb"\s", b"", text) or b"0", 16)
+
+
+def cmap_has_entries(data):
+    """True when a ToUnicode CMap defines at least one bfrange, bfchar, or cidrange entry."""
+    return (
+        any(_BFRANGE_ENTRY_RE.search(block) for block in _BFRANGE_BLOCK_RE.findall(data))
+        or any(_BFCHAR_ENTRY_RE.search(block) for block in _BFCHAR_BLOCK_RE.findall(data))
+        or any(_CIDRANGE_ENTRY_RE.search(block) for block in _CIDRANGE_BLOCK_RE.findall(data))
+    )
+
+
+def cmap_is_identity(data):
+    """True when a ToUnicode CMap maps every code it lists to itself.
+
+    MuPDF honours such a map, so with CID = glyph id each glyph id comes back
+    as the character, the same soup as /ToUnicode /Identity-H (#1754). Read
+    from the entries, not the CMapName: PyMuPDF writes its correct maps as
+    /Adobe-Identity-UCS too. Producers also paste in the Identity-H CMap
+    itself (a cidrange from each code to the same number) or a stream that
+    only says "/Identity-H usecmap"; both count. A map with no entries proves
+    nothing. A wrong answer here can't reject readable text on its own:
+    glyph_id_fonts still has to find the glyph ids in what MuPDF extracted.
+    """
+    entries = 0
+    for block in _BFRANGE_BLOCK_RE.findall(data):
+        for start, dest in _BFRANGE_ENTRY_RE.findall(block):
+            if dest == b"[" or _hex_value(dest[1:-1]) != _hex_value(start):
+                return False
+            entries += 1
+    for block in _BFCHAR_BLOCK_RE.findall(data):
+        for source, dest in _BFCHAR_ENTRY_RE.findall(block):
+            if _hex_value(dest) != _hex_value(source):
+                return False
+            entries += 1
+    for block in _CIDRANGE_BLOCK_RE.findall(data):
+        for start, cid in _CIDRANGE_ENTRY_RE.findall(block):
+            if int(cid) != _hex_value(start):
+                return False
+            entries += 1
+    return entries > 0 or bool(_USES_IDENTITY_RE.search(data))
 
 
 def _object_number(doc, text):
@@ -80,32 +138,6 @@ def _object_number(doc, text):
         return None
     number = int(ref.group(1))
     return number if 0 < number < doc.xref_length() else None
-
-
-def _falls_back_to_glyph_ids(doc, xref, prefix=""):
-    """True when an unmapped glyph in this Type0 font would come back as its glyph id.
-
-    The font dict is object xref, or, with a prefix such as
-    "Resources/Font/F1/", the dict at that key path under object xref (an
-    inline font, see _inline_font_location).
-
-    Needs both halves. No ToUnicode stream: a missing key, a name such as
-    /Identity-H, or a reference to nothing all leave MuPDF without a map. And a
-    CID that is the glyph id: the descendant font's CIDToGIDMap absent or
-    /Identity. Producers that store Unicode as the CID and map it to glyphs
-    through a CIDToGIDMap stream (the tFPDF and TCPDF style) fall back to the
-    CID too, but there the CID is the right character, so that text reads fine
-    today and must not be sent to OCR.
-
-    Only reads objects whose numbers are in range, so a damaged font dict makes
-    this answer False (the behaviour before #955) instead of raising.
-    """
-    if not 0 < xref < doc.xref_length():
-        return False
-    to_unicode = _object_number(doc, doc.xref_get_key(xref, prefix + "ToUnicode")[1])
-    if to_unicode is not None and doc.xref_is_stream(to_unicode):
-        return False
-    return _cid_is_glyph_id(doc, xref, prefix)
 
 
 def _cid_is_glyph_id(doc, xref, prefix=""):
@@ -119,6 +151,58 @@ def _cid_is_glyph_id(doc, xref, prefix=""):
             break
         descendant = doc.xref_object(number, compressed=True)
     return not _CID_TO_GID_STREAM_RE.search(descendant)
+
+
+def _classify_to_unicode(doc, xref, prefix=""):
+    """'unmapped', 'identity', or 'mapped' for a Type0 font at (xref, prefix)."""
+    if not 0 < xref < doc.xref_length() or not _cid_is_glyph_id(doc, xref, prefix):
+        return "mapped"
+    value = doc.xref_get_key(xref, prefix + "ToUnicode")[1]
+    if _IDENTITY_NAME_RE.match(value):
+        return "identity"
+    stream = _object_number(doc, value)
+    if stream is None or not doc.xref_is_stream(stream):
+        return "unmapped"
+    data = doc.xref_stream(stream)
+    if cmap_is_identity(data):
+        return "identity"
+    return "mapped" if cmap_has_entries(data) else "unmapped"
+
+
+# A font's ToUnicode verdict, keyed by its location. Fonts are shared across
+# pages and the check runs on every page, so each stream is read and parsed
+# once instead of once per page. Each run starts it empty: the docs
+# dispatcher execs every run in a fresh namespace, and a run opens one file.
+_font_cache = {}
+
+
+def _font_verdict(doc, xref, prefix=""):
+    key = (id(doc), xref, prefix)
+    if key not in _font_cache:
+        _font_cache[key] = _classify_to_unicode(doc, xref, prefix)
+    return _font_cache[key]
+
+
+def _falls_back_to_glyph_ids(doc, xref, prefix=""):
+    """True when an unmapped glyph in this Type0 font would come back as its glyph id.
+
+    The font dict is object xref, or, with a prefix such as
+    "Resources/Font/F1/", the dict at that key path under object xref (an
+    inline font, see _inline_font_location).
+
+    Needs both halves. No usable ToUnicode map: a missing key, a reference to
+    nothing, or a stream that decodes to no mapping entries (#1768) all leave
+    MuPDF without a map. (/Identity-H maps each code to itself and goes through
+    maps_glyph_ids_as_unicode.) And a CID that is the glyph id: the descendant
+    font's CIDToGIDMap absent or /Identity. Producers that store Unicode as the
+    CID and map it to glyphs through a CIDToGIDMap stream (the tFPDF and TCPDF
+    style) fall back to the CID too, but there the CID is the right character,
+    so that text reads fine today and must not be sent to OCR.
+
+    Only reads objects whose numbers are in range, so a damaged font dict makes
+    this answer False (the behaviour before #955) instead of raising.
+    """
+    return _font_verdict(doc, xref, prefix) == "unmapped"
 
 
 # Page tree nodes to climb looking for inherited Resources. Real trees are a
@@ -187,85 +271,8 @@ def draws_unmapped_composite_font(page):
     return False
 
 
-# ToUnicode written as the name of an identity CMap where a stream belongs.
-_IDENTITY_NAME_RE = re.compile(r"^/Identity-[HV]$")
-# The mapping sections of a ToUnicode CMap, and their entries. A bfrange's
-# destination is a hex string or an array; an array is never identity.
-# Hex strings may hold whitespace (<00 41>), which PDF ignores.
-_BFRANGE_BLOCK_RE = re.compile(rb"beginbfrange(.*?)endbfrange", re.S)
-_BFCHAR_BLOCK_RE = re.compile(rb"beginbfchar(.*?)endbfchar", re.S)
-_CIDRANGE_BLOCK_RE = re.compile(rb"begincidrange(.*?)endcidrange", re.S)
-_HEX = rb"<([0-9A-Fa-f\s]+)>"
-_BFRANGE_ENTRY_RE = re.compile(_HEX + rb"\s*<[0-9A-Fa-f\s]+>\s*(<[0-9A-Fa-f\s]+>|\[)")
-_BFCHAR_ENTRY_RE = re.compile(_HEX + rb"\s*" + _HEX)
-_CIDRANGE_ENTRY_RE = re.compile(_HEX + rb"\s*<[0-9A-Fa-f\s]+>\s*(\d+)")
-# A CMap that only pulls in the predefined identity CMap.
-_USES_IDENTITY_RE = re.compile(rb"/Identity-[HV]\s+usecmap")
-
-
-def _hex_value(text):
-    return int(re.sub(rb"\s", b"", text) or b"0", 16)
-
-
-def cmap_is_identity(data):
-    """True when a ToUnicode CMap maps every code it lists to itself.
-
-    MuPDF honours such a map, so with CID = glyph id each glyph id comes back
-    as the character, the same soup as /ToUnicode /Identity-H (#1754). Read
-    from the entries, not the CMapName: PyMuPDF writes its correct maps as
-    /Adobe-Identity-UCS too. Producers also paste in the Identity-H CMap
-    itself (a cidrange from each code to the same number) or a stream that
-    only says "/Identity-H usecmap"; both count. A map with no entries proves
-    nothing. A wrong answer here can't reject readable text on its own:
-    glyph_id_fonts still has to find the glyph ids in what MuPDF extracted.
-    """
-    entries = 0
-    for block in _BFRANGE_BLOCK_RE.findall(data):
-        for start, dest in _BFRANGE_ENTRY_RE.findall(block):
-            if dest == b"[" or _hex_value(dest[1:-1]) != _hex_value(start):
-                return False
-            entries += 1
-    for block in _BFCHAR_BLOCK_RE.findall(data):
-        for source, dest in _BFCHAR_ENTRY_RE.findall(block):
-            if _hex_value(dest) != _hex_value(source):
-                return False
-            entries += 1
-    for block in _CIDRANGE_BLOCK_RE.findall(data):
-        for start, cid in _CIDRANGE_ENTRY_RE.findall(block):
-            if int(cid) != _hex_value(start):
-                return False
-            entries += 1
-    return entries > 0 or bool(_USES_IDENTITY_RE.search(data))
-
-
-def _identity_to_unicode(doc, xref, prefix=""):
-    """True when this font's ToUnicode is an identity CMap, by name or as a stream."""
-    value = doc.xref_get_key(xref, prefix + "ToUnicode")[1]
-    if _IDENTITY_NAME_RE.match(value):
-        return True
-    stream = _object_number(doc, value)
-    return (
-        stream is not None
-        and doc.xref_is_stream(stream)
-        and cmap_is_identity(doc.xref_stream(stream))
-    )
-
-
-# A font's ToUnicode verdict, keyed by its location. Fonts are shared across
-# pages and the check runs on every page, so each stream is read and parsed
-# once instead of once per page. Each run starts it empty: the docs
-# dispatcher execs every run in a fresh namespace, and a run opens one file.
-_identity_cache = {}
-
-
 def _identity_font(doc, xref, prefix):
-    key = (id(doc), xref, prefix)
-    if key not in _identity_cache:
-        # The CIDToGIDMap test is a dict read; the stream read only if it passes.
-        _identity_cache[key] = _cid_is_glyph_id(doc, xref, prefix) and _identity_to_unicode(
-            doc, xref, prefix
-        )
-    return _identity_cache[key]
+    return _font_verdict(doc, xref, prefix) == "identity"
 
 
 def maps_glyph_ids_as_unicode(page):
@@ -394,8 +401,13 @@ def text_outside_fonts(page_dict, fonts):
     )
 
 
-def _judge_without_glyph_id_fonts(page):
+def _judge_without_glyph_id_fonts(page, flags=None):
     """The page's text minus fonts that came out as glyph ids, or None to keep the #955 verdict.
+
+    When the page also draws an unmapped composite font (#1768), pass the
+    no-CID dict flags so that font's spans come back as U+FFFD instead of CID
+    fallback letters. When it doesn't, flags stays None so a CID-is-Unicode
+    font on the page still reads through the CID fallback.
 
     Only ever feeds the readability verdict, never the .txt, so a failure here
     falls back to the #955 verdict instead of failing the extraction.
@@ -407,7 +419,7 @@ def _judge_without_glyph_id_fonts(page):
         if type3 is None:
             return None
         fonts = glyph_id_fonts(page.get_texttrace(), type3)
-        return text_outside_fonts(page.get_text("dict"), fonts) if fonts else None
+        return text_outside_fonts(page.get_text("dict", flags=flags), fonts) if fonts else None
     except Exception as exc:  # noqa: BLE001
         print(
             f"[doc_text] glyph-id font check skipped on page {page.number}: {exc!r}",
@@ -457,7 +469,9 @@ def main():
             # ToUnicode stream isn't flagged by draws_unmapped_composite_font,
             # since MuPDF has a map for it (#1754).
             flagged = draws_unmapped_composite_font(page)
-            readable = _judge_without_glyph_id_fonts(page)
+            readable = _judge_without_glyph_id_fonts(
+                page, unmapped_as_fffd if flagged else None
+            )
             if readable is not None:
                 judged.append(readable)
             elif flagged:

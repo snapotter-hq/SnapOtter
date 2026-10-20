@@ -140,8 +140,9 @@ describe.skipIf(!hasPython)("doc_text.has_readable_text", () => {
 interface FakeFont {
   type: string;
   /** "stream" is a real map; "identity-stream" a stream mapping every code to
-   *  itself; "name" is /Identity-H; "dangling" points at no object. */
-  toUnicode: "stream" | "identity-stream" | "none" | "name" | "dangling";
+   *  itself; "empty-stream" a stream with no mapping entries; "name" is
+   *  /Identity-H; "dangling" points at no object. */
+  toUnicode: "stream" | "identity-stream" | "empty-stream" | "none" | "name" | "dangling";
   /** On the descendant CIDFont. "stream" is the tFPDF/TCPDF CID = Unicode shape. */
   cidToGid?: "absent" | "identity" | "stream";
   /** Defaults to an indirect font; 0 is how get_fonts reports an inline font dict. */
@@ -171,9 +172,11 @@ function onFakePage<T = boolean>(fn: string, fonts: FakeFont[]): T {
     "LENGTH = 1000",
     "TO_UNICODE = {'stream': ('xref', '%d 0 R'), 'none': ('null', 'null'),",
     "              'name': ('name', '/Identity-H'), 'dangling': ('xref', '5000 0 R'),",
-    "              'identity-stream': ('xref', '%d 0 R')}",
+    "              'identity-stream': ('xref', '%d 0 R'), 'empty-stream': ('xref', '%d 0 R')}",
+    " STREAM_BASE = {'stream': 100, 'identity-stream': 400, 'empty-stream': 500}".trimStart(),
     "REAL_CMAP = b'1 beginbfrange\\n<0004> <0062> <0020>\\nendbfrange\\n'",
     "IDENTITY_CMAP = b'1 beginbfrange\\n<0000> <FFFF> <0000>\\nendbfrange\\n'",
+    "EMPTY_CMAP = b'1 begincodespacerange\\n<0000> <FFFF>\\nendcodespacerange\\n0 beginbfrange\\nendbfrange\\n'",
     "CID_TO_GID = {'absent': '', 'identity': '/CIDToGIDMap/Identity', 'stream': '/CIDToGIDMap %d 0 R'}",
     "PAGE, PAGES, XOBJECT = 900, 901, 902",
     "HOLDER = {'page': PAGE, 'inherited': PAGES, 'xobject': XOBJECT, 'missing': PAGE}",
@@ -191,7 +194,7 @@ function onFakePage<T = boolean>(fn: string, fonts: FakeFont[]): T {
     "        return ('name', '/' + name) if name else ('null', 'null')",
     "    if key == 'ToUnicode':",
     "        kind, value = TO_UNICODE[fonts[i]['toUnicode']]",
-    "        base = 400 if fonts[i]['toUnicode'] == 'identity-stream' else 100",
+    "        base = STREAM_BASE.get(fonts[i]['toUnicode'], 100)",
     "        return (kind, value % (base + i) if '%d' in value else value)",
     "    assert key == 'DescendantFonts', key",
     "    return ('array', '[%d 0 R]' % (200 + i))",
@@ -217,9 +220,11 @@ function onFakePage<T = boolean>(fn: string, fonts: FakeFont[]): T {
     "    def xref_length(self):",
     "        return LENGTH",
     "    def xref_is_stream(self, xref):",
-    "        return 100 <= xref < 200 or 300 <= xref < 500",
+    "        return 100 <= xref < 200 or 300 <= xref < 600",
     "    def xref_stream(self, xref):",
-    "        assert 100 <= xref < 200 or 400 <= xref < 500, xref",
+    "        assert 100 <= xref < 200 or 400 <= xref < 600, xref",
+    "        if xref >= 500:",
+    "            return EMPTY_CMAP",
     "        return IDENTITY_CMAP if xref >= 400 else REAL_CMAP",
     "    def xref_get_key(self, xref, key):",
     "        if xref in (PAGE, PAGES, XOBJECT):",
@@ -271,6 +276,40 @@ function cmapIsIdentity(cmap: string): boolean {
   if (res.status !== 0) throw new Error(`python3 failed: ${res.stderr}`);
   return JSON.parse(res.stdout) as boolean;
 }
+
+/** Run cmap_has_entries on a CMap given as text. */
+function cmapHasEntries(cmap: string): boolean {
+  const code = [
+    "import sys, json",
+    `sys.path.insert(0, ${JSON.stringify(SCRIPT_DIR)})`,
+    "from doc_text import cmap_has_entries",
+    "sys.stdout.write(json.dumps(cmap_has_entries(sys.argv[1].encode('latin1'))))",
+  ].join("\n");
+  const res = spawnSync("python3", ["-c", code, cmap], { encoding: "utf8", timeout: 5000 });
+  if (res.status !== 0) throw new Error(`python3 failed: ${res.stderr}`);
+  return JSON.parse(res.stdout) as boolean;
+}
+
+describe.skipIf(!hasPython)("doc_text.cmap_has_entries (#1768)", () => {
+  const ranges = (body: string) =>
+    `1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n${body}`;
+
+  it("accepts a CMap with bfrange, bfchar, or cidrange entries", () => {
+    expect(cmapHasEntries(ranges("1 beginbfrange\n<0004> <0062> <0020>\nendbfrange\n"))).toBe(true);
+    expect(
+      cmapHasEntries(ranges("1 beginbfrange\n<0000> <0001> [<0041> <0042>]\nendbfrange\n")),
+    ).toBe(true);
+    expect(cmapHasEntries(ranges("1 beginbfchar\n<0041> <0042>\nendbfchar\n"))).toBe(true);
+    expect(cmapHasEntries(ranges("1 begincidrange\n<0000> <FFFF> 0\nendcidrange\n"))).toBe(true);
+    expect(cmapHasEntries(ranges("1 beginbfchar\n<00 41> <00 42>\nendbfchar\n"))).toBe(true);
+  });
+
+  it("refuses an empty stream or a CMap with no mapping entries", () => {
+    expect(cmapHasEntries("")).toBe(false);
+    expect(cmapHasEntries(ranges(""))).toBe(false);
+    expect(cmapHasEntries(ranges("0 beginbfrange\nendbfrange\n"))).toBe(false);
+  });
+});
 
 describe.skipIf(!hasPython)("doc_text.cmap_is_identity (#1754)", () => {
   const ranges = (body: string) =>
@@ -327,6 +366,7 @@ describe.skipIf(!hasPython)("doc_text.maps_glyph_ids_as_unicode (#1566)", () => 
   it("ignores the #955 shapes, which MuPDF already reports as U+FFFD", () => {
     expect(mapsGlyphIdsAsUnicode([{ type: "Type0", toUnicode: "none" }])).toBe(false);
     expect(mapsGlyphIdsAsUnicode([{ type: "Type0", toUnicode: "dangling" }])).toBe(false);
+    expect(mapsGlyphIdsAsUnicode([{ type: "Type0", toUnicode: "empty-stream" }])).toBe(false);
     expect(mapsGlyphIdsAsUnicode([{ type: "Type0", toUnicode: "stream" }])).toBe(false);
   });
 
@@ -392,6 +432,37 @@ describe.skipIf(!hasPython)("doc_text.draws_unmapped_composite_font", () => {
 
   it("flags a ToUnicode reference that points at no object", () => {
     expect(drawsUnmappedComposite([{ type: "Type0", toUnicode: "dangling" }])).toBe(true);
+  });
+
+  it("flags a ToUnicode stream that decodes to no mapping entries (#1768)", () => {
+    expect(drawsUnmappedComposite([{ type: "Type0", toUnicode: "empty-stream" }])).toBe(true);
+    expect(drawsUnmappedComposite([{ type: "Type0", toUnicode: "empty-stream", xref: 0 }])).toBe(
+      true,
+    );
+    expect(
+      drawsUnmappedComposite([{ type: "Type0", toUnicode: "empty-stream", cidToGid: "stream" }]),
+    ).toBe(false);
+  });
+
+  it("does not flag an identity ToUnicode font, which maps_glyph_ids_as_unicode handles (#1768)", () => {
+    // Keeping /Identity-H out of draws_unmapped_composite_font lets a page that
+    // pairs /Identity-H with a CID = Unicode font keep the CID fallback, while
+    // a page that pairs /Identity-H with a #955 font drops the CID fallback.
+    expect(drawsUnmappedComposite([{ type: "Type0", toUnicode: "name" }])).toBe(false);
+    expect(drawsUnmappedComposite([{ type: "Type0", toUnicode: "name", xref: 0 }])).toBe(false);
+    expect(drawsUnmappedComposite([{ type: "Type0", toUnicode: "identity-stream" }])).toBe(false);
+    expect(
+      drawsUnmappedComposite([
+        { type: "Type0", toUnicode: "name" },
+        { type: "Type0", toUnicode: "none", cidToGid: "stream" },
+      ]),
+    ).toBe(false);
+    expect(
+      drawsUnmappedComposite([
+        { type: "Type0", toUnicode: "name" },
+        { type: "Type0", toUnicode: "none" },
+      ]),
+    ).toBe(true);
   });
 
   it("does not flag a Type0 font that carries a ToUnicode map", () => {
@@ -663,6 +734,128 @@ describe.skipIf(!hasPython)("doc_text.text_outside_fonts (#1566)", () => {
   });
 });
 
+describe.skipIf(!hasPython)("doc_text._judge_without_glyph_id_fonts (#1768)", () => {
+  function judgeFakePage(
+    fonts: FakeFont[],
+    extraSpans: Array<{ font: string; text: string }> = [],
+  ): string | null {
+    const code = [
+      "import sys, json",
+      `sys.path.insert(0, ${JSON.stringify(SCRIPT_DIR)})`,
+      "from doc_text import _judge_without_glyph_id_fonts, draws_unmapped_composite_font",
+      "fonts, extra_spans = json.loads(sys.argv[1])",
+      "class Doc:",
+      "    def xref_length(self):",
+      "        return 100",
+      "    def xref_get_key(self, xref, key):",
+      "        f = fonts[xref - 1]",
+      "        if key == 'ToUnicode':",
+      "            return ('name', '/Identity-H') if f['toUnicode'] == 'name' else ('null', 'null')",
+      "        return ('array', '[%d 0 R]' % (50 + xref))",
+      "    def xref_object(self, xref, compressed=False):",
+      "        f = fonts[xref - 51]",
+      "        cid = '/CIDToGIDMap 80 0 R' if f.get('cidToGid') == 'stream' else ''",
+      "        return '<</Type/Font/Subtype/CIDFontType2%s>>' % cid",
+      "class Page:",
+      "    parent = Doc()",
+      "    number = 0",
+      "    def get_fonts(self, full=False):",
+      "        return [",
+      "            (i + 1, 'ttf', f['type'], 'ABCDEF+' + (f.get('name') or 'Font%d' % i), 'F%d' % i, '', 0)",
+      "            for i, f in enumerate(fonts)",
+      "        ]",
+      "    def get_texttrace(self):",
+      "        return [",
+      "            {'font': 'Roboto-Black', 'chars': [[44, 44], [73, 73], [80, 80], [83, 83]]},",
+      "            {'font': 'Montserrat-Black', 'chars': [[0xFFFD, 40], [0xFFFD, 41], [0xFFFD, 42]]},",
+      "        ]",
+      "    def get_text(self, opt='text', flags=None):",
+      "        assert opt == 'dict'",
+      "        # Default flags apply MuPDF's CID fallback; no-CID flags emit U+FFFD.",
+      "        other = 'Hello world' if flags is None else '\\uFFFD\\uFFFD\\uFFFD'",
+      "        spans = [",
+      "            {'font': 'Roboto-Black', 'text': ',IPPS'},",
+      "            {'font': 'Montserrat-Black', 'text': other},",
+      "        ] + extra_spans",
+      "        return {'blocks': [{'lines': [{'spans': spans}]}]}",
+      "page = Page()",
+      "flagged = draws_unmapped_composite_font(page)",
+      "sys.stdout.write(json.dumps(_judge_without_glyph_id_fonts(page, 1 if flagged else None)))",
+    ].join("\n");
+    const res = spawnSync("python3", ["-c", code, JSON.stringify([fonts, extraSpans])], {
+      encoding: "utf8",
+      timeout: 5000,
+    });
+    if (res.status !== 0) throw new Error(`python3 failed: ${res.stderr}`);
+    return JSON.parse(res.stdout) as string | null;
+  }
+
+  it("reads kept spans with no-CID flags when the page also has a #955 font, and default flags for CID = Unicode", () => {
+    const fonts: FakeFont[] = [
+      { type: "Type0", toUnicode: "name", name: "Roboto-Black" },
+      { type: "Type0", toUnicode: "none", name: "Montserrat-Black" },
+    ];
+    // Flagged page (no-CID flags passed): the #955 span comes back as U+FFFD, not readable text.
+    const flaggedVerdict = judgeFakePage(fonts);
+    expect(flaggedVerdict).toBe("���");
+    expect(hasReadable(flaggedVerdict as string)).toBe(false);
+    // A third span in a normal mapped font on the same flagged page still reads as text.
+    const mixedVerdict = judgeFakePage(fonts, [{ font: "Helvetica", text: "Readable line" }]);
+    expect(mixedVerdict).toBe("���Readable line");
+    expect(hasReadable(mixedVerdict as string)).toBe(true);
+    // Unflagged page (CID = Unicode alongside /Identity-H, flags=None): CID fallback stays on.
+    const cidUnicodeVerdict = judgeFakePage([
+      { type: "Type0", toUnicode: "name", name: "Roboto-Black" },
+      { type: "Type0", toUnicode: "none", cidToGid: "stream", name: "Montserrat-Black" },
+    ]);
+    expect(cidUnicodeVerdict).toBe("Hello world");
+    expect(hasReadable(cidUnicodeVerdict as string)).toBe(true);
+  });
+
+  it("reads each font's ToUnicode stream once across draws_unmapped_composite_font and maps_glyph_ids_as_unicode", () => {
+    const code = [
+      "import sys, json",
+      `sys.path.insert(0, ${JSON.stringify(SCRIPT_DIR)})`,
+      "from doc_text import draws_unmapped_composite_font, maps_glyph_ids_as_unicode",
+      "STREAMS = {",
+      "    100: b'1 beginbfrange\\n<0004> <0062> <0020>\\nendbfrange\\n',",
+      "    101: b'1 beginbfrange\\n<0000> <FFFF> <0000>\\nendbfrange\\n',",
+      "    102: b'',",
+      "}",
+      "class Doc:",
+      "    reads = {100: 0, 101: 0, 102: 0}",
+      "    def xref_length(self):",
+      "        return 200",
+      "    def xref_is_stream(self, xref):",
+      "        return xref in STREAMS",
+      "    def xref_stream(self, xref):",
+      "        Doc.reads[xref] += 1",
+      "        return STREAMS[xref]",
+      "    def xref_get_key(self, xref, key):",
+      "        return ('xref', '%d 0 R' % (99 + xref)) if key == 'ToUnicode' else ('array', '[150 0 R]')",
+      "    def xref_object(self, xref, compressed=False):",
+      "        return '<</Type/Font/Subtype/CIDFontType2>>'",
+      "class Page:",
+      "    parent = Doc()",
+      "    xref = 10",
+      "    def get_fonts(self, full=False):",
+      "        return [",
+      "            (1, 'ttf', 'Type0', 'ABCDEF+FontA', 'F0', '', 0),",
+      "            (2, 'ttf', 'Type0', 'ABCDEF+FontB', 'F1', '', 0),",
+      "            (3, 'ttf', 'Type0', 'ABCDEF+FontC', 'F2', '', 0),",
+      "        ]",
+      "p = Page()",
+      "for _ in range(5):",
+      "    draws_unmapped_composite_font(p)",
+      "    maps_glyph_ids_as_unicode(p)",
+      "sys.stdout.write(json.dumps(Doc.reads))",
+    ].join("\n");
+    const res = spawnSync("python3", ["-c", code], { encoding: "utf8", timeout: 5000 });
+    if (res.status !== 0) throw new Error(`python3 failed: ${res.stderr}`);
+    expect(JSON.parse(res.stdout)).toEqual({ "100": 1, "101": 1, "102": 1 });
+  });
+});
+
 // The helpers above are only worth anything if extraction actually calls them,
 // and PyMuPDF is absent from CI so no test here can run main(). Guard the wiring
 // at the source level instead, the way pymupdf-message-redirect.test.ts does.
@@ -690,9 +883,11 @@ describe("doc_text.main wiring", () => {
 
   it("drops glyph-id spans from a flagged page's verdict (#1566)", () => {
     // Every page, not just flagged ones: an identity ToUnicode stream isn't
-    // flagged by draws_unmapped_composite_font (#1754).
+    // flagged by draws_unmapped_composite_font (#1754). When the page also
+    // draws an unmapped composite font (#1768), the dict uses the no-CID flags
+    // so that font's glyphs come back as U+FFFD instead of CID fallback letters.
     expect(main).toMatch(
-      /readable = _judge_without_glyph_id_fonts\(page\)\n\s+if readable is not None:/,
+      /readable = _judge_without_glyph_id_fonts\(\s*page,\s*unmapped_as_fffd if flagged else None\s*\)\n\s+if readable is not None:/,
     );
     const judge = source.slice(
       source.indexOf("def _judge_without_glyph_id_fonts("),
@@ -702,7 +897,7 @@ describe("doc_text.main wiring", () => {
     expect(judge).toMatch(/if not maps_glyph_ids_as_unicode\(page\)/);
     expect(judge).toMatch(/glyph_id_fonts\(page\.get_texttrace\(\), type3\)/);
     expect(judge).toMatch(/type3 = type3_span_names\(page\)/);
-    expect(judge).toMatch(/text_outside_fonts\(page\.get_text\("dict"\), fonts\)/);
+    expect(judge).toMatch(/text_outside_fonts\(page\.get_text\("dict", flags=flags\), fonts\)/);
     // Verdict-only, so a failure keeps the #955 verdict rather than failing extraction.
     expect(judge).toMatch(/except Exception as exc:[\s\S]*return None/);
   });

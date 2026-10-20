@@ -69,7 +69,9 @@ type FontPdfKind =
   | "type0-identity-name"
   | "type0-identity-name-mixed"
   | "type0-identity-name-plus-cid-is-unicode"
+  | "type0-identity-name-plus-no-tounicode"
   | "type0-identity-stream"
+  | "type0-empty-tounicode-stream"
   | "type0-identity-name-plus-type3"
   | "type0-identity-name-plus-type3-codes"
   | "simple-unmapped-names";
@@ -95,9 +97,13 @@ type FontPdfKind =
  *    in Montserrat in the "type0-cid-is-unicode" shape, which only reads right
  *    through MuPDF's CID fallback. Set smaller because Montserrat Black at 12pt
  *    runs past the page edge.
+ *  - "type0-identity-name-plus-no-tounicode": the /Identity-H line plus a
+ *    second line in Montserrat with ToUnicode removed (#1768).
  *  - "type0-identity-stream": ToUnicode is a real stream, but one that maps
  *    every code to itself, so the glyph ids come back as text just like the
  *    /Identity-H name (#1754).
+ *  - "type0-empty-tounicode-stream": ToUnicode is a stream that decodes to
+ *    nothing, so MuPDF has no mapping and falls back to glyph ids (#1768).
  *  - "type0-identity-name-plus-type3": the /Identity-H line plus a line in a
  *    hand-built Type3 font. MuPDF reports a Type3 glyph as its character code,
  *    so that readable line also has Unicode equal to its glyph ids.
@@ -136,16 +142,21 @@ function makeFontPdf(kind: FontPdfKind): Buffer {
     "    content = d.get_new_xref(); d.update_object(content, '<<>>')",
     "    d.update_stream(content, ('BT /T3 9 Tf 72 150 Td <%s> Tj ET' % ''.join('%02x' % c for c in codes)).encode('latin1'))",
     "    d.xref_set_key(p.xref, 'Contents', '[%s]' % ' '.join('%d 0 R' % x for x in p.get_contents() + [content]))",
-    "if kind == 'type0-identity-stream':",
+    "if kind in ('type0-identity-stream', 'type0-empty-tounicode-stream'):",
     "    for xref, _ext, ftype, *_ in p.get_fonts():",
     "        if ftype == 'Type0':",
-    "            d.update_stream(int(d.xref_get_key(xref, 'ToUnicode')[1].split()[0]), IDENTITY_CMAP)",
+    "            d.update_stream(int(d.xref_get_key(xref, 'ToUnicode')[1].split()[0]), IDENTITY_CMAP if kind == 'type0-identity-stream' else b'')",
     "if kind.startswith('type0-identity-name-plus-type3'):",
     "    for xref, _ext, ftype, *_ in p.get_fonts():",
     "        if ftype == 'Type0':",
     "            d.xref_set_key(xref, 'ToUnicode', '/Identity-H')",
     "    add_type3([ord(ch) for ch in text] if kind == 'type0-identity-name-plus-type3' else list(range(1, 20)))",
     "mont = font.replace('Roboto-Black', 'Montserrat-Black')",
+    "if kind == 'type0-identity-name-plus-no-tounicode':",
+    "    p.insert_text((72, 120), text, fontname='mont', fontfile=mont, fontsize=9)",
+    "    fonts = {r[4]: r[0] for r in p.get_fonts() if r[2] == 'Type0'}",
+    "    d.xref_set_key(fonts['rob'], 'ToUnicode', '/Identity-H')",
+    "    d.xref_set_key(fonts['mont'], 'ToUnicode', 'null')",
     "if kind == 'type0-identity-name-plus-cid-is-unicode':",
     "    p.insert_text((72, 120), text, fontname='mont', fontfile=mont, fontsize=9)",
     "    fonts = {r[4]: r[0] for r in p.get_fonts() if r[2] == 'Type0'}",
@@ -297,6 +308,28 @@ describe.skipIf(!hasFitz)("pdf-to-text (requires PyMuPDF)", () => {
 
   it("tells the user to run OCR when ToUnicode is a stream mapping every code to itself (#1754)", async () => {
     const res = await runTool(makeFontPdf("type0-identity-stream"), "identity-stream.pdf");
+    expect(res.statusCode).toBe(422);
+    const body = JSON.parse(res.body);
+    expect(body.error).toMatch(/text layer/i);
+    expect(body.error).toMatch(/OCR/);
+  }, 60_000);
+
+  it("tells the user to run OCR when a page mixes an /Identity-H font with a no-ToUnicode font (#1768)", async () => {
+    const res = await runTool(
+      makeFontPdf("type0-identity-name-plus-no-tounicode"),
+      "identity-plus-no-tounicode.pdf",
+    );
+    expect(res.statusCode).toBe(422);
+    const body = JSON.parse(res.body);
+    expect(body.error).toMatch(/text layer/i);
+    expect(body.error).toMatch(/OCR/);
+  }, 60_000);
+
+  it("tells the user to run OCR when a ToUnicode stream decodes to nothing (#1768)", async () => {
+    const res = await runTool(
+      makeFontPdf("type0-empty-tounicode-stream"),
+      "empty-tounicode-stream.pdf",
+    );
     expect(res.statusCode).toBe(422);
     const body = JSON.parse(res.body);
     expect(body.error).toMatch(/text layer/i);
