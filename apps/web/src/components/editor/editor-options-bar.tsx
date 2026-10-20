@@ -72,16 +72,14 @@ export function EditorOptionsBar() {
 
   const OptionsComponent = getOptionsComponent(activeTool);
 
-  // The eyedropper reads its sample size from the store too, so the dropdown and
-  // the tool cannot drift apart (#2300).
+  // The eyedropper reads its sample size and hover preview color from the store so
+  // the options bar and the canvas stay in sync without re-rendering EditorCanvas (#2155, #2300).
   const eyedropperSampleSize = useEditorStore((s) => s.eyedropperSampleSize);
   const setEyedropperSampleSize = useEditorStore((s) => s.setEyedropperSampleSize);
+  const eyedropperSampledColor = useEditorStore((s) => s.eyedropperSampledColor);
 
   // Transform tool API (managed here since TransformOptions requires props)
   const transformApi = useTransformTool();
-
-  // Pick sampled color from store foreground when eyedropper is active
-  const foregroundColor = useEditorStore((s) => s.foregroundColor);
 
   return (
     <div
@@ -101,7 +99,7 @@ export function EditorOptionsBar() {
           <EyedropperOptions
             sampleSize={eyedropperSampleSize}
             onSampleSizeChange={setEyedropperSampleSize}
-            sampledColor={foregroundColor}
+            sampledColor={eyedropperSampledColor}
           />
         )}
         {activeTool === "transform" && <TransformOptions api={transformApi} />}

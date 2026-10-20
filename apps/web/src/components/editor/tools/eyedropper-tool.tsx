@@ -1,7 +1,7 @@
 // apps/web/src/components/editor/tools/eyedropper-tool.tsx
 
 import type Konva from "konva";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useEditorStore } from "@/stores/editor-store";
 import {
@@ -18,12 +18,12 @@ interface UseEyedropperToolOptions {
 export function useEyedropperTool({ stageRef }: UseEyedropperToolOptions) {
   const setForegroundColor = useEditorStore((s) => s.setForegroundColor);
   const setBackgroundColor = useEditorStore((s) => s.setBackgroundColor);
+  const setSampledColor = useEditorStore((s) => s.setEyedropperSampledColor);
   const zoom = useEditorStore((s) => s.zoom);
   const panOffset = useEditorStore((s) => s.panOffset);
   const canvasSize = useEditorStore((s) => s.canvasSize);
   const historyVersion = useEditorStore((s) => s._historyVersion);
   const sampleSize = useEditorStore((s) => s.eyedropperSampleSize);
-  const [sampledColor, setSampledColor] = useState<string | null>(null);
   const contextCache = useRef<CanvasRenderingContext2D | null>(null);
   // Set when a capture couldn't be read. Sampling runs on every mousemove, so
   // without it a tainted stage would throw, or toast, once per mouse event.
@@ -49,6 +49,7 @@ export function useEyedropperTool({ stageRef }: UseEyedropperToolOptions) {
       } catch (err) {
         // Not ours to explain, but one throw per press, not one per mousemove.
         captureFailed.current = true;
+        setSampledColor(null);
         throw err;
       }
       if (!capture.ok) {
@@ -59,7 +60,7 @@ export function useEyedropperTool({ stageRef }: UseEyedropperToolOptions) {
       contextCache.current = capture.ctx;
       return capture.ctx;
     },
-    [stageRef, canvasSize, captureMessages],
+    [stageRef, canvasSize, captureMessages, setSampledColor],
   );
 
   /**
@@ -76,7 +77,8 @@ export function useEyedropperTool({ stageRef }: UseEyedropperToolOptions) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: both only signal that the document changed
   useEffect(() => {
     invalidateCache();
-  }, [canvasSize, historyVersion, invalidateCache]);
+    setSampledColor(null);
+  }, [canvasSize, historyVersion, invalidateCache, setSampledColor]);
 
   /**
    * Sample color at stage pointer position.
@@ -85,13 +87,22 @@ export function useEyedropperTool({ stageRef }: UseEyedropperToolOptions) {
   const sampleAtPointer = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>, report: boolean): string | null => {
       const stage = e.target.getStage();
-      if (!stage) return null;
+      if (!stage) {
+        setSampledColor(null);
+        return null;
+      }
 
       const pointer = stage.getPointerPosition();
-      if (!pointer) return null;
+      if (!pointer) {
+        setSampledColor(null);
+        return null;
+      }
 
       const ctx = contextCache.current ?? getStageContext(report);
-      if (!ctx) return null;
+      if (!ctx) {
+        setSampledColor(null);
+        return null;
+      }
 
       // Transform pointer coordinates from screen space to canvas space
       const x = Math.floor((pointer.x - panOffset.x) / zoom);
@@ -99,6 +110,7 @@ export function useEyedropperTool({ stageRef }: UseEyedropperToolOptions) {
 
       // Bounds check against the actual canvas dimensions (unzoomed)
       if (x < 0 || y < 0 || x >= canvasSize.width || y >= canvasSize.height) {
+        setSampledColor(null);
         return null;
       }
 
@@ -110,13 +122,14 @@ export function useEyedropperTool({ stageRef }: UseEyedropperToolOptions) {
           console.error("Failed to sample pixel color:", err);
           reportCaptureFailure("no-context", captureMessages);
         }
+        setSampledColor(null);
         return null;
       }
 
       setSampledColor(color);
       return color;
     },
-    [getStageContext, sampleSize, zoom, panOffset, canvasSize, captureMessages],
+    [getStageContext, sampleSize, zoom, panOffset, canvasSize, captureMessages, setSampledColor],
   );
 
   /**
@@ -149,10 +162,15 @@ export function useEyedropperTool({ stageRef }: UseEyedropperToolOptions) {
     [sampleAtPointer],
   );
 
-  return {
-    handleEyedropperClick,
-    handleEyedropperMove,
-    sampledColor,
-    invalidateCache,
-  };
+  return useMemo(
+    () => ({
+      handleEyedropperClick,
+      handleEyedropperMove,
+      get sampledColor() {
+        return useEditorStore.getState().eyedropperSampledColor;
+      },
+      invalidateCache,
+    }),
+    [handleEyedropperClick, handleEyedropperMove, invalidateCache],
+  );
 }

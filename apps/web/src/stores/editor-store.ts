@@ -534,6 +534,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
 
       // --- Eyedropper ---
       eyedropperSampleSize: 1,
+      eyedropperSampledColor: null,
 
       // --- Brush ---
       brushSize: 10,
@@ -657,6 +658,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
           activeTool: tool,
           previousTool: activeTool,
           isCropping: tool === "crop",
+          ...(tool !== activeTool ? { eyedropperSampledColor: null } : {}),
           ...(leavingCrop ? { cropState: null } : {}),
           ...(enteringCrop && !cropState
             ? {
@@ -701,6 +703,7 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
           isCropping: false,
           cropApplying: false,
           rebaking: false,
+          eyedropperSampledColor: null,
           adjustments: { ...DEFAULT_ADJUSTMENTS },
           filters: DEFAULT_FILTERS.map((f) => ({
             ...f,
@@ -1183,6 +1186,10 @@ export const useEditorStore = create<EditorState & EditorStateExtensions>()(
 
       // Eyedropper
       setEyedropperSampleSize: (size) => set({ eyedropperSampleSize: size }),
+      setEyedropperSampledColor: (color) => {
+        if (get().eyedropperSampledColor === color) return;
+        set({ eyedropperSampledColor: color });
+      },
 
       // Colors
       setForegroundColor: (color) => {
@@ -2004,6 +2011,9 @@ useEditorStore.subscribe((state, prev) => {
           state.lastAction.id === "restoreAutosave")))
   ) {
     cancelPendingRebakes();
+    if (state.eyedropperSampledColor !== null) {
+      useEditorStore.setState({ eyedropperSampledColor: null });
+    }
   }
 });
 

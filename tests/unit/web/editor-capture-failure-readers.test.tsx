@@ -167,6 +167,10 @@ describe("eyedropper (#2139)", () => {
 
   it("throws an unexpected capture error once per press, not once per mousemove", () => {
     const { stage, toCanvas, hook } = setup(fakeContext());
+    act(() => hook.result.current.handleEyedropperMove(pointerEvent(stage)));
+    expect(hook.result.current.sampledColor).toBe("#0a141e");
+
+    act(() => hook.result.current.invalidateCache());
     toCanvas.mockImplementation(() => {
       throw new TypeError("konva broke");
     });
@@ -174,11 +178,12 @@ describe("eyedropper (#2139)", () => {
     expect(() => act(() => hook.result.current.handleEyedropperMove(pointerEvent(stage)))).toThrow(
       "konva broke",
     );
+    expect(hook.result.current.sampledColor).toBeNull();
     for (let i = 0; i < 4; i++) {
       act(() => hook.result.current.handleEyedropperMove(pointerEvent(stage)));
     }
 
-    expect(toCanvas).toHaveBeenCalledTimes(1);
+    expect(toCanvas).toHaveBeenCalledTimes(2);
   });
 
   it("captures again after the canvas is resized or an edit is committed", () => {

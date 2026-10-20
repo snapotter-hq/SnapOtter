@@ -40,6 +40,8 @@ beforeEach(() => {
     zoom: 1,
     panOffset: { x: 0, y: 0 },
     activeTool: "eyedropper",
+    foregroundColor: "#000000",
+    eyedropperSampledColor: null,
   });
   useEditorStore.getState().setEyedropperSampleSize(1);
 });
@@ -147,5 +149,115 @@ describe("eyedropper options bar", () => {
     render(<EditorOptionsBar />);
 
     expect(screen.getByTestId("sample-size-dropdown")).toHaveTextContent("3x3 Average");
+  });
+
+  it("shows the hovered color in the options bar without re-rendering the canvas host (#2155)", () => {
+    getImageData.mockImplementation((x: number, _y: number, w: number, h: number) => {
+      const color = x < 10 ? [255, 0, 0, 255] : [0, 128, 255, 255];
+      const data = new Uint8ClampedArray(w * h * 4);
+      for (let i = 0; i < w * h; i++) data.set(color, i * 4);
+      return { data, width: w, height: h };
+    });
+
+    const stage = {} as Konva.Stage;
+    const stageRef = { current: stage };
+    let canvasRenders = 0;
+    let api!: ReturnType<typeof useEyedropperTool>;
+
+    function CanvasHost() {
+      canvasRenders++;
+      api = useEyedropperTool({ stageRef });
+      return null;
+    }
+
+    render(
+      <>
+        <CanvasHost />
+        <EditorOptionsBar />
+      </>,
+    );
+
+    expect(canvasRenders).toBe(1);
+    expect(screen.getByText("#000000")).toBeInTheDocument();
+
+    act(() => api.handleEyedropperMove(pointerEvent(2, 2)));
+    expect(screen.getByText("#ff0000")).toBeInTheDocument();
+    expect(screen.getByTestId("eyedropper-sampled-color")).toHaveAttribute("title", "#ff0000");
+    expect(useEditorStore.getState().foregroundColor).toBe("#000000");
+    expect(canvasRenders).toBe(1);
+
+    act(() => api.handleEyedropperMove(pointerEvent(15, 2)));
+    expect(screen.getByText("#0080ff")).toBeInTheDocument();
+    expect(canvasRenders).toBe(1);
+
+    // Moving outside the document clears the hover preview back to foregroundColor.
+    act(() => api.handleEyedropperMove(pointerEvent(25, 2)));
+    expect(screen.getByText("#000000")).toBeInTheDocument();
+    expect(canvasRenders).toBe(1);
+  });
+});
+
+describe("eyedropper hover preview (#2155)", () => {
+  it("clears the hover preview color when switching tools or replacing the document", () => {
+    const stage = {} as Konva.Stage;
+    const hook = renderHook(() => useEyedropperTool({ stageRef: { current: stage } }));
+
+    act(() => hook.result.current.handleEyedropperMove(pointerEvent(5, 5)));
+    expect(useEditorStore.getState().eyedropperSampledColor).toBe("#ff6432");
+
+    // Re-selecting the already active tool keeps the hover preview intact.
+    act(() => useEditorStore.getState().setTool("eyedropper"));
+    expect(useEditorStore.getState().eyedropperSampledColor).toBe("#ff6432");
+
+    act(() => useEditorStore.getState().setTool("move"));
+    expect(useEditorStore.getState().eyedropperSampledColor).toBeNull();
+
+    act(() => useEditorStore.getState().setTool("eyedropper"));
+    act(() => hook.result.current.handleEyedropperMove(pointerEvent(5, 5)));
+    expect(useEditorStore.getState().eyedropperSampledColor).toBe("#ff6432");
+
+    act(() => useEditorStore.getState().loadImage("data:image/png;base64,iVBORw0KGgo=", 10, 10));
+    expect(useEditorStore.getState().eyedropperSampledColor).toBeNull();
+
+    act(() => hook.result.current.handleEyedropperMove(pointerEvent(5, 5)));
+    expect(useEditorStore.getState().eyedropperSampledColor).toBe("#ff6432");
+
+    // File > Close clears sourceImageUrl via setState; the store subscriber clears the preview too.
+    act(() => useEditorStore.setState({ sourceImageUrl: null, sourceImageSize: null }));
+    expect(useEditorStore.getState().eyedropperSampledColor).toBeNull();
+  });
+
+  it("clears the hover preview color when the stage, pointer, or pixel read is unavailable", () => {
+    const stage = {} as Konva.Stage;
+    const hook = renderHook(() => useEyedropperTool({ stageRef: { current: stage } }));
+
+    act(() => hook.result.current.handleEyedropperMove(pointerEvent(5, 5)));
+    expect(useEditorStore.getState().eyedropperSampledColor).toBe("#ff6432");
+
+    const noPointerEvent = {
+      target: { getStage: () => ({ getPointerPosition: () => null }) },
+      evt: { altKey: false },
+    } as unknown as Konva.KonvaEventObject<MouseEvent>;
+    act(() => hook.result.current.handleEyedropperMove(noPointerEvent));
+    expect(useEditorStore.getState().eyedropperSampledColor).toBeNull();
+
+    act(() => hook.result.current.handleEyedropperMove(pointerEvent(5, 5)));
+    expect(useEditorStore.getState().eyedropperSampledColor).toBe("#ff6432");
+
+    const noStageEvent = {
+      target: { getStage: () => null },
+      evt: { altKey: false },
+    } as unknown as Konva.KonvaEventObject<MouseEvent>;
+    act(() => hook.result.current.handleEyedropperMove(noStageEvent));
+    expect(useEditorStore.getState().eyedropperSampledColor).toBeNull();
+
+    act(() => hook.result.current.handleEyedropperMove(pointerEvent(5, 5)));
+    expect(useEditorStore.getState().eyedropperSampledColor).toBe("#ff6432");
+
+    getImageData.mockImplementationOnce(() => {
+      throw new DOMException("Tainted", "SecurityError");
+    });
+    act(() => hook.result.current.handleEyedropperMove(pointerEvent(5, 5)));
+    expect(useEditorStore.getState().eyedropperSampledColor).toBeNull();
   });
 });

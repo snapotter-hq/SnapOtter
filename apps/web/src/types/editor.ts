@@ -360,6 +360,7 @@ export interface EditorState {
 
   // Eyedropper
   eyedropperSampleSize: EyedropperSampleSize;
+  eyedropperSampledColor: string | null;
 
   // Colors
   foregroundColor: string;
@@ -527,6 +528,7 @@ export interface EditorState {
 
   // Eyedropper
   setEyedropperSampleSize: (size: EyedropperSampleSize) => void;
+  setEyedropperSampledColor: (color: string | null) => void;
 
   // Brush
   setBrushSize: (size: number) => void;

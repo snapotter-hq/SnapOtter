@@ -14,7 +14,7 @@ const SAMPLE_SIZES: SampleSize[] = [1, 3, 5];
 interface EyedropperOptionsProps {
   sampleSize: SampleSize;
   onSampleSizeChange: (size: SampleSize) => void;
-  sampledColor: string | null;
+  sampledColor?: string | null;
 }
 
 export function EyedropperOptions({
