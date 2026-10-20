@@ -115,6 +115,44 @@ const settingsSchema = settingsShape.superRefine(requireBackgroundColors);
 
 type RemoveBgSettings = z.infer<typeof settingsSchema>;
 
+const PHASE_2_BACKGROUND_FIELDS = [
+  "backgroundType",
+  ...(Object.keys(backgroundFields) as Array<keyof typeof backgroundFields>),
+] as const;
+
+const PHASE_2_ONLY_MESSAGE =
+  "Phase 1 only returns the transparent mask; pass background and effect settings to POST /api/v1/tools/image/remove-background/effects";
+
+const phase2RejectedShape = Object.fromEntries(
+  PHASE_2_BACKGROUND_FIELDS.map((key) => [key, z.unknown().optional()]),
+) as Record<(typeof PHASE_2_BACKGROUND_FIELDS)[number], z.ZodOptional<z.ZodUnknown>>;
+
+// Phase 1 returns the transparent mask and caches the original; compositing happens
+// in Phase 2 (/effects) or in pipelines and batches (#2281).
+export const phase1SettingsSchema = z
+  .object({
+    model: z.enum(BG_REMOVAL_MODELS).optional(),
+    edgeRefine: z.number().int().min(0).max(3).optional(),
+    decontaminate: z.boolean().optional(),
+    ...phase2RejectedShape,
+  })
+  .superRefine((s, ctx) => {
+    for (const key of PHASE_2_BACKGROUND_FIELDS) {
+      if (s[key] !== undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: PHASE_2_ONLY_MESSAGE,
+        });
+      }
+    }
+  })
+  .transform(({ model, edgeRefine, decontaminate }) => ({
+    ...(model !== undefined ? { model } : {}),
+    ...(edgeRefine !== undefined ? { edgeRefine } : {}),
+    ...(decontaminate !== undefined ? { decontaminate } : {}),
+  }));
+
 // Pipelines and batches carry settings as JSON, so an uploaded background image
 // can't reach the worker. Reject the type up front instead of returning a
 // cutout with the background silently dropped (#1047).
@@ -165,8 +203,10 @@ registerAiJobHandler(
     "Background removal failed",
     (s) => s?.outputFormat ?? "png",
     async (input, data, ctx) => {
-      const settings = settingsSchema.parse(data.settings);
       const standalone = data.kind === "ai-tool";
+      const settings = standalone
+        ? phase1SettingsSchema.parse(data.settings)
+        : settingsSchema.parse(data.settings);
       const source = standalone ? input : await autoOrient(input);
 
       // Phase 1: AI background removal -> transparent PNG
@@ -187,7 +227,14 @@ registerAiJobHandler(
         throw await asInputErrorIfUndecodable(source, err);
       }
 
-      if (!standalone) return compositeCutout(transparentResult, source, settings, data.filename);
+      if (!standalone) {
+        return compositeCutout(
+          transparentResult,
+          source,
+          settings as RemoveBgSettings,
+          data.filename,
+        );
+      }
 
       // The mask IS the transparent result; cache original for effects re-apply
       const maskFilename = `${data.filename.replace(/\.[^.]+$/, "")}_mask.png`;
@@ -309,10 +356,10 @@ export function registerRemoveBackground(app: FastifyInstance) {
           return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
         }
 
-        let settings: z.infer<typeof settingsSchema>;
+        let settings: z.infer<typeof phase1SettingsSchema>;
         try {
           const parsed = settingsRaw ? JSON.parse(settingsRaw) : {};
-          const result = settingsSchema.safeParse(parsed);
+          const result = phase1SettingsSchema.safeParse(parsed);
           if (!result.success) {
             return reply
               .status(400)

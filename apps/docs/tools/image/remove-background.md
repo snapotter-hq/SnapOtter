@@ -16,20 +16,12 @@ AI-powered background removal with optional effects (blur, shadow, gradient, cus
 
 ## Parameters {#parameters}
 
+Phase 1 removes the background and caches the transparent PNG mask and original image. Background replacement, blur, drop shadow, and output format conversion are applied in [Phase 2 (`/api/v1/tools/image/remove-background/effects`)](#effects-endpoint-phase-2) (or when running `remove-background` as a pipeline step or batch job); passing those fields to Phase 1 returns 400.
+
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | file | file | Yes | - | Image file (multipart) |
 | model | string | No | - | AI model variant to use |
-| backgroundType | string | No | `"transparent"` | One of: `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | Required when `backgroundType` is `color` | - | Hex color: `#RRGGBB` or `#RGB` (the `#` is optional) |
-| gradientColor1 | string | Required when `backgroundType` is `gradient` | - | First gradient color, hex like `backgroundColor` |
-| gradientColor2 | string | Required when `backgroundType` is `gradient` | - | Second gradient color, hex like `backgroundColor` |
-| gradientAngle | number | No | - | Gradient angle in degrees |
-| blurEnabled | boolean | No | - | Blur the original background behind the subject (`backgroundType: "blur"` implies it) |
-| blurIntensity | number | No | - | Blur intensity (0-100) |
-| shadowEnabled | boolean | No | - | Enable drop shadow on subject |
-| shadowOpacity | number | No | `35` | Shadow opacity (0-100), used when `shadowEnabled` is true |
-| outputFormat | string | No | - | Output format: `png`, `webp`, or `avif` |
 | edgeRefine | integer | No | - | Edge refinement level (0-3) |
 | decontaminate | boolean | No | - | Remove color bleed from edges |
 
@@ -38,7 +30,7 @@ AI-powered background removal with optional effects (blur, shadow, gradient, cus
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/remove-background \
   -F "file=@photo.jpg" \
-  -F 'settings={"backgroundType":"transparent","edgeRefine":2,"outputFormat":"png"}'
+  -F 'settings={"model":"birefnet-portrait","edgeRefine":2,"decontaminate":true}'
 ```
 
 ## Response {#response}
@@ -93,20 +85,20 @@ Re-applies background effects without re-running the AI model. Uses cached mask 
 
 #### Settings JSON fields {#settings-json-fields}
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| jobId | string | Yes | Job ID from Phase 1 |
-| filename | string | Yes | Original filename from Phase 1 |
-| backgroundType | string | No | `transparent`, `color`, `gradient`, `blur`, `image` |
-| backgroundColor | string | Required for `color` | Hex color, `#RRGGBB` or `#RGB` |
-| gradientColor1 | string | Required for `gradient` | First gradient color (hex) |
-| gradientColor2 | string | Required for `gradient` | Second gradient color (hex) |
-| gradientAngle | number | No | Gradient angle in degrees |
-| blurEnabled | boolean | No | Enable background blur |
-| blurIntensity | number | No | Blur intensity (0-100) |
-| shadowEnabled | boolean | No | Enable drop shadow |
-| shadowOpacity | number | No | Shadow opacity (0-100) |
-| outputFormat | string | No | `png`, `webp`, or `avif` |
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| jobId | string | Yes | - | Job ID from Phase 1 |
+| filename | string | Yes | - | Original filename from Phase 1 |
+| backgroundType | string | No | `"transparent"` | One of: `transparent`, `color`, `gradient`, `blur`, `image` |
+| backgroundColor | string | Required when `backgroundType` is `color` | - | Hex color: `#RRGGBB` or `#RGB` (the `#` is optional) |
+| gradientColor1 | string | Required when `backgroundType` is `gradient` | - | First gradient color, hex like `backgroundColor` |
+| gradientColor2 | string | Required when `backgroundType` is `gradient` | - | Second gradient color, hex like `backgroundColor` |
+| gradientAngle | number | No | - | Gradient angle in degrees |
+| blurEnabled | boolean | No | - | Blur the original background behind the subject (`backgroundType: "blur"` implies it) |
+| blurIntensity | number | No | - | Blur intensity (0-100) |
+| shadowEnabled | boolean | No | - | Enable drop shadow on subject |
+| shadowOpacity | number | No | `35` | Shadow opacity (0-100), used when `shadowEnabled` is true |
+| outputFormat | string | No | `"png"` | Output format: `png`, `webp`, or `avif` |
 
 ### Example Request {#example-request-1}
 

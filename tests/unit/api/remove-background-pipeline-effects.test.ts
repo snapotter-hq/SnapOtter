@@ -2,7 +2,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { runAiToolJob } from "../../../apps/api/src/jobs/ai-handlers.js";
 import type { ToolJobData } from "../../../apps/api/src/jobs/types.js";
 import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
@@ -36,6 +36,11 @@ beforeAll(async () => {
     .toBuffer();
   aiMocks.removeBackground.mockResolvedValue(transparent);
   registerRemoveBackground({ post: vi.fn() } as unknown as FastifyInstance);
+});
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  aiMocks.removeBackground.mockResolvedValue(transparent);
 });
 
 function job(kind: ToolJobData["kind"], settings: unknown): ToolJobData {
@@ -121,7 +126,7 @@ describe("remove-background AI handler in pipelines and batches (#1047)", () => 
 
   it("leaves the standalone Phase 1 contract alone: transparent mask plus original", async () => {
     const out = await runAiToolJob(
-      job("ai-tool", { backgroundType: "color", backgroundColor: "#FF0000" }),
+      job("ai-tool", { model: "u2net", edgeRefine: 2, decontaminate: true }),
       original,
       ctx,
     );
@@ -129,5 +134,26 @@ describe("remove-background AI handler in pipelines and batches (#1047)", () => 
     expect(out.filename).toBe("photo_mask.png");
     expect(out.buffer).toEqual(transparent);
     expect(out.extraOutputs?.map((e) => e.name)).toEqual(["photo_original.png"]);
+    expect(aiMocks.removeBackground).toHaveBeenCalledWith(
+      original,
+      ctx.scratchDir,
+      expect.objectContaining({ model: "u2net", edgeRefine: 2, decontaminate: true }),
+      expect.any(Function),
+    );
+  });
+
+  it("rejects background settings on a standalone Phase 1 job (#2281)", async () => {
+    await expect(
+      runAiToolJob(
+        job("ai-tool", { backgroundType: "color", backgroundColor: "#FF0000" }),
+        original,
+        ctx,
+      ),
+    ).rejects.toMatchObject({
+      cause: expect.objectContaining({
+        message: expect.stringMatching(/\/api\/v1\/tools\/image\/remove-background\/effects/),
+      }),
+    });
+    expect(aiMocks.removeBackground).not.toHaveBeenCalled();
   });
 });

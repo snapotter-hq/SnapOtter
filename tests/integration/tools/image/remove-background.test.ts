@@ -94,12 +94,12 @@ describe("Remove Background", () => {
     }
   }, 60_000);
 
-  it("accepts transparent backgroundType", async () => {
+  it("accepts model setting on Phase 1", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
       {
         name: "settings",
-        content: JSON.stringify({ backgroundType: "transparent" }),
+        content: JSON.stringify({ model: "u2net" }),
       },
     ]);
 
@@ -116,19 +116,34 @@ describe("Remove Background", () => {
     expect([202, 501]).toContain(res.statusCode);
   }, 60_000);
 
-  it("accepts color background with blur and shadow settings", async () => {
+  it.each([
+    ["transparent backgroundType", { backgroundType: "transparent" }],
+    [
+      "color background with blur and shadow settings",
+      {
+        backgroundType: "color",
+        backgroundColor: "#FF0000",
+        blurEnabled: true,
+        blurIntensity: 50,
+        shadowEnabled: true,
+        shadowOpacity: 60,
+      },
+    ],
+    [
+      "gradient background settings",
+      {
+        backgroundType: "gradient",
+        gradientColor1: "#FF0000",
+        gradientColor2: "#0000FF",
+        gradientAngle: 45,
+      },
+    ],
+  ])("rejects %s on Phase 1 and points to /effects (#2281)", async (_label, settings) => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
       {
         name: "settings",
-        content: JSON.stringify({
-          backgroundType: "color",
-          backgroundColor: "#FF0000",
-          blurEnabled: true,
-          blurIntensity: 50,
-          shadowEnabled: true,
-          shadowOpacity: 60,
-        }),
+        content: JSON.stringify(settings),
       },
     ]);
 
@@ -142,35 +157,13 @@ describe("Remove Background", () => {
       body,
     });
 
-    expect([202, 501]).toContain(res.statusCode);
-  }, 60_000);
-
-  it("accepts gradient background settings", async () => {
-    const { body, contentType } = createMultipartPayload([
-      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
-      {
-        name: "settings",
-        content: JSON.stringify({
-          backgroundType: "gradient",
-          gradientColor1: "#FF0000",
-          gradientColor2: "#0000FF",
-          gradientAngle: 45,
-        }),
-      },
-    ]);
-
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/remove-background",
-      headers: {
-        authorization: `Bearer ${adminToken}`,
-        "content-type": contentType,
-      },
-      body,
-    });
-
-    expect([202, 501]).toContain(res.statusCode);
-  }, 60_000);
+    expect([400, 501]).toContain(res.statusCode);
+    if (res.statusCode === 400) {
+      const result = JSON.parse(res.body);
+      expect(result.error).toMatch(/invalid settings/i);
+      expect(result.details).toMatch(/\/effects/);
+    }
+  });
 
   it("processes JPEG input", async () => {
     const { body, contentType } = createMultipartPayload([
@@ -381,6 +374,10 @@ describe("Remove Background", () => {
     ["a color background without a color", { backgroundType: "color" }],
     ["a gradient missing a stop", { backgroundType: "gradient", gradientColor1: "#000000" }],
     ["an image background without the file", { backgroundType: "image" }],
+    ["an invalid backgroundType", { backgroundType: "sparkles" }],
+    ["a blurIntensity out of range", { blurIntensity: 200 }],
+    ["a shadowOpacity out of range", { shadowOpacity: 200 }],
+    ["an invalid outputFormat", { outputFormat: "gif" }],
   ])("effects route answers 400 for %s (#2075)", async (_label, extra) => {
     const res = await effectsFor({ jobId: randomUUID(), filename: "test.png", ...extra });
 
@@ -610,7 +607,7 @@ describe("Remove Background", () => {
     expect([202, 501]).toContain(res.statusCode);
   }, 60_000);
 
-  it("accepts output format settings", async () => {
+  it("rejects outputFormat on Phase 1 and points to /effects (#2281)", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
       {
@@ -629,8 +626,13 @@ describe("Remove Background", () => {
       body,
     });
 
-    expect([202, 501]).toContain(res.statusCode);
-  }, 60_000);
+    expect([400, 501]).toContain(res.statusCode);
+    if (res.statusCode === 400) {
+      const result = JSON.parse(res.body);
+      expect(result.error).toMatch(/invalid settings/i);
+      expect(result.details).toMatch(/\/effects/);
+    }
+  });
 
   it("rejects edgeRefine out of range", async () => {
     const { body, contentType } = createMultipartPayload([
