@@ -345,3 +345,77 @@ describe("smart-crop face: clampRegion half-pixel rounding at image edges (#2200
     expect(b).toBeLessThan(30);
   });
 });
+
+describe("smart-crop PNG output: quality override stays lossless (#2205)", () => {
+  const ctx = {} as ToolProcessCtx;
+
+  // PNG IHDR chunk starts at byte 8 (4-byte length + "IHDR"); byte 25 is the
+  // colour type: 2 = truecolor RGB, 3 = indexed-colour (palette), 6 = RGBA.
+  const PNG_COLOR_TYPE_OFFSET = 25;
+  const PNG_COLOR_TYPE_TRUECOLOR = 2;
+
+  async function noisyTruecolorPng(width = 64, height = 64) {
+    const raw = Buffer.alloc(width * height * 3);
+    for (let i = 0; i < width * height; i++) {
+      raw[i * 3] = i & 0xff;
+      raw[i * 3 + 1] = (i >> 4) & 0xff;
+      raw[i * 3 + 2] = (i >> 8) & 0xff;
+    }
+    const buffer = await sharp(raw, { raw: { width, height, channels: 3 } })
+      .png()
+      .toBuffer();
+    return { raw, buffer };
+  }
+
+  it.each([
+    ["subject", { mode: "subject", width: 64, height: 64, quality: 95 }],
+    ["face", { mode: "face", width: 64, height: 64, quality: 95 }],
+    ["trim", { mode: "trim", threshold: 0, quality: 95 }],
+  ] as const)(
+    "keeps a truecolor PNG lossless and non-palette in %s mode when quality: 95 is sent",
+    async (label, inputSettings) => {
+      if (label === "face") {
+        mocks.detectFaces.mockResolvedValueOnce({
+          facesDetected: 1,
+          faces: [{ x: 0, y: 0, w: 64, h: 64 }],
+        });
+      }
+      const { raw, buffer } = await noisyTruecolorPng(64, 64);
+      expect(buffer[PNG_COLOR_TYPE_OFFSET]).toBe(PNG_COLOR_TYPE_TRUECOLOR);
+
+      const settings = schema.safeParse(inputSettings).data;
+      const out = await config.process(buffer, settings, "noisy.png", ctx);
+
+      expect(out.buffer[PNG_COLOR_TYPE_OFFSET]).toBe(PNG_COLOR_TYPE_TRUECOLOR);
+      const decoded = await sharp(out.buffer).raw().toBuffer();
+      expect(decoded.equals(raw)).toBe(true);
+    },
+  );
+
+  it("still honors quality override for JPEG inputs", async () => {
+    const { raw } = await noisyTruecolorPng(64, 64);
+    const jpegInput = await sharp(raw, { raw: { width: 64, height: 64, channels: 3 } })
+      .jpeg({ quality: 100 })
+      .toBuffer();
+
+    const highSettings = schema.safeParse({
+      mode: "subject",
+      width: 64,
+      height: 64,
+      quality: 95,
+    }).data;
+    const lowSettings = schema.safeParse({
+      mode: "subject",
+      width: 64,
+      height: 64,
+      quality: 10,
+    }).data;
+
+    const highOut = await config.process(jpegInput, highSettings, "photo.jpg", ctx);
+    const lowOut = await config.process(jpegInput, lowSettings, "photo.jpg", ctx);
+
+    expect(highOut.contentType).toBe("image/jpeg");
+    expect(lowOut.contentType).toBe("image/jpeg");
+    expect(lowOut.buffer.length).toBeLessThan(highOut.buffer.length);
+  });
+});

@@ -6,11 +6,11 @@ export interface OutputFormat {
   extension: string;
   contentType: string;
   /**
-   * Undefined for PNG unless explicitly overridden: Sharp reads `quality` on
-   * PNG as "quantise down to a palette", which dithers the image and often
-   * inflates the file (issue #710). `toFormat(format, { quality: undefined })`
-   * behaves exactly like passing no quality at all, so routes can spread this
-   * without caring about the format.
+   * Always undefined for PNG: Sharp reads `quality` on PNG as "quantise down to
+   * a palette", which dithers the image and often inflates the file (issues
+   * #710, #2205). `toFormat(format, { quality: undefined })` behaves exactly
+   * like passing no quality at all, so routes can spread this without caring
+   * about the format.
    */
   quality?: number;
   /**
@@ -90,9 +90,9 @@ export async function resolveOutputFormat(
 
   const mapped = detected ? FORMAT_MAP[detected] : undefined;
   const config = mapped ?? PNG_FALLBACK;
-  // PNG stays lossless unless the caller explicitly asked for a quality;
-  // every other encoder wants the default hint.
-  const quality = qualityOverride ?? (config.format === "png" ? undefined : DEFAULT_QUALITY);
+  // PNG has no lossy quality; Sharp reads `quality` on PNG as palette
+  // quantisation (#710, #2205), so ignore qualityOverride for PNG too.
+  const quality = config.format === "png" ? undefined : (qualityOverride ?? DEFAULT_QUALITY);
 
   return outputFormatFor(config.format, quality);
 }
@@ -108,15 +108,16 @@ export async function resolveOutputFormat(
  */
 export function outputFormatFor(format: SharpFormat, quality?: number): OutputFormat {
   const config = FORMAT_MAP[format] ?? PNG_FALLBACK;
+  const effectiveQuality = config.format === "png" ? undefined : quality;
   return {
     ...config,
     format,
-    quality,
+    quality: effectiveQuality,
     encoderOptions:
       format === "gif"
-        ? { quality, reuse: false }
+        ? { quality: effectiveQuality, reuse: false }
         : format === "tiff"
-          ? { quality, compression: "lzw" }
-          : { quality },
+          ? { quality: effectiveQuality, compression: "lzw" }
+          : { quality: effectiveQuality },
   };
 }

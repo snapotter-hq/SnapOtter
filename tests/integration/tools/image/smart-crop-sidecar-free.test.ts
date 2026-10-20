@@ -123,6 +123,46 @@ describe("smart-crop sidecar-free processing", () => {
     expect(outputUrl).toContain("_smartcrop.");
   });
 
+  it("keeps a truecolor PNG lossless instead of palette-quantising when quality: 95 is passed (#2205)", async () => {
+    const width = 64;
+    const height = 64;
+    const raw = Buffer.alloc(width * height * 3);
+    for (let i = 0; i < width * height; i++) {
+      raw[i * 3] = i & 0xff;
+      raw[i * 3 + 1] = (i >> 4) & 0xff;
+      raw[i * 3 + 2] = (i >> 8) & 0xff;
+    }
+    const truecolorPng = await sharp(raw, { raw: { width, height, channels: 3 } })
+      .png()
+      .toBuffer();
+
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "noisy.png", contentType: "image/png", content: truecolorPng },
+      {
+        name: "settings",
+        content: JSON.stringify({ mode: "subject", width: 64, height: 64, quality: 95 }),
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/smart-crop",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    const download = await downloadOutput(await outputUrlFor(res));
+    const meta = await sharp(download.rawPayload).metadata();
+    expect(meta.format).toBe("png");
+    // PNG IHDR byte 25 is the colour type: 2 = truecolor RGB, 3 = palette.
+    expect(download.rawPayload[25]).toBe(2);
+
+    const decoded = await sharp(download.rawPayload).raw().toBuffer();
+    expect(decoded.equals(raw)).toBe(true);
+  });
+
   it("maps legacy attention/content modes to subject and trim behavior", async () => {
     const attention = await postSmartCrop({ mode: "attention", width: 80, height: 80 });
     await expect(outputUrlFor(attention)).resolves.toContain("_smartcrop.");

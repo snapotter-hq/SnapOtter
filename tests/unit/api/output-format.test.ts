@@ -24,7 +24,6 @@ describe("resolveOutputFormat", () => {
     expect(result.contentType).toBe("image/png");
     // Sharp reads `quality` on PNG as "quantise to a palette", so a default
     // quality silently dithered every PNG that passed through (issue #710).
-    // Only an explicit override may request that.
     expect(result.quality).toBeUndefined();
   });
 
@@ -51,10 +50,28 @@ describe("resolveOutputFormat", () => {
     expect(result.quality).toBe(50);
   });
 
-  it("accepts quality override for PNG without error", async () => {
-    const result = await resolveOutputFormat(PNG, "image.png", 50);
-    expect(result.format).toBe("png");
-    expect(result.quality).toBe(50);
+  it("ignores quality override for PNG and PNG fallbacks so output stays lossless (#2205)", async () => {
+    const pngResult = await resolveOutputFormat(PNG, "image.png", 95);
+    expect(pngResult.format).toBe("png");
+    expect(pngResult.quality).toBeUndefined();
+    expect(pngResult.encoderOptions).toEqual({ quality: undefined });
+
+    const svg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="red"/></svg>',
+    );
+    const svgFallback = await resolveOutputFormat(svg, "vector.svg", 80);
+    expect(svgFallback.format).toBe("png");
+    expect(svgFallback.quality).toBeUndefined();
+    expect(svgFallback.encoderOptions).toEqual({ quality: undefined });
+
+    const fallbackResult = await resolveOutputFormat(
+      Buffer.from("not an image at all"),
+      "mystery.bin",
+      50,
+    );
+    expect(fallbackResult.format).toBe("png");
+    expect(fallbackResult.quality).toBeUndefined();
+    expect(fallbackResult.encoderOptions).toEqual({ quality: undefined });
   });
 });
 
@@ -111,6 +128,13 @@ describe("encoderOptions", () => {
       compression: "lzw",
     });
     expect(outputFormatFor("png")).toMatchObject({
+      format: "png",
+      extension: "png",
+      contentType: "image/png",
+      quality: undefined,
+      encoderOptions: { quality: undefined },
+    });
+    expect(outputFormatFor("png", 95)).toMatchObject({
       format: "png",
       extension: "png",
       contentType: "image/png",
