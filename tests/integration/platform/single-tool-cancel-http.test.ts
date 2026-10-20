@@ -80,7 +80,7 @@ vi.mock("../../../apps/api/src/jobs/enqueue.js", async (importOriginal) => {
   };
 });
 
-const { eq } = await import("drizzle-orm");
+const { and, eq } = await import("drizzle-orm");
 const { db, schema } = await import("../../../apps/api/src/db/index.js");
 const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js");
 const { getQueue } = await import("../../../apps/api/src/jobs/queues.js");
@@ -525,6 +525,111 @@ describe("concurrent-job limit with alias rows (#808)", () => {
         .update(schema.settings)
         .set({ value: "0" })
         .where(eq(schema.settings.key, "maxConcurrentJobsPerUser"));
+    }
+  });
+
+  it("fails closed with 500 instead of skipping the cap when reading maxConcurrentJobsPerUser or rateLimitPerUser throws (#2545)", async () => {
+    function breakSettingRead(targetKey: string) {
+      const originalSelect = db.select.bind(db);
+      return vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+        const selection = args[0] as Record<string, unknown> | undefined;
+        // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+        const builder = (originalSelect as any)(...args);
+        if (selection && "value" in selection) {
+          const origFrom = builder.from.bind(builder);
+          builder.from = (...fromArgs: unknown[]) => {
+            const query = origFrom(...fromArgs);
+            const origWhere = query.where.bind(query);
+            query.where = (...whereArgs: unknown[]) => {
+              const filtered = origWhere(...whereArgs);
+              if (filtered.toSQL().params.includes(targetKey)) {
+                throw new Error(`simulated settings store failure for ${targetKey}`);
+              }
+              return filtered;
+            };
+            return query;
+          };
+        }
+        return builder;
+      });
+    }
+
+    const user = await createUserAndLogin(app, `single-cancel-strict-${Date.now()}`);
+    const seededJobId = randomUUID();
+    await db.insert(schema.jobs).values({
+      id: seededJobId,
+      userId: user.userId,
+      type: "tool",
+      status: "queued",
+      inputRefs: [],
+    });
+    await db
+      .insert(schema.settings)
+      .values({ key: "maxConcurrentJobsPerUser", value: "1" })
+      .onConflictDoUpdate({ target: schema.settings.key, set: { value: "1" } });
+
+    try {
+      const maxConcurrentSpy = breakSettingRead("maxConcurrentJobsPerUser");
+      try {
+        const { body, contentType } = createMultipartPayload([
+          { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+          { name: "settings", content: JSON.stringify({ width: 50 }) },
+          { name: "clientJobId", content: randomUUID() },
+        ]);
+        const res = await app.inject({
+          method: "POST",
+          url: "/api/v1/tools/image/resize",
+          headers: { "content-type": contentType, authorization: `Bearer ${user.token}` },
+          body,
+        });
+        expect(res.statusCode).toBe(500);
+      } finally {
+        maxConcurrentSpy.mockRestore();
+      }
+
+      const toolJobs = await db
+        .select({ id: schema.jobs.id })
+        .from(schema.jobs)
+        .where(and(eq(schema.jobs.userId, user.userId), eq(schema.jobs.type, "tool")));
+      expect(toolJobs.map((r) => r.id)).toEqual([seededJobId]);
+
+      await db
+        .update(schema.settings)
+        .set({ value: "0" })
+        .where(eq(schema.settings.key, "maxConcurrentJobsPerUser"));
+      await db
+        .insert(schema.settings)
+        .values({ key: "rateLimitPerUser", value: "1" })
+        .onConflictDoUpdate({ target: schema.settings.key, set: { value: "1" } });
+
+      const rateLimitSpy = breakSettingRead("rateLimitPerUser");
+      try {
+        const { body, contentType } = createMultipartPayload([
+          { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+          { name: "settings", content: JSON.stringify({ width: 50 }) },
+        ]);
+        const res = await app.inject({
+          method: "POST",
+          url: "/api/v1/tools/image/resize",
+          headers: { "content-type": contentType, authorization: `Bearer ${user.token}` },
+          body,
+        });
+        expect(res.statusCode).toBe(500);
+      } finally {
+        rateLimitSpy.mockRestore();
+      }
+
+      const toolJobsAfterRateLimitFault = await db
+        .select({ id: schema.jobs.id })
+        .from(schema.jobs)
+        .where(and(eq(schema.jobs.userId, user.userId), eq(schema.jobs.type, "tool")));
+      expect(toolJobsAfterRateLimitFault.map((r) => r.id)).toEqual([seededJobId]);
+    } finally {
+      await db
+        .update(schema.settings)
+        .set({ value: "0" })
+        .where(eq(schema.settings.key, "maxConcurrentJobsPerUser"));
+      await db.delete(schema.settings).where(eq(schema.settings.key, "rateLimitPerUser"));
     }
   });
 });

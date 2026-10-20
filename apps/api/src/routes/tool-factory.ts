@@ -30,7 +30,7 @@ import { createUniqueNamer } from "../lib/filename.js";
 import { multipartFailure } from "../lib/multipart-parts.js";
 import { deletePrefix, getObjectBuffer, putObject } from "../lib/object-storage.js";
 import { resolveToolPool, shouldSkipSyncWindow } from "../lib/pool.js";
-import { getSettingNumber } from "../lib/settings-helpers.js";
+import { getSettingStrict, parseNumericSettingValue } from "../lib/settings-helpers.js";
 import { type ReceivedUpload, receiveUpload } from "../lib/upload-stream.js";
 import { type InputHandler, InputValidationError } from "../modality/contract.js";
 import { inputHandlerFor } from "../modality/input-handler.js";
@@ -583,7 +583,11 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         // carry the owner so cancels can be authorized); counting them
         // would double-charge every tool-route run against the limit.
         const userId = authUser.id;
-        const maxConcurrent = await getSettingNumber("maxConcurrentJobsPerUser", 0);
+        const maxConcurrent = parseNumericSettingValue(
+          "maxConcurrentJobsPerUser",
+          await getSettingStrict("maxConcurrentJobsPerUser"),
+          0,
+        );
         if (maxConcurrent > 0 && userId) {
           const activeJobs = await db
             .select({ count: sql<number>`count(*)::int` })

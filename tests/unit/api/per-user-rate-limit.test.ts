@@ -3,18 +3,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Mocks: the plugin depends on getAuthUser (auth), sharedRedis (BullMQ Redis
-// connection), and getSettingNumber (DB-backed settings). Mocking all three
-// lets us drive every branch of the preHandler deterministically, without a
-// real Redis instance or the timing flakiness of a sliding-window counter.
+// connection), and DB-backed settings read via getSettingStrict +
+// parseNumericSettingValue. Mocking auth, Redis, db, and logger lets us drive
+// every branch of the preHandler deterministically without a live Redis or DB.
 // ---------------------------------------------------------------------------
 
 type AuthUser = { id: string; username: string; role: string } | null;
 
 let mockUser: AuthUser = null;
 let mockRateLimit = 0;
+let mockRateLimitRaw: string | null | undefined;
+let mockRateLimitError: Error | null = null;
 let mockZcardResult: number | null = 0;
 // When true, multi.exec() resolves to null (a Redis MULTI abort / WATCH fail).
 let mockExecReturnsNull = false;
+const loggerWarn = vi.hoisted(() => vi.fn());
 
 const zremrangebyscore = vi.fn();
 const zadd = vi.fn();
@@ -66,8 +69,31 @@ vi.mock("../../../apps/api/src/jobs/connection.js", () => ({
   sharedRedis: () => ({ multi: redisMulti }),
 }));
 
-vi.mock("../../../apps/api/src/lib/settings-helpers.js", () => ({
-  getSettingNumber: vi.fn(async () => mockRateLimit),
+vi.mock("../../../apps/api/src/db/index.js", () => ({
+  db: {
+    select: vi.fn(() => ({
+      from: () => ({
+        where: () => ({
+          limit: async () => {
+            if (mockRateLimitError) throw mockRateLimitError;
+            if (mockRateLimitRaw === null) return [];
+            if (mockRateLimitRaw !== undefined) return [{ value: mockRateLimitRaw }];
+            return [{ value: String(mockRateLimit) }];
+          },
+        }),
+      }),
+    })),
+  },
+  schema: { settings: { key: "key", value: "value" } },
+}));
+
+vi.mock("../../../apps/api/src/lib/logger.js", () => ({
+  logger: {
+    warn: loggerWarn,
+    error: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  },
 }));
 
 import { registerPerUserRateLimit } from "../../../apps/api/src/plugins/per-user-rate-limit.js";
@@ -95,6 +121,8 @@ describe("registerPerUserRateLimit", () => {
   beforeEach(() => {
     mockUser = { id: "user-1", username: "alice", role: "user" };
     mockRateLimit = 0;
+    mockRateLimitRaw = undefined;
+    mockRateLimitError = null;
     mockZcardResult = 0;
     mockExecReturnsNull = false;
     zremrangebyscore.mockClear();
@@ -103,6 +131,7 @@ describe("registerPerUserRateLimit", () => {
     expire.mockClear();
     exec.mockClear();
     redisMulti.mockClear();
+    loggerWarn.mockClear();
   });
 
   afterEach(async () => {
@@ -255,5 +284,41 @@ describe("registerPerUserRateLimit", () => {
 
     expect(zremrangebyscore).toHaveBeenCalledWith("ratelimit:user:user-42", 0, expect.any(Number));
     expect(expire).toHaveBeenCalledWith("ratelimit:user:user-42", 61);
+  });
+
+  // -- Branch: DB settings read failure -> fail closed with 500 (#2545) -----
+  it("fails closed with 500 and skips Redis work when reading rateLimitPerUser throws (#2545)", async () => {
+    mockRateLimitError = new Error("connection terminated unexpectedly");
+    app = await buildApp();
+
+    const res = await app.inject({ method: "GET", url: "/api/v1/ping" });
+
+    expect(res.statusCode).toBe(500);
+    expect(redisMulti).not.toHaveBeenCalled();
+    expect(res.headers["x-ratelimit-limit"]).toBeUndefined();
+  });
+
+  it("treats an absent rateLimitPerUser setting row as disabled (0) without warning (#2545)", async () => {
+    mockRateLimitRaw = null;
+    app = await buildApp();
+
+    const res = await app.inject({ method: "GET", url: "/api/v1/ping" });
+
+    expect(res.statusCode).toBe(200);
+    expect(redisMulti).not.toHaveBeenCalled();
+    expect(loggerWarn).not.toHaveBeenCalled();
+  });
+
+  it("treats blank or non-numeric stored rateLimitPerUser values as disabled (0) (#2545)", async () => {
+    app = await buildApp();
+
+    const invalidValues = ["", "   ", "not-a-number", "1.5", "Infinity"];
+    for (const raw of invalidValues) {
+      mockRateLimitRaw = raw;
+      const res = await app.inject({ method: "GET", url: "/api/v1/ping" });
+      expect(res.statusCode).toBe(200);
+    }
+    expect(redisMulti).not.toHaveBeenCalled();
+    expect(loggerWarn).toHaveBeenCalledTimes(invalidValues.length);
   });
 });

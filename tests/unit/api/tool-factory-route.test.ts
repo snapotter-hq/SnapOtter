@@ -40,6 +40,15 @@ vi.mock("../../../apps/api/src/config.js", () => ({
   },
 }));
 
+vi.mock("../../../apps/api/src/lib/logger.js", () => ({
+  logger: {
+    warn: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
 vi.mock("../../../apps/api/src/jobs/enqueue.js", () => ({
   enqueueToolJob: vi.fn().mockResolvedValue({}),
   insertToolJobAlias: vi.fn().mockResolvedValue(true),
@@ -659,6 +668,207 @@ describe("createToolRoute", () => {
         restore();
       }
       expect(deletePrefix).toHaveBeenCalledWith(expect.stringMatching(/^uploads\/[^/]+\/$/));
+    });
+
+    it("rejects and discards the upload without enqueuing when reading maxConcurrentJobsPerUser fails (#2545)", async () => {
+      const select = vi.mocked(db.select);
+      const original = select.getMockImplementation();
+      select.mockImplementation(((fields?: Record<string, unknown>) =>
+        fields && "value" in fields
+          ? {
+              from: () => ({
+                where: () => ({
+                  limit: () => Promise.reject(new Error("settings store failure")),
+                }),
+              }),
+            }
+          : original?.()) as never);
+
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+      const req = createMockRequest({ fileBuffer: Buffer.from("png-data") });
+
+      try {
+        await expect(handler(req, createMockReply())).rejects.toThrow("settings store failure");
+      } finally {
+        select.mockImplementation(original as never);
+      }
+      expect(enqueueToolJob).not.toHaveBeenCalled();
+      expect(deletePrefix).toHaveBeenCalledWith(expect.stringMatching(/^uploads\/[^/]+\/$/));
+    });
+
+    it("returns 429 and discards the upload when activeJobs reaches maxConcurrentJobsPerUser (#2545)", async () => {
+      const select = vi.mocked(db.select);
+      const original = select.getMockImplementation();
+      select.mockImplementation(((fields?: Record<string, unknown>) => {
+        if (fields && "value" in fields) {
+          return {
+            from: () => ({
+              where: () => ({
+                limit: () => Promise.resolve([{ value: "2" }]),
+              }),
+            }),
+          };
+        }
+        if (fields && "count" in fields) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ count: 2 }]),
+            }),
+          };
+        }
+        return original?.();
+      }) as never);
+
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+      const reply = createMockReply();
+      const req = createMockRequest({ fileBuffer: Buffer.from("png-data") });
+
+      try {
+        await handler(req, reply);
+      } finally {
+        select.mockImplementation(original as never);
+      }
+      expect(reply.status).toHaveBeenCalledWith(429);
+      expect(reply.send).toHaveBeenCalledWith({
+        error: "Too many concurrent jobs. Please wait for existing jobs to complete.",
+        activeJobs: 2,
+        limit: 2,
+      });
+      expect(enqueueToolJob).not.toHaveBeenCalled();
+      expect(deletePrefix).toHaveBeenCalledWith(expect.stringMatching(/^uploads\/[^/]+\/$/));
+    });
+
+    it("enqueues normally when activeJobs is strictly below maxConcurrentJobsPerUser (#2545)", async () => {
+      const select = vi.mocked(db.select);
+      const original = select.getMockImplementation();
+      select.mockImplementation(((fields?: Record<string, unknown>) => {
+        if (fields && "value" in fields) {
+          return {
+            from: () => ({
+              where: () => ({
+                limit: () => Promise.resolve([{ value: "2" }]),
+              }),
+            }),
+          };
+        }
+        if (fields && "count" in fields) {
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ count: 1 }]),
+            }),
+          };
+        }
+        return original?.();
+      }) as never);
+
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+      const reply = createMockReply();
+      const req = createMockRequest({ fileBuffer: Buffer.from("png-data") });
+
+      try {
+        await handler(req, reply);
+      } finally {
+        select.mockImplementation(original as never);
+      }
+      expect(enqueueToolJob).toHaveBeenCalledTimes(1);
+      expect(reply.send).toHaveBeenCalledWith(
+        expect.objectContaining({ jobId: expect.any(String) }),
+      );
+      expect(deletePrefix).not.toHaveBeenCalled();
+    });
+
+    it("rejects and discards the upload when the activeJobs count query fails (#2545)", async () => {
+      const select = vi.mocked(db.select);
+      const original = select.getMockImplementation();
+      select.mockImplementation(((fields?: Record<string, unknown>) => {
+        if (fields && "value" in fields) {
+          return {
+            from: () => ({
+              where: () => ({
+                limit: () => Promise.resolve([{ value: "2" }]),
+              }),
+            }),
+          };
+        }
+        if (fields && "count" in fields) {
+          return {
+            from: () => ({
+              where: () => Promise.reject(new Error("active jobs query failed")),
+            }),
+          };
+        }
+        return original?.();
+      }) as never);
+
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+      const req = createMockRequest({ fileBuffer: Buffer.from("png-data") });
+
+      try {
+        await expect(handler(req, createMockReply())).rejects.toThrow("active jobs query failed");
+      } finally {
+        select.mockImplementation(original as never);
+      }
+      expect(enqueueToolJob).not.toHaveBeenCalled();
+      expect(deletePrefix).toHaveBeenCalledWith(expect.stringMatching(/^uploads\/[^/]+\/$/));
+    });
+
+    it("treats blank or out-of-range maxConcurrentJobsPerUser values as disabled (0) (#2545)", async () => {
+      const select = vi.mocked(db.select);
+      const original = select.getMockImplementation();
+      let storedRaw = "";
+      let countQueries = 0;
+      select.mockImplementation(((fields?: Record<string, unknown>) => {
+        if (fields && "value" in fields) {
+          return {
+            from: () => ({
+              where: () => ({
+                limit: () => Promise.resolve([{ value: storedRaw }]),
+              }),
+            }),
+          };
+        }
+        if (fields && "count" in fields) {
+          countQueries++;
+          return {
+            from: () => ({
+              where: () => Promise.resolve([{ count: 99 }]),
+            }),
+          };
+        }
+        return original?.();
+      }) as never);
+
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+
+      try {
+        for (const bad of ["", "-1", "1.5", "not-a-number", "Infinity"]) {
+          storedRaw = bad;
+          const reply = createMockReply();
+          const req = createMockRequest({ fileBuffer: Buffer.from("png-data") });
+          await handler(req, reply);
+          expect(reply.send).toHaveBeenCalledWith(
+            expect.objectContaining({ jobId: expect.any(String) }),
+          );
+        }
+      } finally {
+        select.mockImplementation(original as never);
+      }
+      expect(countQueries).toBe(0);
     });
 
     it("spreads resultPayload fields at top level in sync 200 envelope", async () => {
