@@ -176,7 +176,7 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 
 | Tool ID | Name | AI Model | Key settings |
 |---------|------|---------|-------------|
-| `remove-background` | Remove Background | rembg (BiRefNet / U2-Net) | `model`, `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
+| `remove-background` | Remove Background | rembg (BiRefNet / U2-Net) | Phase 1: `model`, `edgeRefine` (0-3), `decontaminate`. Phase 2 (`/api/v1/tools/image/remove-background/effects`), `/batch`, and pipelines: `backgroundType` (transparent/color/gradient/blur, plus image on `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
 | `upscale` | Image Upscaling | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Object Eraser | LaMa (ONNX) | Mask sent as second file part (fieldname `mask`), `format`, `quality` |
 | `ocr` | OCR / Text Extraction | Tesseract (fast); RapidOCR + PP-OCR ONNX (balanced/best) | `quality` (fast/balanced/best), `language`, `enhance` |

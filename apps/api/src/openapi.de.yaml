@@ -3951,15 +3951,9 @@ paths:
                   description: |
                     JSON string with options:
                     - `model` (string, optional) - AI model name (one of: u2net, isnet-general-use, bria-rmbg, birefnet-general-lite, birefnet-portrait, birefnet-general, birefnet-matting, birefnet-hr-matting)
-                    - `backgroundType` (string, optional) - One of: transparent, color, gradient, blur, image
-                    - `backgroundColor` (string, optional) - Hex color to replace removed background with
-                    - `gradientColor1` (string, optional) - First gradient color
-                    - `gradientColor2` (string, optional) - Second gradient color
-                    - `gradientAngle` (number, optional) - Gradient angle in degrees
-                    - `blurEnabled` (boolean, optional) - Enable background blur effect
-                    - `blurIntensity` (number 0-100, optional) - Blur strength
-                    - `shadowEnabled` (boolean, optional) - Enable drop shadow
-                    - `shadowOpacity` (number 0-100, optional) - Shadow opacity
+                    - `edgeRefine` (integer 0-3, optional) - Edge refinement level
+                    - `decontaminate` (boolean, optional) - Remove background color spill
+                    Background and effect settings belong on `POST /api/v1/tools/image/remove-background/effects` (or `/batch` and pipelines).
                 clientJobId:
                   type: string
                   pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
@@ -4042,6 +4036,7 @@ paths:
                     - `blurIntensity` (number 0-100) - Blur strength
                     - `shadowEnabled` (boolean) - Enable drop shadow
                     - `shadowOpacity` (number 0-100) - Shadow opacity
+                    - `outputFormat` (string, optional) - One of: png, webp, avif
       responses:
         '200':
           description: Image with applied effects

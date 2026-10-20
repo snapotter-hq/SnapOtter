@@ -160,6 +160,15 @@ const pipelineSettingsSchema = settingsShape
   .extend({ backgroundType: z.enum(["transparent", "color", "gradient", "blur"]).optional() })
   .superRefine(requireBackgroundColors);
 
+export const effectsSchema = z
+  .object({
+    jobId: z.string().min(1),
+    filename: z.string().min(1),
+    backgroundType: z.enum(BACKGROUND_TYPES).optional(),
+    ...backgroundFields,
+  })
+  .superRefine(requireBackgroundColors);
+
 /**
  * Composite the cutout over the requested background and name the result.
  * Shared by the pipeline/batch path of the AI handler and the registry process
@@ -477,15 +486,6 @@ export function registerRemoveBackground(app: FastifyInstance) {
       if (!settingsRaw) {
         return reply.status(400).send({ error: "No settings provided" });
       }
-
-      const effectsSchema = z
-        .object({
-          jobId: z.string().min(1),
-          filename: z.string().min(1),
-          backgroundType: z.enum(BACKGROUND_TYPES).optional(),
-          ...backgroundFields,
-        })
-        .superRefine(requireBackgroundColors);
 
       let settings: z.infer<typeof effectsSchema>;
       try {

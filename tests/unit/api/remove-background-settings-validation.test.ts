@@ -1,10 +1,12 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
+import { load } from "js-yaml";
 import sharp from "sharp";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import {
+  effectsSchema,
   phase1SettingsSchema,
   registerRemoveBackground,
 } from "../../../apps/api/src/routes/tools/remove-background.js";
@@ -350,5 +352,83 @@ describe("remove-background Phase 1 settings validation (#2281)", () => {
     expect(verifyAiMatch).not.toBeNull();
     const verifyAiSettings = parseObjectLiteral(verifyAiMatch?.[1] ?? "");
     expect(phase1SettingsSchema.safeParse(verifyAiSettings).success).toBe(true);
+  });
+
+  it("pins Phase 1 and Phase 2 settings in openapi.yaml and apps/docs/api/rest.md (#2975)", () => {
+    const openapi = load(
+      readFileSync(path.join(REPO_ROOT, "apps/api/src/openapi.yaml"), "utf8"),
+    ) as {
+      paths: Record<
+        string,
+        {
+          post?: {
+            requestBody?: {
+              content?: {
+                "multipart/form-data"?: {
+                  schema?: { properties?: { settings?: { description?: string } } };
+                };
+              };
+            };
+          };
+        }
+      >;
+    };
+
+    const expectedPhase2Keys = Object.keys(effectsSchema._def.schema.shape);
+    const expectedPhase1Keys = Object.keys(
+      phase1SettingsSchema._def.schema._def.schema.shape,
+    ).filter((k) => !expectedPhase2Keys.includes(k));
+
+    const phase1Desc =
+      openapi.paths["/api/v1/tools/image/remove-background"]?.post?.requestBody?.content?.[
+        "multipart/form-data"
+      ]?.schema?.properties?.settings?.description ?? "";
+    const phase1Bullets = [...phase1Desc.matchAll(/^- `(\w+)`/gm)].map((m) => m[1]);
+    expect(phase1Bullets).toEqual(expectedPhase1Keys);
+    expect(phase1Desc).toContain("- `edgeRefine` (integer 0-3, optional)");
+    expect(phase1Desc).toContain("- `decontaminate` (boolean, optional)");
+    expect(phase1Desc).toContain("/api/v1/tools/image/remove-background/effects");
+
+    const phase1Probes: Record<string, unknown> = {
+      model: "u2net",
+      edgeRefine: 2,
+      decontaminate: true,
+    };
+    for (const key of phase1Bullets) {
+      expect(phase1SettingsSchema.safeParse({ [key]: phase1Probes[key] })).toEqual({
+        success: true,
+        data: { [key]: phase1Probes[key] },
+      });
+    }
+
+    const phase2Desc =
+      openapi.paths["/api/v1/tools/image/remove-background/effects"]?.post?.requestBody?.content?.[
+        "multipart/form-data"
+      ]?.schema?.properties?.settings?.description ?? "";
+    const phase2Bullets = [...phase2Desc.matchAll(/^- `(\w+)`/gm)].map((m) => m[1]);
+    expect(phase2Bullets).toEqual(expectedPhase2Keys);
+    expect(phase2Desc).toContain("- `outputFormat` (string, optional) - One of: png, webp, avif");
+    for (const fmt of ["png", "webp", "avif"] as const) {
+      expect(
+        effectsSchema.safeParse({ jobId: "j1", filename: "photo.png", outputFormat: fmt }).success,
+      ).toBe(true);
+    }
+
+    const restDoc = readFileSync(path.join(REPO_ROOT, "apps/docs/api/rest.md"), "utf8");
+    const removeBgRow = restDoc
+      .split("\n")
+      .find((line) => line.startsWith("| `remove-background` |"));
+    expect(removeBgRow).toBeDefined();
+    const keySettingsCell = removeBgRow?.split("|")[4] ?? "";
+    const [restPhase1, restPhase2] = keySettingsCell.split("Phase 2");
+    expect(restPhase1).toBeDefined();
+    expect(restPhase2).toBeDefined();
+    const restPhase1Keys = [...(restPhase1?.matchAll(/`([a-zA-Z]\w*)`/g) ?? [])].map((m) => m[1]);
+    const restPhase2Keys = [...(restPhase2?.matchAll(/`([a-zA-Z]\w*)`/g) ?? [])].map((m) => m[1]);
+    expect(restPhase1Keys).toEqual(expectedPhase1Keys);
+    expect(restPhase2Keys).toEqual(
+      expectedPhase2Keys.filter((k) => k !== "jobId" && k !== "filename"),
+    );
+    expect(restPhase2).toContain("`/api/v1/tools/image/remove-background/effects`");
   });
 });
