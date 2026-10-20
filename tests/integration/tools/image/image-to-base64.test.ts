@@ -6,7 +6,9 @@
  */
 
 import { gzipSync } from "node:zlib";
+import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env } from "../../../../apps/api/src/config.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
@@ -1386,5 +1388,48 @@ describe("image-to-base64", () => {
     expect(json.results[0].mimeType).toBe("image/png");
     expect(json.results[0].width).toBeLessThanOrEqual(50);
     expect(json.results[0].dataUri).toMatch(/^data:image\/png;base64,/);
+  });
+
+  it("records MAX_MEGAPIXELS rejections in errors while processing valid files (#3104)", async () => {
+    const twoMpPng = await sharp({
+      create: {
+        width: 2000,
+        height: 1000,
+        channels: 3,
+        background: { r: 20, g: 40, b: 60 },
+      },
+    })
+      .png()
+      .toBuffer();
+
+    const prevMaxMp = env.MAX_MEGAPIXELS;
+    (env as { MAX_MEGAPIXELS: number }).MAX_MEGAPIXELS = 1;
+    try {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "oversized.png", contentType: "image/png", content: twoMpPng },
+        { name: "file", filename: "ok.png", contentType: "image/png", content: PNG },
+        { name: "settings", content: JSON.stringify({ outputFormat: "original" }) },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/image-to-base64",
+        headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+        body,
+      });
+
+      expect(res.statusCode).toBe(200);
+      const json = JSON.parse(res.body);
+      expect(json.results).toHaveLength(1);
+      expect(json.results[0].filename).toBe("ok.png");
+      expect(json.errors).toEqual([
+        {
+          filename: "oversized.png",
+          error: "Image exceeds maximum size: 2.0MP (limit: 1MP)",
+        },
+      ]);
+    } finally {
+      (env as { MAX_MEGAPIXELS: number }).MAX_MEGAPIXELS = prevMaxMp;
+    }
   });
 });

@@ -2,7 +2,7 @@ import { basename } from "node:path";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import {
   DecoderOutOfMemoryError,
@@ -118,10 +118,14 @@ export function registerImageToBase64(app: FastifyInstance) {
 
           let decoded = buffer;
           const validation = await validateImageBuffer(buffer, filename);
-          if (validation.valid && validation.format === "heif") {
+          if (!validation.valid) {
+            errors.push({ filename, error: validation.reason });
+            continue;
+          }
+          if (validation.format === "heif") {
             decoded = await decodeHeic(decoded);
           }
-          if (validation.valid && needsCliDecode(validation.format)) {
+          if (needsCliDecode(validation.format)) {
             try {
               const fileExt = filename.split(".").pop()?.toLowerCase();
               decoded = await decodeToSharpCompat(decoded, validation.format, fileExt);
@@ -135,7 +139,7 @@ export function registerImageToBase64(app: FastifyInstance) {
               }
             }
           }
-          let isSvg = validation.valid && validation.format === "svg";
+          let isSvg = validation.format === "svg";
           if (isSvg) {
             decoded = decompressSvgz(decoded);
             decoded = sanitizeSvg(decoded);
@@ -242,7 +246,9 @@ export function registerImageToBase64(app: FastifyInstance) {
           if (isDecoderUnavailable(err)) throw err;
           errors.push({
             filename,
-            error: err instanceof Error ? err.message : "Failed to process image",
+            error: stripInternalPaths(
+              err instanceof Error ? err.message : "Failed to process image",
+            ),
           });
         }
       }

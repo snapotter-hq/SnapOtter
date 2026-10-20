@@ -7,8 +7,10 @@
  * extremes, format forcing, and error handling through the HTTP layer.
  */
 
+import { gzipSync } from "node:zlib";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env } from "../../../../apps/api/src/config.js";
 import { getToolConfig } from "../../../../apps/api/src/routes/tool-factory.js";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -1327,5 +1329,103 @@ describe("Beautify", () => {
 
     const res = await post("/api/v1/tools/image/beautify", payload);
     expect(res.statusCode).toBe(200);
+  });
+
+  // ── Input validation & backgroundImage preparation (#3104) ──────────
+  it("rejects main image or backgroundImage exceeding MAX_MEGAPIXELS with 400 (#3104)", async () => {
+    const twoMpPng = await sharp({
+      create: {
+        width: 2000,
+        height: 1000,
+        channels: 3,
+        background: { r: 20, g: 40, b: 60 },
+      },
+    })
+      .png()
+      .toBuffer();
+
+    const prevMaxMp = env.MAX_MEGAPIXELS;
+    (env as { MAX_MEGAPIXELS: number }).MAX_MEGAPIXELS = 1;
+    try {
+      const mainPayload = createMultipartPayload([
+        { name: "file", filename: "huge.png", contentType: "image/png", content: twoMpPng },
+        { name: "settings", content: JSON.stringify({}) },
+      ]);
+      const mainRes = await post("/api/v1/tools/image/beautify", mainPayload);
+      expect(mainRes.statusCode).toBe(400);
+      expect(JSON.parse(mainRes.body).error).toBe(
+        "Invalid image: Image exceeds maximum size: 2.0MP (limit: 1MP)",
+      );
+
+      const bgPayload = createMultipartPayload([
+        { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+        {
+          name: "backgroundImage",
+          filename: "huge-bg.png",
+          contentType: "image/png",
+          content: twoMpPng,
+        },
+        { name: "settings", content: JSON.stringify({ backgroundType: "image" }) },
+      ]);
+      const bgRes = await post("/api/v1/tools/image/beautify", bgPayload);
+      expect(bgRes.statusCode).toBe(400);
+      expect(JSON.parse(bgRes.body).error).toBe(
+        "Invalid background image: Image exceeds maximum size: 2.0MP (limit: 1MP)",
+      );
+    } finally {
+      (env as { MAX_MEGAPIXELS: number }).MAX_MEGAPIXELS = prevMaxMp;
+    }
+  });
+
+  it("decompresses and sanitizes .svgz and .svg backgroundImage uploads and rejects invalid backgroundImage with 400 (#3104)", async () => {
+    const rawSvg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><feImage href="http://127.0.0.1:9/ssrf"/><script>alert(1)</script><rect width="300" height="200" fill="#00ff00"/></svg>',
+    );
+    const svgz = gzipSync(rawSvg);
+
+    const svgzPayload = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "backgroundImage",
+        filename: "bg.svgz",
+        contentType: "image/svg+xml",
+        content: svgz,
+      },
+      {
+        name: "settings",
+        content: JSON.stringify({ backgroundType: "image", padding: 30, shadowPreset: "none" }),
+      },
+    ]);
+
+    const svgzRes = await post("/api/v1/tools/image/beautify", svgzPayload);
+    expect(svgzRes.statusCode).toBe(200);
+
+    const dlUrl = JSON.parse(svgzRes.body).downloadUrl as string;
+    const dlRes = await app.inject({
+      method: "GET",
+      url: dlUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dlRes.statusCode).toBe(200);
+    const { data } = await sharp(dlRes.rawPayload).raw().toBuffer({ resolveWithObject: true });
+    expect(data[0]).toBe(0);
+    expect(data[1]).toBe(255);
+    expect(data[2]).toBe(0);
+
+    const badBgPayload = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      {
+        name: "backgroundImage",
+        filename: "bad.png",
+        contentType: "image/png",
+        content: Buffer.from("not an image"),
+      },
+      { name: "settings", content: JSON.stringify({ backgroundType: "image" }) },
+    ]);
+    const badBgRes = await post("/api/v1/tools/image/beautify", badBgPayload);
+    expect(badBgRes.statusCode).toBe(400);
+    expect(JSON.parse(badBgRes.body).error).toBe(
+      "Invalid background image: Unrecognized image format",
+    );
   });
 });

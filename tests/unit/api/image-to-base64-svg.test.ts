@@ -1,6 +1,8 @@
 import { Readable } from "node:stream";
 import { gzipSync } from "node:zlib";
+import sharp from "sharp";
 import { beforeAll, describe, expect, it, vi } from "vitest";
+import { env } from "../../../apps/api/src/config.js";
 import { registerImageToBase64 } from "../../../apps/api/src/routes/tools/image-to-base64.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 
@@ -168,7 +170,7 @@ describe("image-to-base64 SVG and SVGZ sanitization in original mode (#2594)", (
     }
   });
 
-  it("decompresses and sanitizes SVGs that bypass validateImageBuffer sniff window or .svgz extension check", async () => {
+  it("rejects SVGs that fail validateImageBuffer (such as >4KB leading comment or gzipped .svg) in errors", async () => {
     const longComment = `<!-- ${"x".repeat(4500)} -->`;
     const commentPaddedSvg = Buffer.from(
       `${longComment}<svg xmlns="http://www.w3.org/2000/svg" width="25" height="25"><script>alert(4)</script><rect width="25" height="25"/></svg>`,
@@ -188,17 +190,78 @@ describe("image-to-base64 SVG and SVGZ sanitization in original mode (#2594)", (
     );
 
     expect(statusCode).toBe(200);
-    expect(json.errors).toEqual([]);
-    expect(json.results).toHaveLength(2);
+    expect(json.results).toEqual([]);
+    expect(json.errors).toEqual([
+      { filename: "long-comment.svg", error: "Unrecognized image format" },
+      { filename: "gzipped-as-svg.svg", error: "Unrecognized image format" },
+    ]);
+  });
 
+  it("sanitizes comment-padded SVGs that pass validateImageBuffer via .apng or .tga extension fallback", async () => {
+    const longComment = `<!-- ${"x".repeat(4500)} -->`;
+    const commentPaddedSvg = Buffer.from(
+      `${longComment}<svg xmlns="http://www.w3.org/2000/svg" width="25" height="25"><script>alert(4)</script><rect width="25" height="25"/></svg>`,
+    );
+
+    const { statusCode, json } = await invokeRoute(
+      [
+        { filename: "long-comment.apng", content: commentPaddedSvg },
+        { filename: "long-comment.tga", content: commentPaddedSvg },
+        { filename: "empty.png", content: Buffer.alloc(0) },
+        { filename: "nulls.png", content: Buffer.alloc(64, 0) },
+      ],
+      { outputFormat: "original", maxWidth: 0, maxHeight: 0 },
+    );
+
+    expect(statusCode).toBe(200);
+    expect(json.results).toHaveLength(2);
     for (const result of json.results) {
       expect(result.mimeType).toBe("image/svg+xml");
-      const decodedBytes = Buffer.from(result.base64, "base64");
-      expect(decodedBytes[0]).not.toBe(0x1f);
-      const decodedXml = decodedBytes.toString("utf-8");
+      const decodedXml = Buffer.from(result.base64, "base64").toString("utf-8");
       expect(decodedXml).toContain("<svg");
       expect(decodedXml).not.toContain("<script");
       expect(decodedXml).not.toContain("alert(");
+    }
+    expect(json.errors).toEqual([
+      { filename: "empty.png", error: "File is empty" },
+      { filename: "nulls.png", error: "File contains no image data" },
+    ]);
+  });
+
+  it("rejects images exceeding MAX_MEGAPIXELS in errors and continues processing valid files (#3104)", async () => {
+    const twoMpPng = await sharp({
+      create: {
+        width: 2000,
+        height: 1000,
+        channels: 3,
+        background: { r: 10, g: 20, b: 30 },
+      },
+    })
+      .png()
+      .toBuffer();
+
+    const prevMaxMp = env.MAX_MEGAPIXELS;
+    (env as { MAX_MEGAPIXELS: number }).MAX_MEGAPIXELS = 1;
+    try {
+      const { statusCode, json } = await invokeRoute(
+        [
+          { filename: "too-big.png", content: twoMpPng },
+          { filename: "ok.png", content: PNG_200 },
+        ],
+        { outputFormat: "original" },
+      );
+
+      expect(statusCode).toBe(200);
+      expect(json.results).toHaveLength(1);
+      expect(json.results[0].filename).toBe("ok.png");
+      expect(json.errors).toEqual([
+        {
+          filename: "too-big.png",
+          error: "Image exceeds maximum size: 2.0MP (limit: 1MP)",
+        },
+      ]);
+    } finally {
+      (env as { MAX_MEGAPIXELS: number }).MAX_MEGAPIXELS = prevMaxMp;
     }
   });
 

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { hasServerErrorStatus } from "@snapotter/shared";
-import type { FastifyInstance } from "fastify";
+import { hasServerErrorStatus, isToolInputError } from "@snapotter/shared";
+import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { autoOrient } from "../../lib/auto-orient.js";
 import {
@@ -17,7 +17,7 @@ import {
 } from "../../lib/beautify/constants.js";
 import { renderFrame } from "../../lib/beautify/frames.js";
 import { applyShadow } from "../../lib/beautify/shadow.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import {
@@ -30,7 +30,8 @@ import { decodeHeic } from "../../lib/heic-converter.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { putObject } from "../../lib/object-storage.js";
-import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { decompressSvgz, isSvgzClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 const ALPHA_FORMATS = new Set(["png", "webp", "avif"]);
@@ -76,37 +77,89 @@ function resolveOutputFilename(filename: string, settings: BeautifySettings): st
   return filename.replace(/\.[^.]+$/, ext);
 }
 
+function sanitizeSvgInput(buf: Buffer): Buffer {
+  try {
+    const decompressed = decompressSvgz(buf);
+    return sanitizeSvg(decompressed);
+  } catch (err) {
+    if (
+      isSvgzClientError(err) ||
+      (err instanceof Error && err.message.includes("SVGZ file does not contain"))
+    ) {
+      const validationErr = new InputValidationError(
+        err instanceof Error ? err.message : "Invalid SVG",
+      );
+      validationErr.cause = err;
+      throw validationErr;
+    }
+    throw err;
+  }
+}
+
+async function prepareBeautifyImage(
+  inputBuffer: Buffer,
+  filename: string,
+  errorPrefix: "Invalid image" | "Invalid background image",
+  log?: Pick<FastifyBaseLogger, "warn">,
+): Promise<Buffer> {
+  let buf = inputBuffer;
+  const validation = await validateImageBuffer(buf, filename);
+  if (!validation.valid) {
+    throw new InputValidationError(`${errorPrefix}: ${validation.reason}`);
+  }
+  if (validation.format === "heif") {
+    try {
+      buf = await decodeHeic(buf);
+    } catch (err) {
+      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+      throw await asInputErrorIfUndecodable(buf, err);
+    }
+  }
+  let fallbackFormat: string | undefined;
+  if (needsCliDecode(validation.format)) {
+    try {
+      const fileExt = filename.split(".").pop()?.toLowerCase();
+      buf = await decodeToSharpCompat(buf, validation.format, fileExt);
+    } catch (decodeErr) {
+      if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+      try {
+        const meta = await sharp(buf).metadata();
+        fallbackFormat = meta.format;
+      } catch (err) {
+        if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) throw decodeErr;
+        throw await asInputErrorIfUndecodable(buf, err);
+      }
+    }
+  }
+  let isSvg = validation.format === "svg" || fallbackFormat === "svg";
+  if (!isSvg && validation.format === "png" && filename.toLowerCase().endsWith(".apng")) {
+    const meta = await sharp(buf)
+      .metadata()
+      .catch(() => null);
+    if (meta?.format === "svg") isSvg = true;
+  }
+  if (isSvg) {
+    buf = sanitizeSvgInput(buf);
+  } else {
+    buf = await autoOrient(buf, log);
+  }
+  return buf;
+}
+
 export async function processBeautify(
   inputBuffer: Buffer,
   settings: BeautifySettings,
   _filename: string,
   bgImageBuffer?: Buffer,
+  bgFilename = "background",
+  log?: Pick<FastifyBaseLogger, "warn">,
 ): Promise<Buffer> {
   // 1. Decode & Prepare
-  let buf = inputBuffer;
-  const validation = await validateImageBuffer(buf, _filename);
-  if (validation.valid && validation.format === "heif") {
-    buf = await decodeHeic(buf);
-  }
-  if (validation.valid && needsCliDecode(validation.format)) {
-    try {
-      const fileExt = _filename.split(".").pop()?.toLowerCase();
-      buf = await decodeToSharpCompat(buf, validation.format, fileExt);
-    } catch (decodeErr) {
-      if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
-      try {
-        await sharp(buf).metadata();
-      } catch (err) {
-        if (isDecoderUnavailable(decodeErr)) throw decodeErr;
-        throw err;
-      }
-    }
-  }
-  if (validation.valid && validation.format === "svg") {
-    buf = decompressSvgz(buf);
-    buf = sanitizeSvg(buf);
-  }
-  buf = await autoOrient(buf);
+  let buf = await prepareBeautifyImage(inputBuffer, _filename, "Invalid image", log);
+  const preparedBgBuffer =
+    settings.backgroundType === "image" && bgImageBuffer !== undefined
+      ? await prepareBeautifyImage(bgImageBuffer, bgFilename, "Invalid background image", log)
+      : undefined;
   try {
     buf = await sharp(buf).ensureAlpha().png().toBuffer();
   } catch (err) {
@@ -150,8 +203,8 @@ export async function processBeautify(
   const canvasH = framedH + padding * 2;
 
   let bgOpts: BackgroundOpts;
-  if (settings.backgroundType === "image" && bgImageBuffer) {
-    bgOpts = { type: "image", imageBuffer: bgImageBuffer, width: canvasW, height: canvasH };
+  if (settings.backgroundType === "image" && preparedBgBuffer) {
+    bgOpts = { type: "image", imageBuffer: preparedBgBuffer, width: canvasW, height: canvasH };
   } else if (settings.backgroundType === "solid") {
     bgOpts = { type: "solid", color: settings.backgroundColor, width: canvasW, height: canvasH };
   } else if (
@@ -275,6 +328,7 @@ export function registerBeautify(app: FastifyInstance) {
     let mainBuffer: Buffer | null = null;
     let bgImageBuffer: Buffer | null = null;
     let filename = "image";
+    let bgFilename = "background";
     let settingsRaw: string | null = null;
 
     try {
@@ -288,6 +342,7 @@ export function registerBeautify(app: FastifyInstance) {
           const buf = Buffer.concat(chunks);
           if (part.fieldname === "backgroundImage") {
             bgImageBuffer = buf;
+            bgFilename = sanitizeFilename(part.filename ?? "background");
           } else {
             mainBuffer = buf;
             filename = sanitizeFilename(part.filename ?? "image");
@@ -326,6 +381,8 @@ export function registerBeautify(app: FastifyInstance) {
         settings,
         filename,
         bgImageBuffer ?? undefined,
+        bgFilename,
+        request.log,
       );
       const outFilename = resolveOutputFilename(filename, settings);
 
@@ -341,9 +398,17 @@ export function registerBeautify(app: FastifyInstance) {
     } catch (err) {
       if (isDecoderUnavailable(err)) throw err;
       if (hasServerErrorStatus(err)) throw err;
+      if (err instanceof InputValidationError) {
+        return reply.status(400).send({
+          error: err.message,
+        });
+      }
+      if (!isToolInputError(err)) {
+        request.log?.error({ err, toolId: "beautify" }, "Beautify processing failed");
+      }
       return reply.status(422).send({
         error: "Processing failed",
-        details: err instanceof Error ? err.message : "Image processing failed",
+        details: stripInternalPaths(err instanceof Error ? err.message : "Image processing failed"),
       });
     }
   });
