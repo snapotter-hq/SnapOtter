@@ -904,42 +904,57 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       // and refuses if the hash or role differs from the one verified. This conflicts
       // with the FOR NO KEY UPDATE / FOR UPDATE in the password and role change routes,
       // closing the race condition (#2235, #2823).
-      const inserted = await db.transaction(
-        async (tx): Promise<"ok" | "password_changed" | "user_disabled" | "role_changed"> => {
-          const [lockedUser] = await tx
-            .select({ passwordHash: schema.users.passwordHash, role: schema.users.role })
-            .from(schema.users)
-            .where(eq(schema.users.id, user.id))
-            .for("share");
+      const inserted = await db.transaction(async (tx) => {
+        const [lockedUser] = await tx
+          .select({
+            passwordHash: schema.users.passwordHash,
+            role: schema.users.role,
+            team: schema.users.team,
+          })
+          .from(schema.users)
+          .where(eq(schema.users.id, user.id))
+          .for("share");
 
-          if (!lockedUser) {
-            return "password_changed";
-          }
-          if (lockedUser.passwordHash !== user.passwordHash) {
-            return lockedUser.passwordHash === null && isDisabledRole(lockedUser.role)
-              ? "user_disabled"
-              : "password_changed";
-          }
-          if (isDisabledRole(lockedUser.role)) {
-            return "user_disabled";
-          }
-          if (lockedUser.role !== user.role) {
-            return "role_changed";
-          }
+        if (!lockedUser) {
+          return { status: "password_changed" as const };
+        }
+        if (lockedUser.passwordHash !== user.passwordHash) {
+          return {
+            status:
+              lockedUser.passwordHash === null && isDisabledRole(lockedUser.role)
+                ? ("user_disabled" as const)
+                : ("password_changed" as const),
+          };
+        }
+        if (isDisabledRole(lockedUser.role)) {
+          return { status: "user_disabled" as const };
+        }
+        if (lockedUser.role !== user.role) {
+          return { status: "role_changed" as const };
+        }
 
-          await tx.insert(schema.sessions).values({
-            id: token,
-            userId: user.id,
-            expiresAt,
-          });
+        await tx.insert(schema.sessions).values({
+          id: token,
+          userId: user.id,
+          expiresAt,
+        });
 
-          await evictExcessUserSessions(tx, user.id, maxSessions, token);
+        await evictExcessUserSessions(tx, user.id, maxSessions, token);
 
-          return "ok";
-        },
-      );
+        const [teamRow] = await tx
+          .select()
+          .from(schema.teams)
+          .where(eq(schema.teams.id, lockedUser.team));
+        const permissions = await getPermissions(lockedUser.role);
 
-      if (inserted === "user_disabled") {
+        return {
+          status: "ok" as const,
+          permissions,
+          teamName: teamRow?.name ?? lockedUser.team,
+        };
+      });
+
+      if (inserted.status === "user_disabled") {
         authAttempts.inc({ method: "password", result: "failure" });
         await audit("LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),
@@ -948,20 +963,20 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(403).send({ error: "User is disabled", code: "USER_DISABLED" });
       }
 
-      if (inserted !== "ok") {
+      if (inserted.status !== "ok") {
         authAttempts.inc({ method: "password", result: "failure" });
         void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN_FAILED, { method: "password" });
         await audit("LOGIN_FAILED", {
           username: sanitizeAuditInput(body.username),
           reason:
-            inserted === "role_changed"
+            inserted.status === "role_changed"
               ? "role_changed_concurrently"
               : "password_changed_concurrently",
         });
 
         // Only count a concurrent password rotation against the brute-force throttle;
         // a concurrent role update on a user who proved their password should not lock them out.
-        if (inserted === "password_changed") {
+        if (inserted.status === "password_changed") {
           await recordThrottleFailure();
         }
         return reply.status(401).send({ error: "Invalid credentials" });
@@ -970,8 +985,6 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       authAttempts.inc({ method: "password", result: "success" });
       void trackEvent(ANALYTICS_EVENTS.AUTH_LOGIN, { method: "password" });
       await audit("LOGIN_SUCCESS", { userId: user.id, username: user.username });
-
-      const [teamRow] = await db.select().from(schema.teams).where(eq(schema.teams.id, user.team));
 
       setSessionCookie(request, reply, token);
 
@@ -982,8 +995,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           username: user.username,
           role: user.role,
           mustChangePassword: env.SKIP_MUST_CHANGE_PASSWORD ? false : user.mustChangePassword,
-          permissions: await getPermissions(user.role),
-          teamName: teamRow?.name ?? user.team,
+          permissions: inserted.permissions,
+          teamName: inserted.teamName,
         },
         expiresAt: expiresAt.toISOString(),
       });

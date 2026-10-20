@@ -1249,6 +1249,173 @@ describe("Concurrent session limit", () => {
     }
   });
 
+  it("rolls back the new session and prior session eviction when schema.teams select fails during login (#3118)", async () => {
+    const { username, password, id } = await createUser();
+
+    function faultTeamsSelectOnce() {
+      const state = { faulted: false };
+      // biome-ignore lint/suspicious/noExplicitAny: wrap Drizzle select builder on both db and tx
+      const wrapSelect = (origSelect: (...args: any[]) => any) => {
+        return (...args: unknown[]) => {
+          const builder = origSelect(...args);
+          const origFrom = builder.from.bind(builder);
+          builder.from = (table: unknown, ...fromArgs: unknown[]) => {
+            if (!state.faulted && table === schema.teams) {
+              state.faulted = true;
+              throw new Error("simulated transient teams lookup failure");
+            }
+            return origFrom(table, ...fromArgs);
+          };
+          return builder;
+        };
+      };
+
+      const origDbSelect = db.select.bind(db);
+      const selectSpy = vi.spyOn(db, "select").mockImplementation(wrapSelect(origDbSelect));
+      const realTransaction = db.transaction.bind(db) as (
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) => Promise<unknown>;
+      const txSpy = vi.spyOn(db, "transaction").mockImplementation(((
+        cb: (tx: object) => Promise<unknown>,
+        config?: unknown,
+      ) =>
+        realTransaction((tx) => {
+          // biome-ignore lint/suspicious/noExplicitAny: proxy tx.select to fault schema.teams inside transaction
+          const origTxSelect = (tx as any).select.bind(tx);
+          const wrappedTx = new Proxy(tx, {
+            get(target, prop, receiver) {
+              if (prop === "select") {
+                return wrapSelect(origTxSelect);
+              }
+              return Reflect.get(target, prop, receiver);
+            },
+          });
+          return cb(wrappedTx);
+        }, config)) as unknown as typeof db.transaction);
+
+      return {
+        state,
+        restore: () => {
+          txSpy.mockRestore();
+          selectSpy.mockRestore();
+        },
+      };
+    }
+
+    await setSetting("maxSessionsPerUser", "1");
+    try {
+      const t1 = await loginAs(username, password);
+      const passwordSuccessCount = async (): Promise<number> => {
+        const metric = await authAttempts.get();
+        const row = metric.values.find(
+          (v) => v.labels.method === "password" && v.labels.result === "success",
+        );
+        return row?.value ?? 0;
+      };
+      const successBefore = await passwordSuccessCount();
+      const loginSuccessBefore = await db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.action, "LOGIN_SUCCESS"));
+      const userAuditBefore = loginSuccessBefore.filter((row) => row.actorId === id);
+
+      const teamsFault = faultTeamsSelectOnce();
+      try {
+        const res = await testApp.app.inject({
+          method: "POST",
+          url: "/api/auth/login",
+          payload: { username, password },
+        });
+        expect(res.statusCode).toBe(500);
+        expect(teamsFault.state.faulted).toBe(true);
+        expect(JSON.parse(res.body).token).toBeUndefined();
+        expect(String(res.headers["set-cookie"] ?? "")).not.toContain("snapotter-session=");
+      } finally {
+        teamsFault.restore();
+      }
+
+      expect(await passwordSuccessCount()).toBe(successBefore);
+
+      const remainingAfterFault = await db
+        .select({ id: schema.sessions.id })
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, id));
+      expect(remainingAfterFault.map((r) => r.id)).toEqual([t1]);
+
+      const loginSuccessAfterFault = await db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.action, "LOGIN_SUCCESS"));
+      expect(loginSuccessAfterFault.filter((row) => row.actorId === id)).toHaveLength(
+        userAuditBefore.length,
+      );
+
+      // Prior session t1 remains valid after the rolled-back login attempt.
+      const priorSessionRes = await testApp.app.inject({
+        method: "GET",
+        url: "/api/auth/session",
+        headers: { authorization: `Bearer ${t1}` },
+      });
+      expect(priorSessionRes.statusCode).toBe(200);
+
+      // Retrying login after the transient fault clears succeeds and evicts t1.
+      const retryRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username, password },
+      });
+      expect(retryRes.statusCode).toBe(200);
+      const retryBody = JSON.parse(retryRes.body);
+      expect(typeof retryBody.token).toBe("string");
+      expect(retryBody.user.teamName).toBe("Default");
+      expect(retryBody.user.permissions).toContain("tools:use");
+      expect(String(retryRes.headers["set-cookie"])).toContain(
+        `snapotter-session=${retryBody.token}`,
+      );
+
+      const remainingAfterRetry = await db
+        .select({ id: schema.sessions.id })
+        .from(schema.sessions)
+        .where(eq(schema.sessions.userId, id));
+      expect(remainingAfterRetry.map((r) => r.id)).toEqual([retryBody.token]);
+
+      // If the user's team changes between the initial select and db.transaction,
+      // login resolves teamName from lockedUser.team inside the transaction.
+      const newTeamName = `login-tx-team-${Date.now()}`;
+      const createTeamRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/v1/teams",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { name: newTeamName },
+      });
+      expect(createTeamRes.statusCode).toBe(201);
+      const newTeamId = JSON.parse(createTeamRes.body).id as string;
+
+      const origTx = db.transaction.bind(db);
+      const teamRaceSpy = vi
+        .spyOn(db, "transaction")
+        // biome-ignore lint/suspicious/noExplicitAny: wrap db.transaction to simulate concurrent team move
+        .mockImplementationOnce(async (fn: any, ...rest: any[]) => {
+          await db.update(schema.users).set({ team: newTeamId }).where(eq(schema.users.id, id));
+          return origTx(fn, ...rest);
+        });
+      try {
+        const teamRaceRes = await testApp.app.inject({
+          method: "POST",
+          url: "/api/auth/login",
+          payload: { username, password },
+        });
+        expect(teamRaceRes.statusCode).toBe(200);
+        expect(JSON.parse(teamRaceRes.body).user.teamName).toBe(newTeamName);
+      } finally {
+        teamRaceSpy.mockRestore();
+      }
+    } finally {
+      await clearSetting("maxSessionsPerUser");
+    }
+  });
+
   it("treats blank or out-of-range maxSessionsPerUser as disabled (0) rather than failing login (#2517)", async () => {
     const { username, password, id } = await createUser();
 
