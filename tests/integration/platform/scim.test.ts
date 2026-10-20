@@ -2683,6 +2683,36 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect((await userRow(id))?.email).toBeNull();
     });
 
+    it.each([
+      ["missing value", { op: "replace" }, "Operations.1.value is required"],
+      ["null value", { op: "add", value: null }, "Operations.1.value must be an object, got null"],
+      [
+        "primitive value",
+        { op: "replace", value: "alice" },
+        "Operations.1.value must be an object, got string",
+      ],
+      [
+        "array value",
+        { op: "add", value: ["alice"] },
+        "Operations.1.value must be an object, got array",
+      ],
+    ])(
+      "Users PATCH refuses a path-less op with a %s and applies none of the operations (#2657)",
+      async (_label, op, detail) => {
+        const { id, userName } = await createScimUser({
+          userName: uniqueName("scim-typed-patch-pathless-nonobj"),
+        });
+        const res = await send("PATCH", `Users/${id}`, {
+          Operations: [{ op: "replace", path: "active", value: false }, op],
+        });
+
+        expectRefused(res, detail);
+        const row = await userRow(id);
+        expect(row?.username).toBe(userName);
+        expect(row?.role).toBe("user");
+      },
+    );
+
     it("Users PATCH refuses an object userName and applies none of the operations", async () => {
       const { id, userName } = await createScimUser({ userName: uniqueName("scim-typed-patch") });
       const res = await send("PATCH", `Users/${id}`, {

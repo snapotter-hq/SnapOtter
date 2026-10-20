@@ -952,7 +952,7 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
         if (opType === "replace" || opType === "add") {
           if (
             op.path === "active" ||
-            (!op.path &&
+            (op.path === undefined &&
               typeof op.value === "object" &&
               op.value !== null &&
               "active" in (op.value as Record<string, unknown>))
@@ -984,7 +984,7 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
           }
 
           // Handle valueless replace (bulk value object)
-          if (!op.path && typeof op.value === "object" && op.value !== null) {
+          if (op.path === undefined && typeof op.value === "object" && op.value !== null) {
             const valObj = op.value as Record<string, unknown>;
             if (valObj.userName) {
               const nextUserName = valObj.userName as string;

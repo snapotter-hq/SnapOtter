@@ -79,6 +79,7 @@ export type ScimMember = z.infer<typeof member>;
 // Per-operation values, checked before any operation writes.
 const emailsValue = z.union([z.array(email), email, scimString]);
 const membersValue = z.union([z.array(member), member]);
+const patchValueObject = z.record(z.unknown());
 
 /** A bare address is the primary one; a single entry is a list of one. */
 function emailList(value: z.infer<typeof emailsValue>): ScimEmail[] {
@@ -281,8 +282,9 @@ export function normalizeUserOps(ops: ScimPatchOp[]): ScimParse<ScimPatchOp[]> {
         value = emails.ok
           ? { ok: true, data: emails.data === null ? null : emailList(emails.data) }
           : emails;
-      } else if (!op.path && typeof op.value === "object" && op.value !== null) {
-        const keyed = canonicalValueObject(op.value as Record<string, unknown>, at);
+      } else if (op.path === undefined) {
+        const object = parseWith(patchValueObject, op.value, "invalidValue", at);
+        const keyed = object.ok ? canonicalValueObject(object.data, at) : object;
         value = keyed.ok ? parseWith(scimUserBody, keyed.data, "invalidValue", at) : keyed;
         if (
           value.ok &&
@@ -344,8 +346,6 @@ function groupPath(path: string): GroupPath {
   return /^(members|displayname)\b/.test(lower) ? { kind: "unsupported" } : { kind: "ignored" };
 }
 
-const groupValueObject = z.record(z.unknown());
-
 /**
  * Check and coerce each Groups PATCH operation for the route, before any of
  * them writes (#1683). What comes out is one of two shapes: add, replace or
@@ -383,7 +383,7 @@ export function normalizeGroupOps(ops: ScimPatchOp[]): ScimParse<ScimPatchOp[]> 
           scimType: "noTarget",
         };
       }
-      const object = parseWith(groupValueObject, raw.value, "invalidValue", at);
+      const object = parseWith(patchValueObject, raw.value, "invalidValue", at);
       if (!object.ok) return object;
       const keyed: Record<string, unknown> = {};
       for (const [key, field] of Object.entries(object.data)) {

@@ -182,6 +182,21 @@ describe("normalizeUserOps", () => {
     ).toEqual(invalid("Operations.0.value.externalId must be a string, got array"));
   });
 
+  it("refuses a path-less add or replace whose value is missing, null, a primitive, or an array (#2657)", () => {
+    expect(normalizeUserOps([{ op: "replace" }])).toEqual(
+      invalid("Operations.0.value is required"),
+    );
+    expect(normalizeUserOps([{ op: "add", value: null }])).toEqual(
+      invalid("Operations.0.value must be an object, got null"),
+    );
+    expect(normalizeUserOps([{ op: "replace", value: "alice" }])).toEqual(
+      invalid("Operations.0.value must be an object, got string"),
+    );
+    expect(normalizeUserOps([{ op: "add", value: ["alice"] }])).toEqual(
+      invalid("Operations.0.value must be an object, got array"),
+    );
+  });
+
   it("names the operation when a path's value has the wrong type", () => {
     expect(
       normalizeUserOps([
