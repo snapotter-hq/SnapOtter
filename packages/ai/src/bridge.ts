@@ -766,28 +766,47 @@ export class PythonDispatcher {
         activeTimer = timer;
 
         proc.stdout.on("data", (chunk: Buffer) => {
+          if (attempt !== activeAttempt) return;
           stdout += chunk.toString();
         });
 
+        const handleStderrLine = (line: string) => {
+          const trimmed = line.trim();
+          if (!trimmed) return;
+
+          if (trimmed.startsWith("{")) {
+            try {
+              const parsed = JSON.parse(trimmed);
+              if (typeof parsed?.progress === "number" && typeof parsed?.stage === "string") {
+                if (!timedOut) options.onProgress?.(parsed.progress, parsed.stage);
+                return;
+              }
+              if (typeof parsed?.info === "string") {
+                aiLog.info(`[python] ${parsed.info}`);
+                return;
+              }
+              if (typeof parsed?.warning === "string") {
+                aiLog.warn(`[python] ${parsed.warning}`);
+                return;
+              }
+            } catch {
+              // Malformed JSON object - collect as regular stderr.
+            }
+          } else if (trimmed.startsWith("[")) {
+            // Forward diagnostic messages to Node.js logger and collect as regular stderr.
+            aiLog.info(`[python] ${trimmed}`);
+          }
+          stderrLines.push(trimmed);
+        };
+
         proc.stderr.on("data", (chunk: Buffer) => {
+          if (attempt !== activeAttempt) return;
           stderrBuffer += chunk.toString();
           const lines = stderrBuffer.split("\n");
           stderrBuffer = lines.pop() ?? "";
 
           for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed) continue;
-
-            try {
-              const parsed = JSON.parse(trimmed);
-              if (typeof parsed.progress === "number" && typeof parsed.stage === "string") {
-                options.onProgress?.(parsed.progress, parsed.stage);
-                continue;
-              }
-            } catch {
-              // Not JSON - collect as regular stderr
-            }
-            stderrLines.push(trimmed);
+            handleStderrLine(line);
           }
         });
 
@@ -811,7 +830,7 @@ export class PythonDispatcher {
           if (attempt !== activeAttempt) return;
 
           if (stderrBuffer.trim()) {
-            stderrLines.push(stderrBuffer.trim());
+            handleStderrLine(stderrBuffer);
           }
 
           if (timedOut) {

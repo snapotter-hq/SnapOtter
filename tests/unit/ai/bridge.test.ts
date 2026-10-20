@@ -3151,6 +3151,154 @@ describe("bridge - per-request fallback edge cases", () => {
     await promise;
     expect(onProgress).not.toHaveBeenCalled();
   });
+
+  it("forwards per-request stderr diagnostics ({info}, {warning}, and bracket-prefixed lines) to aiLog on exit 0 (issue #2568)", async () => {
+    const mockDisp = createMockProcess();
+    const mockPerReq = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return mockDisp.process;
+      return mockPerReq.process;
+    });
+
+    const { setAiLogger } = await import("../../../packages/ai/src/log.js");
+    const sink = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    setAiLogger(sink);
+    onTestFinished(() => setAiLogger(null));
+
+    const promise = runPythonWithProgress("test.py", []);
+
+    mockPerReq.stderr.emit(
+      "data",
+      Buffer.from(
+        '{"info": "model cached"}\n{"warning": "low memory"}\n[model] Loading weights...\n',
+      ),
+    );
+    // Trailing partial diagnostic without newline flushed on close
+    mockPerReq.stderr.emit("data", Buffer.from('{"warning": "trailing notice"}'));
+    mockPerReq.stdout.emit("data", Buffer.from('{"ok": true}\n'));
+    mockPerReq.emitEvent("close", 0, null);
+
+    const result = await promise;
+    expect(result.stdout).toBe('{"ok": true}');
+    expect(result.stderr).toBe("[model] Loading weights...");
+    expect(sink.info.mock.calls.map((call) => call[0])).toEqual([
+      "[python] model cached",
+      "[python] [model] Loading weights...",
+    ]);
+    expect(sink.warn.mock.calls.map((call) => call[0])).toEqual([
+      "[python] low memory",
+      "[python] trailing notice",
+    ]);
+  });
+
+  it("forwards runDocsScript per-request stderr diagnostics to aiLog even though runDocsScript returns only stdout (issue #2568)", async () => {
+    const mockDisp = createMockProcess();
+    const mockPerReq = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return mockDisp.process;
+      return mockPerReq.process;
+    });
+
+    const { runDocsScript, shutdownDocsDispatcher } = await import(
+      "../../../packages/ai/src/bridge.js"
+    );
+    const { setAiLogger } = await import("../../../packages/ai/src/log.js");
+    const sink = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    setAiLogger(sink);
+    onTestFinished(async () => {
+      setAiLogger(null);
+      await shutdownDocsDispatcher();
+    });
+
+    const promise = runDocsScript("doc_to_word", { path: "/tmp/in.pdf", out: "/tmp/out.docx" });
+
+    mockPerReq.stderr.emit(
+      "data",
+      Buffer.from(
+        '[doc_to_word] pymupdf message redirect unavailable: boom\n{"warning": "fallback"}\n',
+      ),
+    );
+    mockPerReq.stdout.emit("data", Buffer.from('{"ok": true}\n'));
+    mockPerReq.emitEvent("close", 0, null);
+
+    await expect(promise).resolves.toBe('{"ok": true}');
+    expect(sink.info.mock.calls.map((call) => call[0])).toEqual([
+      "[python] [doc_to_word] pymupdf message redirect unavailable: boom",
+    ]);
+    expect(sink.warn.mock.calls.map((call) => call[0])).toEqual(["[python] fallback"]);
+  });
+
+  it("ignores late stderr chunks after abort and suppresses trailing onProgress on timeout while still logging diagnostics (issue #2568)", async () => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+
+    const mockDisp = createMockProcess();
+    const mockAborted = createMockProcess();
+    const mockTimedOut = createMockProcess();
+    let callCount = 0;
+
+    vi.mocked(spawn).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return mockDisp.process;
+      if (callCount === 2) return mockAborted.process;
+      return mockTimedOut.process;
+    });
+
+    const { setAiLogger } = await import("../../../packages/ai/src/log.js");
+    const sink = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    setAiLogger(sink);
+    onTestFinished(() => setAiLogger(null));
+
+    const enoent = new Error("ENOENT") as NodeJS.ErrnoException;
+    enoent.code = "ENOENT";
+
+    const abortController = new AbortController();
+    const abortedProgress = vi.fn();
+    const pAborted = runPythonWithProgress("test.py", [], {
+      signal: abortController.signal,
+      onProgress: abortedProgress,
+    });
+    mockDisp.emitEvent("error", enoent);
+    await vi.advanceTimersByTimeAsync(10);
+
+    abortController.abort();
+    await expect(pAborted).rejects.toThrow("Python script canceled");
+
+    // Late stderr/stdout from the SIGTERMed child after abort is ignored
+    mockAborted.stderr.emit(
+      "data",
+      Buffer.from('{"progress": 90, "stage": "late"}\n{"warning": "stale"}\n'),
+    );
+    mockAborted.stdout.emit("data", Buffer.from('{"ok": true}\n'));
+    expect(abortedProgress).not.toHaveBeenCalled();
+    expect(sink.warn).not.toHaveBeenCalled();
+
+    // Now test timeout with a trailing progress frame vs diagnostic in stderrBuffer
+    const timeoutProgress = vi.fn();
+    const pTimedOut = runPythonWithProgress("slow.py", [], {
+      timeout: 1000,
+      onProgress: timeoutProgress,
+    });
+    const settledTimedOut = pTimedOut.catch((e: unknown) => e);
+    await vi.advanceTimersByTimeAsync(10);
+
+    // Partial progress without newline before timeout, followed by close after timeout
+    mockTimedOut.stderr.emit("data", Buffer.from('{"progress": 99, "stage": "Hung"}'));
+    vi.advanceTimersByTime(1500);
+    mockTimedOut.emitEvent("close", null, "SIGTERM");
+
+    const err = (await settledTimedOut) as Error;
+    expect(err.message).toBe("Python script timed out");
+    expect(timeoutProgress).not.toHaveBeenCalled();
+  });
 });
 
 // ── Dispatcher error event handling ──────────────────────────────────
