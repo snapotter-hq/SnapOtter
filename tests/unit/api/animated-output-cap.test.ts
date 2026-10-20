@@ -295,4 +295,65 @@ describe("gif-webp and convert enforce assertGifWorkload on animated input (#252
     expect(meta.width).toBe(800);
     expect(meta.height).toBe(600);
   });
+
+  it("converts an animated GIF with a stale .png pipeline filename to WebP in gif-webp (#3047)", async () => {
+    const gifWebp = getToolConfig("gif-webp");
+    expect(gifWebp).toBeDefined();
+    const settings = gifWebp?.settingsSchema.parse({});
+
+    const result = await gifWebp?.process(await threeFrameGif(16), settings, "step0.png");
+
+    expect(result?.contentType).toBe("image/webp");
+    expect(result?.filename).toBe("step0.webp");
+    const meta = await sharp(result?.buffer, { animated: true }).metadata();
+    expect(meta.format).toBe("webp");
+    expect(meta.pages).toBe(3);
+  });
+
+  it("converts an animated WebP with a stale .gif pipeline filename to GIF in gif-webp (#3047)", async () => {
+    const gifWebp = getToolConfig("gif-webp");
+    expect(gifWebp).toBeDefined();
+    const settings = gifWebp?.settingsSchema.parse({});
+
+    const result = await gifWebp?.process(await threeFrameWebp(16), settings, "step0.gif");
+
+    expect(result?.contentType).toBe("image/gif");
+    expect(result?.filename).toBe("step0.gif");
+    const meta = await sharp(result?.buffer, { animated: true }).metadata();
+    expect(meta.format).toBe("gif");
+    expect(meta.pages).toBe(3);
+  });
+
+  it("converts an extensionless single-frame WebP and resizes via meta.width in gif-webp (#3047)", async () => {
+    const stillWebp = await sharp({
+      create: { width: 40, height: 20, channels: 3, background: { r: 80, g: 80, b: 80 } },
+    })
+      .webp()
+      .toBuffer();
+    const gifWebp = getToolConfig("gif-webp");
+    expect(gifWebp).toBeDefined();
+    const settings = gifWebp?.settingsSchema.parse({ resizePercent: 50 });
+
+    const result = await gifWebp?.process(stillWebp, settings, "animation");
+
+    expect(result?.contentType).toBe("image/gif");
+    expect(result?.filename).toBe("animation.gif");
+    const meta = await sharp(result?.buffer).metadata();
+    expect(meta.format).toBe("gif");
+    expect(meta.width).toBe(20);
+    expect(meta.height).toBe(10);
+  });
+
+  it("rejects a PNG buffer disguised with a .gif filename in gif-webp (#3047)", async () => {
+    const gifWebp = getToolConfig("gif-webp");
+    expect(gifWebp).toBeDefined();
+    const settings = gifWebp?.settingsSchema.parse({});
+
+    const error = await gifWebp
+      ?.process(readFixture(fixtures.image.base.png200), settings, "fake.gif")
+      .catch((e: unknown) => e);
+
+    expect((error as Error)?.name).toBe("InputValidationError");
+    expect((error as Error)?.message).toMatch(/only gif and webp inputs are supported/i);
+  });
 });

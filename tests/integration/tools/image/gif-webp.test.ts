@@ -209,6 +209,29 @@ describe("GIF/WebP Converter", () => {
     expect(msg).toMatch(/only gif and webp/i);
   });
 
+  it("rejects PNG input even when uploaded with a .gif filename (#3047)", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "fake.gif", contentType: "image/gif", content: STILL_PNG },
+      { name: "settings", content: JSON.stringify({}) },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/gif-webp",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBeGreaterThanOrEqual(400);
+    expect(res.statusCode).toBeLessThan(500);
+    const result = JSON.parse(res.body);
+    const msg = [result.error, result.details].join(" ");
+    expect(msg).toMatch(/only gif and webp/i);
+  });
+
   it("rejects an animated GIF exceeding MAX_GIF_FRAMES with 400 in gif-webp (#2528)", async () => {
     const excessiveGif = await buildManyFrameGif(501);
     const { body, contentType } = createMultipartPayload([

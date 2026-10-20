@@ -1,4 +1,3 @@
-import { extname } from "node:path";
 import sharp from "sharp";
 import { apngFrameCount } from "./apng.js";
 
@@ -15,13 +14,15 @@ export interface AnimationInfo {
  * (`apngFrameCount`). Used by the remove-gif-background route to reject stills
  * and enforce the frame cap before enqueuing.
  */
-export async function detectAnimation(buf: Buffer, filename: string): Promise<AnimationInfo> {
-  const ext = extname(filename).toLowerCase();
-  if (ext === ".png" || ext === ".apng") {
-    const n = apngFrameCount(buf) ?? 1;
-    return { animated: n > 1, frames: n };
+export async function detectAnimation(buf: Buffer, _filename?: string): Promise<AnimationInfo> {
+  const apngFrames = apngFrameCount(buf);
+  if (apngFrames !== null) {
+    return { animated: apngFrames > 1, frames: apngFrames };
   }
   const meta = await sharp(buf, { animated: true }).metadata();
+  if (meta.format !== "gif" && meta.format !== "webp") {
+    return { animated: false, frames: 1 };
+  }
   const pages = meta.pages ?? 1;
   return { animated: pages > 1, frames: pages };
 }

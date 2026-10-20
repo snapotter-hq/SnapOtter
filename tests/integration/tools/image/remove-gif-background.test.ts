@@ -102,6 +102,30 @@ describe("Remove GIF Background (#496)", () => {
     expect(JSON.parse(res.body).code).toBe("NOT_ANIMATED");
   });
 
+  it("rejects a multi-page TIFF with NOT_ANIMATED instead of treating pages as frames (#3047)", async () => {
+    setInstalled(["background-removal"]);
+    const res = await post(
+      readFixture(fixtures.image.multipageTiff),
+      "multipage.tiff",
+      "image/tiff",
+    );
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).code).toBe("NOT_ANIMATED");
+  });
+
+  it("detects animated GIF and APNG buffers across mismatched extensions (#3047)", async () => {
+    setInstalled(["background-removal"]);
+    // 4-frame APNG named .gif still trips the 3-frame cap via magic-byte detection.
+    const apngRes = await post(APNG, "upload.gif", "image/gif");
+    expect(apngRes.statusCode).toBe(400);
+    expect(JSON.parse(apngRes.body).code).toBe("TOO_MANY_FRAMES");
+
+    // 3-frame GIF named .png passes detectAnimation + cap, then trips the backgroundImage check.
+    const gifRes = await post(GIF, "upload.png", "image/png", { backgroundType: "image" });
+    expect(gifRes.statusCode).toBe(400);
+    expect(JSON.parse(gifRes.body).error).toMatch(/background image/i);
+  });
+
   it("rejects an over-cap animation with TOO_MANY_FRAMES", async () => {
     setInstalled(["background-removal"]);
     // Cap is 3; the APNG fixture has 4 frames.

@@ -1,4 +1,3 @@
-import { extname } from "node:path";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -21,27 +20,28 @@ export function registerGifWebp(app: FastifyInstance) {
       "GIF/WebP conversion failed",
       (s) => (s?.lossless ? "lossless" : "lossy"),
       async (inputBuffer, settings, filename) => {
-        const ext = extname(filename).toLowerCase();
-
-        // Route-level extension guard: image modality has no 415 gate
-        if (ext !== ".gif" && ext !== ".webp") {
-          throw new InputValidationError("Only GIF and WebP inputs are supported");
-        }
-
-        const anim = await readAnimationFor(inputBuffer, ext === ".gif" ? "webp" : "gif");
-        let pipeline = openAnimated(inputBuffer, anim);
-
-        const base = filename.replace(/\.[^.]+$/, "");
-
         try {
+          const meta = await sharp(inputBuffer).metadata();
+
+          // Route-level format guard: image modality has no 415 gate
+          if (meta.format !== "gif" && meta.format !== "webp") {
+            throw new InputValidationError("Only GIF and WebP inputs are supported");
+          }
+
+          const targetFormat = meta.format === "gif" ? "webp" : "gif";
+          const anim = await readAnimationFor(inputBuffer, targetFormat);
+          let pipeline = openAnimated(inputBuffer, anim);
+
+          const base = filename.replace(/\.[^.]+$/, "");
+
           // Apply resize when below 100%
           if (settings.resizePercent < 100) {
-            const origW = anim.width || ((await sharp(inputBuffer).metadata()).width ?? 1);
+            const origW = anim.width || (meta.width ?? 1);
             const target = Math.max(1, Math.round(origW * (settings.resizePercent / 100)));
             pipeline = pipeline.resize(target);
           }
 
-          if (ext === ".gif") {
+          if (targetFormat === "webp") {
             // GIF -> WebP (preserving animation)
             const buffer = await pipeline
               .webp({ quality: settings.quality, lossless: settings.lossless })
