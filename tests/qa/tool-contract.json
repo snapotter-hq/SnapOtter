@@ -6897,7 +6897,7 @@
       },
       {
         "key": "colors",
-        "values": [2, 129, 256, null]
+        "values": [2, 4, 16, 256, null]
       },
       {
         "key": "dither",

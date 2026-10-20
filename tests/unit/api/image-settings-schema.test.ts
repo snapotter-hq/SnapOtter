@@ -1,5 +1,8 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { MAX_RESIZE_OUTPUT_DIMENSION } from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
+import { load } from "js-yaml";
 import { beforeAll, describe, expect, it } from "vitest";
 import { settingsSchema as beautifySettingsSchema } from "../../../apps/api/src/lib/beautify/constants.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
@@ -13,6 +16,9 @@ import { registerOptimizeForWeb } from "../../../apps/api/src/routes/tools/optim
 import { registerResize } from "../../../apps/api/src/routes/tools/resize.js";
 import { registerRotate } from "../../../apps/api/src/routes/tools/rotate.js";
 import { registerSplit } from "../../../apps/api/src/routes/tools/split.js";
+import { deriveAxes } from "../../helpers/zod-pict.js";
+
+const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
 
 const app = {
   post: () => undefined,
@@ -101,6 +107,80 @@ describe("Sharp-backed image settings schemas", () => {
     }
     for (const colors of [1, 3, 8, 32, 64, 128, 255, 257]) {
       expect(parses("gif-tools", { mode: "optimize", colors })).toBe(false);
+    }
+  });
+
+  it("keeps gif-tools optimize colors in OpenAPI, docs, bench.sh, and tool-contract.json aligned with the schema (#2919)", () => {
+    const config = getToolConfig("gif-tools");
+    if (!config) throw new Error("gif-tools must be registered");
+
+    const openapi = load(
+      readFileSync(path.join(REPO_ROOT, "apps/api/src/openapi.yaml"), "utf8"),
+    ) as {
+      paths: Record<
+        string,
+        {
+          post?: {
+            requestBody?: {
+              content?: {
+                "multipart/form-data"?: {
+                  schema?: { properties?: { settings?: { description?: string } } };
+                };
+              };
+            };
+          };
+        }
+      >;
+    };
+    const settingsDesc =
+      openapi.paths["/api/v1/tools/image/gif-tools"]?.post?.requestBody?.content?.[
+        "multipart/form-data"
+      ]?.schema?.properties?.settings?.description ?? "";
+    expect(settingsDesc).toContain(
+      "- `colors` (number, default 256) - Color palette size, one of: 2, 4, 16, 256 (optimize mode)",
+    );
+    expect(settingsDesc).not.toContain("2-256");
+
+    const doc = readFileSync(path.join(REPO_ROOT, "apps/docs/tools/image/gif-tools.md"), "utf8");
+    expect(doc).toContain(
+      "| colors | number | No | 256 | Maximum number of colors in palette (2, 4, 16, or 256) |",
+    );
+    expect(doc).not.toContain("2 to 256");
+    const docOptimizeMatches = [...doc.matchAll(/-F 'settings=(\{"mode":"optimize"[^']*\})'/g)];
+    expect(docOptimizeMatches.length).toBeGreaterThan(0);
+    for (const match of docOptimizeMatches) {
+      const parsed = JSON.parse(match[1]) as Record<string, unknown>;
+      expect(parsed).toHaveProperty("colors");
+      expect(parses("gif-tools", parsed)).toBe(true);
+    }
+
+    const bench = readFileSync(path.join(REPO_ROOT, "tests/benchmark/bench.sh"), "utf8");
+    const benchOptimizeMatches = [
+      ...bench.matchAll(
+        /bench_tool\s+"core"\s+"image\/gif-tools"\s+"optimize-[^"]+"\s+"\$GIF"\s+'(\{[^']+\})'/g,
+      ),
+    ];
+    expect(benchOptimizeMatches.length).toBeGreaterThan(0);
+    for (const match of benchOptimizeMatches) {
+      const parsed = JSON.parse(match[1]) as Record<string, unknown>;
+      expect(parsed).toHaveProperty("colors");
+      expect(parses("gif-tools", parsed)).toBe(true);
+    }
+
+    const contracts = JSON.parse(
+      readFileSync(path.join(REPO_ROOT, "tests/qa/tool-contract.json"), "utf8"),
+    ) as Array<{ id: string; axes: Array<{ key: string; values: unknown[] }> }>;
+    const gifContract = contracts.find((c) => c.id === "gif-tools");
+    const expectedColorsValues = deriveAxes(config.settingsSchema)
+      .find((a) => a.key === "colors")
+      ?.values.map((v) => (v === undefined ? null : v));
+    const actualColorsValues = gifContract?.axes.find((a) => a.key === "colors")?.values;
+    expect(expectedColorsValues).toEqual([2, 4, 16, 256, null]);
+    expect(actualColorsValues).toEqual(expectedColorsValues);
+    for (const value of actualColorsValues ?? []) {
+      if (value !== null) {
+        expect(parses("gif-tools", { mode: "optimize", colors: value })).toBe(true);
+      }
     }
   });
 

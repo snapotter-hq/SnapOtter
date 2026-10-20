@@ -31,7 +31,7 @@ Resize, optimize, change speed, reverse, extract frames, and rotate animated GIF
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| colors | number | No | 256 | Maximum number of colors in palette (2 to 256) |
+| colors | number | No | 256 | Maximum number of colors in palette (2, 4, 16, or 256) |
 | dither | number | No | 1.0 | Dithering strength (0 to 1, where 0 disables dithering) |
 | effort | number | No | 7 | Optimization effort level (1 to 10, higher = slower but smaller) |
 
@@ -74,7 +74,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
   -F "file=@large.gif" \
-  -F 'settings={"mode":"optimize","colors":128,"effort":9}'
+  -F 'settings={"mode":"optimize","colors":16,"effort":9}'
 ```
 
 ### Speed Up {#speed-up}

@@ -234,7 +234,7 @@ for run in 1 2 3; do
   bench_tool "core" "image/vectorize" "small-r${run}" "$S" '{"colorMode":"color"}'
   bench_tool "core" "image/vectorize" "large-r${run}" "$P" '{"colorMode":"color"}'
 
-  bench_tool "core" "image/gif-tools" "optimize-r${run}" "$GIF" '{"mode":"optimize","colors":64}'
+  bench_tool "core" "image/gif-tools" "optimize-r${run}" "$GIF" '{"mode":"optimize","colors":16}'
 
   bench_tool "core" "pdf/pdf-to-image" "r${run}" "$PDF" '{"format":"png","dpi":300}'
 

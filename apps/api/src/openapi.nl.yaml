@@ -2382,7 +2382,7 @@ paths:
                     - `width` (number 1-16384, optional) - Target width in pixels (resize mode)
                     - `height` (number 1-16384, optional) - Target height in pixels (resize mode)
                     - `percentage` (number 1-500, optional) - Scale by percentage (resize mode)
-                    - `colors` (number 2-256, default 256) - Color palette size (optimize mode)
+                    - `colors` (number, default 256) - Color palette size, one of: 2, 4, 16, 256 (optimize mode)
                     - `dither` (number 0-1, default 1.0) - Dither amount (optimize mode)
                     - `effort` (number 1-10, default 7) - Compression effort (optimize mode)
                     - `speedFactor` (number 0.1-10, default 1.0) - Speed multiplier (speed mode)
