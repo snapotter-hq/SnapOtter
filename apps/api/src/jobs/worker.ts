@@ -1928,7 +1928,15 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
         httpStatus?: number;
       } | null;
       const errorMsg = rowError?.message ?? "Processing failed";
-      const inputFilename = row.inputRefs?.[0]?.split("/").pop() ?? `file-${i}`;
+      let inputRef = row.inputRefs?.[0];
+      if (!inputRef && row.type === "pipeline-finalize") {
+        const [step0] = await db
+          .select({ inputRefs: schema.jobs.inputRefs })
+          .from(schema.jobs)
+          .where(eq(schema.jobs.id, `${childId}-s0`));
+        inputRef = step0?.inputRefs?.[0];
+      }
+      const inputFilename = inputRef?.split("/").pop() ?? `file-${i}`;
       const error = friendlyError(errorMsg);
       manifest.push({
         index: i,

@@ -1406,7 +1406,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                 pool: batchPipelinePool,
                 type: "pipeline-finalize",
                 status: "queued",
-                inputRefs: [],
+                inputRefs: [finalUploadKey],
                 settings: {},
               });
               stagedBatch?.childIds.push(perFileJobId);

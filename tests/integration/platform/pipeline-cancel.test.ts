@@ -271,7 +271,7 @@ async function buildPipelineFlow(
     toolId: "pipeline",
     pool: "image",
     status: "queued",
-    inputRefs: [],
+    inputRefs: opts.parentId ? [uploadKey] : [],
     // Cancel metadata is stamped on single-run flow rows only; per-file
     // rows of a batch resolve through the parent instead.
     settings: opts.parentId ? {} : { stepCount: totalSteps, clientJobId: progressId },
@@ -916,7 +916,16 @@ describe("pipeline-batch cancel", () => {
       const j = await getQueue("system").getJob(parentId);
       return j?.returnvalue ? (j.returnvalue as Record<string, unknown>) : undefined;
     });
-    expect((returned.resultPayload as { canceled?: boolean }).canceled).toBe(true);
+    const payload = returned.resultPayload as {
+      canceled?: boolean;
+      manifest?: Array<{ index: number; filename: string; error?: string }>;
+    };
+    expect(payload.canceled).toBe(true);
+    expect(payload.manifest?.[1]).toEqual({
+      index: 1,
+      filename: "slow.png",
+      error: "Canceled",
+    });
   });
 
   it("a full cancel before any step ran settles the batch with the Canceled synthetic", async () => {

@@ -1937,15 +1937,31 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
       rowsById: {
         "batch-dedup-f0": {
           id: "batch-dedup-f0",
+          type: "pipeline-finalize",
           status: "failed",
           inputRefs: [],
           error: { message: "Step 1: kaboom" },
         },
         "batch-dedup-f1": {
           id: "batch-dedup-f1",
+          type: "pipeline-finalize",
           status: "failed",
           inputRefs: [],
           error: { message: "Step 1: other" },
+        },
+        "batch-dedup-f1-s0": {
+          id: "batch-dedup-f1-s0",
+          type: "pipeline-step",
+          status: "failed",
+          inputRefs: ["uploads/batch-dedup-f1-s0/second.png"],
+          error: { message: "other" },
+        },
+        "batch-dedup-f2": {
+          id: "batch-dedup-f2",
+          type: "pipeline-finalize",
+          status: "failed",
+          inputRefs: ["uploads/batch-dedup-f2-s0/third.png"],
+          error: { message: "Step 1: third-err" },
         },
       },
       counterErrors: [
@@ -1954,7 +1970,7 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
       ],
     });
 
-    await p1({
+    const res1 = (await p1({
       id: "batch-dedup",
       name: "batch-finalize",
       data: {
@@ -1963,27 +1979,33 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
         toolId: "pipeline-batch",
         userId: null,
         pool: "system",
-        totalFiles: 3,
+        totalFiles: 4,
         inputRefs: [],
         filename: "",
         settings: {
-          flowChildCount: 2,
-          fileIndexMap: [1, 2],
+          flowChildCount: 3,
+          fileIndexMap: [1, 2, 3],
           preFailureFaults: [{ error: "File is empty" }],
         },
       },
-    });
+    })) as { resultPayload?: { manifest?: unknown } };
 
+    expect(res1.resultPayload?.manifest).toEqual([
+      { index: 0, filename: "file-0", error: "Step 1: kaboom" },
+      { index: 1, filename: "second.png", error: "Step 1: other" },
+      { index: 2, filename: "third.png", error: "Step 1: third-err" },
+    ]);
     expect(fail1).toHaveBeenCalledWith({
       jobId: "batch-dedup",
-      totalFiles: 3,
-      completedFiles: 3,
-      failedFiles: 3,
+      totalFiles: 4,
+      completedFiles: 4,
+      failedFiles: 4,
       message: "All files failed processing",
       errors: [
         { filename: "empty.png", error: "File is empty" },
         { filename: "first.png", error: "Step 1: kaboom" },
-        { filename: "file-1", error: "Step 1: other" },
+        { filename: "second.png", error: "Step 1: other" },
+        { filename: "third.png", error: "Step 1: third-err" },
       ],
     });
 

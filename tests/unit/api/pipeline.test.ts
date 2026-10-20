@@ -1063,6 +1063,38 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685)", () => {
       });
     }
   });
+
+  it("stamps inputRefs on each per-file pipeline-finalize row so batch-finalize preserves filenames (#3141)", async () => {
+    vi.clearAllMocks();
+
+    const reply = await invokePipelineBatchRoute([
+      { type: "file", filename: "one.png", content: Buffer.from("one-png") },
+      { type: "file", filename: "two.png", content: Buffer.from("two-png") },
+      {
+        type: "field",
+        fieldname: "pipeline",
+        value: JSON.stringify({ steps: [{ toolId: batchTestToolId, settings: {} }] }),
+      },
+      { type: "field", fieldname: "clientJobId", value: "pipeline-batch-3141" },
+    ]);
+
+    expect(reply.statusCode).toBe(202);
+    const finalizeInserts = insertValuesMock.mock.calls
+      .map((call) => call[0] as Record<string, unknown>)
+      .filter((row) => row?.type === "pipeline-finalize");
+    expect(finalizeInserts).toEqual([
+      expect.objectContaining({
+        id: "pipeline-batch-3141-f0",
+        type: "pipeline-finalize",
+        inputRefs: ["uploads/pipeline-batch-3141-f0-s0/one.png"],
+      }),
+      expect.objectContaining({
+        id: "pipeline-batch-3141-f1",
+        type: "pipeline-finalize",
+        inputRefs: ["uploads/pipeline-batch-3141-f1-s0/two.png"],
+      }),
+    ]);
+  });
 });
 
 describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {

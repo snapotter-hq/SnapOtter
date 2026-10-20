@@ -519,7 +519,10 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
     expect(res.json()).toMatchObject({
       code: "ENGINE_UNAVAILABLE",
       details: HINT,
-      errors: [{ code: "ENGINE_UNAVAILABLE" }, { code: "ENGINE_UNAVAILABLE" }],
+      errors: [
+        { filename: "one.png", code: "ENGINE_UNAVAILABLE" },
+        { filename: "two.png", code: "ENGINE_UNAVAILABLE" },
+      ],
     });
   });
 
@@ -680,7 +683,13 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
       },
     ]);
     expect(res.statusCode, res.body).toBe(422);
-    expect(res.json().error).toBe("Step 1: Resize ran out of road");
+    expect(res.json()).toEqual({
+      error: "Step 1: Resize ran out of road",
+      errors: [
+        { filename: "one.png", error: "Step 1: Resize ran out of road" },
+        { filename: "two.png", error: "Step 1: Resize ran out of road" },
+      ],
+    });
   });
 
   describe("image decoder unavailability in batch, pipeline, previews, and workers (#1453)", () => {
