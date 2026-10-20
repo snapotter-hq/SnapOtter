@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   isStorageServiceFault: vi.fn<(_e: unknown) => boolean>(() => false),
   isValidObjectKey: vi.fn(() => true),
   putObject: vi.fn(() => Promise.resolve()),
+  verifyS3Bucket: vi.fn(() => Promise.resolve()),
   reportError: vi.fn(() => Promise.resolve()),
   requireFileAccess: vi.fn(() => Promise.resolve({ id: "user-1", role: "admin" })),
   requirePermission: vi.fn(() => () => Promise.resolve(true)),
@@ -40,6 +41,7 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
     isStorageServiceFault: mocks.isStorageServiceFault,
     isValidObjectKey: mocks.isValidObjectKey,
     putObject: mocks.putObject,
+    verifyS3Bucket: mocks.verifyS3Bucket,
   };
 });
 
@@ -297,6 +299,7 @@ describe("files route logic", () => {
       mocks.isValidObjectKey.mockReturnValue(true);
       mocks.getObjectSize.mockResolvedValue(5);
       mocks.getObjectStream.mockImplementation(async () => Readable.from([Buffer.from("hello")]));
+      mocks.verifyS3Bucket.mockResolvedValue(undefined);
     });
 
     function makeDownloadReply() {
@@ -435,6 +438,7 @@ describe("files route logic", () => {
         cause: s3Reset,
       });
       expect(classifyError(outputsErr, "http")).toBe("operational");
+      expect(mocks.verifyS3Bucket).not.toHaveBeenCalled();
 
       // 2. outputs/ misses (404), uploads/ size probe fails with AccessDenied
       const notFound = Object.assign(new Error("NotFound"), {
@@ -462,6 +466,7 @@ describe("files route logic", () => {
         cause: accessDenied,
       });
       expect(classifyError(uploadsErr, "http")).toBe("operational");
+      expect(mocks.verifyS3Bucket).not.toHaveBeenCalled();
 
       // 3. getObjectStream fails with SlowDown
       mocks.isStorageServiceFault.mockReturnValue(true);
@@ -503,6 +508,81 @@ describe("files route logic", () => {
       );
       expect(bugErr).toBe(unexpectedBug);
       expect(classifyError(bugErr, "http")).toBe("bug");
+    });
+
+    it("verifies S3 bucket existence only when both outputs/ and uploads/ size probes miss (#996)", async () => {
+      const notFound = Object.assign(new Error("NotFound"), {
+        name: "NotFound",
+        $metadata: { httpStatusCode: 404 },
+      });
+      mocks.isStorageServiceFault.mockReturnValue(false);
+
+      // 1. outputs/ hits -> verifyS3Bucket not called
+      mocks.getObjectSize.mockResolvedValueOnce(5);
+      await downloadHandler(
+        {
+          params: { jobId: "job-1", filename: "result.png" },
+          headers: {},
+          log: { warn: vi.fn(), error: vi.fn() },
+        },
+        makeDownloadReply(),
+      );
+      expect(mocks.verifyS3Bucket).not.toHaveBeenCalled();
+
+      // 2. outputs/ misses, uploads/ hits -> verifyS3Bucket not called
+      mocks.getObjectSize.mockRejectedValueOnce(notFound).mockResolvedValueOnce(5);
+      await downloadHandler(
+        {
+          params: { jobId: "job-1", filename: "input.png" },
+          headers: {},
+          log: { warn: vi.fn(), error: vi.fn() },
+        },
+        makeDownloadReply(),
+      );
+      expect(mocks.verifyS3Bucket).not.toHaveBeenCalled();
+
+      // 3. both miss and bucket exists -> verifyS3Bucket called once, warns and returns 404
+      mocks.getObjectSize.mockRejectedValueOnce(notFound).mockRejectedValueOnce(notFound);
+      const warnOnMiss = vi.fn();
+      const missReply = makeDownloadReply();
+      await downloadHandler(
+        {
+          params: { jobId: "job-1", filename: "missing.png" },
+          headers: {},
+          log: { warn: warnOnMiss, error: vi.fn() },
+        },
+        missReply,
+      );
+      expect(mocks.verifyS3Bucket).toHaveBeenCalledTimes(1);
+      expect(warnOnMiss).toHaveBeenCalledTimes(1);
+      expect(missReply.statusCode).toBe(404);
+      expect(missReply.payload).toEqual({ error: "File not found" });
+
+      // 4. both miss because bucket vanished -> verifyS3Bucket rejects with 503 before 404 warn
+      const { SafeError } = await import("@snapotter/shared");
+      const bucketFault = new SafeError("The server's storage service is unavailable.", {
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+      });
+      mocks.verifyS3Bucket.mockRejectedValueOnce(bucketFault);
+      mocks.getObjectSize.mockRejectedValueOnce(notFound).mockRejectedValueOnce(notFound);
+      const warnOnVanishedBucket = vi.fn();
+      const vanishedReply = makeDownloadReply();
+      const caught = await downloadHandler(
+        {
+          params: { jobId: "job-1", filename: "result.png" },
+          headers: {},
+          log: { warn: warnOnVanishedBucket, error: vi.fn() },
+        },
+        vanishedReply,
+      ).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(caught).toBe(bucketFault);
+      expect(warnOnVanishedBucket).not.toHaveBeenCalled();
+      expect(vanishedReply.send).not.toHaveBeenCalled();
     });
   });
 

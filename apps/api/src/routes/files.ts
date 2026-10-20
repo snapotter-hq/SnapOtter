@@ -23,6 +23,7 @@ import {
   isValidObjectKey,
   normalizeS3ReadFault,
   putObject,
+  verifyS3Bucket,
 } from "../lib/object-storage.js";
 import { decompressSvgz, isSvgBuffer, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { engineUnavailable } from "../modality/image-input.js";
@@ -278,6 +279,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
           size = await getObjectSize(key);
         } catch (uploadsErr) {
           rethrowIfStorageFault(uploadsErr);
+          await verifyS3Bucket();
           request.log.warn({ jobId, filename }, "result download: object missing in storage");
           return reply.status(404).send({ error: "File not found" });
         }

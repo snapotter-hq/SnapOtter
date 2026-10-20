@@ -23,6 +23,7 @@ import {
   objectExists,
   putObject,
   putObjectStream,
+  verifyS3Bucket,
 } from "../../../apps/api/src/lib/object-storage.js";
 
 describe("object-storage (local backend)", () => {
@@ -1414,5 +1415,9 @@ describe("object-storage missing-key + robustness paths", () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it("treats verifyS3Bucket as a no-op on the local backend (#996)", async () => {
+    await expect(verifyS3Bucket()).resolves.toBeUndefined();
   });
 });

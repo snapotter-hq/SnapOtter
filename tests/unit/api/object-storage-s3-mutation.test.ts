@@ -15,6 +15,7 @@ const s3 = vi.hoisted(() => ({
   defaultMod: null as unknown,
   load: vi.fn<() => Promise<unknown>>(),
   configure: vi.fn(),
+  checkConnection: vi.fn(),
   putObject: vi.fn(),
   putStream: vi.fn(),
   getStream: vi.fn(),
@@ -51,6 +52,7 @@ vi.mock("@snapotter/enterprise", async () => {
   s3.defaultMod = {
     isMissingObjectError,
     configureS3: s3.configure,
+    checkConnection: s3.checkConnection,
     putGenericObject: s3.putObject,
     putGenericObjectStream: s3.putStream,
     getGenericObjectStream: s3.getStream,
@@ -80,11 +82,13 @@ import {
   putObject,
   putObjectStream,
   STORAGE_UNAVAILABLE_MESSAGE,
+  verifyS3Bucket,
 } from "../../../apps/api/src/lib/object-storage.js";
 
 beforeEach(() => {
   vi.clearAllMocks();
   s3.load.mockResolvedValue(s3.defaultMod);
+  s3.checkConnection.mockResolvedValue(undefined);
   s3.putObject.mockResolvedValue(undefined);
   s3.deleteObject.mockResolvedValue(undefined);
   s3.deletePrefix.mockResolvedValue(undefined);
@@ -932,5 +936,52 @@ describe("normalizeS3ReadFault (#2808)", () => {
     ["unexpected TypeError bug", new TypeError("unexpected S3 client defect")],
   ])("passes %s through unchanged", (_label, original) => {
     expect(normalizeS3ReadFault(original)).toBe(original);
+  });
+});
+
+describe("verifyS3Bucket (#996)", () => {
+  it("resolves when s3.checkConnection succeeds", async () => {
+    await expect(verifyS3Bucket()).resolves.toBeUndefined();
+    expect(s3.checkConnection).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [
+      "a NoSuchBucket 404 from checkConnection",
+      Object.assign(new Error("The specified bucket does not exist"), {
+        name: "NoSuchBucket",
+        $metadata: { httpStatusCode: 404 },
+      }),
+    ],
+    [
+      "AccessDenied on HeadBucket",
+      Object.assign(new Error("Access Denied"), {
+        name: "AccessDenied",
+        $metadata: { httpStatusCode: 403 },
+      }),
+    ],
+    [
+      "an unreachable S3 endpoint",
+      Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), {
+        code: "ECONNREFUSED",
+        syscall: "connect",
+      }),
+    ],
+  ])("normalizes %s into a 503 storage-unavailable SafeError", async (_label, cause) => {
+    s3.checkConnection.mockRejectedValueOnce(cause);
+    await expect(verifyS3Bucket()).rejects.toMatchObject({
+      message: STORAGE_UNAVAILABLE_MESSAGE,
+      isSafeMessage: true,
+      kind: "operational",
+      code: "storage-unavailable",
+      statusCode: 503,
+      cause,
+    });
+  });
+
+  it("rethrows an unexpected non-S3 defect from checkConnection untouched", async () => {
+    const bug = new TypeError("unexpected checkConnection defect");
+    s3.checkConnection.mockRejectedValueOnce(bug);
+    await expect(verifyS3Bucket()).rejects.toBe(bug);
   });
 });

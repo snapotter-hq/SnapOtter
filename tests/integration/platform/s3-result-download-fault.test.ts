@@ -147,4 +147,28 @@ describe.skipIf(!minioAvailable)("S3-mode tool-result download fault classificat
       s3Storage.configureS3(s3Config());
     }
   });
+
+  // #996: HeadObject responses have no body, so a vanished bucket and a missing
+  // key both arrive from getObjectSize as NotFound (HTTP 404). Disambiguating
+  // on the double-miss path with HeadBucket must surface the bucket outage as
+  // 503 rather than folding every job result into 404 "File not found". Kept
+  // last in the file because it destroys the bucket; afterAll tolerates it.
+  it("returns 503, not 404, when the whole bucket is gone (#996)", async () => {
+    const objects = await s3Client.send(new ListObjectsV2Command({ Bucket: BUCKET }));
+    for (const obj of objects.Contents ?? []) {
+      if (obj.Key) {
+        await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: obj.Key }));
+      }
+    }
+    await s3Client.send(new DeleteBucketCommand({ Bucket: BUCKET }));
+
+    const res = await testApp.app.inject({
+      method: "GET",
+      url: `/api/v1/download/${jobId}/result.png`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+
+    expect(res.statusCode).toBe(503);
+    expect(JSON.parse(res.body).error).not.toMatch(/not found/i);
+  });
 });

@@ -407,11 +407,30 @@ export function isStorageServiceFault(error: unknown): boolean {
  * error while the lazy singleton is unloaded, is not proven missing and
  * returns false. One inherited blind spot: a HeadObject 404 (getObjectSize)
  * looks the same for a missing key and a missing bucket (see the enterprise
- * isMissingObjectError), so only GetObject reads keep NoSuchBucket a fault.
+ * isMissingObjectError), so HeadObject callers that need to distinguish a
+ * vanished bucket after a miss follow up with verifyS3Bucket (#996).
  */
 export function isMissingObjectError(error: unknown): boolean {
   if (isS3Enabled()) return !!s3Mod && s3Mod.isMissingObjectError(error);
   return (error as NodeJS.ErrnoException | null)?.code === "ENOENT";
+}
+
+/**
+ * Disambiguate a HeadObject 404 (getObjectSize) in S3 mode (#996). HEAD
+ * responses carry no body, so S3 and MinIO report both a missing key and a
+ * vanished bucket as 404 NotFound. When all size probes for a request miss,
+ * one HeadBucket check tells a genuine per-file 404 (resolves) from a missing
+ * or unreachable bucket (rejects with a normalized 503 storage fault). No-op
+ * on the local backend, where stat() errnos already distinguish the two.
+ */
+export async function verifyS3Bucket(): Promise<void> {
+  if (!isS3Enabled()) return;
+  try {
+    const s3 = await getS3();
+    await s3.checkConnection();
+  } catch (err) {
+    throw normalizeS3ReadFault(err);
+  }
 }
 
 export async function getObjectStream(

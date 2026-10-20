@@ -221,4 +221,86 @@ describe("tool-result download fault classification (local mode)", () => {
       await deletePrefix(`outputs/${jobId}`);
     }
   });
+
+  // #996: in S3 mode, HeadObject returns a bodyless 404 NotFound for both a
+  // missing key and a vanished bucket. On the double-miss path, a HeadBucket
+  // probe distinguishes a genuine missing key (bucket returns 200 -> 404) from
+  // a missing bucket (bucket returns 404 -> 503 storage-unavailable).
+  it("disambiguates a missing key (404) from a vanished bucket (503) in S3 mode (#996)", async () => {
+    let bucketExists = false;
+    const seenRequests: string[] = [];
+    const s3Server = http.createServer((req, res) => {
+      seenRequests.push(`${req.method} ${req.url}`);
+      if (req.method === "HEAD" && (req.url === "/test-bucket" || req.url === "/test-bucket/")) {
+        res.writeHead(bucketExists ? 200 : 404);
+        res.end();
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve) => s3Server.listen(0, "127.0.0.1", resolve));
+    const s3Port = (s3Server.address() as AddressInfo).port;
+
+    const e = env as Record<string, unknown>;
+    const saved = {
+      STORAGE_MODE: env.STORAGE_MODE,
+      S3_BUCKET: env.S3_BUCKET,
+      S3_REGION: env.S3_REGION,
+      S3_ENDPOINT: env.S3_ENDPOINT,
+      S3_ACCESS_KEY_ID: env.S3_ACCESS_KEY_ID,
+      S3_SECRET_ACCESS_KEY: env.S3_SECRET_ACCESS_KEY,
+      S3_FORCE_PATH_STYLE: env.S3_FORCE_PATH_STYLE,
+      S3_PREFIX: env.S3_PREFIX,
+    };
+    const { loadS3Storage } = await import("@snapotter/enterprise");
+    const s3 = await loadS3Storage();
+    const cfg = {
+      bucket: "test-bucket",
+      region: "us-east-1",
+      endpoint: `http://127.0.0.1:${s3Port}`,
+      accessKeyId: "minioadmin",
+      secretAccessKey: "minioadmin",
+      forcePathStyle: true,
+      prefix: "",
+    };
+    e.STORAGE_MODE = "s3";
+    e.S3_BUCKET = cfg.bucket;
+    e.S3_REGION = cfg.region;
+    e.S3_ENDPOINT = cfg.endpoint;
+    e.S3_ACCESS_KEY_ID = cfg.accessKeyId;
+    e.S3_SECRET_ACCESS_KEY = cfg.secretAccessKey;
+    e.S3_FORCE_PATH_STYLE = cfg.forcePathStyle;
+    e.S3_PREFIX = cfg.prefix;
+    s3.configureS3(cfg);
+
+    try {
+      const vanishedRes = await download("resfault-s3-996", "result.png");
+      expect(vanishedRes.statusCode).toBe(503);
+      expect(JSON.parse(vanishedRes.body)).toMatchObject({
+        code: "storage-unavailable",
+        message: "The server's storage service is unavailable.",
+      });
+      expect(JSON.parse(vanishedRes.body).error).not.toMatch(/not found/i);
+      expect(seenRequests).toEqual([
+        "HEAD /test-bucket/outputs/resfault-s3-996/result.png",
+        "HEAD /test-bucket/uploads/resfault-s3-996/result.png",
+        "HEAD /test-bucket/",
+      ]);
+
+      seenRequests.length = 0;
+      bucketExists = true;
+      const missingKeyRes = await download("resfault-s3-996", "never-existed.png");
+      expect(missingKeyRes.statusCode).toBe(404);
+      expect(JSON.parse(missingKeyRes.body)).toEqual({ error: "File not found" });
+      expect(seenRequests).toEqual([
+        "HEAD /test-bucket/outputs/resfault-s3-996/never-existed.png",
+        "HEAD /test-bucket/uploads/resfault-s3-996/never-existed.png",
+        "HEAD /test-bucket/",
+      ]);
+    } finally {
+      Object.assign(e, saved);
+      await new Promise<void>((resolve) => s3Server.close(() => resolve()));
+    }
+  });
 });

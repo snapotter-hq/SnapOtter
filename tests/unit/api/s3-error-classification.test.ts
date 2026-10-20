@@ -9,6 +9,7 @@
  * route end to end; CI has no minio, so the shapes are pinned here.
  */
 
+import http from "node:http";
 import net from "node:net";
 import { loadS3Storage, type S3StorageModule } from "@snapotter/enterprise";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -144,6 +145,55 @@ describe("S3Client stalled endpoint timeout (#2755)", () => {
       expect(s3.isMissingObjectError(reqTimeoutErr)).toBe(false);
     } finally {
       for (const socket of sockets) socket.destroy();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+});
+
+describe("checkConnection missing-bucket normalization (#996)", () => {
+  it("normalizes a HeadBucket 404 NotFound into NoSuchBucket so isMissingObjectError rejects it", async () => {
+    let statusToReturn = 404;
+    const server = http.createServer((_req, res) => {
+      res.writeHead(statusToReturn);
+      res.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as net.AddressInfo;
+
+    try {
+      s3.configureS3({
+        bucket: "vanished-bucket",
+        region: "us-east-1",
+        endpoint: `http://127.0.0.1:${port}`,
+        accessKeyId: "k",
+        secretAccessKey: "s",
+        forcePathStyle: true,
+        prefix: "",
+      });
+
+      const missingBucketErr = await s3.checkConnection().then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(missingBucketErr).toBeInstanceOf(Error);
+      expect(missingBucketErr).toMatchObject({
+        name: "NoSuchBucket",
+        $metadata: { httpStatusCode: 404 },
+      });
+      expect(s3.isMissingObjectError(missingBucketErr)).toBe(false);
+
+      statusToReturn = 403;
+      const forbiddenErr = await s3.checkConnection().then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(forbiddenErr).toBeInstanceOf(Error);
+      expect((forbiddenErr as { name?: string }).name).not.toBe("NoSuchBucket");
+      expect(s3.isMissingObjectError(forbiddenErr)).toBe(false);
+
+      statusToReturn = 200;
+      await expect(s3.checkConnection()).resolves.toBeUndefined();
+    } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
   });

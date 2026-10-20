@@ -85,7 +85,21 @@ function requireObjectBody(response: GetObjectCommandOutput, key: string) {
 }
 
 export async function checkConnection(): Promise<void> {
-  await getClient().send(new HeadBucketCommand({ Bucket: cfg().bucket }));
+  try {
+    await getClient().send(new HeadBucketCommand({ Bucket: cfg().bucket }));
+  } catch (err) {
+    // HEAD responses carry no body, so the SDK deserializes a missing-bucket
+    // 404 from HeadBucket as NotFound rather than NoSuchBucket. HeadBucket has
+    // no object key, so any 404 here means the bucket itself is gone (#996).
+    if (
+      typeof err === "object" &&
+      err !== null &&
+      (err as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404
+    ) {
+      (err as { name?: string }).name = "NoSuchBucket";
+    }
+    throw err;
+  }
 }
 
 /**
@@ -94,9 +108,10 @@ export async function checkConnection(): Promise<void> {
  * SDK stamps every dispatched error with $metadata). NoSuchBucket also
  * arrives as HTTP 404 but means the whole bucket is gone, a storage outage
  * rather than a missing file, so it stays a fault. Caveat: that carve-out
- * only works for GetObject callers. HEAD responses carry no body, so for
- * HeadObject the SDK yields the same NotFound/404 shape whether the key or
- * the whole bucket is missing, and this predicate cannot tell them apart.
+ * only works for GetObject and HeadBucket (checkConnection) callers. HEAD
+ * responses carry no body, so for HeadObject the SDK yields the same
+ * NotFound/404 shape whether the key or the whole bucket is missing, and
+ * callers that probe with HeadObject disambiguate a miss via checkConnection.
  * Service faults (AccessDenied, credential rejection, 5xx) and errors that
  * did not come from the SDK return false.
  */
