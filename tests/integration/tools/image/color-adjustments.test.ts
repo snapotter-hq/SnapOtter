@@ -924,3 +924,31 @@ describe("Sharpness exact boundaries", () => {
     expect(res.statusCode).toBe(400);
   });
 });
+
+// ── Backwards-compatible legacy alias routes (#2826) ──────────
+describe("Legacy alias routes (#2826)", () => {
+  it.each([
+    ["brightness-contrast", { brightness: 25, contrast: 15 }],
+    ["saturation", { saturation: 40 }],
+    ["color-channels", { red: 130, green: 90, blue: 110 }],
+    ["color-effects", { effect: "grayscale" }],
+  ] as const)(
+    "processes a PNG via /api/v1/tools/image/%s on the image pool",
+    async (aliasId, settings) => {
+      const { body: payload, contentType } = makePayload(settings);
+      const res = await app.inject({
+        method: "POST",
+        url: `/api/v1/tools/image/${aliasId}`,
+        payload,
+        headers: {
+          "content-type": contentType,
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+      expect(res.statusCode).toBe(200);
+      const result = JSON.parse(res.body);
+      expect(result.downloadUrl).toBeDefined();
+      expect(result.processedSize).toBeGreaterThan(0);
+    },
+  );
+});

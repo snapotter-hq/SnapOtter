@@ -396,7 +396,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         // of the first progress write, so the lazy persist layer can never
         // create the row first. Insert-only: a reused id keeps its previous
         // run's state until enqueueToolJob claims and re-points it.
-        const pool = resolveToolPool(config.toolId);
+        const pool = resolveToolPool(config.toolId, config.section);
         let ownsPreEnqueueAlias = true;
         if (clientJobId && clientJobId !== jobId) {
           ownsPreEnqueueAlias = await insertToolJobAlias({

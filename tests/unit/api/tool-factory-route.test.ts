@@ -148,7 +148,11 @@ vi.mock("sharp", () => ({
 
 import { apiToolPath } from "@snapotter/shared";
 import { db } from "../../../apps/api/src/db/index.js";
-import { enqueueToolJob, waitForJob } from "../../../apps/api/src/jobs/enqueue.js";
+import {
+  enqueueToolJob,
+  insertToolJobAlias,
+  waitForJob,
+} from "../../../apps/api/src/jobs/enqueue.js";
 import { autoOrient } from "../../../apps/api/src/lib/auto-orient.js";
 import {
   getFirstMissingBundleForTool,
@@ -992,6 +996,62 @@ describe("createToolRoute", () => {
       expect(reply.send).toHaveBeenCalledWith(
         expect.objectContaining({ jobId: expect.any(String) }),
       );
+    });
+
+    it.each(["brightness-contrast", "saturation", "color-channels", "color-effects"])(
+      "enqueues adjust-colors alias route %s on the image pool instead of system (#2826)",
+      async (aliasId) => {
+        const app = createMockApp();
+        createToolRoute(app as never, {
+          ...makeMockConfig(aliasId),
+          section: "image",
+        });
+        const routePath = `/api/v1/tools/image/${aliasId}`;
+        const handler = app.routes[routePath];
+        expect(handler).toBeTypeOf("function");
+
+        const reply = createMockReply();
+        const req = createMockRequest({
+          fileBuffer: Buffer.from("png-data"),
+          clientJobId: "11111111-1111-4111-8111-111111111111",
+        });
+
+        await handler(req, reply);
+
+        const job = vi.mocked(enqueueToolJob).mock.calls[0][0];
+        expect(job.toolId).toBe(aliasId);
+        expect(job.pool).toBe("image");
+        expect(insertToolJobAlias).toHaveBeenCalledWith(
+          expect.objectContaining({ jobId: job.jobId, pool: "image" }),
+        );
+        expect(waitForJob).toHaveBeenCalledWith("image", job.jobId);
+      },
+    );
+
+    it("forwards config.section to resolveToolPool for non-catalog routes (#2826)", async () => {
+      const app = createMockApp();
+      createToolRoute(app as never, {
+        ...makeMockConfig("custom-non-catalog-tool"),
+        section: "pdf",
+      });
+      const handler = app.routes["/api/v1/tools/pdf/custom-non-catalog-tool"];
+      expect(handler).toBeTypeOf("function");
+
+      const reply = createMockReply();
+      const req = createMockRequest({
+        fileBuffer: Buffer.from("png-data"),
+        clientJobId: "11111111-1111-4111-8111-111111111111",
+      });
+
+      await handler(req, reply);
+
+      const job = vi.mocked(enqueueToolJob).mock.calls[0][0];
+      expect(job.toolId).toBe("custom-non-catalog-tool");
+      expect(job.pool).toBe("docs");
+      expect(insertToolJobAlias).toHaveBeenCalledWith(
+        expect.objectContaining({ jobId: job.jobId, pool: "docs" }),
+      );
+      expect(waitForJob).toHaveBeenCalledWith("docs", job.jobId);
     });
   });
 
