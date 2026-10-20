@@ -32,6 +32,7 @@ import {
   beginPassportGenerateRun,
   type FaceLandmarks,
   type GenerateResult,
+  passportFileKey,
   usePassportPhotoStore,
 } from "@/stores/passport-photo-store";
 import { claimToolResult, passportPhotoResultKey } from "@/stores/tool-result-claims";
@@ -294,7 +295,8 @@ function CountryOption({
 
 export function PassportPhotoSettings() {
   const { t } = useTranslation();
-  const { files } = useFileStore();
+  const { files, entries } = useFileStore();
+  const currentEntryId = entries[0]?.id;
   const { error } = useToolProcessor("passport-photo");
 
   const {
@@ -313,8 +315,12 @@ export function PassportPhotoSettings() {
     setCustomDimensions,
     analyzeResult,
     setAnalyzeResult,
+    analyzeError,
+    setAnalyzeError,
     generateResult,
     setGenerateResult,
+    generateError,
+    setGenerateError,
     analyzing,
     setAnalyzing,
     generating,
@@ -340,10 +346,6 @@ export function PassportPhotoSettings() {
   const [customWInput, setCustomWInput] = useState("");
   const [customHInput, setCustomHInput] = useState("");
 
-  // Errors
-  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
-  const [generateError, setGenerateError] = useState<string | null>(null);
-
   // Derived state
   const selectedSpec = getCountrySpec(countryCode);
   const isCustom = countryCode === "CUSTOM";
@@ -366,8 +368,12 @@ export function PassportPhotoSettings() {
   }, [dropdownOpen]);
 
   // Auto-select bg color when country changes
+  const prevDocBgColorRef = useRef(docSpec.bgColor);
   useEffect(() => {
-    setBgColor(docSpec.bgColor);
+    if (prevDocBgColorRef.current !== docSpec.bgColor) {
+      prevDocBgColorRef.current = docSpec.bgColor;
+      setBgColor(docSpec.bgColor);
+    }
   }, [docSpec.bgColor, setBgColor]);
 
   // Ensure valid documentType when country changes
@@ -446,20 +452,35 @@ export function PassportPhotoSettings() {
         }
       }
     },
-    [setAnalyzing, setAnalyzeResult, setGenerateResult, t],
+    [setAnalyzing, setAnalyzeError, setAnalyzeResult, setGenerateResult, t],
   );
 
   // Auto-analyze when files change
-  const analyzeRef = useRef<string | null>(null);
-
   useEffect(() => {
-    if (!hasFile || analyzeResult || analyzing) return;
+    const store = usePassportPhotoStore.getState();
+    if (!hasFile) {
+      if (
+        store.analyzedFileKey !== null ||
+        store.analyzeResult !== null ||
+        store.generateResult !== null ||
+        store.analyzeError !== null ||
+        store.generateError !== null
+      ) {
+        store.setAnalyzedFileKey(null);
+        store.setAnalyzeResult(null);
+        store.setGenerateResult(null);
+        store.setAnalyzeError(null);
+        store.setGenerateError(null);
+      }
+      return;
+    }
     const file = files[0];
-    const fileKey = `${file.name}-${file.size}-${file.lastModified}`;
-    if (analyzeRef.current === fileKey) return;
-    analyzeRef.current = fileKey;
+    const fileKey = passportFileKey(file, currentEntryId);
+    if (store.analyzedFileKey === fileKey) return;
+    store.setAnalyzedFileKey(fileKey);
+    setGenerateError(null);
     runAnalyze(file);
-  }, [hasFile, files, analyzeResult, analyzing, runAnalyze]);
+  }, [hasFile, files, currentEntryId, runAnalyze, setGenerateError]);
 
   // Generate
   const handleGenerate = useCallback(async () => {
@@ -568,6 +589,7 @@ export function PassportPhotoSettings() {
     adjustX,
     adjustY,
     setGenerating,
+    setGenerateError,
     setGenerateResult,
   ]);
 

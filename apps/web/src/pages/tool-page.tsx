@@ -685,6 +685,7 @@ function ToolPageContent({
   const handleClearAll = useCallback(() => {
     if (!allowIntake()) return;
     reset();
+    usePassportPhotoStore.getState().reset();
   }, [allowIntake, reset]);
 
   const handleAddMore = useCallback(() => {

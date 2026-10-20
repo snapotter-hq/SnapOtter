@@ -25,7 +25,11 @@ import { ToolPage } from "@/pages/tool-page";
 import { useFeaturesStore } from "@/stores/features-store";
 import { useFileStore } from "@/stores/file-store";
 import { type MemeTemplate, useMemeStore } from "@/stores/meme-store";
-import { type AnalyzeResult, usePassportPhotoStore } from "@/stores/passport-photo-store";
+import {
+  type AnalyzeResult,
+  passportFileKey,
+  usePassportPhotoStore,
+} from "@/stores/passport-photo-store";
 import { useToolResultClaims } from "@/stores/tool-result-claims";
 
 const PREVIEW_PNG =
@@ -265,7 +269,9 @@ afterEach(() => {
 describe("usePassportPhotoStore.reset (#2635)", () => {
   it("resets all analysis, generation, adjustment, and spec fields back to initial defaults", () => {
     const store = usePassportPhotoStore.getState();
+    store.setAnalyzedFileKey("entry-1:portrait.jpg-10-100");
     store.setAnalyzeResult(makeAnalyzeResult("job-1", "portrait.jpg"));
+    store.setAnalyzeError("No face detected");
     store.setCountryCode("GB");
     store.setDocumentType("visa");
     store.setBgColor("#F0F0F0");
@@ -280,14 +286,18 @@ describe("usePassportPhotoStore.reset (#2635)", () => {
       dimensions: { width: 600, height: 600 },
       spec: { country: "CUSTOM", document: "visa" },
     });
+    store.setGenerateError("Photo generation failed");
     store.setAnalyzing(true);
     store.setGenerating(true);
 
     usePassportPhotoStore.getState().reset();
 
     const after = usePassportPhotoStore.getState();
+    expect(after.analyzedFileKey).toBeNull();
     expect(after.analyzeResult).toBeNull();
+    expect(after.analyzeError).toBeNull();
     expect(after.generateResult).toBeNull();
+    expect(after.generateError).toBeNull();
     expect(after.analyzing).toBe(false);
     expect(after.generating).toBe(false);
     expect(after.countryCode).toBe("US");
@@ -695,5 +705,137 @@ describe("ToolPage resets usePassportPhotoStore and useMemeStore across tool cha
     expect(useMemeStore.getState().loading).toBe(false);
     expect(templateRequests).toBe(1);
     expect(screen.getByTestId("work-probe")).toHaveTextContent("clean");
+  });
+
+  it("re-analyzes and clears generateResult when replacing a portrait via drop or paste on /image/passport-photo, including across 768px (#2689)", async () => {
+    renderRoutes("/image/passport-photo");
+
+    await act(async () => {
+      useFileStore
+        .getState()
+        .setFiles([new File(["portrait-1"], "first.jpg", { type: "image/jpeg" })]);
+    });
+
+    const generateBtn = await screen.findByTestId("passport-photo-generate");
+    expect(analyzeCalls).toEqual(["first.jpg"]);
+
+    fireEvent.click(generateBtn);
+    await waitFor(() => {
+      expect(usePassportPhotoStore.getState().generateResult?.downloadUrl).toContain("job-1");
+    });
+    expect(screen.getByTestId("work-probe")).toHaveTextContent("unsaved");
+
+    // Crossing the 768px breakpoint preserves first.jpg and any generateError without re-analyzing.
+    act(() => {
+      usePassportPhotoStore.getState().setGenerateError("Temporary generation warning");
+    });
+    setMobileViewport(true);
+    setMobileViewport(false);
+    expect(analyzeCalls).toEqual(["first.jpg"]);
+    expect(usePassportPhotoStore.getState().generateResult?.downloadUrl).toContain("job-1");
+    expect(screen.getByText("Temporary generation warning")).toBeInTheDocument();
+
+    // Drop a second portrait onto the page while staying on /image/passport-photo.
+    const secondFile = new File(["portrait-2"], "second.jpg", { type: "image/jpeg" });
+    const imageArea = screen.getByRole("region", { name: en.a11y.imageArea });
+    await act(async () => {
+      fireEvent.drop(imageArea, {
+        dataTransfer: { files: [secondFile], types: ["Files"] },
+      });
+    });
+
+    await waitFor(() => {
+      expect(analyzeCalls).toEqual(["first.jpg", "second.jpg"]);
+    });
+    expect(usePassportPhotoStore.getState().analyzeResult?.filename).toBe("second.jpg");
+    expect(usePassportPhotoStore.getState().analyzeResult?.jobId).toBe("job-2");
+    expect(usePassportPhotoStore.getState().generateResult).toBeNull();
+    expect(usePassportPhotoStore.getState().generateError).toBeNull();
+    expect(screen.queryByText("Temporary generation warning")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-probe")).toHaveTextContent("clean");
+
+    // Generate on second.jpg, then paste a third portrait onto the page.
+    fireEvent.click(await screen.findByTestId("passport-photo-generate"));
+    await waitFor(() => {
+      expect(usePassportPhotoStore.getState().generateResult?.downloadUrl).toContain("job-2");
+    });
+    expect(screen.getByTestId("work-probe")).toHaveTextContent("unsaved");
+
+    const thirdFile = new File(["portrait-3"], "third.jpg", { type: "image/jpeg" });
+    await act(async () => {
+      const pasteEvent = new Event("paste", { bubbles: true, cancelable: true });
+      Object.defineProperty(pasteEvent, "clipboardData", {
+        value: { files: [thirdFile], items: [] },
+      });
+      document.dispatchEvent(pasteEvent);
+    });
+
+    await waitFor(() => {
+      expect(analyzeCalls).toEqual(["first.jpg", "second.jpg", "third.jpg"]);
+    });
+    expect(usePassportPhotoStore.getState().analyzeResult?.filename).toBe("third.jpg");
+    expect(usePassportPhotoStore.getState().analyzeResult?.jobId).toBe("job-3");
+    expect(usePassportPhotoStore.getState().generateResult).toBeNull();
+    expect(screen.getByTestId("work-probe")).toHaveTextContent("clean");
+  });
+
+  it("clears analyzeResult and generateResult on Clear all and analyzes the next uploaded portrait on /image/passport-photo (#2689)", async () => {
+    renderRoutes("/image/passport-photo");
+
+    const firstFile = new File(["portrait-1"], "first.jpg", { type: "image/jpeg" });
+    await act(async () => {
+      useFileStore.getState().setFiles([firstFile]);
+    });
+
+    const generateBtn = await screen.findByTestId("passport-photo-generate");
+    expect(analyzeCalls).toEqual(["first.jpg"]);
+
+    fireEvent.click(generateBtn);
+    await waitFor(() => {
+      expect(usePassportPhotoStore.getState().generateResult).not.toBeNull();
+    });
+    expect(screen.getByTestId("work-probe")).toHaveTextContent("unsaved");
+
+    // Click "Clear all" in the left file list while staying on /image/passport-photo.
+    fireEvent.click(screen.getByRole("button", { name: en.toolPage.clearAll }));
+
+    expect(useFileStore.getState().files).toEqual([]);
+    expect(usePassportPhotoStore.getState().analyzeResult).toBeNull();
+    expect(usePassportPhotoStore.getState().generateResult).toBeNull();
+    expect(screen.getByTestId("work-probe")).toHaveTextContent("clean");
+
+    // Uploading a second portrait (or re-uploading the same file) on the dropzone must analyze it.
+    await act(async () => {
+      useFileStore
+        .getState()
+        .setFiles([new File(["portrait-2"], "second.jpg", { type: "image/jpeg" })]);
+    });
+
+    await waitFor(() => {
+      expect(analyzeCalls).toEqual(["first.jpg", "second.jpg"]);
+    });
+    expect(usePassportPhotoStore.getState().analyzeResult?.filename).toBe("second.jpg");
+    expect(usePassportPhotoStore.getState().analyzeResult?.jobId).toBe("job-2");
+
+    // Direct useFileStore.getState().reset() also clears usePassportPhotoStore and allows re-uploading firstFile.
+    act(() => {
+      useFileStore.getState().reset();
+    });
+    expect(usePassportPhotoStore.getState().analyzedFileKey).toBeNull();
+    expect(usePassportPhotoStore.getState().analyzeResult).toBeNull();
+    expect(usePassportPhotoStore.getState().generateResult).toBeNull();
+
+    await act(async () => {
+      useFileStore.getState().setFiles([firstFile]);
+    });
+    await waitFor(() => {
+      expect(analyzeCalls).toEqual(["first.jpg", "second.jpg", "first.jpg"]);
+    });
+    expect(usePassportPhotoStore.getState().analyzeResult?.filename).toBe("first.jpg");
+    expect(usePassportPhotoStore.getState().analyzeResult?.jobId).toBe("job-3");
+
+    const fileForKey = new File(["k"], "key.jpg", { type: "image/jpeg", lastModified: 42 });
+    expect(passportFileKey(fileForKey)).toBe("key.jpg-1-42");
+    expect(passportFileKey(fileForKey, "entry-9")).toBe("entry-9:key.jpg-1-42");
   });
 });

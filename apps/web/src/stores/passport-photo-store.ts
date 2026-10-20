@@ -1,4 +1,10 @@
 import { create } from "zustand";
+import { useFileStore } from "@/stores/file-store";
+
+export function passportFileKey(file: File, entryId?: string): string {
+  const base = `${file.name}-${file.size}-${file.lastModified}`;
+  return entryId ? `${entryId}:${base}` : base;
+}
 
 export interface FaceLandmarks {
   leftEye: { x: number; y: number };
@@ -27,8 +33,12 @@ export interface GenerateResult {
 }
 
 interface PassportPhotoStore {
+  analyzedFileKey: string | null;
+  setAnalyzedFileKey: (key: string | null) => void;
   analyzeResult: AnalyzeResult | null;
   setAnalyzeResult: (r: AnalyzeResult | null) => void;
+  analyzeError: string | null;
+  setAnalyzeError: (e: string | null) => void;
   countryCode: string;
   setCountryCode: (c: string) => void;
   documentType: string;
@@ -50,6 +60,8 @@ interface PassportPhotoStore {
   setZoom: (z: number) => void;
   generateResult: GenerateResult | null;
   setGenerateResult: (r: GenerateResult | null) => void;
+  generateError: string | null;
+  setGenerateError: (e: string | null) => void;
   analyzing: boolean;
   setAnalyzing: (a: boolean) => void;
   generating: boolean;
@@ -58,7 +70,9 @@ interface PassportPhotoStore {
 }
 
 const INITIAL_STATE = {
+  analyzedFileKey: null as string | null,
   analyzeResult: null as AnalyzeResult | null,
+  analyzeError: null as string | null,
   countryCode: "US",
   documentType: "passport",
   bgColor: "#FFFFFF",
@@ -70,6 +84,7 @@ const INITIAL_STATE = {
   adjustY: 0,
   zoom: 1,
   generateResult: null as GenerateResult | null,
+  generateError: null as string | null,
   analyzing: false,
   generating: false,
 };
@@ -132,7 +147,22 @@ function cancelPassportRuns() {
  */
 export const usePassportPhotoStore = create<PassportPhotoStore>((set) => ({
   ...INITIAL_STATE,
-  setAnalyzeResult: (analyzeResult) => set({ analyzeResult, generateResult: null }),
+  setAnalyzedFileKey: (analyzedFileKey) => set({ analyzedFileKey }),
+  setAnalyzeResult: (analyzeResult) =>
+    set((state) => {
+      if (!analyzeResult) {
+        return { analyzeResult: null, generateResult: null };
+      }
+      const { files, entries } = useFileStore.getState();
+      const currentKey =
+        files[0] !== undefined ? passportFileKey(files[0], entries[0]?.id) : state.analyzedFileKey;
+      return {
+        analyzeResult,
+        generateResult: null,
+        analyzedFileKey: currentKey ?? state.analyzedFileKey,
+      };
+    }),
+  setAnalyzeError: (analyzeError) => set({ analyzeError }),
   setCountryCode: (countryCode) =>
     set({ countryCode, generateResult: null, customWidthMm: null, customHeightMm: null }),
   setDocumentType: (documentType) => set({ documentType, generateResult: null }),
@@ -145,6 +175,7 @@ export const usePassportPhotoStore = create<PassportPhotoStore>((set) => ({
   setAdjustY: (adjustY) => set({ adjustY, generateResult: null }),
   setZoom: (zoom) => set({ zoom }),
   setGenerateResult: (generateResult) => set({ generateResult }),
+  setGenerateError: (generateError) => set({ generateError }),
   setAnalyzing: (analyzing) => set({ analyzing }),
   setGenerating: (generating) => set({ generating }),
   reset: () => {
@@ -152,3 +183,21 @@ export const usePassportPhotoStore = create<PassportPhotoStore>((set) => ({
     set({ ...INITIAL_STATE });
   },
 }));
+
+useFileStore.subscribe((state, prevState) => {
+  if (prevState.entries.length > 0 && state.entries[0]?.id !== prevState.entries[0]?.id) {
+    cancelPassportRuns();
+    usePassportPhotoStore.setState({
+      analyzedFileKey: null,
+      analyzeResult: null,
+      analyzeError: null,
+      generateResult: null,
+      generateError: null,
+      analyzing: false,
+      generating: false,
+      adjustX: 0,
+      adjustY: 0,
+      zoom: 1,
+    });
+  }
+});
