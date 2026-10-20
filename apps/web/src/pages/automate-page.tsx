@@ -1073,7 +1073,7 @@ function AutomatePageContent() {
             ) : (
               <div className="space-y-1">
                 {savedPipelines.slice(0, 3).map((p) => (
-                  <div key={p.id} className="flex items-center gap-1">
+                  <div key={p.id} className="flex items-center gap-1 group">
                     <button
                       type="button"
                       onClick={() => handleLoadPipeline(p)}
@@ -1094,6 +1094,14 @@ function AutomatePageContent() {
                       title={t.automate.exportPipeline}
                     >
                       <Download className="h-3 w-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePipeline(p.id)}
+                      className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all shrink-0"
+                      title={t.automate.deletePipeline}
+                    >
+                      <Trash2 className="h-3 w-3" />
                     </button>
                   </div>
                 ))}

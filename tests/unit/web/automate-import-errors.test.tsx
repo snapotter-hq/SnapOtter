@@ -527,6 +527,57 @@ describe("automate pipeline delete (#1987)", () => {
     expect(screen.queryByText(en.automate.deleteListRefreshFailed)).not.toBeInTheDocument();
     expect(screen.queryByText(en.errors.networkError)).not.toBeInTheDocument();
   });
+
+  it("renders a delete button for each row and deletes a saved pipeline when 3 or fewer exist (#2960)", async () => {
+    const three = [1, 2, 3].map((n) => ({
+      ...SAVED,
+      id: `p${n}`,
+      name: `Pipeline ${n}`,
+    }));
+    usePipelineStore.setState({ savedPipelines: three });
+    server = {
+      save: savedOk,
+      list: () => new Response(JSON.stringify({ pipelines: three.slice(1) })),
+      delete: () => new Response(JSON.stringify({ ok: true })),
+    };
+
+    renderAutomate();
+
+    const deleteButtons = await screen.findAllByTitle(en.automate.deletePipeline);
+    expect(deleteButtons).toHaveLength(3);
+    expect(
+      screen.queryByRole("button", { name: format(en.automate.moreCount, { count: 1 }) }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(deleteButtons[0]);
+
+    await waitFor(() =>
+      expect(usePipelineStore.getState().savedPipelines.map((p) => p.id)).toEqual(["p2", "p3"]),
+    );
+    const deleteCalls = vi
+      .mocked(fetch)
+      .mock.calls.filter(
+        ([input, init]) => init?.method === "DELETE" && String(input).endsWith("/pipeline/p1"),
+      );
+    expect(deleteCalls).toHaveLength(1);
+  });
+
+  it("deletes the last saved pipeline and shows the empty state (#2960)", async () => {
+    usePipelineStore.setState({ savedPipelines: [SAVED] });
+    server = {
+      save: savedOk,
+      list: () => new Response(JSON.stringify({ pipelines: [] })),
+      delete: () => new Response(JSON.stringify({ ok: true })),
+    };
+
+    renderAutomate();
+
+    const deleteButton = await screen.findByTitle(en.automate.deletePipeline);
+    fireEvent.click(deleteButton);
+
+    await waitFor(() => expect(screen.getByText(en.automate.noSavedPipelines)).toBeInTheDocument());
+    expect(usePipelineStore.getState().savedPipelines).toEqual([]);
+  });
 });
 
 function renderAutomate() {
