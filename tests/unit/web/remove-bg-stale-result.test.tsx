@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The processor's state as the page sees it. By default Phase 1 (background
@@ -40,6 +40,8 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   useFileStore.getState().setFiles([]);
 });
 
@@ -110,5 +112,199 @@ describe("remove-background result after the files change (#2107)", () => {
     act(() => useFileStore.getState().setFiles([a]));
 
     expect(download()).toBeInTheDocument();
+  });
+
+  it("does not write the saved library id or auto-download when a new file replaces the entry mid-effects request (#2243)", async () => {
+    const a = png("a.png");
+    const b = png("b.png");
+    useFileStore.getState().setFiles([a]);
+    useFileStore.getState().updateEntry(0, { serverFileId: "lib-a-v1" });
+    useFileStore.getState().setLibrarySaveMode("overwrite");
+
+    let resolveEffects: ((res: Response) => void) | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveEffects = resolve;
+          }),
+      ),
+    );
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    render(<RemoveBgSettings />);
+    fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+    await waitFor(() => expect(resolveEffects).toBeDefined());
+
+    act(() => {
+      useFileStore.getState().setFiles([b]);
+    });
+
+    await act(async () => {
+      resolveEffects?.(
+        new Response(
+          JSON.stringify({
+            downloadUrl: "/api/v1/download/JOBA/a_effects.png",
+            savedFileId: "lib-a-v2",
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+
+    const state = useFileStore.getState();
+    expect(state.entries[0].file).toBe(b);
+    expect(state.entries[0].serverFileId).toBeUndefined();
+    expect(state.lastSavedLibraryFileId).toBeNull();
+    expect(state.entries[0].claimed).toBe(false);
+    expect(clickSpy).not.toHaveBeenCalled();
+  });
+
+  it("does not overwrite serverFileId or auto-download when the selected entry's file changes in place mid-effects request (#2243)", async () => {
+    const a = png("a.png");
+    const b = png("b.png");
+    useFileStore.getState().setFiles([a]);
+    useFileStore.getState().updateEntry(0, { serverFileId: "lib-a-v1" });
+    useFileStore.getState().setLibrarySaveMode("overwrite");
+
+    let resolveEffects: ((res: Response) => void) | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveEffects = resolve;
+          }),
+      ),
+    );
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    render(<RemoveBgSettings />);
+    fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+    await waitFor(() => expect(resolveEffects).toBeDefined());
+
+    act(() => {
+      useFileStore.getState().updateEntry(0, { file: b, serverFileId: undefined });
+    });
+
+    await act(async () => {
+      resolveEffects?.(
+        new Response(
+          JSON.stringify({
+            downloadUrl: "/api/v1/download/JOBA/a_effects.png",
+            savedFileId: "lib-a-v2",
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+
+    const state = useFileStore.getState();
+    expect(state.entries[0].file).toBe(b);
+    expect(state.entries[0].serverFileId).toBeUndefined();
+    expect(state.lastSavedLibraryFileId).toBeNull();
+    expect(state.entries[0].claimed).toBe(false);
+    expect(clickSpy).not.toHaveBeenCalled();
+  });
+
+  it("does not write the saved library id or auto-download when Undo clears the cutout mid-effects request (#2243)", async () => {
+    const a = png("a.png");
+    useFileStore.getState().setFiles([a]);
+    useFileStore.getState().updateEntry(0, {
+      serverFileId: "lib-a-v1",
+      processedUrl: "/api/v1/download/JOBA/a_mask.png",
+    });
+    useFileStore.getState().setLibrarySaveMode("overwrite");
+
+    let resolveEffects: ((res: Response) => void) | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveEffects = resolve;
+          }),
+      ),
+    );
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    const { rerender } = render(<RemoveBgSettings />);
+    fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+    await waitFor(() => expect(resolveEffects).toBeDefined());
+
+    act(() => {
+      useFileStore.getState().undoProcessing();
+    });
+    processor.downloadUrl = null;
+    rerender(<RemoveBgSettings />);
+
+    await act(async () => {
+      resolveEffects?.(
+        new Response(
+          JSON.stringify({
+            downloadUrl: "/api/v1/download/JOBA/a_effects.png",
+            savedFileId: "lib-a-v2",
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+
+    const state = useFileStore.getState();
+    expect(state.entries[0].serverFileId).toBe("lib-a-v1");
+    expect(state.lastSavedLibraryFileId).toBeNull();
+    expect(state.entries[0].claimed).toBe(false);
+    expect(clickSpy).not.toHaveBeenCalled();
+  });
+
+  it("ignores a stale effects response after Undo and a new Phase 1 removal on the same file (#2243)", async () => {
+    const a = png("a.png");
+    useFileStore.getState().setFiles([a]);
+    useFileStore.getState().updateEntry(0, { serverFileId: "lib-a-v1" });
+    useFileStore.getState().setLibrarySaveMode("overwrite");
+
+    let resolveEffects: ((res: Response) => void) | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveEffects = resolve;
+          }),
+      ),
+    );
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    const { rerender } = render(<RemoveBgSettings />);
+    fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+    await waitFor(() => expect(resolveEffects).toBeDefined());
+
+    // Undo clears the processor's downloadUrl, and a fresh removal (JOBB) lands on the same file.
+    processor.downloadUrl = null;
+    rerender(<RemoveBgSettings />);
+    fireEvent.click(screen.getByTestId("remove-background-submit"));
+    processor.downloadUrl = "/api/v1/download/JOBB/a_mask.png";
+    rerender(<RemoveBgSettings />);
+    const freshDownloadBtn = await screen.findByTestId("remove-background-download-effects");
+    expect(freshDownloadBtn).toBeEnabled();
+
+    await act(async () => {
+      resolveEffects?.(
+        new Response(
+          JSON.stringify({
+            downloadUrl: "/api/v1/download/JOBA/a_effects.png",
+            savedFileId: "lib-a-v2",
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+
+    const state = useFileStore.getState();
+    expect(state.entries[0].serverFileId).toBe("lib-a-v1");
+    expect(state.lastSavedLibraryFileId).toBeNull();
+    expect(state.entries[0].claimed).toBe(false);
+    expect(clickSpy).not.toHaveBeenCalled();
   });
 });

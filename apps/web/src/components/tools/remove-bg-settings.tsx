@@ -959,6 +959,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   };
   const runFileRef = useRef<File | null>(null);
   const expiredRerunInFlightRef = useRef(false);
+  const effectsRunIdRef = useRef(0);
   const [applyingEffects, setApplyingEffects] = useState(false);
   const [effectsError, setEffectsError] = useState<string | null>(null);
 
@@ -1043,6 +1044,8 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     files[0] === bgResultFile;
   const bgRemovedRef = useRef(bgRemoved);
   bgRemovedRef.current = bgRemoved;
+  const bgJobIdRef = useRef(bgJobId);
+  bgJobIdRef.current = bgJobId;
 
   // The result was made with a different model or refinements than the controls
   // now show. When the cutout arrived without a recorded run in this session,
@@ -1155,7 +1158,9 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   // Phase 1: Run AI background removal
   const handleRemoveBg = () => {
     // Reset Phase 2 state
+    effectsRunIdRef.current += 1;
     expiredRerunInFlightRef.current = false;
+    setApplyingEffects(false);
     setBgJobId(null);
     setBgFilename(null);
     setBgOriginalUrl(null);
@@ -1241,6 +1246,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   // whose automatic re-run is still in flight (#2490).
   useEffect(() => {
     if (bgRemoved) return;
+    setApplyingEffects(false);
     if (
       expiredRerunInFlightRef.current &&
       (processing || Boolean(downloadUrl)) &&
@@ -1261,8 +1267,25 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     // the effects request is the FINAL step, so it carries the save choice.
     const { entries, selectedIndex, librarySaveMode } = useFileStore.getState();
     const capturedEntry = entries[selectedIndex];
+    const capturedFile = capturedEntry?.file;
     const expectedProcessedUrl = capturedEntry?.processedUrl ?? undefined;
     const settingsAtStart = { ...removeBgSession.settings };
+    const runId = ++effectsRunIdRef.current;
+
+    const isStaleEffectsRun = () => {
+      const store = useFileStore.getState();
+      const liveEntry = store.entries[store.selectedIndex];
+      return (
+        effectsRunIdRef.current !== runId ||
+        bgJobIdRef.current !== bgJobId ||
+        !capturedEntry ||
+        !capturedFile ||
+        liveEntry?.id !== capturedEntry.id ||
+        liveEntry?.file !== capturedFile ||
+        (expectedProcessedUrl !== undefined && liveEntry.processedUrl !== expectedProcessedUrl) ||
+        (store.entries.length === 1 && !bgRemovedRef.current)
+      );
+    };
 
     setApplyingEffects(true);
     setEffectsError(null);
@@ -1311,8 +1334,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
           // The user may have swapped the file or undone the cutout while this
           // request ran; the removal below would then upload the old one into
           // the new entry or restart an undone run (#2490).
-          const live = useFileStore.getState().files;
-          if (live.length !== 1 || live[0] !== files[0] || !bgRemovedRef.current) return;
+          if (isStaleEffectsRun() || !bgRemovedRef.current) return;
           handleRemoveBg();
           expiredRerunInFlightRef.current = true;
           setEffectsError(t.toolSettings["remove-background"].effectsExpired);
@@ -1324,6 +1346,10 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
       }
 
       const result = resolveServerUrls(await response.json());
+      // The user may have swapped the file or undone the cutout while this
+      // request ran; skip updating the library id, claiming, and downloading
+      // for a file that is no longer the active entry (#2243).
+      if (isStaleEffectsRun()) return;
       if (typeof result?.downloadUrl !== "string" || !result.downloadUrl) {
         throw new Error(t.errors.invalidResponse);
       }
@@ -1331,10 +1357,10 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
 
       // Surface the "saved to your files" indicator and, on overwrite,
       // re-anchor so a subsequent run derives from the saved version (#565).
+      const store = useFileStore.getState();
       if (result.savedFileId) {
-        const store = useFileStore.getState();
         store.setLastSavedLibraryFileId(result.savedFileId as string);
-        if (librarySaveMode === "overwrite" && capturedEntry?.id) {
+        if (librarySaveMode === "overwrite") {
           store.updateEntryById(capturedEntry.id, { serverFileId: result.savedFileId as string });
         }
       }
@@ -1346,12 +1372,11 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      if (capturedEntry?.id && sameSettings(removeBgSession.settings, settingsAtStart)) {
+      if (sameSettings(removeBgSession.settings, settingsAtStart)) {
         useFileStore.getState().markClaimedById(capturedEntry.id, expectedProcessedUrl);
       }
     } catch (err) {
-      const live = useFileStore.getState().files;
-      if (live.length === 1 && live[0] === files[0] && bgRemovedRef.current) {
+      if (!isStaleEffectsRun() && bgRemovedRef.current) {
         setEffectsError(
           err instanceof Error
             ? err.message
@@ -1359,7 +1384,9 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
         );
       }
     } finally {
-      setApplyingEffects(false);
+      if (effectsRunIdRef.current === runId) {
+        setApplyingEffects(false);
+      }
     }
   };
 
