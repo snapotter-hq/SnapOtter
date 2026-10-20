@@ -434,3 +434,96 @@ describe("ImageInputHandler AVIF fallback logging (#1548)", () => {
     expect(log.info).not.toHaveBeenCalled();
   });
 });
+
+describe("ImageInputHandler SVG sanitization abort signal (#2830)", () => {
+  it("rethrows a timeout abort reason instead of wrapping it in InputValidationError", async () => {
+    const controller = new AbortController();
+    mocks.validateImageBuffer.mockResolvedValue({
+      valid: true,
+      format: "svg",
+      width: 100,
+      height: 100,
+    });
+    mocks.sanitizeSvg.mockImplementation((buf) => {
+      controller.abort("timeout");
+      return buf;
+    });
+
+    await expect(
+      new ImageInputHandler().prepare(RAW, "icon.svg", {
+        scratchDir: "/tmp/in",
+        signal: controller.signal,
+      }),
+    ).rejects.toBe("timeout");
+  });
+
+  it("rethrows a user cancel AbortError during SVG sanitization without wrapping in InputValidationError", async () => {
+    const controller = new AbortController();
+    mocks.validateImageBuffer.mockResolvedValue({
+      valid: true,
+      format: "svg",
+      width: 100,
+      height: 100,
+    });
+    mocks.decompressSvgz.mockImplementation((buf) => {
+      controller.abort();
+      return buf;
+    });
+
+    const err = await new ImageInputHandler()
+      .prepare(RAW, "icon.svg", {
+        scratchDir: "/tmp/in",
+        signal: controller.signal,
+      })
+      .catch((e: unknown) => e);
+
+    expect(err).not.toBeInstanceOf(InputValidationError);
+    expect(err).toMatchObject({ name: "AbortError" });
+  });
+
+  it("still wraps non-abort SVG sanitization failures in InputValidationError", async () => {
+    mocks.validateImageBuffer.mockResolvedValue({
+      valid: true,
+      format: "svg",
+      width: 100,
+      height: 100,
+    });
+    mocks.sanitizeSvg.mockImplementation(() => {
+      throw new Error("SVG contains prohibited <script> element");
+    });
+
+    await expect(
+      new ImageInputHandler().prepare(RAW, "icon.svg", {
+        scratchDir: "/tmp/in",
+        signal: new AbortController().signal,
+      }),
+    ).rejects.toMatchObject({
+      name: "InputValidationError",
+      statusCode: 400,
+      message: "SVG contains prohibited <script> element",
+    });
+  });
+
+  it("falls back to Invalid SVG when a non-Error value is thrown without an abort", async () => {
+    mocks.validateImageBuffer.mockResolvedValue({
+      valid: true,
+      format: "svg",
+      width: 100,
+      height: 100,
+    });
+    mocks.sanitizeSvg.mockImplementation(() => {
+      throw "malformed-xml";
+    });
+
+    await expect(
+      new ImageInputHandler().prepare(RAW, "icon.svg", {
+        scratchDir: "/tmp/in",
+        signal: new AbortController().signal,
+      }),
+    ).rejects.toMatchObject({
+      name: "InputValidationError",
+      statusCode: 400,
+      message: "Invalid SVG",
+    });
+  });
+});

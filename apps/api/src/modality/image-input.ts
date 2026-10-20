@@ -124,6 +124,7 @@ export class ImageInputHandler implements InputHandler {
         fileBuffer = sanitizeSvg(fileBuffer);
         opts.signal?.throwIfAborted();
       } catch (err) {
+        opts.signal?.throwIfAborted();
         throw new InputValidationError(err instanceof Error ? err.message : "Invalid SVG");
       }
     }
