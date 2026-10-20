@@ -39,6 +39,7 @@ import {
   putObject,
 } from "../../lib/object-storage.js";
 import { isUniqueViolation } from "../../lib/pg-errors.js";
+import { withRouteScratch } from "../../lib/route-scratch.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { updateSingleFileProgress } from "../progress.js";
 import { registerToolProcessFn } from "../tool-factory.js";
@@ -244,10 +245,10 @@ export function registerPassportPhoto(app: FastifyInstance) {
         }
 
         // Auto-orient to fix EXIF rotation
-        fileBuffer = await autoOrient(fileBuffer);
+        const orientedBuffer = await autoOrient(fileBuffer);
 
         request.log.info(
-          { toolId: "passport-photo", imageSize: fileBuffer.length },
+          { toolId: "passport-photo", imageSize: orientedBuffer.length },
           "Starting passport photo analysis",
         );
 
@@ -275,11 +276,11 @@ export function registerPassportPhoto(app: FastifyInstance) {
 
         let landmarksResult: Awaited<ReturnType<typeof detectFaceLandmarks>>;
         try {
-          landmarksResult = await detectFaceLandmarks(fileBuffer, landmarkProgress, {
+          landmarksResult = await detectFaceLandmarks(orientedBuffer, landmarkProgress, {
             toolId: "passport-photo",
           });
         } catch (err) {
-          throw await asInputErrorIfUndecodable(fileBuffer, err);
+          throw await asInputErrorIfUndecodable(orientedBuffer, err);
         }
 
         if (!landmarksResult.faceDetected || !landmarksResult.landmarks) {
@@ -310,23 +311,18 @@ export function registerPassportPhoto(app: FastifyInstance) {
             }
           : undefined;
 
-        const scratchDir = join(tmpdir(), "snapotter-scratch", jobId);
-        let bgRemovedBuffer: Buffer;
-        try {
-          await mkdir(scratchDir, { recursive: true });
+        const bgRemovedBuffer = await withRouteScratch("passport-photo", async (scratchDir) => {
           try {
-            bgRemovedBuffer = await removeBackground(
-              fileBuffer,
+            return await removeBackground(
+              orientedBuffer,
               scratchDir,
               { model: "birefnet-portrait", toolId: "passport-photo" },
               bgProgress,
             );
           } catch (err) {
-            throw await asInputErrorIfUndecodable(fileBuffer, err);
+            throw await asInputErrorIfUndecodable(orientedBuffer, err);
           }
-        } finally {
-          await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
-        }
+        });
 
         // Create a smaller preview for fast transfer (max 800px wide)
         const meta = await sharp(bgRemovedBuffer).metadata();

@@ -12,16 +12,17 @@ const removeBackground = vi.fn();
 const putObject = vi.fn();
 const dbInsertValues = vi.fn();
 const updateSingleFileProgress = vi.fn();
-const mkdirSpy = vi.fn();
+const withRouteScratchSpy = vi.fn();
 const autoOrient = vi.fn();
 
-vi.mock("node:fs/promises", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("node:fs/promises")>();
+vi.mock("../../../apps/api/src/lib/route-scratch.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/route-scratch.js")>();
   return {
     ...actual,
-    mkdir: (...args: Parameters<typeof actual.mkdir>) => {
-      mkdirSpy(...args);
-      return actual.mkdir(...args);
+    withRouteScratch: (...args: Parameters<typeof actual.withRouteScratch>) => {
+      withRouteScratchSpy(...args);
+      return actual.withRouteScratch(...args);
     },
   };
 });
@@ -129,7 +130,7 @@ describe("POST /api/v1/tools/image/passport-photo/analyze cleanup and progress s
     putObject.mockReset().mockResolvedValue(undefined);
     dbInsertValues.mockReset().mockResolvedValue(undefined);
     updateSingleFileProgress.mockReset().mockResolvedValue(undefined);
-    mkdirSpy.mockReset();
+    withRouteScratchSpy.mockReset();
     autoOrient.mockReset().mockImplementation(async (buf: Buffer) => buf);
 
     app = Fastify();
@@ -160,7 +161,7 @@ describe("POST /api/v1/tools/image/passport-photo/analyze cleanup and progress s
       details: "passport-photo needs about 2.5 GB free on CPU hosts, this host has 1.2 GB",
     });
 
-    expect(mkdirSpy).not.toHaveBeenCalled();
+    expect(withRouteScratchSpy).not.toHaveBeenCalled();
     expect(putObject).not.toHaveBeenCalled();
     expect(updateSingleFileProgress).toHaveBeenCalledWith({
       jobId: "client-job-landmark-fail",
@@ -185,7 +186,7 @@ describe("POST /api/v1/tools/image/passport-photo/analyze cleanup and progress s
 
     expect(res.statusCode).toBe(422);
     expect(res.json().error).toBe("No face detected");
-    expect(mkdirSpy).not.toHaveBeenCalled();
+    expect(withRouteScratchSpy).not.toHaveBeenCalled();
     expect(putObject).not.toHaveBeenCalled();
     expect(removeBackground).not.toHaveBeenCalled();
     expect(updateSingleFileProgress).toHaveBeenCalledWith({
@@ -242,7 +243,7 @@ describe("POST /api/v1/tools/image/passport-photo/analyze cleanup and progress s
     });
 
     expect(res.statusCode).toBe(503);
-    expect(mkdirSpy).not.toHaveBeenCalled();
+    expect(withRouteScratchSpy).not.toHaveBeenCalled();
     expect(putObject).not.toHaveBeenCalled();
     expect(updateSingleFileProgress).toHaveBeenCalledWith({
       jobId: "client-job-decoder-503",
