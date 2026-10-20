@@ -16,6 +16,20 @@ export function isHttpsUrl(value: string): boolean {
 }
 
 /**
+ * Whether a URL parses with an http: or https: scheme and a non-empty host.
+ * A scheme-less value with a port ("keycloak.lan:8080/realms/x") parses with
+ * protocol "keycloak.lan:" and an empty host, so both checks are needed (#1912, #2869).
+ */
+function isHttpOrHttpsUrl(value: string): boolean {
+  try {
+    const url = new URL(value.trim());
+    return (url.protocol === "http:" || url.protocol === "https:") && url.host.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Canonicalise EXTERNAL_URL to `${url.protocol}//${url.host}${url.pathname}`
  * with trailing slashes stripped when it is an http(s) URL with no credentials,
  * query string, or fragment (#1876). Scheme and host are lowercased (IDN hosts
@@ -248,27 +262,14 @@ const envSchema = z
           message: "OIDC_ISSUER_URL is required when OIDC_ENABLED=true",
           path: ["OIDC_ISSUER_URL"],
         });
-      } else {
-        // A scheme-less value with a port ("keycloak.lan:8080/realms/x") parses
-        // with protocol "keycloak.lan:" and an empty host, so require both an
-        // http(s) protocol and a host (#1912). Plain http stays allowed for LAN
-        // and dev setups (#1879 warns at boot).
-        let validIssuerUrl = false;
-        try {
-          const url = new URL(data.OIDC_ISSUER_URL.trim());
-          validIssuerUrl =
-            (url.protocol === "http:" || url.protocol === "https:") && url.host.length > 0;
-        } catch {
-          validIssuerUrl = false;
-        }
-        if (!validIssuerUrl) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message:
-              "OIDC_ISSUER_URL must be an http(s) URL such as https://auth.example.com/realms/myrealm",
-            path: ["OIDC_ISSUER_URL"],
-          });
-        }
+      } else if (!isHttpOrHttpsUrl(data.OIDC_ISSUER_URL)) {
+        // Plain http stays allowed for LAN and dev setups (#1879 warns at boot).
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "OIDC_ISSUER_URL must be an http(s) URL such as https://auth.example.com/realms/myrealm",
+          path: ["OIDC_ISSUER_URL"],
+        });
       }
       if (!data.OIDC_CLIENT_ID) {
         ctx.addIssue({
@@ -298,6 +299,20 @@ const envSchema = z
           code: z.ZodIssueCode.custom,
           message: "SAML_IDP_SSO_URL is required when SAML_ENABLED=true",
           path: ["SAML_IDP_SSO_URL"],
+        });
+      } else if (!isHttpOrHttpsUrl(data.SAML_IDP_SSO_URL)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "SAML_IDP_SSO_URL must be an http(s) URL such as https://idp.example.com/sso",
+          path: ["SAML_IDP_SSO_URL"],
+        });
+      }
+      if (data.SAML_CALLBACK_URL && !isHttpOrHttpsUrl(data.SAML_CALLBACK_URL)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "SAML_CALLBACK_URL must be an http(s) URL such as https://example.com/api/auth/saml/callback",
+          path: ["SAML_CALLBACK_URL"],
         });
       }
       if (!data.SAML_IDP_CERTIFICATE) {
