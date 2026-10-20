@@ -698,6 +698,391 @@ describe("role authority containment", () => {
     ).toHaveLength(0);
   });
 
+  it("rejects PUT and DELETE when an acting admin is demoted or deleted before the role row lock (#2888)", async () => {
+    const admin2Username = uniqueName("race-actor-admin2");
+    const admin2Token = await createUserAndLogin(admin2Username, "admin");
+    const [admin2Row] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, admin2Username));
+
+    const targetName = uniqueName("race-dem");
+    const renamedName = uniqueName("race-dem-n");
+    const targetId = await createRoleAsAdmin(targetName, ["tools:use"]);
+    const memberUsername = uniqueName("race-actor-member");
+    await createUserAndLogin(memberUsername, targetName);
+
+    const putRes = await raceRowLocks(
+      "roles",
+      1,
+      () =>
+        testApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/roles/${targetId}`,
+          headers: { authorization: `Bearer ${admin2Token}` },
+          payload: { name: renamedName, description: "updated after demotion" },
+        }),
+      (tx) =>
+        tx.update(schema.users).set({ role: "user" }).where(eq(schema.users.id, admin2Row.id)),
+    );
+
+    expect(putRes.statusCode, putRes.body).toBe(403);
+    expect(JSON.parse(putRes.body)).toEqual({
+      error: "Cannot manage a role beyond your role authority",
+      code: "ESCALATION_DENIED",
+    });
+
+    const [roleAfterPut] = await db
+      .select()
+      .from(schema.roles)
+      .where(eq(schema.roles.id, targetId));
+    expect(roleAfterPut?.name).toBe(targetName);
+    expect(roleAfterPut?.description).toBe("");
+    const [memberAfterPut] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, memberUsername));
+    expect(memberAfterPut?.role).toBe(targetName);
+
+    const admin3Username = uniqueName("race-actor-admin3");
+    const admin3Token = await createUserAndLogin(admin3Username, "admin");
+    const [admin3Row] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, admin3Username));
+
+    const delRes = await raceRowLocks(
+      "roles",
+      1,
+      () =>
+        testApp.app.inject({
+          method: "DELETE",
+          url: `/api/v1/roles/${targetId}`,
+          headers: { authorization: `Bearer ${admin3Token}` },
+        }),
+      (tx) => tx.delete(schema.users).where(eq(schema.users.id, admin3Row.id)),
+    );
+
+    expect(delRes.statusCode, delRes.body).toBe(403);
+    expect(JSON.parse(delRes.body)).toEqual({
+      error: "Cannot manage a role beyond your role authority",
+      code: "ESCALATION_DENIED",
+    });
+
+    const [roleAfterDel] = await db
+      .select()
+      .from(schema.roles)
+      .where(eq(schema.roles.id, targetId));
+    expect(roleAfterDel?.name).toBe(targetName);
+    const [memberAfterDel] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, memberUsername));
+    expect(memberAfterDel?.role).toBe(targetName);
+
+    // When the acting admin is disabled (disabled:admin) AND the target role is
+    // deleted in the race window, 403 ESCALATION_DENIED wins over 404 NOT_FOUND.
+    const vanishPutId = await createRoleAsAdmin(uniqueName("race-van-put"), ["tools:use"]);
+    const disabledAdminPutRes = await raceRowLocks(
+      "roles",
+      1,
+      () =>
+        testApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/roles/${vanishPutId}`,
+          headers: { authorization: `Bearer ${adminToken}` },
+          payload: { description: "disabled before vanished check" },
+        }),
+      async (tx) => {
+        await tx
+          .update(schema.users)
+          .set({ role: "disabled:admin" })
+          .where(eq(schema.users.username, "admin"));
+        await tx.delete(schema.roles).where(eq(schema.roles.id, vanishPutId));
+      },
+    );
+    await db.update(schema.users).set({ role: "admin" }).where(eq(schema.users.username, "admin"));
+    expect(disabledAdminPutRes.statusCode, disabledAdminPutRes.body).toBe(403);
+    expect(JSON.parse(disabledAdminPutRes.body)).toEqual({
+      error: "Cannot manage a role beyond your role authority",
+      code: "ESCALATION_DENIED",
+    });
+
+    const vanishDelId = await createRoleAsAdmin(uniqueName("race-van-del"), ["tools:use"]);
+    const disabledAdminDelRes = await raceRowLocks(
+      "roles",
+      1,
+      () =>
+        testApp.app.inject({
+          method: "DELETE",
+          url: `/api/v1/roles/${vanishDelId}`,
+          headers: { authorization: `Bearer ${adminToken}` },
+        }),
+      async (tx) => {
+        await tx
+          .update(schema.users)
+          .set({ role: "disabled:admin" })
+          .where(eq(schema.users.username, "admin"));
+        await tx.delete(schema.roles).where(eq(schema.roles.id, vanishDelId));
+      },
+    );
+    await db.update(schema.users).set({ role: "admin" }).where(eq(schema.users.username, "admin"));
+    expect(disabledAdminDelRes.statusCode, disabledAdminDelRes.body).toBe(403);
+    expect(JSON.parse(disabledAdminDelRes.body)).toEqual({
+      error: "Cannot manage a role beyond your role authority",
+      code: "ESCALATION_DENIED",
+    });
+
+    const auditRows = await db
+      .select()
+      .from(schema.auditLog)
+      .where(sql`${schema.auditLog.action} IN ('ROLE_UPDATED', 'ROLE_DELETED')`);
+    expect(
+      auditRows.filter((r) =>
+        [targetId, vanishPutId, vanishDelId].includes(
+          (r.details as { roleId?: string } | null)?.roleId ?? "",
+        ),
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("rejects PUT and DELETE when an acting custom role loses security:manage before the role row lock (#2888)", async () => {
+    const managerRoleName = uniqueName("race-custom-mgr");
+    const managerRoleId = await createRoleAsAdmin(managerRoleName, [
+      "security:manage",
+      "tools:use",
+    ]);
+    const managerToken = await createUserAndLogin(uniqueName("race-custom-mgr-u"), managerRoleName);
+
+    const targetName = uniqueName("race-custom-tgt");
+    const targetId = await createRoleAsAdmin(targetName, ["tools:use"]);
+
+    // Narrow the actor's custom role to ["tools:use"] (losing security:manage while
+    // still containing targetName's ["tools:use"]) right before the PUT lock completes.
+    const putRes = await raceRowLocks(
+      "roles",
+      1,
+      () =>
+        testApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/roles/${targetId}`,
+          headers: { authorization: `Bearer ${managerToken}` },
+          payload: { description: "updated without security:manage" },
+        }),
+      (tx) =>
+        tx
+          .update(schema.roles)
+          .set({ permissions: ["tools:use"] })
+          .where(eq(schema.roles.id, managerRoleId)),
+    );
+
+    expect(putRes.statusCode, putRes.body).toBe(403);
+    expect(JSON.parse(putRes.body)).toEqual({
+      error: "Cannot manage a role beyond your role authority",
+      code: "ESCALATION_DENIED",
+    });
+
+    const [afterPut] = await db.select().from(schema.roles).where(eq(schema.roles.id, targetId));
+    expect(afterPut?.description).toBe("");
+
+    // For DELETE, start as an admin so the pre-lock canAssignRole(user, "user") check
+    // passes, then move the actor onto the custom role without security:manage before
+    // the DELETE transaction locks the target role row.
+    const delActorUsername = uniqueName("race-del-no-sec");
+    const delActorToken = await createUserAndLogin(delActorUsername, "admin");
+    const [delActorRow] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, delActorUsername));
+
+    const delRes = await raceRowLocks(
+      "roles",
+      1,
+      () =>
+        testApp.app.inject({
+          method: "DELETE",
+          url: `/api/v1/roles/${targetId}`,
+          headers: { authorization: `Bearer ${delActorToken}` },
+        }),
+      (tx) =>
+        tx
+          .update(schema.users)
+          .set({ role: managerRoleName })
+          .where(eq(schema.users.id, delActorRow.id)),
+    );
+
+    expect(delRes.statusCode, delRes.body).toBe(403);
+    expect(JSON.parse(delRes.body)).toEqual({
+      error: "Cannot manage a role beyond your role authority",
+      code: "ESCALATION_DENIED",
+    });
+
+    const [afterDel] = await db.select().from(schema.roles).where(eq(schema.roles.id, targetId));
+    expect(afterDel?.name).toBe(targetName);
+
+    const auditRows = await db
+      .select()
+      .from(schema.auditLog)
+      .where(sql`${schema.auditLog.action} IN ('ROLE_UPDATED', 'ROLE_DELETED')`);
+    expect(
+      auditRows.filter((r) => (r.details as { roleId?: string } | null)?.roleId === targetId),
+    ).toHaveLength(0);
+  });
+
+  it("re-evaluates PUT and DELETE manage, grant, and fallback reassignment authority against the actor's current role (#2888)", async () => {
+    const broadManagerRole = uniqueName("race-broad-mgr");
+    await createRoleAsAdmin(broadManagerRole, [
+      "security:manage",
+      "tools:use",
+      "files:own",
+      "apikeys:own",
+      "pipelines:own",
+      "settings:read",
+    ]);
+    const narrowManagerRole = uniqueName("race-narrow-mgr");
+    await createRoleAsAdmin(narrowManagerRole, ["security:manage", "tools:use"]);
+
+    const actorUsername = uniqueName("race-reassign-actor");
+    const actorToken = await createUserAndLogin(actorUsername, broadManagerRole);
+    const [actorRow] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, actorUsername));
+
+    const targetName = uniqueName("race-reassign-tgt");
+    const targetId = await createRoleAsAdmin(targetName, ["tools:use"]);
+    const memberUsername = uniqueName("race-reassign-member");
+    await createUserAndLogin(memberUsername, targetName);
+
+    // Move the actor onto narrowManagerRole before the PUT row lock: the actor
+    // still holds security:manage and can still manage locked ["tools:use"],
+    // but canGrantRoleDefinition must reject granting ["tools:use", "files:own"].
+    const putRes = await raceRowLocks(
+      "roles",
+      1,
+      () =>
+        testApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/roles/${targetId}`,
+          headers: { authorization: `Bearer ${actorToken}` },
+          payload: { permissions: ["tools:use", "files:own"] },
+        }),
+      (tx) =>
+        tx
+          .update(schema.users)
+          .set({ role: narrowManagerRole })
+          .where(eq(schema.users.id, actorRow.id)),
+    );
+
+    expect(putRes.statusCode, putRes.body).toBe(403);
+    expect(JSON.parse(putRes.body)).toEqual({
+      error: "Cannot update a role beyond your role authority",
+      code: "ESCALATION_DENIED",
+    });
+    const [afterPut] = await db.select().from(schema.roles).where(eq(schema.roles.id, targetId));
+    expect(afterPut?.permissions).toEqual(["tools:use"]);
+
+    // Promote the actor to admin so the pre-lock canAssignRole(user, "user") check
+    // passes, then move the actor onto broadManagerRole before the DELETE row lock:
+    // the actor still holds security:manage and can still manage locked ["tools:use"],
+    // but canAssignRole(currentActor, "user") must reject inside the transaction.
+    await db.update(schema.users).set({ role: "admin" }).where(eq(schema.users.id, actorRow.id));
+
+    const delRes = await raceRowLocks(
+      "roles",
+      1,
+      () =>
+        testApp.app.inject({
+          method: "DELETE",
+          url: `/api/v1/roles/${targetId}`,
+          headers: { authorization: `Bearer ${actorToken}` },
+        }),
+      (tx) =>
+        tx
+          .update(schema.users)
+          .set({ role: broadManagerRole })
+          .where(eq(schema.users.id, actorRow.id)),
+    );
+
+    expect(delRes.statusCode, delRes.body).toBe(403);
+    expect(JSON.parse(delRes.body)).toEqual({
+      error: "Cannot reassign role members beyond your role authority",
+      code: "ESCALATION_DENIED",
+    });
+
+    const [afterDel] = await db.select().from(schema.roles).where(eq(schema.roles.id, targetId));
+    expect(afterDel?.name).toBe(targetName);
+    const [memberAfterDel] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, memberUsername));
+    expect(memberAfterDel?.role).toBe(targetName);
+
+    // Also verify canManageRoleDefinition(currentActor, ...) rejects on PUT and DELETE
+    // when the actor retains security:manage (moved onto narrowManagerRole) while the
+    // locked role has ["tools:use", "files:own"].
+    const widerTargetName = uniqueName("race-wider-tgt");
+    const widerTargetId = await createRoleAsAdmin(widerTargetName, ["tools:use", "files:own"]);
+    await db
+      .update(schema.users)
+      .set({ role: broadManagerRole })
+      .where(eq(schema.users.id, actorRow.id));
+
+    const widerPutRes = await raceRowLocks(
+      "roles",
+      1,
+      () =>
+        testApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/roles/${widerTargetId}`,
+          headers: { authorization: `Bearer ${actorToken}` },
+          payload: { description: "blocked by canManageRoleDefinition" },
+        }),
+      (tx) =>
+        tx
+          .update(schema.users)
+          .set({ role: narrowManagerRole })
+          .where(eq(schema.users.id, actorRow.id)),
+    );
+    expect(widerPutRes.statusCode, widerPutRes.body).toBe(403);
+    expect(JSON.parse(widerPutRes.body)).toEqual({
+      error: "Cannot manage a role beyond your role authority",
+      code: "ESCALATION_DENIED",
+    });
+
+    await db.update(schema.users).set({ role: "admin" }).where(eq(schema.users.id, actorRow.id));
+    const widerDelRes = await raceRowLocks(
+      "roles",
+      1,
+      () =>
+        testApp.app.inject({
+          method: "DELETE",
+          url: `/api/v1/roles/${widerTargetId}`,
+          headers: { authorization: `Bearer ${actorToken}` },
+        }),
+      (tx) =>
+        tx
+          .update(schema.users)
+          .set({ role: narrowManagerRole })
+          .where(eq(schema.users.id, actorRow.id)),
+    );
+    expect(widerDelRes.statusCode, widerDelRes.body).toBe(403);
+    expect(JSON.parse(widerDelRes.body)).toEqual({
+      error: "Cannot manage a role beyond your role authority",
+      code: "ESCALATION_DENIED",
+    });
+
+    const auditRows = await db
+      .select()
+      .from(schema.auditLog)
+      .where(sql`${schema.auditLog.action} IN ('ROLE_UPDATED', 'ROLE_DELETED')`);
+    expect(
+      auditRows.filter((r) =>
+        [targetId, widerTargetId].includes((r.details as { roleId?: string } | null)?.roleId ?? ""),
+      ),
+    ).toHaveLength(0);
+  });
+
   it("rejects updating a user to an unknown role with 400 UNKNOWN_ROLE while preserving target authority and session invalidation (#2232)", async () => {
     const userManagerRole = uniqueName("user-mgr");
     const subordinateRole = uniqueName("sub-role");

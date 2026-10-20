@@ -16,8 +16,28 @@ import {
   canAssignRole,
   canGrantRoleDefinition,
   canManageRoleDefinition,
+  hasEffectivePermission,
   requirePermission,
 } from "../permissions.js";
+import type { AuthUser } from "../plugins/auth.js";
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function resolveTransactionActor(tx: Tx, user: AuthUser): Promise<AuthUser | null> {
+  let currentActor = user;
+  if (user.id !== "anonymous") {
+    const [currentActorRow] = await tx
+      .select({ role: schema.users.role })
+      .from(schema.users)
+      .where(eq(schema.users.id, user.id));
+    if (!currentActorRow) return null;
+    currentActor = { ...user, role: currentActorRow.role };
+  }
+  if (!(await hasEffectivePermission(currentActor, "security:manage"))) {
+    return null;
+  }
+  return currentActor;
+}
 
 const ALL_PERMISSIONS: Permission[] = [
   "tools:use",
@@ -273,10 +293,12 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
             .from(schema.roles)
             .where(eq(schema.roles.id, id))
             .for("update");
+          const currentActor = await resolveTransactionActor(tx, user);
+          if (!currentActor) return "manage-denied" as const;
           if (!locked) return "vanished" as const;
           if (
             !(await canManageRoleDefinition(
-              user,
+              currentActor,
               locked.name,
               locked.permissions,
               locked.toolPermissions,
@@ -291,7 +313,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
               : locked.toolPermissions;
           if (
             !(await canGrantRoleDefinition(
-              user,
+              currentActor,
               lockedProspectivePermissions,
               lockedProspectiveToolPermissions,
             ))
@@ -396,16 +418,21 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
           .from(schema.roles)
           .where(eq(schema.roles.id, id))
           .for("update");
+        const currentActor = await resolveTransactionActor(tx, user);
+        if (!currentActor) return "denied" as const;
         if (!locked) return "vanished" as const;
         if (
           !(await canManageRoleDefinition(
-            user,
+            currentActor,
             locked.name,
             locked.permissions,
             locked.toolPermissions,
           ))
         ) {
           return "denied" as const;
+        }
+        if (!(await canAssignRole(currentActor, "user"))) {
+          return "reassign-denied" as const;
         }
         await tx
           .update(schema.users)
@@ -427,6 +454,12 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
       if (removed === "denied") {
         return reply.status(403).send({
           error: "Cannot manage a role beyond your role authority",
+          code: "ESCALATION_DENIED",
+        });
+      }
+      if (removed === "reassign-denied") {
+        return reply.status(403).send({
+          error: "Cannot reassign role members beyond your role authority",
           code: "ESCALATION_DENIED",
         });
       }
