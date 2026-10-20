@@ -22,6 +22,7 @@ const failBatchJobMock = vi.hoisted(() => vi.fn(async () => true));
 const updateJobProgressMock = vi.hoisted(() => vi.fn());
 const flowAddMock = vi.hoisted(() => vi.fn(async () => {}));
 const putObjectMock = vi.hoisted(() => vi.fn(async () => {}));
+const deleteObjectMock = vi.hoisted(() => vi.fn(async () => {}));
 
 // Mock DB
 vi.mock("../../../apps/api/src/db/index.js", () => ({
@@ -176,7 +177,7 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
   return {
     ...actual,
     putObject: putObjectMock,
-    deleteObject: vi.fn(async () => {}),
+    deleteObject: deleteObjectMock,
     getObjectStream: vi.fn(),
   };
 });
@@ -1004,6 +1005,7 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
       | { type: "file"; filename: string; content: Buffer }
       | { type: "field"; fieldname: string; value: string }
     >,
+    logOverride?: { error: ReturnType<typeof vi.fn>; warn: ReturnType<typeof vi.fn> },
   ) {
     let handler: ((req: unknown, rep: unknown) => Promise<unknown>) | undefined;
     await registerPipelineRoutes({
@@ -1017,7 +1019,7 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
 
     const request = {
       headers: {},
-      log: { error: vi.fn(), warn: vi.fn() },
+      log: logOverride ?? { error: vi.fn(), warn: vi.fn() },
       raw: {
         aborted: false,
         once: vi.fn(),
@@ -1255,6 +1257,52 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
     } finally {
       readFileSpy.mockReset();
       rmSpy.mockReset();
+    }
+  });
+
+  it("logs a warning with { err, key } and still propagates the flow error when deleteObject rejects during finally cleanup on /api/v1/pipeline/execute (#2837)", async () => {
+    vi.clearAllMocks();
+    spoolMultipartFileSpy.mockReset();
+    storeValidatedOcrPdfSpy.mockReset();
+    deleteObjectMock.mockReset();
+    flowAddMock.mockReset();
+
+    storeValidatedOcrPdfSpy.mockResolvedValueOnce(8);
+    const flowErr = new Error("Redis flow add failed");
+    const cleanupErr = Object.assign(new Error("Access Denied"), { name: "AccessDenied" });
+    flowAddMock.mockRejectedValueOnce(flowErr);
+    deleteObjectMock.mockRejectedValueOnce(cleanupErr);
+    const log = { error: vi.fn(), warn: vi.fn() };
+
+    try {
+      await expect(
+        invokePipelineExecuteRoute(
+          [
+            { type: "file", filename: "scan.pdf", content: Buffer.from("%PDF-1.4") },
+            {
+              type: "field",
+              fieldname: "pipeline",
+              value: JSON.stringify({
+                steps: [{ toolId: "ocr-pdf", settings: { quality: "fast", pages: "1" } }],
+              }),
+            },
+          ],
+          log,
+        ),
+      ).rejects.toBe(flowErr);
+
+      expect(deleteObjectMock).toHaveBeenCalledTimes(1);
+      const deletedKey = (deleteObjectMock.mock.calls[0] as unknown[] | undefined)?.[0];
+      expect(deletedKey).toMatch(/^uploads\/.*\/scan\.pdf$/);
+      expect(log.warn).toHaveBeenCalledTimes(1);
+      expect(log.warn).toHaveBeenCalledWith(
+        { err: cleanupErr, key: deletedKey },
+        "pipeline ingress cleanup failed",
+      );
+    } finally {
+      storeValidatedOcrPdfSpy.mockReset();
+      deleteObjectMock.mockReset();
+      flowAddMock.mockReset();
     }
   });
 });

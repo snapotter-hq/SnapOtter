@@ -850,7 +850,12 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           });
         } finally {
           request.raw.removeListener("aborted", abortIngress);
-          if (uncommittedOcrKey) await deleteObject(uncommittedOcrKey).catch(() => {});
+          if (uncommittedOcrKey) {
+            const key = uncommittedOcrKey;
+            await deleteObject(key).catch((cleanupErr) => {
+              request.log.warn({ err: cleanupErr, key }, "pipeline ingress cleanup failed");
+            });
+          }
         }
       });
     },

@@ -148,6 +148,10 @@ export function registerOcr(app: FastifyInstance) {
     let saveModeRaw: string | null = null;
     let inputKey: string | null = null;
     const disconnect = trackClientDisconnect(request, reply);
+    const discardUpload = (key: string) =>
+      deleteObject(key).catch((err) => {
+        request.log.warn?.({ err, jobId, key }, "Failed to delete rejected upload");
+      });
 
     try {
       try {
@@ -171,7 +175,7 @@ export function registerOcr(app: FastifyInstance) {
           }
         }
       } catch (err) {
-        if (inputKey) await deleteObject(inputKey).catch(() => {});
+        if (inputKey) await discardUpload(inputKey);
         const statusCode = ocrUploadErrorStatus(err);
         if (statusCode === 413) {
           const failure = multipartFailure(err);
@@ -185,7 +189,7 @@ export function registerOcr(app: FastifyInstance) {
 
       const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
       if (clientJobIdField === null) {
-        if (inputKey) await deleteObject(inputKey).catch(() => {});
+        if (inputKey) await discardUpload(inputKey);
         return reply.status(400).send({ error: INVALID_CLIENT_JOB_ID_ERROR });
       }
       clientJobId = clientJobIdField ?? null;
@@ -199,7 +203,7 @@ export function registerOcr(app: FastifyInstance) {
 
       const saveMode = parseSaveModeField(saveModeRaw);
       if (saveMode === null) {
-        if (inputKey) await deleteObject(inputKey).catch(() => {});
+        if (inputKey) await discardUpload(inputKey);
         return reply.status(400).send({ error: INVALID_SAVE_MODE_ERROR });
       }
 
@@ -214,7 +218,7 @@ export function registerOcr(app: FastifyInstance) {
         requestedSettings = parsed;
         const result = settingsSchema.safeParse(parsed);
         if (!result.success) {
-          await deleteObject(inputKey).catch(() => {});
+          await discardUpload(inputKey);
           return reply.status(400).send({
             error: "Invalid settings",
             details: formatZodErrors(result.error.issues),
@@ -222,13 +226,13 @@ export function registerOcr(app: FastifyInstance) {
         }
         settings = result.data;
       } catch {
-        await deleteObject(inputKey).catch(() => {});
+        await discardUpload(inputKey);
         return reply.status(400).send({ error: "Settings must be valid JSON" });
       }
 
       const ocrResolution = resolveOcrIngressSettings(toolId, settings, { requestedSettings });
       if (!ocrResolution.ok) {
-        await deleteObject(inputKey).catch(() => {});
+        await discardUpload(inputKey);
         const bundleId = TOOL_OPTIONAL_BUNDLE_MAP[toolId];
         const bundle = getOptionalBundleForTool(toolId);
         return reply.status(501).send({
@@ -286,7 +290,7 @@ export function registerOcr(app: FastifyInstance) {
           });
           return;
         }
-        await deleteObject(inputKey).catch(() => {});
+        await discardUpload(inputKey);
         request.log.error({ err, toolId, jobId }, "Failed to enqueue OCR");
         return reply.status(503).send({
           error: "Failed to queue OCR",

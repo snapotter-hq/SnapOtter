@@ -1,8 +1,10 @@
 import { createReadStream } from "node:fs";
 import { join } from "node:path";
 import type { MultipartFile } from "@fastify/multipart";
+import type { FastifyBaseLogger } from "fastify";
 import { validatePdfPath } from "../modality/document-input.js";
 import { sanitizeFilename } from "./filename.js";
+import { logger } from "./logger.js";
 import { copyReadableToFile, deleteObject, putObjectStream } from "./object-storage.js";
 
 export interface SpooledMultipartFile {
@@ -33,7 +35,12 @@ export async function spoolMultipartFile(
 export async function storeValidatedOcrPdf(
   file: SpooledMultipartFile,
   key: string,
-  opts: { maxBytes: number; signal?: AbortSignal; beforeStore?: () => Promise<void> },
+  opts: {
+    maxBytes: number;
+    signal?: AbortSignal;
+    beforeStore?: () => Promise<void>;
+    log?: Pick<FastifyBaseLogger, "warn">;
+  },
 ): Promise<number> {
   await validatePdfPath(file.path, {
     rejectPasswordProtected: true,
@@ -47,7 +54,9 @@ export async function storeValidatedOcrPdf(
     }
     return written;
   } catch (error) {
-    await deleteObject(key).catch(() => {});
+    await deleteObject(key).catch((err) => {
+      (opts.log ?? logger).warn({ err, key }, "Failed to delete failed OCR PDF upload");
+    });
     throw error;
   }
 }

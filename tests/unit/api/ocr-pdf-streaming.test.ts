@@ -2,6 +2,8 @@ import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { Readable } from "node:stream";
+import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -14,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   getObjectBuffer: vi.fn(),
   getOcrRuntimeCapability: vi.fn(),
   insertToolJobAlias: vi.fn(),
+  putObjectStream: vi.fn(),
   receiveUpload: vi.fn(),
   requestCancel: vi.fn(),
   validatePdfPath: vi.fn(),
@@ -45,6 +48,7 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", () => ({
   copyObjectToFile: mocks.copyObjectToFile,
   deleteObject: mocks.deleteObject,
   getObjectBuffer: mocks.getObjectBuffer,
+  putObjectStream: mocks.putObjectStream,
 }));
 
 vi.mock("../../../apps/api/src/lib/upload-stream.js", () => ({
@@ -66,8 +70,15 @@ vi.mock("../../../apps/api/src/permissions.js", () => ({
 
 import { env } from "../../../apps/api/src/config.js";
 import { type AiPathJobInput, runAiPathToolJob } from "../../../apps/api/src/jobs/ai-handlers.js";
-import type { ToolJobData } from "../../../apps/api/src/jobs/types.js";
+import {
+  INVALID_CLIENT_JOB_ID_ERROR,
+  INVALID_SAVE_MODE_ERROR,
+  type ToolJobData,
+} from "../../../apps/api/src/jobs/types.js";
+import { logger } from "../../../apps/api/src/lib/logger.js";
 import { resolveOcrEncodedInputLimit } from "../../../apps/api/src/lib/ocr-limits.js";
+import { storeValidatedOcrPdf } from "../../../apps/api/src/lib/ocr-pdf-ingress.js";
+import { InputValidationError } from "../../../apps/api/src/modality/contract.js";
 import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerOcrPdf } from "../../../apps/api/src/routes/tools/ocr-pdf.js";
 
@@ -649,6 +660,267 @@ describe("OCR PDF path-backed processing", () => {
     expect(mocks.cancelSingleJobGuarded).toHaveBeenCalledWith({
       jobId: clientJobId,
       expectedArtifactJobId: stampedJobId,
+    });
+  });
+
+  describe("storeValidatedOcrPdf rollback logging (#2837)", () => {
+    const existingFilePath = fileURLToPath(import.meta.url);
+
+    it("logs a warning with { err, key } via opts.log and rethrows the primary error when deleteObject rejects after putObjectStream fails", async () => {
+      const storeErr = new Error("S3 stream failed");
+      const deleteErr = Object.assign(new Error("Access Denied"), { name: "AccessDenied" });
+      mocks.putObjectStream.mockImplementationOnce(async (_key: string, stream: Readable) => {
+        stream.destroy();
+        throw storeErr;
+      });
+      mocks.deleteObject.mockRejectedValueOnce(deleteErr);
+      const log = { warn: vi.fn() };
+
+      await expect(
+        storeValidatedOcrPdf(
+          { path: existingFilePath, filename: "scan.pdf", size: 42 },
+          "uploads/ocr-pdf-job/scan.pdf",
+          { maxBytes: 1024, log },
+        ),
+      ).rejects.toBe(storeErr);
+
+      expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/ocr-pdf-job/scan.pdf");
+      expect(log.warn).toHaveBeenCalledTimes(1);
+      expect(log.warn).toHaveBeenCalledWith(
+        { err: deleteErr, key: "uploads/ocr-pdf-job/scan.pdf" },
+        "Failed to delete failed OCR PDF upload",
+      );
+    });
+
+    it("falls back to the process logger when opts.log is omitted and deleteObject rejects after a size mismatch", async () => {
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const deleteErr = Object.assign(new Error("Access Denied"), { name: "AccessDenied" });
+      mocks.putObjectStream.mockImplementationOnce(async (_key: string, stream: Readable) => {
+        stream.destroy();
+        return 10;
+      });
+      mocks.deleteObject.mockRejectedValueOnce(deleteErr);
+
+      try {
+        await expect(
+          storeValidatedOcrPdf(
+            { path: existingFilePath, filename: "scan.pdf", size: 42 },
+            "uploads/ocr-pdf-job/scan.pdf",
+            { maxBytes: 1024 },
+          ),
+        ).rejects.toThrow("OCR PDF scratch file changed size (42 to 10 bytes)");
+
+        expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/ocr-pdf-job/scan.pdf");
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        expect(warnSpy).toHaveBeenCalledWith(
+          { err: deleteErr, key: "uploads/ocr-pdf-job/scan.pdf" },
+          "Failed to delete failed OCR PDF upload",
+        );
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+  });
+
+  describe("OCR PDF route rollback delete logging (#2837)", () => {
+    it.each([
+      [
+        "multipart parse error after upload",
+        async function* () {
+          yield { type: "file", filename: "scan.pdf", file: {} };
+          yield { type: "file", filename: "second.pdf", file: {} };
+        },
+        undefined,
+        400,
+        {
+          error: "Failed to parse multipart request",
+          details: "Only one PDF file may be uploaded",
+        },
+      ],
+      [
+        "invalid clientJobId",
+        async function* () {
+          yield { type: "file", filename: "scan.pdf", file: {} };
+          yield { type: "field", fieldname: "clientJobId", value: "../bad" };
+        },
+        undefined,
+        400,
+        { error: INVALID_CLIENT_JOB_ID_ERROR },
+      ],
+      [
+        "invalid saveMode",
+        async function* () {
+          yield { type: "file", filename: "scan.pdf", file: {} };
+          yield { type: "field", fieldname: "saveMode", value: "invalid" };
+        },
+        undefined,
+        400,
+        { error: INVALID_SAVE_MODE_ERROR },
+      ],
+      [
+        "schema-invalid settings",
+        async function* () {
+          yield { type: "file", filename: "scan.pdf", file: {} };
+          yield { type: "field", fieldname: "settings", value: '{"quality":"ultra"}' };
+        },
+        undefined,
+        400,
+        { error: "Invalid settings" },
+      ],
+      [
+        "malformed JSON settings",
+        async function* () {
+          yield { type: "file", filename: "scan.pdf", file: {} };
+          yield { type: "field", fieldname: "settings", value: "{bad-json" };
+        },
+        undefined,
+        400,
+        { error: "Settings must be valid JSON" },
+      ],
+      [
+        "unavailable OCR runtime capability",
+        async function* () {
+          yield { type: "file", filename: "scan.pdf", file: {} };
+          yield { type: "field", fieldname: "settings", value: '{"quality":"best"}' };
+        },
+        undefined,
+        501,
+        { error: "Feature not installed" },
+      ],
+      [
+        "PDF validation failure",
+        async function* () {
+          yield { type: "file", filename: "scan.pdf", file: {} };
+          yield { type: "field", fieldname: "settings", value: '{"quality":"fast"}' };
+        },
+        () => {
+          mocks.validatePdfPath.mockRejectedValueOnce(new InputValidationError("Damaged PDF"));
+        },
+        400,
+        { error: "Damaged PDF" },
+      ],
+      [
+        "enqueue failure",
+        async function* () {
+          yield { type: "file", filename: "scan.pdf", file: {} };
+          yield { type: "field", fieldname: "settings", value: '{"quality":"fast"}' };
+        },
+        () => {
+          mocks.enqueueToolJob.mockRejectedValueOnce(new Error("Redis unavailable"));
+        },
+        503,
+        { error: "Failed to queue PDF OCR" },
+      ],
+    ])(
+      "logs a warning with { err, jobId, key } and keeps the primary %s response when deleteObject rejects",
+      async (_label, parts, setupFault, expectedStatus, expectedPayload) => {
+        let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+        registerOcrPdf({
+          post: vi.fn((_path, handler) => {
+            routeHandler = handler;
+          }),
+        } as never);
+
+        const deleteErr = Object.assign(new Error("Access Denied"), { name: "AccessDenied" });
+        mocks.deleteObject.mockRejectedValueOnce(deleteErr);
+        setupFault?.();
+
+        const warn = vi.fn();
+        const request = {
+          headers: {},
+          log: { error: vi.fn(), warn },
+          raw: {
+            aborted: false,
+            once: vi.fn(),
+            removeListener: vi.fn(),
+          },
+          parts,
+        };
+        const reply = {
+          statusCode: 200,
+          payload: undefined as unknown,
+          status(code: number) {
+            this.statusCode = code;
+            return this;
+          },
+          send(payload: unknown) {
+            this.payload = payload;
+            return payload;
+          },
+        };
+
+        await routeHandler?.(request, reply);
+
+        expect(reply.statusCode).toBe(expectedStatus);
+        expect(reply.payload).toMatchObject(expectedPayload);
+        expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/ocr-pdf-job/scan.pdf");
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn).toHaveBeenCalledWith(
+          {
+            err: deleteErr,
+            jobId: expect.any(String),
+            key: "uploads/ocr-pdf-job/scan.pdf",
+          },
+          "Failed to delete rejected upload",
+        );
+      },
+    );
+
+    it("logs a warning with { err, jobId, key } and still rethrows a 503 storage fault when copyObjectToFile and deleteObject both reject", async () => {
+      let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+      registerOcrPdf({
+        post: vi.fn((_path, handler) => {
+          routeHandler = handler;
+        }),
+      } as never);
+
+      const copyFault = Object.assign(new Error("Storage unavailable"), {
+        statusCode: 503,
+        code: "storage-unavailable",
+      });
+      const deleteErr = Object.assign(new Error("Access Denied"), { name: "AccessDenied" });
+      mocks.copyObjectToFile.mockRejectedValueOnce(copyFault);
+      mocks.deleteObject.mockRejectedValueOnce(deleteErr);
+
+      const warn = vi.fn();
+      const request = {
+        headers: {},
+        log: { error: vi.fn(), warn },
+        raw: {
+          aborted: false,
+          once: vi.fn(),
+          removeListener: vi.fn(),
+        },
+        parts: async function* () {
+          yield { type: "file", filename: "scan.pdf", file: {} };
+          yield { type: "field", fieldname: "settings", value: '{"quality":"fast"}' };
+        },
+      };
+      const reply = {
+        statusCode: 200,
+        payload: undefined as unknown,
+        status(code: number) {
+          this.statusCode = code;
+          return this;
+        },
+        send(payload: unknown) {
+          this.payload = payload;
+          return payload;
+        },
+      };
+
+      await expect(routeHandler?.(request, reply)).rejects.toBe(copyFault);
+      expect(reply.payload).toBeUndefined();
+      expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/ocr-pdf-job/scan.pdf");
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        {
+          err: deleteErr,
+          jobId: expect.any(String),
+          key: "uploads/ocr-pdf-job/scan.pdf",
+        },
+        "Failed to delete rejected upload",
+      );
     });
   });
 });

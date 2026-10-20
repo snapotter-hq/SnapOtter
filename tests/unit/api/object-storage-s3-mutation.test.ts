@@ -66,6 +66,7 @@ vi.mock("@snapotter/enterprise", async () => {
   };
 });
 
+import { logger } from "../../../apps/api/src/lib/logger.js";
 import {
   copyObjectToFile,
   deleteObject,
@@ -754,6 +755,39 @@ describe("object-storage S3 dispatch (STORAGE_MODE=s3)", () => {
       );
 
       expect(err).toMatchObject({ statusCode: 413, limitBytes: 1024 });
+    });
+
+    it("logs a warning with { err, key } and still throws the write fault when deleteGenericObject rejects during S3 stream error recovery (#2837)", async () => {
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      const writeCause = Object.assign(new Error("Please reduce your request rate."), {
+        name: "SlowDown",
+        $metadata: { httpStatusCode: 503 },
+      });
+      const deleteCause = Object.assign(new Error("Access Denied"), {
+        name: "AccessDenied",
+        $metadata: { httpStatusCode: 403 },
+      });
+      s3.deleteObject.mockRejectedValueOnce(deleteCause);
+
+      try {
+        const err = await streamFailure(writeCause);
+
+        expect(err).toMatchObject({
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-unavailable",
+          statusCode: 503,
+          cause: writeCause,
+        });
+        expect(s3.deleteObject).toHaveBeenCalledWith("uploads/job-s3fault/a.bin");
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        expect(warnSpy).toHaveBeenCalledWith(
+          { err: deleteCause, key: "uploads/job-s3fault/a.bin" },
+          "Failed to delete partial S3 upload",
+        );
+      } finally {
+        warnSpy.mockRestore();
+      }
     });
   });
 

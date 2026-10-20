@@ -61,7 +61,11 @@ vi.mock("../../../apps/api/src/permissions.js", () => ({
 
 import { env } from "../../../apps/api/src/config.js";
 import { runAiPathToolJob, runAiToolJob } from "../../../apps/api/src/jobs/ai-handlers.js";
-import type { ToolJobData } from "../../../apps/api/src/jobs/types.js";
+import {
+  INVALID_CLIENT_JOB_ID_ERROR,
+  INVALID_SAVE_MODE_ERROR,
+  type ToolJobData,
+} from "../../../apps/api/src/jobs/types.js";
 import type { ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerOcr } from "../../../apps/api/src/routes/tools/ocr.js";
 import "../../../apps/api/src/routes/tools/ocr-pdf.js";
@@ -617,6 +621,140 @@ describe("OCR route enqueue safety", () => {
     expect(warn).toHaveBeenCalledWith(
       expect.objectContaining({ key: "uploads/ocr-job/scan.png" }),
       "Failed to delete abandoned upload",
+    );
+  });
+
+  describe("OCR route rollback delete logging (#2837)", () => {
+    it.each([
+      [
+        "multipart parse error after upload",
+        async function* () {
+          yield { type: "file", filename: "scan.png", file: {} };
+          yield { type: "file", filename: "second.png", file: {} };
+        },
+        undefined,
+        400,
+        {
+          error: "Failed to parse multipart request",
+          details: "Only one image file may be uploaded",
+        },
+      ],
+      [
+        "invalid clientJobId",
+        async function* () {
+          yield { type: "file", filename: "scan.png", file: {} };
+          yield { type: "field", fieldname: "clientJobId", value: "../bad" };
+        },
+        undefined,
+        400,
+        { error: INVALID_CLIENT_JOB_ID_ERROR },
+      ],
+      [
+        "invalid saveMode",
+        async function* () {
+          yield { type: "file", filename: "scan.png", file: {} };
+          yield { type: "field", fieldname: "saveMode", value: "invalid" };
+        },
+        undefined,
+        400,
+        { error: INVALID_SAVE_MODE_ERROR },
+      ],
+      [
+        "schema-invalid settings",
+        async function* () {
+          yield { type: "file", filename: "scan.png", file: {} };
+          yield { type: "field", fieldname: "settings", value: '{"quality":"ultra"}' };
+        },
+        undefined,
+        400,
+        { error: "Invalid settings" },
+      ],
+      [
+        "malformed JSON settings",
+        async function* () {
+          yield { type: "file", filename: "scan.png", file: {} };
+          yield { type: "field", fieldname: "settings", value: "{bad-json" };
+        },
+        undefined,
+        400,
+        { error: "Settings must be valid JSON" },
+      ],
+      [
+        "unavailable OCR runtime capability",
+        async function* () {
+          yield { type: "file", filename: "scan.png", file: {} };
+          yield { type: "field", fieldname: "settings", value: '{"quality":"best"}' };
+        },
+        () => {
+          mocks.getOcrRuntimeCapability.mockReturnValue({
+            available: false,
+            qualities: [],
+            providers: [],
+          });
+        },
+        501,
+        { error: "Feature not installed" },
+      ],
+      [
+        "enqueue failure",
+        async function* () {
+          yield { type: "file", filename: "scan.png", file: {} };
+          yield { type: "field", fieldname: "settings", value: '{"quality":"fast"}' };
+        },
+        () => {
+          mocks.enqueueToolJob.mockRejectedValueOnce(new Error("Redis unavailable"));
+        },
+        503,
+        { error: "Failed to queue OCR" },
+      ],
+    ])(
+      "logs a warning with { err, jobId, key } and keeps the primary %s response when deleteObject rejects",
+      async (_label, parts, setupFault, expectedStatus, expectedPayload) => {
+        let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+        registerOcr({
+          post: vi.fn((_path, handler) => {
+            routeHandler = handler;
+          }),
+        } as never);
+
+        const deleteErr = Object.assign(new Error("Access Denied"), { name: "AccessDenied" });
+        mocks.deleteObject.mockRejectedValueOnce(deleteErr);
+        setupFault?.();
+
+        const warn = vi.fn();
+        const request = {
+          headers: {},
+          log: { error: vi.fn(), info: vi.fn(), warn },
+          parts,
+        };
+        const reply = {
+          statusCode: 200,
+          payload: undefined as unknown,
+          status(code: number) {
+            this.statusCode = code;
+            return this;
+          },
+          send(payload: unknown) {
+            this.payload = payload;
+            return payload;
+          },
+        };
+
+        await routeHandler?.(request, reply);
+
+        expect(reply.statusCode).toBe(expectedStatus);
+        expect(reply.payload).toMatchObject(expectedPayload);
+        expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/ocr-job/scan.png");
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn).toHaveBeenCalledWith(
+          {
+            err: deleteErr,
+            jobId: expect.any(String),
+            key: "uploads/ocr-job/scan.png",
+          },
+          "Failed to delete rejected upload",
+        );
+      },
     );
   });
 });

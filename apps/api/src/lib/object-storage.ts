@@ -341,7 +341,9 @@ export async function putObjectStream(
           source.destroy();
         }
         if (streamStarted) {
-          await s3?.deleteGenericObject(key).catch(() => {});
+          await s3?.deleteGenericObject(key).catch((err) => {
+            logger.warn({ err, key }, "Failed to delete partial S3 upload");
+          });
         }
         throw sourceError !== undefined ? localWriteFault(sourceError) : s3WriteFault(error);
       }
