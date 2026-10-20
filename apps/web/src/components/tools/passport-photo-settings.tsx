@@ -27,6 +27,7 @@ import { format } from "@/lib/format";
 import { passportCountryName, passportDocLabel } from "@/lib/passport-i18n";
 import { useFileStore } from "@/stores/file-store";
 import {
+  type AnalyzeResult,
   beginPassportAnalyzeRun,
   beginPassportGenerateRun,
   type FaceLandmarks,
@@ -42,6 +43,59 @@ type ComplianceCheckId = "faceCentered" | "headLevel" | "lookingStraight" | "fac
 interface ComplianceCheck {
   id: ComplianceCheckId;
   pass: boolean;
+}
+
+function isLandmarkPoint(value: unknown): value is { x: number; y: number } {
+  if (!value || typeof value !== "object") return false;
+  const p = value as Record<string, unknown>;
+  return (
+    typeof p.x === "number" &&
+    Number.isFinite(p.x) &&
+    typeof p.y === "number" &&
+    Number.isFinite(p.y)
+  );
+}
+
+function isFaceLandmarks(value: unknown): value is FaceLandmarks {
+  if (!value || typeof value !== "object") return false;
+  const lm = value as Record<string, unknown>;
+  return (
+    isLandmarkPoint(lm.leftEye) &&
+    isLandmarkPoint(lm.rightEye) &&
+    isLandmarkPoint(lm.eyeCenter) &&
+    isLandmarkPoint(lm.chin) &&
+    isLandmarkPoint(lm.forehead) &&
+    isLandmarkPoint(lm.crown) &&
+    isLandmarkPoint(lm.nose) &&
+    typeof lm.faceCenterX === "number" &&
+    Number.isFinite(lm.faceCenterX)
+  );
+}
+
+function isAnalyzeResult(value: unknown): value is AnalyzeResult {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const r = value as Record<string, unknown>;
+  return (
+    typeof r.preview === "string" &&
+    r.preview.length > 0 &&
+    isFaceLandmarks(r.landmarks) &&
+    typeof r.imageWidth === "number" &&
+    Number.isFinite(r.imageWidth) &&
+    r.imageWidth > 0 &&
+    typeof r.imageHeight === "number" &&
+    Number.isFinite(r.imageHeight) &&
+    r.imageHeight > 0 &&
+    typeof r.jobId === "string" &&
+    r.jobId.length > 0 &&
+    typeof r.filename === "string" &&
+    r.filename.length > 0
+  );
+}
+
+function isGenerateResult(value: unknown): value is GenerateResult {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const r = value as Record<string, unknown>;
+  return typeof r.downloadUrl === "string" && r.downloadUrl.length > 0;
 }
 
 // ── Region groups ──────────────────────────────────────────────────
@@ -369,8 +423,15 @@ export function PassportPhotoSettings() {
           );
         }
 
-        const result = resolveServerUrls(await response.json());
+        const raw = await response.json().catch((err: unknown) => {
+          if (err instanceof SyntaxError) return null;
+          throw err;
+        });
         if (!isCurrent()) return;
+        const result = resolveServerUrls(raw);
+        if (!isAnalyzeResult(result)) {
+          throw new Error(t.errors.invalidServerResponse);
+        }
         setAnalyzeResult(result);
       } catch (err) {
         if (!isCurrent() || (err instanceof DOMException && err.name === "AbortError")) return;
@@ -469,8 +530,15 @@ export function PassportPhotoSettings() {
         );
       }
 
-      const result: GenerateResult = resolveServerUrls(await response.json());
+      const raw = await response.json().catch((err: unknown) => {
+        if (err instanceof SyntaxError) return null;
+        throw err;
+      });
       if (!isCurrent()) return;
+      const result = resolveServerUrls(raw);
+      if (!isGenerateResult(result)) {
+        throw new Error(t.errors.invalidServerResponse);
+      }
       setGenerateResult(result);
     } catch (err) {
       if (!isCurrent() || (err instanceof DOMException && err.name === "AbortError")) return;

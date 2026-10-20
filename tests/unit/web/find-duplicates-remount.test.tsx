@@ -8,6 +8,8 @@ vi.mock("@/lib/analytics", async () => {
   return analyticsModuleMock();
 });
 
+import { en } from "@snapotter/shared";
+import { FindDuplicatesResults } from "@/components/tools/find-duplicates-results";
 import { FindDuplicatesSettings } from "@/components/tools/find-duplicates-settings";
 import { useDuplicateStore } from "@/stores/duplicate-store";
 import { useFileStore } from "@/stores/file-store";
@@ -43,6 +45,13 @@ class FakeXhr {
     act(() => {
       this.status = status;
       this.responseText = JSON.stringify(body);
+      this.onload?.();
+    });
+  }
+  respondRaw(status: number, text: string) {
+    act(() => {
+      this.status = status;
+      this.responseText = text;
       this.onload?.();
     });
   }
@@ -157,5 +166,102 @@ describe("find duplicates across a remount (#2314)", () => {
 
     expect(useDuplicateStore.getState().scanning).toBe(false);
     expect(screen.getByText(/Network error/)).toBeVisible();
+  });
+
+  it("rejects malformed 2xx scan payloads without crashing FindDuplicatesSettings or FindDuplicatesResults (#3142)", () => {
+    const validFile = {
+      filename: "one.png",
+      similarity: 100,
+      width: 100,
+      height: 100,
+      fileSize: 500,
+      format: "png",
+      isBest: true,
+      thumbnail: null,
+    };
+    const validGroup = {
+      groupId: 1,
+      files: [validFile, { ...validFile, filename: "two.png", isBest: false }],
+    };
+
+    const malformedBodies: Array<() => void> = [
+      () => FakeXhr.instances.at(-1)?.respond(200, {}),
+      () => FakeXhr.instances.at(-1)?.respond(200, null),
+      () => FakeXhr.instances.at(-1)?.respond(200, []),
+      () =>
+        FakeXhr.instances.at(-1)?.respond(200, {
+          totalImages: "2",
+          uniqueImages: 2,
+          spaceSaveable: 0,
+          duplicateGroups: [],
+        }),
+      () =>
+        FakeXhr.instances.at(-1)?.respond(200, {
+          totalImages: 2,
+          uniqueImages: -1,
+          spaceSaveable: 0,
+          duplicateGroups: [],
+        }),
+      () =>
+        FakeXhr.instances.at(-1)?.respond(200, {
+          totalImages: 2,
+          uniqueImages: 2,
+          spaceSaveable: 0,
+          duplicateGroups: null,
+        }),
+      () =>
+        FakeXhr.instances.at(-1)?.respond(200, {
+          totalImages: 2,
+          uniqueImages: 0,
+          spaceSaveable: 500,
+          duplicateGroups: [{ groupId: 1, files: [] }],
+        }),
+      () =>
+        FakeXhr.instances.at(-1)?.respond(200, {
+          totalImages: 2,
+          uniqueImages: 0,
+          spaceSaveable: 500,
+          duplicateGroups: [{ groupId: 1, files: [{ filename: "one.png" }] }],
+        }),
+      () =>
+        FakeXhr.instances.at(-1)?.respond(200, {
+          totalImages: 2,
+          uniqueImages: 0,
+          spaceSaveable: 500,
+          duplicateGroups: [validGroup],
+          skippedFiles: "bad",
+        }),
+      () =>
+        FakeXhr.instances.at(-1)?.respond(200, {
+          totalImages: 2,
+          uniqueImages: 0,
+          spaceSaveable: 500,
+          duplicateGroups: [validGroup],
+          skippedFiles: [{ filename: "bad.png", reason: "" }],
+        }),
+      () => FakeXhr.instances.at(-1)?.respondRaw(200, "<html>proxy gateway ok</html>"),
+    ];
+
+    render(
+      <>
+        <FindDuplicatesSettings />
+        <FindDuplicatesResults />
+      </>,
+    );
+
+    for (const respondBad of malformedBodies) {
+      act(() => {
+        useDuplicateStore.setState({ error: null });
+      });
+      fireEvent.click(screen.getByTestId("find-duplicates-submit"));
+      respondBad();
+
+      const state = useDuplicateStore.getState();
+      expect(state.error).toBe(en.errors.invalidServerResponse);
+      expect(state.results).toBeNull();
+      expect(state.scanning).toBe(false);
+      expect(screen.getByText(en.errors.invalidServerResponse)).toBeInTheDocument();
+      expect(screen.getByTestId("find-duplicates-submit")).toBeEnabled();
+    }
   });
 });

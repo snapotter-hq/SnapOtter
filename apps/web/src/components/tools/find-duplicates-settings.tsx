@@ -5,13 +5,84 @@ import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { formatFileSize } from "@/lib/download";
 import { format, plural } from "@/lib/format";
-import type { DuplicateResult } from "@/stores/duplicate-store";
+import type {
+  DuplicateFileInfo,
+  DuplicateGroup,
+  DuplicateResult,
+  SkippedFile,
+} from "@/stores/duplicate-store";
 import { useDuplicateStore } from "@/stores/duplicate-store";
 import { useFileStore } from "@/stores/file-store";
 import { claimToolResult, duplicateResultKey } from "@/stores/tool-result-claims";
 
 type Preset = "exact" | "similar" | "loose";
 const PRESET_THRESHOLDS: Record<Preset, number> = { exact: 2, similar: 8, loose: 14 };
+
+function isDuplicateFileInfo(value: unknown): value is DuplicateFileInfo {
+  if (!value || typeof value !== "object") return false;
+  const f = value as Record<string, unknown>;
+  return (
+    typeof f.filename === "string" &&
+    f.filename.length > 0 &&
+    typeof f.similarity === "number" &&
+    Number.isFinite(f.similarity) &&
+    typeof f.width === "number" &&
+    Number.isFinite(f.width) &&
+    f.width >= 0 &&
+    typeof f.height === "number" &&
+    Number.isFinite(f.height) &&
+    f.height >= 0 &&
+    typeof f.fileSize === "number" &&
+    Number.isFinite(f.fileSize) &&
+    f.fileSize >= 0 &&
+    typeof f.format === "string" &&
+    typeof f.isBest === "boolean" &&
+    (f.thumbnail === null || typeof f.thumbnail === "string")
+  );
+}
+
+function isDuplicateGroup(value: unknown): value is DuplicateGroup {
+  if (!value || typeof value !== "object") return false;
+  const g = value as Record<string, unknown>;
+  return (
+    typeof g.groupId === "number" &&
+    Number.isFinite(g.groupId) &&
+    Array.isArray(g.files) &&
+    g.files.length > 0 &&
+    g.files.every(isDuplicateFileInfo)
+  );
+}
+
+function isSkippedFile(value: unknown): value is SkippedFile {
+  if (!value || typeof value !== "object") return false;
+  const sf = value as Record<string, unknown>;
+  return (
+    typeof sf.filename === "string" &&
+    sf.filename.length > 0 &&
+    typeof sf.reason === "string" &&
+    sf.reason.length > 0
+  );
+}
+
+function isDuplicateResult(value: unknown): value is DuplicateResult {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return (
+    typeof data.totalImages === "number" &&
+    Number.isFinite(data.totalImages) &&
+    data.totalImages >= 0 &&
+    typeof data.uniqueImages === "number" &&
+    Number.isFinite(data.uniqueImages) &&
+    data.uniqueImages >= 0 &&
+    typeof data.spaceSaveable === "number" &&
+    Number.isFinite(data.spaceSaveable) &&
+    data.spaceSaveable >= 0 &&
+    Array.isArray(data.duplicateGroups) &&
+    data.duplicateGroups.every(isDuplicateGroup) &&
+    (data.skippedFiles === undefined ||
+      (Array.isArray(data.skippedFiles) && data.skippedFiles.every(isSkippedFile)))
+  );
+}
 
 export function FindDuplicatesSettings() {
   const { t } = useTranslation();
@@ -91,11 +162,16 @@ export function FindDuplicatesSettings() {
     xhr.onload = () => {
       if (!stillLoaded()) return;
       if (xhr.status >= 200 && xhr.status < 300) {
+        let data: unknown;
         try {
-          const data: DuplicateResult = JSON.parse(xhr.responseText);
-          setResults(data);
+          data = JSON.parse(xhr.responseText);
         } catch {
-          setError(t.toolSettings["find-duplicates"].parseResultsFailed);
+          data = null;
+        }
+        if (isDuplicateResult(data)) {
+          setResults(data);
+        } else {
+          setError(t.errors.invalidServerResponse);
         }
       } else {
         try {

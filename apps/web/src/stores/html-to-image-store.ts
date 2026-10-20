@@ -3,6 +3,25 @@ import { create } from "zustand";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 
+interface CaptureResponse {
+  downloadUrl: string;
+  processedSize?: number | null;
+}
+
+function isCaptureResponse(value: unknown): value is CaptureResponse {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return (
+    typeof data.downloadUrl === "string" &&
+    data.downloadUrl.length > 0 &&
+    (data.processedSize === undefined ||
+      data.processedSize === null ||
+      (typeof data.processedSize === "number" &&
+        Number.isFinite(data.processedSize) &&
+        data.processedSize >= 0))
+  );
+}
+
 interface HtmlToImageState {
   mode: "url" | "html";
   url: string;
@@ -104,12 +123,19 @@ export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
         return;
       }
 
-      const data = resolveServerUrls(await res.json());
+      const raw = await res.json().catch((err: unknown) => {
+        if (err instanceof SyntaxError) return null;
+        throw err;
+      });
       if (!isCurrent()) return;
+      const data = resolveServerUrls(raw);
+      if (!isCaptureResponse(data)) {
+        throw new Error(t.errors.invalidServerResponse);
+      }
 
       set({
         resultUrl: data.downloadUrl,
-        resultSize: data.processedSize,
+        resultSize: data.processedSize ?? null,
         capturing: false,
       });
     } catch (err) {

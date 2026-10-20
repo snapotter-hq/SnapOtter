@@ -9,6 +9,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
 
+import { en, type TranslationKeys } from "@snapotter/shared";
 import { formatHeaders } from "@/lib/api";
 import { useHtmlToImageStore } from "@/stores/html-to-image-store";
 
@@ -196,5 +197,61 @@ describe("useHtmlToImageStore", () => {
       resultSize: null,
       error: null,
     });
+  });
+
+  it("rejects malformed 2xx capture responses and normalizes omitted processedSize (#3142)", async () => {
+    state().setUrl("https://example.com");
+    const badPayloads: unknown[] = [
+      null,
+      [],
+      {},
+      { downloadUrl: "" },
+      { downloadUrl: 123 },
+      { downloadUrl: "/out.png", processedSize: "100" },
+      { downloadUrl: "/out.png", processedSize: -1 },
+      { downloadUrl: "/out.png", processedSize: Number.NaN },
+    ];
+
+    for (const payload of badPayloads) {
+      useHtmlToImageStore.setState({
+        resultUrl: "/old.png",
+        resultSize: 50,
+        error: null,
+      });
+      fetchMock.mockResolvedValueOnce(await okJson(payload));
+
+      await state().capture();
+
+      expect(state().error).toBe(en.errors.invalidServerResponse);
+      expect(state().resultUrl).toBeNull();
+      expect(state().resultSize).toBeNull();
+      expect(state().capturing).toBe(false);
+    }
+
+    const customT: TranslationKeys = {
+      ...en,
+      errors: { ...en.errors, invalidServerResponse: "Ungueltige Antwort vom Server" },
+    };
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.reject(new SyntaxError("Unexpected token <")),
+    } as Response);
+    await state().capture(customT);
+    expect(state().error).toBe("Ungueltige Antwort vom Server");
+    expect(state().resultUrl).toBeNull();
+    expect(state().resultSize).toBeNull();
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.reject(new TypeError("Stream disconnected")),
+    } as Response);
+    await state().capture();
+    expect(state().error).toBe("Stream disconnected");
+
+    fetchMock.mockResolvedValueOnce(await okJson({ downloadUrl: "/out.png" }));
+    await state().capture();
+    expect(state().error).toBeNull();
+    expect(state().resultUrl).toBe("/out.png");
+    expect(state().resultSize).toBeNull();
   });
 });

@@ -13,6 +13,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   formatHeaders: vi.fn(() => ({})),
 }));
 
+import { en, type TranslationKeys } from "@snapotter/shared";
 import type { MemeTemplate } from "@/stores/meme-store";
 import {
   CATEGORIES,
@@ -328,6 +329,79 @@ describe("useMemeStore", () => {
       expect(s.error).toBe("Failed to load templates: 500");
       expect(s.loading).toBe(false);
     });
+
+    it("rejects malformed 2xx template manifests with invalidServerResponse (#3142)", async () => {
+      const badManifests: unknown[] = [
+        null,
+        [],
+        {},
+        { templates: null },
+        { templates: "nope" },
+        { templates: [] },
+        { templates: [null] },
+        { templates: [{ ...TEMPLATE, id: "" }] },
+        { templates: [{ ...TEMPLATE, name: "" }] },
+        { templates: [{ ...TEMPLATE, category: "" }] },
+        { templates: [{ ...TEMPLATE, filename: "" }] },
+        { templates: [{ ...TEMPLATE, aliases: "drake" }] },
+        { templates: [{ ...TEMPLATE, aliases: [123] }] },
+        { templates: [{ ...TEMPLATE, tags: null }] },
+        { templates: [{ ...TEMPLATE, textBoxes: null }] },
+        { templates: [{ ...TEMPLATE, textBoxes: [null] }] },
+        {
+          templates: [
+            {
+              ...TEMPLATE,
+              textBoxes: [{ id: "", x: 0, y: 0, width: 50, height: 50 }],
+            },
+          ],
+        },
+        {
+          templates: [
+            {
+              ...TEMPLATE,
+              textBoxes: [{ id: "top", x: "0", y: 0, width: 50, height: 50 }],
+            },
+          ],
+        },
+      ];
+
+      for (const payload of badManifests) {
+        useMemeStore.setState({ templates: [TEMPLATE], error: null });
+        fetchMock.mockReturnValueOnce(okJson(payload));
+        await useMemeStore.getState().fetchTemplates();
+        const s = useMemeStore.getState();
+        expect(s.error).toBe(en.errors.invalidServerResponse);
+        expect(s.templates).toEqual([]);
+        expect(s.loading).toBe(false);
+      }
+
+      const customT: TranslationKeys = {
+        ...en,
+        errors: { ...en.errors, invalidServerResponse: "Ungueltige Antwort vom Server" },
+      };
+      fetchMock.mockReturnValueOnce(
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.reject(new SyntaxError("Unexpected token <")),
+        } as unknown as Response),
+      );
+      await useMemeStore.getState().fetchTemplates(customT);
+      expect(useMemeStore.getState().error).toBe("Ungueltige Antwort vom Server");
+      expect(useMemeStore.getState().templates).toEqual([]);
+      expect(useMemeStore.getState().loading).toBe(false);
+
+      fetchMock.mockReturnValueOnce(
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.reject(new TypeError("Stream read failed")),
+        } as unknown as Response),
+      );
+      await useMemeStore.getState().fetchTemplates();
+      expect(useMemeStore.getState().error).toBe("Stream read failed");
+    });
   });
 
   describe("generateMeme", () => {
@@ -415,6 +489,57 @@ describe("useMemeStore", () => {
       fetchMock.mockReturnValue(failResponse(500, {}));
       await useMemeStore.getState().generateMeme();
       expect(useMemeStore.getState().error).toBe("Generation failed: 500");
+    });
+
+    it("rejects malformed 2xx generate responses and stays in editor phase (#3142)", async () => {
+      const badPayloads: unknown[] = [null, [], {}, { downloadUrl: "" }, { downloadUrl: 123 }];
+
+      for (const payload of badPayloads) {
+        useMemeStore.setState({
+          phase: "editor",
+          selectedTemplate: TEMPLATE,
+          resultUrl: "/dl/old",
+          downloadUrl: "/dl/old",
+          error: null,
+        });
+        fetchMock.mockReturnValueOnce(okJson(payload));
+        await useMemeStore.getState().generateMeme();
+        const s = useMemeStore.getState();
+        expect(s.error).toBe(en.errors.invalidServerResponse);
+        expect(s.phase).toBe("editor");
+        expect(s.resultUrl).toBeNull();
+        expect(s.downloadUrl).toBeNull();
+        expect(s.generating).toBe(false);
+      }
+
+      const customT: TranslationKeys = {
+        ...en,
+        errors: { ...en.errors, invalidServerResponse: "Ungueltige Antwort vom Server" },
+      };
+      useMemeStore.setState({ phase: "editor", selectedTemplate: TEMPLATE });
+      fetchMock.mockReturnValueOnce(
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.reject(new SyntaxError("Unexpected token <")),
+        } as unknown as Response),
+      );
+      await useMemeStore.getState().generateMeme(customT);
+      expect(useMemeStore.getState().error).toBe("Ungueltige Antwort vom Server");
+      expect(useMemeStore.getState().phase).toBe("editor");
+      expect(useMemeStore.getState().resultUrl).toBeNull();
+      expect(useMemeStore.getState().downloadUrl).toBeNull();
+
+      fetchMock.mockReturnValueOnce(
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.reject(new TypeError("Stream disconnected")),
+        } as unknown as Response),
+      );
+      await useMemeStore.getState().generateMeme();
+      expect(useMemeStore.getState().error).toBe("Stream disconnected");
+      expect(useMemeStore.getState().phase).toBe("editor");
     });
   });
 

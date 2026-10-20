@@ -33,6 +33,61 @@ interface TemplateManifest {
   templates: MemeTemplate[];
 }
 
+function isTemplateTextBox(value: unknown): value is TemplateTextBox {
+  if (!value || typeof value !== "object") return false;
+  const box = value as Record<string, unknown>;
+  return (
+    typeof box.id === "string" &&
+    box.id.length > 0 &&
+    typeof box.x === "number" &&
+    Number.isFinite(box.x) &&
+    typeof box.y === "number" &&
+    Number.isFinite(box.y) &&
+    typeof box.width === "number" &&
+    Number.isFinite(box.width) &&
+    typeof box.height === "number" &&
+    Number.isFinite(box.height) &&
+    (box.defaultText === undefined || typeof box.defaultText === "string")
+  );
+}
+
+function isMemeTemplate(value: unknown): value is MemeTemplate {
+  if (!value || typeof value !== "object") return false;
+  const tpl = value as Record<string, unknown>;
+  return (
+    typeof tpl.id === "string" &&
+    tpl.id.length > 0 &&
+    typeof tpl.name === "string" &&
+    tpl.name.length > 0 &&
+    typeof tpl.category === "string" &&
+    tpl.category.length > 0 &&
+    typeof tpl.filename === "string" &&
+    tpl.filename.length > 0 &&
+    Array.isArray(tpl.aliases) &&
+    tpl.aliases.every((a) => typeof a === "string") &&
+    Array.isArray(tpl.tags) &&
+    tpl.tags.every((tag) => typeof tag === "string") &&
+    Array.isArray(tpl.textBoxes) &&
+    tpl.textBoxes.every(isTemplateTextBox)
+  );
+}
+
+function isTemplateManifest(value: unknown): value is TemplateManifest {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return (
+    Array.isArray(data.templates) &&
+    data.templates.length > 0 &&
+    data.templates.every(isMemeTemplate)
+  );
+}
+
+function isMemeGenerateResponse(value: unknown): value is { downloadUrl: string } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return typeof data.downloadUrl === "string" && data.downloadUrl.length > 0;
+}
+
 export type Phase = "gallery" | "layout-picker" | "editor" | "result";
 export type TextLayout = "top-bottom" | "top-only" | "bottom-only" | "center" | "side-by-side";
 
@@ -190,7 +245,7 @@ interface MemeState {
   setStrokeColor: (c: string) => void;
   setTextAlign: (a: string) => void;
   setAllCaps: (v: boolean) => void;
-  fetchTemplates: () => Promise<void>;
+  fetchTemplates: (t?: TranslationKeys) => Promise<void>;
   /** `t` words a failed answer (#1915); the store has no locale of its own. */
   generateMeme: (t?: TranslationKeys) => Promise<void>;
   backToGallery: () => void;
@@ -289,15 +344,22 @@ export const useMemeStore = create<MemeState>((set, get) => ({
   setTextAlign: (a) => set({ textAlign: a }),
   setAllCaps: (v) => set({ allCaps: v }),
 
-  fetchTemplates: async () => {
+  fetchTemplates: async (t = en) => {
     set({ loading: true, error: null });
     try {
       const res = await fetch(appUrl("/api/v1/meme-templates"), { headers: formatHeaders() });
       if (!res.ok) throw new Error(`Failed to load templates: ${res.status}`);
-      const data: TemplateManifest = await res.json();
-      set({ templates: data.templates, loading: false });
+      const raw = await res.json().catch((err: unknown) => {
+        if (err instanceof SyntaxError) return null;
+        throw err;
+      });
+      if (!isTemplateManifest(raw)) {
+        throw new Error(t.errors.invalidServerResponse);
+      }
+      set({ templates: raw.templates, loading: false });
     } catch (err) {
       set({
+        templates: [],
         error: err instanceof Error ? err.message : "Failed to load templates",
         loading: false,
       });
@@ -312,7 +374,7 @@ export const useMemeStore = create<MemeState>((set, get) => ({
     const isCurrent = () => runId === generateRunId && !controller.signal.aborted;
 
     const state = get();
-    set({ generating: true, error: null });
+    set({ generating: true, error: null, resultUrl: null, downloadUrl: null });
 
     try {
       const apiSettings = {
@@ -355,13 +417,15 @@ export const useMemeStore = create<MemeState>((set, get) => ({
         );
       }
 
-      const result = resolveServerUrls(await response.json()) as {
-        jobId: string;
-        downloadUrl: string;
-        originalSize: number;
-        processedSize: number;
-      };
+      const raw = await response.json().catch((err: unknown) => {
+        if (err instanceof SyntaxError) return null;
+        throw err;
+      });
       if (!isCurrent()) return;
+      const result = resolveServerUrls(raw);
+      if (!isMemeGenerateResponse(result)) {
+        throw new Error(t.errors.invalidServerResponse);
+      }
 
       set({
         resultUrl: result.downloadUrl,

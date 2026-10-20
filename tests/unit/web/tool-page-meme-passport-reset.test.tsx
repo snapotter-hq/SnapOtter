@@ -17,6 +17,8 @@ vi.mock("@/lib/image-preview", () => ({
   revokePreviewUrl: vi.fn(),
 }));
 
+import { en } from "@snapotter/shared";
+import { de } from "@snapotter/shared/i18n/de.js";
 import { I18nProvider } from "@/contexts/i18n-context";
 import { useWorkInFlight } from "@/hooks/use-work-in-flight";
 import { ToolPage } from "@/pages/tool-page";
@@ -541,5 +543,157 @@ describe("ToolPage resets usePassportPhotoStore and useMemeStore across tool cha
     expect(useMemeStore.getState().phase).toBe("editor");
     expect(useMemeStore.getState().selectedTemplate).toBe(TEMPLATE);
     expect(useMemeStore.getState().textBoxValues[0]?.text).toBe("Keep across breakpoint");
+  });
+
+  it("rejects malformed 2xx passport-photo analyze and generate payloads without crashing PassportPhotoPreview or dirtying useWorkInFlight (#3142)", async () => {
+    const validAnalyze = makeAnalyzeResult("job-1", "portrait.jpg");
+    const malformedAnalyzeBodies: Array<() => Response> = [
+      () => new Response(JSON.stringify({}), { status: 200 }),
+      () => new Response(JSON.stringify(null), { status: 200 }),
+      () => new Response(JSON.stringify([]), { status: 200 }),
+      () => new Response(JSON.stringify({ ...validAnalyze, preview: "" }), { status: 200 }),
+      () => new Response(JSON.stringify({ ...validAnalyze, landmarks: null }), { status: 200 }),
+      () =>
+        new Response(
+          JSON.stringify({
+            ...validAnalyze,
+            landmarks: { ...validAnalyze.landmarks, leftEye: { x: "bad", y: 0.4 } },
+          }),
+          { status: 200 },
+        ),
+      () =>
+        new Response(
+          JSON.stringify({
+            ...validAnalyze,
+            landmarks: { ...validAnalyze.landmarks, faceCenterX: null },
+          }),
+          { status: 200 },
+        ),
+      () => new Response(JSON.stringify({ ...validAnalyze, imageWidth: 0 }), { status: 200 }),
+      () => new Response(JSON.stringify({ ...validAnalyze, imageHeight: -10 }), { status: 200 }),
+      () => new Response(JSON.stringify({ ...validAnalyze, jobId: "" }), { status: 200 }),
+      () => new Response(JSON.stringify({ ...validAnalyze, filename: "" }), { status: 200 }),
+      () => new Response("<html>proxy gateway ok</html>", { status: 200 }),
+      () =>
+        ({
+          ok: true,
+          status: 200,
+          json: () => Promise.reject(new TypeError("Analyze stream disconnected")),
+        }) as unknown as Response,
+    ];
+
+    const malformedGenerateBodies: Array<() => Response> = [
+      () => new Response(JSON.stringify({}), { status: 200 }),
+      () => new Response(JSON.stringify(null), { status: 200 }),
+      () => new Response(JSON.stringify([]), { status: 200 }),
+      () => new Response(JSON.stringify({ downloadUrl: "" }), { status: 200 }),
+      () => new Response(JSON.stringify({ downloadUrl: 123 }), { status: 200 }),
+      () => new Response("<html>proxy gateway ok</html>", { status: 200 }),
+      () =>
+        ({
+          ok: true,
+          status: 200,
+          json: () => Promise.reject(new TypeError("Generate stream disconnected")),
+        }) as unknown as Response,
+    ];
+
+    let analyzeIdx = 0;
+    let generateIdx = 0;
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/v1/tools/image/passport-photo/analyze")) {
+        return (
+          malformedAnalyzeBodies[analyzeIdx++]?.() ??
+          new Response(JSON.stringify(validAnalyze), { status: 200 })
+        );
+      }
+      if (url.includes("/api/v1/tools/image/passport-photo/generate")) {
+        return (
+          malformedGenerateBodies[generateIdx++]?.() ??
+          new Response(
+            JSON.stringify({
+              downloadUrl: "/api/v1/download/job-1/passport.jpg",
+              dimensions: { width: 600, height: 600 },
+              spec: { country: "US", document: "passport" },
+            }),
+            { status: 200 },
+          )
+        );
+      }
+      return new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 });
+    });
+
+    renderRoutes("/image/passport-photo");
+
+    for (let i = 0; i < malformedAnalyzeBodies.length; i++) {
+      await act(async () => {
+        useFileStore
+          .getState()
+          .setFiles([new File([`portrait-${i}`], `bad-${i}.jpg`, { type: "image/jpeg" })]);
+      });
+
+      const expectedError =
+        i === malformedAnalyzeBodies.length - 1
+          ? "Analyze stream disconnected"
+          : en.errors.invalidServerResponse;
+      await waitFor(() => {
+        expect(screen.getByText(expectedError)).toBeInTheDocument();
+      });
+      expect(usePassportPhotoStore.getState().analyzeResult).toBeNull();
+      expect(usePassportPhotoStore.getState().analyzing).toBe(false);
+      expect(screen.queryByTestId("passport-photo-generate")).not.toBeInTheDocument();
+      expect(screen.getByTestId("work-probe")).toHaveTextContent("clean");
+    }
+
+    // Next file gets a valid analyze response, then exercises malformed generate responses.
+    await act(async () => {
+      useFileStore
+        .getState()
+        .setFiles([new File(["portrait-good"], "good.jpg", { type: "image/jpeg" })]);
+    });
+    expect(await screen.findByTestId("passport-photo-generate")).toBeInTheDocument();
+    expect(usePassportPhotoStore.getState().analyzeResult).toEqual(validAnalyze);
+
+    for (let i = 0; i < malformedGenerateBodies.length; i++) {
+      const btn = await screen.findByTestId("passport-photo-generate");
+      await act(async () => {
+        fireEvent.click(btn);
+      });
+      const expectedError =
+        i === malformedGenerateBodies.length - 1
+          ? "Generate stream disconnected"
+          : en.errors.invalidServerResponse;
+      await waitFor(() => {
+        expect(screen.getByText(expectedError)).toBeInTheDocument();
+      });
+      expect(usePassportPhotoStore.getState().generateResult).toBeNull();
+      expect(usePassportPhotoStore.getState().generating).toBe(false);
+      expect(screen.getByTestId("work-probe")).toHaveTextContent("clean");
+    }
+    expect(generateIdx).toBe(malformedGenerateBodies.length);
+  });
+
+  it("renders ErrorView in the active locale on /image/meme-generator when /api/v1/meme-templates returns a malformed 200 payload (#3142)", async () => {
+    storageMap.set("snapotter-locale", "de");
+    let templateRequests = 0;
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/v1/meme-templates")) {
+        templateRequests++;
+        return new Response(JSON.stringify({}), { status: 200 });
+      }
+      return new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 });
+    });
+
+    renderRoutes("/image/rotate");
+    expect(await screen.findByTitle("Sprache")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("go-meme"));
+
+    expect(await screen.findByText(de.errors.invalidServerResponse)).toBeInTheDocument();
+    expect(useMemeStore.getState().templates).toEqual([]);
+    expect(useMemeStore.getState().loading).toBe(false);
+    expect(templateRequests).toBe(1);
+    expect(screen.getByTestId("work-probe")).toHaveTextContent("clean");
   });
 });

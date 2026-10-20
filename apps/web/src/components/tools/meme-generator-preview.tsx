@@ -485,6 +485,7 @@ function ErrorView() {
 // ── Main Preview Component (ResultsPanel) ───────────────────────────
 
 export function MemeGeneratorPreview() {
+  const { t } = useTranslation();
   const phase = useMemeStore((s) => s.phase);
   const loading = useMemeStore((s) => s.loading);
   const error = useMemeStore((s) => s.error);
@@ -498,10 +499,10 @@ export function MemeGeneratorPreview() {
 
   // Fetch templates on mount
   useEffect(() => {
-    if (templates.length === 0) {
-      fetchTemplates();
+    if (templates.length === 0 && !error) {
+      fetchTemplates(t);
     }
-  }, [templates.length, fetchTemplates]);
+  }, [templates.length, error, fetchTemplates, t]);
 
   if (loading && templates.length === 0) {
     return <LoadingView />;
