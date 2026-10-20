@@ -634,13 +634,145 @@ describe("object-storage (local backend)", () => {
       const isolatedStorage = await import("../../../apps/api/src/lib/object-storage.js");
       await expect(
         isolatedStorage.copyReadableToFile(Readable.from([Buffer.from("fresh")]), destination),
-      ).rejects.toMatchObject({ code: "EEXIST" });
+      ).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-write-failed",
+        statusCode: 503,
+        cause: expect.objectContaining({ code: "EEXIST" }),
+      });
       expect(readFileSync(stagingPath).toString()).toBe("owned by another copy");
     } finally {
       vi.doUnmock("node:crypto");
       vi.resetModules();
       rmSync(stagingPath, { force: true });
     }
+  });
+
+  describe("a failed copyReadableToFile write (#2853)", () => {
+    function failingSource(error: unknown): Readable {
+      return Readable.from(
+        (async function* () {
+          yield Buffer.from("partial");
+          throw error;
+        })(),
+      );
+    }
+
+    it.each([
+      ["a full disk", { code: "ENOSPC", syscall: "write" }, "storage-full"],
+      ["an exhausted quota", { code: "EDQUOT", syscall: "write" }, "storage-full"],
+      ["a read-only volume", { code: "EROFS", syscall: "open" }, "storage-not-writable"],
+      ["no permission", { code: "EACCES", syscall: "open" }, "storage-not-writable"],
+      ["operation not permitted", { code: "EPERM", syscall: "open" }, "storage-not-writable"],
+      ["another I/O failure", { code: "EIO", syscall: "write" }, "storage-write-failed"],
+      ["descriptor exhaustion", { code: "EMFILE", syscall: "open" }, "storage-write-failed"],
+    ])("answers %s with a 503 naming it", async (_case, errno, code) => {
+      const destination = join(copyDir, `copy-fault-${errno.code}.bin`);
+      const cause = Object.assign(new Error(`${errno.code}: simulated`), errno);
+      await expect(copyReadableToFile(failingSource(cause), destination)).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code,
+        statusCode: 503,
+        cause,
+      });
+      expect(existsSync(destination)).toBe(false);
+    });
+
+    it("keeps a client's fault as it is", async () => {
+      const destination = join(copyDir, "copy-client-fault.bin");
+      const clientFault = Object.assign(new Error("Unexpected end of form"), { statusCode: 400 });
+      await expect(copyReadableToFile(failingSource(clientFault), destination)).rejects.toBe(
+        clientFault,
+      );
+      expect(clientFault.statusCode).toBe(400);
+      expect(existsSync(destination)).toBe(false);
+    });
+
+    it("makes anything else ours: a 500, not a malformed request", async () => {
+      const destination = join(copyDir, "copy-bug-fault.bin");
+      const bug = new TypeError("Cannot read properties of undefined");
+      await expect(copyReadableToFile(failingSource(bug), destination)).rejects.toBe(bug);
+      expect((bug as TypeError & { statusCode?: number }).statusCode).toBe(500);
+      expect(existsSync(destination)).toBe(false);
+    });
+
+    it("classifies a destination filesystem fault (mkdir under a file blocker) as 503 storage-write-failed", async () => {
+      const blocker = join(copyDir, "file-blocker");
+      writeFileSync(blocker, "not-a-dir");
+      const destination = join(blocker, "nested", "out.bin");
+      try {
+        await expect(
+          copyReadableToFile(Readable.from([Buffer.from("payload")]), destination),
+        ).rejects.toMatchObject({
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-write-failed",
+          statusCode: 503,
+          cause: expect.objectContaining({ syscall: "mkdir" }),
+        });
+      } finally {
+        rmSync(blocker, { force: true });
+      }
+    });
+
+    it("preserves a non-AbortError signal reason (such as worker 'timeout') without stamping 500", async () => {
+      const destination = join(copyDir, "copy-timeout-reason.bin");
+      const controller = new AbortController();
+      controller.abort("timeout");
+      const caught = await copyReadableToFile(
+        Readable.from([Buffer.from("payload")]),
+        destination,
+        { signal: controller.signal },
+      ).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(caught).toBe("timeout");
+      expect(existsSync(destination)).toBe(false);
+    });
+  });
+
+  it("classifies a local stat/open fault in copyObjectToFile as a 503 SafeError and preserves non-AbortError signal reasons (#2853)", async () => {
+    const eio = Object.assign(new Error("EIO: i/o error, stat"), {
+      code: "EIO",
+      syscall: "stat",
+    });
+    vi.resetModules();
+    vi.doMock("node:fs/promises", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:fs/promises")>();
+      return {
+        ...actual,
+        stat: async () => {
+          throw eio;
+        },
+      };
+    });
+    try {
+      const isolatedStorage = await import("../../../apps/api/src/lib/object-storage.js");
+      await expect(
+        isolatedStorage.copyObjectToFile(copyKey, join(copyDir, "stat-eio.bin"), {
+          maxBytes: 1024,
+        }),
+      ).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-write-failed",
+        statusCode: 503,
+        cause: eio,
+      });
+    } finally {
+      vi.doUnmock("node:fs/promises");
+      vi.resetModules();
+    }
+
+    const badKeyErr = await copyObjectToFile("outputs/job-1/.", join(copyDir, "bad-key.bin"), {
+      maxBytes: 1024,
+    }).catch((e: unknown) => e);
+    expect(badKeyErr).toBeInstanceOf(Error);
+    expect((badKeyErr as Error).message).toMatch(/invalid object key/i);
+    expect((badKeyErr as { statusCode?: unknown }).statusCode).toBeUndefined();
   });
 
   it("turns local operational write errnos and S3 SDK faults into status-bearing 503 SafeErrors (#1552)", async () => {

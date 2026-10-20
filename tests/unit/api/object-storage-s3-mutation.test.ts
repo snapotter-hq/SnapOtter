@@ -5,6 +5,9 @@
 // and never touch the local filesystem. This complements the local-backend
 // mutation file, which cannot run under STORAGE_MODE="s3".
 
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Readable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -64,6 +67,7 @@ vi.mock("@snapotter/enterprise", async () => {
 });
 
 import {
+  copyObjectToFile,
   deleteObject,
   deletePrefix,
   getObjectSize,
@@ -302,6 +306,184 @@ describe("object-storage S3 dispatch (STORAGE_MODE=s3)", () => {
   it("forwards a byte range to the S3 backend verbatim", async () => {
     await getObjectStream("outputs/job-get/out.bin", { start: 6, end: 10 });
     expect(s3.getStream).toHaveBeenCalledWith("outputs/job-get/out.bin", { start: 6, end: 10 });
+  });
+
+  describe("copyObjectToFile S3 read-step fault classification (#2853)", () => {
+    it.each([
+      [
+        "S3 throttling getObjectSize",
+        "size" as const,
+        Object.assign(new Error("Please reduce your request rate."), {
+          name: "SlowDown",
+          $metadata: { httpStatusCode: 503 },
+        }),
+      ],
+      [
+        "S3 refusing getObjectStream",
+        "stream" as const,
+        Object.assign(new Error("Access Denied"), {
+          name: "AccessDenied",
+          $metadata: { httpStatusCode: 403 },
+        }),
+      ],
+      [
+        "an unreachable S3 endpoint on getObjectSize",
+        "size" as const,
+        Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), { code: "ECONNREFUSED" }),
+      ],
+      [
+        "an S3 stream reset (EIO with read syscall) on getObjectStream",
+        "stream" as const,
+        Object.assign(new Error("EIO: S3 stream reset"), { code: "EIO", syscall: "read" }),
+      ],
+      [
+        "an S3 premature close on getObjectStream",
+        "stream" as const,
+        Object.assign(new Error("Premature close"), { code: "ERR_STREAM_PREMATURE_CLOSE" }),
+      ],
+    ])("answers 503 storage-unavailable for %s", async (_label, step, cause) => {
+      if (step === "size") {
+        s3.getSize.mockRejectedValueOnce(cause);
+      } else {
+        s3.getSize.mockResolvedValueOnce(16);
+        s3.getStream.mockRejectedValueOnce(cause);
+      }
+      await expect(
+        copyObjectToFile("uploads/job-copy/scan.pdf", "/should-not-write/out.pdf", {
+          maxBytes: 1024,
+        }),
+      ).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause,
+      });
+    });
+
+    it.each([
+      [
+        "mid-stream premature close",
+        Object.assign(new Error("Premature close"), { code: "ERR_STREAM_PREMATURE_CLOSE" }),
+      ],
+      ["mid-stream aborted message", new Error("aborted")],
+      [
+        "mid-stream EIO with read syscall",
+        Object.assign(new Error("EIO: S3 stream reset"), { code: "EIO", syscall: "read" }),
+      ],
+    ])(
+      "classifies an S3 source stream failure (%s) during copyObjectToFile as 503 storage-unavailable and cleans up staging",
+      async (_label, streamCause) => {
+        const scratch = mkdtempSync(join(tmpdir(), "snapotter-s3-copy-mid-"));
+        const destination = join(scratch, "out.pdf");
+        s3.getSize.mockResolvedValueOnce(16);
+        s3.getStream.mockResolvedValueOnce(
+          Readable.from(
+            (async function* () {
+              yield Buffer.from("partial");
+              throw streamCause;
+            })(),
+          ),
+        );
+        try {
+          await expect(
+            copyObjectToFile("uploads/job-copy/scan.pdf", destination, { maxBytes: 1024 }),
+          ).rejects.toMatchObject({
+            isSafeMessage: true,
+            kind: "operational",
+            code: "storage-unavailable",
+            statusCode: 503,
+            cause: streamCause,
+          });
+          expect(existsSync(destination)).toBe(false);
+        } finally {
+          rmSync(scratch, { recursive: true, force: true });
+        }
+      },
+    );
+
+    it("keeps a local scratch write failure during S3 copyObjectToFile classified as 503 storage-write-failed", async () => {
+      const scratch = mkdtempSync(join(tmpdir(), "snapotter-s3-copy-localfault-"));
+      const blocker = join(scratch, "file-blocker");
+      writeFileSync(blocker, "not-a-dir");
+      const destination = join(blocker, "nested", "out.pdf");
+      s3.getSize.mockResolvedValueOnce(7);
+      s3.getStream.mockResolvedValueOnce(Readable.from([Buffer.from("payload")]));
+      try {
+        await expect(
+          copyObjectToFile("uploads/job-copy/scan.pdf", destination, { maxBytes: 1024 }),
+        ).rejects.toMatchObject({
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-write-failed",
+          statusCode: 503,
+          cause: expect.objectContaining({ syscall: "mkdir" }),
+        });
+      } finally {
+        rmSync(scratch, { recursive: true, force: true });
+      }
+    });
+
+    it("rejects before getObjectStream when declared S3 size exceeds maxBytes", async () => {
+      s3.getSize.mockResolvedValueOnce(1025);
+      await expect(
+        copyObjectToFile("uploads/job-copy/big.pdf", "/should-not-write/out.pdf", {
+          maxBytes: 1024,
+        }),
+      ).rejects.toMatchObject({
+        statusCode: 413,
+        limitBytes: 1024,
+      });
+      expect(s3.getStream).not.toHaveBeenCalled();
+    });
+
+    it("rejects an invalid key in copyObjectToFile before calling S3 and without stamping 500", async () => {
+      const err = await copyObjectToFile("uploads/../etc/passwd", "/should-not-write/out.pdf", {
+        maxBytes: 1024,
+      }).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(Error);
+      expect((err as Error).message).toMatch(/Invalid object key/);
+      expect((err as { statusCode?: unknown }).statusCode).toBeUndefined();
+      expect(s3.getSize).not.toHaveBeenCalled();
+    });
+
+    it("preserves a non-AbortError signal reason in copyObjectToFile when aborted during getObjectSize", async () => {
+      const controller = new AbortController();
+      s3.getSize.mockImplementationOnce(async () => {
+        controller.abort("timeout");
+        return 16;
+      });
+      const err = await copyObjectToFile("uploads/job-copy/scan.pdf", "/should-not-write/out.pdf", {
+        maxBytes: 1024,
+        signal: controller.signal,
+      }).catch((e: unknown) => e);
+      expect(err).toBe("timeout");
+      expect(s3.getStream).not.toHaveBeenCalled();
+    });
+
+    it("passes a missing-object NoSuchKey rejection through untouched so isMissingObjectError accepts it", async () => {
+      const noSuchKey = Object.assign(new Error("The specified key does not exist."), {
+        name: "NoSuchKey",
+        $metadata: { httpStatusCode: 404 },
+      });
+      s3.getSize.mockRejectedValueOnce(noSuchKey);
+      const err = await copyObjectToFile("uploads/job-copy/gone.pdf", "/should-not-write/out.pdf", {
+        maxBytes: 1024,
+      }).catch((e: unknown) => e);
+      expect(err).toBe(noSuchKey);
+      expect(isMissingObjectError(err)).toBe(true);
+    });
+
+    it("stamps 500 on an unexpected non-S3 error during copyObjectToFile read setup", async () => {
+      const bug = new TypeError("unexpected S3 size defect");
+      s3.getSize.mockRejectedValueOnce(bug);
+      await expect(
+        copyObjectToFile("uploads/job-copy/scan.pdf", "/should-not-write/out.pdf", {
+          maxBytes: 1024,
+        }),
+      ).rejects.toBe(bug);
+      expect((bug as TypeError & { statusCode?: number }).statusCode).toBe(500);
+    });
   });
 
   it("routes deleteObject to the S3 backend with the exact key", async () => {

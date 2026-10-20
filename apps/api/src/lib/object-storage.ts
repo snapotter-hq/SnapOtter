@@ -609,14 +609,27 @@ export async function copyObjectToFile(
   if (!Number.isSafeInteger(opts.maxBytes) || opts.maxBytes < 0) {
     throw new Error("maxBytes must be a non-negative safe integer");
   }
+  assertValidKey(key);
   opts.signal?.throwIfAborted();
 
-  const declaredSize = await getObjectSize(key);
-  opts.signal?.throwIfAborted();
-  if (declaredSize > opts.maxBytes) throw objectSizeLimitError(opts.maxBytes);
+  let source: Readable;
+  try {
+    const declaredSize = await getObjectSize(key);
+    opts.signal?.throwIfAborted();
+    if (declaredSize > opts.maxBytes) throw objectSizeLimitError(opts.maxBytes);
 
-  const source = await getObjectStream(key);
-  return copyReadableToFile(source, destination, opts);
+    source = await getObjectStream(key);
+  } catch (error) {
+    if (opts.signal?.aborted && error === opts.signal.reason) throw error;
+    if (isMissingObjectError(error)) throw error;
+    throw isS3Enabled() ? s3WriteFault(normalizeS3ReadFault(error)) : localWriteFault(error);
+  }
+  return copyReadableToFile(
+    source,
+    destination,
+    opts,
+    isS3Enabled() ? (err) => s3WriteFault(normalizeS3ReadFault(err)) : undefined,
+  );
 }
 
 /** Atomically spool a readable to scratch with bounded memory and cleanup. */
@@ -624,6 +637,7 @@ export async function copyReadableToFile(
   source: Readable,
   destination: string,
   opts: CopyReadableToFileOptions = {},
+  classifySourceFault?: (error: unknown) => unknown,
 ): Promise<number> {
   const destroySource = () => {
     if (!source.destroyed) {
@@ -638,15 +652,21 @@ export async function copyReadableToFile(
   const stagingPath = `${destination}.${randomUUID()}.partial`;
   let stagingOwned = false;
   let written = 0;
+  let sourceError: unknown;
   const countAndLimit = async function* (chunks: AsyncIterable<Buffer | Uint8Array | string>) {
-    for await (const chunk of chunks) {
-      opts.signal?.throwIfAborted();
-      const bytes = typeof chunk === "string" ? Buffer.byteLength(chunk) : chunk.byteLength;
-      written += bytes;
-      if (opts.maxBytes !== undefined && written > opts.maxBytes) {
-        throw objectSizeLimitError(opts.maxBytes);
+    try {
+      for await (const chunk of chunks) {
+        opts.signal?.throwIfAborted();
+        const bytes = typeof chunk === "string" ? Buffer.byteLength(chunk) : chunk.byteLength;
+        written += bytes;
+        if (opts.maxBytes !== undefined && written > opts.maxBytes) {
+          throw objectSizeLimitError(opts.maxBytes);
+        }
+        yield chunk;
       }
-      yield chunk;
+    } catch (err) {
+      sourceError ??= err;
+      throw err;
     }
   };
 
@@ -671,7 +691,11 @@ export async function copyReadableToFile(
   } catch (error) {
     destroySource();
     if (stagingOwned) await unlink(stagingPath).catch(() => {});
-    throw normalizeOperationalWriteError(error);
+    if (opts.signal?.aborted && error === opts.signal.reason) throw error;
+    if (sourceError !== undefined && classifySourceFault) {
+      throw classifySourceFault(sourceError);
+    }
+    throw localWriteFault(error);
   }
 }
 
