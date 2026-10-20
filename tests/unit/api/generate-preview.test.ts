@@ -9,6 +9,7 @@
  * buffer actually throws and a valid one actually encodes.
  */
 
+import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -46,7 +47,10 @@ vi.mock("../../../apps/api/src/lib/engine-unavailable.js", async (importOriginal
 });
 
 import { generatePreview } from "../../../apps/api/src/jobs/postprocess.js";
+import * as formatDecoders from "../../../apps/api/src/lib/format-decoders.js";
 import { DecoderUnavailableError } from "../../../apps/api/src/lib/format-decoders.js";
+import { encodeQoi } from "../../../apps/api/src/lib/format-encoders.js";
+import { registerEditMetadata } from "../../../apps/api/src/routes/tools/edit-metadata.js";
 
 const JOB_ID = "job-preview-test";
 
@@ -113,6 +117,56 @@ describe("generatePreview honesty (#746)", () => {
     expect(reportEngineUnavailableMock.mock.calls[0]?.[1]).toBe("output-preview");
   });
 
+  it.each(["image/qoi", "image/x-qoi"])(
+    "decodes CLI-encoded %s output via decodeToSharpCompat before encoding preview.webp (#2704)",
+    async (contentType) => {
+      const pngBuffer = await sharp({
+        create: { width: 8, height: 8, channels: 4, background: { r: 20, g: 40, b: 60, alpha: 1 } },
+      })
+        .png()
+        .toBuffer();
+      const qoiBuffer = await encodeQoi(pngBuffer);
+
+      const key = await generatePreview(qoiBuffer, contentType, JOB_ID, "convert");
+
+      expect(key).toBe(`outputs/${JOB_ID}/preview.webp`);
+      expect(putObjectMock).toHaveBeenCalledOnce();
+      const [, previewBytes] = putObjectMock.mock.calls[0] as [string, Buffer];
+      const meta = await sharp(previewBytes).metadata();
+      expect(meta.format).toBe("webp");
+      expect(meta.width).toBe(8);
+      expect(meta.height).toBe(8);
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+    },
+  );
+
+  it("reports a missing CLI decoder through reportEngineUnavailable and stays non-fatal (#2704)", async () => {
+    const decodeSpy = vi
+      .spyOn(formatDecoders, "decodeToSharpCompat")
+      .mockRejectedValueOnce(new DecoderUnavailableError("No ImageMagick found."));
+    try {
+      const key = await generatePreview(
+        Buffer.from("psd-bytes"),
+        "image/vnd.adobe.photoshop",
+        JOB_ID,
+        "convert",
+      );
+
+      expect(key).toBeUndefined();
+      expect(putObjectMock).not.toHaveBeenCalled();
+      expect(reportEngineUnavailableMock).toHaveBeenCalledOnce();
+      expect(reportEngineUnavailableMock.mock.calls[0]?.[0]).toMatchObject({
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        message: "No ImageMagick found.",
+      });
+      expect(reportEngineUnavailableMock.mock.calls[0]?.[1]).toBe("convert");
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+    } finally {
+      decodeSpy.mockRestore();
+    }
+  });
+
   it.each([
     "application/epub+zip",
     "text/html",
@@ -141,4 +195,174 @@ describe("generatePreview honesty (#746)", () => {
       expect(loggerMock.warn).not.toHaveBeenCalled();
     },
   );
+});
+
+describe("registerEditMetadata CLI-decoded preview generation (#2704)", () => {
+  type EditHandler = (req: unknown, reply: unknown) => Promise<unknown>;
+
+  function getEditMetadataHandler(): EditHandler {
+    const routes = new Map<string, EditHandler>();
+    const fakeApp = {
+      post: (path: string, handler: EditHandler) => {
+        routes.set(path, handler);
+      },
+    } as unknown as FastifyInstance;
+    registerEditMetadata(fakeApp);
+    const handler = routes.get("/api/v1/tools/image/edit-metadata");
+    if (!handler) throw new Error("edit-metadata route not registered");
+    return handler;
+  }
+
+  function makeMultipartRequest(fileBuffer: Buffer, filename: string, settings = "{}") {
+    return {
+      log: loggerMock,
+      parts: async function* () {
+        yield {
+          type: "file",
+          fieldname: "file",
+          filename,
+          file: (async function* () {
+            yield fileBuffer;
+          })(),
+        };
+        yield {
+          type: "field",
+          fieldname: "settings",
+          value: settings,
+        };
+      },
+    };
+  }
+
+  function makeReply() {
+    let statusCode = 200;
+    let payload: unknown;
+    const reply = {
+      status(code: number) {
+        statusCode = code;
+        return reply;
+      },
+      send(body: unknown) {
+        payload = body;
+        return reply;
+      },
+      get statusCode() {
+        return statusCode;
+      },
+      get payload() {
+        return payload;
+      },
+    };
+    return reply;
+  }
+
+  it("decodes a QOI file via decodeToSharpCompat and writes preview.webp (#2704)", async () => {
+    const handler = getEditMetadataHandler();
+    const pngBuffer = await sharp({
+      create: {
+        width: 10,
+        height: 10,
+        channels: 4,
+        background: { r: 50, g: 100, b: 150, alpha: 1 },
+      },
+    })
+      .png()
+      .toBuffer();
+    const qoiBuffer = await encodeQoi(pngBuffer);
+    const reply = makeReply();
+
+    await handler(makeMultipartRequest(qoiBuffer, "sample.qoi"), reply);
+
+    expect(reply.statusCode).toBe(200);
+    const body = reply.payload as { jobId: string; previewUrl?: string };
+    expect(body.previewUrl).toBe(`/api/v1/download/${body.jobId}/preview.webp`);
+    expect(putObjectMock).toHaveBeenCalledTimes(2);
+    const [previewKey, previewBytes] = putObjectMock.mock.calls[1] as [string, Buffer];
+    expect(previewKey).toBe(`outputs/${body.jobId}/preview.webp`);
+    const meta = await sharp(previewBytes).metadata();
+    expect(meta.format).toBe("webp");
+    expect(meta.width).toBe(10);
+    expect(meta.height).toBe(10);
+  });
+
+  it("reports a missing CLI decoder through reportEngineUnavailable and keeps the 200 response (#2704)", async () => {
+    const handler = getEditMetadataHandler();
+    const pngBuffer = await sharp({
+      create: { width: 8, height: 8, channels: 4, background: { r: 10, g: 20, b: 30, alpha: 1 } },
+    })
+      .png()
+      .toBuffer();
+    const qoiBuffer = await encodeQoi(pngBuffer);
+    const decodeSpy = vi
+      .spyOn(formatDecoders, "decodeToSharpCompat")
+      .mockRejectedValueOnce(new DecoderUnavailableError("No ImageMagick found."));
+    const reply = makeReply();
+
+    try {
+      await handler(makeMultipartRequest(qoiBuffer, "sample.qoi"), reply);
+
+      expect(reply.statusCode).toBe(200);
+      const body = reply.payload as { jobId: string; previewUrl?: string };
+      expect(body.previewUrl).toBeUndefined();
+      expect(reportEngineUnavailableMock).toHaveBeenCalledOnce();
+      expect(reportEngineUnavailableMock.mock.calls[0]?.[1]).toBe("edit-metadata");
+    } finally {
+      decodeSpy.mockRestore();
+    }
+  });
+
+  it("logs a warning without calling reportEngineUnavailable when decodeToSharpCompat fails with a non-503 error (#2704)", async () => {
+    const handler = getEditMetadataHandler();
+    const pngBuffer = await sharp({
+      create: { width: 8, height: 8, channels: 4, background: { r: 10, g: 20, b: 30, alpha: 1 } },
+    })
+      .png()
+      .toBuffer();
+    const qoiBuffer = await encodeQoi(pngBuffer);
+    const decodeSpy = vi
+      .spyOn(formatDecoders, "decodeToSharpCompat")
+      .mockRejectedValueOnce(new Error("corrupt qoi"));
+    const reply = makeReply();
+
+    try {
+      await handler(makeMultipartRequest(qoiBuffer, "sample.qoi"), reply);
+
+      expect(reply.statusCode).toBe(200);
+      const body = reply.payload as { jobId: string; previewUrl?: string };
+      expect(body.previewUrl).toBeUndefined();
+      expect(reportEngineUnavailableMock).not.toHaveBeenCalled();
+      expect(loggerMock.warn).toHaveBeenCalledOnce();
+      expect(loggerMock.warn.mock.calls[0]?.[1]).toBe(
+        "preview generation failed; result has no renderable preview",
+      );
+    } finally {
+      decodeSpy.mockRestore();
+    }
+  });
+
+  it("forwards the RAW extension to decodeToSharpCompat and falls back to Sharp on TIFF-headed DNG when the CLI decoder is missing (#2704)", async () => {
+    const handler = getEditMetadataHandler();
+    const tiffBuffer = await sharp({
+      create: { width: 12, height: 12, channels: 3, background: { r: 40, g: 80, b: 120 } },
+    })
+      .tiff()
+      .toBuffer();
+    const decodeSpy = vi
+      .spyOn(formatDecoders, "decodeToSharpCompat")
+      .mockRejectedValueOnce(new DecoderUnavailableError("No LibRaw found."));
+    const reply = makeReply();
+
+    try {
+      await handler(makeMultipartRequest(tiffBuffer, "photo.dng"), reply);
+
+      expect(decodeSpy).toHaveBeenCalledWith(tiffBuffer, "raw", "dng");
+      expect(reply.statusCode).toBe(200);
+      const body = reply.payload as { jobId: string; previewUrl?: string };
+      expect(body.previewUrl).toBe(`/api/v1/download/${body.jobId}/preview.webp`);
+      expect(reportEngineUnavailableMock).not.toHaveBeenCalled();
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+    } finally {
+      decodeSpy.mockRestore();
+    }
+  });
 });

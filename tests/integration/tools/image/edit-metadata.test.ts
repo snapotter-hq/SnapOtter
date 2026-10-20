@@ -9,6 +9,7 @@
  * the tests gracefully handle the 422 response.
  */
 
+import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -282,6 +283,39 @@ describe("Different input formats", () => {
     if (res.statusCode === 422) return;
     expect(res.statusCode).toBe(200);
   });
+
+  it.each([
+    ["psd", "image/vnd.adobe.photoshop"],
+    ["jxl", "image/jxl"],
+    ["jp2", "image/jp2"],
+    ["qoi", "image/qoi"],
+    ["tga", "image/x-tga"],
+    ["ico", "image/x-icon"],
+    ["ppm", "image/x-portable-pixmap"],
+  ])(
+    "generates a working preview.webp for CLI-decoded %s output (#2704)",
+    { timeout: 60_000 },
+    async (ext, mime) => {
+      const buf = readFixture(fixtures.image.formats(ext));
+      // Empty settings avoids ExifTool write support gaps on niche formats
+      // while exercising the edit-metadata route's output + preview pipeline.
+      const res = await postTool({}, buf, `sample.${ext}`, mime);
+      if (ext !== "qoi" && (res.statusCode === 422 || res.statusCode === 503)) return;
+      expect(res.statusCode).toBe(200);
+      const result = JSON.parse(res.body);
+      expect(result.previewUrl).toBe(`/api/v1/download/${result.jobId}/preview.webp`);
+
+      const previewRes = await app.inject({
+        method: "GET",
+        url: result.previewUrl,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(previewRes.statusCode).toBe(200);
+      expect(previewRes.headers["content-type"]).toBe("image/webp");
+      const meta = await sharp(previewRes.rawPayload).metadata();
+      expect(meta.format).toBe("webp");
+    },
+  );
 });
 
 // ── Inspect endpoint ────────────────────────────────────────────

@@ -45,6 +45,16 @@ vi.mock("../../../apps/api/src/lib/heic-converter.js", () => ({
   decodeHeic: decodeHeicMock,
 }));
 
+const decodeToSharpCompatMock = vi.hoisted(() => vi.fn());
+vi.mock("../../../apps/api/src/lib/format-decoders.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/format-decoders.js")>();
+  return {
+    ...actual,
+    decodeToSharpCompat: decodeToSharpCompatMock,
+  };
+});
+
 import {
   buildOutputName,
   CONTENT_TYPE_TO_EXT,
@@ -101,6 +111,7 @@ describe("generatePreview", () => {
     videoPosterPreviewMock.mockReset();
     pdfFirstPagePreviewMock.mockReset();
     decodeHeicMock.mockReset();
+    decodeToSharpCompatMock.mockReset();
   });
 
   it.each([
@@ -212,6 +223,68 @@ describe("generatePreview", () => {
     expect(putObjectMock).not.toHaveBeenCalled();
     expect(loggerWarnMock).toHaveBeenCalledWith(
       { err, jobId: "job-heic-err", contentType: "image/heic" },
+      "preview generation failed; result has no renderable preview",
+    );
+  });
+
+  it.each([
+    ["image/x-icon", "ico"],
+    ["image/vnd.adobe.photoshop", "psd"],
+    ["image/x-tga", "tga"],
+    ["image/x-targa", "tga"],
+    ["image/jxl", "jxl"],
+    ["image/jp2", "jp2"],
+    ["image/jpx", "jp2"],
+    ["image/qoi", "qoi"],
+    ["image/x-qoi", "qoi"],
+    ["image/x-portable-pixmap", "ppm"],
+    ["image/x-portable-graymap", "pgm"],
+    ["image/x-portable-bitmap", "pbm"],
+    ["image/x-portable-anymap", "ppm"],
+    ["image/vnd.ms-dds", "dds"],
+    ["image/x-dds", "dds"],
+    ["image/x-exr", "exr"],
+    ["image/vnd.radiance", "hdr"],
+    ["image/x-dpx", "dpx"],
+    ["image/x-cineon", "dpx"],
+    ["image/fits", "fits"],
+    ["image/x-eps", "eps"],
+  ])(
+    "decodes %s via decodeToSharpCompat(%s) before passing to Sharp (#2704)",
+    async (contentType, expectedFormat) => {
+      const decoded = Buffer.from(`decoded-${expectedFormat}`);
+      const webpOut = Buffer.from(`webp-${expectedFormat}`);
+      decodeToSharpCompatMock.mockResolvedValueOnce(decoded);
+      sharpMock.mockReturnValueOnce({
+        webp: () => ({ toBuffer: async () => webpOut }),
+      });
+
+      const rawBuf = Buffer.from(`raw-${expectedFormat}`);
+      const key = await generatePreview(rawBuf, contentType, "job-cli");
+
+      expect(decodeToSharpCompatMock).toHaveBeenCalledWith(rawBuf, expectedFormat);
+      expect(sharpMock).toHaveBeenCalledWith(decoded);
+      expect(putObjectMock).toHaveBeenCalledWith("outputs/job-cli/preview.webp", webpOut);
+      expect(key).toBe("outputs/job-cli/preview.webp");
+      expect(loggerWarnMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it("logs a warning and returns undefined when decodeToSharpCompat rejects with a non-503 error (#2704)", async () => {
+    const err = new Error("corrupt psd");
+    decodeToSharpCompatMock.mockRejectedValueOnce(err);
+
+    const key = await generatePreview(
+      Buffer.from("bad-psd"),
+      "image/vnd.adobe.photoshop",
+      "job-psd-err",
+    );
+
+    expect(key).toBeUndefined();
+    expect(sharpMock).not.toHaveBeenCalled();
+    expect(putObjectMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      { err, jobId: "job-psd-err", contentType: "image/vnd.adobe.photoshop" },
       "preview generation failed; result has no renderable preview",
     );
   });

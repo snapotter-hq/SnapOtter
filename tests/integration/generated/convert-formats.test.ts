@@ -431,3 +431,49 @@ describe("Animated format preservation", () => {
     expect(meta.pages ?? 1).toBe(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Preview generation for CLI-encoded convert outputs (#2704)
+// ---------------------------------------------------------------------------
+describe("CLI-encoded convert output previews (#2704)", () => {
+  it.each(["ico", "psd", "tga", "jxl", "jp2", "qoi", "ppm"] as const)(
+    "returns a working preview.webp when converting png -> %s",
+    async (outputFmt) => {
+      const input = inputs.png;
+      const { body: payload, contentType } = createMultipartPayload([
+        {
+          name: "file",
+          filename: input.filename,
+          contentType: input.contentType,
+          content: input.buffer,
+        },
+        { name: "settings", content: JSON.stringify({ format: outputFmt }) },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/convert",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body: payload,
+      });
+
+      if (outputFmt !== "qoi" && (res.statusCode === 422 || res.statusCode === 503)) return;
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.previewUrl).toBe(`/api/v1/download/${body.jobId}/preview.webp`);
+
+      const previewRes = await app.inject({
+        method: "GET",
+        url: body.previewUrl,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(previewRes.statusCode).toBe(200);
+      expect(previewRes.headers["content-type"]).toBe("image/webp");
+      const meta = await sharp(previewRes.rawPayload).metadata();
+      expect(meta.format).toBe("webp");
+    },
+  );
+});

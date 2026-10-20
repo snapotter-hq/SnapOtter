@@ -17,7 +17,7 @@ import sharp from "sharp";
 import { db, schema } from "../db/index.js";
 import { reportEngineUnavailable } from "../lib/engine-unavailable.js";
 import { reportError } from "../lib/error-report.js";
-import { isDecoderUnavailable } from "../lib/format-decoders.js";
+import { decodeToSharpCompat, isDecoderUnavailable } from "../lib/format-decoders.js";
 import { logger } from "../lib/logger.js";
 import { putObject } from "../lib/object-storage.js";
 import { engineUnavailable } from "../modality/image-input.js";
@@ -114,6 +114,30 @@ const BROWSER_PREVIEWABLE = new Set([
   "image/avif",
 ]);
 
+const CLI_DECODE_FORMAT_BY_MIME: Readonly<Record<string, string>> = {
+  "image/x-icon": "ico",
+  "image/vnd.adobe.photoshop": "psd",
+  "image/x-tga": "tga",
+  "image/x-targa": "tga",
+  "image/jxl": "jxl",
+  "image/jp2": "jp2",
+  "image/jpx": "jp2",
+  "image/qoi": "qoi",
+  "image/x-qoi": "qoi",
+  "image/x-portable-pixmap": "ppm",
+  "image/x-portable-graymap": "pgm",
+  "image/x-portable-bitmap": "pbm",
+  "image/x-portable-anymap": "ppm",
+  "image/vnd.ms-dds": "dds",
+  "image/x-dds": "dds",
+  "image/x-exr": "exr",
+  "image/vnd.radiance": "hdr",
+  "image/x-dpx": "dpx",
+  "image/x-cineon": "dpx",
+  "image/fits": "fits",
+  "image/x-eps": "eps",
+};
+
 /**
  * Generate a browser-previewable thumbnail for formats that browsers
  * cannot render in <img> tags. Writes to object storage under
@@ -153,10 +177,13 @@ export async function generatePreview(
 
   try {
     let previewInput = buffer;
-    // Sharp cannot decode HEIC natively; use system decoder first
+    const cliFormat = CLI_DECODE_FORMAT_BY_MIME[contentType];
+    // Sharp cannot decode HEIC or CLI-encoded formats natively; use system decoder first
     if (contentType === "image/heic" || contentType === "image/heif") {
       const { decodeHeic } = await import("../lib/heic-converter.js");
       previewInput = await decodeHeic(buffer);
+    } else if (cliFormat) {
+      previewInput = await decodeToSharpCompat(buffer, cliFormat);
     }
     const previewBuffer = await sharp(previewInput).webp({ quality: 80 }).toBuffer();
     await putObject(key, previewBuffer);

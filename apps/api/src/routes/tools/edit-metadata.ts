@@ -13,7 +13,11 @@ import {
 } from "../../lib/exiftool.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { isDecoderUnavailable } from "../../lib/format-decoders.js";
+import {
+  DecoderOutOfMemoryError,
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+} from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { putObject } from "../../lib/object-storage.js";
@@ -95,6 +99,33 @@ const BROWSER_PREVIEWABLE = new Set([
   "image/bmp",
   "image/avif",
 ]);
+
+const CLI_DECODE_FORMAT_BY_MIME: Readonly<Record<string, string>> = {
+  "image/x-icon": "ico",
+  "image/vnd.adobe.photoshop": "psd",
+  "image/x-tga": "tga",
+  "image/x-targa": "tga",
+  "image/jxl": "jxl",
+  "image/jp2": "jp2",
+  "image/jpx": "jp2",
+  "image/qoi": "qoi",
+  "image/x-qoi": "qoi",
+  "image/x-portable-pixmap": "ppm",
+  "image/x-portable-graymap": "pgm",
+  "image/x-portable-bitmap": "pbm",
+  "image/x-portable-anymap": "ppm",
+  "image/vnd.ms-dds": "dds",
+  "image/x-dds": "dds",
+  "image/x-exr": "exr",
+  "image/vnd.radiance": "hdr",
+  "image/x-dpx": "dpx",
+  "image/x-cineon": "dpx",
+  "image/fits": "fits",
+  "image/x-eps": "eps",
+  "application/postscript": "eps",
+  "image/x-dcraw": "raw",
+  "image/x-canon-cr3": "raw",
+};
 
 export function registerEditMetadata(app: FastifyInstance) {
   // Inspect endpoint - returns parsed metadata via ExifTool
@@ -208,13 +239,28 @@ export function registerEditMetadata(app: FastifyInstance) {
         const jobId = randomUUID();
         await putObject(`outputs/${jobId}/${filename}`, outputBuffer);
 
-        // Generate preview for non-browser-previewable formats (HEIF, TIFF)
+        // Generate preview for non-browser-previewable formats (HEIF, TIFF, CLI-decoded)
         let previewUrl: string | undefined;
         if (!BROWSER_PREVIEWABLE.has(contentType)) {
           try {
             let previewInput = outputBuffer;
+            const cliFormat = CLI_DECODE_FORMAT_BY_MIME[contentType];
             if (contentType === "image/heif" || contentType === "image/heic") {
               previewInput = await decodeHeic(outputBuffer);
+            } else if (cliFormat) {
+              const fileExt = filename.split(".").pop()?.toLowerCase();
+              try {
+                previewInput = await decodeToSharpCompat(outputBuffer, cliFormat, fileExt);
+              } catch (decodeErr) {
+                if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+                // Sharp reads some TIFF-headed RAW files (such as .dng) itself;
+                // only surface a CLI decode failure if Sharp cannot read it either.
+                try {
+                  await sharp(outputBuffer).metadata();
+                } catch {
+                  throw decodeErr;
+                }
+              }
             }
             const previewBuffer = await sharp(previewInput).webp({ quality: 80 }).toBuffer();
             await putObject(`outputs/${jobId}/preview.webp`, previewBuffer);
@@ -222,8 +268,12 @@ export function registerEditMetadata(app: FastifyInstance) {
           } catch (err) {
             if (isDecoderUnavailable(err)) {
               reportEngineUnavailable(engineUnavailable(err), "edit-metadata", request.log);
+            } else {
+              request.log.warn(
+                { err, jobId, contentType },
+                "preview generation failed; result has no renderable preview",
+              );
             }
-            // Non-fatal - frontend shows fallback
           }
         }
 

@@ -775,6 +775,42 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
       }
     });
 
+    it("edit-metadata preview keeps the 200 result and reports a CLI decoder fault once (#2704)", async () => {
+      const cliSpy = vi
+        .spyOn(formatDecoders, "decodeToSharpCompat")
+        .mockRejectedValue(new DecoderOutOfMemoryError("Decoder out of memory."));
+      try {
+        const res = await post("/api/v1/tools/image/edit-metadata", [
+          { name: "file", filename: "icon.ico", contentType: "image/x-icon", content: ICO },
+          { name: "settings", content: "{}" },
+        ]);
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.json().previewUrl).toBeUndefined();
+        expect(helperSawEngineDown("edit-metadata")).toBe(true);
+        expect(engineReports("edit-metadata")).toHaveLength(1);
+      } finally {
+        cliSpy.mockRestore();
+      }
+    });
+
+    it("worker generatePreview keeps the 200 result and reports a missing CLI decoder once (#2704)", async () => {
+      const cliSpy = vi
+        .spyOn(formatDecoders, "decodeToSharpCompat")
+        .mockRejectedValue(new DecoderUnavailableError("No ImageMagick found."));
+      try {
+        const res = await post("/api/v1/tools/image/convert", [
+          { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+          { name: "settings", content: JSON.stringify({ format: "qoi" }) },
+        ]);
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.json().previewUrl).toBeUndefined();
+        expect(helperSawEngineDown("convert")).toBe(true);
+        expect(engineReports("convert")).toHaveLength(1);
+      } finally {
+        cliSpy.mockRestore();
+      }
+    });
+
     it("svg-to-raster HEIF preview keeps the 200 result and reports a missing HEIF decoder once", async () => {
       const encSpy = vi.spyOn(heicConverter, "encodeHeic").mockResolvedValue(HEIC);
       const decSpy = vi
