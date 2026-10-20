@@ -667,7 +667,14 @@ export async function copyObjectToFile(
     source = await getObjectStream(key);
   } catch (error) {
     if (opts.signal?.aborted && error === opts.signal.reason) throw error;
-    if (isMissingObjectError(error)) throw error;
+    if (isMissingObjectError(error)) {
+      try {
+        await verifyS3Bucket();
+      } catch (probeErr) {
+        throw s3WriteFault(probeErr);
+      }
+      throw error;
+    }
     throw isS3Enabled() ? s3WriteFault(normalizeS3ReadFault(error)) : localWriteFault(error);
   }
   return copyReadableToFile(

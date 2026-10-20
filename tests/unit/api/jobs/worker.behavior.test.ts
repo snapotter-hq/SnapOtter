@@ -10,6 +10,7 @@ const objectStorageMocks = vi.hoisted(() => ({
   isMissingObjectError: vi.fn((err: unknown) => (err as { code?: string })?.code === "ENOENT"),
   putObject: vi.fn(),
   putObjectStream: vi.fn(),
+  verifyS3Bucket: vi.fn(),
 }));
 
 function enoent(path: string): NodeJS.ErrnoException {
@@ -288,6 +289,7 @@ describe("worker result payload behavior", () => {
       expect((err as Error).cause).toBe(cause);
       // The client-facing message must not carry the server path.
       expect((err as Error).message).not.toContain("/data/");
+      expect(objectStorageMocks.verifyS3Bucket).toHaveBeenCalledTimes(1);
     });
 
     it("fails the whole load when any one of several inputs is gone", async () => {
@@ -382,6 +384,7 @@ describe("worker result payload behavior", () => {
           new AbortController().signal,
         ),
       ).rejects.toBe(scratchMiss);
+      expect(objectStorageMocks.verifyS3Bucket).not.toHaveBeenCalled();
     });
 
     it("keeps the raw error when the confirmation probe itself faults", async () => {
@@ -401,6 +404,7 @@ describe("worker result payload behavior", () => {
           new AbortController().signal,
         ),
       ).rejects.toBe(cause);
+      expect(objectStorageMocks.verifyS3Bucket).not.toHaveBeenCalled();
     });
 
     it("keeps the OCR PDF size-limit mapping ahead of the missing-input check", async () => {
@@ -418,6 +422,148 @@ describe("worker result payload behavior", () => {
           new AbortController().signal,
         ),
       ).rejects.toMatchObject({ name: "InputValidationError", statusCode: 413 });
+    });
+
+    it("propagates verifyS3Bucket's 503 storage-unavailable rejection instead of relabeling as 410 INPUT_MISSING (#2923)", async () => {
+      const { SafeError } = await vi.importActual<
+        typeof import("../../../../packages/shared/src/tool-errors.js")
+      >("../../../../packages/shared/src/tool-errors.js");
+      const bucketFault = new SafeError("The server's storage service is unavailable.", {
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+      });
+      objectStorageMocks.getObjectBuffer.mockRejectedValueOnce(
+        enoent("/data/workspace/uploads/job-1/photo.jpg"),
+      );
+      objectStorageMocks.getObjectSize.mockRejectedValueOnce(gone("photo.jpg"));
+      objectStorageMocks.verifyS3Bucket.mockRejectedValueOnce(bucketFault);
+      const { loadToolInputs } = await loadWorker();
+
+      await expect(
+        loadToolInputs(
+          "image-enhancement",
+          ["uploads/job-1/photo.jpg"],
+          "photo.jpg",
+          "/tmp/job-1",
+          new AbortController().signal,
+        ),
+      ).rejects.toBe(bucketFault);
+      expect(objectStorageMocks.verifyS3Bucket).toHaveBeenCalledTimes(1);
+    });
+
+    it("propagates a 503 storage-unavailable SafeError instead of 410 INPUT_MISSING when the S3 bucket vanishes on HeadObject probes (#2923)", async () => {
+      const notFound = Object.assign(new Error("NotFound"), {
+        name: "NotFound",
+        $metadata: { httpStatusCode: 404 },
+      });
+      const noSuchBucket = Object.assign(new Error("NoSuchBucket"), {
+        name: "NoSuchBucket",
+        $metadata: { httpStatusCode: 404 },
+      });
+      const getGenericObjectSize = vi.fn().mockRejectedValue(notFound);
+      const checkConnection = vi.fn().mockRejectedValue(noSuchBucket);
+      const { isMissingObjectError: s3IsMissingObjectError } = await vi.importActual<
+        typeof import("../../../../packages/enterprise/src/storage-s3.js")
+      >("../../../../packages/enterprise/src/storage-s3.js");
+      const { connectivityClass, isClientAbort, SafeError } = await vi.importActual<
+        typeof import("../../../../packages/shared/src/index.js")
+      >("../../../../packages/shared/src/index.js");
+
+      const { loadToolInputBuffer, loadToolInputs } = await loadWorker("", () => {
+        vi.doMock("@snapotter/shared", () => ({
+          SafeError,
+          connectivityClass,
+          isClientAbort,
+          isSafeMessageError: () => false,
+          isToolInputError: () => false,
+          hasServerErrorStatus: () => false,
+          ANALYTICS_EVENTS: {},
+          TOOLS: [],
+          COMPRESS_PRESETS: [],
+          getBundleForTool: vi.fn(() => null),
+          getOptionalBundleForTool: vi.fn(() => null),
+        }));
+        vi.doMock("../../../../apps/api/src/config.js", () => ({
+          env: {
+            BASE_PATH: "",
+            SCRATCH_PATH: "",
+            STORAGE_MODE: "s3",
+            WORKSPACE_PATH: "/unused",
+            S3_BUCKET: "snap-bucket",
+            S3_REGION: "us-east-1",
+            S3_ENDPOINT: "https://s3.example.test",
+            S3_ACCESS_KEY_ID: "AKIA-TEST",
+            S3_SECRET_ACCESS_KEY: "secret",
+            S3_FORCE_PATH_STYLE: true,
+            S3_PREFIX: "",
+            JOB_TIMEOUT_LONG_S: 60,
+            JOB_TIMEOUT_FAST_S: 15,
+          },
+        }));
+        vi.doMock("@snapotter/enterprise", () => ({
+          loadS3Storage: vi.fn(async () => ({
+            isMissingObjectError: s3IsMissingObjectError,
+            configureS3: vi.fn(),
+            checkConnection,
+            getGenericObjectSize,
+          })),
+        }));
+        vi.doUnmock("../../../../apps/api/src/lib/object-storage.js");
+      });
+
+      await expect(loadToolInputBuffer("ocr", "uploads/job-1/scan.png")).rejects.toMatchObject({
+        name: "SafeError",
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause: noSuchBucket,
+      });
+      expect(getGenericObjectSize).toHaveBeenCalledTimes(1);
+      expect(checkConnection).toHaveBeenCalledTimes(1);
+      getGenericObjectSize.mockClear();
+      checkConnection.mockClear();
+
+      await expect(
+        loadToolInputs(
+          "ocr",
+          ["uploads/job-1/scan.png"],
+          "scan.png",
+          "/tmp/job-1",
+          new AbortController().signal,
+        ),
+      ).rejects.toMatchObject({
+        name: "SafeError",
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause: noSuchBucket,
+      });
+      expect(getGenericObjectSize).toHaveBeenCalledTimes(1);
+      expect(checkConnection).toHaveBeenCalledTimes(1);
+      getGenericObjectSize.mockClear();
+      checkConnection.mockClear();
+
+      await expect(
+        loadToolInputs(
+          "ocr-pdf",
+          ["uploads/job-1/scan.pdf"],
+          "scan.pdf",
+          "/tmp/job-1",
+          new AbortController().signal,
+        ),
+      ).rejects.toMatchObject({
+        name: "SafeError",
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause: noSuchBucket,
+      });
+      expect(getGenericObjectSize).toHaveBeenCalledTimes(1);
+      expect(checkConnection).toHaveBeenCalledTimes(1);
     });
   });
 

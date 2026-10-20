@@ -76,6 +76,7 @@ import {
   isMissingObjectError,
   putObject,
   putObjectStream,
+  verifyS3Bucket,
 } from "../lib/object-storage.js";
 import { OCR_MAX_ENCODED_INPUT_BYTES } from "../lib/ocr-limits.js";
 import { SCRUB_PDF_PRODUCER_TOOLS, scrubPdfProducer } from "../lib/pdf-producer.js";
@@ -158,7 +159,15 @@ export async function loadToolInputBuffer(toolId: string, ref: string): Promise<
     throw new Error("OCR PDF input must use the path-backed loader");
   }
   if (toolId === "ocr") {
-    const size = await getObjectSize(ref);
+    let size: number;
+    try {
+      size = await getObjectSize(ref);
+    } catch (err) {
+      if (isMissingObjectError(err)) {
+        await verifyS3Bucket();
+      }
+      throw err;
+    }
     if (size > OCR_MAX_ENCODED_INPUT_BYTES) {
       throw new InputValidationError(
         `OCR input exceeds the ${formatLimit(OCR_MAX_ENCODED_INPUT_BYTES)} safety limit`,
@@ -219,6 +228,7 @@ export async function loadToolInputs(
     // own bug. Relabel only when storage confirms a queued input is gone.
     const gone = await Promise.all(refs.map(isQueuedInputGone));
     if (!gone.includes(true)) throw err;
+    await verifyS3Bucket();
     throw new SafeError("Input file is no longer available. Upload it again.", {
       kind: "operational",
       code: "INPUT_MISSING",

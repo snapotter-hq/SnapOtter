@@ -494,6 +494,35 @@ describe("object-storage S3 dispatch (STORAGE_MODE=s3)", () => {
       }).catch((e: unknown) => e);
       expect(err).toBe(noSuchKey);
       expect(isMissingObjectError(err)).toBe(true);
+      expect(s3.checkConnection).toHaveBeenCalledTimes(1);
+    });
+
+    it("disambiguates a HeadObject NotFound 404 in copyObjectToFile via verifyS3Bucket so a vanished bucket rejects with 503 storage-unavailable (#2923)", async () => {
+      const notFound = Object.assign(new Error("NotFound"), {
+        name: "NotFound",
+        $metadata: { httpStatusCode: 404 },
+      });
+      const noSuchBucket = Object.assign(new Error("NoSuchBucket"), {
+        name: "NoSuchBucket",
+        $metadata: { httpStatusCode: 404 },
+      });
+      s3.getSize.mockRejectedValueOnce(notFound);
+      s3.checkConnection.mockRejectedValueOnce(noSuchBucket);
+
+      await expect(
+        copyObjectToFile("uploads/job-1/scan.pdf", "/should-not-write/out.pdf", {
+          maxBytes: 1024,
+        }),
+      ).rejects.toMatchObject({
+        message: STORAGE_UNAVAILABLE_MESSAGE,
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause: noSuchBucket,
+      });
+      expect(s3.checkConnection).toHaveBeenCalledTimes(1);
+      expect(s3.getStream).not.toHaveBeenCalled();
     });
 
     it("stamps 500 on an unexpected non-S3 error during copyObjectToFile read setup", async () => {
