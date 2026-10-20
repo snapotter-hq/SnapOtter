@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
+import { en } from "@snapotter/shared";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import AdmZip from "adm-zip";
 import { StrictMode } from "react";
@@ -609,5 +610,407 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
     expect(vi.mocked(captureHandledError).mock.calls[0][0].message).toBe(
       "Ending a pipeline run after its panel unmounted failed",
     );
+  });
+
+  it("aborts in-flight libraryFileIds downloads when the user drops a file on /automate and does not overwrite it (#3162)", async () => {
+    let capturedSignal: AbortSignal | undefined;
+    let resolveDownload: (res: Response) => void = () => {};
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/files/slow-file/download")) {
+        capturedSignal = init?.signal ?? undefined;
+        return new Promise<Response>((resolve) => {
+          resolveDownload = resolve;
+        });
+      }
+      if (url.includes("/pipeline/list")) {
+        return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+      );
+    });
+
+    arrive({ libraryFileIds: ["slow-file"] });
+    expect(capturedSignal).toBeInstanceOf(AbortSignal);
+    expect(capturedSignal?.aborted).toBe(false);
+
+    fireEvent.drop(screen.getByRole("region", { name: en.dropzone.ariaLabel }), {
+      dataTransfer: { files: [png("dropped.png")] },
+    });
+
+    expect(capturedSignal?.aborted).toBe(true);
+    expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual(["dropped.png"]);
+
+    await act(async () => {
+      resolveDownload(
+        new Response("slow-library-bytes", {
+          headers: { "content-disposition": 'attachment; filename="slow-library.png"' },
+        }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
+    expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual(["dropped.png"]);
+  });
+
+  it("aborts in-flight libraryFileIds downloads when importing from the library modal on /automate (#3162)", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    let capturedSignal: AbortSignal | undefined;
+    let rejectSlowDownload: (err: Error) => void = () => {};
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/files/slow-file/download")) {
+        capturedSignal = init?.signal ?? undefined;
+        return new Promise<Response>((_, reject) => {
+          rejectSlowDownload = reject;
+        });
+      }
+      if (url.includes("/files/modal-file/download")) {
+        return Promise.resolve(new Response("modal-bytes", { status: 200 }));
+      }
+      if (url.includes("/api/v1/files")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              files: [{ id: "modal-file", originalName: "modal.png", mimeType: "image/png" }],
+              total: 1,
+            }),
+          ),
+        );
+      }
+      if (url.includes("/pipeline/list")) {
+        return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+      );
+    });
+
+    arrive({ libraryFileIds: ["slow-file"] });
+    expect(capturedSignal?.aborted).toBe(false);
+
+    fireEvent.click(screen.getAllByRole("button", { name: en.automate.importFromLibrary })[0]);
+    fireEvent.click(await screen.findByText("modal.png"));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: en.commonUi.fileLibrary.importCount.replace("{count}", "1"),
+      }),
+    );
+
+    await waitFor(() =>
+      expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual(["modal.png"]),
+    );
+    expect(capturedSignal?.aborted).toBe(true);
+
+    await act(async () => {
+      rejectSlowDownload(new DOMException("Aborted", "AbortError"));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
+    expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual(["modal.png"]);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(consoleError).not.toHaveBeenCalled();
+  });
+
+  it("aborts in-flight libraryFileIds downloads only when handleAddMore picks at least one file (#3162)", async () => {
+    let capturedSignal: AbortSignal | undefined;
+    let resolveSlowDownload: (res: Response) => void = () => {};
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/files/slow-file/download")) {
+        capturedSignal = init?.signal ?? undefined;
+        return new Promise<Response>((resolve) => {
+          resolveSlowDownload = resolve;
+        });
+      }
+      if (url.includes("/pipeline/list")) {
+        return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+      );
+    });
+
+    useFileStore.getState().setFiles([png("existing.png")]);
+    arrive({ libraryFileIds: ["slow-file"] });
+    expect(capturedSignal?.aborted).toBe(false);
+
+    const createdInputs: HTMLInputElement[] = [];
+    const realCreate = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation(((tag: string) => {
+      const el = realCreate(tag);
+      if (tag === "input") {
+        createdInputs.push(el as HTMLInputElement);
+        (el as HTMLInputElement).click = () => {};
+      }
+      return el;
+    }) as typeof document.createElement);
+
+    // Empty file picker selection (user canceled dialog) leaves the download running.
+    fireEvent.click(screen.getByRole("button", { name: en.automate.addButton }));
+    const emptyInput = createdInputs.at(-1);
+    if (!emptyInput) throw new Error("handleAddMore created no file input");
+    Object.defineProperty(emptyInput, "files", { value: [] });
+    act(() => {
+      emptyInput.onchange?.({ target: emptyInput } as unknown as Event);
+    });
+    expect(capturedSignal?.aborted).toBe(false);
+
+    // Picking a file aborts the slow libraryFileIds download and appends the picked file.
+    fireEvent.click(screen.getByRole("button", { name: en.automate.addButton }));
+    const pickedInput = createdInputs.at(-1);
+    if (!pickedInput) throw new Error("handleAddMore created no file input");
+    Object.defineProperty(pickedInput, "files", { value: [png("added.png")] });
+    act(() => {
+      pickedInput.onchange?.({ target: pickedInput } as unknown as Event);
+    });
+    expect(capturedSignal?.aborted).toBe(true);
+    expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual([
+      "existing.png",
+      "added.png",
+    ]);
+
+    await act(async () => {
+      resolveSlowDownload(
+        new Response("slow-library-bytes", {
+          headers: { "content-disposition": 'attachment; filename="slow-library.png"' },
+        }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
+    expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual([
+      "existing.png",
+      "added.png",
+    ]);
+  });
+
+  it("surfaces an alert, resets stale file store state, and logs each failure when all libraryFileIds downloads fail, including on mobile and when res.blob() rejects (#3162)", async () => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({
+        matches: query.includes("max-width"),
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/files/missing-1/download")) {
+        return Promise.resolve(new Response("Not found", { status: 404 }));
+      }
+      if (url.includes("/files/missing-2/download")) {
+        return Promise.reject(new TypeError("Failed to fetch"));
+      }
+      if (url.includes("/files/corrupt-3/download")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers(),
+          blob: () => Promise.reject(new TypeError("Stream reset")),
+        } as unknown as Response);
+      }
+      if (url.includes("/pipeline/list")) {
+        return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+      );
+    });
+
+    useFileStore.getState().setFiles([png("stale-from-tool.png")]);
+    useFileStore.getState().setProcessing(true);
+    arrive({ libraryFileIds: ["missing-1", "missing-2", "corrupt-3"] });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't import 3 of 3 files.");
+    expect(useFileStore.getState().entries).toEqual([]);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(consoleError).toHaveBeenCalledTimes(3);
+    expect(consoleError).toHaveBeenCalledWith(
+      "[automate-page] failed to download file missing-1",
+      expect.objectContaining({ message: "HTTP 404" }),
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      "[automate-page] failed to download file missing-2",
+      expect.objectContaining({ message: "Failed to fetch" }),
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      "[automate-page] failed to download file corrupt-3",
+      expect.objectContaining({ message: "Stream reset" }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: en.common.close }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("loads the valid files, surfaces a partial-failure alert, and clears the alert when files are cleared (#3162)", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/files/good-file/download")) {
+        return Promise.resolve(
+          new Response("good-bytes", {
+            headers: { "content-disposition": 'attachment; filename="good.png"' },
+          }),
+        );
+      }
+      if (url.includes("/files/bad-file/download")) {
+        return Promise.resolve(new Response("Not found", { status: 404 }));
+      }
+      if (url.includes("/pipeline/list")) {
+        return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+      );
+    });
+
+    arrive({ libraryFileIds: ["good-file", "bad-file"] });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't import 1 of 2 files.");
+    expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual(["good.png"]);
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    expect(consoleError).toHaveBeenCalledWith(
+      "[automate-page] failed to download file bad-file",
+      expect.objectContaining({ message: "HTTP 404" }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: en.automate.clearButton }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(useFileStore.getState().entries).toEqual([]);
+  });
+
+  it("aborts in-flight libraryFileIds downloads when the Clear button is clicked mid-download (#3162)", async () => {
+    let capturedSignal: AbortSignal | undefined;
+    let resolveSlowDownload: (res: Response) => void = () => {};
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/files/slow-file/download")) {
+        capturedSignal = init?.signal ?? undefined;
+        return new Promise<Response>((resolve) => {
+          resolveSlowDownload = resolve;
+        });
+      }
+      if (url.includes("/pipeline/list")) {
+        return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+      );
+    });
+
+    useFileStore.getState().setFiles([png("existing.png")]);
+    arrive({ libraryFileIds: ["slow-file"] });
+    expect(capturedSignal?.aborted).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: en.automate.clearButton }));
+    expect(capturedSignal?.aborted).toBe(true);
+    expect(useFileStore.getState().entries).toEqual([]);
+
+    await act(async () => {
+      resolveSlowDownload(
+        new Response("slow-library-bytes", {
+          headers: { "content-disposition": 'attachment; filename="slow-library.png"' },
+        }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
+    expect(useFileStore.getState().entries).toEqual([]);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("clears an active libraryImportFailed alert when selecting files via Dropzone, FileLibraryModal, or handleAddMore (#3162)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/files/good-file/download")) {
+        return Promise.resolve(
+          new Response("good-bytes", {
+            headers: { "content-disposition": 'attachment; filename="good.png"' },
+          }),
+        );
+      }
+      if (url.includes("/files/bad-file/download")) {
+        return Promise.resolve(new Response("Not found", { status: 404 }));
+      }
+      if (url.includes("/files/modal-file/download")) {
+        return Promise.resolve(new Response("modal-bytes", { status: 200 }));
+      }
+      if (url.includes("/api/v1/files")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              files: [{ id: "modal-file", originalName: "modal.png", mimeType: "image/png" }],
+              total: 1,
+            }),
+          ),
+        );
+      }
+      if (url.includes("/pipeline/list")) {
+        return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+      );
+    });
+
+    // 1. Total failure alert cleared by dropping a file onto Dropzone (handleFiles).
+    const firstView = arrive({ libraryFileIds: ["bad-file"] });
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't import 1 of 1 files.");
+    fireEvent.drop(screen.getByRole("region", { name: en.dropzone.ariaLabel }), {
+      dataTransfer: { files: [png("dropped.png")] },
+    });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    firstView.unmount();
+
+    // 2. Total failure alert cleared by importing from FileLibraryModal (handleLibraryImport).
+    const secondView = arrive({ libraryFileIds: ["bad-file"] });
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't import 1 of 1 files.");
+    fireEvent.click(screen.getAllByRole("button", { name: en.automate.importFromLibrary })[0]);
+    fireEvent.click(await screen.findByText("modal.png"));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: en.commonUi.fileLibrary.importCount.replace("{count}", "1"),
+      }),
+    );
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    secondView.unmount();
+
+    // 3. Partial failure alert preserved when handleAddMore is canceled, then cleared when a file is picked.
+    const createdInputs: HTMLInputElement[] = [];
+    const realCreate = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation(((tag: string) => {
+      const el = realCreate(tag);
+      if (tag === "input") {
+        createdInputs.push(el as HTMLInputElement);
+        (el as HTMLInputElement).click = () => {};
+      }
+      return el;
+    }) as typeof document.createElement);
+
+    arrive({ libraryFileIds: ["good-file", "bad-file"] });
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't import 1 of 2 files.");
+
+    fireEvent.click(screen.getByRole("button", { name: en.automate.addButton }));
+    const emptyInput = createdInputs.at(-1);
+    if (!emptyInput) throw new Error("handleAddMore created no file input");
+    Object.defineProperty(emptyInput, "files", { value: [] });
+    act(() => {
+      emptyInput.onchange?.({ target: emptyInput } as unknown as Event);
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("Couldn't import 1 of 2 files.");
+
+    fireEvent.click(screen.getByRole("button", { name: en.automate.addButton }));
+    const pickedInput = createdInputs.at(-1);
+    if (!pickedInput) throw new Error("handleAddMore created no file input");
+    Object.defineProperty(pickedInput, "files", { value: [png("added.png")] });
+    act(() => {
+      pickedInput.onchange?.({ target: pickedInput } as unknown as Event);
+    });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

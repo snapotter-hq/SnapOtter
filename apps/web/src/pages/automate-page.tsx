@@ -181,6 +181,10 @@ function AutomatePageContent({
   const [previewCollapsed, setPreviewCollapsed] = useState(false);
   const [mobileToolPaletteOpen, setMobileToolPaletteOpen] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [libraryImportFailed, setLibraryImportFailed] = useState<{
+    failed: number;
+    total: number;
+  } | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [listLoadFailed, setListLoadFailed] = useState(false);
   const listFetchSeqRef = useRef(0);
@@ -257,30 +261,41 @@ function AutomatePageContent({
     navigate(location.pathname, { replace: true, state: null });
 
     (async () => {
-      const downloaded = await Promise.all(
+      const outcomes = await Promise.allSettled(
         fileIds.map(async (id) => {
-          try {
-            const res = await fetch(getFileDownloadUrl(id), {
-              headers: formatHeaders(),
-              signal,
-            });
-            if (!res.ok) return null;
-            const blob = await res.blob();
-            if (signal.aborted) return null;
-            const name =
-              res.headers.get("content-disposition")?.match(/filename="?(.+?)"?$/)?.[1] ??
-              `file-${id}`;
-            return new File([blob], name, { type: blob.type });
-          } catch {
-            return null;
+          const res = await fetch(getFileDownloadUrl(id), {
+            headers: formatHeaders(),
+            signal,
+          });
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
           }
+          const blob = await res.blob();
+          if (signal.aborted) return null;
+          const name =
+            res.headers.get("content-disposition")?.match(/filename="?(.+?)"?$/)?.[1] ??
+            `file-${id}`;
+          return new File([blob], name, { type: blob.type });
         }),
       );
       if (signal.aborted) return;
-      const valid = downloaded.filter((f): f is File => f !== null);
+      const valid: File[] = [];
+      let failed = 0;
+      for (let i = 0; i < outcomes.length; i++) {
+        const outcome = outcomes[i];
+        if (outcome.status === "fulfilled") {
+          if (outcome.value) valid.push(outcome.value);
+        } else {
+          failed += 1;
+          console.error(`[automate-page] failed to download file ${fileIds[i]}`, outcome.reason);
+        }
+      }
+      resetFiles();
       if (valid.length > 0) {
-        resetFiles();
         setFiles(valid);
+      }
+      if (failed > 0) {
+        setLibraryImportFailed({ failed, total: fileIds.length });
       }
     })();
   }, [location.state, location.pathname, navigate, resetFiles, setFiles, libraryImportAbortRef]);
@@ -312,6 +327,8 @@ function AutomatePageContent({
 
   const handleLibraryImport = useCallback(
     (imported: File[]) => {
+      libraryImportAbortRef.current?.abort();
+      setLibraryImportFailed(null);
       if (files.length === 0) {
         resetFiles();
         setFiles(imported);
@@ -319,15 +336,17 @@ function AutomatePageContent({
         addFiles(imported);
       }
     },
-    [files.length, resetFiles, setFiles, addFiles],
+    [libraryImportAbortRef, files.length, resetFiles, setFiles, addFiles],
   );
 
   const handleFiles = useCallback(
     (newFiles: File[]) => {
+      libraryImportAbortRef.current?.abort();
+      setLibraryImportFailed(null);
       resetFiles();
       setFiles(newFiles);
     },
-    [setFiles, resetFiles],
+    [libraryImportAbortRef, setFiles, resetFiles],
   );
 
   const handleAddMore = useCallback(() => {
@@ -336,10 +355,20 @@ function AutomatePageContent({
     input.multiple = true;
     input.onchange = (e) => {
       const picked = Array.from((e.target as HTMLInputElement).files || []);
-      if (picked.length > 0) addFiles(picked);
+      if (picked.length > 0) {
+        libraryImportAbortRef.current?.abort();
+        setLibraryImportFailed(null);
+        addFiles(picked);
+      }
     };
     input.click();
-  }, [addFiles]);
+  }, [libraryImportAbortRef, addFiles]);
+
+  const handleClearFiles = useCallback(() => {
+    libraryImportAbortRef.current?.abort();
+    setLibraryImportFailed(null);
+    resetFiles();
+  }, [libraryImportAbortRef, resetFiles]);
 
   const handleProcess = useCallback(() => {
     if (files.length === 0 || steps.length === 0) return;
@@ -800,6 +829,22 @@ function AutomatePageContent({
 
           {/* Mobile pipeline steps */}
           <div className="flex-1 overflow-y-auto px-4 py-3">
+            {libraryImportFailed && (
+              <div
+                role="alert"
+                className="mb-3 text-xs text-destructive-ink bg-red-50 dark:bg-red-950/30 rounded px-2 py-1.5 flex items-start gap-1.5"
+              >
+                <button
+                  type="button"
+                  onClick={() => setLibraryImportFailed(null)}
+                  aria-label={t.common.close}
+                  className="shrink-0 mt-0.5 hover:opacity-80"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+                <span>{format(t.commonUi.fileLibrary.importFailed, libraryImportFailed)}</span>
+              </div>
+            )}
             {!hasFile && (
               <div className="mb-4 space-y-2">
                 <Dropzone
@@ -841,7 +886,7 @@ function AutomatePageContent({
                 </button>
                 <button
                   type="button"
-                  onClick={() => resetFiles()}
+                  onClick={handleClearFiles}
                   className="text-xs text-muted-foreground hover:text-foreground"
                 >
                   {t.automate.clearButton}
@@ -1202,7 +1247,7 @@ function AutomatePageContent({
                 </button>
                 <button
                   type="button"
-                  onClick={() => resetFiles()}
+                  onClick={handleClearFiles}
                   className="text-xs text-muted-foreground hover:text-foreground"
                 >
                   {t.automate.clearButton}
@@ -1229,6 +1274,22 @@ function AutomatePageContent({
           <div className="flex-1 flex flex-col overflow-hidden min-h-0">
             {/* Pipeline steps area */}
             <div className="flex-1 overflow-y-auto px-5 py-4 min-h-0">
+              {libraryImportFailed && (
+                <div
+                  role="alert"
+                  className="mb-3 text-xs text-destructive-ink bg-red-50 dark:bg-red-950/30 rounded-lg px-3 py-2 flex items-start gap-1.5"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setLibraryImportFailed(null)}
+                    aria-label={t.common.close}
+                    className="shrink-0 mt-0.5 hover:opacity-80"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                  <span>{format(t.commonUi.fileLibrary.importFailed, libraryImportFailed)}</span>
+                </div>
+              )}
               {error && (
                 <div className="mb-3 text-xs text-destructive-ink bg-red-50 dark:bg-red-950/30 rounded-lg px-3 py-2 flex items-start gap-1.5">
                   <X className="h-3.5 w-3.5 shrink-0 mt-0.5" />
