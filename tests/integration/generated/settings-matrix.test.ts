@@ -924,9 +924,11 @@ const SETTINGS_VARIATIONS: Record<string, Variation[]> = {
   ],
 
   "compress-pdf": [
-    { label: "preset screen", settings: { preset: "screen" } },
-    { label: "preset ebook", settings: { preset: "ebook" } },
-    { label: "preset printer", settings: { preset: "printer" } },
+    { label: "quality mode low", settings: { mode: "quality", quality: 1 } },
+    { label: "quality mode mid", settings: { mode: "quality", quality: 50 } },
+    { label: "quality mode high", settings: { mode: "quality", quality: 100 } },
+    { label: "target size small", settings: { mode: "targetSize", targetSizeKb: 10 } },
+    { label: "target size large", settings: { mode: "targetSize", targetSizeKb: 500 } },
   ],
 
   "protect-pdf": [
