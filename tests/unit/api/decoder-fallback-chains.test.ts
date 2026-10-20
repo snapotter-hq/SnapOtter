@@ -18,6 +18,7 @@ import {
   DecoderUnavailableError,
   decodeToSharpCompat,
   isDecoderUnavailable,
+  lacksFormatSupport,
 } from "../../../apps/api/src/lib/format-decoders.js";
 import { decodeHeic } from "../../../apps/api/src/lib/heic-converter.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
@@ -156,6 +157,115 @@ exit 1`,
     expect(err).toBeInstanceOf(Error);
     expect(isDecoderUnavailable(err)).toBe(false);
   });
+
+  it("EPS: ImageMagick blocked by policy.xml is an unavailable decoder (#1461)", async () => {
+    useShims({
+      magick: `${MAGICK_VERSION}
+echo "convert: attempt to perform an operation not allowed by the security policy \\\`EPS' @ error/constitute.c/IsCoderAuthorized/454." >&2
+exit 1`,
+    });
+
+    const err = await decodeToSharpCompat(readFixture(fixtures.image.formats("eps")), "eps").catch(
+      (e) => e,
+    );
+
+    expect(err).toBeInstanceOf(DecoderUnavailableError);
+    expect(err.message).toMatch(/policy\.xml/);
+  });
+
+  it("EPS: ImageMagick 7 without Ghostscript (FailedToExecuteCommand) is an unavailable decoder (#1461)", async () => {
+    useShims({
+      magick: `${MAGICK_VERSION}
+echo "convert: FailedToExecuteCommand \\\`'gs' -sstdout=%stderr -dQUIET' (32512) @ error/ghostscript-private.h/ExecuteGhostscriptCommand/75." >&2
+exit 1`,
+    });
+
+    const err = await decodeToSharpCompat(readFixture(fixtures.image.formats("eps")), "eps").catch(
+      (e) => e,
+    );
+
+    expect(err).toBeInstanceOf(DecoderUnavailableError);
+    expect(err.message).toMatch(/no support for this format/);
+  });
+
+  it("EPS: ImageMagick 6 without Ghostscript on PATH is an unavailable decoder (#1461)", async () => {
+    useShims({
+      magick: `${MAGICK_VERSION}
+echo "convert: delegate failed \\\`'gs' -q -dQUIET' @ error/delegate.c/InvokeDelegate/1911." >&2
+exit 1`,
+    });
+
+    const err = await decodeToSharpCompat(readFixture(fixtures.image.formats("eps")), "eps").catch(
+      (e) => e,
+    );
+
+    expect(err).toBeInstanceOf(DecoderUnavailableError);
+    expect(err.cause?.syscall).toBe("spawn gs");
+  });
+
+  it("EPS: ImageMagick 6 with a Ghostscript binary whose shared libraries won't load (exit 127) is an unavailable decoder (#1461)", async () => {
+    useShims({
+      gs: "exit 127",
+      magick: `${MAGICK_VERSION}
+echo "convert: delegate failed \\\`'gs' -q -dQUIET' @ error/delegate.c/InvokeDelegate/1911." >&2
+exit 1`,
+    });
+
+    const err = await decodeToSharpCompat(readFixture(fixtures.image.formats("eps")), "eps").catch(
+      (e) => e,
+    );
+
+    expect(err).toBeInstanceOf(DecoderUnavailableError);
+    expect(err.cause?.code).toBe(127);
+  });
+
+  it("EPS: a non-127 gs --version failure keeps ImageMagick's decode error (#1461)", async () => {
+    useShims({
+      gs: "exit 1",
+      magick: `${MAGICK_VERSION}
+echo "convert: Postscript delegate failed \\\`x.eps': No such file or directory @ error/ps.c/ReadPSImage/806." >&2
+exit 1`,
+    });
+
+    const err = await decodeToSharpCompat(readFixture(fixtures.image.formats("eps")), "eps").catch(
+      (e) => e,
+    );
+
+    expect(err).toBeInstanceOf(Error);
+    expect(isDecoderUnavailable(err)).toBe(false);
+    expect(err.message).toMatch(/Postscript delegate failed/);
+  });
+
+  it.each([
+    [
+      "IM6 with Ghostscript banner",
+      "GPL Ghostscript 10.02.1: Unrecoverable error, exit code 1\nconvert: Postscript delegate failed \\`x.eps': No such file or directory @ error/ps.c/ReadPSImage/806.",
+    ],
+    [
+      "IM7 with Ghostscript banner",
+      "GPL Ghostscript 10.05.1: Unrecoverable error, exit code 1\nconvert: FailedToExecuteCommand \\`'gs' -sstdout=%stderr -dQUIET' (256) @ error/ghostscript-private.h/ExecuteGhostscriptCommand/75.",
+    ],
+    [
+      "IM6 Postscript delegate failed with gs on PATH",
+      "convert: Postscript delegate failed \\`x.eps': No such file or directory @ error/ps.c/ReadPSImage/806.",
+    ],
+  ])(
+    "EPS: Ghostscript rejecting a corrupt file stays a plain decode error (%s) (#1461)",
+    async (_label, stderr) => {
+      useShims({
+        gs: "exit 0",
+        magick: `${MAGICK_VERSION}\nprintf '%s\\n' "${stderr}" >&2\nexit 1`,
+      });
+
+      const err = await decodeToSharpCompat(
+        readFixture(fixtures.image.formats("eps")),
+        "eps",
+      ).catch((e) => e);
+
+      expect(err).toBeInstanceOf(Error);
+      expect(isDecoderUnavailable(err)).toBe(false);
+    },
+  );
 });
 
 describe("fallback chains keep the first real verdict (#1429)", () => {
@@ -364,10 +474,24 @@ describe("asDecoderUnavailable classification (#1429)", () => {
     "Could not decode image: Unsupported feature: Unsupported codec",
     "Support for this compression format has not been built in",
     "MAGICK: NO DECODE DELEGATE FOR THIS IMAGE FORMAT",
+    "convert: FailedToExecuteCommand `'gs' -sstdout=%stderr -dQUIET'",
+    'convert: FailedToExecuteCommand `"gs" -sstdout=%stderr -dQUIET\'',
+    "convert: FailedToExecuteCommand 'gs' -sstdout=%stderr",
   ])("reads %j as missing support", (stderr) => {
     const converted = asDecoderUnavailable(execError(stderr));
     expect(converted).toBeInstanceOf(DecoderUnavailableError);
     expect((converted as Error).message).toMatch(/no support for this format/);
+  });
+
+  it.each([
+    "convert: attempt to perform an operation not allowed by the security policy `EPS' @ error/constitute.c/IsCoderAuthorized/454.",
+    "convert-im6.q16: attempt to perform an operation not allowed by the security policy `PS' @ error/constitute.c/IsCoderAuthorized/427.",
+  ])("reads %j as a security policy block and names policy.xml (#1461)", (stderr) => {
+    const err = execError(stderr);
+    expect(lacksFormatSupport(err)).toBe(true);
+    const converted = asDecoderUnavailable(err);
+    expect(converted).toBeInstanceOf(DecoderUnavailableError);
+    expect((converted as Error).message).toMatch(/policy\.xml/);
   });
 
   it("reads exit 127 as a decoder that could not start", () => {
@@ -379,11 +503,46 @@ describe("asDecoderUnavailable classification (#1429)", () => {
   it.each([
     ["a real rejection", execError("magick: improper image header `x'")],
     [
+      "a bare delegate failed from Ghostscript on a bad file",
+      execError(
+        "convert: Postscript delegate failed `x.eps': No such file or directory @ error/ps.c/ReadPSImage/806.",
+      ),
+    ],
+    [
+      "an IM6 InvokeDelegate failure on a bad file",
+      execError(
+        "convert: delegate failed `'gs' -q -dQUIET' @ error/delegate.c/InvokeDelegate/1911.",
+      ),
+    ],
+    [
+      "an IM7 FailedToExecuteCommand after Ghostscript rejected the file",
+      execError(
+        "GPL Ghostscript 10.05.1: Unrecoverable error, exit code 1\nconvert: FailedToExecuteCommand `'gs' -sstdout=%stderr' (256) @ error/ghostscript-private.h/ExecuteGhostscriptCommand/75.",
+      ),
+    ],
+    [
+      "an IM7 FailedToExecuteCommand with Ghostscript exit status 1 (256) and no banner",
+      execError(
+        "convert: FailedToExecuteCommand `'gs' -sstdout=%stderr' (256) @ error/ghostscript-private.h/ExecuteGhostscriptCommand/75.",
+      ),
+    ],
+    [
+      "a FailedToExecuteCommand for a non-gs tool",
+      execError("convert: FailedToExecuteCommand `'ufraw-batch' --silent' (-1)"),
+    ],
+    [
       "a phrase only in the command line",
       Object.assign(
         new Error("Command failed: magick no decode delegate for this image format.dng"),
         { stderr: "", code: 1 },
       ),
+    ],
+    [
+      "a security policy phrase only in the command line",
+      Object.assign(new Error("Command failed: magick not allowed by the security policy.eps"), {
+        stderr: "",
+        code: 1,
+      }),
     ],
     ["an ENOENT code string with no spawn", Object.assign(new Error("gone"), { code: "ENOENT" })],
     ["a non-127 exit", execError("", 2)],

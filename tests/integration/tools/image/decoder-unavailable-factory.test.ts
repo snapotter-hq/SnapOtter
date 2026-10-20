@@ -204,4 +204,93 @@ exit 1
       rmSync(shimDir, { recursive: true, force: true });
     }
   });
+
+  it("reports an ImageMagick security policy block on EPS as 503 ENGINE_UNAVAILABLE (#1461)", async () => {
+    const shimDir = mkdtempSync(join(tmpdir(), "factory-eps-policy-shims-"));
+    try {
+      const imagemagick = `#!/bin/sh
+if [ "$1" = "--version" ]; then echo "Version: ImageMagick 7"; exit 0; fi
+echo "convert: attempt to perform an operation not allowed by the security policy \\\`EPS' @ error/constitute.c/IsCoderAuthorized/454." >&2
+exit 1
+`;
+      for (const name of ["magick", "convert"]) {
+        writeFileSync(join(shimDir, name), imagemagick);
+        chmodSync(join(shimDir, name), 0o755);
+      }
+      process.env.PATH = shimDir;
+
+      const res = await resizeRequest({
+        filename: "vector.eps",
+        contentType: "application/postscript",
+        content: readFixture(fixtures.image.formats("eps")),
+      });
+
+      expect(res.statusCode, res.body).toBe(503);
+      expect(res.json().code).toBe("ENGINE_UNAVAILABLE");
+      expect(res.json().error).toMatch(/policy\.xml/);
+    } finally {
+      rmSync(shimDir, { recursive: true, force: true });
+    }
+  });
+
+  it("reports an ImageMagick without Ghostscript on EPS as 503 ENGINE_UNAVAILABLE (#1461)", async () => {
+    for (const stderrLine of [
+      "convert: FailedToExecuteCommand \\`'gs' -sstdout=%stderr -dQUIET' (32512) @ error/ghostscript-private.h/ExecuteGhostscriptCommand/75.",
+      "convert: delegate failed \\`'gs' -q -dQUIET' @ error/delegate.c/InvokeDelegate/1911.",
+    ]) {
+      const shimDir = mkdtempSync(join(tmpdir(), "factory-eps-gs-shims-"));
+      try {
+        const imagemagick = `#!/bin/sh
+if [ "$1" = "--version" ]; then echo "Version: ImageMagick 7"; exit 0; fi
+echo "${stderrLine}" >&2
+exit 1
+`;
+        for (const name of ["magick", "convert"]) {
+          writeFileSync(join(shimDir, name), imagemagick);
+          chmodSync(join(shimDir, name), 0o755);
+        }
+        process.env.PATH = shimDir;
+
+        const res = await resizeRequest({
+          filename: "vector.eps",
+          contentType: "application/postscript",
+          content: readFixture(fixtures.image.formats("eps")),
+        });
+
+        expect(res.statusCode, res.body).toBe(503);
+        expect(res.json().code).toBe("ENGINE_UNAVAILABLE");
+      } finally {
+        rmSync(shimDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("keeps 422 for a corrupt EPS when ImageMagick and Ghostscript reject the file (#1461)", async () => {
+    const shimDir = mkdtempSync(join(tmpdir(), "factory-eps-corrupt-shims-"));
+    try {
+      const imagemagick = `#!/bin/sh
+if [ "$1" = "--version" ]; then echo "Version: ImageMagick 7"; exit 0; fi
+echo "GPL Ghostscript 10.05.1: Unrecoverable error, exit code 1" >&2
+echo "convert: FailedToExecuteCommand \\\`'gs' -sstdout=%stderr -dQUIET' (256) @ error/ghostscript-private.h/ExecuteGhostscriptCommand/75." >&2
+exit 1
+`;
+      for (const name of ["magick", "convert"]) {
+        writeFileSync(join(shimDir, name), imagemagick);
+        chmodSync(join(shimDir, name), 0o755);
+      }
+      writeFileSync(join(shimDir, "gs"), "#!/bin/sh\nexit 0\n");
+      chmodSync(join(shimDir, "gs"), 0o755);
+      process.env.PATH = shimDir;
+
+      const res = await resizeRequest({
+        filename: "broken.eps",
+        contentType: "application/postscript",
+        content: readFixture(fixtures.image.formats("eps")),
+      });
+
+      expect(res.statusCode, res.body).toBe(422);
+    } finally {
+      rmSync(shimDir, { recursive: true, force: true });
+    }
+  });
 });

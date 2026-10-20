@@ -81,7 +81,9 @@ export function asDecoderUnavailable(err: unknown): unknown {
   }
   if (lacksFormatSupport(err)) {
     return new DecoderUnavailableError(
-      "An image decoder on this server has no support for this format. Check the container's decoder packages (ImageMagick delegates, libheif plugins).",
+      blockedBySecurityPolicy(err)
+        ? "An image decoder on this server has no support for this format because ImageMagick's security policy (policy.xml) blocks it."
+        : "An image decoder on this server has no support for this format. Check the container's decoder packages (ImageMagick delegates, libheif plugins).",
       err,
     );
   }
@@ -96,19 +98,44 @@ function cannotStart(err: unknown): boolean {
   return isBinarySpawnFailure(err) || (err as { code?: unknown } | null)?.code === 127;
 }
 
+const POLICY_BLOCKED = /not allowed by the security policy/i;
+
+/**
+ * Ghostscript's own fatal banner on a bad PostScript/EPS input, or an
+ * ImageMagick 7 `FailedToExecuteCommand` line carrying exit status 1 (`256`
+ * from waitpid, or `1`) rather than `/bin/sh`'s exit 127 (`32512`).
+ * ImageMagick 7 follows every non-zero Ghostscript exit with
+ * `FailedToExecuteCommand `'gs' ...'`, so `FailedToExecuteCommand` naming `gs`
+ * only means Ghostscript was missing when Ghostscript itself never ran (#1461).
+ */
+const GHOSTSCRIPT_VERDICT =
+  /Ghostscript.*Unrecoverable error|FailedToExecuteCommand\s+[`"']*gs\b[^\r\n]*\((?:256|1)\)/i;
+
 /**
  * The decoder ran but can't handle the format at all, so it never judged the
- * file: ImageMagick without the delegate, or libheif without its HEVC plugin
- * (newer and 1.15-1.17 wording, and a build without plugin loading). Only
- * stderr is read: the command line in the error message carries a temp path
- * derived from the upload (#1429).
+ * file: ImageMagick without the delegate, blocked by policy.xml, or missing
+ * Ghostscript (#1461), or libheif without its HEVC plugin (newer and 1.15-1.17
+ * wording, and a build without plugin loading). Only stderr is read: the
+ * command line in the error message carries a temp path derived from the
+ * upload (#1429).
  */
 const MISSING_SUPPORT =
-  /no decode delegate for this image format|delegate library support not built-in|No decoding plugin installed|No decoder for this image format|Unsupported feature: Unsupported codec|Support for this compression format has not been built in/i;
+  /no decode delegate for this image format|delegate library support not built-in|not allowed by the security policy|FailedToExecuteCommand\s+[`"']*gs\b|No decoding plugin installed|No decoder for this image format|Unsupported feature: Unsupported codec|Support for this compression format has not been built in/i;
+
+function blockedBySecurityPolicy(err: unknown): boolean {
+  const stderr = (err as { stderr?: unknown } | null)?.stderr;
+  return stderr !== undefined && POLICY_BLOCKED.test(String(stderr));
+}
+
+function hasGhostscriptVerdict(err: unknown): boolean {
+  const stderr = (err as { stderr?: unknown } | null)?.stderr;
+  return stderr !== undefined && GHOSTSCRIPT_VERDICT.test(String(stderr));
+}
 
 export function lacksFormatSupport(err: unknown): boolean {
   const stderr = (err as { stderr?: unknown } | null)?.stderr;
-  return stderr !== undefined && MISSING_SUPPORT.test(String(stderr));
+  if (stderr === undefined || hasGhostscriptVerdict(err)) return false;
+  return MISSING_SUPPORT.test(String(stderr));
 }
 
 /**
@@ -1049,24 +1076,44 @@ async function decodeEps(buffer: Buffer, options: DecodeSafetyOptions): Promise<
   const outputPath = join(tmpdir(), `eps-out-${id}.png`);
   try {
     await writeTempExclusive(inputPath, buffer);
-    await execFileAsync(
-      cmd,
-      magickArgs(
+    try {
+      await execFileAsync(
         cmd,
-        [
-          "-density",
-          "300",
-          "-define",
-          "gs:MaxBitmap=500000000",
-          inputPath,
-          "-colorspace",
-          "sRGB",
-          `png:${outputPath}`,
-        ],
-        options,
-      ),
-      commandOptions(options, 30_000),
-    );
+        magickArgs(
+          cmd,
+          [
+            "-density",
+            "300",
+            "-define",
+            "gs:MaxBitmap=500000000",
+            inputPath,
+            "-colorspace",
+            "sRGB",
+            `png:${outputPath}`,
+          ],
+          options,
+        ),
+        commandOptions(options, 30_000),
+      );
+    } catch (error) {
+      options.signal?.throwIfAborted();
+      if (
+        !unavailable(error) &&
+        !outOfMemory(error) &&
+        !inconclusive(error) &&
+        !hasGhostscriptVerdict(error)
+      ) {
+        // ImageMagick 6 without Ghostscript exits 1 with `delegate failed` or
+        // `no images defined`, the same wording a corrupt EPS produces (#1461).
+        try {
+          await execFileAsync("gs", ["--version"], commandOptions(options, 5_000));
+        } catch (gsErr) {
+          options.signal?.throwIfAborted();
+          if (cannotStart(gsErr)) throw gsErr;
+        }
+      }
+      throw error;
+    }
     return await readFile(outputPath);
   } finally {
     await rm(inputPath, { force: true }).catch(() => {});
