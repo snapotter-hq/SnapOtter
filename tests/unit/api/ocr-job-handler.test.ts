@@ -48,9 +48,14 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", () => ({
   deleteObject: mocks.deleteObject,
 }));
 
-vi.mock("../../../apps/api/src/lib/upload-cleanup.js", () => ({
-  hasPersistedJobRow: mocks.hasPersistedJobRow,
-}));
+vi.mock("../../../apps/api/src/lib/upload-cleanup.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/upload-cleanup.js")>();
+  return {
+    ...actual,
+    hasPersistedJobRow: mocks.hasPersistedJobRow,
+  };
+});
 
 vi.mock("../../../apps/api/src/lib/upload-stream.js", () => ({
   receiveUpload: mocks.receiveUpload,
@@ -103,7 +108,7 @@ beforeEach(() => {
   mocks.deleteObject.mockResolvedValue(undefined);
   mocks.enqueueToolJob.mockResolvedValue(undefined);
   mocks.hasPersistedJobRow.mockResolvedValue(false);
-  mocks.insertToolJobAlias.mockResolvedValue(undefined);
+  mocks.insertToolJobAlias.mockResolvedValue(true);
   mocks.requestCancel.mockResolvedValue(true);
   mocks.waitForJob.mockResolvedValue(null);
   mocks.receiveUpload.mockResolvedValue({
@@ -1022,6 +1027,250 @@ describe("OCR route enqueue safety", () => {
         );
       },
     );
+  });
+
+  describe("OCR pre-stamped alias settlement on pre-enqueue rejection (#2617)", () => {
+    const clientJobId = "22222222-2222-4222-8222-222222222222";
+
+    it.each([
+      [
+        "invalid saveMode",
+        async function* () {
+          yield { type: "file", filename: "scan.png", file: {} };
+          yield { type: "field", fieldname: "clientJobId", value: clientJobId };
+          yield { type: "field", fieldname: "saveMode", value: "invalid" };
+        },
+        undefined,
+        400,
+      ],
+      [
+        "missing file",
+        async function* () {
+          yield { type: "field", fieldname: "clientJobId", value: clientJobId };
+        },
+        undefined,
+        400,
+      ],
+      [
+        "schema-invalid settings",
+        async function* () {
+          yield { type: "file", filename: "scan.png", file: {} };
+          yield { type: "field", fieldname: "clientJobId", value: clientJobId };
+          yield { type: "field", fieldname: "settings", value: '{"quality":"ultra"}' };
+        },
+        undefined,
+        400,
+      ],
+      [
+        "malformed JSON settings",
+        async function* () {
+          yield { type: "file", filename: "scan.png", file: {} };
+          yield { type: "field", fieldname: "clientJobId", value: clientJobId };
+          yield { type: "field", fieldname: "settings", value: "{bad-json" };
+        },
+        undefined,
+        400,
+      ],
+      [
+        "unavailable OCR runtime capability",
+        async function* () {
+          yield { type: "file", filename: "scan.png", file: {} };
+          yield { type: "field", fieldname: "clientJobId", value: clientJobId };
+          yield { type: "field", fieldname: "settings", value: '{"quality":"best"}' };
+        },
+        () => {
+          mocks.getOcrRuntimeCapability.mockReturnValue({
+            available: false,
+            qualities: [],
+            providers: [],
+          });
+        },
+        501,
+      ],
+      [
+        "enqueue failure without persisted jobs row",
+        async function* () {
+          yield { type: "file", filename: "scan.png", file: {} };
+          yield { type: "field", fieldname: "clientJobId", value: clientJobId };
+          yield { type: "field", fieldname: "settings", value: '{"quality":"fast"}' };
+        },
+        () => {
+          mocks.hasPersistedJobRow.mockResolvedValueOnce(false);
+          mocks.enqueueToolJob.mockRejectedValueOnce(new Error("Redis unavailable"));
+        },
+        503,
+      ],
+    ])(
+      "settles the pre-stamped alias via cancelSingleJobGuarded on %s",
+      async (_label, parts, setupFault, expectedStatus) => {
+        let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+        registerOcr({
+          post: vi.fn((_path, handler) => {
+            routeHandler = handler;
+          }),
+        } as never);
+        setupFault?.();
+
+        const request = {
+          headers: {},
+          log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+          parts,
+        };
+        const reply = {
+          statusCode: 200,
+          payload: undefined as unknown,
+          status(code: number) {
+            this.statusCode = code;
+            return this;
+          },
+          send(payload: unknown) {
+            this.payload = payload;
+            return payload;
+          },
+        };
+
+        await routeHandler?.(request, reply);
+
+        expect(reply.statusCode).toBe(expectedStatus);
+        expect(mocks.insertToolJobAlias).toHaveBeenCalledTimes(1);
+        const stampedJobId = mocks.insertToolJobAlias.mock.calls[0][0].jobId as string;
+        expect(mocks.cancelSingleJobGuarded).toHaveBeenCalledWith({
+          jobId: clientJobId,
+          expectedArtifactJobId: stampedJobId,
+        });
+      },
+    );
+
+    it("settles the pre-stamped alias when enqueueToolJob throws 429 before persisting a jobs row, and keeps it when the jobs row was persisted", async () => {
+      let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+      registerOcr({
+        post: vi.fn((_path, handler) => {
+          routeHandler = handler;
+        }),
+      } as never);
+
+      // 1. 429 quota error before persisting jobs row -> settle alias
+      const quotaErr = Object.assign(new Error("Too many concurrent AI jobs"), { statusCode: 429 });
+      mocks.enqueueToolJob.mockRejectedValueOnce(quotaErr);
+      mocks.hasPersistedJobRow.mockResolvedValueOnce(false);
+      const req1 = {
+        headers: {},
+        log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+        parts: async function* () {
+          yield { type: "file", filename: "scan.png", file: {} };
+          yield { type: "field", fieldname: "clientJobId", value: clientJobId };
+          yield { type: "field", fieldname: "settings", value: '{"quality":"fast"}' };
+        },
+      };
+      const reply1 = {
+        statusCode: 200,
+        payload: undefined as unknown,
+        status(code: number) {
+          this.statusCode = code;
+          return this;
+        },
+        send(payload: unknown) {
+          this.payload = payload;
+          return payload;
+        },
+      };
+      await expect(routeHandler?.(req1, reply1)).rejects.toBe(quotaErr);
+      const stampedJobId = mocks.insertToolJobAlias.mock.calls[0][0].jobId as string;
+      expect(mocks.cancelSingleJobGuarded).toHaveBeenCalledWith({
+        jobId: clientJobId,
+        expectedArtifactJobId: stampedJobId,
+      });
+
+      // 2. Enqueue error after persisting jobs row -> keep alias
+      mocks.cancelSingleJobGuarded.mockClear();
+      mocks.enqueueToolJob.mockRejectedValueOnce(new Error("Redis unavailable"));
+      mocks.hasPersistedJobRow.mockResolvedValueOnce(true);
+      const req2 = {
+        headers: {},
+        log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+        parts: async function* () {
+          yield { type: "file", filename: "scan.png", file: {} };
+          yield { type: "field", fieldname: "clientJobId", value: clientJobId };
+          yield { type: "field", fieldname: "settings", value: '{"quality":"fast"}' };
+        },
+      };
+      const reply2 = {
+        statusCode: 200,
+        payload: undefined as unknown,
+        status(code: number) {
+          this.statusCode = code;
+          return this;
+        },
+        send(payload: unknown) {
+          this.payload = payload;
+          return payload;
+        },
+      };
+      await routeHandler?.(req2, reply2);
+      expect(reply2.statusCode).toBe(503);
+      expect(mocks.cancelSingleJobGuarded).not.toHaveBeenCalled();
+    });
+
+    it("does not call cancelSingleJobGuarded when insertToolJobAlias returned false on a reused id or when clientJobId is invalid", async () => {
+      let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+      registerOcr({
+        post: vi.fn((_path, handler) => {
+          routeHandler = handler;
+        }),
+      } as never);
+      mocks.insertToolJobAlias.mockResolvedValueOnce(false);
+
+      const request = {
+        headers: {},
+        log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+        parts: async function* () {
+          yield { type: "file", filename: "scan.png", file: {} };
+          yield { type: "field", fieldname: "clientJobId", value: clientJobId };
+          yield { type: "field", fieldname: "saveMode", value: "invalid" };
+        },
+      };
+      const reply = {
+        statusCode: 200,
+        payload: undefined as unknown,
+        status(code: number) {
+          this.statusCode = code;
+          return this;
+        },
+        send(payload: unknown) {
+          this.payload = payload;
+          return payload;
+        },
+      };
+
+      await routeHandler?.(request, reply);
+      expect(reply.statusCode).toBe(400);
+      expect(mocks.cancelSingleJobGuarded).not.toHaveBeenCalled();
+
+      const badIdRequest = {
+        headers: {},
+        log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+        parts: async function* () {
+          yield { type: "file", filename: "scan.png", file: {} };
+          yield { type: "field", fieldname: "clientJobId", value: "../bad" };
+        },
+      };
+      const badIdReply = {
+        statusCode: 200,
+        payload: undefined as unknown,
+        status(code: number) {
+          this.statusCode = code;
+          return this;
+        },
+        send(payload: unknown) {
+          this.payload = payload;
+          return payload;
+        },
+      };
+
+      await routeHandler?.(badIdRequest, badIdReply);
+      expect(badIdReply.statusCode).toBe(400);
+      expect(mocks.cancelSingleJobGuarded).not.toHaveBeenCalled();
+    });
   });
 });
 

@@ -21,7 +21,11 @@ import { validateImageBuffer } from "../../lib/file-validation.js";
 import { createUniqueNamer } from "../../lib/filename.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { getObjectBuffer } from "../../lib/object-storage.js";
-import { discardUnenqueuedUploads, hasPersistedJobRow } from "../../lib/upload-cleanup.js";
+import {
+  discardUnenqueuedUploads,
+  hasPersistedJobRow,
+  settleUnenqueuedAlias,
+} from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { inputHandlerFor } from "../../modality/input-handler.js";
@@ -106,6 +110,7 @@ export function registerSignPdf(app: FastifyInstance) {
     }
 
     let enqueued = false;
+    let aliasStamped = false;
     try {
       const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
       if (clientJobIdField === null) {
@@ -117,7 +122,8 @@ export function registerSignPdf(app: FastifyInstance) {
       // cancel landing between parse and enqueueToolJob needs a durable pointer
       // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
       if (clientJobId && clientJobId !== jobId) {
-        await insertToolJobAlias({ jobId, clientJobId, userId, pool: "docs" });
+        aliasStamped =
+          (await insertToolJobAlias({ jobId, clientJobId, userId, pool: "docs" })) !== false;
       }
 
       const saveMode = parseSaveModeField(saveModeRaw);
@@ -205,7 +211,12 @@ export function registerSignPdf(app: FastifyInstance) {
         throw err;
       }
     } finally {
-      if (!enqueued) await discardUnenqueuedUploads(jobId, request.log);
+      if (!enqueued) {
+        await discardUnenqueuedUploads(jobId, request.log);
+        if (aliasStamped) {
+          await settleUnenqueuedAlias(jobId, clientJobId, request.log);
+        }
+      }
     }
 
     try {

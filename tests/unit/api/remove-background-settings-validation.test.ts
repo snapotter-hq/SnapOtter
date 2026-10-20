@@ -47,6 +47,7 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
 vi.mock("../../../apps/api/src/lib/upload-cleanup.js", () => ({
   discardUnenqueuedUploads: mocks.discardUnenqueuedUploads,
   hasPersistedJobRow: vi.fn(async () => false),
+  settleUnenqueuedAlias: vi.fn(async () => {}),
 }));
 vi.mock("../../../apps/api/src/jobs/enqueue.js", () => ({
   enqueueToolJob: mocks.enqueueToolJob,

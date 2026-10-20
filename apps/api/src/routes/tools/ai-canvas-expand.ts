@@ -35,7 +35,11 @@ import {
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
-import { discardUnenqueuedUploads, hasPersistedJobRow } from "../../lib/upload-cleanup.js";
+import {
+  discardUnenqueuedUploads,
+  hasPersistedJobRow,
+  settleUnenqueuedAlias,
+} from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
@@ -227,6 +231,7 @@ export function registerAiCanvasExpand(app: FastifyInstance) {
       }
 
       let enqueued = false;
+      let aliasStamped = false;
       try {
         const clientJobIdField = parseClientJobIdField(clientJobIdRaw);
         if (clientJobIdField === null) {
@@ -238,7 +243,8 @@ export function registerAiCanvasExpand(app: FastifyInstance) {
         // cancel landing between parse and enqueueToolJob needs a durable pointer
         // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
         if (clientJobId && clientJobId !== jobId) {
-          await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" });
+          aliasStamped =
+            (await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" })) !== false;
         }
 
         const saveMode = parseSaveModeField(saveModeRaw);
@@ -333,7 +339,12 @@ export function registerAiCanvasExpand(app: FastifyInstance) {
 
         return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
       } finally {
-        if (!enqueued) await discardUnenqueuedUploads(jobId, request.log);
+        if (!enqueued) {
+          await discardUnenqueuedUploads(jobId, request.log);
+          if (aliasStamped) {
+            await settleUnenqueuedAlias(jobId, clientJobId, request.log);
+          }
+        }
       }
     },
   );

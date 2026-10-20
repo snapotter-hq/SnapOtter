@@ -26,7 +26,7 @@ import {
   resolveOcrEncodedInputLimit,
 } from "../../lib/ocr-limits.js";
 import { withRouteScratch } from "../../lib/route-scratch.js";
-import { hasPersistedJobRow } from "../../lib/upload-cleanup.js";
+import { hasPersistedJobRow, settleUnenqueuedAlias } from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { validatePdfPath } from "../../modality/document-input.js";
@@ -131,6 +131,8 @@ export function registerOcrPdf(app: FastifyInstance) {
     let fileId: string | null = null;
     let saveModeRaw: string | null = null;
     let inputKey: string | null = null;
+    let enqueued = false;
+    let aliasStamped = false;
     const disconnect = trackClientDisconnect(request, reply);
     const discardUpload = (key: string) =>
       deleteObject(key).catch((err) => {
@@ -184,7 +186,8 @@ export function registerOcrPdf(app: FastifyInstance) {
       // to resolve. Insert-only; enqueueToolJob re-points it at enqueue (#886).
       if (clientJobId && clientJobId !== jobId) {
         try {
-          await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" });
+          aliasStamped =
+            (await insertToolJobAlias({ jobId, clientJobId, userId, pool: "ai" })) !== false;
         } catch (err) {
           if (inputKey) await discardUpload(inputKey);
           throw err;
@@ -264,6 +267,7 @@ export function registerOcrPdf(app: FastifyInstance) {
             uploadKeys: [uploadedInputKey],
             log: request.log,
           });
+          aliasStamped = false;
           return;
         }
         await discardUpload(uploadedInputKey);
@@ -289,9 +293,11 @@ export function registerOcrPdf(app: FastifyInstance) {
           uploadKeys: [uploadedInputKey],
           log: request.log,
         });
+        aliasStamped = false;
         return;
       }
 
+      enqueued = true;
       const { engine: _legacyEngine, ...normalizedSettings } = settings;
       const jobData: ToolJobData = {
         jobId,
@@ -311,6 +317,9 @@ export function registerOcrPdf(app: FastifyInstance) {
         clientJobId = jobData.clientJobId ?? null;
       } catch (err) {
         const jobPersisted = await hasPersistedJobRow(jobId, request.log);
+        if (!jobPersisted) {
+          enqueued = false;
+        }
         if (disconnect.clientGone()) {
           await disconnect.settleAbandoned({
             jobId,
@@ -318,6 +327,7 @@ export function registerOcrPdf(app: FastifyInstance) {
             uploadKeys: jobPersisted ? [] : [uploadedInputKey],
             log: request.log,
           });
+          aliasStamped = false;
           return;
         }
         if (!jobPersisted) {
@@ -340,6 +350,9 @@ export function registerOcrPdf(app: FastifyInstance) {
       return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
     } finally {
       disconnect.release();
+      if (!enqueued && aliasStamped) {
+        await settleUnenqueuedAlias(jobId, clientJobId, request.log);
+      }
     }
   });
 }

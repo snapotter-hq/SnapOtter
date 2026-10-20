@@ -12,6 +12,7 @@ const jobRows = vi.hoisted(() => ({
 }));
 
 const mocks = vi.hoisted(() => ({
+  cancelSingleJobGuarded: vi.fn(),
   deleteObject: vi.fn(),
   deletePrefix: vi.fn(),
   enqueueToolJob: vi.fn(),
@@ -42,6 +43,10 @@ vi.mock("../../../apps/api/src/jobs/enqueue.js", () => ({
   waitForJob: mocks.waitForJob,
 }));
 
+vi.mock("../../../apps/api/src/routes/progress.js", () => ({
+  cancelSingleJobGuarded: mocks.cancelSingleJobGuarded,
+}));
+
 vi.mock("../../../apps/api/src/lib/feature-status.js", () => ({
   getFirstMissingBundleForTool: vi.fn(() => "face-restoration"),
   isFeatureInstalled: mocks.isFeatureInstalled,
@@ -67,6 +72,7 @@ vi.mock("../../../apps/api/src/plugins/auth.js", () => ({
   ),
 }));
 
+import { settleUnenqueuedAlias } from "../../../apps/api/src/lib/upload-cleanup.js";
 import { registerAiCanvasExpand } from "../../../apps/api/src/routes/tools/ai-canvas-expand.js";
 import { registerAutoSubtitles } from "../../../apps/api/src/routes/tools/auto-subtitles.js";
 import { registerBackgroundReplace } from "../../../apps/api/src/routes/tools/background-replace.js";
@@ -125,10 +131,11 @@ beforeEach(() => {
   jobRows.error = null;
   mocks.isToolInstalled.mockReturnValue(true);
   mocks.isFeatureInstalled.mockReturnValue(true);
+  mocks.cancelSingleJobGuarded.mockResolvedValue(undefined);
   mocks.deleteObject.mockResolvedValue(undefined);
   mocks.deletePrefix.mockResolvedValue(undefined);
   mocks.putObject.mockResolvedValue(undefined);
-  mocks.insertToolJobAlias.mockResolvedValue(undefined);
+  mocks.insertToolJobAlias.mockResolvedValue(true);
   mocks.enqueueToolJob.mockResolvedValue({});
   mocks.waitForJob.mockResolvedValue(null);
   mocks.getObjectBuffer.mockResolvedValue(PNG);
@@ -266,6 +273,10 @@ describe("custom tool routes discard uploads when rejecting before enqueue (#259
     const uploadedJobId = mocks.receiveUpload.mock.calls[0][1] as string;
     expect(uploadedJobId).not.toBe("11111111-1111-4111-8111-111111111111");
     expect(mocks.deletePrefix).toHaveBeenCalledWith(`uploads/${uploadedJobId}/`);
+    expect(mocks.cancelSingleJobGuarded).toHaveBeenCalledWith({
+      jobId: "11111111-1111-4111-8111-111111111111",
+      expectedArtifactJobId: uploadedJobId,
+    });
   });
 
   it.each(ROUTES)(
@@ -284,6 +295,7 @@ describe("custom tool routes discard uploads when rejecting before enqueue (#259
       expect(mocks.enqueueToolJob).not.toHaveBeenCalled();
       const uploadedJobId = mocks.receiveUpload.mock.calls[0][1] as string;
       expect(mocks.deletePrefix).toHaveBeenCalledWith(`uploads/${uploadedJobId}/`);
+      expect(mocks.cancelSingleJobGuarded).not.toHaveBeenCalled();
     },
   );
 
@@ -294,13 +306,24 @@ describe("custom tool routes discard uploads when rejecting before enqueue (#259
       jobRows.rows = [];
       const quotaErr = Object.assign(new Error("Too many concurrent AI jobs"), { statusCode: 429 });
       mocks.enqueueToolJob.mockRejectedValueOnce(quotaErr);
-      const req = makeRequest(validPartsFor(toolId));
+      const req = makeRequest([
+        ...validPartsFor(toolId),
+        {
+          type: "field",
+          fieldname: "clientJobId",
+          value: "11111111-1111-4111-8111-111111111111",
+        },
+      ]);
       const reply = makeReply();
 
       await expect(handlers[path](req, reply)).rejects.toThrow("Too many concurrent AI jobs");
 
       const uploadedJobId = mocks.receiveUpload.mock.calls[0][1] as string;
       expect(mocks.deletePrefix).toHaveBeenCalledWith(`uploads/${uploadedJobId}/`);
+      expect(mocks.cancelSingleJobGuarded).toHaveBeenCalledWith({
+        jobId: "11111111-1111-4111-8111-111111111111",
+        expectedArtifactJobId: uploadedJobId,
+      });
     },
   );
 
@@ -310,12 +333,20 @@ describe("custom tool routes discard uploads when rejecting before enqueue (#259
       setupValidBuffersFor(toolId);
       jobRows.rows = [{ id: "existing-job-row" }];
       mocks.enqueueToolJob.mockRejectedValueOnce(new Error("redis queue.add failed"));
-      const req = makeRequest(validPartsFor(toolId));
+      const req = makeRequest([
+        ...validPartsFor(toolId),
+        {
+          type: "field",
+          fieldname: "clientJobId",
+          value: "11111111-1111-4111-8111-111111111111",
+        },
+      ]);
       const reply = makeReply();
 
       await expect(handlers[path](req, reply)).rejects.toThrow("redis queue.add failed");
 
       expect(mocks.deletePrefix).not.toHaveBeenCalled();
+      expect(mocks.cancelSingleJobGuarded).not.toHaveBeenCalled();
     },
   );
 
@@ -323,7 +354,14 @@ describe("custom tool routes discard uploads when rejecting before enqueue (#259
     "%s keeps uploads/<jobId>/ when the request is enqueued",
     async (toolId, path) => {
       setupValidBuffersFor(toolId);
-      const req = makeRequest(validPartsFor(toolId));
+      const req = makeRequest([
+        ...validPartsFor(toolId),
+        {
+          type: "field",
+          fieldname: "clientJobId",
+          value: "11111111-1111-4111-8111-111111111111",
+        },
+      ]);
       const reply = makeReply();
 
       await handlers[path](req, reply);
@@ -331,8 +369,70 @@ describe("custom tool routes discard uploads when rejecting before enqueue (#259
       expect(reply.statusCode).toBe(202);
       expect(mocks.enqueueToolJob).toHaveBeenCalledTimes(1);
       expect(mocks.deletePrefix).not.toHaveBeenCalled();
+      expect(mocks.cancelSingleJobGuarded).not.toHaveBeenCalled();
     },
   );
+
+  it.each(ROUTES)(
+    "%s skips cancelSingleJobGuarded when insertToolJobAlias returned false on a reused clientJobId (#2617)",
+    async (toolId, path) => {
+      setupValidBuffersFor(toolId);
+      mocks.insertToolJobAlias.mockResolvedValueOnce(false);
+      const req = makeRequest([
+        ...validPartsFor(toolId),
+        {
+          type: "field",
+          fieldname: "clientJobId",
+          value: "11111111-1111-4111-8111-111111111111",
+        },
+        { type: "field", fieldname: "saveMode", value: "invalid" },
+      ]);
+      const reply = makeReply();
+
+      await handlers[path](req, reply);
+
+      expect(reply.statusCode).toBe(400);
+      expect(mocks.cancelSingleJobGuarded).not.toHaveBeenCalled();
+    },
+  );
+
+  it("logs a warning and does not throw when cancelSingleJobGuarded fails during rejection cleanup (#2617)", async () => {
+    mocks.cancelSingleJobGuarded.mockRejectedValueOnce(new Error("db update failed"));
+    const clientJobId = "11111111-1111-4111-8111-111111111111";
+    const req = makeRequest([
+      ...validPartsFor("upscale"),
+      { type: "field", fieldname: "clientJobId", value: clientJobId },
+      { type: "field", fieldname: "saveMode", value: "invalid" },
+    ]);
+    const reply = makeReply();
+
+    await handlers["/api/v1/tools/image/upscale"](req, reply);
+
+    expect(reply.statusCode).toBe(400);
+    expect(req.log.warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        err: expect.any(Error),
+        jobId: expect.any(String),
+        clientJobId,
+      }),
+      "failed to settle a rejected request's job alias",
+    );
+  });
+
+  it("settleUnenqueuedAlias skips empty or self-pointing clientJobIds and swallows errors when log is omitted (#2617)", async () => {
+    await settleUnenqueuedAlias("job-1", null);
+    await settleUnenqueuedAlias("job-1", undefined);
+    await settleUnenqueuedAlias("job-1", "");
+    await settleUnenqueuedAlias("job-1", "job-1");
+    expect(mocks.cancelSingleJobGuarded).not.toHaveBeenCalled();
+
+    mocks.cancelSingleJobGuarded.mockRejectedValueOnce(new Error("db update failed"));
+    await expect(settleUnenqueuedAlias("job-1", "client-1")).resolves.toBeUndefined();
+    expect(mocks.cancelSingleJobGuarded).toHaveBeenCalledWith({
+      jobId: "client-1",
+      expectedArtifactJobId: "job-1",
+    });
+  });
 
   it("erase-object deletes uploads/<jobId>/ on missing mask, invalid settings, and missing inpaint-hq 501", async () => {
     const missingMaskReply = makeReply();

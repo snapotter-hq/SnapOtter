@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db, schema } from "../db/index.js";
+import { cancelSingleJobGuarded } from "../routes/progress.js";
 import { deletePrefix } from "./object-storage.js";
 
 interface WarnLogger {
@@ -15,6 +16,26 @@ interface WarnLogger {
 export async function discardUnenqueuedUploads(jobId: string, log?: WarnLogger): Promise<void> {
   await deletePrefix(`uploads/${jobId}/`).catch((err) => {
     log?.warn?.({ err, jobId }, "failed to discard a rejected request's uploads");
+  });
+}
+
+/**
+ * Settle a pre-stamped `clientJobId` alias row when a tool request exits
+ * before `enqueueToolJob` commits the artifact row (#2617). Guarded on
+ * `expectedArtifactJobId: jobId` so a reused `clientJobId` still pointing at
+ * an earlier run is never touched.
+ */
+export async function settleUnenqueuedAlias(
+  jobId: string,
+  clientJobId: string | null | undefined,
+  log?: WarnLogger,
+): Promise<void> {
+  if (!clientJobId || clientJobId === jobId) return;
+  await cancelSingleJobGuarded({
+    jobId: clientJobId,
+    expectedArtifactJobId: jobId,
+  }).catch((err) => {
+    log?.warn?.({ err, jobId, clientJobId }, "failed to settle a rejected request's job alias");
   });
 }
 

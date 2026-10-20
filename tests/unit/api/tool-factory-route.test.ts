@@ -78,6 +78,7 @@ vi.mock("../../../apps/api/src/lib/upload-stream.js", () => ({
 }));
 
 vi.mock("../../../apps/api/src/routes/progress.js", () => ({
+  cancelSingleJobGuarded: vi.fn(() => Promise.resolve()),
   updateSingleFileProgress: vi.fn(),
 }));
 
@@ -170,6 +171,7 @@ import {
 import { validateImageBuffer } from "../../../apps/api/src/lib/file-validation.js";
 import { deletePrefix } from "../../../apps/api/src/lib/object-storage.js";
 import { receiveUpload } from "../../../apps/api/src/lib/upload-stream.js";
+import { cancelSingleJobGuarded } from "../../../apps/api/src/routes/progress.js";
 import type { AnyToolRouteConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import {
   createToolRoute,
@@ -1378,6 +1380,136 @@ describe("createToolRoute", () => {
       expect(req.log.warn).toHaveBeenCalledWith(
         expect.objectContaining({ err: expect.any(Error), jobId: expect.any(String) }),
         "failed to discard a rejected request's uploads",
+      );
+    });
+  });
+
+  describe("pre-stamped alias settlement on pre-enqueue rejection (#2617)", () => {
+    it("settles the pre-stamped alias via cancelSingleJobGuarded when rejecting after insertToolJobAlias", async () => {
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id, strictQualitySchema()));
+      const handler = app.routes[apiToolPath(id)];
+      const reply = createMockReply();
+      const clientJobId = "11111111-1111-4111-8111-111111111111";
+      const req = createMockRequest({
+        fileBuffer: Buffer.from("png-data"),
+        settings: JSON.stringify({ quality: 200 }),
+        clientJobId,
+      });
+
+      await handler(req, reply);
+
+      expect(reply.status).toHaveBeenCalledWith(400);
+      expect(insertToolJobAlias).toHaveBeenCalledTimes(1);
+      const stampedJobId = vi.mocked(insertToolJobAlias).mock.calls[0][0].jobId;
+      expect(cancelSingleJobGuarded).toHaveBeenCalledWith({
+        jobId: clientJobId,
+        expectedArtifactJobId: stampedJobId,
+      });
+    });
+
+    it("does not call cancelSingleJobGuarded when insertToolJobAlias returned false on a reused id", async () => {
+      vi.mocked(insertToolJobAlias).mockResolvedValueOnce(false);
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id, strictQualitySchema()));
+      const handler = app.routes[apiToolPath(id)];
+      const reply = createMockReply();
+      const req = createMockRequest({
+        fileBuffer: Buffer.from("png-data"),
+        settings: JSON.stringify({ quality: 200 }),
+        clientJobId: "11111111-1111-4111-8111-111111111111",
+      });
+
+      await handler(req, reply);
+
+      expect(reply.status).toHaveBeenCalledWith(400);
+      expect(cancelSingleJobGuarded).not.toHaveBeenCalled();
+    });
+
+    it("does not call cancelSingleJobGuarded when rejecting before insertToolJobAlias (e.g. invalid saveMode)", async () => {
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+      const reply = createMockReply();
+      const req = createMockRequest({
+        fileBuffer: Buffer.from("png-data"),
+        saveMode: "invalid",
+        clientJobId: "11111111-1111-4111-8111-111111111111",
+      });
+
+      await handler(req, reply);
+
+      expect(reply.status).toHaveBeenCalledWith(400);
+      expect(insertToolJobAlias).not.toHaveBeenCalled();
+      expect(cancelSingleJobGuarded).not.toHaveBeenCalled();
+    });
+
+    it("settles the alias when enqueueToolJob throws before persisting the jobs row, but keeps it when the jobs row exists", async () => {
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+      const clientJobId = "11111111-1111-4111-8111-111111111111";
+
+      // 1. No jobs row persisted -> settle alias
+      jobRows.rows = [];
+      vi.mocked(enqueueToolJob).mockRejectedValueOnce(new Error("db insert failed"));
+      const reply1 = createMockReply();
+      const req1 = createMockRequest({
+        fileBuffer: Buffer.from("png-data"),
+        clientJobId,
+      });
+      await expect(handler(req1, reply1)).rejects.toThrow("db insert failed");
+      const stampedJobId = vi.mocked(insertToolJobAlias).mock.calls[0][0].jobId;
+      expect(cancelSingleJobGuarded).toHaveBeenCalledWith({
+        jobId: clientJobId,
+        expectedArtifactJobId: stampedJobId,
+      });
+
+      // 2. Jobs row persisted -> keep alias
+      vi.mocked(cancelSingleJobGuarded).mockClear();
+      jobRows.rows = [{ id: "persisted-job" }];
+      vi.mocked(enqueueToolJob).mockRejectedValueOnce(new Error("redis queue.add failed"));
+      try {
+        const reply2 = createMockReply();
+        const req2 = createMockRequest({
+          fileBuffer: Buffer.from("png-data"),
+          clientJobId,
+        });
+        await expect(handler(req2, reply2)).rejects.toThrow("redis queue.add failed");
+        expect(cancelSingleJobGuarded).not.toHaveBeenCalled();
+      } finally {
+        jobRows.rows = [];
+      }
+    });
+
+    it("logs a warning and keeps the primary error response when cancelSingleJobGuarded rejects", async () => {
+      vi.mocked(cancelSingleJobGuarded).mockRejectedValueOnce(new Error("db update failed"));
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id, strictQualitySchema()));
+      const handler = app.routes[apiToolPath(id)];
+      const reply = createMockReply();
+      const clientJobId = "11111111-1111-4111-8111-111111111111";
+      const req = createMockRequest({
+        fileBuffer: Buffer.from("png-data"),
+        settings: JSON.stringify({ quality: 200 }),
+        clientJobId,
+      });
+
+      await handler(req, reply);
+
+      expect(reply.status).toHaveBeenCalledWith(400);
+      expect(req.log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          err: expect.any(Error),
+          jobId: expect.any(String),
+          clientJobId,
+        }),
+        "failed to settle a rejected request's job alias",
       );
     });
   });

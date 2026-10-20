@@ -31,6 +31,7 @@ import { multipartFailure } from "../lib/multipart-parts.js";
 import { deletePrefix, getObjectBuffer, putObject } from "../lib/object-storage.js";
 import { resolveToolPool, shouldSkipSyncWindow } from "../lib/pool.js";
 import { getSettingStrict, parseNumericSettingValue } from "../lib/settings-helpers.js";
+import { settleUnenqueuedAlias } from "../lib/upload-cleanup.js";
 import { type ReceivedUpload, receiveUpload } from "../lib/upload-stream.js";
 import { type InputHandler, InputValidationError } from "../modality/contract.js";
 import { inputHandlerFor } from "../modality/input-handler.js";
@@ -292,6 +293,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
       const received: ReceivedUpload[] = [];
       const uniqueInputName = createUniqueNamer();
       let enqueued = false;
+      let aliasStamped = false;
 
       // Every rejection between the upload and enqueue lands here. Without a
       // jobs row, nothing else ever removes the upload on S3 (#1690).
@@ -399,12 +401,14 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         const pool = resolveToolPool(config.toolId, config.section);
         let ownsPreEnqueueAlias = true;
         if (clientJobId && clientJobId !== jobId) {
-          ownsPreEnqueueAlias = await insertToolJobAlias({
-            jobId,
-            clientJobId,
-            userId: authUser.id,
-            pool,
-          });
+          ownsPreEnqueueAlias =
+            (await insertToolJobAlias({
+              jobId,
+              clientJobId,
+              userId: authUser.id,
+              pool,
+            })) !== false;
+          aliasStamped = ownsPreEnqueueAlias;
         }
 
         const reportProgress = (percent: number, stage?: string) => {
@@ -742,8 +746,13 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           });
         }
       } finally {
+        if (!enqueued) {
+          if (aliasStamped) {
+            await settleUnenqueuedAlias(jobId, clientJobId, request.log);
+          }
+          await discardUploads();
+        }
         await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
-        if (!enqueued) await discardUploads();
       }
     },
   );

@@ -104,4 +104,28 @@ describe("custom tool routes stamp the SSE alias pre-enqueue (#892)", () => {
       .map((r) => r.file);
     expect(unsynced).toEqual([]);
   });
+
+  it("settles the pre-stamped alias when rejecting before enqueueToolJob (#2617)", () => {
+    const unsettled = inScope
+      .filter(({ source }) => {
+        const capturesStamp = /aliasStamped\s*=\s*\(await insertToolJobAlias\(/.test(source);
+        const enqueueIdx = source.indexOf("await enqueueToolJob(jobData);");
+        const finallyIdx = source.indexOf("finally {", enqueueIdx);
+        const settleIdx = source.indexOf(
+          "await settleUnenqueuedAlias(jobId, clientJobId, request.log);",
+          finallyIdx,
+        );
+        const finallySlice = finallyIdx === -1 ? "" : source.slice(finallyIdx);
+        return (
+          !capturesStamp ||
+          enqueueIdx === -1 ||
+          finallyIdx === -1 ||
+          settleIdx === -1 ||
+          !finallySlice.includes("!enqueued") ||
+          !finallySlice.includes("aliasStamped")
+        );
+      })
+      .map((r) => r.file);
+    expect(unsettled).toEqual([]);
+  });
 });

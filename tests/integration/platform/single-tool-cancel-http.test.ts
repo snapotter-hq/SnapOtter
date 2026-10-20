@@ -193,8 +193,14 @@ describe("route-stamped alias metadata (#808)", () => {
     expect(res.statusCode).toBeGreaterThanOrEqual(400);
     expect(res.statusCode).toBeLessThan(500);
 
+    const frame = await waitForTerminalFrame(clientJobId, 10_000);
+    expect(frame.error).toBe("Canceled");
+
     const alias = await jobRow(clientJobId);
     expect(alias?.type).toBe("single");
+    expect(alias?.status).toBe("canceled");
+    expect(alias?.completedAt).not.toBeNull();
+    expect(alias?.error).toEqual({ message: "Canceled" });
     expect(alias?.userId).not.toBeNull();
     expect(typeof ((alias?.settings ?? {}) as { artifactJobId?: string }).artifactJobId).toBe(
       "string",
@@ -224,11 +230,60 @@ describe("route-stamped alias metadata (#808)", () => {
     });
     expect(res.statusCode).toBe(400);
 
+    const frame = await waitForTerminalFrame(clientJobId, 10_000);
+    expect(frame.error).toBe("Canceled");
+
     const alias = await jobRow(clientJobId);
     expect(alias?.type).toBe("single");
+    expect(alias?.status).toBe("canceled");
+    expect(alias?.completedAt).not.toBeNull();
+    expect(alias?.error).toEqual({ message: "Canceled" });
     expect(alias?.userId).not.toBeNull();
     expect(typeof ((alias?.settings ?? {}) as { artifactJobId?: string }).artifactJobId).toBe(
       "string",
+    );
+  });
+
+  it("preserves a reused clientJobId's earlier state when a later request rejects before enqueue (#2617)", async () => {
+    const clientJobId = randomUUID();
+    await runResize(clientJobId, adminToken);
+    const before = await jobRow(clientJobId);
+    const firstArtifact = ((before?.settings ?? {}) as { artifactJobId?: string }).artifactJobId;
+    expect(before?.status).toBe("completed");
+    expect(typeof firstArtifact).toBe("string");
+
+    // 1. Factory route rejects after insertToolJobAlias (invalid settings)
+    const { body: badResizeBody, contentType: badResizeCt } = createMultipartPayload([
+      { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: "not json" },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+    const resizeRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/resize",
+      headers: { "content-type": badResizeCt, authorization: `Bearer ${adminToken}` },
+      body: badResizeBody,
+    });
+    expect(resizeRes.statusCode).toBe(400);
+
+    // 2. Custom route rejects after insertToolJobAlias (invalid saveMode)
+    const { body: badOcrBody, contentType: badOcrCt } = createMultipartPayload([
+      { name: "file", filename: "scan.png", contentType: "image/png", content: PNG },
+      { name: "saveMode", content: "invalid" },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+    const ocrRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/ocr",
+      headers: { "content-type": badOcrCt, authorization: `Bearer ${adminToken}` },
+      body: badOcrBody,
+    });
+    expect(ocrRes.statusCode).toBe(400);
+
+    const after = await jobRow(clientJobId);
+    expect(after?.status).toBe("completed");
+    expect(((after?.settings ?? {}) as { artifactJobId?: string }).artifactJobId).toBe(
+      firstArtifact,
     );
   });
 
