@@ -29,3 +29,4 @@ export { stripMetadata } from "./operations/strip-metadata.js";
 export * from "./types.js";
 export * from "./utils/metadata.js";
 export * from "./utils/mime.js";
+export * from "./utils/recomb.js";

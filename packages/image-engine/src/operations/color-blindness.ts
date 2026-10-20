@@ -1,6 +1,5 @@
 import type { ColorBlindnessOptions, ColorBlindnessType, Sharp } from "../types.js";
-
-type Matrix3x3 = [[number, number, number], [number, number, number], [number, number, number]];
+import { applyRecombMatrix, type Matrix3x3 } from "../utils/recomb.js";
 
 export const COLOR_BLINDNESS_MATRICES: Record<ColorBlindnessType, Matrix3x3> = {
   protanopia: [
@@ -46,5 +45,5 @@ export const COLOR_BLINDNESS_MATRICES: Record<ColorBlindnessType, Matrix3x3> = {
 };
 
 export async function colorBlindness(image: Sharp, options: ColorBlindnessOptions): Promise<Sharp> {
-  return image.recomb(COLOR_BLINDNESS_MATRICES[options.type]);
+  return applyRecombMatrix(image, COLOR_BLINDNESS_MATRICES[options.type]);
 }

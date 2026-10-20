@@ -1499,6 +1499,85 @@ describe("processImage", () => {
       { type: "sepia", options: {} },
     ]);
     expect(result.buffer.length).toBeGreaterThan(0);
+    const pngRaw = await sharp(result.buffer).raw().toBuffer();
+    // png200x150 first pixel is [255, 100, 50, 255] -> inverted RGB [0, 155, 205] -> sepia [157, 140, 109]
+    expect([pngRaw[0], pngRaw[1], pngRaw[2]]).toEqual([157, 140, 109]);
+
+    const sample = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 100, g: 50, b: 20 } },
+    })
+      .png()
+      .toBuffer();
+    const sampleInvSepia = await processImage(sample, [
+      { type: "invert", options: {} },
+      { type: "sepia", options: {} },
+    ]);
+    const invSepiaRaw = await sharp(sampleInvSepia.buffer).raw().toBuffer();
+    // [100, 50, 20] -> inverted [155, 205, 235] -> sepia [255, 234, 182] (not all-black [0, 0, 0])
+    expect([invSepiaRaw[0], invSepiaRaw[1], invSepiaRaw[2]]).toEqual([255, 234, 182]);
+
+    const sampleSepiaInv = await processImage(sample, [
+      { type: "sepia", options: {} },
+      { type: "invert", options: {} },
+    ]);
+    const sepiaInvRaw = await sharp(sampleSepiaInv.buffer).raw().toBuffer();
+    // [100, 50, 20] -> sepia [81, 72, 56] -> inverted [174, 183, 199]
+    expect([sepiaInvRaw[0], sepiaInvRaw[1], sepiaInvRaw[2]]).toEqual([174, 183, 199]);
+  });
+
+  it("composes consecutive recomb operations in processImage and direct calls (#3121)", async () => {
+    const gray = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 128, g: 128, b: 128 } },
+    })
+      .png()
+      .toBuffer();
+
+    const zeroRedSepia = await processImage(gray, [
+      { type: "color-channels", options: { red: 0, green: 100, blue: 100 } },
+      { type: "sepia", options: {} },
+    ]);
+    const zeroRedSepiaRaw = await sharp(zeroRedSepia.buffer).raw().toBuffer();
+    expect([zeroRedSepiaRaw[0], zeroRedSepiaRaw[1], zeroRedSepiaRaw[2]]).toEqual([122, 109, 85]);
+
+    const threeRecomb = await processImage(gray, [
+      { type: "color-channels", options: { red: 0, green: 150, blue: 100 } },
+      { type: "color-blindness", options: { type: "deuteranopia" } },
+      { type: "sepia", options: {} },
+    ]);
+    const threeRecombRaw = await sharp(threeRecomb.buffer).raw().toBuffer();
+    // [0, 192, 128] -> deuteranopia [136.06, 135.19, 132.24] -> sepia [182.38, 162.45, 126.53] -> [182, 162, 126]
+    expect([threeRecombRaw[0], threeRecombRaw[1], threeRecombRaw[2]]).toEqual([182, 162, 126]);
+  });
+
+  it("isolates conflicting pipeline stages across grayscale, invert, convolve, and preserves input format (#3121)", async () => {
+    const sample = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 100, g: 50, b: 20 } },
+    })
+      .png()
+      .toBuffer();
+
+    const ccGray = await processImage(sample, [
+      { type: "color-channels", options: { red: 0, green: 100, blue: 100 } },
+      { type: "grayscale", options: {} },
+    ]);
+    const ccGrayRaw = await sharp(ccGray.buffer).raw().toBuffer();
+    expect([ccGrayRaw[0], ccGrayRaw[1], ccGrayRaw[2]]).toEqual([42, 42, 42]);
+
+    const hpInvert = await processImage(sample, [
+      { type: "sharpen-advanced", options: { method: "high-pass", strength: 50, kernelSize: 3 } },
+      { type: "invert", options: {} },
+    ]);
+    const hpInvertRaw = await sharp(hpInvert.buffer).raw().toBuffer();
+    expect([hpInvertRaw[0], hpInvertRaw[1], hpInvertRaw[2]]).toEqual([155, 205, 235]);
+
+    const jpgSample = await sharp(sample).jpeg({ quality: 100 }).toBuffer();
+    const jpgInvSepia = await processImage(jpgSample, [
+      { type: "invert", options: {} },
+      { type: "sepia", options: {} },
+    ]);
+    expect(jpgInvSepia.info.format).toBe("jpeg");
+    const jpgRaw = await sharp(jpgInvSepia.buffer).raw().toBuffer();
+    expect(jpgRaw[0]).toBeGreaterThan(200);
   });
 
   it("color-channels operation through processImage", async () => {
