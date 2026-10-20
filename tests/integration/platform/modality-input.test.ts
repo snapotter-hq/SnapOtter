@@ -86,9 +86,18 @@ describe("DocumentInputHandler", () => {
   it.skipIf(!qpdfAvailable())("rejects a truncated PDF under strict mode", async () => {
     const full = readFixture(fixtures.document.pdf3);
     const truncated = full.subarray(0, Math.floor(full.length * 0.6));
-    await expect(
-      new DocumentInputHandler().prepare(truncated, "broken.pdf", { scratchDir }),
-    ).rejects.toThrow(/Damaged PDF/);
+    const err = await new DocumentInputHandler()
+      .prepare(truncated, "broken.pdf", { scratchDir })
+      .then(
+        (): Error => {
+          throw new Error("expected rejection");
+        },
+        (e: unknown): Error => e as Error,
+      );
+    expect(err.message).toMatch(/Damaged PDF/);
+    expect(err.message).toContain("[internal]");
+    expect(err.message).not.toContain(scratchDir);
+    expect(err.message).not.toContain(tmpdir());
   });
 
   it.skipIf(!qpdfAvailable())("accepts a truncated PDF under lenient mode", async () => {

@@ -127,6 +127,63 @@ describe("path-backed PDF validation", () => {
     expect(qpdf.pageCount).not.toHaveBeenCalled();
   });
 
+  it("scrubs internal scratch paths from qpdf stderr before slicing Damaged PDF errors (#2925)", async () => {
+    const inputPath = join(scratchDir, "qpdf-1234", "input.pdf");
+    const longPadding = "x".repeat(200);
+    const leakedStderr = `qpdf exited 2: WARNING: ${inputPath}: ${longPadding}\nWARNING: ${inputPath}: trailing path`;
+    const captureRejection = (promise: Promise<void>): Promise<Error> =>
+      promise.then(
+        (): Error => {
+          throw new Error("expected rejection");
+        },
+        (e: unknown): Error => e as Error,
+      );
+
+    // 1. qpdfRequiresPassword failure
+    const validHeaderPath = join(scratchDir, "damaged-pw.pdf");
+    writeFileSync(validHeaderPath, "%PDF-path-backed");
+    qpdf.requiresPassword.mockRejectedValueOnce(new Error(leakedStderr));
+    const pwErr = await captureRejection(
+      validatePdfPath(validHeaderPath, { rejectPasswordProtected: true }),
+    );
+    expect(pwErr.name).toBe("InputValidationError");
+    expect(pwErr.message).toContain("Damaged PDF: qpdf exited 2: WARNING: [internal]");
+    expect(pwErr.message).toContain("WARNING: [internal] trailing path");
+    expect(pwErr.message).not.toContain(scratchDir);
+    expect(pwErr.message).not.toContain(tmpdir());
+
+    // 2. qpdfCheck failure
+    qpdf.requiresPassword.mockResolvedValueOnce(false);
+    qpdf.check.mockRejectedValueOnce(new Error(leakedStderr));
+    const checkErr = await captureRejection(
+      validatePdfPath(validHeaderPath, { rejectPasswordProtected: true }),
+    );
+    expect(checkErr.name).toBe("InputValidationError");
+    expect(checkErr.message).toContain("Damaged PDF: qpdf exited 2: WARNING: [internal]");
+    expect(checkErr.message).toContain("WARNING: [internal] trailing path");
+    expect(checkErr.message).not.toContain(scratchDir);
+    expect(checkErr.message).not.toContain(tmpdir());
+
+    // 3. qpdfPageCount failure
+    const originalMaxPages = env.MAX_PDF_PAGES;
+    env.MAX_PDF_PAGES = 10;
+    try {
+      qpdf.requiresPassword.mockResolvedValueOnce(false);
+      qpdf.check.mockResolvedValueOnce(undefined);
+      qpdf.pageCount.mockRejectedValueOnce(new Error(leakedStderr));
+      const pageCountErr = await captureRejection(
+        validatePdfPath(validHeaderPath, { rejectPasswordProtected: true }),
+      );
+      expect(pageCountErr.name).toBe("InputValidationError");
+      expect(pageCountErr.message).toContain("Damaged PDF: qpdf exited 2: WARNING: [internal]");
+      expect(pageCountErr.message).toContain("WARNING: [internal] trailing path");
+      expect(pageCountErr.message).not.toContain(scratchDir);
+      expect(pageCountErr.message).not.toContain(tmpdir());
+    } finally {
+      env.MAX_PDF_PAGES = originalMaxPages;
+    }
+  });
+
   it("treats a qpdf check timeout as inconclusive and warns through the given logger (#1547)", async () => {
     const inputPath = join(scratchDir, "big-but-healthy.pdf");
     writeFileSync(inputPath, "%PDF-path-backed");

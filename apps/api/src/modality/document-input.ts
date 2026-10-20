@@ -11,6 +11,7 @@ import {
 import type { FastifyBaseLogger } from "fastify";
 import { env } from "../config.js";
 import { isBinarySpawnFailure } from "../lib/binary-overrides.js";
+import { stripInternalPaths } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
 import { type InputHandler, InputValidationError, type PreparedInput } from "./contract.js";
 
@@ -20,6 +21,12 @@ const ZIP_MAGIC = Buffer.from("PK");
 function isQpdfTimeout(err: unknown): boolean {
   return (
     err instanceof QpdfTimeoutError || (err instanceof Error && err.name === "QpdfTimeoutError")
+  );
+}
+
+function damagedPdfError(err: unknown): InputValidationError {
+  return new InputValidationError(
+    `Damaged PDF: ${err instanceof Error ? stripInternalPaths(err.message).slice(0, 300) : "structural check failed"}`,
   );
 }
 
@@ -81,11 +88,7 @@ export async function validatePdfPath(
   } catch (err) {
     const unavailable = qpdfUnavailable(err);
     if (unavailable) throw unavailable;
-    if (!isQpdfTimeout(err)) {
-      throw new InputValidationError(
-        `Damaged PDF: ${err instanceof Error ? err.message.slice(0, 300) : "structural check failed"}`,
-      );
-    }
+    if (!isQpdfTimeout(err)) throw damagedPdfError(err);
     // --requires-password only reads the encryption dictionary, so it does not
     // scale with content the way --check does: a stall here is anomalous (a
     // pathological xref forcing reconstruction, a dead disk, a crafted file),
@@ -112,11 +115,7 @@ export async function validatePdfPath(
   } catch (err) {
     const unavailable = qpdfUnavailable(err);
     if (unavailable) throw unavailable;
-    if (!isQpdfTimeout(err)) {
-      throw new InputValidationError(
-        `Damaged PDF: ${err instanceof Error ? err.message.slice(0, 300) : "structural check failed"}`,
-      );
-    }
+    if (!isQpdfTimeout(err)) throw damagedPdfError(err);
     // A big-but-healthy PDF on a slow host can outlive the check budget
     // (issue #920). That is inconclusive, not damage: proceed like the
     // password-protected branch above, where qpdf also cannot inspect the
@@ -144,11 +143,7 @@ export async function validatePdfPath(
     } catch (err) {
       const unavailable = qpdfUnavailable(err);
       if (unavailable) throw unavailable;
-      if (!isQpdfTimeout(err)) {
-        throw new InputValidationError(
-          `Damaged PDF: ${err instanceof Error ? err.message.slice(0, 300) : "structural check failed"}`,
-        );
-      }
+      if (!isQpdfTimeout(err)) throw damagedPdfError(err);
       // Fail closed: the cap is a resource guard, so a file that stalls the
       // page-count probe must not slip past it. Say so instead of a 500.
       throw new InputValidationError(
