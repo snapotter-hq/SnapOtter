@@ -13,17 +13,28 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  */
 const failures = vi.hoisted(() => ({
   kill: null as Record<string, unknown> | null,
+  probe: null as Record<string, unknown> | null,
   // Per binary, for fallback chains: each listed command's decode fails once.
   byCommand: {} as Record<string, Record<string, unknown>>,
+  open: null as Error | null,
   read: null as Error | null,
+  writeOutput: null as Buffer | null,
 }));
 
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
   return {
     ...actual,
+    open: (async (path: unknown, ...rest: unknown[]) => {
+      if (failures.open && /dimensions-[^/\\]*\.\w+$/.test(String(path))) {
+        const err = failures.open;
+        failures.open = null;
+        throw err;
+      }
+      return (actual.open as (...args: unknown[]) => unknown)(path, ...rest);
+    }) as typeof actual.open,
     readFile: (async (path: unknown, ...rest: unknown[]) => {
-      if (failures.read && /any-out-[^/\\]*\.png$/.test(String(path))) {
+      if (failures.read && /(any-out-[^/\\]*\.png|raw-in-[^/\\]*\.tiff)$/.test(String(path))) {
         const err = failures.read;
         failures.read = null;
         throw err;
@@ -35,23 +46,40 @@ vi.mock("node:fs/promises", async (importOriginal) => {
 
 vi.mock("node:child_process", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:child_process")>();
+  const { writeFile } = await import("node:fs/promises");
   const { promisify } = await import("node:util");
   const execFileAsync = promisify(actual.execFile) as (...args: unknown[]) => Promise<unknown>;
   // The decoders call promisify(execFile), which uses this custom form. Only
   // the decode itself fails, not the `--version` probe, and only once.
   const execFile = Object.assign((...args: unknown[]) => actual.execFile(...(args as [string])), {
-    [promisify.custom]: (file: string, argv: string[], options?: unknown) => {
-      const decoding = argv.some((arg) => /-in-[^/\\]*\.\w+(\[0\])?$/.test(arg));
+    [promisify.custom]: async (file: string, argv: string[], options?: unknown) => {
+      if (failures.probe && argv.includes("--version")) {
+        const fields = failures.probe;
+        failures.probe = null;
+        throw Object.assign(new Error(`Command failed: ${file} --version`), fields);
+      }
+      const decoding = !argv.includes("--version");
       const binary = String(file).split(/[/\\]/).pop() as string;
-      const chained = failures.byCommand[binary];
+      const taggedKey = argv.includes("-PreviewImage") ? `${binary}:-PreviewImage` : binary;
+      const chained = failures.byCommand[taggedKey] ?? failures.byCommand[binary];
       if (decoding && chained) {
-        delete failures.byCommand[binary];
-        return Promise.reject(Object.assign(new Error(`Command failed: ${binary}`), chained));
+        if (failures.byCommand[taggedKey]) delete failures.byCommand[taggedKey];
+        else delete failures.byCommand[binary];
+        throw Object.assign(new Error(`Command failed: ${binary}`), chained);
+      }
+      if (failures.writeOutput && decoding) {
+        const outArg = argv.find((arg) => /^png:|-out-/.test(arg));
+        if (outArg) {
+          const buf = failures.writeOutput;
+          failures.writeOutput = null;
+          await writeFile(outArg.replace(/^png:/, ""), buf);
+          return { stdout: "", stderr: "" };
+        }
       }
       if (failures.kill && argv.some((arg) => /(any|psd)-in-[^/\\]*\.\w+(\[0\])?$/.test(arg))) {
         const fields = failures.kill;
         failures.kill = null;
-        return Promise.reject(Object.assign(new Error("Command failed: magick"), fields));
+        throw Object.assign(new Error("Command failed: magick"), fields);
       }
       return execFileAsync(file, argv, options);
     },
@@ -59,13 +87,22 @@ vi.mock("node:child_process", async (importOriginal) => {
   return { ...actual, execFile };
 });
 
-const { asDecoderOutOfMemory, decodeAnyFormat, decodeToSharpCompat, isDecoderUnavailable } =
-  await import("../../../apps/api/src/lib/format-decoders.js");
+const {
+  asDecoderOutOfMemory,
+  DecoderUnavailableError,
+  decodeAnyFormat,
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+  noDecoderFound,
+} = await import("../../../apps/api/src/lib/format-decoders.js");
 
 afterEach(() => {
   failures.kill = null;
+  failures.probe = null;
   failures.byCommand = {};
+  failures.open = null;
   failures.read = null;
+  failures.writeOutput = null;
 });
 
 const LIBHEIF_ALLOCATION =
@@ -154,9 +191,55 @@ describe("asDecoderOutOfMemory", () => {
     const err = asDecoderOutOfMemory(new RangeError("Array buffer allocation failed")) as Error;
     expect(err.name).toBe("DecoderOutOfMemoryError");
   });
+
+  it("reads Buffer stderr from buffer-mode execFile calls and passes existing DecoderOutOfMemoryError through", () => {
+    const err = asDecoderOutOfMemory(
+      failure({ code: 1, signal: null, stderr: Buffer.from(LIBGOMP, "utf8") }),
+    ) as Error;
+    expect(err.name).toBe("DecoderOutOfMemoryError");
+    expect(asDecoderOutOfMemory(err)).toBe(err);
+  });
 });
 
 describe("decoders that run ImageMagick (#1751)", () => {
+  // Runs before the decode tests below so cachedMagickCmd is still null and
+  // findMagickCmd actually executes its `--version` probe (#1758).
+  it("answers a killed ImageMagick --version probe as a 503", async () => {
+    failures.probe = { code: null, signal: "SIGKILL", stderr: "" };
+    const err = await decodeAnyFormat(Buffer.from("not really an avif"), "avif").catch(
+      (e: unknown) => e as Error,
+    );
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect((err as Error).name).toBe("DecoderOutOfMemoryError");
+  });
+
+  it("keeps a killed ImageMagick --version probe as DecoderOutOfMemoryError in a fallback chain when the primary cannot start", async () => {
+    failures.byCommand.djxl = { code: "ENOENT", syscall: "spawn djxl" };
+    failures.probe = { code: null, signal: "SIGKILL", stderr: "" };
+    const err = await decodeToSharpCompat(Buffer.from("not really a jxl"), "jxl").catch(
+      (e: unknown) => e as Error,
+    );
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect((err as Error).name).toBe("DecoderOutOfMemoryError");
+  });
+
+  it("answers a --version probe hitting a thread limit in noDecoderFound as a 503", () => {
+    const threadErr = failure({ code: null, signal: "SIGABRT", stderr: THREAD_ABORT });
+    const spawnErr = Object.assign(new Error("spawn convert ENOENT"), {
+      code: "ENOENT",
+      syscall: "spawn convert",
+    });
+    for (const list of [
+      [threadErr, spawnErr],
+      [spawnErr, threadErr],
+    ]) {
+      const err = noDecoderFound("No ImageMagick found.", list);
+      expect(isDecoderUnavailable(err)).toBe(true);
+      expect(err.name).toBe("DecoderOutOfMemoryError");
+      expect(err.cause).toBe(threadErr);
+    }
+  });
+
   it("answers decodeAnyFormat running out of memory as a 503", async () => {
     failures.kill = { code: 1, signal: null, stderr: LIBGOMP };
     const err = await decodeAnyFormat(Buffer.from("not really an avif"), "avif").catch(
@@ -233,5 +316,213 @@ describe("decoders that run ImageMagick (#1751)", () => {
     );
     expect(isDecoderUnavailable(err)).toBe(false);
     expect((err as { stderr?: unknown }).stderr).toBe(corrupt.stderr);
+  });
+});
+
+describe("decodeRaw and preflight/post-decode fault handling (#1758)", () => {
+  it("ends decodeRaw as a 503 instead of returning the embedded preview when dcraw_emu is killed", async () => {
+    const { fixtures, readFixture } = await import("../../fixtures/index.js");
+    failures.byCommand.dcraw_emu = { code: null, signal: "SIGKILL", stderr: "" };
+
+    const err = await decodeToSharpCompat(
+      readFixture(fixtures.image.formats("dng")),
+      "raw",
+      "dng",
+    ).catch((e: unknown) => e as Error);
+
+    expect(err).toBeInstanceOf(Error);
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect((err as Error).name).toBe("DecoderOutOfMemoryError");
+  });
+
+  it("ends decodeRaw as a 503 when dcraw_emu hits a thread limit and there is no preview", async () => {
+    failures.byCommand.dcraw_emu = { code: 1, signal: null, stderr: LIBGOMP };
+
+    const err = await decodeToSharpCompat(Buffer.from("not really a raw"), "raw", "dng").catch(
+      (e: unknown) => e as Error,
+    );
+
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect((err as Error).name).toBe("DecoderOutOfMemoryError");
+  });
+
+  it("ends decodeRaw as a 503 when reading dcraw_emu's TIFF output fails to allocate", async () => {
+    const { fixtures, readFixture } = await import("../../fixtures/index.js");
+    failures.read = new RangeError("Array buffer allocation failed");
+
+    const err = await decodeToSharpCompat(
+      readFixture(fixtures.image.formats("dng")),
+      "raw",
+      "dng",
+    ).catch((e: unknown) => e as Error);
+
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect((err as Error).name).toBe("DecoderOutOfMemoryError");
+  });
+
+  it("ends decodeRaw as a 503 when dcraw_emu rejects and exiftool's preview extract is killed", async () => {
+    failures.byCommand.dcraw_emu = {
+      code: 1,
+      signal: null,
+      stderr: "Cannot open raw: Unsupported file format\n",
+    };
+    failures.byCommand.exiftool = { code: null, signal: "SIGKILL", stderr: "" };
+
+    const err = await decodeToSharpCompat(Buffer.from("not really a raw"), "raw", "dng").catch(
+      (e: unknown) => e as Error,
+    );
+
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect((err as Error).name).toBe("DecoderOutOfMemoryError");
+  });
+
+  it("ends decodeRaw as a 503 when exiftool's second preview tier (-PreviewImage) hits a thread limit", async () => {
+    failures.byCommand.dcraw_emu = {
+      code: 1,
+      signal: null,
+      stderr: "Cannot open raw: Unsupported file format\n",
+    };
+    failures.byCommand["exiftool:-PreviewImage"] = {
+      code: 1,
+      signal: null,
+      stderr: Buffer.from(LIBGOMP, "utf8"),
+    };
+
+    const err = await decodeToSharpCompat(Buffer.from("not really a raw"), "raw", "dng").catch(
+      (e: unknown) => e as Error,
+    );
+
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect((err as Error).name).toBe("DecoderOutOfMemoryError");
+  });
+
+  it("ends decodeRaw as a 503 when dcraw_emu cannot start and the ImageMagick fallback runs out of memory", async () => {
+    failures.byCommand.dcraw_emu = { code: "ENOENT", syscall: "spawn dcraw_emu" };
+    const oom = { code: null, signal: "SIGKILL", stderr: "" };
+    failures.byCommand.magick = oom;
+    failures.byCommand.convert = oom;
+
+    const err = await decodeToSharpCompat(Buffer.from("not really a raw"), "raw", "dng").catch(
+      (e: unknown) => e as Error,
+    );
+
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect((err as Error).name).toBe("DecoderOutOfMemoryError");
+  });
+
+  it.each(["ENOSPC", "EMFILE", "EACCES"])(
+    "surfaces a %s temp-write failure in preflightEncodedDimensions as a 503 with cause",
+    async (code) => {
+      const fsErr = Object.assign(new Error(`${code}: open temp file`), {
+        code,
+        syscall: "open",
+      });
+      failures.open = fsErr;
+
+      const err = (await decodeToSharpCompat(Buffer.from("not really a jxl"), "jxl", undefined, {
+        maxPixels: 100_000,
+      }).catch((e: unknown) => e)) as Error;
+
+      expect(err).toBeInstanceOf(DecoderUnavailableError);
+      expect(err.name).toBe("DecoderUnavailableError");
+      expect(err.message).toMatch(/could not write a temporary file/);
+      expect(isDecoderUnavailable(err)).toBe(true);
+      expect(err.cause).toBe(fsErr);
+    },
+  );
+
+  it("surfaces a killed exiftool in preflightEncodedDimensions as a 503 DecoderOutOfMemoryError", async () => {
+    const killFields = { code: null, signal: "SIGKILL", stderr: "" };
+    failures.byCommand.exiftool = killFields;
+
+    const err = await decodeToSharpCompat(Buffer.from("not really a jxl"), "jxl", undefined, {
+      maxPixels: 100_000,
+    }).catch((e: unknown) => e as Error);
+
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect((err as Error).name).toBe("DecoderOutOfMemoryError");
+  });
+
+  it("surfaces an exiftool timeout in preflightEncodedDimensions as a 503 DecoderUnavailableError", async () => {
+    failures.byCommand.exiftool = { killed: true, signal: "SIGTERM", code: null, stderr: "" };
+
+    const err = (await decodeToSharpCompat(Buffer.from("not really a jxl"), "jxl", undefined, {
+      maxPixels: 100_000,
+    }).catch((e: unknown) => e)) as Error;
+
+    expect(err).toBeInstanceOf(DecoderUnavailableError);
+    expect(err.name).toBe("DecoderUnavailableError");
+    expect(err.message).toMatch(/Exiftool timed out or was terminated/);
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect(err.cause).toMatchObject({ killed: true, signal: "SIGTERM" });
+  });
+
+  it("surfaces an unstartable exiftool (exit 127) in preflightEncodedDimensions as a 503 DecoderUnavailableError", async () => {
+    failures.byCommand.exiftool = { code: 127, signal: null, stderr: "" };
+
+    const err = (await decodeToSharpCompat(Buffer.from("not really a jxl"), "jxl", undefined, {
+      maxPixels: 100_000,
+    }).catch((e: unknown) => e)) as Error;
+
+    expect(err).toBeInstanceOf(DecoderUnavailableError);
+    expect(err.name).toBe("DecoderUnavailableError");
+    expect(err.message).toMatch(/could not be started/);
+    expect(isDecoderUnavailable(err)).toBe(true);
+  });
+
+  it("attaches exiftool's rejection as cause when preflightEncodedDimensions cannot read dimensions", async () => {
+    failures.byCommand.exiftool = {
+      code: 1,
+      signal: null,
+      stderr: "Error: File format error\n",
+    };
+
+    const err = (await decodeToSharpCompat(Buffer.from("not really a jxl"), "jxl", undefined, {
+      maxPixels: 100_000,
+    }).catch((e: unknown) => e)) as Error;
+
+    expect(isDecoderUnavailable(err)).toBe(false);
+    expect(err.message).toMatch(/encoded dimensions are unavailable/);
+    expect((err.cause as { stderr?: string } | undefined)?.stderr).toBe(
+      "Error: File format error\n",
+    );
+  });
+
+  it("keeps Sharp's real error in assertDecodedWithinLimit when the decoded PNG is corrupt", async () => {
+    const { fixtures, readFixture } = await import("../../fixtures/index.js");
+    failures.writeOutput = Buffer.from("not a valid png");
+
+    const err = (await decodeToSharpCompat(
+      readFixture(fixtures.image.formats("bmp")),
+      "bmp",
+      undefined,
+      { maxPixels: 1_000_000 },
+    ).catch((e: unknown) => e)) as Error;
+
+    expect(err.message).not.toMatch(/configured image safety limits/);
+    expect(err.message).toMatch(/unsupported image format|VipsPng/i);
+  });
+
+  it("still enforces limitInputPixels and maxDimension in assertDecodedWithinLimit when decoded output exceeds them", async () => {
+    const { fixtures, readFixture } = await import("../../fixtures/index.js");
+    // A 1x1 QOI header passes preflight, then the mocked BMP decode writes a
+    // 200x150 PNG that assertDecodedWithinLimit checks.
+    const png200 = readFixture(fixtures.image.base.png200);
+    const tinyBmp = Buffer.from(readFixture(fixtures.image.formats("bmp")));
+    tinyBmp.writeInt32LE(10, 18);
+    tinyBmp.writeInt32LE(10, 22);
+
+    failures.writeOutput = png200;
+    const pixelErr = (await decodeToSharpCompat(tinyBmp, "bmp", undefined, {
+      maxPixels: 500,
+    }).catch((e: unknown) => e)) as Error;
+    expect(pixelErr.message).toMatch(/input image exceeds pixel limit/i);
+
+    failures.writeOutput = png200;
+    const dimErr = (await decodeToSharpCompat(tinyBmp, "bmp", undefined, {
+      maxDimension: 150,
+      maxPixels: 100_000,
+    }).catch((e: unknown) => e)) as Error;
+    expect(dimErr.message).toMatch(/pixel dimension safety limit.*200x150/i);
   });
 });

@@ -60,6 +60,10 @@ export function isDecoderUnavailable(err: unknown): boolean {
  * something they already have.
  */
 export function noDecoderFound(message: string, probeFailures: unknown[]): Error {
+  for (const err of probeFailures) {
+    const outOfMemory = asDecoderOutOfMemory(err);
+    if (outOfMemory !== err) return outOfMemory as Error;
+  }
   const notInstalled = probeFailures.every(cannotStart);
   if (notInstalled) return new DecoderUnavailableError(message, probeFailures.at(-1));
   return new Error(message, { cause: probeFailures.find((err) => !cannotStart(err)) });
@@ -172,8 +176,10 @@ const THREAD_START_ABORTED =
 const OPENMP_THREAD_FAILED = /libgomp: Thread creation failed: Resource temporarily unavailable/;
 
 export function asDecoderOutOfMemory(err: unknown): unknown {
+  if (err instanceof DecoderOutOfMemoryError) return err;
   const { signal, stderr } = (err ?? {}) as { signal?: unknown; stderr?: unknown };
-  const decoderOutput = typeof stderr === "string" ? stderr : "";
+  const decoderOutput =
+    typeof stderr === "string" ? stderr : Buffer.isBuffer(stderr) ? stderr.toString("utf8") : "";
   if (
     (signal === "SIGABRT" && THREAD_START_ABORTED.test(decoderOutput)) ||
     OPENMP_THREAD_FAILED.test(decoderOutput)
@@ -224,7 +230,7 @@ function chainFailure(failures: unknown[]): unknown {
 }
 
 function outOfMemory(err: unknown): boolean {
-  return asDecoderOutOfMemory(err) !== err;
+  return err instanceof DecoderOutOfMemoryError || asDecoderOutOfMemory(err) !== err;
 }
 
 export interface DecodeSafetyOptions {
@@ -275,10 +281,8 @@ async function assertDecodedWithinLimit(
       }).metadata();
       assertDimensionsWithinLimit(metadata.width, metadata.height, options);
     } catch (error) {
-      if (isImageSafetyError(error)) throw error;
-      throw new Error("Decoded image exceeds the configured image safety limits", {
-        cause: error,
-      });
+      options.signal?.throwIfAborted();
+      throw asDecoderOutOfMemory(error);
     }
   }
   options.signal?.throwIfAborted();
@@ -414,41 +418,60 @@ async function preflightEncodedDimensions(
   const id = randomUUID();
   const safeExt = (ext || format || "img").replace(/[^a-z0-9]/gi, "") || "img";
   const inputPath = join(tmpdir(), `dimensions-${id}.${safeExt}`);
+  let exiftoolFailure: unknown;
   try {
-    await writeTempExclusive(inputPath, buffer);
-    const { stdout } = await execFileAsync(
-      "exiftool",
-      ["-fast2", "-s3", "-ImageWidth", "-ImageHeight", inputPath],
-      {
-        timeout: 15_000,
-        maxBuffer: 64 * 1024,
-        signal: options.signal,
-      },
-    );
-    const values = String(stdout).trim().split(/\s+/).map(Number);
-    if (values.length >= 2 && values.every(Number.isFinite)) {
-      assertDimensionsWithinLimit(values[0], values[1], options);
-      return;
-    }
-  } catch (error) {
-    options.signal?.throwIfAborted();
-    if (isImageSafetyError(error)) throw error;
-    // Without exiftool the safety limits can't be checked at all, whatever
-    // the file: that's the host, not the upload (#1428).
-    if ((error as NodeJS.ErrnoException).code === "ENOENT" && isBinarySpawnFailure(error)) {
+    try {
+      await writeTempExclusive(inputPath, buffer);
+    } catch (error) {
+      options.signal?.throwIfAborted();
       throw new DecoderUnavailableError(
-        "No exiftool found. Install exiftool (libimage-exiftool-perl) to check image dimensions safely.",
+        "The server could not write a temporary file to check image dimensions.",
         error,
       );
     }
-    const unavailable = asDecoderUnavailable(error);
-    if (unavailable !== error) throw unavailable;
+    try {
+      const { stdout } = await execFileAsync(
+        "exiftool",
+        ["-fast2", "-s3", "-ImageWidth", "-ImageHeight", inputPath],
+        {
+          timeout: 15_000,
+          maxBuffer: 64 * 1024,
+          signal: options.signal,
+        },
+      );
+      const values = String(stdout).trim().split(/\s+/).map(Number);
+      if (values.length >= 2 && values.every(Number.isFinite)) {
+        assertDimensionsWithinLimit(values[0], values[1], options);
+        return;
+      }
+    } catch (error) {
+      options.signal?.throwIfAborted();
+      if (isImageSafetyError(error)) throw error;
+      // Without exiftool the safety limits can't be checked at all, whatever
+      // the file: that's the host, not the upload (#1428).
+      if ((error as NodeJS.ErrnoException).code === "ENOENT" && isBinarySpawnFailure(error)) {
+        throw new DecoderUnavailableError(
+          "No exiftool found. Install exiftool (libimage-exiftool-perl) to check image dimensions safely.",
+          error,
+        );
+      }
+      const unavailable = asDecoderUnavailable(asDecoderOutOfMemory(error));
+      if (unavailable !== error) throw unavailable;
+      if (inconclusive(error)) {
+        throw new DecoderUnavailableError(
+          "Exiftool timed out or was terminated before it could check image dimensions.",
+          error,
+        );
+      }
+      exiftoolFailure = error;
+    }
   } finally {
     await rm(inputPath, { force: true }).catch(() => {});
   }
 
   throw new Error(
     `Cannot safely decode ${format.toUpperCase()}: encoded dimensions are unavailable for the configured image safety limits`,
+    exiftoolFailure !== undefined ? { cause: exiftoolFailure } : undefined,
   );
 }
 
@@ -635,6 +658,8 @@ async function findMagickCmd(options: DecodeSafetyOptions = {}): Promise<string>
       return cmd;
     } catch (err) {
       options.signal?.throwIfAborted();
+      const outOfMemory = asDecoderOutOfMemory(err);
+      if (outOfMemory !== err) throw outOfMemory;
       probeFailures.push(err);
     }
   }
@@ -762,7 +787,9 @@ async function decodeRaw(
       }
     } catch (error) {
       options.signal?.throwIfAborted();
-      if (error instanceof Error && /pixel safety limit/i.test(error.message)) throw error;
+      if (isImageSafetyError(error)) throw error;
+      const outOfMemory = asDecoderOutOfMemory(error);
+      if (outOfMemory !== error) throw outOfMemory;
       // dcraw_emu not available or unsupported format -- fall through
       dcrawFailure = error;
     }
@@ -782,8 +809,10 @@ async function decodeRaw(
       if (jpegBuf && jpegBuf.length > 1000 && jpegBuf[0] === 0xff && jpegBuf[1] === 0xd8) {
         return jpegBuf;
       }
-    } catch {
+    } catch (error) {
       options.signal?.throwIfAborted();
+      const outOfMemory = asDecoderOutOfMemory(error);
+      if (outOfMemory !== error) throw outOfMemory;
       // ExifTool not available or no embedded JPEG -- fall through
     }
 
@@ -805,8 +834,10 @@ async function decodeRaw(
       ) {
         return previewBuf;
       }
-    } catch {
+    } catch (error) {
       options.signal?.throwIfAborted();
+      const outOfMemory = asDecoderOutOfMemory(error);
+      if (outOfMemory !== error) throw outOfMemory;
       // fall through
     }
 
@@ -828,7 +859,7 @@ async function decodeRaw(
       // dcraw_emu is the image's RAW decoder. ImageMagick's RAW path hands off
       // to ufraw or darktable, which fail with messages no pattern can tell
       // from a bad file, so a dcraw_emu that can't start decides it (#1429).
-      if (cannotStart(dcrawFailure)) throw dcrawFailure;
+      if (cannotStart(dcrawFailure) && !outOfMemory(error)) throw dcrawFailure;
       throw chainFailure([dcrawFailure, error].filter((err) => err !== undefined));
     }
     return await readFile(outputPath);
