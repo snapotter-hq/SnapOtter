@@ -704,6 +704,10 @@ export function useSelectionTool(): SelectionToolApi {
 
   const magicWandSelect = useCallback(
     (stage: Konva.Stage, x: number, y: number, tolerance: number, contiguous: boolean) => {
+      const sx = Math.floor(x);
+      const sy = Math.floor(y);
+      if (sx < 0 || sx >= canvasSize.width || sy < 0 || sy >= canvasSize.height) return;
+
       // Capture the document at document resolution, ignoring zoom/pan. A capture
       // that can't be read selects nothing and says why, rather than flood-filling
       // the zeros of a dead canvas into a whole-document selection (#2139).
@@ -718,7 +722,7 @@ export function useSelectionTool(): SelectionToolApi {
         return;
       }
       const imageData = pixels.imageData;
-      const mask = floodFillMask(imageData, x, y, tolerance, contiguous);
+      const mask = floodFillMask(imageData, sx, sy, tolerance, contiguous);
       const bounds = maskToBounds(mask);
       if (!bounds) return;
 

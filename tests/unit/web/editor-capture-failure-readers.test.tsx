@@ -249,6 +249,27 @@ describe("magic wand (#2139)", () => {
     expect(useEditorStore.getState().selection).toBeNull();
     expect(reportFailure).toHaveBeenCalledWith("no-context", messages);
   });
+
+  it.each([
+    ["left of canvas", -1, 0],
+    ["sub-pixel left of canvas", -0.1, 0],
+    ["above canvas", 0, -1],
+    ["sub-pixel above canvas", 0, -0.1],
+    ["right of canvas", 2, 0],
+    ["below canvas", 0, 2],
+  ])(
+    "ignores out-of-bounds clicks (%s) without capturing or reporting failure (#2452)",
+    (_label, x, y) => {
+      const { stage, toCanvas } = fakeStage(fakeContext({ readThrows: tainted() }));
+      const hook = renderHook(() => useSelectionTool());
+
+      act(() => hook.result.current.magicWandSelect(stage, x, y, 32, true));
+
+      expect(toCanvas).not.toHaveBeenCalled();
+      expect(reportFailure).not.toHaveBeenCalled();
+      expect(useEditorStore.getState().selection).toBeNull();
+    },
+  );
 });
 
 describe("histogram (#2139)", () => {

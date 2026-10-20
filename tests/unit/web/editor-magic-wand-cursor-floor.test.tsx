@@ -186,7 +186,43 @@ describe("magic wand coordinate flooring (#2431)", () => {
     // (-0.25, -0.25) is outside the canvas. Math.round(-0.25) is -0, passing sx < 0.
     act(() => result.current.magicWandSelect(stage, -0.25, -0.25, 0, true));
 
+    expect(stage.toCanvas).not.toHaveBeenCalled();
     expect(useEditorStore.getState().selection).toBeNull();
+  });
+
+  it("selects all matching pixels when contiguous is false", () => {
+    const stage = makeFakeStage();
+    const { result } = renderHook(() => useSelectionTool());
+
+    // (1, 0) and (0, 1) are both blue and non-adjacent (diagonal).
+    act(() => result.current.magicWandSelect(stage, 1.25, 0.25, 0, false));
+
+    const selection = useEditorStore.getState().selection;
+    expect(selection?.bounds).toEqual({ x: 0, y: 0, width: 2, height: 2 });
+    expect(Array.from(selection?.mask ?? [])).toEqual([0, 1, 1, 0]);
+  });
+
+  it("ignores EditorCanvas magic-wand clicks in the panned margin without capturing (#2452)", () => {
+    const existingSelection = {
+      type: "rect" as const,
+      points: [],
+      bounds: { x: 0, y: 0, width: 1, height: 1 },
+    };
+    useEditorStore.setState({
+      activeTool: "magic-wand",
+      zoom: 2,
+      panOffset: { x: 10, y: 20 },
+      selection: existingSelection,
+    });
+    render(<EditorCanvas />);
+
+    // Pointer at (9, 19) with pan (10, 20) and zoom 2 => canvas (-0.5, -0.5), outside the 2x2 canvas.
+    const stage = makeFakeStage({ x: 9, y: 19 });
+    act(() => stageProps.onMouseDown?.(stageMouseEvent(stage)));
+
+    expect(stage.toCanvas).not.toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
+    expect(useEditorStore.getState().selection).toEqual(existingSelection);
   });
 });
 
