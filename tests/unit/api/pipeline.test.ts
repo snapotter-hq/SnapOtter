@@ -130,12 +130,19 @@ vi.mock("node:fs/promises", async (importOriginal) => {
   return {
     ...actual,
     readFile: async (...args: Parameters<typeof actual.readFile>) => {
+      if (readFileSpy.getMockImplementation()) {
+        return readFileSpy(...args);
+      }
       const buf = (await actual.readFile(...args)) as Buffer;
       readFileSpy(...args);
       return buf;
     },
-    rm: (...args: Parameters<typeof actual.rm>) => {
-      rmSpy(...args);
+    rm: async (...args: Parameters<typeof actual.rm>) => {
+      if (rmSpy.getMockImplementation()) {
+        await rmSpy(...args);
+      } else {
+        rmSpy(...args);
+      }
       return actual.rm(...args);
     },
   };
@@ -967,7 +974,20 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685)", () => {
   );
 });
 
-describe("POST /api/v1/pipeline/execute upload faults (#1642)", () => {
+describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
+  const executeTestToolId = `pipeline-execute-test-${Math.random().toString(36).slice(2, 8)}`;
+  registerToolProcessFn({
+    toolId: executeTestToolId,
+    settingsSchema: {
+      safeParse: (d: unknown) => ({ success: true, data: d ?? {} }),
+      parse: (d: unknown) => d ?? {},
+    } as never,
+    process: async (buf: Buffer) => ({
+      buffer: buf,
+      filename: "out.png",
+      contentType: "image/png",
+    }),
+  });
   registerToolProcessFn({
     toolId: "ocr-pdf",
     settingsSchema: {
@@ -1159,4 +1179,82 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642)", () => {
       }
     },
   );
+
+  it("continues processing when rm rejects after reading the spooled scratch file on /api/v1/pipeline/execute (#2860)", async () => {
+    vi.clearAllMocks();
+    readFileSpy.mockReset();
+    rmSpy.mockReset();
+    rmSpy.mockImplementation(async (target: unknown) => {
+      if (String(target).endsWith("/0-first.png")) {
+        throw new Error("EACCES: unlink failed");
+      }
+    });
+    try {
+      const reply = await invokePipelineExecuteRoute([
+        { type: "file", filename: "first.png", content: Buffer.from("first-ok") },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: executeTestToolId, settings: {} }],
+          }),
+        },
+      ]);
+
+      expect(reply.statusCode).toBe(202);
+      expect(readFileSpy).toHaveBeenCalledTimes(1);
+      expect(
+        rmSpy.mock.calls.some(
+          (call: unknown[]) =>
+            String(call[0]).endsWith("/0-first.png") &&
+            (call[1] as { force?: boolean } | undefined)?.force === true,
+        ),
+      ).toBe(true);
+      expect(putObjectMock).toHaveBeenCalledWith(
+        expect.stringMatching(/^uploads\/.*\/first\.png$/),
+        Buffer.from("first-ok"),
+      );
+    } finally {
+      rmSpy.mockReset();
+    }
+  });
+
+  it("removes the spooled scratch file in finally and propagates the readFile error when readFile rejects on /api/v1/pipeline/execute (#2860)", async () => {
+    vi.clearAllMocks();
+    readFileSpy.mockReset();
+    rmSpy.mockReset();
+    const readErr = new Error("EIO: i/o error, read");
+    readFileSpy.mockRejectedValueOnce(readErr);
+    rmSpy.mockImplementation(async (target: unknown) => {
+      if (String(target).endsWith("/0-first.png")) {
+        throw new Error("EACCES: unlink failed");
+      }
+    });
+    try {
+      await expect(
+        invokePipelineExecuteRoute([
+          { type: "file", filename: "first.png", content: Buffer.from("first-ok") },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: [{ toolId: executeTestToolId, settings: {} }],
+            }),
+          },
+        ]),
+      ).rejects.toBe(readErr);
+
+      expect(
+        rmSpy.mock.calls.some(
+          (call: unknown[]) =>
+            String(call[0]).endsWith("/0-first.png") &&
+            (call[1] as { force?: boolean } | undefined)?.force === true,
+        ),
+      ).toBe(true);
+      expect(putObjectMock).not.toHaveBeenCalled();
+    } finally {
+      readFileSpy.mockReset();
+      rmSpy.mockReset();
+    }
+  });
 });

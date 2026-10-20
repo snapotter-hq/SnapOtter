@@ -400,8 +400,11 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           }
           const inputModality = TOOLS.find((t) => t.id === firstToolId)?.modality ?? "image";
           if (firstToolId !== "ocr-pdf") {
-            processBuffer = await readFile(file.path);
-            await rm(file.path, { force: true });
+            try {
+              processBuffer = await readFile(file.path);
+            } finally {
+              await rm(file.path, { force: true }).catch(() => {});
+            }
           }
           const preprocessingReply =
             firstToolId === "ocr-pdf"
