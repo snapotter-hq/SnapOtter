@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { isAnimated, readAnimationFor } from "../../../apps/api/src/lib/animated-image.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerColorAdjustments } from "../../../apps/api/src/routes/tools/adjust-colors.js";
+import { registerBorder } from "../../../apps/api/src/routes/tools/border.js";
 import { registerCircleCrop } from "../../../apps/api/src/routes/tools/circle-crop.js";
 import { registerColorBlindness } from "../../../apps/api/src/routes/tools/color-blindness.js";
 import { registerCompress } from "../../../apps/api/src/routes/tools/compress.js";
@@ -45,6 +46,7 @@ const app = { post: () => undefined } as unknown as FastifyInstance;
 
 beforeAll(() => {
   registerColorAdjustments(app);
+  registerBorder(app);
   registerCircleCrop(app);
   registerColorBlindness(app);
   registerCompress(app);
@@ -70,6 +72,7 @@ beforeAll(() => {
 /** Tools expected to carry animation from input to output. */
 const ROUND_TRIP_TOOLS = [
   "adjust-colors",
+  "border",
   "color-blindness",
   "compress",
   "crop",
@@ -406,6 +409,16 @@ describe("a setting that needs alpha does not cost the animation (#1083)", () =>
       settings: { background: "transparent" },
       expectedFilename: "frames_padded.webp",
     },
+    {
+      toolId: "border",
+      settings: { cornerRadius: 10 },
+      expectedFilename: "frames.webp",
+    },
+    {
+      toolId: "border",
+      settings: { shadow: true },
+      expectedFilename: "frames.webp",
+    },
   ])(
     "$toolId falls back to WebP rather than PNG",
     async ({ toolId, settings, expectedFilename }) => {
@@ -434,6 +447,16 @@ describe("a setting that needs alpha does not cost the animation (#1083)", () =>
       toolId: "image-pad",
       settings: { background: "transparent" },
       expectedFilename: "test-200x150_padded.png",
+    },
+    {
+      toolId: "border",
+      settings: { cornerRadius: 10 },
+      expectedFilename: "test-200x150.png",
+    },
+    {
+      toolId: "border",
+      settings: { shadow: true },
+      expectedFilename: "test-200x150.png",
     },
   ])("$toolId still returns PNG for a still", async ({ toolId, settings, expectedFilename }) => {
     const config = getToolConfig(toolId);
@@ -495,6 +518,80 @@ describe("a setting that needs alpha does not cost the animation (#1083)", () =>
     async ({ load, filename, settings, expectedContentType, expectedFilename }) => {
       const config = getToolConfig("replace-color");
       if (!config) throw new Error("replace-color must be registered");
+
+      const result = await config.process(
+        await load(),
+        config.settingsSchema.parse(settings),
+        filename,
+      );
+
+      expect(result.contentType).toBe(expectedContentType);
+      expect(result.filename).toBe(expectedFilename);
+    },
+  );
+
+  it.each([
+    {
+      label: "still JPEG with .jpg extension and cornerRadius",
+      load: async () => readFixture(fixtures.image.base.jpg100),
+      filename: "test-100x100.jpg",
+      settings: { cornerRadius: 10 },
+      expectedContentType: "image/png",
+      expectedFilename: "test-100x100.png",
+    },
+    {
+      label: "still JPEG without extension and cornerRadius",
+      load: async () => readFixture(fixtures.image.base.jpg100),
+      filename: "image",
+      settings: { cornerRadius: 10 },
+      expectedContentType: "image/png",
+      expectedFilename: "image.png",
+    },
+    {
+      label: "still JPEG with dotfile filename and shadow",
+      load: async () => readFixture(fixtures.image.base.jpg100),
+      filename: ".hidden",
+      settings: { shadow: true },
+      expectedContentType: "image/png",
+      expectedFilename: ".hidden.png",
+    },
+    {
+      label: "animated GIF without extension and cornerRadius",
+      load: gifSource,
+      filename: "frames",
+      settings: { cornerRadius: 10 },
+      expectedContentType: "image/webp",
+      expectedFilename: "frames.webp",
+    },
+    {
+      label: "animated GIF with dotfile filename and shadow",
+      load: gifSource,
+      filename: ".frames",
+      settings: { shadow: true },
+      expectedContentType: "image/webp",
+      expectedFilename: ".frames.webp",
+    },
+    {
+      label: "single-frame GIF with cornerRadius",
+      load: async () => firstFrameOnly(await gifSource(), "gif"),
+      filename: "still.gif",
+      settings: { cornerRadius: 10 },
+      expectedContentType: "image/png",
+      expectedFilename: "still.png",
+    },
+    {
+      label: "still JPEG when neither cornerRadius nor shadow is enabled",
+      load: async () => readFixture(fixtures.image.base.jpg100),
+      filename: "test-100x100.jpg",
+      settings: { borderWidth: 10 },
+      expectedContentType: "image/jpeg",
+      expectedFilename: "test-100x100.jpg",
+    },
+  ])(
+    "border updates filename extension only when container changes ($label) (#3067)",
+    async ({ load, filename, settings, expectedContentType, expectedFilename }) => {
+      const config = getToolConfig("border");
+      if (!config) throw new Error("border must be registered");
 
       const result = await config.process(
         await load(),
@@ -789,6 +886,13 @@ describe("animation detection inspects buffer format, not filename extension or 
       expectedContentType: "image/png",
       expectedFilename: "multipage_padded.png",
       expectedShape: { pages: 1, width: 800, pageHeight: 800 },
+    },
+    {
+      toolId: "border",
+      settings: { borderWidth: 10, cornerRadius: 10 },
+      expectedContentType: "image/png",
+      expectedFilename: "multipage.png",
+      expectedShape: { pages: 1, width: 820, pageHeight: 620 },
     },
   ])(
     "$toolId converts multipage.tiff page 1 as a single-frame still instead of an animation",

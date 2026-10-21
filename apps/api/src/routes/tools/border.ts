@@ -1,8 +1,10 @@
+import { extname } from "node:path";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
+import { isAnimated, runPerFrame } from "../../lib/animated-image.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
-import { resolveOutputFormat } from "../../lib/output-format.js";
+import { outputFormatFor, resolveOutputFormat } from "../../lib/output-format.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -37,9 +39,26 @@ export function registerBorder(app: FastifyInstance) {
       "Image border failed",
       (s) => (s?.shadow ? "shadow" : "border"),
       async (inputBuffer, settings, filename) => {
-        let buf = inputBuffer;
+        const outputFormat = await resolveOutputFormat(inputBuffer, filename);
+        const ALPHA_FORMATS = new Set(["png", "webp", "avif"]);
+        const needsAlpha = settings.cornerRadius > 0 || settings.shadow;
+        // Rounded corners and drop shadows need full alpha. PNG is the right
+        // landing place for a still, but it cannot hold frames, so an animation
+        // switches to WebP instead of being flattened (#1083, #3067). No quality
+        // on the forced PNG: Sharp reads it as palette quantisation (#710).
+        const useFormat =
+          needsAlpha && !ALPHA_FORMATS.has(outputFormat.format)
+            ? (await isAnimated(inputBuffer))
+              ? outputFormatFor("webp", outputFormat.quality)
+              : outputFormatFor("png")
+            : outputFormat;
 
-        try {
+        // Rounded corners and shadows composite over the canvas, and a composite
+        // lands on the first frame only, so animation is handled a frame at a
+        // time (#1083, #3067).
+        const core = async (source: Buffer): Promise<Buffer> => {
+          let buf = source;
+
           // Both steps below name PNG so the colour they paint is not re-encoded in
           // the input's own container: a green border came back as 76,105,113 out
           // of a GIF, whose palette has no green in it (#1190).
@@ -156,23 +175,25 @@ export function registerBorder(app: FastifyInstance) {
               .toBuffer();
           }
 
-          const outputFormat = await resolveOutputFormat(inputBuffer, filename);
-          const ALPHA_FORMATS = new Set(["png", "webp", "avif"]);
-          const needsAlpha = settings.cornerRadius > 0 || settings.shadow;
+          return await sharp(buf).toFormat(useFormat.format, useFormat.encoderOptions).toBuffer();
+        };
 
-          if (needsAlpha && !ALPHA_FORMATS.has(outputFormat.format)) {
-            const buffer = await sharp(buf).png().toBuffer();
-            const outName = filename.replace(/\.[^.]+$/, ".png");
-            return { buffer, filename: outName, contentType: "image/png" };
-          }
-
-          const buffer = await sharp(buf)
-            .toFormat(outputFormat.format, outputFormat.encoderOptions)
-            .toBuffer();
-          return { buffer, filename, contentType: outputFormat.contentType };
+        let buffer: Buffer;
+        try {
+          buffer =
+            (await runPerFrame(inputBuffer, useFormat.format, core)) ?? (await core(inputBuffer));
         } catch (err) {
           throw await asInputErrorIfUndecodable(inputBuffer, err);
         }
+
+        const ext = extname(filename);
+        const baseName = ext ? filename.slice(0, -ext.length) : filename;
+        const outputFilename =
+          useFormat.format !== outputFormat.format
+            ? `${baseName}.${useFormat.extension}`
+            : filename;
+
+        return { buffer, filename: outputFilename, contentType: useFormat.contentType };
       },
     ),
   });
