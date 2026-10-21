@@ -29,7 +29,7 @@ import { expandAccept, isImageFile } from "@/components/common/dropzone";
 import { useTranslation } from "@/contexts/i18n-context";
 import { type CollageTemplate, getTemplateById } from "@/lib/collage-templates";
 import { format } from "@/lib/format";
-import { showUnsupportedFileType } from "@/lib/intake-notice";
+import { showIntakeIgnored, showUnsupportedFileType } from "@/lib/intake-notice";
 import { cn } from "@/lib/utils";
 import type { CellTransform, CollageImage } from "@/stores/collage-store";
 import { useCollageStore } from "@/stores/collage-store";
@@ -53,6 +53,14 @@ function getAspectMultiplier(ar: string): number | null {
 
 function displayUrl(img: CollageImage): string {
   return img.previewBlobUrl ?? img.blobUrl;
+}
+
+function allowCollageIntake(ignoredMessage: string): boolean {
+  if (useCollageStore.getState().phase === "processing") {
+    showIntakeIgnored(ignoredMessage);
+    return false;
+  }
+  return true;
 }
 
 export function CollagePreview() {
@@ -105,13 +113,18 @@ function UploadArea() {
       setIsDragging(false);
       const dropped = Array.from(e.dataTransfer.files);
       const files = dropped.filter(isImageFile);
-      if (files.length > 0) addImages(files);
-      else if (dropped.length > 0) showUnsupportedFileType(t.dropzone.unsupportedFileType);
+      if (files.length > 0) {
+        if (!allowCollageIntake(t.dropzone.ignoredWhileRunning)) return;
+        addImages(files);
+      } else if (dropped.length > 0) {
+        showUnsupportedFileType(t.dropzone.unsupportedFileType);
+      }
     },
     [addImages, t],
   );
 
   const handleClick = () => {
+    if (!allowCollageIntake(t.dropzone.ignoredWhileRunning)) return;
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
@@ -120,8 +133,12 @@ function UploadArea() {
       const selected = Array.from((e.target as HTMLInputElement).files || []);
       if (selected.length === 0) return;
       const files = selected.filter(isImageFile);
-      if (files.length > 0) addImages(files);
-      else showUnsupportedFileType(t.dropzone.unsupportedFileType);
+      if (files.length > 0) {
+        if (!allowCollageIntake(t.dropzone.ignoredWhileRunning)) return;
+        addImages(files);
+      } else {
+        showUnsupportedFileType(t.dropzone.unsupportedFileType);
+      }
     };
     input.click();
   };
@@ -641,6 +658,7 @@ function ImageStrip() {
   const { images } = store;
 
   const handleAddMore = useCallback(() => {
+    if (!allowCollageIntake(t.dropzone.ignoredWhileRunning)) return;
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
@@ -649,8 +667,12 @@ function ImageStrip() {
       const selected = Array.from((e.target as HTMLInputElement).files || []);
       if (selected.length === 0) return;
       const files = selected.filter(isImageFile);
-      if (files.length > 0) store.addImages(files);
-      else showUnsupportedFileType(t.dropzone.unsupportedFileType);
+      if (files.length > 0) {
+        if (!allowCollageIntake(t.dropzone.ignoredWhileRunning)) return;
+        store.addImages(files);
+      } else {
+        showUnsupportedFileType(t.dropzone.unsupportedFileType);
+      }
     };
     input.click();
   }, [store, t]);
@@ -688,6 +710,7 @@ function ImageStrip() {
         ))}
         <button
           type="button"
+          aria-label={t.toolPage.addMore}
           onClick={handleAddMore}
           className="shrink-0 w-14 h-14 rounded-md border-2 border-dashed border-border hover:border-primary/50 flex items-center justify-center transition-colors"
         >

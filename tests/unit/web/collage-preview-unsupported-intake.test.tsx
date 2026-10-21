@@ -5,10 +5,11 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const toastErrorSpy = vi.hoisted(() => vi.fn());
+const toastInfoSpy = vi.hoisted(() => vi.fn());
 
 // By path: a bare "sonner" resolves differently here than in apps/web and mocks nothing (#1235).
 vi.mock("../../../apps/web/node_modules/sonner", () => ({
-  toast: { error: toastErrorSpy, info: vi.fn() },
+  toast: { error: toastErrorSpy, info: toastInfoSpy },
 }));
 
 vi.mock("@/lib/image-preview", () => ({
@@ -19,7 +20,7 @@ vi.mock("@/lib/image-preview", () => ({
 
 import { CollagePreview } from "@/components/tools/collage-preview";
 import { I18nProvider } from "@/contexts/i18n-context";
-import { useCollageStore } from "@/stores/collage-store";
+import { beginCollageRun, useCollageStore } from "@/stores/collage-store";
 
 const png = (name: string) => new File([new ArrayBuffer(64)], name, { type: "image/png" });
 const txt = (name: string) => new File(["hello"], name, { type: "text/plain" });
@@ -45,6 +46,7 @@ function pickFiles(trigger: HTMLElement, files: File[]): HTMLInputElement {
 describe("CollagePreview rejects non-image files (#2863)", () => {
   beforeEach(() => {
     toastErrorSpy.mockClear();
+    toastInfoSpy.mockClear();
     URL.createObjectURL ??= () => "";
     URL.revokeObjectURL ??= () => {};
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:c");
@@ -128,5 +130,164 @@ describe("CollagePreview rejects non-image files (#2863)", () => {
     expect(add).toBeTruthy();
     pickFiles(add as HTMLElement, []);
     expect(toastErrorSpy).not.toHaveBeenCalled();
+  });
+
+  it("labels the ImageStrip + button with t.toolPage.addMore (#3236)", () => {
+    act(() => {
+      useCollageStore.getState().addImages([png("a.png"), png("b.png")]);
+    });
+    renderPreview();
+    const addButton = screen.getByRole("button", { name: en.toolPage.addMore });
+    expect(addButton).toHaveAttribute("aria-label", en.toolPage.addMore);
+  });
+
+  it("refuses late ImageStrip file-picker onchange while a collage run is processing without aborting the active run (#3236)", () => {
+    act(() => {
+      useCollageStore.getState().addImages([png("a.png"), png("b.png")]);
+    });
+    const { container } = renderPreview();
+
+    const inputs: HTMLInputElement[] = [];
+    const clickSpy = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(function (
+      this: HTMLInputElement,
+    ) {
+      inputs.push(this);
+    });
+    const addButton =
+      screen.queryByRole("button", { name: en.toolPage.addMore }) ??
+      (container.querySelector("button:has(svg.lucide-image-plus)") as HTMLElement);
+    fireEvent.click(addButton);
+    expect(inputs).toHaveLength(1);
+    const pickerInput = inputs[0];
+
+    const abortSpy = vi.fn();
+    const run = beginCollageRun(abortSpy);
+    useCollageStore.getState().setPhase("processing");
+
+    // A click reaching ImageStrip.handleAddMore before the processing view commits is refused before opening a picker.
+    fireEvent.click(addButton);
+    clickSpy.mockRestore();
+    expect(inputs).toHaveLength(1);
+    expect(toastInfoSpy).toHaveBeenCalledTimes(1);
+    expect(toastInfoSpy).toHaveBeenCalledWith(en.dropzone.ignoredWhileRunning, {
+      id: "intake-ignored-while-running",
+    });
+    toastInfoSpy.mockClear();
+
+    act(() => {
+      useCollageStore.getState().setPhase("processing");
+    });
+
+    // Empty picker cancellation while processing stays silent.
+    Object.defineProperty(pickerInput, "files", { value: [], configurable: true });
+    act(() => {
+      pickerInput.dispatchEvent(new Event("change"));
+    });
+    expect(toastInfoSpy).not.toHaveBeenCalled();
+    expect(toastErrorSpy).not.toHaveBeenCalled();
+    expect(abortSpy).not.toHaveBeenCalled();
+
+    // Unsupported file selection while processing shows the unsupported toast without aborting the run.
+    Object.defineProperty(pickerInput, "files", {
+      value: [txt("notes.txt")],
+      configurable: true,
+    });
+    act(() => {
+      pickerInput.dispatchEvent(new Event("change"));
+    });
+    expect(toastErrorSpy).toHaveBeenCalledTimes(1);
+    expect(toastErrorSpy).toHaveBeenCalledWith(en.dropzone.unsupportedFileType, {
+      id: "intake-unsupported-file-type",
+    });
+    expect(toastInfoSpy).not.toHaveBeenCalled();
+    expect(abortSpy).not.toHaveBeenCalled();
+
+    // Valid image selection while processing is rejected with showIntakeIgnored and leaves the run intact.
+    Object.defineProperty(pickerInput, "files", {
+      value: [png("c.png")],
+      configurable: true,
+    });
+    act(() => {
+      pickerInput.dispatchEvent(new Event("change"));
+    });
+    expect(toastInfoSpy).toHaveBeenCalledTimes(1);
+    expect(toastInfoSpy).toHaveBeenCalledWith(en.dropzone.ignoredWhileRunning, {
+      id: "intake-ignored-while-running",
+    });
+    expect(abortSpy).not.toHaveBeenCalled();
+    expect(run.isCurrent()).toBe(true);
+    expect(useCollageStore.getState().phase).toBe("processing");
+    expect(useCollageStore.getState().images.map((i) => i.file.name)).toEqual(["a.png", "b.png"]);
+
+    // Once the run finishes, selecting the image adds it.
+    run.end();
+    act(() => {
+      useCollageStore.getState().setPhase("editing");
+    });
+    act(() => {
+      pickerInput.dispatchEvent(new Event("change"));
+    });
+    expect(toastInfoSpy).toHaveBeenCalledTimes(1);
+    expect(useCollageStore.getState().images.map((i) => i.file.name)).toEqual([
+      "a.png",
+      "b.png",
+      "c.png",
+    ]);
+  });
+
+  it("refuses UploadArea click, drop, and late file-picker onchange while a collage run is processing (#3236)", () => {
+    renderPreview();
+
+    const inputs: HTMLInputElement[] = [];
+    const clickSpy = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(function (
+      this: HTMLInputElement,
+    ) {
+      inputs.push(this);
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: en.toolSettings.collage.uploadImagesForCollage }),
+    );
+    expect(inputs).toHaveLength(1);
+    const pickerInput = inputs[0];
+
+    const abortSpy = vi.fn();
+    const run = beginCollageRun(abortSpy);
+    act(() => {
+      useCollageStore.getState().setPhase("processing");
+    });
+
+    // Clicking upload while processing (when images.length === 0 keeps UploadArea mounted) is refused before opening a picker.
+    fireEvent.click(
+      screen.getByRole("button", { name: en.toolSettings.collage.uploadImagesForCollage }),
+    );
+    expect(inputs).toHaveLength(1);
+    expect(toastInfoSpy).toHaveBeenCalledTimes(1);
+    expect(toastInfoSpy).toHaveBeenCalledWith(en.dropzone.ignoredWhileRunning, {
+      id: "intake-ignored-while-running",
+    });
+
+    // Dropping an image on UploadArea while processing is refused without aborting the run.
+    const zone = screen.getByRole("region", { name: en.a11y.fileDropZone });
+    fireEvent.drop(zone, { dataTransfer: { files: [png("dropped.png")] } });
+    expect(toastInfoSpy).toHaveBeenCalledTimes(2);
+    expect(abortSpy).not.toHaveBeenCalled();
+    expect(useCollageStore.getState().images).toHaveLength(0);
+
+    // Late picker onchange opened while idle is refused once processing starts.
+    Object.defineProperty(pickerInput, "files", {
+      value: [png("picked.png")],
+      configurable: true,
+    });
+    act(() => {
+      pickerInput.dispatchEvent(new Event("change"));
+    });
+    expect(toastInfoSpy).toHaveBeenCalledTimes(3);
+    expect(abortSpy).not.toHaveBeenCalled();
+    expect(run.isCurrent()).toBe(true);
+    expect(useCollageStore.getState().phase).toBe("processing");
+    expect(useCollageStore.getState().images).toHaveLength(0);
+
+    clickSpy.mockRestore();
+    run.end();
   });
 });
