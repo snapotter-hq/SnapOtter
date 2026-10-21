@@ -24,65 +24,67 @@ const ADMIN_PERMISSIONS = [
   "security:manage",
 ];
 
-let testApp: TestApp;
-let adminToken: string;
+describe("config export and import without enterprise license", () => {
+  let testApp: TestApp;
+  let adminToken: string;
 
-beforeAll(async () => {
-  testApp = await buildTestApp();
-  adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+  beforeAll(async () => {
+    testApp = await buildTestApp();
+    adminToken = await loginAsAdmin(testApp.app);
+  }, 30_000);
 
-afterAll(async () => {
-  await testApp.cleanup();
-}, 10_000);
+  afterAll(async () => {
+    await testApp.cleanup();
+  }, 10_000);
 
-describe("config export without enterprise license", () => {
-  it("returns 403 without enterprise license", async () => {
-    const res = await testApp.app.inject({
-      method: "GET",
-      url: "/api/v1/enterprise/config/export",
-      headers: { authorization: `Bearer ${adminToken}` },
+  describe("config export without enterprise license", () => {
+    it("returns 403 without enterprise license", async () => {
+      const res = await testApp.app.inject({
+        method: "GET",
+        url: "/api/v1/enterprise/config/export",
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(res.statusCode).toBe(403);
+      const body = JSON.parse(res.body);
+      expect(body.error).toContain("enterprise");
     });
-    expect(res.statusCode).toBe(403);
-    const body = JSON.parse(res.body);
-    expect(body.error).toContain("enterprise");
+
+    it("returns 401 without authentication", async () => {
+      const res = await testApp.app.inject({
+        method: "GET",
+        url: "/api/v1/enterprise/config/export",
+      });
+      expect(res.statusCode).toBe(401);
+    });
   });
 
-  it("returns 401 without authentication", async () => {
-    const res = await testApp.app.inject({
-      method: "GET",
-      url: "/api/v1/enterprise/config/export",
+  describe("config import without enterprise license", () => {
+    it("returns 403 without enterprise license", async () => {
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: {
+          dryRun: false,
+          config: { configSchemaVersion: 1 },
+        },
+      });
+      expect(res.statusCode).toBe(403);
+      const body = JSON.parse(res.body);
+      expect(body.error).toContain("enterprise");
     });
-    expect(res.statusCode).toBe(401);
-  });
-});
 
-describe("config import without enterprise license", () => {
-  it("returns 403 without enterprise license", async () => {
-    const res = await testApp.app.inject({
-      method: "POST",
-      url: "/api/v1/enterprise/config/import",
-      headers: { authorization: `Bearer ${adminToken}` },
-      payload: {
-        dryRun: false,
-        config: { configSchemaVersion: 1 },
-      },
+    it("returns 401 without authentication", async () => {
+      const res = await testApp.app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        payload: {
+          dryRun: false,
+          config: { configSchemaVersion: 1 },
+        },
+      });
+      expect(res.statusCode).toBe(401);
     });
-    expect(res.statusCode).toBe(403);
-    const body = JSON.parse(res.body);
-    expect(body.error).toContain("enterprise");
-  });
-
-  it("returns 401 without authentication", async () => {
-    const res = await testApp.app.inject({
-      method: "POST",
-      url: "/api/v1/enterprise/config/import",
-      payload: {
-        dryRun: false,
-        config: { configSchemaVersion: 1 },
-      },
-    });
-    expect(res.statusCode).toBe(401);
   });
 });
 
@@ -103,6 +105,19 @@ describe("config export with enterprise license", () => {
     await licensedApp.cleanup();
     vi.restoreAllMocks();
   }, 10_000);
+
+  it("closes the unlicensed job spine before starting the licensed app (#2805)", async () => {
+    const { closeQueues, getQueue } = await import("../../../apps/api/src/jobs/queues.js");
+    const queue = getQueue("system");
+    try {
+      await vi.waitFor(async () => expect(await queue.getWorkersCount()).toBe(1), {
+        timeout: 1_000,
+        interval: 25,
+      });
+    } finally {
+      await closeQueues();
+    }
+  });
 
   it("returns 200 with config object", async () => {
     const res = await licensedApp.app.inject({

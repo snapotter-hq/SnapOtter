@@ -10,7 +10,6 @@ import {
 import { raceInserts, raceRowLocks, raceUpdates } from "../../helpers/pg-race.js";
 import { buildTestApp, type TestApp } from "../test-server.js";
 
-let testApp: TestApp;
 const SCIM_TOKEN = `so_scim_v2_${"a".repeat(64)}`;
 const ADMIN_PERMISSIONS = [
   "tools:use",
@@ -32,22 +31,24 @@ const ADMIN_PERMISSIONS = [
   "security:manage",
 ];
 
-beforeAll(async () => {
-  testApp = await buildTestApp();
-
-  // Set up a SCIM token hash in the settings table
-  const tokenHash = await hashPassword(SCIM_TOKEN);
-  await db
-    .insert(schema.settings)
-    .values({ key: "scim_token_hash", value: tokenHash })
-    .onConflictDoNothing();
-}, 30_000);
-
-afterAll(async () => {
-  await testApp.cleanup();
-}, 10_000);
-
 describe("SCIM 2.0 provisioning", () => {
+  let testApp: TestApp;
+
+  beforeAll(async () => {
+    testApp = await buildTestApp();
+
+    // Set up a SCIM token hash in the settings table
+    const tokenHash = await hashPassword(SCIM_TOKEN);
+    await db
+      .insert(schema.settings)
+      .values({ key: "scim_token_hash", value: tokenHash })
+      .onConflictDoNothing();
+  }, 30_000);
+
+  afterAll(async () => {
+    await testApp.cleanup();
+  }, 10_000);
+
   // ── Discovery (no auth required) ───────────────────────────────
 
   describe("discovery endpoints", () => {
@@ -522,6 +523,19 @@ describe("SCIM global token administration", () => {
     await licensedApp.cleanup();
     vi.restoreAllMocks();
   }, 10_000);
+
+  it("closes the unlicensed job spine before starting the licensed app (#2805)", async () => {
+    const { closeQueues, getQueue } = await import("../../../apps/api/src/jobs/queues.js");
+    const queue = getQueue("system");
+    try {
+      await vi.waitFor(async () => expect(await queue.getWorkersCount()).toBe(1), {
+        timeout: 1_000,
+        interval: 25,
+      });
+    } finally {
+      await closeQueues();
+    }
+  });
 
   it("denies token issuance to a custom role even when it has every admin permission", async () => {
     const originalHash = "scim-issuance-authorization-sentinel";

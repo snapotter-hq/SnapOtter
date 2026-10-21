@@ -3,19 +3,19 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
-let testApp: TestApp;
-let adminToken: string;
-
-beforeAll(async () => {
-  testApp = await buildTestApp();
-  adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
-
-afterAll(async () => {
-  await testApp.cleanup();
-}, 10_000);
-
 describe("upgrade management - without enterprise license", () => {
+  let testApp: TestApp;
+  let adminToken: string;
+
+  beforeAll(async () => {
+    testApp = await buildTestApp();
+    adminToken = await loginAsAdmin(testApp.app);
+  }, 30_000);
+
+  afterAll(async () => {
+    await testApp.cleanup();
+  }, 10_000);
+
   it("GET /api/v1/admin/version returns 403 without enterprise license", async () => {
     const res = await testApp.app.inject({
       method: "GET",
@@ -91,6 +91,19 @@ describe("upgrade management - with enterprise license", () => {
     await entApp.cleanup();
     vi.restoreAllMocks();
   }, 10_000);
+
+  it("closes the unlicensed job spine before starting the licensed app (#2805)", async () => {
+    const { closeQueues, getQueue } = await import("../../../apps/api/src/jobs/queues.js");
+    const queue = getQueue("system");
+    try {
+      await vi.waitFor(async () => expect(await queue.getWorkersCount()).toBe(1), {
+        timeout: 1_000,
+        interval: 25,
+      });
+    } finally {
+      await closeQueues();
+    }
+  });
 
   it("GET /api/v1/admin/version returns 200 with version info", async () => {
     const res = await entApp.app.inject({
