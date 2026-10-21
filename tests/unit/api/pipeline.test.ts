@@ -552,7 +552,7 @@ describe("POST /api/v1/pipeline/save database error handling (#1988)", () => {
 
 // ── POST /api/v1/pipeline/batch ingress (#2684, #2685) ─────────────────
 
-describe("POST /api/v1/pipeline/batch ingress (#2684, #2685)", () => {
+describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
   const batchTestToolId = `pipeline-batch-test-${Math.random().toString(36).slice(2, 8)}`;
   registerToolProcessFn({
     toolId: batchTestToolId,
@@ -1375,6 +1375,102 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685)", () => {
       putObjectMock.mockResolvedValue(undefined);
       flowAddMock.mockReset();
       flowAddMock.mockResolvedValue(undefined);
+    }
+  });
+
+  it("continues processing when rm rejects after reading the spooled scratch file on /api/v1/pipeline/batch (#2879)", async () => {
+    vi.clearAllMocks();
+    readFileSpy.mockReset();
+    rmSpy.mockReset();
+    rmSpy.mockImplementation(async (target: unknown) => {
+      if (String(target).endsWith("/0-first.png")) {
+        throw new Error("EACCES: unlink failed");
+      }
+    });
+    try {
+      const reply = await invokePipelineBatchRoute([
+        { type: "file", filename: "first.png", content: Buffer.from("first-ok") },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: batchTestToolId, settings: {} }],
+          }),
+        },
+        { type: "field", fieldname: "clientJobId", value: "pipeline-batch-2879-rm-reject" },
+      ]);
+
+      expect(reply.statusCode).toBe(202);
+      expect(readFileSpy).toHaveBeenCalledTimes(1);
+      expect(
+        rmSpy.mock.calls.some(
+          (call: unknown[]) =>
+            String(call[0]).endsWith("/0-first.png") &&
+            (call[1] as { force?: boolean } | undefined)?.force === true,
+        ),
+      ).toBe(true);
+      expect(putObjectMock).toHaveBeenCalledWith(
+        "uploads/pipeline-batch-2879-rm-reject-f0-s0/first.png",
+        Buffer.from("first-ok"),
+      );
+    } finally {
+      rmSpy.mockReset();
+    }
+  });
+
+  it("removes the spooled scratch file in finally, settles failBatchJob, deletes earlier uploads, and propagates the readFile error when readFile rejects mid-batch on /api/v1/pipeline/batch (#2879)", async () => {
+    vi.clearAllMocks();
+    readFileSpy.mockReset();
+    rmSpy.mockReset();
+    const readErr = new Error("EIO: i/o error, read");
+    readFileSpy.mockResolvedValueOnce(Buffer.from("first-ok")).mockRejectedValueOnce(readErr);
+    rmSpy.mockImplementation(async (target: unknown) => {
+      if (String(target).endsWith("/1-second.png")) {
+        throw new Error("EACCES: unlink failed");
+      }
+    });
+    try {
+      await expect(
+        invokePipelineBatchRoute([
+          { type: "file", filename: "first.png", content: Buffer.from("first-ok") },
+          { type: "file", filename: "second.png", content: Buffer.from("second-fail") },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: [{ toolId: batchTestToolId, settings: {} }],
+            }),
+          },
+          { type: "field", fieldname: "clientJobId", value: "pipeline-batch-2879-read-reject" },
+        ]),
+      ).rejects.toBe(readErr);
+
+      expect(
+        rmSpy.mock.calls.some(
+          (call: unknown[]) =>
+            String(call[0]).endsWith("/1-second.png") &&
+            (call[1] as { force?: boolean } | undefined)?.force === true,
+        ),
+      ).toBe(true);
+      expect(putObjectMock).toHaveBeenCalledTimes(1);
+      expect(putObjectMock).toHaveBeenCalledWith(
+        "uploads/pipeline-batch-2879-read-reject-f0-s0/first.png",
+        Buffer.from("first-ok"),
+      );
+      expect(deleteObjectMock).toHaveBeenCalledWith(
+        "uploads/pipeline-batch-2879-read-reject-f0-s0/first.png",
+      );
+      expect(failBatchJobMock).toHaveBeenCalledWith({
+        jobId: "pipeline-batch-2879-read-reject",
+        totalFiles: 2,
+        completedFiles: 2,
+        failedFiles: 2,
+        errors: [{ filename: "", error: "Internal server error" }],
+        message: "Internal server error",
+      });
+    } finally {
+      readFileSpy.mockReset();
+      rmSpy.mockReset();
     }
   });
 });

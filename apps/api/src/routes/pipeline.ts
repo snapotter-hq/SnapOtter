@@ -1466,8 +1466,12 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                 await rm(file.path, { force: true }).catch(() => {});
               }
             } else {
-              let processBuffer: Buffer = await readFile(file.path);
-              await rm(file.path, { force: true }).catch(() => {});
+              let processBuffer: Buffer;
+              try {
+                processBuffer = await readFile(file.path);
+              } finally {
+                await rm(file.path, { force: true }).catch(() => {});
+              }
               if (batchModality === "image" && parsedSteps[0]?.resolvedToolId === "ocr") {
                 try {
                   const prepared = await prepareOcrIngressImage(
