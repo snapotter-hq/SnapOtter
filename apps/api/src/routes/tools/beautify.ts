@@ -126,6 +126,9 @@ async function prepareBeautifyImage(
       try {
         const meta = await sharp(buf).metadata();
         fallbackFormat = meta.format;
+        if (fallbackFormat !== "svg") {
+          await sharp(buf).resize(1).raw().toBuffer();
+        }
       } catch (err) {
         if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) throw decodeErr;
         throw await asInputErrorIfUndecodable(buf, err);

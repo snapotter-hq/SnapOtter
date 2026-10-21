@@ -223,6 +223,7 @@ export function registerColorPalette(app: FastifyInstance) {
           if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
           try {
             await sharp(fileBuffer).metadata();
+            await sharp(fileBuffer).resize(1).raw().toBuffer();
           } catch (err) {
             if (isDecoderUnavailable(decodeErr)) throw decodeErr;
             return reply.status(422).send({

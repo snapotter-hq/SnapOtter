@@ -247,6 +247,29 @@ describe("image-to-pdf inner CLI decode catches surface operational write errors
     await app.close();
   });
 
+  it("answers 503 ENGINE_UNAVAILABLE when decodeToSharpCompat throws DecoderUnavailableError on a TIFF-headed RAW (CR2/NEF) whose header Sharp reads but pixels fail (#2801)", async () => {
+    const CR2 = readFileSync(join(__dirname, "../../fixtures/image/formats/sample.cr2"));
+    const NEF = readFileSync(join(__dirname, "../../fixtures/image/formats/sample.nef"));
+    decodeToSharpCompat.mockRejectedValue(new DecoderUnavailableError("No dcraw_emu found."));
+    const app = await buildApp();
+
+    for (const [filename, content] of [
+      ["photo.cr2", CR2],
+      ["photo.nef", NEF],
+    ] as const) {
+      const res = await app.inject({
+        method: "POST",
+        url: apiToolPath("image-to-pdf"),
+        ...multipartBody([{ filename, contentType: "application/octet-stream", content }]),
+      });
+
+      expect(res.statusCode, `${filename}: ${res.body}`).toBe(503);
+      expect(res.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+    }
+    expect(deletePrefix).not.toHaveBeenCalled();
+    await app.close();
+  });
+
   it("still answers 422 for an ordinary HEIC or PSD decode failure", async () => {
     decodeHeic.mockRejectedValue(new Error("Corrupt HEIC bitstream"));
     decodeToSharpCompat.mockRejectedValue(new Error("Corrupt PSD header"));
@@ -269,6 +292,16 @@ describe("image-to-pdf inner CLI decode catches surface operational write errors
     });
     expect(psdRes.statusCode).toBe(422);
     expect(psdRes.json().error).toContain("Failed to decode PSD");
+
+    const CR2 = readFileSync(join(__dirname, "../../fixtures/image/formats/sample.cr2"));
+    decodeToSharpCompat.mockRejectedValue(new Error("Corrupt CR2 payload"));
+    const cr2Res = await app.inject({
+      method: "POST",
+      url: apiToolPath("image-to-pdf"),
+      ...multipartBody([{ filename: "photo.cr2", contentType: "image/x-canon-cr2", content: CR2 }]),
+    });
+    expect(cr2Res.statusCode).toBe(422);
+    expect(cr2Res.json().error).toContain('Failed to decode RAW file "photo.cr2"');
 
     await app.close();
   });

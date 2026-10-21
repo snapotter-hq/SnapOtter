@@ -276,6 +276,19 @@ describe("ImageInputHandler decoder availability (#1428)", () => {
     });
   });
 
+  it("turns a missing CLI decoder into 503 when Sharp reads the TIFF header but cannot decode the pixel stream (#2801)", async () => {
+    detected("raw");
+    mocks.decodeToSharpCompat.mockRejectedValue(missingMagick());
+    mocks.toBuffer.mockRejectedValue(
+      new Error("tiff2vips: Sorry, requested compression method is not configured"),
+    );
+
+    await expect(prepare("photo.cr2")).rejects.toMatchObject({
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+    });
+  });
+
   it("uses Sharp's own decode when the CLI decoder is missing but Sharp reads the file", async () => {
     detected("raw");
     mocks.decodeToSharpCompat.mockRejectedValue(missingMagick());
@@ -305,6 +318,16 @@ describe("ImageInputHandler decoder availability (#1428)", () => {
     mocks.metadata.mockRejectedValue(new Error("Input buffer contains unsupported image format"));
 
     await expect(prepare("photo.nef")).rejects.toMatchObject({ statusCode: 422 });
+  });
+
+  it("keeps 422 when the CLI decoder rejected a TIFF-headed RAW whose header Sharp reads but pixels fail (#2801)", async () => {
+    detected("raw");
+    mocks.decodeToSharpCompat.mockRejectedValue(new Error("Command failed: dcraw_emu"));
+    mocks.toBuffer.mockRejectedValue(
+      new Error("tiff2vips: Sorry, requested compression method is not configured"),
+    );
+
+    await expect(prepare("photo.cr2")).rejects.toMatchObject({ statusCode: 422 });
   });
 
   it("turns a missing ImageMagick on the AVIF fallback into 503", async () => {

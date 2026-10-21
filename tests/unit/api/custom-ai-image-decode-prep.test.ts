@@ -811,7 +811,7 @@ describe("custom AI image routes input decode, fileExt, SVG prep, and error logg
     const unavailableErr = new formatDecoders.DecoderUnavailableError("No magick found");
     const cliUnavailSpy = vi
       .spyOn(formatDecoders, "decodeToSharpCompat")
-      .mockRejectedValueOnce(unavailableErr);
+      .mockRejectedValue(unavailableErr);
     try {
       mocks.getObjectBuffer.mockResolvedValueOnce(Buffer.from("not an image"));
       const req503 = makeRequest([
@@ -822,6 +822,32 @@ describe("custom AI image routes input decode, fileExt, SVG prep, and error logg
         unavailableErr,
       );
       expect(isToolInputError(unavailableErr)).toBe(false);
+
+      // #2801: TIFF-headed RAW (CR2) passes sharp(buf).metadata() but fails pixel decode;
+      // prepareRouteImage must still rethrow DecoderUnavailableError instead of keeping the undecoded RAW buffer.
+      const cr2Bytes = readFixture(fixtures.image.formats("cr2"));
+      mocks.getObjectBuffer.mockResolvedValueOnce(cr2Bytes);
+      const reqCr2503 = makeRequest([
+        { type: "file", fieldname: "file", filename: "photo.cr2", file: {} },
+      ]);
+      const replyCr2503 = makeReply();
+      await expect(handlers["/api/v1/tools/image/upscale"](reqCr2503, replyCr2503)).rejects.toBe(
+        unavailableErr,
+      );
+
+      // Disguised comment-padded SVG exceeding element cap with .tga extension still hits
+      // sanitizeSvg (400) rather than rasterizing unsanitized SVG in the CLI pixel probe.
+      const commentPaddedBombSvg = Buffer.from(
+        `<!-- ${"x".repeat(4500)} --><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16">${"<rect/>".repeat(5005)}</svg>`,
+      );
+      mocks.getObjectBuffer.mockResolvedValueOnce(commentPaddedBombSvg);
+      const reqTgaBomb = makeRequest([
+        { type: "file", fieldname: "file", filename: "bomb.tga", file: {} },
+      ]);
+      const replyTgaBomb = makeReply();
+      await handlers["/api/v1/tools/image/upscale"](reqTgaBomb, replyTgaBomb);
+      expect(replyTgaBomb.statusCode).toBe(400);
+      expect((replyTgaBomb.payload as { error: string }).error).toContain("maximum element count");
     } finally {
       cliUnavailSpy.mockRestore();
     }

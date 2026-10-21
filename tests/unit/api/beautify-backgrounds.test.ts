@@ -17,6 +17,7 @@ import * as svgSanitize from "../../../apps/api/src/lib/svg-sanitize.js";
 import { InputValidationError } from "../../../apps/api/src/modality/contract.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { processBeautify, registerBeautify } from "../../../apps/api/src/routes/tools/beautify.js";
+import { registerMemeGenerator } from "../../../apps/api/src/routes/tools/meme-generator.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 
 describe("generateBackground", () => {
@@ -157,6 +158,7 @@ describe("beautify route and processBeautify validation & backgroundImage prepar
         handler = fn;
       }),
     } as unknown as Parameters<typeof registerBeautify>[0];
+    registerMemeGenerator(fakeApp);
     registerBeautify(fakeApp);
   });
 
@@ -443,6 +445,36 @@ describe("beautify route and processBeautify validation & backgroundImage prepar
     );
     expect(isToolInputError(tgaErr)).toBe(true);
     expect((tgaErr as Error).message).toBe(UNDECODABLE_IMAGE_MESSAGE);
+
+    // #2801: when decodeToSharpCompat throws DecoderUnavailableError on a TIFF-headed RAW (CR2)
+    // whose header Sharp reads but whose pixels fail, beautify and meme-generator rethrow DecoderUnavailableError (503)
+    const cr2Buf = readFixture(fixtures.image.formats("cr2"));
+    const unavailableErr = new formatDecoders.DecoderUnavailableError("No dcraw_emu found.");
+    const unavailSpy = vi
+      .spyOn(formatDecoders, "decodeToSharpCompat")
+      .mockRejectedValue(unavailableErr);
+    try {
+      await expect(
+        invokeBeautify({
+          file: { filename: "photo.cr2", content: cr2Buf },
+          settings: {},
+        }),
+      ).rejects.toBe(unavailableErr);
+
+      const memeConfig = getToolConfig("meme-generator");
+      if (!memeConfig) throw new Error("meme-generator missing from toolRegistry");
+      await expect(memeConfig.process(cr2Buf, {}, "photo.cr2")).rejects.toBe(unavailableErr);
+
+      unavailSpy.mockRejectedValueOnce(new Error("dcraw_emu failed on corrupt CR2"));
+      const memeClientErr = await memeConfig.process(cr2Buf, {}, "photo.cr2").then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(isToolInputError(memeClientErr)).toBe(true);
+      expect((memeClientErr as Error).message).toBe(UNDECODABLE_IMAGE_MESSAGE);
+    } finally {
+      unavailSpy.mockRestore();
+    }
   });
 
   it("sanitizes comment-padded SVGs uploaded with .apng or .tga extension on beautify", async () => {

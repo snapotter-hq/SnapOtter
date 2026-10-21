@@ -1137,6 +1137,30 @@ describe("files route logic", () => {
       expect(mocks.readImageDimensions).toHaveBeenCalledWith(rafMagic, "raf");
     });
 
+    it("answers 503 ENGINE_UNAVAILABLE when decodeToSharpCompat throws DecoderUnavailableError on a TIFF-headed RAW (CR2) whose header Sharp reads (#2801)", async () => {
+      const cr2Bytes = readFileSync(
+        resolve(process.cwd(), "tests/fixtures/image/formats/sample.cr2"),
+      );
+      const formatDecoders = await import("../../../apps/api/src/lib/format-decoders.js");
+      mocks.decodeToSharpCompat.mockRejectedValueOnce(
+        new formatDecoders.DecoderUnavailableError("No dcraw_emu found."),
+      );
+
+      const req = {
+        log: { warn: vi.fn(), error: vi.fn() },
+        file: async () => ({
+          filename: "photo.cr2",
+          toBuffer: async () => cr2Bytes,
+        }),
+      };
+      const reply = makePreviewReply();
+
+      await previewHandler(req, reply);
+
+      expect(reply.statusCode).toBe(503);
+      expect(reply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+    });
+
     it("uses extname instead of split('.').pop() at POST /api/v1/preview and every decodeToSharpCompat call site (#3246)", () => {
       const filesRouteSrc = readFileSync(
         resolve(process.cwd(), "apps/api/src/routes/files.ts"),

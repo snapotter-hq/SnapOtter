@@ -148,6 +148,7 @@ export function registerFavicon(app: FastifyInstance) {
             if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
             try {
               await sharp(buf).metadata();
+              await sharp(buf).resize(1).raw().toBuffer();
             } catch (err) {
               if (isDecoderUnavailable(decodeErr)) throw decodeErr;
               throw err;

@@ -1564,6 +1564,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                     }
                     try {
                       await sharp(processBuffer).metadata();
+                      await sharp(processBuffer).resize(1).raw().toBuffer();
                     } catch {
                       if (isDecoderUnavailable(decodeErr)) {
                         const unavailable = engineUnavailable(decodeErr);

@@ -772,6 +772,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
             }
             try {
               await sharp(rawBuffer).metadata();
+              await sharp(rawBuffer).resize(1).raw().toBuffer();
             } catch (err) {
               if (isDecoderUnavailable(decodeErr)) throw decodeErr;
               throw err;

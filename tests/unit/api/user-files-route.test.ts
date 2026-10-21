@@ -9,6 +9,7 @@ import { Readable } from "node:stream";
 import { IMAGE_EXT_TO_MIME } from "@snapotter/shared";
 import sharp from "sharp";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { fixtures, readFixture } from "../../fixtures/index.js";
 
 // ── Mocks ───────────────────────────────────────────────────────────────
 
@@ -1502,6 +1503,35 @@ describe("user files route logic", () => {
           );
           expect(dngReply.statusCode).toBe(200);
           expect(dngReply.headers["content-type"]).toBe("image/jpeg");
+
+          // #2801: when the CLI decoder is missing on a TIFF-headed RAW (CR2) whose
+          // header Sharp reads but whose pixels Sharp cannot decode, thumbnail returns 503 ENGINE_UNAVAILABLE.
+          const cr2Buffer = readFixture(fixtures.image.formats("cr2"));
+          const cr2Row = makeFileRow({
+            id: "11111111-1111-4111-8111-111111111195",
+            originalName: "photo.cr2",
+            storedName: "photo.cr2",
+            mimeType: "image/x-canon-cr2",
+          });
+          mocks.parentRows = [cr2Row];
+          mocks.readStoredFile.mockResolvedValueOnce(cr2Buffer);
+          mocks.validateImageBuffer.mockResolvedValueOnce({
+            valid: true as const,
+            format: "raw",
+            width: 1536,
+            height: 1024,
+          });
+          decodeSpy.mockRejectedValueOnce(
+            new formatDecoders.DecoderUnavailableError("No LibRaw found."),
+          );
+          const cr2Reply = makeReply();
+          await thumbnailHandler(
+            { params: { id: cr2Row.id }, log: { warn: vi.fn(), error: vi.fn() } },
+            cr2Reply,
+          );
+          expect(cr2Reply.statusCode).toBe(503);
+          expect(cr2Reply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+          mocks.parentRows = [dngRow];
 
           // DecoderOutOfMemoryError bypasses the Sharp fallback and answers 503 ENGINE_UNAVAILABLE.
           mocks.readStoredFile.mockResolvedValueOnce(tiffHeadedDng);

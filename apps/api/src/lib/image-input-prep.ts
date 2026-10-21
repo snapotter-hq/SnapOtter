@@ -57,9 +57,10 @@ function replaceExtWithPng(filename: string): string {
  * 1. Decodes HEIF via `decodeHeic`, normalizing operational write errors and
  *    marking client decode failures as `ToolInputError`.
  * 2. Decodes CLI-decoded formats (`needsCliDecode`) via `decodeToSharpCompat`
- *    with lowercase `fileExt`, falling back to `sharp(buf).metadata()` for
- *    formats Sharp reads natively (such as TIFF-based DNG or disguised SVGs)
- *    and classifying undecodable client inputs via `asInputErrorIfUndecodable`.
+ *    with lowercase `fileExt`, falling back to a Sharp metadata + 1x1 pixel
+ *    decode probe for formats Sharp reads natively (such as TIFF-based DNG or
+ *    disguised SVGs) and classifying undecodable client inputs via
+ *    `asInputErrorIfUndecodable`.
  * 3. Detects SVG/SVGZ inputs (including comment-padded SVGs disguised with
  *    `.apng` or CLI-decoded extensions), runs `decompressSvgz` and
  *    `sanitizeSvg` (throwing `InputValidationError` on 400 client SVG errors),
@@ -105,6 +106,9 @@ export async function prepareRouteImage(
       try {
         const meta = await sharp(buf).metadata();
         fallbackFormat = meta.format;
+        if (fallbackFormat !== "svg") {
+          await sharp(buf).resize(1).raw().toBuffer();
+        }
       } catch (err) {
         if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
           throw decodeErr;

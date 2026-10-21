@@ -496,6 +496,7 @@ export function registerCollage(app: FastifyInstance) {
           if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
           try {
             await sharp(file.buffer).metadata();
+            await sharp(file.buffer).resize(1).raw().toBuffer();
           } catch (err) {
             // Sharp can read some of these formats itself, so a missing CLI
             // decoder only matters once that fallback fails too (#795).

@@ -35,6 +35,11 @@ const SAMPLES = {
     contentType: "image/x-icon",
     content: readFixture(fixtures.image.formats("ico")),
   },
+  cr2: {
+    filename: "photo.cr2",
+    contentType: "image/x-canon-cr2",
+    content: readFixture(fixtures.image.formats("cr2")),
+  },
 };
 
 const ORIGINAL_PATH = process.env.PATH;
@@ -79,6 +84,15 @@ const ROUTES: RouteCase[] = [
       { name: "file1", ...s },
       { name: "file2", filename: "b.png", contentType: "image/png", content: PNG },
       settings({ direction: "horizontal", resizeMode: "fit" }),
+    ],
+  },
+  {
+    name: "collage",
+    url: "/api/v1/tools/image/collage",
+    parts: (s) => [
+      { name: "file1", ...s },
+      { name: "file2", filename: "b.png", contentType: "image/png", content: PNG },
+      settings({ layout: "grid-2x1", width: 200, height: 100 }),
     ],
   },
   {
@@ -207,6 +221,7 @@ const ROUTES: RouteCase[] = [
 const EXPECTED_MESSAGE = {
   heic: /HEIF decoder/,
   ico: /ImageMagick/,
+  cr2: /ImageMagick|image decoder.*could not be started|No exiftool found/,
 };
 
 function post(route: RouteCase, sample: Sample) {
@@ -257,7 +272,7 @@ describe("Hand-written image routes: decoder availability (#1428)", () => {
 
   it("split: a corrupt ICO still answers 422 when ImageMagick is installed", async () => {
     const ico = SAMPLES.ico.content;
-    const res = await post(ROUTES[1], {
+    const res = await post(ROUTES.find((r) => r.name === "split") as RouteCase, {
       ...SAMPLES.ico,
       content: Buffer.concat([ico.subarray(0, 22), Buffer.alloc(2048, 0x5a)]),
     });

@@ -931,6 +931,30 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
         }
       }
 
+      const CR2 = readFixture(fixtures.image.formats("cr2"));
+      for (const toolId of ["blur-faces", "meme-generator", "red-eye-removal", "beautify"]) {
+        const config = getToolConfig(toolId);
+        expect(config, toolId).toBeDefined();
+        const cliSpy = vi
+          .spyOn(formatDecoders, "decodeToSharpCompat")
+          .mockRejectedValueOnce(new DecoderUnavailableError("No dcraw_emu found."));
+        try {
+          await expect(
+            config?.process(CR2, {}, "photo.cr2", {
+              scratchDir: "/tmp",
+              signal: new AbortController().signal,
+              report: () => {},
+            }),
+          ).rejects.toMatchObject({
+            name: "DecoderUnavailableError",
+            code: "ENGINE_UNAVAILABLE",
+            statusCode: 503,
+          });
+        } finally {
+          cliSpy.mockRestore();
+        }
+      }
+
       // A DecoderUnavailableError thrown inside a 2-attempt pool worker
       // settles on attempt 1 without retrying.
       let calls = 0;

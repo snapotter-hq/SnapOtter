@@ -256,6 +256,7 @@ export function registerImageToPdfRoute(
             }
             try {
               await sharp(buf).metadata();
+              await sharp(buf).resize(1).raw().toBuffer();
             } catch (err) {
               if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
                 throw decodeErr;

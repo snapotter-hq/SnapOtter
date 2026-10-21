@@ -101,6 +101,7 @@ export class ImageInputHandler implements InputHandler {
         }
         try {
           await boundedSharp(fileBuffer, opts.maxPixels).metadata();
+          await boundedSharp(fileBuffer, opts.maxPixels).resize(1).raw().toBuffer();
         } catch (err) {
           // Sharp reads some of these formats itself (DNG is a TIFF), so a
           // missing CLI decoder only matters once that fallback fails too.

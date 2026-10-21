@@ -402,6 +402,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
         // CLI decoder unavailable: try Sharp directly as fallback for preview
         try {
           await sharp(buffer).metadata();
+          await sharp(buffer).resize(1).raw().toBuffer();
         } catch {
           if (isDecoderUnavailable(decodeErr)) {
             return sendInputValidationError(

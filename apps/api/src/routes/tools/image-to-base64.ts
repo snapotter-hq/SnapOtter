@@ -132,7 +132,10 @@ export function registerImageToBase64(app: FastifyInstance) {
             } catch (decodeErr) {
               if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
               try {
-                await sharp(decoded).metadata();
+                const meta = await sharp(decoded).metadata();
+                if (meta.format !== "svg") {
+                  await sharp(decoded).resize(1).raw().toBuffer();
+                }
               } catch (err) {
                 if (isDecoderUnavailable(decodeErr)) throw decodeErr;
                 throw err;

@@ -399,6 +399,27 @@ describe("registerEditMetadata CLI-decoded preview generation (#2704)", () => {
     }
   });
 
+  it("reports engine unavailable when decodeToSharpCompat throws DecoderUnavailableError on a TIFF-headed RAW (CR2) whose header Sharp reads (#2801)", async () => {
+    const handler = getEditMetadataHandler();
+    const cr2Buffer = readFixture(fixtures.image.formats("cr2"));
+    const decodeSpy = vi
+      .spyOn(formatDecoders, "decodeToSharpCompat")
+      .mockRejectedValueOnce(new DecoderUnavailableError("No LibRaw found."));
+    const reply = makeReply();
+
+    try {
+      await handler(makeMultipartRequest(cr2Buffer, "photo.cr2"), reply);
+
+      expect(reply.statusCode).toBe(200);
+      const body = reply.payload as { jobId: string; previewUrl?: string };
+      expect(body.previewUrl).toBeUndefined();
+      expect(reportEngineUnavailableMock).toHaveBeenCalledOnce();
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+    } finally {
+      decodeSpy.mockRestore();
+    }
+  });
+
   it("maps Radiance HDR inputs to image/vnd.radiance and generates preview.webp (#3180)", async () => {
     const handler = getEditMetadataHandler();
     const hdrBuffer = readFixture(fixtures.image.formats("hdr"));

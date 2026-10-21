@@ -202,6 +202,7 @@ export function registerFindDuplicates(app: FastifyInstance) {
             // decoder's failure only matters once that fallback fails too.
             try {
               await sharp(file.buffer).metadata();
+              await sharp(file.buffer).resize(1).raw().toBuffer();
             } catch (err) {
               if (isDecoderUnavailable(decodeErr)) throw decodeErr;
               // pino serializes only the `err` key as an Error, so the decoder's

@@ -112,6 +112,7 @@ export function registerStitch(app: FastifyInstance) {
           if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
           try {
             await sharp(file.buffer).metadata();
+            await sharp(file.buffer).resize(1).raw().toBuffer();
           } catch (err) {
             if (isDecoderUnavailable(decodeErr)) throw decodeErr;
             return reply.status(422).send({

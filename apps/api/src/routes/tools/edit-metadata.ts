@@ -259,6 +259,7 @@ export function registerEditMetadata(app: FastifyInstance) {
                 // only surface a CLI decode failure if Sharp cannot read it either.
                 try {
                   await sharp(outputBuffer).metadata();
+                  await sharp(outputBuffer).resize(1).raw().toBuffer();
                 } catch {
                   throw decodeErr;
                 }
