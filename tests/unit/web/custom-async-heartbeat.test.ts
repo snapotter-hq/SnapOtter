@@ -245,7 +245,8 @@ describe.each(subscribers)("%s async progress", (_name, subscribe) => {
 describe.each([
   ["erase-object", subscribeEraseObjectJobProgress],
   ["sign-pdf", subscribeSignPdfJobProgress],
-] as const)("%s async progress: stop (#2932)", (_name, subscribe) => {
+  ["editor-export", subscribeExportJobProgress],
+] as const)("%s async progress: stop (#2932, #2949)", (_name, subscribe) => {
   beforeEach(() => {
     vi.useFakeTimers();
     FakeEventSource.instances = [];

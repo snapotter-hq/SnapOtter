@@ -202,6 +202,7 @@ export function subscribeExportJobProgress(
     if (done) return;
     if (stall) clearTimeout(stall);
     stall = setTimeout(() => {
+      if (done) return;
       cleanup();
       handlers.onStall();
     }, SSE_STALL_TIMEOUT_MS);
@@ -217,6 +218,7 @@ export function subscribeExportJobProgress(
       return;
     }
     es.onmessage = (event) => {
+      if (done) return;
       let data: ProgressFrame;
       try {
         data = resolveServerUrls(JSON.parse(event.data));

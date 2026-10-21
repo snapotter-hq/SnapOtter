@@ -314,6 +314,63 @@ describe("OCR async response handling", () => {
     events.emit({ type: "single", phase: "complete", result: { text: "after the noise" } });
     await expect(promise).resolves.toMatchObject({ text: "after the noise" });
   });
+
+  it.each([
+    [
+      "stop() after the upload finished",
+      async (xhr: MockXhr, stop: () => void, promise: Promise<unknown>) => {
+        xhr.upload.onload?.();
+        stop();
+        await expect(promise).rejects.toThrow("OCR scan stopped");
+      },
+    ],
+    [
+      "a synchronous 200 response",
+      async (xhr: MockXhr, _stop: () => void, promise: Promise<unknown>) => {
+        xhr.status = 200;
+        xhr.responseText = JSON.stringify({ text: "sync OCR text" });
+        xhr.onload?.();
+        await expect(promise).resolves.toMatchObject({ text: "sync OCR text" });
+      },
+    ],
+    [
+      "a synchronous 422 response",
+      async (xhr: MockXhr, _stop: () => void, promise: Promise<unknown>) => {
+        xhr.status = 422;
+        xhr.responseText = JSON.stringify({ error: "OCR failed" });
+        xhr.onload?.();
+        await expect(promise).rejects.toThrow("OCR failed");
+      },
+    ],
+  ] as const)("ignores queued SSE frames arriving after %s (#2949)", async (_label, settle) => {
+    vi.useFakeTimers();
+    const onProcessingProgress = vi.fn();
+    let stop: () => void = () => {};
+    const promise = ocrOneFile(
+      new File(["image"], "scan.png", { type: "image/png" }),
+      { quality: "fast", language: "en", enhance: false },
+      {
+        onUploadProgress: vi.fn(),
+        onProcessingProgress,
+        onStoppable: (s) => {
+          stop = s;
+        },
+      },
+    );
+    const xhr = xhrs[0];
+    const events = MockEventSource.instances[0];
+
+    await settle(xhr, () => stop(), promise);
+
+    events.emit({ type: "heartbeat" });
+    events.emit({ type: "single", phase: "processing", percent: 50, stage: "Recognizing" });
+    events.emit({ type: "single", phase: "complete", result: { text: "late text" } });
+    events.emit({ type: "single", phase: "failed", error: "late error" });
+    await vi.advanceTimersByTimeAsync(300_000);
+
+    expect(onProcessingProgress).not.toHaveBeenCalled();
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
 });
 
 describe("OCR stopping a file (#2093)", () => {

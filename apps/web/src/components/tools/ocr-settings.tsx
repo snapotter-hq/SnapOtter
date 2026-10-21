@@ -120,6 +120,7 @@ export function ocrOneFile(
       return;
     }
     es.onmessage = (event) => {
+      if (settled) return;
       // Only an unparseable frame is ignorable. A throw past the parse is our
       // own handling failing, and it must end the run (#1287).
       let data: ProgressFrame;
