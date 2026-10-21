@@ -80,13 +80,17 @@ export function AuthImage({
 interface FileLibraryModalProps {
   open: boolean;
   onClose: () => void;
-  onImport: (files: File[]) => void;
+  onImport: (files: File[]) => boolean | undefined;
 }
 
 export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalProps) {
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDivElement>(null);
   useFocusTrap(dialogRef, open);
+  const onImportRef = useRef(onImport);
+  onImportRef.current = onImport;
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const [files, setFiles] = useState<UserFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -229,13 +233,15 @@ export function FileLibraryModal({ open, onClose, onImport }: FileLibraryModalPr
           failedIds.add(source.id);
         }
       }
-      if (valid.length > 0) {
-        onImport(valid);
-      }
+      const accepted = valid.length > 0 && onImportRef.current(valid) !== false;
       if (failedIds.size === 0) {
-        onClose();
+        if (accepted) {
+          onCloseRef.current();
+        }
       } else {
-        setCheckedIds(failedIds);
+        if (accepted) {
+          setCheckedIds(failedIds);
+        }
         setImportFailed({ failed: failedIds.size, total: toDownload.length });
       }
     } finally {

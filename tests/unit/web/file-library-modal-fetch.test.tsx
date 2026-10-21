@@ -443,6 +443,86 @@ describe("FileLibraryModal import (#1948)", () => {
     expect(onImport).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  it("stays open and preserves checkedIds when onImport returns false, including when onImport updates while downloads are in flight (#3197)", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const onClose = vi.fn();
+    const initialOnImport = vi.fn<(_files: File[]) => boolean | undefined>(() => undefined);
+    const refusingOnImport = vi.fn<(_files: File[]) => boolean | undefined>(() => false);
+    const acceptingOnImport = vi.fn<(_files: File[]) => boolean | undefined>(() => undefined);
+    apiListFiles.mockResolvedValueOnce({
+      files: [userFile("a", "beaver.png"), userFile("b", "otter.png")],
+      total: 2,
+    });
+    const inFlightGate = deferred<void>();
+    downloadFetchStub(async () => {
+      await inFlightGate.promise;
+      return new Response("png-bytes", { status: 200 });
+    });
+
+    const { rerender } = render(
+      <FileLibraryModal open onClose={onClose} onImport={initialOnImport} />,
+    );
+    fireEvent.click(await screen.findByText("beaver.png"));
+    fireEvent.click(screen.getByText("otter.png"));
+    const importTwoBtn = screen.getByRole("button", {
+      name: en.commonUi.fileLibrary.importCount.replace("{count}", "2"),
+    });
+    fireEvent.click(importTwoBtn);
+
+    // Parent updates onImport to refuse intake while the download is still in flight.
+    rerender(<FileLibraryModal open onClose={onClose} onImport={refusingOnImport} />);
+    await act(async () => {
+      inFlightGate.resolve();
+    });
+
+    await waitFor(() => expect(refusingOnImport).toHaveBeenCalledTimes(1));
+    expect(initialOnImport).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: en.commonUi.fileLibrary.importCount.replace("{count}", "2"),
+      }),
+    ).toBeEnabled();
+
+    // Even when one download fails and one succeeds while onImport returns false,
+    // both files stay ticked so neither is lost when retrying after the run finishes.
+    downloadFetchStub((id) =>
+      id === "a"
+        ? new Response("Not found", { status: 404 })
+        : new Response("png-bytes", { status: 200 }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: en.commonUi.fileLibrary.importCount.replace("{count}", "2"),
+      }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't import 1 of 2 files.");
+    expect(refusingOnImport).toHaveBeenCalledTimes(2);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByRole("button", {
+        name: en.commonUi.fileLibrary.importCount.replace("{count}", "2"),
+      }),
+    ).toBeEnabled();
+
+    // Once intake is accepted again, retrying imports both files and closes the modal.
+    rerender(<FileLibraryModal open onClose={onClose} onImport={acceptingOnImport} />);
+    downloadFetchStub(() => new Response("png-bytes", { status: 200 }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: en.commonUi.fileLibrary.importCount.replace("{count}", "2"),
+      }),
+    );
+
+    await waitFor(() => expect(acceptingOnImport).toHaveBeenCalledTimes(1));
+    const imported = acceptingOnImport.mock.calls[0][0] as File[];
+    expect(imported.map((f) => f.name)).toEqual(["beaver.png", "otter.png"]);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("FileLibraryModal AuthImage (#2957)", () => {

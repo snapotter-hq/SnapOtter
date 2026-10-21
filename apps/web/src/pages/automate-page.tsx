@@ -336,7 +336,7 @@ function AutomatePageContent({
 
   const handleLibraryImport = useCallback(
     (imported: File[]) => {
-      if (!allowIntake()) return;
+      if (!allowIntake()) return false;
       libraryImportAbortRef.current?.abort();
       setLibraryImportFailed(null);
       if (files.length === 0) {

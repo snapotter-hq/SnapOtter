@@ -618,6 +618,103 @@ describe("AutomatePage file-action intake guard (#2652)", () => {
     await waitFor(() => expect(showIgnored).toHaveBeenCalledTimes(2));
     expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual(["initial.png"]);
     expect(useFileStore.getState().processing).toBe(true);
+    // Refusing intake keeps the library modal open with its selection preserved (#3197).
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    const retryImportBtn = screen.getByRole("button", {
+      name: en.commonUi.fileLibrary.importCount.replace("{count}", "1"),
+    });
+    expect(retryImportBtn).toBeEnabled();
+
+    // Once the pipeline run finishes, clicking Import in the still-open modal imports the file and closes the modal.
+    act(() => {
+      useFileStore.getState().setProcessing(false);
+    });
+    fireEvent.click(retryImportBtn);
+    await waitFor(() =>
+      expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual([
+        "initial.png",
+        "modal.png",
+      ]),
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(showIgnored).toHaveBeenCalledTimes(2);
+  });
+
+  it("refuses FileLibraryModal import when a run starts while download is in flight with no initial files, then imports via setFiles once idle (#3197)", async () => {
+    let resolveModalDownload: ((res: Response) => void) | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/files/modal-file/download")) {
+          return new Promise<Response>((resolve) => {
+            resolveModalDownload = resolve;
+          });
+        }
+        if (url.includes("/api/v1/files")) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                files: [{ id: "modal-file", originalName: "modal.png", mimeType: "image/png" }],
+                total: 1,
+              }),
+            ),
+          );
+        }
+        if (url.includes("/pipeline/list")) {
+          return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
+        }
+        return Promise.resolve(
+          new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+        );
+      }),
+    );
+
+    renderAutomatePage();
+    expect(useFileStore.getState().entries).toHaveLength(0);
+
+    // Open FileLibraryModal from the empty-state button and click Import while idle.
+    const importButtons = screen.getAllByRole("button", {
+      name: en.automate.importFromLibrary,
+    });
+    fireEvent.click(importButtons[0]);
+    fireEvent.click(await screen.findByText("modal.png"));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: en.commonUi.fileLibrary.importCount.replace("{count}", "1"),
+      }),
+    );
+    expect(resolveModalDownload).toBeTypeOf("function");
+
+    // A run starts before the file download resolves.
+    act(() => {
+      useFileStore.getState().setProcessing(true);
+    });
+    await act(async () => {
+      resolveModalDownload?.(new Response("modal-bytes", { status: 200 }));
+    });
+
+    await waitFor(() => expect(showIgnored).toHaveBeenCalledTimes(1));
+    expect(showIgnored).toHaveBeenCalledWith(en.dropzone.ignoredWhileRunning);
+    expect(useFileStore.getState().entries).toHaveLength(0);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    const retryBtn = screen.getByRole("button", {
+      name: en.commonUi.fileLibrary.importCount.replace("{count}", "1"),
+    });
+    expect(retryBtn).toBeEnabled();
+
+    // Once the run finishes, retrying in the still-open modal loads modal.png via setFiles and closes the dialog.
+    act(() => {
+      useFileStore.getState().setProcessing(false);
+    });
+    fireEvent.click(retryBtn);
+    await act(async () => {
+      resolveModalDownload?.(new Response("modal-bytes", { status: 200 }));
+    });
+    await waitFor(() =>
+      expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual(["modal.png"]),
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("refuses Dropzone drop and both Import from library buttons on desktop and mobile when processing is active with no files loaded", async () => {
