@@ -6,7 +6,7 @@ import { useFilesPageStore } from "@/stores/files-page-store";
 
 export function FileUploadArea() {
   const { t } = useTranslation();
-  const { uploadFiles, loading, uploadProgress } = useFilesPageStore();
+  const { uploadFiles, uploading, uploadProgress, error } = useFilesPageStore();
   const [dragging, setDragging] = useState(false);
 
   function handleDragOver(e: React.DragEvent) {
@@ -32,7 +32,7 @@ export function FileUploadArea() {
   }
 
   return (
-    <div className="flex-1 flex items-center justify-center p-8">
+    <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
       <label
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -42,10 +42,10 @@ export function FileUploadArea() {
           dragging
             ? "border-primary bg-primary/5"
             : "border-border hover:border-primary/50 hover:bg-muted/50",
-          loading && "pointer-events-none opacity-50",
+          uploading && "pointer-events-none opacity-50",
         )}
       >
-        {loading ? (
+        {uploading ? (
           <div className="flex flex-col items-center gap-2">
             <div className="h-10 w-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             {uploadProgress !== null && uploadProgress > 0 && (
@@ -57,14 +57,19 @@ export function FileUploadArea() {
         )}
         <div className="text-center">
           <p className="text-sm font-medium text-foreground">
-            {loading ? t.common.loading : t.files.dropFilesHere}
+            {uploading ? t.common.loading : t.files.dropFilesHere}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            {loading ? "" : t.files.orClickToSelect}
+            {uploading ? "" : t.files.orClickToSelect}
           </p>
         </div>
         <input type="file" multiple className="hidden" onChange={handleInputChange} />
       </label>
+      {!uploading && error && (
+        <p role="alert" className="text-sm text-destructive text-center max-w-lg">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
