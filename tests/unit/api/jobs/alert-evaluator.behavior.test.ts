@@ -944,4 +944,87 @@ describe("alert evaluator behavior", () => {
       },
     ]);
   });
+
+  it("logs a warning, keeps the CAS baseline unchanged, and still delivers to all destinations when key-rotation writeback fails (#3398)", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
+    const { evaluateAlerts } = await loadAlertEvaluator();
+    const rawDestinations = JSON.stringify([
+      {
+        name: "Hook 1",
+        url: "https://example.test/alerts-1",
+        authHeader: "$ENC$old-1",
+        enabled: true,
+        type: "alerts",
+      },
+      {
+        name: "Hook 2",
+        url: "https://example.test/alerts-2",
+        authHeader: "$ENC$old-2",
+        enabled: true,
+        type: "alerts",
+      },
+    ]);
+    const dbError = new Error("db writeback failed");
+
+    getSettingStrictMock.mockResolvedValueOnce(rawDestinations).mockResolvedValueOnce("");
+    statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
+    selectMock.mockReturnValue(queryChain([{ count: 0 }]));
+    getActiveLicenseMock.mockReturnValue(null);
+    decryptSettingMock
+      .mockResolvedValueOnce({ value: "Bearer one", reencrypted: "$ENC$new-1" })
+      .mockResolvedValueOnce({ value: "Bearer two", reencrypted: "$ENC$new-2" });
+    updateMock.mockImplementationOnce(() => ({
+      set: () => ({
+        where: () => Promise.reject(dbError),
+      }),
+    }));
+    deliverWebhookMock.mockResolvedValue({ success: true });
+
+    await expect(evaluateAlerts()).resolves.toBeUndefined();
+
+    expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      { err: dbError, name: "Hook 1", key: "webhook_destinations" },
+      "alert-evaluator: failed to persist re-encrypted webhook authHeader",
+    );
+    expect(deliverWebhookMock).toHaveBeenCalledTimes(2);
+    expect(deliverWebhookMock).toHaveBeenNthCalledWith(
+      1,
+      "https://example.test/alerts-1",
+      "Bearer one",
+      [{ condition: "backup_never_run" }],
+      { maxRetries: 1 },
+    );
+    expect(deliverWebhookMock).toHaveBeenNthCalledWith(
+      2,
+      "https://example.test/alerts-2",
+      "Bearer two",
+      [{ condition: "backup_never_run" }],
+      { maxRetries: 1 },
+    );
+    expect(updatesRecorded).toHaveLength(1);
+    expect(JSON.parse(updatesRecorded[0].set.value as string)).toEqual([
+      {
+        name: "Hook 1",
+        url: "https://example.test/alerts-1",
+        authHeader: "$ENC$new-1",
+        enabled: true,
+        type: "alerts",
+      },
+      {
+        name: "Hook 2",
+        url: "https://example.test/alerts-2",
+        authHeader: "$ENC$new-2",
+        enabled: true,
+        type: "alerts",
+      },
+    ]);
+    expect(updatesRecorded[0].where).toEqual({
+      op: "and",
+      args: [
+        { op: "eq", col: "settings.key", val: "webhook_destinations" },
+        { op: "eq", col: "settings.value", val: rawDestinations },
+      ],
+    });
+  });
 });

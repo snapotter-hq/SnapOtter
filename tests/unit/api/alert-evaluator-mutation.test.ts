@@ -18,6 +18,7 @@ const decryptSettingMock = vi.hoisted(() => vi.fn());
 const getActiveLicenseMock = vi.hoisted(() => vi.fn());
 const isFeatureEnabledMock = vi.hoisted(() => vi.fn());
 const selectMock = vi.hoisted(() => vi.fn());
+const updateMock = vi.hoisted(() => vi.fn());
 const reportErrorMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const loggerMock = vi.hoisted(() => ({
   info: vi.fn(),
@@ -46,6 +47,12 @@ async function loadAlertEvaluator() {
   isFeatureEnabledMock.mockReset();
   isFeatureEnabledMock.mockReturnValue(true);
   selectMock.mockReset();
+  updateMock.mockReset();
+  updateMock.mockImplementation(() => ({
+    set: () => ({
+      where: () => Promise.resolve(),
+    }),
+  }));
   reportErrorMock.mockClear();
   for (const fn of Object.values(loggerMock)) fn.mockClear();
 
@@ -65,9 +72,10 @@ async function loadAlertEvaluator() {
   }));
 
   vi.doMock("../../../apps/api/src/db/index.js", () => ({
-    db: { select: selectMock },
+    db: { select: selectMock, update: updateMock },
     schema: {
       auditLog: { action: "action", createdAt: "createdAt" },
+      settings: { key: "settings.key", value: "settings.value" },
     },
   }));
 
@@ -768,6 +776,59 @@ describe("alert-evaluator.ts mutation coverage", () => {
       );
       expect(reportErrorMock).not.toHaveBeenCalled();
       expect(logSpy).not.toHaveBeenCalled();
+    });
+
+    it("logs a warning and still delivers to all destinations when key-rotation writeback throws (#3398)", async () => {
+      vi.spyOn(Date, "now").mockReturnValue(NOW);
+      const { evaluateAlerts } = await loadAlertEvaluator();
+      const dbError = new Error("db writeback failed");
+      getSettingStrictMock
+        .mockResolvedValueOnce(
+          JSON.stringify([
+            {
+              name: "Ops Alerts",
+              url: "https://example.test/alerts-1",
+              authHeader: "$ENC$old-1",
+              enabled: true,
+              type: "alerts",
+            },
+            {
+              name: "Backup Alerts",
+              url: "https://example.test/alerts-2",
+              authHeader: "$ENC$old-2",
+              enabled: true,
+              type: "alerts",
+            },
+          ]),
+        )
+        .mockResolvedValueOnce("");
+      statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
+      selectMock.mockReturnValue(queryChain([{ count: 0 }]));
+      getActiveLicenseMock.mockReturnValue(null);
+      decryptSettingMock
+        .mockResolvedValueOnce({ value: "Bearer rotated-1", reencrypted: "$ENC$new-1" })
+        .mockResolvedValueOnce({ value: "Bearer rotated-2", reencrypted: "$ENC$new-2" });
+      updateMock.mockImplementationOnce(() => ({
+        set: () => ({
+          where: () => Promise.reject(dbError),
+        }),
+      }));
+      deliverWebhookMock.mockResolvedValue({ success: true });
+
+      await evaluateAlerts();
+
+      expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+      expect(loggerMock.warn).toHaveBeenCalledWith(
+        { err: dbError, name: "Ops Alerts", key: "webhook_destinations" },
+        "alert-evaluator: failed to persist re-encrypted webhook authHeader",
+      );
+      expect(deliverWebhookMock).toHaveBeenCalledTimes(2);
+      expect(deliverWebhookMock.mock.calls.map((c) => [c[0], c[1]])).toEqual([
+        ["https://example.test/alerts-1", "Bearer rotated-1"],
+        ["https://example.test/alerts-2", "Bearer rotated-2"],
+      ]);
+      expect(loggerMock.error).not.toHaveBeenCalled();
+      expect(reportErrorMock).not.toHaveBeenCalled();
     });
   });
 

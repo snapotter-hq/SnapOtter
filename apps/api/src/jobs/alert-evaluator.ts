@@ -218,16 +218,23 @@ export async function evaluateAlerts(): Promise<void> {
       if (decrypted.reencrypted) {
         dest.authHeader = decrypted.reencrypted;
         const nextDestJson = JSON.stringify(destinations);
-        await db
-          .update(schema.settings)
-          .set({ value: nextDestJson, updatedAt: new Date() })
-          .where(
-            and(
-              eq(schema.settings.key, "webhook_destinations"),
-              eq(schema.settings.value, currentDestJson),
-            ),
+        try {
+          await db
+            .update(schema.settings)
+            .set({ value: nextDestJson, updatedAt: new Date() })
+            .where(
+              and(
+                eq(schema.settings.key, "webhook_destinations"),
+                eq(schema.settings.value, currentDestJson),
+              ),
+            );
+          currentDestJson = nextDestJson;
+        } catch (err) {
+          logger.warn(
+            { err, name: dest.name, key: "webhook_destinations" },
+            "alert-evaluator: failed to persist re-encrypted webhook authHeader",
           );
-        currentDestJson = nextDestJson;
+        }
       }
       authHeader = decrypted.value;
     }
