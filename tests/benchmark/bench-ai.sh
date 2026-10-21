@@ -154,7 +154,7 @@ for run in 1 2 3; do
 
   bench_ai_tool "image/restore-photo" "full-r${run}" "$BW" '{"mode":"auto","scratchRemoval":true,"faceEnhancement":true,"colorize":true}'
 
-  bench_ai_tool "image/passport-photo" "r${run}" "$HEAD" ''
+  bench_ai_tool "image/passport-photo/analyze" "r${run}" "$HEAD" ''
 
   bench_ai_tool "image/content-aware-resize" "face-r${run}" "$P" '{"width":300,"protectFaces":true}'
 done

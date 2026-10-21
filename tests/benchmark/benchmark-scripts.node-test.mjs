@@ -177,3 +177,17 @@ test("bench-ai.sh targets the batch endpoint for multi-file remove-background an
   assert.doesNotMatch(batchSection, /\/api\/v1\/tools\/image\/remove-background"/);
   assert.match(batchSection, /"application\/zip"\s+"\$batch_size"/);
 });
+
+test("bench-ai.sh targets the passport-photo analyze sub-route instead of the 400 base route", () => {
+  const source = readFileSync(new URL("bench-ai.sh", import.meta.url), "utf8");
+  const passportInvocations = [
+    ...source.matchAll(/bench_ai_tool\s+"(image\/passport-photo[^"]*)"/g),
+  ].map((match) => match[1]);
+
+  assert.ok(passportInvocations.length > 0, "bench-ai.sh should benchmark passport-photo");
+  assert.deepEqual(
+    passportInvocations,
+    passportInvocations.map(() => "image/passport-photo/analyze"),
+  );
+  assert.doesNotMatch(source, /\/api\/v1\/tools\/image\/passport-photo"/);
+});

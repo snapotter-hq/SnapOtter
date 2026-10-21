@@ -1,11 +1,15 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import multipart from "@fastify/multipart";
 import { SafeError } from "@snapotter/shared";
 import Fastify from "fastify";
 import sharp from "sharp";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { resolveBenchmarkResponse } from "../../benchmark/lib/job-aware.mjs";
+
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
 const detectFaceLandmarks = vi.fn();
 const removeBackground = vi.fn();
@@ -401,5 +405,66 @@ describe("POST /api/v1/tools/image/passport-photo/analyze cleanup and progress s
       percent: 100,
       result: { jobId: body.jobId, faceDetected: true },
     });
+  });
+
+  it("bench-ai.sh posts passport-photo to /analyze and resolves a 200 benchmark response (#3000)", async () => {
+    const benchAi = readFileSync(join(REPO_ROOT, "tests/benchmark/bench-ai.sh"), "utf8");
+    const passportCalls = [
+      ...benchAi.matchAll(/bench_ai_tool\s+"(image\/passport-photo[^"]*)"/g),
+    ].map((match) => match[1]);
+
+    expect(passportCalls.length).toBeGreaterThan(0);
+
+    const baseRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/passport-photo",
+      ...buildAnalyzeMultipart(validPng),
+    });
+    expect(baseRes.statusCode).toBe(400);
+    expect(baseRes.json()).toEqual({
+      error: "Use /api/v1/tools/image/passport-photo/analyze or /generate",
+    });
+    await expect(
+      resolveBenchmarkResponse({
+        baseUrl: "http://localhost:1349",
+        admissionStatus: baseRes.statusCode,
+        admissionMime: baseRes.headers["content-type"],
+        admissionBody: baseRes.rawPayload,
+        expectedMime: undefined,
+        expectedZipEntries: undefined,
+        oracle: undefined,
+      }),
+    ).rejects.toThrow(/admission returned HTTP 400/);
+
+    for (const toolPath of passportCalls) {
+      expect(toolPath).toBe("image/passport-photo/analyze");
+
+      detectFaceLandmarks.mockResolvedValueOnce({
+        faceDetected: true,
+        landmarks: SAMPLE_LANDMARKS,
+        imageWidth: 32,
+        imageHeight: 32,
+      });
+      removeBackground.mockResolvedValueOnce(validPng);
+
+      const res = await app.inject({
+        method: "POST",
+        url: `/api/v1/tools/${toolPath}`,
+        ...buildAnalyzeMultipart(validPng),
+      });
+
+      expect(res.statusCode).toBe(200);
+      const resolved = await resolveBenchmarkResponse({
+        baseUrl: "http://localhost:1349",
+        admissionStatus: res.statusCode,
+        admissionMime: res.headers["content-type"],
+        admissionBody: res.rawPayload,
+        expectedMime: undefined,
+        expectedZipEntries: undefined,
+        oracle: undefined,
+      });
+      expect(resolved.completionStatus).toBe("completed");
+      expect(resolved.outputMime).toBe("application/json");
+    }
   });
 });
