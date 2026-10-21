@@ -822,4 +822,147 @@ describe("compress-pdf route processor (#1373)", () => {
     const modes = new Set(cases.map((c) => c.data.mode));
     expect(modes).toEqual(new Set(["quality", "targetSize"]));
   });
+
+  it("forwards ctx.signal to pdfScrubProducerPy in both quality and targetSize modes (#3254)", async () => {
+    vi.mocked(gsCompressPdfTuned).mockImplementation(async (_inPath: string, outPath: string) => {
+      await writeFile(outPath, Buffer.alloc(600, 0x41));
+    });
+    vi.mocked(pdfScrubProducerPy).mockImplementation(async (inPath: string, outPath: string) => {
+      const orig = await readFile(inPath);
+      await writeFile(outPath, orig);
+    });
+
+    registerCompressPdf(createMockApp());
+    const config = getToolConfig("compress-pdf");
+
+    await withScratch(async (scratchDir) => {
+      const input = Buffer.alloc(1000, 0x49);
+      const qualityCtx = createCompressCtx(scratchDir, input, {
+        mode: "quality",
+        quality: 75,
+      });
+      await config?.processV2?.(qualityCtx);
+      const expectedOut = join(scratchDir, "doc_compressed.pdf");
+      expect(pdfScrubProducerPy).toHaveBeenCalledWith(expectedOut, `${expectedOut}.scrub.pdf`, {
+        signal: qualityCtx.signal,
+      });
+    });
+
+    vi.mocked(pdfScrubProducerPy).mockClear();
+
+    await withScratch(async (scratchDir) => {
+      const input = Buffer.alloc(1000, 0x49);
+      const targetCtx = createCompressCtx(scratchDir, input, {
+        mode: "targetSize",
+        targetSizeKb: 1,
+      });
+      await config?.processV2?.(targetCtx);
+      const expectedCand = join(scratchDir, "cand-q51.pdf");
+      expect(pdfScrubProducerPy).toHaveBeenCalledWith(expectedCand, `${expectedCand}.scrub.pdf`, {
+        signal: targetCtx.signal,
+      });
+    });
+  });
+
+  it("stops targetSize binary search immediately when ctx.signal aborts (#3254)", async () => {
+    registerCompressPdf(createMockApp());
+    const config = getToolConfig("compress-pdf");
+
+    // 1. Abort inside pdfScrubProducerPy on the first probe: must not swallow the abort or run further iterations.
+    await withScratch(async (scratchDir) => {
+      const ac = new AbortController();
+      const abortErr = Object.assign(new Error("Python script canceled"), {
+        name: "AbortError",
+        code: "canceled",
+      });
+      vi.mocked(gsCompressPdfTuned).mockImplementation(async (_inPath: string, outPath: string) => {
+        await writeFile(outPath, Buffer.alloc(900, 0x41));
+      });
+      vi.mocked(pdfScrubProducerPy).mockImplementationOnce(
+        async (_inPath: string, outPath: string) => {
+          await writeFile(outPath, Buffer.from("partial"));
+          ac.abort(abortErr);
+          throw abortErr;
+        },
+      );
+
+      const input = Buffer.alloc(2000, 0x49);
+      const ctx = {
+        ...createCompressCtx(scratchDir, input, { mode: "targetSize", targetSizeKb: 0.5 }),
+        signal: ac.signal,
+      };
+      await expect(config?.processV2?.(ctx)).rejects.toBe(abortErr);
+      expect(gsCompressPdfTuned).toHaveBeenCalledTimes(1);
+      expect(pdfScrubProducerPy).toHaveBeenCalledTimes(1);
+      await expect(readFile(join(scratchDir, "cand-q51.pdf.scrub.pdf"))).rejects.toThrow();
+    });
+
+    vi.clearAllMocks();
+
+    // 2. Signal aborts during gsCompressPdfTuned on iteration 0: scrubPdfProducerFile and iteration 1 never run.
+    await withScratch(async (scratchDir) => {
+      const ac = new AbortController();
+      const abortErr = new DOMException("The operation was aborted", "AbortError");
+      vi.mocked(gsCompressPdfTuned).mockImplementationOnce(
+        async (_inPath: string, outPath: string) => {
+          await writeFile(outPath, Buffer.alloc(900, 0x41));
+          ac.abort(abortErr);
+        },
+      );
+
+      const input = Buffer.alloc(2000, 0x49);
+      const ctx = {
+        ...createCompressCtx(scratchDir, input, { mode: "targetSize", targetSizeKb: 0.5 }),
+        signal: ac.signal,
+      };
+      await expect(config?.processV2?.(ctx)).rejects.toBe(abortErr);
+      expect(gsCompressPdfTuned).toHaveBeenCalledTimes(1);
+      expect(pdfScrubProducerPy).not.toHaveBeenCalled();
+    });
+
+    vi.clearAllMocks();
+
+    // 3. Signal aborts after iteration 0 completes (inside ctx.report on iteration 1): stops before iteration 1's probe.
+    await withScratch(async (scratchDir) => {
+      const ac = new AbortController();
+      const abortErr = new DOMException("The operation was aborted", "AbortError");
+      vi.mocked(gsCompressPdfTuned).mockImplementation(async (_inPath: string, outPath: string) => {
+        await writeFile(outPath, Buffer.alloc(900, 0x41));
+      });
+      vi.mocked(pdfScrubProducerPy).mockImplementationOnce(
+        async (inPath: string, outPath: string) => {
+          await writeFile(outPath, await readFile(inPath));
+          // Abort right as iteration 0's scrub finishes so iteration 1's loop-top throwIfAborted() trips.
+          setImmediate(() => ac.abort(abortErr));
+        },
+      );
+
+      const input = Buffer.alloc(2000, 0x49);
+      const ctx = {
+        ...createCompressCtx(scratchDir, input, { mode: "targetSize", targetSizeKb: 0.5 }),
+        signal: ac.signal,
+      };
+      await expect(config?.processV2?.(ctx)).rejects.toBe(abortErr);
+      expect(gsCompressPdfTuned).toHaveBeenCalledTimes(1);
+      expect(pdfScrubProducerPy).toHaveBeenCalledTimes(1);
+    });
+
+    vi.clearAllMocks();
+
+    // 4. Pre-aborted signal in quality mode skips Ghostscript and scrubbing entirely.
+    await withScratch(async (scratchDir) => {
+      const ac = new AbortController();
+      const abortErr = new DOMException("The operation was aborted", "AbortError");
+      ac.abort(abortErr);
+
+      const input = Buffer.alloc(2000, 0x49);
+      const ctx = {
+        ...createCompressCtx(scratchDir, input, { mode: "quality", quality: 75 }),
+        signal: ac.signal,
+      };
+      await expect(config?.processV2?.(ctx)).rejects.toBe(abortErr);
+      expect(gsCompressPdfTuned).not.toHaveBeenCalled();
+      expect(pdfScrubProducerPy).not.toHaveBeenCalled();
+    });
+  });
 });

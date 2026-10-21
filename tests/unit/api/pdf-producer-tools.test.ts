@@ -1,4 +1,6 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import multipart from "@fastify/multipart";
 import { apiToolPath, BASE_CONFIG, COMPRESS_PRESETS, CONVERSION_PRESETS } from "@snapotter/shared";
 import AdmZip from "adm-zip";
@@ -35,7 +37,11 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
   };
 });
 
-import { SCRUB_PDF_PRODUCER_TOOLS } from "../../../apps/api/src/lib/pdf-producer.js";
+import {
+  SCRUB_PDF_PRODUCER_TOOLS,
+  scrubPdfProducer,
+  scrubPdfProducerFile,
+} from "../../../apps/api/src/lib/pdf-producer.js";
 import {
   registerImageToPdf,
   registerImageToPdfPreset,
@@ -439,5 +445,135 @@ describe("image-to-pdf custom route Producer scrub (#2501)", () => {
     });
 
     await app.close();
+  });
+});
+
+describe("scrubPdfProducerFile and scrubPdfProducer AbortSignal handling (#3254)", () => {
+  beforeEach(() => {
+    pdfScrubProducerPy.mockReset();
+  });
+
+  it("forwards opts to pdfScrubProducerPy in scrubPdfProducerFile and rethrows on abort after cleaning up the sibling temp file", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "pdf-producer-unit-"));
+    const filePath = join(dir, "cand.pdf");
+    const original = Buffer.from("%PDF-1.4 original");
+    await writeFile(filePath, original);
+
+    try {
+      const ac = new AbortController();
+      pdfScrubProducerPy.mockImplementationOnce(async (_inPath: string, outPath: string) => {
+        await writeFile(outPath, Buffer.from("%PDF-1.4 scrubbed"));
+      });
+
+      await scrubPdfProducerFile(filePath, { signal: ac.signal, timeoutMs: 15_000 });
+      expect(pdfScrubProducerPy).toHaveBeenCalledWith(filePath, `${filePath}.scrub.pdf`, {
+        signal: ac.signal,
+        timeoutMs: 15_000,
+      });
+      expect(await readFile(filePath, "utf8")).toBe("%PDF-1.4 scrubbed");
+
+      // Now abort mid-scrub: partial .scrub.pdf must be removed, original file kept, and abort rethrown without warning.
+      await writeFile(filePath, original);
+      const abortAc = new AbortController();
+      const abortErr = Object.assign(new Error("Python script canceled"), {
+        name: "AbortError",
+        code: "canceled",
+      });
+      pdfScrubProducerPy.mockImplementationOnce(async (_inPath: string, outPath: string) => {
+        await writeFile(outPath, Buffer.from("partial"));
+        abortAc.abort(abortErr);
+        throw abortErr;
+      });
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        await expect(scrubPdfProducerFile(filePath, { signal: abortAc.signal })).rejects.toBe(
+          abortErr,
+        );
+        expect((await readFile(filePath)).equals(original)).toBe(true);
+        await expect(stat(`${filePath}.scrub.pdf`)).rejects.toThrow();
+        expect(warnSpy).not.toHaveBeenCalled();
+
+        // Pre-aborted signal rejects before invoking pdfScrubProducerPy.
+        pdfScrubProducerPy.mockClear();
+        await expect(scrubPdfProducerFile(filePath, { signal: abortAc.signal })).rejects.toBe(
+          abortErr,
+        );
+        expect(pdfScrubProducerPy).not.toHaveBeenCalled();
+        expect(warnSpy).not.toHaveBeenCalled();
+
+        // Non-abort scrub failure racing with a timeout signal throws the signal's reason ("timeout")
+        // rather than leaking the internal scrub error.
+        const timeoutAc = new AbortController();
+        pdfScrubProducerPy.mockImplementationOnce(async () => {
+          timeoutAc.abort("timeout");
+          throw new Error("doc_scrub_meta failed: No module named 'fitz'");
+        });
+        await expect(scrubPdfProducerFile(filePath, { signal: timeoutAc.signal })).rejects.toBe(
+          "timeout",
+        );
+        expect(warnSpy).not.toHaveBeenCalled();
+      } finally {
+        warnSpy.mockRestore();
+      }
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("forwards opts to pdfScrubProducerPy in scrubPdfProducer and rethrows on abort instead of returning the unscrubbed buffer", async () => {
+    const original = Buffer.from("%PDF-1.4 raw");
+    const scrubbed = Buffer.from("%PDF-1.4 scrubbed");
+    const ac = new AbortController();
+
+    pdfScrubProducerPy.mockImplementationOnce(async (_inPath: string, outPath: string) => {
+      await writeFile(outPath, scrubbed);
+    });
+
+    const out = await scrubPdfProducer(original, { signal: ac.signal });
+    expect(out.equals(scrubbed)).toBe(true);
+    expect(pdfScrubProducerPy).toHaveBeenCalledWith(
+      expect.stringMatching(/in\.pdf$/),
+      expect.stringMatching(/out\.pdf$/),
+      { signal: ac.signal },
+    );
+
+    const abortAc = new AbortController();
+    const abortErr = Object.assign(new Error("Python script canceled"), {
+      name: "AbortError",
+      code: "canceled",
+    });
+    let capturedDir = "";
+    pdfScrubProducerPy.mockImplementationOnce(async (inPath: string) => {
+      capturedDir = inPath.replace(/\/in\.pdf$/, "");
+      abortAc.abort(abortErr);
+      throw abortErr;
+    });
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await expect(scrubPdfProducer(original, { signal: abortAc.signal })).rejects.toBe(abortErr);
+      expect(capturedDir).not.toBe("");
+      await expect(stat(capturedDir)).rejects.toThrow();
+      expect(warnSpy).not.toHaveBeenCalled();
+
+      // Pre-aborted signal rejects without calling pdfScrubProducerPy.
+      pdfScrubProducerPy.mockClear();
+      await expect(scrubPdfProducer(original, { signal: abortAc.signal })).rejects.toBe(abortErr);
+      expect(pdfScrubProducerPy).not.toHaveBeenCalled();
+      expect(warnSpy).not.toHaveBeenCalled();
+
+      // Non-abort scrub failure racing with a timeout signal throws the signal's reason ("timeout").
+      const timeoutAc = new AbortController();
+      pdfScrubProducerPy.mockImplementationOnce(async () => {
+        timeoutAc.abort("timeout");
+        throw new Error("doc_scrub_meta failed: No module named 'fitz'");
+      });
+      await expect(scrubPdfProducer(original, { signal: timeoutAc.signal })).rejects.toBe(
+        "timeout",
+      );
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });

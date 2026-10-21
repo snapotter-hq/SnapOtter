@@ -48,10 +48,12 @@ export function registerCompressPdf(app: FastifyInstance) {
     },
     processV2: async (ctx) => {
       const settings = settingsSchema.parse(ctx.settings);
+      ctx.signal.throwIfAborted();
       const input = ctx.inputs[0];
       const base = input.filename.replace(/\.[^.]+$/, "");
       const inPath = join(ctx.scratchDir, `in-${input.filename.replace(/[^A-Za-z0-9._-]/g, "_")}`);
       await writeFile(inPath, input.buffer);
+      ctx.signal.throwIfAborted();
       const outPath = join(ctx.scratchDir, `${base}_compressed.pdf`);
 
       let resultPayload: Record<string, unknown> | undefined;
@@ -68,7 +70,7 @@ export function registerCompressPdf(app: FastifyInstance) {
           const { dpi, qFactor } = paramsForQuality(key);
           const path = join(ctx.scratchDir, `cand-q${key}.pdf`);
           await gsCompressPdfTuned(inPath, path, dpi, qFactor);
-          await scrubPdfProducerFile(path);
+          await scrubPdfProducerFile(path, { signal: ctx.signal });
           const entry = { path, size: (await stat(path)).size };
           cache.set(key, entry);
           return entry;
@@ -80,6 +82,7 @@ export function registerCompressPdf(app: FastifyInstance) {
         let smallest: { path: string; size: number } | null = null;
         const MAX_ITERS = 8;
         for (let iter = 0; iter < MAX_ITERS && lo <= hi; iter++) {
+          ctx.signal.throwIfAborted();
           const q = Math.round((lo + hi) / 2);
           ctx.report(10 + iter * 10, "Searching");
           const cand = await runQ(q);
@@ -106,7 +109,7 @@ export function registerCompressPdf(app: FastifyInstance) {
         ctx.report(10, "Compressing");
         const { dpi, qFactor } = paramsForQuality(settings.quality ?? 75);
         await gsCompressPdfTuned(inPath, outPath, dpi, qFactor);
-        await scrubPdfProducerFile(outPath);
+        await scrubPdfProducerFile(outPath, { signal: ctx.signal });
         // A "Compress" tool must never enlarge the file.
         if ((await stat(outPath)).size >= input.buffer.length) {
           await writeFile(outPath, input.buffer);

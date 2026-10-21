@@ -650,23 +650,26 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
         resultContentType,
       );
 
+      // A handler that never reads the signal can still finish after a user cancel
+      // landed. Settle it as canceled before metadata scrubbing or storage writes
+      // (#2092, #3254). A timeout abort alone is left be: that result is finished
+      // and good, and throwing here would retry the whole job.
+      if (wasUserCanceled(jobId)) throw new Error("Canceled");
+
       // Generated PDFs carry the conversion engine's name as Producer/Creator
       // (LibreOffice, Ghostscript, pdfcpu, ...); stamp SnapOtter instead.
-      // Best effort: a failed scrub keeps the original bytes.
+      // Best effort: a failed scrub keeps the original bytes. Pass userCancel
+      // (never the deadline signal) so a user cancel stops doc_scrub_meta
+      // without discarding a finished result on a deadline overrun (#2144, #3254).
       if (
         SCRUB_PDF_PRODUCER_TOOLS.has(data.toolId) &&
         outName.toLowerCase().endsWith(".pdf") &&
         resultBuffer
       ) {
-        resultBuffer = await scrubPdfProducer(resultBuffer);
+        resultBuffer = await scrubPdfProducer(resultBuffer, { signal: userCancel });
         resultSize = resultBuffer.length;
+        if (wasUserCanceled(jobId)) throw new Error("Canceled");
       }
-
-      // A handler that never reads the signal can still finish after a user cancel
-      // landed. Settle it as canceled before anything is written (#2092). A timeout
-      // abort alone is left be: that result is finished and good, and throwing here
-      // would retry the whole job.
-      if (wasUserCanceled(jobId)) throw new Error("Canceled");
 
       // Persist the tool's own resultPayload before the primary output (#1389)
       // so the deliverable artifact never exists on disk without its sidecar,
@@ -710,12 +713,14 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       // Write extra outputs (AI tools may produce multiple files)
       if (extraOutputs) {
         for (const extra of extraOutputs) {
+          if (wasUserCanceled(jobId)) throw new Error("Canceled");
           const extraKey = `outputs/${jobId}/${extra.name}`;
           if (extra.buffer) {
             const body =
               SCRUB_PDF_PRODUCER_TOOLS.has(data.toolId) && extra.name.toLowerCase().endsWith(".pdf")
-                ? await scrubPdfProducer(extra.buffer)
+                ? await scrubPdfProducer(extra.buffer, { signal: userCancel })
                 : extra.buffer;
+            if (wasUserCanceled(jobId)) throw new Error("Canceled");
             await putObject(extraKey, body);
           } else if (extra.scratchPath) {
             // Over-cap extra: streamed as-is. The producer scrub needs bytes in

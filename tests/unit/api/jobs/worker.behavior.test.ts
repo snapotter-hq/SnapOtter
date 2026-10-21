@@ -3004,4 +3004,242 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
       vi.useRealTimers();
     }
   });
+
+  it("checks wasUserCanceled before scrubPdfProducer and passes userCancel to primary and extra PDF scrubs (#3254)", async () => {
+    const processV2Mock = vi.fn();
+    const scrubPdfProducerMock = vi.fn(async (buf: Buffer, _opts?: { signal?: AbortSignal }) =>
+      Buffer.concat([buf, Buffer.from("-scrubbed")]),
+    );
+    const dbSetMock = vi.fn(() => ({
+      where: vi.fn().mockResolvedValue(undefined),
+    }));
+    const userCancelAc = new AbortController();
+    const wasUserCanceledMock = vi.fn((_jobId?: string) => false);
+
+    const workerMod = await loadWorker("", () => {
+      vi.doMock("../../../../apps/api/src/lib/pdf-producer.js", () => ({
+        SCRUB_PDF_PRODUCER_TOOLS: new Set(["word-to-pdf"]),
+        scrubPdfProducer: (buf: Buffer, opts?: { signal?: AbortSignal }) =>
+          scrubPdfProducerMock(buf, opts),
+      }));
+      vi.doMock("node:fs/promises", () => ({
+        mkdir: vi.fn().mockResolvedValue(undefined),
+        readFile: vi.fn(),
+        rm: vi.fn().mockResolvedValue(undefined),
+      }));
+      vi.doMock("../../../../apps/api/src/db/index.js", () => ({
+        db: {
+          update: vi.fn(() => ({
+            set: dbSetMock,
+          })),
+        },
+        schema: { jobs: { id: "jobs.id" } },
+      }));
+      vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+        getToolConfig: vi.fn(() => ({ processV2: processV2Mock })),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/ai-handlers.js", () => ({
+        hasAiJobHandler: vi.fn(() => false),
+        hasAiPathJobHandler: vi.fn(() => false),
+        runAiToolJob: vi.fn(),
+        runAiPathToolJob: vi.fn(),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/cancel.js", () => ({
+        claimFinalize: vi.fn(async () => true),
+        registerCancelable: vi.fn(() => new AbortController()),
+        releaseFinalize: vi.fn(async () => {}),
+        unregisterCancelable: vi.fn(),
+        userCancelSignal: vi.fn(() => userCancelAc.signal),
+        wasUserCanceled: (id: string) => wasUserCanceledMock(id),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/postprocess.js", () => ({
+        autoSaveToLibrary: vi.fn().mockResolvedValue({}),
+        buildOutputName: vi.fn((out: string) => out),
+        generatePreview: vi.fn().mockResolvedValue(undefined),
+        stageAutoSaveToLibrary: vi.fn().mockResolvedValue({}),
+      }));
+      vi.doMock("@snapotter/media-engine", () => ({
+        HW_ACCEL_FAMILIES: [],
+        hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+        softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+        binaryOverrideWarning: vi.fn(),
+        checkBinaryOverrides: vi.fn(() => []),
+        probeFailureLevel: vi.fn(() => "warn"),
+      }));
+    });
+
+    objectStorageMocks.getObjectBuffer.mockResolvedValue(Buffer.from("docx-input"));
+    objectStorageMocks.putObject.mockResolvedValue(undefined);
+    objectStorageMocks.deletePrefix.mockResolvedValue(undefined);
+
+    const { Worker, UnrecoverableError } = await import("bullmq");
+    workerMod.startWorkers();
+    const workerCalls = (Worker as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    const docsCall = workerCalls.find(([queue]) => String(queue).endsWith("docs"));
+    if (!docsCall) throw new Error("docs pool worker not registered");
+    const processor = docsCall[1] as (job: unknown) => Promise<unknown>;
+
+    // 1. User cancel landed while the handler was finishing: wasUserCanceled runs BEFORE scrubPdfProducer.
+    wasUserCanceledMock.mockReturnValueOnce(true).mockReturnValueOnce(true);
+    processV2Mock.mockResolvedValueOnce({
+      buffer: Buffer.from("%PDF-1.4 primary"),
+      filename: "out.pdf",
+      contentType: "application/pdf",
+    });
+
+    await expect(
+      processor({
+        id: "job-cancel-before-scrub",
+        attemptsMade: 0,
+        opts: { attempts: 1 },
+        updateProgress: vi.fn(),
+        data: {
+          jobId: "job-cancel-before-scrub",
+          toolId: "word-to-pdf",
+          userId: null,
+          pool: "docs",
+          inputRefs: ["uploads/job-cancel-before-scrub/in.docx"],
+          filename: "in.docx",
+          settings: {},
+          kind: "tool",
+        },
+      }),
+    ).rejects.toBeInstanceOf(UnrecoverableError);
+    expect(scrubPdfProducerMock).not.toHaveBeenCalled();
+    expect(objectStorageMocks.putObject).not.toHaveBeenCalled();
+
+    // 2. Normal completion forwards { signal: userCancel } to both primary and extra PDF scrubs.
+    wasUserCanceledMock.mockReset().mockReturnValue(false);
+    scrubPdfProducerMock.mockClear();
+    objectStorageMocks.putObject.mockClear();
+    processV2Mock.mockResolvedValueOnce({
+      buffer: Buffer.from("%PDF-1.4 primary"),
+      filename: "out.pdf",
+      contentType: "application/pdf",
+      extraOutputs: [
+        {
+          name: "attachment.pdf",
+          buffer: Buffer.from("%PDF-1.4 extra"),
+          contentType: "application/pdf",
+        },
+      ],
+    });
+
+    await processor({
+      id: "job-scrub-signals",
+      attemptsMade: 0,
+      opts: { attempts: 1 },
+      updateProgress: vi.fn(),
+      data: {
+        jobId: "job-scrub-signals",
+        toolId: "word-to-pdf",
+        userId: null,
+        pool: "docs",
+        inputRefs: ["uploads/job-scrub-signals/in.docx"],
+        filename: "in.docx",
+        settings: {},
+        kind: "tool",
+      },
+    });
+
+    expect(scrubPdfProducerMock).toHaveBeenCalledTimes(2);
+    expect(scrubPdfProducerMock).toHaveBeenNthCalledWith(1, Buffer.from("%PDF-1.4 primary"), {
+      signal: userCancelAc.signal,
+    });
+    expect(scrubPdfProducerMock).toHaveBeenNthCalledWith(2, Buffer.from("%PDF-1.4 extra"), {
+      signal: userCancelAc.signal,
+    });
+
+    // 3. User cancel landing during scrubPdfProducer aborts the scrub and settles the job canceled.
+    scrubPdfProducerMock.mockClear();
+    objectStorageMocks.putObject.mockClear();
+    dbSetMock.mockClear();
+    scrubPdfProducerMock.mockImplementationOnce(
+      async (_buf: Buffer, opts?: { signal?: AbortSignal }) => {
+        expect(opts?.signal).toBe(userCancelAc.signal);
+        wasUserCanceledMock.mockReturnValue(true);
+        userCancelAc.abort();
+        throw Object.assign(new Error("Python script canceled"), {
+          name: "AbortError",
+          code: "canceled",
+        });
+      },
+    );
+    processV2Mock.mockResolvedValueOnce({
+      buffer: Buffer.from("%PDF-1.4 primary"),
+      filename: "out.pdf",
+      contentType: "application/pdf",
+    });
+
+    await expect(
+      processor({
+        id: "job-cancel-during-scrub",
+        attemptsMade: 0,
+        opts: { attempts: 1 },
+        updateProgress: vi.fn(),
+        data: {
+          jobId: "job-cancel-during-scrub",
+          toolId: "word-to-pdf",
+          userId: null,
+          pool: "docs",
+          inputRefs: ["uploads/job-cancel-during-scrub/in.docx"],
+          filename: "in.docx",
+          settings: {},
+          kind: "tool",
+        },
+      }),
+    ).rejects.toBeInstanceOf(UnrecoverableError);
+    expect(scrubPdfProducerMock).toHaveBeenCalledTimes(1);
+    expect(objectStorageMocks.putObject).not.toHaveBeenCalled();
+    expect(dbSetMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        status: "canceled",
+        error: { message: "Canceled" },
+      }),
+    );
+
+    // 4. User cancel landing right as scrubPdfProducer resolves is caught by the post-scrub wasUserCanceled guard.
+    wasUserCanceledMock.mockReset().mockReturnValue(false);
+    scrubPdfProducerMock.mockClear();
+    objectStorageMocks.putObject.mockClear();
+    dbSetMock.mockClear();
+    scrubPdfProducerMock.mockImplementationOnce(async (buf: Buffer) => {
+      wasUserCanceledMock.mockReturnValue(true);
+      return Buffer.concat([buf, Buffer.from("-scrubbed")]);
+    });
+    processV2Mock.mockResolvedValueOnce({
+      buffer: Buffer.from("%PDF-1.4 primary"),
+      filename: "out.pdf",
+      contentType: "application/pdf",
+    });
+
+    await expect(
+      processor({
+        id: "job-cancel-post-scrub",
+        attemptsMade: 0,
+        opts: { attempts: 1 },
+        updateProgress: vi.fn(),
+        data: {
+          jobId: "job-cancel-post-scrub",
+          toolId: "word-to-pdf",
+          userId: null,
+          pool: "docs",
+          inputRefs: ["uploads/job-cancel-post-scrub/in.docx"],
+          filename: "in.docx",
+          settings: {},
+          kind: "tool",
+        },
+      }),
+    ).rejects.toBeInstanceOf(UnrecoverableError);
+    expect(scrubPdfProducerMock).toHaveBeenCalledTimes(1);
+    expect(objectStorageMocks.putObject).not.toHaveBeenCalled();
+    expect(dbSetMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        status: "canceled",
+        error: { message: "Canceled" },
+      }),
+    );
+  });
 });
