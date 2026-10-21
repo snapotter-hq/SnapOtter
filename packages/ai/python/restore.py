@@ -543,6 +543,8 @@ def enhance_faces(img_bgr, fidelity=0.7):
 
     result = img_bgr.copy()
     faces_enhanced = 0
+    attempted_faces = 0
+    last_error = None
 
     for i, face_box in enumerate(face_boxes):
         x = face_box["x"]
@@ -552,6 +554,8 @@ def enhance_faces(img_bgr, fidelity=0.7):
 
         if w < 48 or h < 48:
             continue
+
+        attempted_faces += 1
 
         # Clamp fidelity for small faces to prevent over-smoothing
         face_fidelity = fidelity
@@ -592,8 +596,12 @@ def enhance_faces(img_bgr, fidelity=0.7):
         # Run inference
         try:
             output = session.run(None, model_inputs)[0][0]  # (3, 512, 512)
+        except MemoryError:
+            raise
         except Exception as e:
-            print(f"[restore] CodeFormer inference failed for face {i}: {e}", file=sys.stderr, flush=True)
+            detail = str(e).strip() or type(e).__name__
+            emit_warning(f"[restore] CodeFormer inference failed for face {i}: {detail}")
+            last_error = e
             continue
 
         # Postprocess: [-1, 1] -> [0, 255], RGB -> BGR
@@ -623,6 +631,9 @@ def enhance_faces(img_bgr, fidelity=0.7):
         blended = face_region * (1.0 - blend_mask) + enhanced_crop.astype(np.float32) * blend_mask
         result[y1:y2, x1:x2] = np.clip(blended, 0, 255).astype(np.uint8)
         faces_enhanced += 1
+
+    if attempted_faces > 0 and faces_enhanced == 0 and last_error is not None:
+        raise last_error
 
     return result, faces_enhanced
 

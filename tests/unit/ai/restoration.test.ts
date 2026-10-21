@@ -1014,6 +1014,266 @@ print("RESTORE_3078_OK")
         expect(res.status, res.stderr).toBe(0);
         expect(res.stdout).toContain("RESTORE_3078_OK");
       });
+
+      it("emits structured warnings on per-face CodeFormer failures and raises when all attempted faces fail (issue #3086)", () => {
+        const res = runPy(`
+import contextlib, importlib.util, io, json, os, sys, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+import gpu
+
+spec = importlib.util.spec_from_file_location("restore_mod", os.path.join(py_dir, "restore.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+class FakeArr:
+    def __init__(self, shape=(200, 200, 3)):
+        self.shape = shape
+    def copy(self):
+        return FakeArr(self.shape)
+    def __getitem__(self, _idx):
+        return FakeArr((100, 100, 3))
+    def __setitem__(self, _idx, _val):
+        pass
+    def astype(self, _dtype):
+        return self
+    def clip(self, _lo, _hi):
+        return self
+    def __truediv__(self, _other):
+        return self
+    def __sub__(self, _other):
+        return self
+    def __add__(self, _other):
+        return self
+    def __rsub__(self, _other):
+        return self
+    def __mul__(self, _other):
+        return self
+
+mod._IMPORT_ERROR = None
+mod.cv2 = types.SimpleNamespace(
+    IMREAD_COLOR=1,
+    COLOR_BGR2RGB=1,
+    COLOR_RGB2BGR=2,
+    INTER_AREA=3,
+    INTER_LANCZOS4=4,
+    imread=lambda _p, _f: FakeArr((200, 200, 3)),
+    imwrite=lambda _p, _img: True,
+    cvtColor=lambda img, _c: img,
+    resize=lambda _img, sz, interpolation=None: FakeArr((sz[1], sz[0], 3)),
+    ellipse=lambda *args, **kwargs: None,
+    GaussianBlur=lambda mask, _ksize, _sigma: mask,
+)
+mod.np = types.SimpleNamespace(
+    float32="float32",
+    float64="float64",
+    uint8="uint8",
+    newaxis=slice(None),
+    transpose=lambda a, _axes: a,
+    expand_dims=lambda a, _axis: a,
+    array=lambda _v: FakeArr((1,)),
+    clip=lambda a, _lo, _hi: a,
+    zeros=lambda shape, dtype="float32": FakeArr((shape[0], shape[1], 1)),
+)
+mod._get_codeformer_path = lambda: "/tmp/fake-codeformer-3086.onnx"
+mod.is_grayscale = lambda _img: False
+gpu.onnx_gpu_available = lambda: False
+
+active_boxes = []
+class FakeDetector:
+    def __init__(self, model_selection=0, min_detection_confidence=0.4):
+        self.ms = model_selection
+    def process(self, _img):
+        if self.ms != 0:
+            return types.SimpleNamespace(detections=[])
+        dets = [
+            types.SimpleNamespace(
+                location_data=types.SimpleNamespace(
+                    relative_bounding_box=types.SimpleNamespace(
+                        xmin=b["xmin"], ymin=b["ymin"], width=b["w"], height=b["h"]
+                    )
+                )
+            )
+            for b in active_boxes
+        ]
+        return types.SimpleNamespace(detections=dets)
+    def close(self):
+        pass
+
+sys.modules["mediapipe"] = types.SimpleNamespace(
+    solutions=types.SimpleNamespace(
+        face_detection=types.SimpleNamespace(FaceDetection=FakeDetector)
+    )
+)
+
+session_behaviors = []
+session_calls = []
+class FakeSession:
+    def get_inputs(self):
+        return [types.SimpleNamespace(name="input"), types.SimpleNamespace(name="weight")]
+    def run(self, _out, inp):
+        idx = len(session_calls)
+        session_calls.append(inp)
+        behavior = session_behaviors[idx]
+        if isinstance(behavior, BaseException):
+            raise behavior
+        return [[FakeArr((3, 512, 512))]]
+
+gpu.safe_onnx_session = lambda _p: (FakeSession(), "cpu")
+
+def parse_stderr_events(raw):
+    return [json.loads(line) for line in raw.strip().splitlines() if line.strip()]
+
+settings_faces_only = json.dumps({
+    "scratchRemoval": False,
+    "faceEnhancement": True,
+    "denoise": False,
+    "colorize": False,
+})
+sys.argv = ["restore.py", "/tmp/in.png", "/tmp/out.png", settings_faces_only]
+
+# 1. Partial face failure: 2 faces >= 48x48 (100x100 on 200x200 image), face 0 fails with empty RuntimeError(), face 1 succeeds
+active_boxes[:] = [
+    {"xmin": 0.0, "ymin": 0.0, "w": 0.5, "h": 0.5},
+    {"xmin": 0.4, "ymin": 0.4, "w": 0.5, "h": 0.5},
+]
+session_calls.clear()
+session_behaviors[:] = [RuntimeError("   "), "ok"]
+out_buf, err_buf = io.StringIO(), io.StringIO()
+with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+    mod.main()
+
+payload_partial = json.loads(out_buf.getvalue().strip())
+events_partial = parse_stderr_events(err_buf.getvalue())
+assert payload_partial["success"] is True, payload_partial
+assert payload_partial["facesEnhanced"] == 1, payload_partial
+assert "face_enhancement" in payload_partial["steps"], payload_partial
+assert [e["warning"] for e in events_partial if "warning" in e] == [
+    "[restore] CodeFormer inference failed for face 0: RuntimeError"
+], events_partial
+assert {"progress": 65, "stage": "Enhanced 1 face"} in events_partial, events_partial
+
+# 1b. Trailing face failure after an earlier face succeeds ([ok, fail] ordering): must still keep the enhanced face and not raise last_error
+session_calls.clear()
+session_behaviors[:] = ["ok", RuntimeError("Trailing face failure")]
+out_buf, err_buf = io.StringIO(), io.StringIO()
+with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+    mod.main()
+
+payload_trailing = json.loads(out_buf.getvalue().strip())
+events_trailing = parse_stderr_events(err_buf.getvalue())
+assert payload_trailing["success"] is True, payload_trailing
+assert payload_trailing["facesEnhanced"] == 1, payload_trailing
+assert "face_enhancement" in payload_trailing["steps"], payload_trailing
+assert [e["warning"] for e in events_trailing if "warning" in e] == [
+    "[restore] CodeFormer inference failed for face 1: Trailing face failure"
+], events_trailing
+assert {"progress": 65, "stage": "Enhanced 1 face"} in events_trailing, events_trailing
+
+# 2. Total face failure: 1 small face (< 48x48, skipped) + 2 candidate faces >= 48x48 that both fail inference
+# Must emit per-face structured warnings for both attempted faces, raise the last error out of enhance_faces,
+# and report "Face enhancement skipped: ..." (never "No faces detected")
+active_boxes[:] = [
+    {"xmin": 0.0, "ymin": 0.0, "w": 0.1, "h": 0.1},
+    {"xmin": 0.1, "ymin": 0.1, "w": 0.4, "h": 0.4},
+    {"xmin": 0.3, "ymin": 0.3, "w": 0.5, "h": 0.5},
+]
+session_calls.clear()
+first_err = "First face failed"
+long_err = "ONNX execution provider failed on CodeFormer node_17"
+session_behaviors[:] = [ValueError(first_err), RuntimeError(long_err)]
+out_buf, err_buf = io.StringIO(), io.StringIO()
+with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+    mod.main()
+
+payload_total_fail = json.loads(out_buf.getvalue().strip())
+events_total_fail = parse_stderr_events(err_buf.getvalue())
+assert payload_total_fail["success"] is True, payload_total_fail
+assert payload_total_fail["facesEnhanced"] == 0, payload_total_fail
+assert "face_enhancement" not in payload_total_fail["steps"], payload_total_fail
+assert {"warning": f"[restore] CodeFormer inference failed for face 1: {first_err}"} in events_total_fail, events_total_fail
+assert {"warning": f"[restore] CodeFormer inference failed for face 2: {long_err}"} in events_total_fail, events_total_fail
+assert {"warning": f"[restore] Face enhancement skipped: {long_err}"} in events_total_fail, events_total_fail
+assert {"progress": 65, "stage": f"Face enhancement skipped: {long_err[:40]}"} in events_total_fail, events_total_fail
+assert not any(e.get("stage") == "No faces detected" for e in events_total_fail), events_total_fail
+
+# 3. Only sub-48x48 faces detected: 0 faces attempted -> returns (result, 0) cleanly and emits "No faces detected"
+active_boxes[:] = [
+    {"xmin": 0.0, "ymin": 0.0, "w": 0.1, "h": 0.1},
+]
+session_calls.clear()
+session_behaviors[:] = []
+out_buf, err_buf = io.StringIO(), io.StringIO()
+with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+    mod.main()
+
+payload_small_only = json.loads(out_buf.getvalue().strip())
+events_small_only = parse_stderr_events(err_buf.getvalue())
+assert payload_small_only["success"] is True, payload_small_only
+assert payload_small_only["facesEnhanced"] == 0, payload_small_only
+assert session_calls == [], session_calls
+assert {"progress": 65, "stage": "No faces detected"} in events_small_only, events_small_only
+assert not any("warning" in e for e in events_small_only), events_small_only
+
+# 4. Per-face MemoryError re-raises immediately without attempting second face
+active_boxes[:] = [
+    {"xmin": 0.0, "ymin": 0.0, "w": 0.5, "h": 0.5},
+    {"xmin": 0.4, "ymin": 0.4, "w": 0.5, "h": 0.5},
+]
+session_calls.clear()
+session_behaviors[:] = [MemoryError("CodeFormer arena OOM"), "ok"]
+out_buf, err_buf = io.StringIO(), io.StringIO()
+try:
+    with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+        mod.main()
+except SystemExit as exc:
+    assert exc.code == 1, exc.code
+    assert len(session_calls) == 1, session_calls
+    payload_oom = json.loads(out_buf.getvalue().strip())
+    assert payload_oom == {"success": False, "error": "CodeFormer arena OOM"}, payload_oom
+else:
+    raise AssertionError("Expected SystemExit(1) for per-face MemoryError")
+
+# 5. mp.tasks.vision.FaceDetector fallback (AttributeError on mp.solutions) + longest > 1920 downscale
+mod._ensure_face_detect_model = lambda: "/tmp/fake-blaze-face.tflite"
+class FakeTasksDetector:
+    def detect(self, _mp_img):
+        # On a 3840x2160 image downscaled by 0.5 (inv_scale=2.0), a 30x30 detection becomes 60x60 (>= 48x48)
+        bbox = types.SimpleNamespace(origin_x=10, origin_y=10, width=30, height=30)
+        return types.SimpleNamespace(detections=[types.SimpleNamespace(bounding_box=bbox)])
+    def close(self):
+        pass
+
+sys.modules["mediapipe"] = types.SimpleNamespace(
+    ImageFormat=types.SimpleNamespace(SRGB=1),
+    Image=lambda image_format, data: data,
+    tasks=types.SimpleNamespace(
+        BaseOptions=lambda model_asset_path: model_asset_path,
+        vision=types.SimpleNamespace(
+            RunningMode=types.SimpleNamespace(IMAGE=1),
+            FaceDetectorOptions=lambda **kw: kw,
+            FaceDetector=types.SimpleNamespace(create_from_options=lambda _opts: FakeTasksDetector()),
+        ),
+    ),
+)
+mod.cv2.imread = lambda _p, _f: FakeArr((2160, 3840, 3))
+session_calls.clear()
+session_behaviors[:] = [RuntimeError("Tasks detector face inference failed")]
+out_buf, err_buf = io.StringIO(), io.StringIO()
+with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+    mod.main()
+
+events_tasks_fail = parse_stderr_events(err_buf.getvalue())
+assert len(session_calls) == 1, session_calls
+assert {"warning": "[restore] CodeFormer inference failed for face 0: Tasks detector face inference failed"} in events_tasks_fail, events_tasks_fail
+assert {"warning": "[restore] Face enhancement skipped: Tasks detector face inference failed"} in events_tasks_fail, events_tasks_fail
+
+print("RESTORE_3086_OK")
+`);
+        expect(res.status, res.stderr).toBe(0);
+        expect(res.stdout).toContain("RESTORE_3086_OK");
+      });
     },
   );
 });
