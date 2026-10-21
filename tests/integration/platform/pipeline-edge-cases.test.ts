@@ -856,6 +856,55 @@ describe("Pipeline batch execution", () => {
     });
   });
 
+  it("preserves earlier preFailures on the settled parent row when a later file faults on /api/v1/pipeline/batch (#3289)", async () => {
+    const clientJobId = `pipeline-batch-3289-${randomUUID()}`;
+    const collidingChildId = `${clientJobId}-f0`;
+    await db.insert(schema.jobs).values({
+      id: collidingChildId,
+      toolId: "rotate",
+      pool: "image",
+      type: "tool",
+      status: "completed",
+      inputRefs: [],
+      settings: {},
+    });
+
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "empty.png",
+        contentType: "image/png",
+        content: Buffer.alloc(0),
+      },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG_200x150 },
+      {
+        name: "pipeline",
+        content: JSON.stringify({ steps: [{ toolId: "rotate", settings: { angle: 90 } }] }),
+      },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/pipeline/batch",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(409);
+    expect(res.json()).toEqual({ error: "Job ID already in use", code: "CONFLICT" });
+
+    const [parentRow] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    expect(parentRow?.status).toBe("failed");
+    expect(parentRow?.error).toEqual({
+      message: "Job ID already in use",
+      code: "CONFLICT",
+      details: [
+        { filename: "empty.png", error: "File is empty" },
+        { filename: "", error: "Job ID already in use" },
+      ],
+    });
+  });
+
   it("pipeline batch with multi-step chain processes correctly", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "multi.png", contentType: "image/png", content: PNG_200x150 },

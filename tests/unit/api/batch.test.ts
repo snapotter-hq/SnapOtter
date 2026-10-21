@@ -7,6 +7,7 @@
 import { existsSync } from "node:fs";
 import { Readable } from "node:stream";
 import { gzipSync } from "node:zlib";
+import { SafeError } from "@snapotter/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -882,5 +883,72 @@ describe("batch route spooled multipart ingress (#1239)", () => {
         }),
       }),
     );
+  });
+
+  it("preserves earlier preFailures in failBatchJob when a later file or flow enqueue faults (#3289)", async () => {
+    const workspaceCap = new SafeError("Workspace storage limit reached", {
+      statusCode: 503,
+      code: "workspace-cap",
+    });
+    mocks.putObject.mockRejectedValueOnce(workspaceCap);
+
+    await expect(
+      invokeBatchRoute({
+        section: "image",
+        toolId: "resize",
+        parts: [
+          { type: "file", filename: "empty.png", content: Buffer.alloc(0) },
+          { type: "file", filename: "b.png", content: Buffer.from("valid-png") },
+          { type: "field", fieldname: "settings", value: "{}" },
+          { type: "field", fieldname: "clientJobId", value: "batch-3289-prefail-fault" },
+        ],
+      }),
+    ).rejects.toBe(workspaceCap);
+
+    expect(mocks.failBatchJob).toHaveBeenCalledWith({
+      jobId: "batch-3289-prefail-fault",
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 2,
+      errors: [
+        { filename: "empty.png", error: "File is empty" },
+        { filename: "", error: "Workspace storage limit reached" },
+      ],
+      message: "Workspace storage limit reached",
+      code: "workspace-cap",
+    });
+
+    mocks.failBatchJob.mockClear();
+    const enqueueFault = new SafeError("Queue service unavailable", {
+      statusCode: 503,
+      code: "queue-unavailable",
+    });
+    mocks.flowAdd.mockRejectedValueOnce(enqueueFault);
+
+    await expect(
+      invokeBatchRoute({
+        section: "image",
+        toolId: "resize",
+        parts: [
+          { type: "file", filename: "empty.png", content: Buffer.alloc(0) },
+          { type: "file", filename: "b.png", content: Buffer.from("valid-png") },
+          { type: "field", fieldname: "settings", value: "{}" },
+          { type: "field", fieldname: "clientJobId", value: "batch-3289-flow-add-fault" },
+        ],
+      }),
+    ).rejects.toBe(enqueueFault);
+
+    expect(mocks.failBatchJob).toHaveBeenCalledWith({
+      jobId: "batch-3289-flow-add-fault",
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 2,
+      errors: [
+        { filename: "empty.png", error: "File is empty" },
+        { filename: "", error: "Queue service unavailable" },
+      ],
+      message: "Queue service unavailable",
+      code: "queue-unavailable",
+    });
   });
 });

@@ -1396,6 +1396,53 @@ describe("Workspace storage cap during batch ingress", () => {
       storageMock.putObjectFail.clear();
     }
   }, 30_000);
+
+  it("preserves earlier preFailures on the settled row and terminal frame when a later file cannot be stored (#3289)", async () => {
+    const clientJobId = randomUUID();
+    storageMock.putObjectFail.set(`uploads/${clientJobId}-f0/`, "Injected cap after empty file");
+    try {
+      const { body, contentType } = createMultipartPayload([
+        {
+          name: "file",
+          filename: "empty.png",
+          contentType: "image/png",
+          content: Buffer.alloc(0),
+        },
+        { name: "file", filename: "b.png", content: Buffer.from(PNG) },
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/resize/batch",
+        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        body,
+      });
+
+      expect(res.statusCode).toBe(503);
+      expect(res.body).toContain("Injected cap after empty file");
+
+      const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+      expect(row?.status).toBe("failed");
+      expect(row?.error).toEqual({
+        message: "Injected cap after empty file",
+        code: "workspace-cap",
+        details: [
+          { filename: "empty.png", error: "File is empty" },
+          { filename: "", error: "Injected cap after empty file" },
+        ],
+      });
+
+      const frame = await waitForTerminalFrame(clientJobId, 10_000);
+      expect(frame.status).toBe("failed");
+      expect(frame.errors).toEqual([
+        { filename: "empty.png", error: "File is empty" },
+        { filename: "", error: "Injected cap after empty file" },
+      ]);
+    } finally {
+      storageMock.putObjectFail.clear();
+    }
+  }, 30_000);
 });
 
 // ── All files fail ingress validation (#750) ────────────────────

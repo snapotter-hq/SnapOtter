@@ -1057,6 +1057,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           parentId: string;
           totalFiles: number;
           childIds: string[];
+          preFailures: Array<{ filename: string; error: string }>;
         } | null = null;
         request.raw.once("aborted", abortIngress);
         if (request.raw.aborted) ingressAbort.abort();
@@ -1326,7 +1327,15 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             }
             throw err;
           }
-          stagedBatch = { parentId, totalFiles: files.length, childIds: [] };
+          const preFailures: Array<{
+            originalIndex: number;
+            filename: string;
+            error: string;
+            statusCode?: number;
+            code?: string;
+            details?: string;
+          }> = [];
+          stagedBatch = { parentId, totalFiles: files.length, childIds: [], preFailures };
 
           // Emit initial batch progress
           updateJobProgress({
@@ -1340,14 +1349,6 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
           // Validate, decode, and upload each file; build per-file pipeline chains
           const perFileChildren: FlowJob[] = [];
-          const preFailures: Array<{
-            originalIndex: number;
-            filename: string;
-            error: string;
-            statusCode?: number;
-            code?: string;
-            details?: string;
-          }> = [];
           // Flow index -> original upload index, consumed by batch-finalize so
           // fileResults keeps index alignment across pre-failures.
           const fileIndexMap: number[] = [];
@@ -1857,7 +1858,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
         } catch (err) {
           const conflict = isUniqueViolation(err);
           if (stagedBatch) {
-            const { parentId, totalFiles, childIds } = stagedBatch;
+            const { parentId, totalFiles, childIds, preFailures } = stagedBatch;
             const message = conflict
               ? "Job ID already in use"
               : friendlyError(err instanceof Error ? err.message : String(err));
@@ -1870,7 +1871,10 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                 totalFiles,
                 completedFiles: totalFiles,
                 failedFiles: totalFiles,
-                errors: [{ filename: "", error: message }],
+                errors: [
+                  ...preFailures.map(({ filename, error }) => ({ filename, error })),
+                  { filename: "", error: message },
+                ],
                 message,
                 ...(conflict
                   ? { code: "CONFLICT" }

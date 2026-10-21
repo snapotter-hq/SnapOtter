@@ -160,7 +160,12 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
         // The rows this request inserted, until the flow owns them. Set once
         // the parent row exists, cleared once the flow is enqueued; an
         // ingress failure in between settles them (see the catch below).
-        let stagedBatch: { parentId: string; totalFiles: number; childIds: string[] } | null = null;
+        let stagedBatch: {
+          parentId: string;
+          totalFiles: number;
+          childIds: string[];
+          preFailures: Array<{ filename: string; error: string }>;
+        } | null = null;
         request.raw.once("aborted", abortIngress);
         if (request.raw.aborted) ingressAbort.abort();
         try {
@@ -374,7 +379,15 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             }
             throw err;
           }
-          stagedBatch = { parentId, totalFiles: files.length, childIds: [] };
+          const preFailures: Array<{
+            originalIndex: number;
+            filename: string;
+            error: string;
+            statusCode?: number;
+            code?: string;
+            details?: string;
+          }> = [];
+          stagedBatch = { parentId, totalFiles: files.length, childIds: [], preFailures };
 
           updateJobProgress({
             jobId: parentId,
@@ -387,14 +400,6 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
 
           // ── Validate, decode, and upload each file ────────────────────
           const flowChildren: FlowJob[] = [];
-          const preFailures: Array<{
-            originalIndex: number;
-            filename: string;
-            error: string;
-            statusCode?: number;
-            code?: string;
-            details?: string;
-          }> = [];
           // Flow index -> original upload index, consumed by batch-finalize so
           // fileResults keeps #645's index alignment across pre-failures.
           const fileIndexMap: number[] = [];
@@ -906,7 +911,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
           // forever; the finally removes the uploads (#1161, #1724).
           const conflict = isUniqueViolation(err);
           if (stagedBatch) {
-            const { parentId, totalFiles, childIds } = stagedBatch;
+            const { parentId, totalFiles, childIds, preFailures } = stagedBatch;
             const message = conflict
               ? "Job ID already in use"
               : friendlyError(err instanceof Error ? err.message : String(err));
@@ -919,7 +924,10 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                 totalFiles,
                 completedFiles: totalFiles,
                 failedFiles: totalFiles,
-                errors: [{ filename: "", error: message }],
+                errors: [
+                  ...preFailures.map(({ filename, error }) => ({ filename, error })),
+                  { filename: "", error: message },
+                ],
                 message,
                 ...(conflict
                   ? { code: "CONFLICT" }

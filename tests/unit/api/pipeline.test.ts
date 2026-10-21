@@ -6,6 +6,7 @@
  */
 import { Readable } from "node:stream";
 import { gzipSync } from "node:zlib";
+import { SafeError } from "@snapotter/shared";
 import Fastify, { type FastifyRequest } from "fastify";
 import { describe, expect, it, vi } from "vitest";
 
@@ -1106,6 +1107,81 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685)", () => {
         inputRefs: ["uploads/pipeline-batch-3141-f1-s0/two.png"],
       }),
     ]);
+  });
+
+  it("preserves earlier preFailures in failBatchJob when a later file or flow enqueue faults (#3289)", async () => {
+    vi.clearAllMocks();
+    const workspaceCap = new SafeError("Workspace storage limit reached", {
+      statusCode: 503,
+      code: "workspace-cap",
+    });
+    putObjectMock.mockRejectedValueOnce(workspaceCap);
+
+    try {
+      await expect(
+        invokePipelineBatchRoute([
+          { type: "file", filename: "empty.png", content: Buffer.alloc(0) },
+          { type: "file", filename: "b.png", content: Buffer.from("valid-png") },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({ steps: [{ toolId: batchTestToolId, settings: {} }] }),
+          },
+          { type: "field", fieldname: "clientJobId", value: "pipeline-batch-3289-prefail-fault" },
+        ]),
+      ).rejects.toBe(workspaceCap);
+
+      expect(failBatchJobMock).toHaveBeenCalledWith({
+        jobId: "pipeline-batch-3289-prefail-fault",
+        totalFiles: 2,
+        completedFiles: 2,
+        failedFiles: 2,
+        errors: [
+          { filename: "empty.png", error: "File is empty" },
+          { filename: "", error: "Workspace storage limit reached" },
+        ],
+        message: "Workspace storage limit reached",
+        code: "workspace-cap",
+      });
+
+      failBatchJobMock.mockClear();
+      const enqueueFault = new SafeError("Queue service unavailable", {
+        statusCode: 503,
+        code: "queue-unavailable",
+      });
+      flowAddMock.mockRejectedValueOnce(enqueueFault);
+
+      await expect(
+        invokePipelineBatchRoute([
+          { type: "file", filename: "empty.png", content: Buffer.alloc(0) },
+          { type: "file", filename: "b.png", content: Buffer.from("valid-png") },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({ steps: [{ toolId: batchTestToolId, settings: {} }] }),
+          },
+          { type: "field", fieldname: "clientJobId", value: "pipeline-batch-3289-flow-add-fault" },
+        ]),
+      ).rejects.toBe(enqueueFault);
+
+      expect(failBatchJobMock).toHaveBeenCalledWith({
+        jobId: "pipeline-batch-3289-flow-add-fault",
+        totalFiles: 2,
+        completedFiles: 2,
+        failedFiles: 2,
+        errors: [
+          { filename: "empty.png", error: "File is empty" },
+          { filename: "", error: "Queue service unavailable" },
+        ],
+        message: "Queue service unavailable",
+        code: "queue-unavailable",
+      });
+    } finally {
+      putObjectMock.mockReset();
+      putObjectMock.mockResolvedValue(undefined);
+      flowAddMock.mockReset();
+      flowAddMock.mockResolvedValue(undefined);
+    }
   });
 });
 
