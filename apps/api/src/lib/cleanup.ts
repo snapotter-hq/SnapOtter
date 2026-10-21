@@ -2,11 +2,13 @@ import { eq } from "drizzle-orm";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { logger } from "./logger.js";
+import { parseNumericSettingValue } from "./settings-helpers.js";
 
 /**
- * Read the temp file max age from DB settings, falling back to env var when no
- * valid setting row is stored. Database read errors propagate so the caller can
- * skip the sweep rather than silently shortening retention (#1525).
+ * Read the temp file max age from DB settings, falling back to env var only
+ * when no setting row is stored. Invalid stored values log a warning and
+ * return 0, and database read errors propagate so the caller skips the sweep
+ * rather than silently shortening retention (#1525, #2752).
  * Called each cleanup cycle so changes take effect without restart.
  */
 export async function getMaxAgeMs(): Promise<number> {
@@ -14,11 +16,10 @@ export async function getMaxAgeMs(): Promise<number> {
     .select()
     .from(schema.settings)
     .where(eq(schema.settings.key, "tempFileMaxAgeHours"));
-  if (row) {
-    const hours = parseFloat(row.value);
-    if (!Number.isNaN(hours) && hours > 0) return hours * 60 * 60 * 1000;
+  if (!row) {
+    return env.FILE_MAX_AGE_HOURS * 60 * 60 * 1000;
   }
-  return env.FILE_MAX_AGE_HOURS * 60 * 60 * 1000;
+  return parseNumericSettingValue("tempFileMaxAgeHours", row.value, 0) * 60 * 60 * 1000;
 }
 
 /**

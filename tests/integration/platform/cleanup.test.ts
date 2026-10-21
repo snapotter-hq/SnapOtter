@@ -43,20 +43,46 @@ describe("getMaxAgeMs", () => {
     expect(result).toBe(1 * 60 * 60 * 1000);
   });
 
-  it("returns env fallback for invalid (non-numeric) DB value", async () => {
-    await setSetting("tempFileMaxAgeHours", "notanumber");
-    const result = await getMaxAgeMs();
-    expect(result).toBe(1 * 60 * 60 * 1000);
+  it("returns 0 and logs a warning for invalid (non-numeric, blank, non-finite, or trailing-junk) DB values (#2752)", async () => {
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      for (const invalid of ["notanumber", "", "   ", "Infinity", "-Infinity", "1abc"]) {
+        warnSpy.mockClear();
+        await setSetting("tempFileMaxAgeHours", invalid);
+        const result = await getMaxAgeMs();
+        expect(result).toBe(0);
+        expect(warnSpy).toHaveBeenCalledWith(
+          { key: "tempFileMaxAgeHours", value: invalid },
+          "invalid numeric setting, using default",
+        );
+      }
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
-  it("returns env fallback for zero or negative DB value", async () => {
-    await setSetting("tempFileMaxAgeHours", "0");
-    const result = await getMaxAgeMs();
-    expect(result).toBe(1 * 60 * 60 * 1000);
+  it("returns 0 and logs a warning for zero or negative DB values (#2752)", async () => {
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      await setSetting("tempFileMaxAgeHours", "0");
+      const result = await getMaxAgeMs();
+      expect(result).toBe(0);
+      expect(warnSpy).toHaveBeenCalledWith(
+        { key: "tempFileMaxAgeHours", value: "0" },
+        "invalid numeric setting, using default",
+      );
 
-    await setSetting("tempFileMaxAgeHours", "-5");
-    const result2 = await getMaxAgeMs();
-    expect(result2).toBe(1 * 60 * 60 * 1000);
+      warnSpy.mockClear();
+      await setSetting("tempFileMaxAgeHours", "-5");
+      const result2 = await getMaxAgeMs();
+      expect(result2).toBe(0);
+      expect(warnSpy).toHaveBeenCalledWith(
+        { key: "tempFileMaxAgeHours", value: "-5" },
+        "invalid numeric setting, using default",
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it("handles fractional hours", async () => {

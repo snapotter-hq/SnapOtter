@@ -175,6 +175,45 @@ describe("runSystemJob", () => {
         { err: readError },
         "Storage TTL: tempFileMaxAgeHours read failed; skipping global sweep",
       );
+
+      // Corrupt or non-positive setting values also skip the global sweep rather than falling back to FILE_MAX_AGE_HOURS (#2752)
+      selectSpy.mockRestore();
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+      try {
+        for (const invalid of ["corrupt", "", "0", "-5", "Infinity", "1abc"]) {
+          warnSpy.mockClear();
+          await db
+            .update(schema.settings)
+            .set({ value: invalid, updatedAt: new Date() })
+            .where(eq(schema.settings.key, "tempFileMaxAgeHours"));
+
+          const corruptResult = await runSystemJob({
+            name: SYSTEM_JOBS.storageTtl,
+          } as unknown as Job);
+          expect((corruptResult as { removed: number }).removed).toBe(0);
+          expect(existsSync(protectedDir)).toBe(true);
+          expect(warnSpy).toHaveBeenCalledWith(
+            { key: "tempFileMaxAgeHours", value: invalid },
+            "invalid numeric setting, using default",
+          );
+        }
+
+        // Restoring a valid 168h setting continues protecting the 2-hour-old directory without warnings
+        warnSpy.mockClear();
+        await db
+          .update(schema.settings)
+          .set({ value: "168", updatedAt: new Date() })
+          .where(eq(schema.settings.key, "tempFileMaxAgeHours"));
+
+        const recoveredResult = await runSystemJob({
+          name: SYSTEM_JOBS.storageTtl,
+        } as unknown as Job);
+        expect((recoveredResult as { removed: number }).removed).toBe(0);
+        expect(existsSync(protectedDir)).toBe(true);
+        expect(warnSpy).not.toHaveBeenCalled();
+      } finally {
+        warnSpy.mockRestore();
+      }
     } finally {
       selectSpy.mockRestore();
       errSpy.mockRestore();

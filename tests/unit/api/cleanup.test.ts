@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const selectWhereMock = vi.hoisted(() => vi.fn());
 const loggerErrorMock = vi.hoisted(() => vi.fn());
+const loggerWarnMock = vi.hoisted(() => vi.fn());
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((col: unknown, val: unknown) => ({ col, val })),
@@ -16,6 +17,7 @@ vi.mock("../../../apps/api/src/config.js", () => ({
 vi.mock("../../../apps/api/src/lib/logger.js", () => ({
   logger: {
     error: loggerErrorMock,
+    warn: loggerWarnMock,
   },
 }));
 
@@ -47,26 +49,33 @@ describe("getMaxAgeMs (#1525)", () => {
 
     await expect(getMaxAgeMs()).resolves.toBe(168 * 60 * 60 * 1000);
     expect(eq).toHaveBeenCalledWith("settings.key", "tempFileMaxAgeHours");
+    expect(loggerWarnMock).not.toHaveBeenCalled();
   });
 
   it("supports fractional hours", async () => {
     selectWhereMock.mockResolvedValueOnce([{ key: "tempFileMaxAgeHours", value: "0.5" }]);
 
     await expect(getMaxAgeMs()).resolves.toBe(0.5 * 60 * 60 * 1000);
+    expect(loggerWarnMock).not.toHaveBeenCalled();
   });
 
   it("falls back to FILE_MAX_AGE_HOURS when no setting row is stored", async () => {
     selectWhereMock.mockResolvedValueOnce([]);
 
     await expect(getMaxAgeMs()).resolves.toBe(72 * 60 * 60 * 1000);
+    expect(loggerWarnMock).not.toHaveBeenCalled();
   });
 
-  it.each(["notanumber", "0", "-5"])(
-    "falls back to FILE_MAX_AGE_HOURS when the stored value is %j",
+  it.each(["notanumber", "", "   ", "0", "-5", "Infinity", "-Infinity", "1abc"])(
+    "logs a warning and returns 0 when the stored value is %j (#2752)",
     async (value) => {
       selectWhereMock.mockResolvedValueOnce([{ key: "tempFileMaxAgeHours", value }]);
 
-      await expect(getMaxAgeMs()).resolves.toBe(72 * 60 * 60 * 1000);
+      await expect(getMaxAgeMs()).resolves.toBe(0);
+      expect(loggerWarnMock).toHaveBeenCalledWith(
+        { key: "tempFileMaxAgeHours", value },
+        "invalid numeric setting, using default",
+      );
     },
   );
 
