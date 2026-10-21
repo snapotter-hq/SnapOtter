@@ -524,4 +524,217 @@ describe("GifToolsControls (#1223)", async () => {
       useFileStore.setState({ files: [], selectedIndex: 0 });
     }
   });
+
+  it("keeps speed, reverse, and extract modes selectable in pipeline steps and before metadata resolves, and disables them only for a known static image on the standalone page (#2934)", async () => {
+    const { useFileStore } = await import("@/stores/file-store");
+    const { PipelineStepSettings } = await import("@/components/tools/pipeline-step-settings");
+    try {
+      const onPipelineNoFile = vi.fn();
+      render(<GifToolsControls settings={{}} onChange={onPipelineNoFile} />);
+      for (const label of ["Resize", "Optimize", "Speed", "Reverse", "Extract", "Rotate"]) {
+        expect((screen.getByRole("button", { name: label }) as HTMLButtonElement).disabled).toBe(
+          false,
+        );
+      }
+
+      await userEvent.click(screen.getByRole("button", { name: "Speed" }));
+      expect(onPipelineNoFile).toHaveBeenLastCalledWith({
+        mode: "speed",
+        speedFactor: 1,
+        loop: 0,
+      });
+
+      await userEvent.click(screen.getByRole("button", { name: "Reverse" }));
+      expect(onPipelineNoFile).toHaveBeenLastCalledWith({
+        mode: "reverse",
+        loop: 0,
+      });
+
+      await userEvent.click(screen.getByRole("button", { name: "Extract" }));
+      expect(onPipelineNoFile).toHaveBeenLastCalledWith({
+        mode: "extract",
+        extractMode: "single",
+        frameNumber: 0,
+        extractFormat: "png",
+        loop: 0,
+      });
+      cleanup();
+
+      const onStepSettings = vi.fn();
+      render(<PipelineStepSettings toolId="gif-tools" settings={{}} onChange={onStepSettings} />);
+      const speedBtn = await screen.findByRole("button", { name: "Speed" });
+      expect((speedBtn as HTMLButtonElement).disabled).toBe(false);
+      await userEvent.click(speedBtn);
+      expect(onStepSettings).toHaveBeenLastCalledWith({
+        mode: "speed",
+        speedFactor: 1,
+        loop: 0,
+      });
+      cleanup();
+
+      const onStandalonePending = vi.fn();
+      render(<GifToolsControls onChange={onStandalonePending} />);
+      for (const label of ["Resize", "Optimize", "Speed", "Reverse", "Extract", "Rotate"]) {
+        expect((screen.getByRole("button", { name: label }) as HTMLButtonElement).disabled).toBe(
+          false,
+        );
+      }
+      await userEvent.click(screen.getByRole("button", { name: "Speed" }));
+      expect(onStandalonePending).toHaveBeenLastCalledWith({
+        mode: "speed",
+        speedFactor: 1,
+        loop: 0,
+      });
+      cleanup();
+
+      useFileStore.setState({
+        files: [new File(["gif"], "static.gif", { type: "image/gif" })],
+        selectedIndex: 0,
+      });
+      vi.spyOn(globalThis, "fetch").mockImplementation(
+        async () =>
+          new Response(
+            JSON.stringify({
+              width: 64,
+              height: 64,
+              pages: 1,
+              delay: [],
+              loop: 0,
+              fileSize: 512,
+              duration: 0,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+      );
+
+      const onPipelineWithStaticFile = vi.fn();
+      await act(async () => {
+        render(<GifToolsControls settings={{}} onChange={onPipelineWithStaticFile} />);
+      });
+      expect(screen.getByText("Static image")).toBeDefined();
+      for (const label of ["Resize", "Optimize", "Speed", "Reverse", "Extract", "Rotate"]) {
+        expect((screen.getByRole("button", { name: label }) as HTMLButtonElement).disabled).toBe(
+          false,
+        );
+      }
+      await userEvent.click(screen.getByRole("button", { name: "Reverse" }));
+      expect(onPipelineWithStaticFile).toHaveBeenLastCalledWith({
+        mode: "reverse",
+        loop: 0,
+      });
+      cleanup();
+
+      const onStandaloneStatic = vi.fn();
+      await act(async () => {
+        render(<GifToolsControls onChange={onStandaloneStatic} />);
+      });
+      expect(screen.getByText("Static image")).toBeDefined();
+      for (const label of ["Resize", "Optimize", "Rotate"]) {
+        const btn = screen.getByRole("button", { name: label }) as HTMLButtonElement;
+        expect(btn.disabled).toBe(false);
+        expect(btn.getAttribute("title")).toBeNull();
+      }
+      for (const label of ["Speed", "Reverse", "Extract"]) {
+        const btn = screen.getByRole("button", { name: label }) as HTMLButtonElement;
+        expect(btn.disabled).toBe(true);
+        expect(btn.getAttribute("title")).toBe("Requires animated GIF");
+      }
+      cleanup();
+
+      useFileStore.setState({
+        files: [new File(["gif"], "animated.gif", { type: "image/gif" })],
+        selectedIndex: 0,
+      });
+      vi.spyOn(globalThis, "fetch").mockImplementation(
+        async () =>
+          new Response(
+            JSON.stringify({
+              width: 64,
+              height: 64,
+              pages: 4,
+              delay: [100, 100, 100, 100],
+              loop: 0,
+              fileSize: 1024,
+              duration: 400,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+      );
+
+      const onStandaloneAnimated = vi.fn();
+      await act(async () => {
+        render(<GifToolsControls onChange={onStandaloneAnimated} />);
+      });
+      for (const label of ["Resize", "Optimize", "Speed", "Reverse", "Extract", "Rotate"]) {
+        const btn = screen.getByRole("button", { name: label }) as HTMLButtonElement;
+        expect(btn.disabled).toBe(false);
+        expect(btn.getAttribute("title")).toBeNull();
+      }
+      cleanup();
+
+      let resolveDeferredFetch!: (res: Response) => void;
+      useFileStore.setState({
+        files: [new File(["gif"], "deferred-static.gif", { type: "image/gif" })],
+        selectedIndex: 0,
+      });
+      vi.spyOn(globalThis, "fetch").mockImplementation(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveDeferredFetch = resolve;
+          }),
+      );
+
+      const onStandaloneDeferred = vi.fn();
+      render(<GifToolsControls onChange={onStandaloneDeferred} />);
+      expect(screen.getByText("Reading GIF metadata...")).toBeDefined();
+      for (const label of ["Resize", "Optimize", "Speed", "Reverse", "Extract", "Rotate"]) {
+        expect((screen.getByRole("button", { name: label }) as HTMLButtonElement).disabled).toBe(
+          false,
+        );
+      }
+      await act(async () => {
+        resolveDeferredFetch(
+          new Response(
+            JSON.stringify({
+              width: 32,
+              height: 32,
+              pages: 1,
+              delay: [],
+              loop: 0,
+              fileSize: 256,
+              duration: 0,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      });
+      expect(screen.getByText("Static image")).toBeDefined();
+      for (const label of ["Speed", "Reverse", "Extract"]) {
+        const btn = screen.getByRole("button", { name: label }) as HTMLButtonElement;
+        expect(btn.disabled).toBe(true);
+        expect(btn.getAttribute("title")).toBe("Requires animated GIF");
+      }
+      cleanup();
+
+      useFileStore.setState({
+        files: [new File(["not-a-gif"], "broken.gif", { type: "image/gif" })],
+        selectedIndex: 0,
+      });
+      vi.spyOn(globalThis, "fetch").mockImplementation(
+        async () => new Response(JSON.stringify({ error: "Invalid GIF" }), { status: 422 }),
+      );
+      const onStandaloneError = vi.fn();
+      await act(async () => {
+        render(<GifToolsControls onChange={onStandaloneError} />);
+      });
+      for (const label of ["Resize", "Optimize", "Speed", "Reverse", "Extract", "Rotate"]) {
+        expect((screen.getByRole("button", { name: label }) as HTMLButtonElement).disabled).toBe(
+          false,
+        );
+      }
+    } finally {
+      cleanup();
+      useFileStore.setState({ files: [], selectedIndex: 0 });
+    }
+  });
 });

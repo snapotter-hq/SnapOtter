@@ -303,7 +303,11 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
         <p className="text-xs text-muted-foreground mb-1">{t.toolSettings["gif-tools"].mode}</p>
         <div className="grid grid-cols-3 gap-1">
           {MODES.map((m) => {
-            const disabled = m.requiresAnimation && !isAnimated;
+            const disabled =
+              m.requiresAnimation &&
+              initialSettings === undefined &&
+              info != null &&
+              info.pages <= 1;
             return (
               <button
                 key={m.id}
