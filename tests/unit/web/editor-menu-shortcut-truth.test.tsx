@@ -296,6 +296,140 @@ describe("editor menu bar hints name keys that run the command (#1943)", () => {
     expect(useEditorStore.getState().selectedObjectIds).toEqual(["obj-1"]);
     expect(useEditorStore.getState().selection).toBeNull();
   });
+
+  it("ignores Paste in Place (Ctrl+Shift+V) when a text input is focused (#3272)", () => {
+    onWindows();
+    const pasteInPlace = vi.fn();
+    useEditorStore.setState({ pasteInPlace });
+    renderHook(() => useEditorShortcuts());
+
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    input.focus();
+    try {
+      fireEvent.keyDown(document, { key: "V", code: "KeyV", ctrlKey: true, shiftKey: true });
+      expect(pasteInPlace).not.toHaveBeenCalled();
+    } finally {
+      input.remove();
+    }
+
+    fireEvent.keyDown(document, { key: "V", code: "KeyV", ctrlKey: true, shiftKey: true });
+    expect(pasteInPlace).toHaveBeenCalledTimes(1);
+  });
+
+  it("suppresses hotkeys, capture-phase export, fill-dialog event fallback, and Space hand tool when disabled is true (#3272)", () => {
+    onWindows();
+    const onSave = vi.fn();
+    const onExport = vi.fn();
+    const fillEvents: Event[] = [];
+    const onFillEvent = (e: Event) => fillEvents.push(e);
+    window.addEventListener("snapotter:open-fill-dialog", onFillEvent);
+
+    const copiedRect = {
+      id: "obj-1",
+      type: "rect" as const,
+      layerId: "layer-1",
+      attrs: { x: 10, y: 20, width: 50, height: 40, fill: "#ff0000" },
+    };
+    useEditorStore.setState({
+      activeTool: "move",
+      brushSize: 20,
+      foregroundColor: "#112233",
+      backgroundColor: "#445566",
+      rulersVisible: false,
+      guidesVisible: false,
+      gridVisible: false,
+      rightPanelVisible: true,
+      zoom: 1,
+      objects: [copiedRect],
+      selectedObjectIds: ["obj-1"],
+      clipboard: [copiedRect],
+      isSpaceHeld: false,
+    });
+
+    try {
+      const { rerender } = renderHook(
+        ({ disabled }: { disabled: boolean }) => useEditorShortcuts({ onSave, onExport, disabled }),
+        { initialProps: { disabled: true } },
+      );
+
+      // Single-key tool, color, and brush size shortcuts
+      for (const [key, code] of [
+        ["v", "KeyV"],
+        ["m", "KeyM"],
+        ["l", "KeyL"],
+        ["w", "KeyW"],
+        ["c", "KeyC"],
+        ["i", "KeyI"],
+        ["b", "KeyB"],
+        ["n", "KeyN"],
+        ["e", "KeyE"],
+        ["s", "KeyS"],
+        ["o", "KeyO"],
+        ["g", "KeyG"],
+        ["u", "KeyU"],
+        ["t", "KeyT"],
+        ["h", "KeyH"],
+        ["z", "KeyZ"],
+        ["x", "KeyX"],
+        ["d", "KeyD"],
+        ["[", "BracketLeft"],
+        ["]", "BracketRight"],
+      ] as const) {
+        fireEvent.keyDown(document, { key, code });
+        fireEvent.keyDown(document, { key: key.toUpperCase(), code, shiftKey: true });
+      }
+      expect(useEditorStore.getState().activeTool).toBe("move");
+      expect(useEditorStore.getState().brushSize).toBe(20);
+      expect(useEditorStore.getState().foregroundColor).toBe("#112233");
+
+      // Modifier, dialog, view, zoom, layer, and object shortcuts
+      fireEvent.keyDown(document, { key: "s", code: "KeyS", ctrlKey: true });
+      fireEvent.keyDown(window, { key: "S", code: "KeyS", ctrlKey: true, shiftKey: true });
+      fireEvent.keyDown(document, { key: "Backspace", code: "Backspace", shiftKey: true });
+      fireEvent.keyDown(document, { key: "v", code: "KeyV", ctrlKey: true });
+      fireEvent.keyDown(document, { key: "V", code: "KeyV", ctrlKey: true, shiftKey: true });
+      fireEvent.keyDown(document, { key: "a", code: "KeyA", ctrlKey: true });
+      fireEvent.keyDown(document, { key: "d", code: "KeyD", ctrlKey: true });
+      fireEvent.keyDown(document, { key: "j", code: "KeyJ", ctrlKey: true });
+      fireEvent.keyDown(document, { key: "=", code: "Equal", ctrlKey: true });
+      fireEvent.keyDown(document, { key: "-", code: "Minus", ctrlKey: true });
+      fireEvent.keyDown(document, { key: "r", code: "KeyR", ctrlKey: true });
+      fireEvent.keyDown(document, { key: ";", code: "Semicolon", ctrlKey: true });
+      fireEvent.keyDown(document, { key: "'", code: "Quote", ctrlKey: true });
+      fireEvent.keyDown(document, { key: "Tab", code: "Tab" });
+      fireEvent.keyDown(document, { key: "Delete", code: "Delete" });
+      fireEvent.keyDown(document, { key: "Escape", code: "Escape" });
+      fireEvent.keyDown(window, { key: " ", code: "Space" });
+      fireEvent.keyUp(window, { key: " ", code: "Space" });
+
+      expect(onSave).not.toHaveBeenCalled();
+      expect(onExport).not.toHaveBeenCalled();
+      expect(fillEvents).toHaveLength(0);
+      expect(useEditorStore.getState().objects).toHaveLength(1);
+      expect(useEditorStore.getState().selectedObjectIds).toEqual(["obj-1"]);
+      expect(useEditorStore.getState().selection).toBeNull();
+      expect(useEditorStore.getState().zoom).toBe(1);
+      expect(useEditorStore.getState().rulersVisible).toBe(false);
+      expect(useEditorStore.getState().guidesVisible).toBe(false);
+      expect(useEditorStore.getState().gridVisible).toBe(false);
+      expect(useEditorStore.getState().rightPanelVisible).toBe(true);
+      expect(useEditorStore.getState().isSpaceHeld).toBe(false);
+
+      // Re-enabling shortcuts allows them to fire again.
+      rerender({ disabled: false });
+      fireEvent.keyDown(document, { key: "b", code: "KeyB" });
+      expect(useEditorStore.getState().activeTool).toBe("brush");
+      fireEvent.keyDown(document, { key: "Backspace", code: "Backspace", shiftKey: true });
+      expect(fillEvents).toHaveLength(1);
+      fireEvent.keyDown(window, { key: "S", code: "KeyS", ctrlKey: true, shiftKey: true });
+      expect(onExport).toHaveBeenCalledTimes(1);
+      fireEvent.keyDown(document, { key: "s", code: "KeyS", ctrlKey: true });
+      expect(onSave).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener("snapotter:open-fill-dialog", onFillEvent);
+    }
+  });
 });
 
 describe("editor canvas context menu (#1943, #1964)", () => {

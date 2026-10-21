@@ -124,6 +124,7 @@ export function EditorPage() {
     onSave: handleManualSave,
     onExport: handleOpenExport,
     onFillDialog: () => setFillDialogOpen(true),
+    disabled: isModalOpen,
   });
 
   useEffect(() => {
@@ -132,10 +133,13 @@ export function EditorPage() {
 
   // Listen for fill-dialog custom event (dispatched from Shift+Backspace shortcut)
   useEffect(() => {
-    const handler = () => setFillDialogOpen(true);
+    const handler = () => {
+      if (isModalOpen) return;
+      setFillDialogOpen(true);
+    };
     window.addEventListener("snapotter:open-fill-dialog", handler);
     return () => window.removeEventListener("snapotter:open-fill-dialog", handler);
-  }, []);
+  }, [isModalOpen]);
 
   const loadBlobImage = useCallback(
     (blob: Blob, runId: number, fromServer = false) => {

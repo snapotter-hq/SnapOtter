@@ -70,7 +70,10 @@ export function useEditorShortcuts(callbacks?: {
   onSave?: () => void;
   onExport?: () => void;
   onFillDialog?: () => void;
+  disabled?: boolean;
 }) {
+  const disabled = callbacks?.disabled === true;
+  const enabled = !disabled;
   const previousToolRef = useRef<ToolType | null>(null);
   const isSpaceHeldRef = useRef(false);
   const { t: translations } = useTranslation();
@@ -83,17 +86,17 @@ export function useEditorShortcuts(callbacks?: {
   useHotkeys(
     "v",
     () => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       useEditorStore.getState().setTool("move");
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // M - Marquee selection (cycles rect/ellipse)
   useHotkeys(
     "m",
     () => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       const current = useEditorStore.getState().activeTool;
       if (MARQUEE_CYCLE.includes(current)) {
         useEditorStore.getState().setTool(cycleSubtool(current, MARQUEE_CYCLE));
@@ -101,25 +104,25 @@ export function useEditorShortcuts(callbacks?: {
         useEditorStore.getState().setTool("marquee-rect");
       }
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Shift+M - Cycle marquee subtypes
   useHotkeys(
     "shift+m",
     () => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       const current = useEditorStore.getState().activeTool;
       useEditorStore.getState().setTool(cycleSubtool(current, MARQUEE_CYCLE));
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // L - Lasso tool (cycles freehand/polygonal)
   useHotkeys(
     "l",
     () => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       const current = useEditorStore.getState().activeTool;
       if (LASSO_CYCLE.includes(current)) {
         useEditorStore.getState().setTool(cycleSubtool(current, LASSO_CYCLE));
@@ -127,106 +130,106 @@ export function useEditorShortcuts(callbacks?: {
         useEditorStore.getState().setTool("lasso-free");
       }
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Shift+L - Cycle lasso subtypes
   useHotkeys(
     "shift+l",
     () => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       useEditorStore
         .getState()
         .setTool(cycleSubtool(useEditorStore.getState().activeTool, LASSO_CYCLE));
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // W - Magic wand
   useHotkeys(
     "w",
     () => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       useEditorStore.getState().setTool("magic-wand");
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // C - Crop tool
   useHotkeys(
     "c",
     () => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       useEditorStore.getState().setTool("crop");
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // I - Eyedropper
   useHotkeys(
     "i",
     () => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       useEditorStore.getState().setTool("eyedropper");
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // B - Brush tool
   useHotkeys(
     "b",
     () => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       useEditorStore.getState().setTool("brush");
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // N - Pencil tool
   useHotkeys(
     "n",
     () => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       useEditorStore.getState().setTool("pencil");
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // E - Eraser tool
   useHotkeys(
     "e",
     () => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       useEditorStore.getState().setTool("eraser");
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // S - Clone stamp
   useHotkeys(
     "s",
     () => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       useEditorStore.getState().setTool("clone-stamp");
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // O - Dodge tool
   useHotkeys(
     "o",
     () => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       useEditorStore.getState().setTool("dodge");
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // G - Fill/Gradient (cycles)
   useHotkeys(
     "g",
     () => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       const current = useEditorStore.getState().activeTool;
       if (FILL_CYCLE.includes(current)) {
         useEditorStore.getState().setTool(cycleSubtool(current, FILL_CYCLE));
@@ -234,26 +237,26 @@ export function useEditorShortcuts(callbacks?: {
         useEditorStore.getState().setTool("fill");
       }
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Shift+G - Cycle fill/gradient subtypes
   useHotkeys(
     "shift+g",
     () => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       useEditorStore
         .getState()
         .setTool(cycleSubtool(useEditorStore.getState().activeTool, FILL_CYCLE));
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // U - Shape tool (cycles shapes)
   useHotkeys(
     "u",
     () => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       const current = useEditorStore.getState().activeTool;
       if (SHAPE_CYCLE.includes(current)) {
         useEditorStore.getState().setTool(cycleSubtool(current, SHAPE_CYCLE));
@@ -261,49 +264,49 @@ export function useEditorShortcuts(callbacks?: {
         useEditorStore.getState().setTool("shape-rect");
       }
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Shift+U - Cycle shape subtypes
   useHotkeys(
     "shift+u",
     () => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       useEditorStore
         .getState()
         .setTool(cycleSubtool(useEditorStore.getState().activeTool, SHAPE_CYCLE));
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // T - Text tool
   useHotkeys(
     "t",
     () => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       useEditorStore.getState().setTool("text");
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // H - Hand tool
   useHotkeys(
     "h",
     () => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       useEditorStore.getState().setTool("hand");
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Z - Zoom tool
   useHotkeys(
     "z",
     () => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       useEditorStore.getState().setTool("zoom");
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // ---- Color shortcuts ----
@@ -312,44 +315,44 @@ export function useEditorShortcuts(callbacks?: {
   useHotkeys(
     "x",
     () => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       useEditorStore.getState().swapColors();
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // D - Reset colors to black/white
   useHotkeys(
     "d",
     () => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       useEditorStore.getState().resetColors();
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // [ - Decrease brush size
   useHotkeys(
     "[",
     () => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       const state = useEditorStore.getState();
       const step = getBrushSizeStep(state.brushSize);
       state.setBrushSize(state.brushSize - step);
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // ] - Increase brush size
   useHotkeys(
     "]",
     () => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       const state = useEditorStore.getState();
       const step = getBrushSizeStep(state.brushSize);
       state.setBrushSize(state.brushSize + step);
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // ---- Modifier shortcuts (always active, override browser defaults) ----
@@ -358,31 +361,34 @@ export function useEditorShortcuts(callbacks?: {
   useHotkeys(
     "mod+z",
     (e) => {
+      if (disabled) return;
       e.preventDefault();
       void undoEditor();
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Ctrl+Shift+Z / Cmd+Shift+Z - Redo
   useHotkeys(
     "mod+shift+z",
     (e) => {
+      if (disabled) return;
       e.preventDefault();
       void redoEditor();
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Ctrl+S / Cmd+S - Save project
   useHotkeys(
     "mod+s",
     (e) => {
+      if (disabled) return;
       e.preventDefault();
       if (useEditorStore.getState().rebaking) return;
       callbacks?.onSave?.();
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Ctrl+Shift+S / Cmd+Shift+S - Export image
@@ -393,6 +399,7 @@ export function useEditorShortcuts(callbacks?: {
   onExportRef.current = callbacks?.onExport;
 
   useEffect(() => {
+    if (disabled) return;
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "s") {
         e.preventDefault();
@@ -403,13 +410,13 @@ export function useEditorShortcuts(callbacks?: {
     };
     window.addEventListener("keydown", handler, { capture: true });
     return () => window.removeEventListener("keydown", handler, { capture: true });
-  }, []);
+  }, [disabled]);
 
   // Ctrl+A / Cmd+A - Select all (pixel selection over the whole canvas)
   useHotkeys(
     "mod+a",
     (e) => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       e.preventDefault();
       const state = useEditorStore.getState();
       const { width, height } = state.canvasSize;
@@ -420,62 +427,62 @@ export function useEditorShortcuts(callbacks?: {
         bounds: { x: 0, y: 0, width, height },
       });
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Alt+Ctrl+A / Option+Cmd+A - Select all objects/layers
   useHotkeys(
     "alt+mod+a",
     (e) => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       e.preventDefault();
       const state = useEditorStore.getState();
       const allIds = state.objects.map((o) => o.id);
       state.setSelection(null);
       state.setSelectedObjects(allIds);
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Ctrl+D / Cmd+D - Deselect
   useHotkeys(
     "mod+d",
     (e) => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       e.preventDefault();
       useEditorStore.getState().setSelectedObjects([]);
       useEditorStore.getState().setSelection(null);
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Ctrl+C / Cmd+C - Copy
   useHotkeys(
     "mod+c",
     (e) => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       e.preventDefault();
       useEditorStore.getState().copyObjects();
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Ctrl+X / Cmd+X - Cut
   useHotkeys(
     "mod+x",
     (e) => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       e.preventDefault();
       useEditorStore.getState().cutObjects();
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Ctrl+V / Cmd+V - Paste
   useHotkeys(
     "mod+v",
     (e) => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       // Only paste internal clipboard; system paste is handled by paste event listener
       const state = useEditorStore.getState();
       if (state.clipboard && state.clipboard.length > 0) {
@@ -483,82 +490,85 @@ export function useEditorShortcuts(callbacks?: {
         state.pasteObjects();
       }
     },
-    { preventDefault: false },
+    { preventDefault: false, enabled },
   );
 
   // Ctrl+Shift+C / Cmd+Shift+C - Copy merged
   useHotkeys(
     "mod+shift+c",
     (e) => {
+      if (disabled) return;
       e.preventDefault();
       void copyMergedToClipboard(copyFailedMessage);
     },
-    { preventDefault: true },
-    [copyFailedMessage],
+    { preventDefault: true, enabled },
+    [copyFailedMessage, disabled],
   );
 
   // Ctrl+Shift+V / Cmd+Shift+V - Paste in place
   useHotkeys(
     "mod+shift+v",
     (e) => {
+      if (disabled || isInputFocused()) return;
       e.preventDefault();
       useEditorStore.getState().pasteInPlace();
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Ctrl+Alt+T / Cmd+Option+T (plus Ctrl+T / Cmd+T in an installed PWA) - Free transform
   useHotkeys(
     "mod+alt+t,mod+t",
     (e) => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       e.preventDefault();
       useEditorStore.getState().setTool("transform");
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Ctrl+J / Cmd+J - Duplicate layer
   useHotkeys(
     "mod+j",
     (e) => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       e.preventDefault();
       const state = useEditorStore.getState();
       state.duplicateLayer(state.activeLayerId);
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Ctrl+Alt+Shift+N / Cmd+Option+Shift+N (plus Ctrl+Shift+N / Cmd+Shift+N in an installed PWA) - New layer
   useHotkeys(
     "mod+alt+shift+n,mod+shift+n",
     (e) => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       e.preventDefault();
       useEditorStore.getState().addLayer();
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Delete / Backspace - Delete selected objects
   useHotkeys(
     "delete,backspace",
     (e) => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       e.preventDefault();
       const state = useEditorStore.getState();
       if (state.selectedObjectIds.length > 0) {
         state.removeObjects(state.selectedObjectIds);
       }
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Ctrl+0 / Cmd+0 - Fit to screen
   useHotkeys(
     "mod+0",
     (e) => {
+      if (disabled) return;
       e.preventDefault();
       const editorCanvas = document.querySelector("[data-testid='editor-canvas']");
       if (!editorCanvas) return;
@@ -572,13 +582,14 @@ export function useEditorShortcuts(callbacks?: {
       useEditorStore.getState().setZoom(fitZoom);
       useEditorStore.getState().setPanOffset({ x: offsetX, y: offsetY });
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Ctrl+1 / Cmd+1 - Zoom to 100%
   useHotkeys(
     "mod+1",
     (e) => {
+      if (disabled) return;
       e.preventDefault();
       const editorCanvas = document.querySelector("[data-testid='editor-canvas']");
       if (!editorCanvas) return;
@@ -589,129 +600,131 @@ export function useEditorShortcuts(callbacks?: {
       useEditorStore.getState().setZoom(1);
       useEditorStore.getState().setPanOffset({ x: offsetX, y: offsetY });
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Ctrl++ / Cmd++ - Zoom in
   useHotkeys(
     "mod+=,mod+plus",
     (e) => {
+      if (disabled) return;
       e.preventDefault();
       const state = useEditorStore.getState();
       state.setZoom(state.zoom * 1.25);
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Ctrl+- / Cmd+- - Zoom out
   useHotkeys(
     "mod+-,mod+minus",
     (e) => {
+      if (disabled) return;
       e.preventDefault();
       const state = useEditorStore.getState();
       state.setZoom(state.zoom / 1.25);
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Tab - Toggle right panel
   useHotkeys(
     "tab",
     (e) => {
-      if (isInputFocused() || isNativeInteractiveTarget(e.target)) return;
+      if (disabled || isInputFocused() || isNativeInteractiveTarget(e.target)) return;
       e.preventDefault();
       useEditorStore.getState().toggleRightPanel();
     },
-    { preventDefault: false },
+    { preventDefault: false, enabled },
   );
 
   // Arrow keys - Nudge selected 1px
   useHotkeys(
     "left",
     (e) => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       e.preventDefault();
       nudgeSelected(-1, 0);
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   useHotkeys(
     "right",
     (e) => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       e.preventDefault();
       nudgeSelected(1, 0);
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   useHotkeys(
     "up",
     (e) => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       e.preventDefault();
       nudgeSelected(0, -1);
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   useHotkeys(
     "down",
     (e) => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       e.preventDefault();
       nudgeSelected(0, 1);
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Shift+Arrow - Nudge 10px
   useHotkeys(
     "shift+left",
     (e) => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       e.preventDefault();
       nudgeSelected(-10, 0);
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   useHotkeys(
     "shift+right",
     (e) => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       e.preventDefault();
       nudgeSelected(10, 0);
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   useHotkeys(
     "shift+up",
     (e) => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       e.preventDefault();
       nudgeSelected(0, -10);
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   useHotkeys(
     "shift+down",
     (e) => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       e.preventDefault();
       nudgeSelected(0, 10);
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Enter - Close an in-progress polygonal lasso, else apply the crop
   useHotkeys(
     "enter",
     (e) => {
-      if (isInputFocused() || isNativeInteractiveTarget(e.target)) return;
+      if (disabled || isInputFocused() || isNativeInteractiveTarget(e.target)) return;
       e.preventDefault();
       if (polygonalLassoRefHolder.current?.close()) return;
       const state = useEditorStore.getState();
@@ -719,13 +732,14 @@ export function useEditorShortcuts(callbacks?: {
         runEditorAction(state.applyCrop(), actionFailedMessage);
       }
     },
-    { preventDefault: false },
+    { preventDefault: false, enabled },
   );
 
   // Escape - Cancel current operation
   useHotkeys(
     "escape",
     (e) => {
+      if (disabled) return;
       e.preventDefault();
       if (polygonalLassoRefHolder.current?.cancel()) return;
       const state = useEditorStore.getState();
@@ -735,127 +749,137 @@ export function useEditorShortcuts(callbacks?: {
       state.setSelectedObjects([]);
       state.setSelection(null);
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Ctrl+R / Cmd+R - Toggle rulers (override browser refresh)
   useHotkeys(
     "mod+r",
     (e) => {
+      if (disabled) return;
       e.preventDefault();
       useEditorStore.getState().toggleRulers();
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Ctrl+; / Cmd+; - Toggle guides
   useHotkeys(
     "mod+;",
     (e) => {
+      if (disabled) return;
       e.preventDefault();
       useEditorStore.getState().toggleGuides();
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Ctrl+' / Cmd+' - Toggle grid
   useHotkeys(
     "mod+'",
     (e) => {
+      if (disabled) return;
       e.preventDefault();
       useEditorStore.getState().toggleGrid();
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Ctrl+Shift+I / Cmd+Shift+I - Inverse selection
   useHotkeys(
     "mod+shift+i",
     (e) => {
+      if (disabled) return;
       e.preventDefault();
       useEditorStore.getState().invertSelection();
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Ctrl+E / Cmd+E - Merge down
   useHotkeys(
     "mod+e",
     (e) => {
+      if (disabled) return;
       e.preventDefault();
       const state = useEditorStore.getState();
       state.mergeDown(state.activeLayerId);
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Ctrl+Shift+E / Cmd+Shift+E - Flatten all
   useHotkeys(
     "mod+shift+e",
     (e) => {
+      if (disabled) return;
       e.preventDefault();
       useEditorStore.getState().flattenAll();
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Ctrl+Shift+] / Cmd+Shift+] - Bring to front
   useHotkeys(
     "mod+shift+]",
     (e) => {
+      if (disabled) return;
       e.preventDefault();
       const state = useEditorStore.getState();
       if (state.selectedObjectIds.length === 1) {
         state.bringToFront(state.selectedObjectIds[0]);
       }
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Ctrl+Shift+[ / Cmd+Shift+[ - Send to back
   useHotkeys(
     "mod+shift+[",
     (e) => {
+      if (disabled) return;
       e.preventDefault();
       const state = useEditorStore.getState();
       if (state.selectedObjectIds.length === 1) {
         state.sendToBack(state.selectedObjectIds[0]);
       }
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Ctrl+] / Cmd+] - Bring forward
   useHotkeys(
     "mod+]",
     (e) => {
+      if (disabled) return;
       e.preventDefault();
       const state = useEditorStore.getState();
       if (state.selectedObjectIds.length === 1) {
         state.bringForward(state.selectedObjectIds[0]);
       }
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Ctrl+[ / Cmd+[ - Send backward
   useHotkeys(
     "mod+[",
     (e) => {
+      if (disabled) return;
       e.preventDefault();
       const state = useEditorStore.getState();
       if (state.selectedObjectIds.length === 1) {
         state.sendBackward(state.selectedObjectIds[0]);
       }
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // Shift+Backspace - Open fill dialog
   useHotkeys(
     "shift+backspace",
     (e) => {
-      if (isInputFocused()) return;
+      if (disabled || isInputFocused()) return;
       e.preventDefault();
       if (callbacks?.onFillDialog) {
         callbacks.onFillDialog();
@@ -864,49 +888,67 @@ export function useEditorShortcuts(callbacks?: {
         window.dispatchEvent(new CustomEvent("snapotter:open-fill-dialog"));
       }
     },
-    { preventDefault: true },
+    { preventDefault: true, enabled },
   );
 
   // ---- Space key: temporary hand tool ----
 
-  const handleSpaceDown = useCallback((e: KeyboardEvent) => {
-    if (isInputFocused() || isNativeInteractiveTarget(e.target)) return;
-    if (e.code !== "Space") return;
-    if (e.repeat) return;
-    e.preventDefault();
-
-    isSpaceHeldRef.current = true;
-    const state = useEditorStore.getState();
-    if (state.activeTool !== "hand") {
-      previousToolRef.current = state.activeTool;
-      useEditorStore.setState({ isSpaceHeld: true });
-      state.setTool("hand");
+  useEffect(() => {
+    if (!disabled || !isSpaceHeldRef.current) return;
+    isSpaceHeldRef.current = false;
+    useEditorStore.setState({ isSpaceHeld: false });
+    if (previousToolRef.current) {
+      useEditorStore.getState().setTool(previousToolRef.current);
+      previousToolRef.current = null;
     }
-  }, []);
+  }, [disabled]);
 
-  const handleSpaceUp = useCallback((e: KeyboardEvent) => {
-    if (e.code !== "Space") return;
-    if (!isSpaceHeldRef.current && isNativeInteractiveTarget(e.target)) return;
-    e.preventDefault();
+  const handleSpaceDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (disabled || isInputFocused() || isNativeInteractiveTarget(e.target)) return;
+      if (e.code !== "Space") return;
+      if (e.repeat) return;
+      e.preventDefault();
 
-    if (isSpaceHeldRef.current) {
-      isSpaceHeldRef.current = false;
-      useEditorStore.setState({ isSpaceHeld: false });
-      if (previousToolRef.current) {
-        useEditorStore.getState().setTool(previousToolRef.current);
-        previousToolRef.current = null;
+      isSpaceHeldRef.current = true;
+      const state = useEditorStore.getState();
+      if (state.activeTool !== "hand") {
+        previousToolRef.current = state.activeTool;
+        useEditorStore.setState({ isSpaceHeld: true });
+        state.setTool("hand");
       }
-    }
-  }, []);
+    },
+    [disabled],
+  );
+
+  const handleSpaceUp = useCallback(
+    (e: KeyboardEvent) => {
+      if (disabled && !isSpaceHeldRef.current) return;
+      if (e.code !== "Space") return;
+      if (!isSpaceHeldRef.current && isNativeInteractiveTarget(e.target)) return;
+      e.preventDefault();
+
+      if (isSpaceHeldRef.current) {
+        isSpaceHeldRef.current = false;
+        useEditorStore.setState({ isSpaceHeld: false });
+        if (previousToolRef.current) {
+          useEditorStore.getState().setTool(previousToolRef.current);
+          previousToolRef.current = null;
+        }
+      }
+    },
+    [disabled],
+  );
 
   useEffect(() => {
+    if (disabled) return;
     window.addEventListener("keydown", handleSpaceDown);
     window.addEventListener("keyup", handleSpaceUp);
     return () => {
       window.removeEventListener("keydown", handleSpaceDown);
       window.removeEventListener("keyup", handleSpaceUp);
     };
-  }, [handleSpaceDown, handleSpaceUp]);
+  }, [disabled, handleSpaceDown, handleSpaceUp]);
 }
 
 /** Nudge all selected objects by (dx, dy) pixels. */

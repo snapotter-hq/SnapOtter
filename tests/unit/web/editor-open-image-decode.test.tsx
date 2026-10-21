@@ -1308,18 +1308,14 @@ describe("EditorPage Open Image server decode (#2530)", () => {
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const stream = FakeEventSource.instances[0];
 
-    // User opens Canvas Size (and starts Apply decode) and Fill dialogs while waiting for the server decode.
+    // User opens Canvas Size (and starts Apply decode) while waiting for the server decode.
     fireEvent.click(screen.getByTestId("menu-image"));
     fireEvent.click(screen.getByTestId("menu-item-canvas-size"));
     fireEvent.change(screen.getByLabelText(en.editor.ui.widthPx), { target: { value: "1000" } });
     fireEvent.click(screen.getByRole("button", { name: en.editor.ui.apply }));
     expect(FakeImage.instances).toHaveLength(1);
     const resizeDecodeImg = FakeImage.instances[0];
-    act(() => {
-      window.dispatchEvent(new CustomEvent("snapotter:open-fill-dialog"));
-    });
     expect(screen.getByLabelText(en.editor.ui.widthPx)).toBeInTheDocument();
-    expect(screen.getByRole("dialog", { name: en.a11y.fill })).toBeInTheDocument();
 
     // The server-decoded image finishes and calls loadImage while Canvas Size Apply is still decoding.
     await act(async () => {
@@ -1340,8 +1336,17 @@ describe("EditorPage Open Image server decode (#2530)", () => {
     expect(loadImageSpy).toHaveBeenCalledWith("blob:opened-1", 320, 240);
     expect(useEditorStore.getState().canvasSize).toEqual({ width: 320, height: 240 });
     expect(screen.queryByLabelText(en.editor.ui.widthPx)).toBeNull();
-    expect(screen.queryByRole("dialog", { name: en.a11y.fill })).toBeNull();
     expect(toastError).not.toHaveBeenCalled();
+
+    // Fill dialog also closes when a replacement image loads.
+    act(() => {
+      window.dispatchEvent(new CustomEvent("snapotter:open-fill-dialog"));
+    });
+    expect(screen.getByRole("dialog", { name: en.a11y.fill })).toBeInTheDocument();
+    act(() => {
+      loadImageSpy("blob:fill-close", 400, 300);
+    });
+    expect(screen.queryByRole("dialog", { name: en.a11y.fill })).toBeNull();
 
     // Also verify Image Size, Export, and New Document close when the document is replaced or closed via the store,
     // while undoing an in-document edit back to a loadImage history snapshot keeps modals open and undoing a
@@ -1448,6 +1453,162 @@ describe("EditorPage Open Image server decode (#2530)", () => {
     } finally {
       window.history.replaceState({}, "", prevHref);
     }
+  });
+
+  it("suppresses useEditorShortcuts and fill-dialog events while any EditorPage modal dialog is open (#3272)", () => {
+    vi.spyOn(navigator, "platform", "get").mockReturnValue("Win32");
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+    );
+
+    const copiedRect = {
+      id: "obj-1",
+      type: "rect" as const,
+      layerId: "layer-1",
+      attrs: { x: 10, y: 20, width: 50, height: 40, fill: "#ff0000" },
+    };
+
+    useEditorStore.temporal.getState().clear();
+    useEditorStore.setState({
+      sourceImageUrl: "blob:initial",
+      sourceImageSize: { width: 800, height: 600 },
+      canvasSize: { width: 800, height: 600 },
+      activeTool: "move",
+      activeLayerId: "layer-1",
+      objects: [copiedRect],
+      selectedObjectIds: ["obj-1"],
+      clipboard: [copiedRect],
+      isSpaceHeld: false,
+    });
+
+    renderEditor();
+
+    const assertShortcutsSuppressedWhileModalOpen = (options?: { skipEscape?: boolean }) => {
+      const beforeObjects = useEditorStore.getState().objects;
+      const beforeTool = useEditorStore.getState().activeTool;
+      const beforeHistory = useEditorStore.getState()._historyVersion;
+
+      // Internal object paste (Ctrl+V) and paste-in-place (Ctrl+Shift+V)
+      fireEvent.keyDown(document, { key: "v", code: "KeyV", ctrlKey: true });
+      fireEvent.keyDown(document, { key: "V", code: "KeyV", ctrlKey: true, shiftKey: true });
+      expect(useEditorStore.getState().objects).toEqual(beforeObjects);
+
+      // Undo (Ctrl+Z) and Redo (Ctrl+Shift+Z)
+      fireEvent.keyDown(document, { key: "z", code: "KeyZ", ctrlKey: true });
+      fireEvent.keyDown(document, { key: "Z", code: "KeyZ", ctrlKey: true, shiftKey: true });
+      expect(useEditorStore.getState()._historyVersion).toBe(beforeHistory);
+
+      // Single-key tool shortcut (B) and Space temporary hand tool
+      fireEvent.keyDown(document, { key: "b", code: "KeyB" });
+      fireEvent.keyDown(window, { key: " ", code: "Space" });
+      expect(useEditorStore.getState().activeTool).toBe(beforeTool);
+      expect(useEditorStore.getState().isSpaceHeld).toBe(false);
+      fireEvent.keyUp(window, { key: " ", code: "Space" });
+
+      // Delete / Backspace and arrow nudge
+      fireEvent.keyDown(document, { key: "Delete", code: "Delete" });
+      fireEvent.keyDown(document, { key: "ArrowRight", code: "ArrowRight" });
+      expect(useEditorStore.getState().objects).toEqual(beforeObjects);
+
+      if (!options?.skipEscape) {
+        // Escape does not clear selected objects on the canvas behind the modal
+        fireEvent.keyDown(document, { key: "Escape", code: "Escape" });
+        expect(useEditorStore.getState().selectedObjectIds).toEqual(["obj-1"]);
+      }
+    };
+
+    // Hold Space on the canvas first; opening Canvas Size should release the temporary hand tool.
+    fireEvent.keyDown(window, { key: " ", code: "Space" });
+    expect(useEditorStore.getState().activeTool).toBe("hand");
+    expect(useEditorStore.getState().isSpaceHeld).toBe(true);
+
+    // 1. Canvas Size modal open
+    fireEvent.click(screen.getByTestId("menu-image"));
+    fireEvent.click(screen.getByTestId("menu-item-canvas-size"));
+    expect(screen.getByLabelText(en.editor.ui.widthPx)).toBeInTheDocument();
+    expect(useEditorStore.getState().activeTool).toBe("move");
+    expect(useEditorStore.getState().isSpaceHeld).toBe(false);
+
+    assertShortcutsSuppressedWhileModalOpen();
+    // Dialog-opening shortcuts (Ctrl+Shift+S, Shift+Backspace, and custom event) do not stack Export or Fill on top.
+    fireEvent.keyDown(window, { key: "S", code: "KeyS", ctrlKey: true, shiftKey: true });
+    fireEvent.keyDown(document, {
+      key: "Backspace",
+      code: "Backspace",
+      shiftKey: true,
+    });
+    act(() => {
+      window.dispatchEvent(new CustomEvent("snapotter:open-fill-dialog"));
+    });
+    expect(screen.queryByText(en.editor.ui.exportDialog.heading)).toBeNull();
+    expect(screen.queryByRole("dialog", { name: en.a11y.fill })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: en.common.cancel }));
+    expect(screen.queryByLabelText(en.editor.ui.widthPx)).toBeNull();
+
+    // 2. Image Size modal open
+    fireEvent.click(screen.getByTestId("menu-image"));
+    fireEvent.click(screen.getByTestId("menu-item-image-size"));
+    expect(screen.getByLabelText(en.editor.ui.widthPx)).toBeInTheDocument();
+    assertShortcutsSuppressedWhileModalOpen();
+    fireEvent.keyDown(window, { key: "S", code: "KeyS", ctrlKey: true, shiftKey: true });
+    fireEvent.keyDown(document, {
+      key: "Backspace",
+      code: "Backspace",
+      shiftKey: true,
+    });
+    expect(screen.queryByText(en.editor.ui.exportDialog.heading)).toBeNull();
+    expect(screen.queryByRole("dialog", { name: en.a11y.fill })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: en.common.cancel }));
+
+    // 3. Fill modal open (Escape closes FillDialog without clearing canvas selection)
+    fireEvent.keyDown(document, {
+      key: "Backspace",
+      code: "Backspace",
+      shiftKey: true,
+    });
+    expect(screen.getByRole("dialog", { name: en.a11y.fill })).toBeInTheDocument();
+    assertShortcutsSuppressedWhileModalOpen({ skipEscape: true });
+    fireEvent.keyDown(window, { key: "S", code: "KeyS", ctrlKey: true, shiftKey: true });
+    expect(screen.queryByText(en.editor.ui.exportDialog.heading)).toBeNull();
+    fireEvent.keyDown(window, { key: "Escape", code: "Escape" });
+    expect(screen.queryByRole("dialog", { name: en.a11y.fill })).toBeNull();
+    expect(useEditorStore.getState().selectedObjectIds).toEqual(["obj-1"]);
+
+    // 4. Export modal open (Escape closes ExportDialog without clearing canvas selection)
+    fireEvent.keyDown(window, { key: "S", code: "KeyS", ctrlKey: true, shiftKey: true });
+    expect(screen.getByText(en.editor.ui.exportDialog.heading)).toBeInTheDocument();
+    assertShortcutsSuppressedWhileModalOpen({ skipEscape: true });
+    fireEvent.keyDown(document, {
+      key: "Backspace",
+      code: "Backspace",
+      shiftKey: true,
+    });
+    expect(screen.queryByRole("dialog", { name: en.a11y.fill })).toBeNull();
+    fireEvent.keyDown(window, { key: "Escape", code: "Escape" });
+    expect(screen.queryByText(en.editor.ui.exportDialog.heading)).toBeNull();
+    expect(useEditorStore.getState().selectedObjectIds).toEqual(["obj-1"]);
+
+    // 5. New Document modal open
+    fireEvent.click(screen.getByTestId("menu-file"));
+    fireEvent.click(screen.getByTestId("menu-item-new"));
+    expect(screen.getByText(en.editor.ui.newDocument.heading)).toBeInTheDocument();
+    assertShortcutsSuppressedWhileModalOpen();
+    fireEvent.keyDown(window, { key: "S", code: "KeyS", ctrlKey: true, shiftKey: true });
+    fireEvent.keyDown(document, {
+      key: "Backspace",
+      code: "Backspace",
+      shiftKey: true,
+    });
+    expect(screen.queryByText(en.editor.ui.exportDialog.heading)).toBeNull();
+    expect(screen.queryByRole("dialog", { name: en.a11y.fill })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: en.common.cancel }));
+    expect(screen.queryByText(en.editor.ui.newDocument.heading)).toBeNull();
+
+    // Once all modals are closed, Ctrl+V and Ctrl+Shift+V paste objects again.
+    fireEvent.keyDown(document, { key: "v", code: "KeyV", ctrlKey: true });
+    expect(useEditorStore.getState().objects).toHaveLength(2);
+    fireEvent.keyDown(document, { key: "V", code: "KeyV", ctrlKey: true, shiftKey: true });
+    expect(useEditorStore.getState().objects).toHaveLength(3);
   });
 
   describe("WelcomeScreen file intake (#2552)", () => {
