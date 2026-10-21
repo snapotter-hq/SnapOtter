@@ -831,6 +831,29 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
       }
     });
 
+    it("svg-to-raster JXL preview keeps the 200 result and reports a JXL decoder fault once (#3179)", async () => {
+      const formatEncoders = await import("../../../apps/api/src/lib/format-encoders.js");
+      const encSpy = vi
+        .spyOn(formatEncoders, "encodeJxl")
+        .mockResolvedValue(Buffer.from("jxl-bytes"));
+      const decSpy = vi
+        .spyOn(formatDecoders, "decodeToSharpCompat")
+        .mockRejectedValue(new DecoderOutOfMemoryError("Decoder out of memory."));
+      try {
+        const res = await post("/api/v1/tools/image/svg-to-raster", [
+          { name: "file", filename: "icon.svg", contentType: "image/svg+xml", content: SVG },
+          { name: "settings", content: JSON.stringify({ outputFormat: "jxl" }) },
+        ]);
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.json().previewUrl).toBeUndefined();
+        expect(helperSawEngineDown("svg-to-raster")).toBe(true);
+        expect(engineReports("svg-to-raster")).toHaveLength(1);
+      } finally {
+        encSpy.mockRestore();
+        decSpy.mockRestore();
+      }
+    });
+
     it("fetch-urls preview decode keeps the stored file and reports a missing decoder once", async () => {
       const decSpy = vi
         .spyOn(heicConverter, "decodeHeic")

@@ -49,8 +49,11 @@ vi.mock("../../../apps/api/src/lib/engine-unavailable.js", async (importOriginal
 import { generatePreview } from "../../../apps/api/src/jobs/postprocess.js";
 import * as formatDecoders from "../../../apps/api/src/lib/format-decoders.js";
 import { DecoderUnavailableError } from "../../../apps/api/src/lib/format-decoders.js";
+import * as formatEncoders from "../../../apps/api/src/lib/format-encoders.js";
 import { encodeQoi } from "../../../apps/api/src/lib/format-encoders.js";
 import { registerEditMetadata } from "../../../apps/api/src/routes/tools/edit-metadata.js";
+import { registerSvgToRaster } from "../../../apps/api/src/routes/tools/svg-to-raster.js";
+import { fixtures, readFixture } from "../../fixtures/index.js";
 
 const JOB_ID = "job-preview-test";
 
@@ -362,6 +365,166 @@ describe("registerEditMetadata CLI-decoded preview generation (#2704)", () => {
       expect(reportEngineUnavailableMock).not.toHaveBeenCalled();
       expect(loggerMock.warn).not.toHaveBeenCalled();
     } finally {
+      decodeSpy.mockRestore();
+    }
+  });
+});
+
+describe("registerSvgToRaster JXL preview generation (#3179)", () => {
+  type SvgHandler = (req: unknown, reply: unknown) => Promise<unknown>;
+
+  function getSvgToRasterHandler(): SvgHandler {
+    const routes = new Map<string, SvgHandler>();
+    const fakeApp = {
+      post: (path: string, handler: SvgHandler) => {
+        routes.set(path, handler);
+      },
+    } as unknown as FastifyInstance;
+    registerSvgToRaster(fakeApp);
+    const handler = routes.get("/api/v1/tools/image/svg-to-raster");
+    if (!handler) throw new Error("svg-to-raster route not registered");
+    return handler;
+  }
+
+  function makeSvgRequest(svgBuffer: Buffer, filename: string, settings: string) {
+    return {
+      log: loggerMock,
+      parts: async function* () {
+        yield {
+          type: "file",
+          fieldname: "file",
+          filename,
+          file: (async function* () {
+            yield svgBuffer;
+          })(),
+        };
+        yield {
+          type: "field",
+          fieldname: "settings",
+          value: settings,
+        };
+      },
+    };
+  }
+
+  function makeReply() {
+    let statusCode = 200;
+    let payload: unknown;
+    const reply = {
+      status(code: number) {
+        statusCode = code;
+        return reply;
+      },
+      send(body: unknown) {
+        payload = body;
+        return reply;
+      },
+      get statusCode() {
+        return statusCode;
+      },
+      get payload() {
+        return payload;
+      },
+    };
+    return reply;
+  }
+
+  const SVG_BUF = Buffer.from(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16" fill="#2266aa"/></svg>',
+  );
+
+  it("decodes a JXL output via decodeToSharpCompat and writes preview.webp (#3179)", async () => {
+    const handler = getSvgToRasterHandler();
+    const jxlFixture = readFixture(fixtures.image.formats("jxl"));
+    const encodeSpy = vi.spyOn(formatEncoders, "encodeJxl").mockResolvedValueOnce(jxlFixture);
+    const decodeSpy = vi.spyOn(formatDecoders, "decodeToSharpCompat");
+    const reply = makeReply();
+
+    try {
+      await handler(
+        makeSvgRequest(SVG_BUF, "icon.svg", JSON.stringify({ outputFormat: "jxl", dpi: 72 })),
+        reply,
+      );
+
+      expect(reply.statusCode).toBe(200);
+      const body = reply.payload as { jobId: string; downloadUrl: string; previewUrl?: string };
+      expect(body.downloadUrl).toBe(`/api/v1/download/${body.jobId}/icon.jxl`);
+      expect(body.previewUrl).toBe(`/api/v1/download/${body.jobId}/preview.webp`);
+      expect(decodeSpy).toHaveBeenCalledWith(jxlFixture, "jxl");
+      expect(putObjectMock).toHaveBeenCalledTimes(2);
+      const [previewKey, previewBytes] = putObjectMock.mock.calls[1] as [string, Buffer];
+      expect(previewKey).toBe(`outputs/${body.jobId}/preview.webp`);
+      const meta = await sharp(previewBytes).metadata();
+      expect(meta.format).toBe("webp");
+      expect(meta.width).toBeLessThanOrEqual(1200);
+      expect(meta.height).toBeLessThanOrEqual(1200);
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+    } finally {
+      encodeSpy.mockRestore();
+      decodeSpy.mockRestore();
+    }
+  });
+
+  it("reports a missing JXL decoder through reportEngineUnavailable and keeps the 200 response (#3179)", async () => {
+    const handler = getSvgToRasterHandler();
+    const encodeSpy = vi
+      .spyOn(formatEncoders, "encodeJxl")
+      .mockResolvedValueOnce(Buffer.from("jxl-bytes"));
+    const decodeSpy = vi
+      .spyOn(formatDecoders, "decodeToSharpCompat")
+      .mockRejectedValueOnce(new DecoderUnavailableError("No JXL decoder found."));
+    const reply = makeReply();
+
+    try {
+      await handler(
+        makeSvgRequest(SVG_BUF, "icon.svg", JSON.stringify({ outputFormat: "jxl", dpi: 72 })),
+        reply,
+      );
+
+      expect(reply.statusCode).toBe(200);
+      const body = reply.payload as { jobId: string; downloadUrl: string; previewUrl?: string };
+      expect(body.downloadUrl).toBe(`/api/v1/download/${body.jobId}/icon.jxl`);
+      expect(body.previewUrl).toBeUndefined();
+      expect(reportEngineUnavailableMock).toHaveBeenCalledOnce();
+      expect(reportEngineUnavailableMock.mock.calls[0]?.[0]).toMatchObject({
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        message: "No JXL decoder found.",
+      });
+      expect(reportEngineUnavailableMock.mock.calls[0]?.[1]).toBe("svg-to-raster");
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+    } finally {
+      encodeSpy.mockRestore();
+      decodeSpy.mockRestore();
+    }
+  });
+
+  it("logs a warning without calling reportEngineUnavailable when decodeToSharpCompat fails with a non-503 error (#3179)", async () => {
+    const handler = getSvgToRasterHandler();
+    const encodeSpy = vi
+      .spyOn(formatEncoders, "encodeJxl")
+      .mockResolvedValueOnce(Buffer.from("jxl-bytes"));
+    const decodeSpy = vi
+      .spyOn(formatDecoders, "decodeToSharpCompat")
+      .mockRejectedValueOnce(new Error("corrupt jxl"));
+    const reply = makeReply();
+
+    try {
+      await handler(
+        makeSvgRequest(SVG_BUF, "icon.svg", JSON.stringify({ outputFormat: "jxl", dpi: 72 })),
+        reply,
+      );
+
+      expect(reply.statusCode).toBe(200);
+      const body = reply.payload as { jobId: string; previewUrl?: string };
+      expect(body.previewUrl).toBeUndefined();
+      expect(reportEngineUnavailableMock).not.toHaveBeenCalled();
+      expect(loggerMock.warn).toHaveBeenCalledOnce();
+      expect(loggerMock.warn.mock.calls[0]?.[1]).toBe(
+        "preview generation failed; result has no renderable preview",
+      );
+    } finally {
+      encodeSpy.mockRestore();
       decodeSpy.mockRestore();
     }
   });

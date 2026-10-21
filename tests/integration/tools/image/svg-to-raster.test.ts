@@ -1145,7 +1145,7 @@ describe("svg-to-raster", () => {
 
   // ── JXL output format ──────────────────────────────────────────────
 
-  it("converts to jxl format (if Sharp supports JXL)", async () => {
+  it("converts to jxl format and generates a webp preview (#3179)", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.svg", contentType: "image/svg+xml", content: SVG },
       { name: "settings", content: JSON.stringify({ outputFormat: "jxl", quality: 75 }) },
@@ -1158,12 +1158,24 @@ describe("svg-to-raster", () => {
       body,
     });
 
-    // JXL support depends on the Sharp build
+    // JXL encoding requires cjxl or an ImageMagick JXL delegate
     expect([200, 422]).toContain(res.statusCode);
     if (res.statusCode === 200) {
       const json = JSON.parse(res.body);
       expect(json.downloadUrl).toBeDefined();
       expect(json.processedSize).toBeGreaterThan(0);
+      expect(json.previewUrl).toBe(`/api/v1/download/${json.jobId}/preview.webp`);
+
+      const previewRes = await app.inject({
+        method: "GET",
+        url: json.previewUrl,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(previewRes.statusCode).toBe(200);
+      const meta = await sharp(Buffer.from(previewRes.rawPayload)).metadata();
+      expect(meta.format).toBe("webp");
+      expect(meta.width).toBeLessThanOrEqual(1200);
+      expect(meta.height).toBeLessThanOrEqual(1200);
     }
   });
 

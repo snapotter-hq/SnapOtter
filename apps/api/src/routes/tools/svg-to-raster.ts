@@ -13,7 +13,7 @@ import { reportEngineUnavailable } from "../../lib/engine-unavailable.js";
 import { resolveConcurrency } from "../../lib/env.js";
 import { formatZodErrors, friendlyError } from "../../lib/errors.js";
 import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
-import { isDecoderUnavailable } from "../../lib/format-decoders.js";
+import { decodeToSharpCompat, isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
@@ -24,7 +24,7 @@ import { engineUnavailable } from "../../modality/image-input.js";
 import { requireToolAccess } from "../../permissions.js";
 import { failBatchJob, updateJobProgress } from "../progress.js";
 
-const NON_PREVIEWABLE = new Set(["tiff", "heif"]);
+const NON_PREVIEWABLE = new Set(["tiff", "heif", "jxl"]);
 
 /** Case-insensitive check that a filename ends with one of the accepted extensions. */
 function matchesAccept(filename: string, accept: string[]): boolean {
@@ -597,8 +597,13 @@ export function registerSvgToRasterRoute(
       let previewUrl: string | undefined;
       if (NON_PREVIEWABLE.has(ext)) {
         try {
-          // Sharp can't decode HEVC-encoded HEIF; decode first
-          const previewInput = ext === "heif" ? await decodeHeic(buffer) : buffer;
+          // Sharp can't decode HEVC-encoded HEIF or JXL; decode first
+          let previewInput = buffer;
+          if (ext === "heif") {
+            previewInput = await decodeHeic(buffer);
+          } else if (ext === "jxl") {
+            previewInput = await decodeToSharpCompat(buffer, "jxl");
+          }
           const previewBuffer = await sharp(previewInput)
             .resize(1200, 1200, { fit: "inside" })
             .webp({ quality: 80 })
@@ -608,6 +613,11 @@ export function registerSvgToRasterRoute(
         } catch (err) {
           if (isDecoderUnavailable(err)) {
             reportEngineUnavailable(engineUnavailable(err), opts.toolId, request.log);
+          } else {
+            request.log.warn(
+              { err, jobId, ext },
+              "preview generation failed; result has no renderable preview",
+            );
           }
           // Non-fatal - frontend shows success card fallback
         }
