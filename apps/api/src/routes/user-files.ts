@@ -36,6 +36,7 @@ import {
 } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import {
+  asDecoderOutOfMemory,
   DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
@@ -794,10 +795,11 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           .header("Cache-Control", "public, max-age=86400, immutable")
           .send(thumbnail);
       } catch (err) {
-        if (isDecoderUnavailable(err)) {
+        const decoderErr = asDecoderOutOfMemory(err);
+        if (isDecoderUnavailable(decoderErr)) {
           return sendInputValidationError(
             reply,
-            engineUnavailable(err),
+            engineUnavailable(decoderErr),
             "user-file-thumbnail",
             request.log,
           );

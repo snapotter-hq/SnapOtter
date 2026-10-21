@@ -680,6 +680,36 @@ describe("Thumbnail generation", () => {
         headers: { authorization: `Bearer ${adminToken}` },
       });
       expect(vidRes.statusCode).toBe(500);
+
+      const { DecoderOutOfMemoryError } = await import(
+        "../../../apps/api/src/lib/format-decoders.js"
+      );
+      pdfSpy.mockRejectedValueOnce(
+        new DecoderOutOfMemoryError(
+          "The PDF preview engine ran out of memory rendering this PDF, or was killed.",
+        ),
+      );
+      vidSpy.mockRejectedValueOnce(
+        new DecoderOutOfMemoryError(
+          "The video preview engine ran out of memory decoding this video, or was killed.",
+        ),
+      );
+
+      const pdfOomRes = await app.inject({
+        method: "GET",
+        url: `/api/v1/files/${pdfFileId}/thumbnail`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(pdfOomRes.statusCode).toBe(503);
+      expect(JSON.parse(pdfOomRes.body)).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+
+      const vidOomRes = await app.inject({
+        method: "GET",
+        url: `/api/v1/files/${vidFileId}/thumbnail`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(vidOomRes.statusCode).toBe(503);
+      expect(JSON.parse(vidOomRes.body)).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
     } finally {
       pdfSpy.mockRestore();
       vidSpy.mockRestore();

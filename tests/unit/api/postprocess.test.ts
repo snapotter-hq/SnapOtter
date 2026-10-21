@@ -256,6 +256,55 @@ describe("generatePreview", () => {
     );
   });
 
+  it("routes SIGKILL / DecoderOutOfMemoryError from videoPosterPreview and pdfFirstPagePreview through reportEngineUnavailable and returns undefined (#3353)", async () => {
+    const { DecoderOutOfMemoryError } = await import(
+      "../../../apps/api/src/lib/format-decoders.js"
+    );
+    const vidOom = new DecoderOutOfMemoryError(
+      "The video preview engine ran out of memory decoding this video, or was killed.",
+      Object.assign(new Error("ffmpeg exited SIGKILL: "), { signal: "SIGKILL" }),
+    );
+    videoPosterPreviewMock.mockRejectedValueOnce(vidOom);
+
+    const vidKey = await generatePreview(
+      Buffer.from("mp4-bytes"),
+      "video/mp4",
+      "job-vid-oom",
+      "vid-oom-tool",
+    );
+    expect(vidKey).toBeUndefined();
+    expect(putObjectMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: "ENGINE_UNAVAILABLE",
+        cause: "DecoderOutOfMemoryError",
+        toolId: "vid-oom-tool",
+      }),
+      "Tool engine unavailable during input preparation",
+    );
+
+    loggerWarnMock.mockReset();
+    const pdfSigkill = Object.assign(new Error("gs exited SIGKILL: "), { signal: "SIGKILL" });
+    pdfFirstPagePreviewMock.mockRejectedValueOnce(pdfSigkill);
+
+    const pdfKey = await generatePreview(
+      Buffer.from("pdf-bytes"),
+      "application/pdf",
+      "job-pdf-oom",
+      "pdf-oom-tool",
+    );
+    expect(pdfKey).toBeUndefined();
+    expect(putObjectMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: "ENGINE_UNAVAILABLE",
+        cause: "DecoderOutOfMemoryError",
+        toolId: "pdf-oom-tool",
+      }),
+      "Tool engine unavailable during input preparation",
+    );
+  });
+
   it.each(["image/heic", "image/heif"])(
     "decodes %s via decodeHeic before passing to Sharp",
     async (contentType) => {

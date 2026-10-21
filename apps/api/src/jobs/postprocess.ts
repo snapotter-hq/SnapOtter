@@ -17,7 +17,11 @@ import sharp from "sharp";
 import { db, schema } from "../db/index.js";
 import { reportEngineUnavailable } from "../lib/engine-unavailable.js";
 import { reportError } from "../lib/error-report.js";
-import { decodeToSharpCompat, isDecoderUnavailable } from "../lib/format-decoders.js";
+import {
+  asDecoderOutOfMemory,
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+} from "../lib/format-decoders.js";
 import { logger } from "../lib/logger.js";
 import { putObject } from "../lib/object-storage.js";
 import { engineUnavailable } from "../modality/image-input.js";
@@ -193,8 +197,9 @@ export async function generatePreview(
     await putObject(key, previewBuffer);
     return key;
   } catch (err) {
-    if (isDecoderUnavailable(err)) {
-      reportEngineUnavailable(engineUnavailable(err), toolId, logger);
+    const decoderErr = asDecoderOutOfMemory(err);
+    if (isDecoderUnavailable(decoderErr)) {
+      reportEngineUnavailable(engineUnavailable(decoderErr), toolId, logger);
       return undefined;
     }
     // The result itself can't be decoded for a preview. Do NOT fall back to the

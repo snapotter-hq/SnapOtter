@@ -104,6 +104,7 @@ export async function runFfmpeg(args: string[], opts: RunFfmpegOptions = {}): Pr
       if (code === 0) resolvePromise(stderrTail);
       else {
         const err = new Error(`ffmpeg exited ${code ?? signal}: ${stderrTail}`);
+        if (signal !== null) Object.assign(err, { signal });
         reject(markIfInputError(err, stderrTail));
       }
     });

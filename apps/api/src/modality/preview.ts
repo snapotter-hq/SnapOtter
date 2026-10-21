@@ -7,6 +7,7 @@ import { resolveGs } from "@snapotter/doc-engine";
 import { ffmpegAvailable, runFfmpeg } from "@snapotter/media-engine";
 import { hasServerErrorStatus } from "@snapotter/shared";
 import { isOperationalErrno } from "../lib/error-report.js";
+import { DecoderOutOfMemoryError } from "../lib/format-decoders.js";
 import { logger } from "../lib/logger.js";
 
 const PREVIEW_WIDTH = 480;
@@ -23,6 +24,13 @@ const PREVIEW_OPERATIONAL_CODES = new Set([
   "EIO",
 ]);
 
+function isPreviewOutOfMemory(err: unknown): boolean {
+  return (
+    (err as { signal?: unknown } | null)?.signal === "SIGKILL" ||
+    (err instanceof RangeError && err.message.startsWith("Array buffer allocation failed"))
+  );
+}
+
 /**
  * True when a preview or thumbnail failure is an operational/server fault
  * (scratch disk/permission/descriptor/memory errno, syscall-bearing spawn or
@@ -30,7 +38,7 @@ const PREVIEW_OPERATIONAL_CODES = new Set([
  * rather than an input file the preview engine could not render (#2870).
  */
 export function isPreviewServerFault(err: unknown): boolean {
-  if (isOperationalErrno(err) || hasServerErrorStatus(err)) {
+  if (isOperationalErrno(err) || hasServerErrorStatus(err) || isPreviewOutOfMemory(err)) {
     return true;
   }
   const { code, syscall } = (err ?? {}) as NodeJS.ErrnoException;
@@ -40,12 +48,7 @@ export function isPreviewServerFault(err: unknown): boolean {
   if (typeof syscall === "string" && !(code === "ENOENT" && syscall === "open")) {
     return true;
   }
-  return (
-    err instanceof TypeError ||
-    err instanceof ReferenceError ||
-    err instanceof SyntaxError ||
-    (err instanceof RangeError && err.message.startsWith("Array buffer allocation failed"))
-  );
+  return err instanceof TypeError || err instanceof ReferenceError || err instanceof SyntaxError;
 }
 
 function isMissingPreviewOutput(err: unknown, outputPath: string): boolean {
@@ -70,6 +73,12 @@ export async function videoPosterPreview(buffer: Buffer): Promise<Buffer | null>
     );
     return await readFile(output);
   } catch (err) {
+    if (isPreviewOutOfMemory(err)) {
+      throw new DecoderOutOfMemoryError(
+        "The video preview engine ran out of memory decoding this video, or was killed. The video may need more memory than this server has.",
+        err,
+      );
+    }
     if (!scratchStaged || (!isMissingPreviewOutput(err, output) && isPreviewServerFault(err))) {
       throw err;
     }
@@ -130,11 +139,21 @@ export async function pdfFirstPagePreview(buffer: Buffer): Promise<Buffer | null
         settled = true;
         clearTimeout(timer);
         if (code === 0) resolvePromise();
-        else reject(new Error(`gs exited ${code ?? signal}: ${err}`));
+        else {
+          const exitErr = new Error(`gs exited ${code ?? signal}: ${err}`);
+          if (signal !== null) Object.assign(exitErr, { signal });
+          reject(exitErr);
+        }
       });
     });
     return await readFile(output);
   } catch (err) {
+    if (isPreviewOutOfMemory(err)) {
+      throw new DecoderOutOfMemoryError(
+        "The PDF preview engine ran out of memory rendering this PDF, or was killed. The PDF may need more memory than this server has.",
+        err,
+      );
+    }
     if (!scratchStaged || (!isMissingPreviewOutput(err, output) && isPreviewServerFault(err))) {
       throw err;
     }

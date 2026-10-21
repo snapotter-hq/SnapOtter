@@ -255,18 +255,31 @@ describe("runFfmpeg: non-zero exit", () => {
     const p = runFfmpeg(["out.mp4"]);
     child.stderr.emit("data", Buffer.from("Unknown encoder 'libbogus'"));
     child.proc.emit("close", 3, null);
-    await expect(p).rejects.toThrow("ffmpeg exited 3: Unknown encoder 'libbogus'");
+    let caught: unknown;
+    try {
+      await p;
+    } catch (e) {
+      caught = e;
+    }
+    expect((caught as Error).message).toBe("ffmpeg exited 3: Unknown encoder 'libbogus'");
+    expect(caught).not.toHaveProperty("signal");
   });
 
-  it("uses the signal name when exit code is null", async () => {
-    const child = makeChild();
-    mockSpawnReturns(child);
-    const runFfmpeg = await loadRunFfmpeg();
-    const p = runFfmpeg(["out.mp4"]);
-    child.stderr.emit("data", Buffer.from("killed"));
-    child.proc.emit("close", null, "SIGSEGV");
-    await expect(p).rejects.toThrow("ffmpeg exited SIGSEGV: killed");
-  });
+  it.each(["SIGSEGV", "SIGKILL"] as const)(
+    "uses the signal name (%s) and attaches err.signal when exit code is null",
+    async (signal) => {
+      const child = makeChild();
+      mockSpawnReturns(child);
+      const runFfmpeg = await loadRunFfmpeg();
+      const p = runFfmpeg(["out.mp4"]);
+      child.stderr.emit("data", Buffer.from("killed"));
+      child.proc.emit("close", null, signal);
+      await expect(p).rejects.toMatchObject({
+        message: `ffmpeg exited ${signal}: killed`,
+        signal,
+      });
+    },
+  );
 
   it("marks the rejection as a tool input error when stderr matches an input pattern", async () => {
     const child = makeChild();

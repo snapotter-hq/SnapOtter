@@ -19,7 +19,8 @@ vi.mock("node:fs/promises", () => ({
 }));
 
 const spawnMock = vi.hoisted(() => vi.fn());
-vi.mock("node:child_process", () => ({
+vi.mock("node:child_process", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("node:child_process")>()),
   spawn: spawnMock,
 }));
 
@@ -139,12 +140,19 @@ describe("videoPosterPreview and pdfFirstPagePreview fault handling (#2870)", ()
     },
   );
 
-  it("videoPosterPreview logs a warning and returns null when ffmpeg exits non-zero or times out", async () => {
+  it("videoPosterPreview logs a warning and returns null when ffmpeg exits non-zero, exits via non-SIGKILL signal, or times out", async () => {
     const exitErr = new Error("ffmpeg exited 1: Invalid data found when processing input");
     mediaMocks.runFfmpeg.mockRejectedValueOnce(exitErr);
 
     await expect(videoPosterPreview(Buffer.from("corrupt-mp4"))).resolves.toBeNull();
     expect(loggerMocks.warn).toHaveBeenCalledWith({ err: exitErr }, "video poster preview failed");
+
+    loggerMocks.warn.mockReset();
+    const segvErr = Object.assign(new Error("ffmpeg exited SIGSEGV: "), { signal: "SIGSEGV" });
+    mediaMocks.runFfmpeg.mockRejectedValueOnce(segvErr);
+
+    await expect(videoPosterPreview(Buffer.from("segv-mp4"))).resolves.toBeNull();
+    expect(loggerMocks.warn).toHaveBeenCalledWith({ err: segvErr }, "video poster preview failed");
 
     loggerMocks.warn.mockReset();
     const timeoutErr = new SafeError("ffmpeg timed out", { kind: "operational", code: "timeout" });
@@ -155,6 +163,33 @@ describe("videoPosterPreview and pdfFirstPagePreview fault handling (#2870)", ()
       { err: timeoutErr },
       "video poster preview failed",
     );
+  });
+
+  it("videoPosterPreview converts a SIGKILL ffmpeg exit or readFile V8 RangeError into a 503 DecoderOutOfMemoryError (#3353)", async () => {
+    const sigkillErr = Object.assign(new Error("ffmpeg exited SIGKILL: "), {
+      signal: "SIGKILL",
+    });
+    mediaMocks.runFfmpeg.mockRejectedValueOnce(sigkillErr);
+
+    await expect(videoPosterPreview(Buffer.from("oom-mp4"))).rejects.toMatchObject({
+      name: "DecoderOutOfMemoryError",
+      code: "ENGINE_UNAVAILABLE",
+      statusCode: 503,
+      message: expect.stringContaining("video preview engine ran out of memory"),
+      cause: sigkillErr,
+    });
+    expect(fsMocks.rm).toHaveBeenCalledOnce();
+    expect(loggerMocks.warn).not.toHaveBeenCalled();
+
+    const rangeErr = new RangeError("Array buffer allocation failed");
+    fsMocks.readFile.mockRejectedValueOnce(rangeErr);
+    await expect(videoPosterPreview(Buffer.from("huge-poster-mp4"))).rejects.toMatchObject({
+      name: "DecoderOutOfMemoryError",
+      code: "ENGINE_UNAVAILABLE",
+      statusCode: 503,
+      message: expect.stringContaining("video preview engine ran out of memory"),
+      cause: rangeErr,
+    });
   });
 
   it("videoPosterPreview logs a warning and returns null when ffmpeg produces no output file (readFile ENOENT), but rethrows readFile EIO", async () => {
@@ -281,20 +316,66 @@ describe("videoPosterPreview and pdfFirstPagePreview fault handling (#2870)", ()
     }
   });
 
-  it("pdfFirstPagePreview logs signal name when ghostscript exits via signal", async () => {
+  it("pdfFirstPagePreview logs signal name when ghostscript exits via a non-SIGKILL signal", async () => {
     spawnMock.mockImplementationOnce(() => {
       const child = makeFakeChild();
       queueMicrotask(() => {
+        child.emit("close", null, "SIGSEGV");
+      });
+      return child;
+    });
+
+    await expect(pdfFirstPagePreview(Buffer.from("%PDF-segv"))).resolves.toBeNull();
+    expect(loggerMocks.warn).toHaveBeenCalledWith(
+      {
+        err: expect.objectContaining({
+          message: expect.stringContaining("gs exited SIGSEGV"),
+          signal: "SIGSEGV",
+        }),
+      },
+      "pdf first-page preview failed",
+    );
+  });
+
+  it("pdfFirstPagePreview converts a SIGKILL ghostscript exit or readFile V8 RangeError into a 503 DecoderOutOfMemoryError (#3353)", async () => {
+    spawnMock.mockImplementationOnce(() => {
+      const child = makeFakeChild();
+      queueMicrotask(() => {
+        child.stderr.emit("data", Buffer.from("Rendering page 1..."));
         child.emit("close", null, "SIGKILL");
       });
       return child;
     });
 
-    await expect(pdfFirstPagePreview(Buffer.from("%PDF-killed"))).resolves.toBeNull();
-    expect(loggerMocks.warn).toHaveBeenCalledWith(
-      { err: expect.objectContaining({ message: expect.stringContaining("gs exited SIGKILL") }) },
-      "pdf first-page preview failed",
-    );
+    await expect(pdfFirstPagePreview(Buffer.from("%PDF-killed"))).rejects.toMatchObject({
+      name: "DecoderOutOfMemoryError",
+      code: "ENGINE_UNAVAILABLE",
+      statusCode: 503,
+      message: expect.stringContaining("PDF preview engine ran out of memory"),
+      cause: expect.objectContaining({
+        message: "gs exited SIGKILL: Rendering page 1...",
+        signal: "SIGKILL",
+      }),
+    });
+    expect(fsMocks.rm).toHaveBeenCalledOnce();
+    expect(loggerMocks.warn).not.toHaveBeenCalled();
+
+    spawnMock.mockImplementationOnce(() => {
+      const child = makeFakeChild();
+      queueMicrotask(() => {
+        child.emit("close", 0, null);
+      });
+      return child;
+    });
+    const rangeErr = new RangeError("Array buffer allocation failed");
+    fsMocks.readFile.mockRejectedValueOnce(rangeErr);
+    await expect(pdfFirstPagePreview(Buffer.from("%PDF-huge"))).rejects.toMatchObject({
+      name: "DecoderOutOfMemoryError",
+      code: "ENGINE_UNAVAILABLE",
+      statusCode: 503,
+      message: expect.stringContaining("PDF preview engine ran out of memory"),
+      cause: rangeErr,
+    });
   });
 
   it("pdfFirstPagePreview logs a warning and returns null when ghostscript produces no output file (readFile ENOENT), but rethrows readFile EIO", async () => {
@@ -366,8 +447,18 @@ describe("videoPosterPreview and pdfFirstPagePreview fault handling (#2870)", ()
     expect(isPreviewServerFault(new ReferenceError("missing ref"))).toBe(true);
     expect(isPreviewServerFault(new SyntaxError("unexpected token"))).toBe(true);
     expect(isPreviewServerFault(new RangeError("Array buffer allocation failed"))).toBe(true);
+    expect(
+      isPreviewServerFault(
+        Object.assign(new Error("ffmpeg exited SIGKILL: "), { signal: "SIGKILL" }),
+      ),
+    ).toBe(true);
 
     expect(isPreviewServerFault(new Error("corrupt input"))).toBe(false);
+    expect(
+      isPreviewServerFault(
+        Object.assign(new Error("ffmpeg exited SIGSEGV: "), { signal: "SIGSEGV" }),
+      ),
+    ).toBe(false);
     expect(
       isPreviewServerFault(
         Object.assign(new RangeError("File size is greater than 2 GiB"), {

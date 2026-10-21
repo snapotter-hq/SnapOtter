@@ -1551,6 +1551,58 @@ describe("user files route logic", () => {
           );
           expect(oomReply.statusCode).toBe(503);
           expect(oomReply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+
+          // #3353: SIGKILL / DecoderOutOfMemoryError during video or PDF thumbnail rendering
+          // answers 503 ENGINE_UNAVAILABLE instead of 422.
+          const vidOom = new formatDecoders.DecoderOutOfMemoryError(
+            "The video preview engine ran out of memory decoding this video, or was killed.",
+            Object.assign(new Error("ffmpeg exited SIGKILL: "), { signal: "SIGKILL" }),
+          );
+          mocks.parentRows = [videoRow];
+          mocks.readStoredFile.mockResolvedValueOnce(Buffer.from("video-bytes"));
+          mocks.videoPosterPreview.mockRejectedValueOnce(vidOom);
+          const vidOomReply = makeReply();
+          await thumbnailHandler(
+            { params: { id: videoRow.id }, log: { warn: vi.fn(), error: vi.fn() } },
+            vidOomReply,
+          );
+          expect(vidOomReply.statusCode).toBe(503);
+          expect(vidOomReply.payload).toMatchObject({
+            code: "ENGINE_UNAVAILABLE",
+            error: expect.stringContaining("video preview engine ran out of memory"),
+          });
+
+          const pdfOom = new formatDecoders.DecoderOutOfMemoryError(
+            "The PDF preview engine ran out of memory rendering this PDF, or was killed.",
+            Object.assign(new Error("gs exited SIGKILL: "), { signal: "SIGKILL" }),
+          );
+          mocks.parentRows = [pdfRow];
+          mocks.readStoredFile.mockResolvedValueOnce(Buffer.from("pdf-bytes"));
+          mocks.pdfFirstPagePreview.mockRejectedValueOnce(pdfOom);
+          const pdfOomReply = makeReply();
+          await thumbnailHandler(
+            { params: { id: pdfRow.id }, log: { warn: vi.fn(), error: vi.fn() } },
+            pdfOomReply,
+          );
+          expect(pdfOomReply.statusCode).toBe(503);
+          expect(pdfOomReply.payload).toMatchObject({
+            code: "ENGINE_UNAVAILABLE",
+            error: expect.stringContaining("PDF preview engine ran out of memory"),
+          });
+
+          const rawSigkill = Object.assign(new Error("gs exited SIGKILL: "), {
+            signal: "SIGKILL",
+          });
+          mocks.parentRows = [pdfRow];
+          mocks.readStoredFile.mockResolvedValueOnce(Buffer.from("pdf-bytes"));
+          mocks.pdfFirstPagePreview.mockRejectedValueOnce(rawSigkill);
+          const rawSigkillReply = makeReply();
+          await thumbnailHandler(
+            { params: { id: pdfRow.id }, log: { warn: vi.fn(), error: vi.fn() } },
+            rawSigkillReply,
+          );
+          expect(rawSigkillReply.statusCode).toBe(503);
+          expect(rawSigkillReply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
         } finally {
           decodeSpy.mockRestore();
         }
