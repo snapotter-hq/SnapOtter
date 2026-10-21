@@ -72,6 +72,7 @@ afterEach(async () => {
   await db.delete(schema.settings).where(eq(schema.settings.key, "siem_last_forwarded_at"));
   await db.delete(schema.settings).where(eq(schema.settings.key, "backup_last_completed"));
   await db.delete(schema.settings).where(eq(schema.settings.key, "defaultTheme"));
+  await db.delete(schema.settings).where(eq(schema.settings.key, "oidc_client_secret"));
 });
 
 afterAll(async () => {
@@ -556,6 +557,150 @@ describe("Encrypted-setting decrypt callers (#2031)", () => {
       } finally {
         spy.mockRestore();
       }
+    });
+  });
+
+  describe("PUT masked secret preservation during key rotation (#2852)", () => {
+    it("re-encrypts a preserved *** authHeader on PUT /api/v1/enterprise/webhooks/:index when stored under DATA_ENCRYPTION_KEY_PREVIOUS", async () => {
+      env.DATA_ENCRYPTION_KEY = KEY_B;
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = KEY_A;
+      const untouchedHeader = await encrypt("Bearer sibling-token", KEY_B);
+      const oldEncryptedHeader = await encrypt(AUTH_HEADER, KEY_A);
+      await upsertSetting(
+        "webhook_destinations",
+        JSON.stringify([
+          {
+            name: "Sibling Hook",
+            url: "https://93.184.216.34/sibling",
+            authHeader: untouchedHeader,
+            eventFilter: [],
+            batchIntervalSeconds: 30,
+            enabled: true,
+            type: "alerts",
+          },
+          {
+            name: "SIEM Dest",
+            url: "https://93.184.216.34/siem",
+            authHeader: oldEncryptedHeader,
+            eventFilter: [],
+            batchIntervalSeconds: 30,
+            enabled: true,
+            type: "siem",
+          },
+        ]),
+      );
+
+      const putRes = await testApp.app.inject({
+        method: "PUT",
+        url: "/api/v1/enterprise/webhooks/1",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: {
+          name: "SIEM Dest Updated",
+          url: "https://93.184.216.34/siem-v2",
+          authHeader: "***",
+          batchIntervalSeconds: 60,
+          enabled: true,
+          type: "siem",
+        },
+      });
+      expect(putRes.statusCode).toBe(200);
+
+      const [rotatedRow] = await db
+        .select({ value: schema.settings.value })
+        .from(schema.settings)
+        .where(eq(schema.settings.key, "webhook_destinations"));
+      const rotatedDests = JSON.parse(rotatedRow.value) as Array<{
+        url: string;
+        authHeader: string;
+      }>;
+      expect(rotatedDests[0].authHeader).toBe(untouchedHeader);
+      expect(rotatedDests[1].url).toBe("https://93.184.216.34/siem-v2");
+      expect(rotatedDests[1].authHeader).not.toBe(oldEncryptedHeader);
+      expect(await decrypt(rotatedDests[1].authHeader, KEY_B)).toBe(AUTH_HEADER);
+      expect(await decrypt(rotatedDests[1].authHeader, KEY_A)).toBeNull();
+
+      // Dropping DATA_ENCRYPTION_KEY_PREVIOUS leaves the rotated secret decryptable
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = "";
+      const testRes = await testApp.app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/webhooks/1/test",
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(testRes.statusCode).toBe(200);
+      expect(deliverWebhookSpy).toHaveBeenCalledTimes(1);
+      expect(deliverWebhookSpy.mock.calls[0][1]).toBe(AUTH_HEADER);
+    });
+
+    it("re-encrypts a preserved *** authHeader on PUT /api/v1/enterprise/siem/config when stored under DATA_ENCRYPTION_KEY_PREVIOUS", async () => {
+      env.DATA_ENCRYPTION_KEY = KEY_B;
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = KEY_A;
+      const oldEncryptedHeader = await encrypt(AUTH_HEADER, KEY_A);
+      await seedSiemConfig(oldEncryptedHeader);
+
+      const putRes = await testApp.app.inject({
+        method: "PUT",
+        url: "/api/v1/enterprise/siem/config",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: {
+          webhookUrl: "https://93.184.216.34/siem-v2",
+          authHeader: "***",
+          flushIntervalSeconds: 60,
+          enabled: true,
+        },
+      });
+      expect(putRes.statusCode).toBe(200);
+
+      const [rotatedRow] = await db
+        .select({ value: schema.settings.value })
+        .from(schema.settings)
+        .where(eq(schema.settings.key, "siem_config"));
+      const rotatedConfig = JSON.parse(rotatedRow.value) as {
+        webhookUrl: string;
+        authHeader: string;
+      };
+      expect(rotatedConfig.webhookUrl).toBe("https://93.184.216.34/siem-v2");
+      expect(rotatedConfig.authHeader).not.toBe(oldEncryptedHeader);
+      expect(await decrypt(rotatedConfig.authHeader, KEY_B)).toBe(AUTH_HEADER);
+      expect(await decrypt(rotatedConfig.authHeader, KEY_A)).toBeNull();
+
+      // Dropping DATA_ENCRYPTION_KEY_PREVIOUS leaves the rotated secret decryptable by runSiemForward
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = "";
+      const forwardResult = await runSiemForward();
+      expect(forwardResult?.forwarded).toBeGreaterThan(0);
+      expect(deliverWebhookSpy).toHaveBeenCalledTimes(1);
+      expect(deliverWebhookSpy.mock.calls[0][1]).toBe(AUTH_HEADER);
+    });
+
+    it("re-encrypts a preserved ******** redacted secret on PUT /api/v1/settings when stored under DATA_ENCRYPTION_KEY_PREVIOUS", async () => {
+      env.DATA_ENCRYPTION_KEY = KEY_B;
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = KEY_A;
+      const oldEncryptedSecret = await encrypt("oidc-secret-from-key-a", KEY_A);
+      await upsertSetting("oidc_client_secret", oldEncryptedSecret);
+
+      const putRes = await testApp.app.inject({
+        method: "PUT",
+        url: "/api/v1/settings",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: {
+          oidc_client_secret: "********",
+          defaultTheme: "dark",
+        },
+      });
+      expect(putRes.statusCode).toBe(200);
+      expect(JSON.parse(putRes.body)).toEqual({ ok: true, updatedCount: 1 });
+
+      const [rotatedRow] = await db
+        .select({ value: schema.settings.value })
+        .from(schema.settings)
+        .where(eq(schema.settings.key, "oidc_client_secret"));
+      expect(rotatedRow.value).not.toBe(oldEncryptedSecret);
+      expect(await decrypt(rotatedRow.value, KEY_B)).toBe("oidc-secret-from-key-a");
+      expect(await decrypt(rotatedRow.value, KEY_A)).toBeNull();
+
+      // Dropping DATA_ENCRYPTION_KEY_PREVIOUS leaves the rotated secret decryptable under KEY_B
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = "";
+      const { decryptSetting } = await import("../../../apps/api/src/lib/encryption.js");
+      expect(await decryptSetting(rotatedRow.value)).toBe("oidc-secret-from-key-a");
     });
   });
 });

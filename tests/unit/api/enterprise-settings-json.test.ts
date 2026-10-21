@@ -22,7 +22,7 @@ vi.mock("drizzle-orm", () => ({
 }));
 
 vi.mock("../../../apps/api/src/config.js", () => ({
-  env: { DATA_ENCRYPTION_KEY: "" },
+  env: { DATA_ENCRYPTION_KEY: "", DATA_ENCRYPTION_KEY_PREVIOUS: "" },
 }));
 
 vi.mock("../../../apps/api/src/db/index.js", () => ({
@@ -971,6 +971,279 @@ describe("enterprise settings JSON resilience (#2554)", () => {
       expect(loggerMock.warn).not.toHaveBeenCalled();
 
       await app.close();
+    });
+  });
+
+  describe("PUT masked authHeader rotation (#2852)", () => {
+    it("re-encrypts a preserved *** webhook authHeader under DATA_ENCRYPTION_KEY when stored under DATA_ENCRYPTION_KEY_PREVIOUS, and keeps ciphertext unchanged when already under DATA_ENCRYPTION_KEY", async () => {
+      const { env } = await import("../../../apps/api/src/config.js");
+      const { decrypt, encrypt } = await import("../../../apps/api/src/lib/encryption.js");
+      const keyA = "a".repeat(64);
+      const keyB = "b".repeat(64);
+      const keyC = "c".repeat(64);
+      env.DATA_ENCRYPTION_KEY = keyB;
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = keyA;
+
+      isEnterpriseFeatureEnabledMock.mockResolvedValue(true);
+      requirePermissionMock.mockResolvedValue({ id: "admin-1", username: "admin" });
+
+      const cipherKeyA = await encrypt("Bearer old-webhook-secret", keyA);
+      const cipherKeyB = await encrypt("Bearer current-webhook-secret", keyB);
+      const cipherKeyC = await encrypt("Bearer unknown-webhook-secret", keyC);
+      const updates: Array<Record<string, unknown>> = [];
+      updateMock.mockReturnValue({
+        set: (arg: Record<string, unknown>) => {
+          updates.push(arg);
+          return {
+            where: () => Promise.resolve(),
+          };
+        },
+      });
+
+      const { registerWebhookRoutes } = await import(
+        "../../../apps/api/src/routes/enterprise/webhooks.js"
+      );
+      const app = Fastify();
+      await registerWebhookRoutes(app);
+      await app.ready();
+      const warnLogSpy = vi.spyOn(app.log, "warn");
+
+      try {
+        // 1. Stored under keyA -> rotated to keyB when *** echoed back
+        mockSelectRow(
+          JSON.stringify([
+            {
+              name: "Siem Dest",
+              url: "https://example.com/siem",
+              authHeader: cipherKeyA,
+              eventFilter: [],
+              batchIntervalSeconds: 30,
+              enabled: true,
+              type: "siem",
+            },
+          ]),
+        );
+
+        const rotateRes = await app.inject({
+          method: "PUT",
+          url: "/api/v1/enterprise/webhooks/0",
+          payload: {
+            name: "Siem Dest Updated",
+            url: "https://example.com/siem-v2",
+            authHeader: "***",
+            type: "siem",
+          },
+        });
+        expect(rotateRes.statusCode).toBe(200);
+        expect(updates).toHaveLength(1);
+        const [rotatedDest] = JSON.parse(updates[0].value as string) as Array<{
+          authHeader: string;
+        }>;
+        expect(rotatedDest.authHeader).not.toBe(cipherKeyA);
+        expect(await decrypt(rotatedDest.authHeader, keyB)).toBe("Bearer old-webhook-secret");
+        expect(await decrypt(rotatedDest.authHeader, keyA)).toBeNull();
+        expect(warnLogSpy).not.toHaveBeenCalled();
+
+        // 2. Already stored under keyB -> kept identical when *** echoed back
+        updates.length = 0;
+        mockSelectRow(
+          JSON.stringify([
+            {
+              name: "Siem Dest",
+              url: "https://example.com/siem",
+              authHeader: cipherKeyB,
+              eventFilter: [],
+              batchIntervalSeconds: 30,
+              enabled: true,
+              type: "siem",
+            },
+          ]),
+        );
+
+        const keepRes = await app.inject({
+          method: "PUT",
+          url: "/api/v1/enterprise/webhooks/0",
+          payload: {
+            name: "Siem Dest Kept",
+            url: "https://example.com/siem-v3",
+            authHeader: "***",
+            type: "siem",
+          },
+        });
+        expect(keepRes.statusCode).toBe(200);
+        expect(updates).toHaveLength(1);
+        const [keptDest] = JSON.parse(updates[0].value as string) as Array<{
+          authHeader: string;
+        }>;
+        expect(keptDest.authHeader).toBe(cipherKeyB);
+        expect(warnLogSpy).not.toHaveBeenCalled();
+
+        // 3. Stored under unknown keyC -> logs warning and preserves existing ciphertext
+        updates.length = 0;
+        mockSelectRow(
+          JSON.stringify([
+            {
+              name: "Siem Dest",
+              url: "https://example.com/siem",
+              authHeader: cipherKeyC,
+              eventFilter: [],
+              batchIntervalSeconds: 30,
+              enabled: true,
+              type: "siem",
+            },
+          ]),
+        );
+
+        const unknownKeyRes = await app.inject({
+          method: "PUT",
+          url: "/api/v1/enterprise/webhooks/0",
+          payload: {
+            name: "Siem Dest Unknown Key",
+            url: "https://example.com/siem-v4",
+            authHeader: "***",
+            type: "siem",
+          },
+        });
+        expect(unknownKeyRes.statusCode).toBe(200);
+        expect(updates).toHaveLength(1);
+        const [preservedDest] = JSON.parse(updates[0].value as string) as Array<{
+          authHeader: string;
+        }>;
+        expect(preservedDest.authHeader).toBe(cipherKeyC);
+        expect(warnLogSpy).toHaveBeenCalledWith(
+          { index: 0, name: "Siem Dest Unknown Key", type: "siem" },
+          expect.stringContaining("DATA_ENCRYPTION_KEY"),
+        );
+      } finally {
+        env.DATA_ENCRYPTION_KEY = "";
+        env.DATA_ENCRYPTION_KEY_PREVIOUS = "";
+        await app.close();
+      }
+    });
+
+    it("re-encrypts a preserved *** SIEM config authHeader under DATA_ENCRYPTION_KEY when stored under DATA_ENCRYPTION_KEY_PREVIOUS, and keeps ciphertext unchanged when already under DATA_ENCRYPTION_KEY", async () => {
+      const { env } = await import("../../../apps/api/src/config.js");
+      const { decrypt, encrypt } = await import("../../../apps/api/src/lib/encryption.js");
+      const keyA = "a".repeat(64);
+      const keyB = "b".repeat(64);
+      const keyC = "c".repeat(64);
+      env.DATA_ENCRYPTION_KEY = keyB;
+      env.DATA_ENCRYPTION_KEY_PREVIOUS = keyA;
+
+      isEnterpriseFeatureEnabledMock.mockResolvedValue(true);
+      requirePermissionMock.mockResolvedValue({ id: "admin-1", username: "admin" });
+
+      const cipherKeyA = await encrypt("Bearer old-siem-secret", keyA);
+      const cipherKeyB = await encrypt("Bearer current-siem-secret", keyB);
+      const cipherKeyC = await encrypt("Bearer unknown-siem-secret", keyC);
+      const updates: Array<Record<string, unknown>> = [];
+      updateMock.mockReturnValue({
+        set: (arg: Record<string, unknown>) => {
+          updates.push(arg);
+          return {
+            where: () => Promise.resolve(),
+          };
+        },
+      });
+
+      const { registerSiemRoutes } = await import(
+        "../../../apps/api/src/routes/enterprise/siem.js"
+      );
+      const app = Fastify();
+      await registerSiemRoutes(app);
+      await app.ready();
+      const warnLogSpy = vi.spyOn(app.log, "warn");
+
+      try {
+        // 1. Stored under keyA -> rotated to keyB when *** echoed back
+        mockSelectRow(
+          JSON.stringify({
+            webhookUrl: "https://example.com/siem",
+            authHeader: cipherKeyA,
+            flushIntervalSeconds: 30,
+            enabled: true,
+          }),
+        );
+
+        const rotateRes = await app.inject({
+          method: "PUT",
+          url: "/api/v1/enterprise/siem/config",
+          payload: {
+            webhookUrl: "https://example.com/siem-v2",
+            authHeader: "***",
+            flushIntervalSeconds: 60,
+            enabled: true,
+          },
+        });
+        expect(rotateRes.statusCode).toBe(200);
+        expect(updates).toHaveLength(1);
+        const rotatedConfig = JSON.parse(updates[0].value as string) as { authHeader: string };
+        expect(rotatedConfig.authHeader).not.toBe(cipherKeyA);
+        expect(await decrypt(rotatedConfig.authHeader, keyB)).toBe("Bearer old-siem-secret");
+        expect(await decrypt(rotatedConfig.authHeader, keyA)).toBeNull();
+        expect(warnLogSpy).not.toHaveBeenCalled();
+
+        // 2. Already stored under keyB -> kept identical when *** echoed back
+        updates.length = 0;
+        mockSelectRow(
+          JSON.stringify({
+            webhookUrl: "https://example.com/siem",
+            authHeader: cipherKeyB,
+            flushIntervalSeconds: 30,
+            enabled: true,
+          }),
+        );
+
+        const keepRes = await app.inject({
+          method: "PUT",
+          url: "/api/v1/enterprise/siem/config",
+          payload: {
+            webhookUrl: "https://example.com/siem-v3",
+            authHeader: "***",
+            flushIntervalSeconds: 60,
+            enabled: true,
+          },
+        });
+        expect(keepRes.statusCode).toBe(200);
+        expect(updates).toHaveLength(1);
+        const keptConfig = JSON.parse(updates[0].value as string) as { authHeader: string };
+        expect(keptConfig.authHeader).toBe(cipherKeyB);
+        expect(warnLogSpy).not.toHaveBeenCalled();
+
+        // 3. Stored under unknown keyC -> logs warning and preserves existing ciphertext
+        updates.length = 0;
+        mockSelectRow(
+          JSON.stringify({
+            webhookUrl: "https://example.com/siem",
+            authHeader: cipherKeyC,
+            flushIntervalSeconds: 30,
+            enabled: true,
+          }),
+        );
+
+        const unknownKeyRes = await app.inject({
+          method: "PUT",
+          url: "/api/v1/enterprise/siem/config",
+          payload: {
+            webhookUrl: "https://example.com/siem-v4",
+            authHeader: "***",
+            flushIntervalSeconds: 60,
+            enabled: true,
+          },
+        });
+        expect(unknownKeyRes.statusCode).toBe(200);
+        expect(updates).toHaveLength(1);
+        const preservedConfig = JSON.parse(updates[0].value as string) as { authHeader: string };
+        expect(preservedConfig.authHeader).toBe(cipherKeyC);
+        expect(warnLogSpy).toHaveBeenCalledWith(
+          { key: "siem_config" },
+          expect.stringContaining("DATA_ENCRYPTION_KEY"),
+        );
+      } finally {
+        env.DATA_ENCRYPTION_KEY = "";
+        env.DATA_ENCRYPTION_KEY_PREVIOUS = "";
+        await app.close();
+      }
     });
   });
 });

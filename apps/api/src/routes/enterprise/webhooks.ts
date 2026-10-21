@@ -209,10 +209,28 @@ export async function registerWebhookRoutes(app: FastifyInstance): Promise<void>
       if (!(await validateWebhookDestinationUrl(dest.url, reply))) return;
 
       // GET masks a non-empty authHeader as "***"; preserve the stored secret
-      // when a client echoes the mask back on update (#2531).
+      // when a client echoes the mask back on update (#2531), rotating it to
+      // DATA_ENCRYPTION_KEY when stored under DATA_ENCRYPTION_KEY_PREVIOUS (#2852).
       if (dest.authHeader === "***") {
-        const existingAuth = destinations[index].authHeader;
-        dest.authHeader = typeof existingAuth === "string" ? existingAuth : "";
+        const existingAuth =
+          typeof destinations[index].authHeader === "string" ? destinations[index].authHeader : "";
+        if (
+          existingAuth &&
+          isEncrypted(existingAuth) &&
+          env.DATA_ENCRYPTION_KEY &&
+          env.DATA_ENCRYPTION_KEY_PREVIOUS
+        ) {
+          const decrypted = await decryptSettingWithRotation(existingAuth);
+          if (decrypted === null) {
+            request.log.warn(
+              { index, name: dest.name, type: dest.type },
+              "webhooks: preserved authHeader could not be decrypted for key rotation; check DATA_ENCRYPTION_KEY and DATA_ENCRYPTION_KEY_PREVIOUS",
+            );
+          }
+          dest.authHeader = decrypted?.reencrypted ?? existingAuth;
+        } else {
+          dest.authHeader = existingAuth;
+        }
       }
       if (dest.authHeader && env.DATA_ENCRYPTION_KEY && !isEncrypted(dest.authHeader)) {
         // Encrypt the auth header before storage

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
 import { auditFromRequest } from "../../lib/audit.js";
-import { encrypt, isEncrypted } from "../../lib/encryption.js";
+import { decryptSettingWithRotation, encrypt, isEncrypted } from "../../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
 import { logger } from "../../lib/logger.js";
 import { validateFetchUrl } from "../../lib/ssrf.js";
@@ -117,11 +117,29 @@ export async function registerSiemRoutes(app: FastifyInstance): Promise<void> {
         .where(eq(schema.settings.key, SETTINGS_KEY));
 
       // GET masks a non-empty authHeader as "***"; preserve the stored secret
-      // when a client echoes the mask back on update (#2531).
+      // when a client echoes the mask back on update (#2531), rotating it to
+      // DATA_ENCRYPTION_KEY when stored under DATA_ENCRYPTION_KEY_PREVIOUS (#2852).
       if (config.authHeader === "***") {
         const existingConfig = existing ? parseSiemConfig(existing.value) : null;
-        config.authHeader =
+        const existingAuth =
           typeof existingConfig?.authHeader === "string" ? existingConfig.authHeader : "";
+        if (
+          existingAuth &&
+          isEncrypted(existingAuth) &&
+          env.DATA_ENCRYPTION_KEY &&
+          env.DATA_ENCRYPTION_KEY_PREVIOUS
+        ) {
+          const decrypted = await decryptSettingWithRotation(existingAuth);
+          if (decrypted === null) {
+            request.log.warn(
+              { key: SETTINGS_KEY },
+              "siem: preserved authHeader could not be decrypted for key rotation; check DATA_ENCRYPTION_KEY and DATA_ENCRYPTION_KEY_PREVIOUS",
+            );
+          }
+          config.authHeader = decrypted?.reencrypted ?? existingAuth;
+        } else {
+          config.authHeader = existingAuth;
+        }
       }
       if (config.authHeader && env.DATA_ENCRYPTION_KEY && !isEncrypted(config.authHeader)) {
         // Encrypt the auth header before storage if encryption key is set

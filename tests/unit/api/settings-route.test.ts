@@ -837,6 +837,154 @@ describe("settingsRoutes PUT /api/v1/settings transactional upsert (#2502)", () 
       expect(publishAnalyticsGateInvalidationSpy).toHaveBeenCalledTimes(1);
     } finally {
       await app.close();
+      vi.doUnmock("../../../apps/api/src/lib/encryption.js");
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("re-encrypts a preserved ******** redacted secret on PUT /api/v1/settings when stored under DATA_ENCRYPTION_KEY_PREVIOUS without incrementing updatedCount (#2852)", async () => {
+    vi.resetModules();
+    vi.doUnmock("../../../apps/api/src/lib/encryption.js");
+    const keyA = "a".repeat(64);
+    const keyB = "b".repeat(64);
+    const keyC = "c".repeat(64);
+
+    vi.doMock("drizzle-orm", () => ({
+      and: (...args: unknown[]) => ({ op: "and", args }),
+      eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+    }));
+    vi.doMock("../../../apps/api/src/config.js", () => ({
+      env: {
+        DATA_ENCRYPTION_KEY: keyB,
+        DATA_ENCRYPTION_KEY_PREVIOUS: keyA,
+        OIDC_ENABLED: false,
+        SAML_ENABLED: false,
+      },
+    }));
+
+    const { decrypt, encrypt } = await import("../../../apps/api/src/lib/encryption.js");
+    const cipherKeyA = await encrypt("oidc-secret-value", keyA);
+    const cipherKeyB = await encrypt("oidc-secret-value", keyB);
+    const cipherKeyC = await encrypt("oidc-secret-value", keyC);
+    let storedValue: string | null = cipherKeyA;
+    const updates: Array<{ set: Record<string, unknown>; where: unknown }> = [];
+    const transactionSpy = vi.fn();
+    const auditSpy = vi.fn();
+
+    vi.doMock("../../../apps/api/src/db/index.js", () => ({
+      db: {
+        select: () => ({
+          from: () => ({
+            where: () =>
+              Promise.resolve(
+                storedValue === null ? [] : [{ key: "oidc_client_secret", value: storedValue }],
+              ),
+          }),
+        }),
+        update: () => ({
+          set: (setArg: Record<string, unknown>) => ({
+            where: (whereArg: unknown) => {
+              updates.push({ set: setArg, where: whereArg });
+              return Promise.resolve();
+            },
+          }),
+        }),
+        transaction: transactionSpy,
+      },
+      schema: { settings: { key: "settings.key", value: "settings.value" } },
+    }));
+    vi.doMock("../../../apps/api/src/permissions.js", () => ({
+      requirePermission: () => async () => ({ id: "admin-1", username: "admin", role: "admin" }),
+      getEffectivePermissions: async () => ["settings:read", "settings:write", "security:manage"],
+      isFullEffectiveAdmin: async () => true,
+    }));
+    vi.doMock("../../../apps/api/src/lib/audit.js", () => ({
+      auditFromRequest: () => auditSpy,
+    }));
+
+    const { settingsRoutes } = await import("../../../apps/api/src/routes/settings.js");
+    const app = Fastify();
+    await settingsRoutes(app);
+    await app.ready();
+    const warnLogSpy = vi.spyOn(app.log, "warn");
+
+    try {
+      const rotateRes = await app.inject({
+        method: "PUT",
+        url: "/api/v1/settings",
+        payload: { oidc_client_secret: "********" },
+      });
+      expect(rotateRes.statusCode).toBe(200);
+      expect(rotateRes.json()).toEqual({ ok: true, updatedCount: 0 });
+      expect(transactionSpy).not.toHaveBeenCalled();
+      expect(auditSpy).not.toHaveBeenCalled();
+      expect(updates).toHaveLength(1);
+      expect(await decrypt(updates[0].set.value as string, keyB)).toBe("oidc-secret-value");
+      expect(await decrypt(updates[0].set.value as string, keyA)).toBeNull();
+      expect(updates[0].where).toEqual({
+        op: "and",
+        args: [
+          { op: "eq", col: "settings.key", val: "oidc_client_secret" },
+          { op: "eq", col: "settings.value", val: cipherKeyA },
+        ],
+      });
+      expect(warnLogSpy).not.toHaveBeenCalled();
+
+      // When already encrypted under keyB, no update is issued
+      updates.length = 0;
+      storedValue = cipherKeyB;
+      const keepRes = await app.inject({
+        method: "PUT",
+        url: "/api/v1/settings",
+        payload: { oidc_client_secret: "********" },
+      });
+      expect(keepRes.statusCode).toBe(200);
+      expect(keepRes.json()).toEqual({ ok: true, updatedCount: 0 });
+      expect(updates).toHaveLength(0);
+      expect(warnLogSpy).not.toHaveBeenCalled();
+
+      // When stored under an unrecognized keyC, logs a warning and skips update
+      updates.length = 0;
+      storedValue = cipherKeyC;
+      const unknownKeyRes = await app.inject({
+        method: "PUT",
+        url: "/api/v1/settings",
+        payload: { oidc_client_secret: "********" },
+      });
+      expect(unknownKeyRes.statusCode).toBe(200);
+      expect(unknownKeyRes.json()).toEqual({ ok: true, updatedCount: 0 });
+      expect(updates).toHaveLength(0);
+      expect(warnLogSpy).toHaveBeenCalledWith(
+        { key: "oidc_client_secret" },
+        expect.stringContaining("DATA_ENCRYPTION_KEY"),
+      );
+
+      // When the redacted setting row does not exist yet, skips update cleanly
+      updates.length = 0;
+      warnLogSpy.mockClear();
+      storedValue = null;
+      const missingRowRes = await app.inject({
+        method: "PUT",
+        url: "/api/v1/settings",
+        payload: { oidc_client_secret: "********" },
+      });
+      expect(missingRowRes.statusCode).toBe(200);
+      expect(missingRowRes.json()).toEqual({ ok: true, updatedCount: 0 });
+      expect(updates).toHaveLength(0);
+      expect(warnLogSpy).not.toHaveBeenCalled();
+
+      // When runtime constraint validation rejects the batch, masked secret rotation does not run
+      updates.length = 0;
+      storedValue = cipherKeyA;
+      const rejectedRes = await app.inject({
+        method: "PUT",
+        url: "/api/v1/settings",
+        payload: { oidc_client_secret: "********", ssoEnforcement: "true" },
+      });
+      expect(rejectedRes.statusCode).toBe(400);
+      expect(updates).toHaveLength(0);
+    } finally {
+      await app.close();
       vi.restoreAllMocks();
     }
   });

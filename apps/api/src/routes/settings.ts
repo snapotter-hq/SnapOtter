@@ -132,6 +132,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     // Pass 1: validate all entries before writing any
     const entries: Array<{ key: string; strValue: string }> = [];
     const canonicalKeys = new Set<string>();
+    const maskedKeys = new Set<string>();
 
     for (const [requestedKey, value] of Object.entries(body)) {
       if (typeof requestedKey !== "string" || requestedKey.length === 0) continue;
@@ -180,6 +181,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       // and persisting "********", which would destroy the real secret (e.g. the OIDC
       // client secret or SIEM webhook auth, neither of which is read-only).
       if (policy.redacted && strValue === "********") {
+        maskedKeys.add(key);
         continue;
       }
 
@@ -246,6 +248,36 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
         username: admin.username,
         keys: entries.map((e) => e.key),
       });
+    }
+
+    // When a redacted secret is preserved via its mask during key rotation,
+    // re-encrypt any existing DATA_ENCRYPTION_KEY_PREVIOUS ciphertext under
+    // DATA_ENCRYPTION_KEY (#2852).
+    if (maskedKeys.size > 0 && env.DATA_ENCRYPTION_KEY && env.DATA_ENCRYPTION_KEY_PREVIOUS) {
+      for (const maskedKey of maskedKeys) {
+        if (canonicalKeys.has(maskedKey)) continue;
+        const [existingRow] = await db
+          .select({ value: schema.settings.value })
+          .from(schema.settings)
+          .where(eq(schema.settings.key, maskedKey));
+        if (!existingRow) continue;
+        const decrypted = await decryptSettingWithRotation(existingRow.value);
+        if (decrypted === null) {
+          request.log.warn(
+            { key: maskedKey },
+            "settings: preserved secret could not be decrypted for key rotation; check DATA_ENCRYPTION_KEY and DATA_ENCRYPTION_KEY_PREVIOUS",
+          );
+          continue;
+        }
+        if (decrypted.reencrypted) {
+          await db
+            .update(schema.settings)
+            .set({ value: decrypted.reencrypted, updatedAt: new Date() })
+            .where(
+              and(eq(schema.settings.key, maskedKey), eq(schema.settings.value, existingRow.value)),
+            );
+        }
+      }
     }
 
     if (entries.some((e) => e.key === "analyticsEnabled")) {
