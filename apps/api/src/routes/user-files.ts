@@ -53,7 +53,11 @@ import {
   sanitizeSvg,
 } from "../lib/svg-sanitize.js";
 import { engineUnavailable } from "../modality/image-input.js";
-import { pdfFirstPagePreview, videoPosterPreview } from "../modality/preview.js";
+import {
+  isPreviewServerFault,
+  pdfFirstPagePreview,
+  videoPosterPreview,
+} from "../modality/preview.js";
 import { hasEffectivePermission, requireFileAccess } from "../permissions.js";
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -713,6 +717,10 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
         if (file.mimeType.startsWith("video/")) {
           const poster = await videoPosterPreview(rawBuffer);
           if (!poster) {
+            request.log.warn(
+              { fileId: id, storedName: file.storedName },
+              "Thumbnail generation failed",
+            );
             return reply.status(422).send({ error: "Could not generate thumbnail" });
           }
           cacheThumbnail(poster);
@@ -726,6 +734,10 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
         if (file.mimeType === "application/pdf") {
           const page = await pdfFirstPagePreview(rawBuffer);
           if (!page) {
+            request.log.warn(
+              { fileId: id, storedName: file.storedName },
+              "Thumbnail generation failed",
+            );
             return reply.status(422).send({ error: "Could not generate thumbnail" });
           }
           cacheThumbnail(page);
@@ -752,7 +764,12 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
               extname(file.originalName).toLowerCase().replace(/^\./, "") || undefined;
             decoded = Buffer.from(await decodeToSharpCompat(rawBuffer, validation.format, fileExt));
           } catch (decodeErr) {
-            if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+            if (
+              decodeErr instanceof DecoderOutOfMemoryError ||
+              (!isDecoderUnavailable(decodeErr) && isPreviewServerFault(decodeErr))
+            ) {
+              throw decodeErr;
+            }
             try {
               await sharp(rawBuffer).metadata();
             } catch (err) {
@@ -784,6 +801,13 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
             request.log,
           );
         }
+        if (isPreviewServerFault(err)) {
+          throw err;
+        }
+        request.log.warn(
+          { err, fileId: id, storedName: file.storedName },
+          "Thumbnail generation failed",
+        );
         return reply.status(422).send({ error: "Could not generate thumbnail" });
       }
     },

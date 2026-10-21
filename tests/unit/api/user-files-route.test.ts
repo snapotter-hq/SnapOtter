@@ -165,10 +165,14 @@ vi.mock("../../../apps/api/src/lib/file-storage.js", () => ({
   streamStoredFile: mocks.streamStoredFile,
 }));
 
-vi.mock("../../../apps/api/src/modality/preview.js", () => ({
-  videoPosterPreview: mocks.videoPosterPreview,
-  pdfFirstPagePreview: mocks.pdfFirstPagePreview,
-}));
+vi.mock("../../../apps/api/src/modality/preview.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/modality/preview.js")>();
+  return {
+    ...actual,
+    videoPosterPreview: mocks.videoPosterPreview,
+    pdfFirstPagePreview: mocks.pdfFirstPagePreview,
+  };
+});
 
 vi.mock("../../../apps/api/src/lib/quota.js", () => ({
   quotaRefusal: mocks.quotaRefusal,
@@ -1385,6 +1389,208 @@ describe("user files route logic", () => {
           expect(reply.payload, c.label).toBe(c.cached);
           expect(mocks.readStoredFile, c.label).not.toHaveBeenCalled();
         }
+      });
+
+      it("rethrows operational scratch/spawn faults and TypeError from thumbnail generation instead of swallowing them as 422 (#2870)", async () => {
+        const videoRow = makeFileRow({
+          id: "file-vid-fault",
+          storedName: "stored-vid-fault.mp4",
+          mimeType: "video/mp4",
+        });
+        const pdfRow = makeFileRow({
+          id: "file-pdf-fault",
+          storedName: "stored-pdf-fault.pdf",
+          mimeType: "application/pdf",
+        });
+        const imgRow = makeFileRow({
+          id: "file-img-fault",
+          storedName: "stored-img-fault.png",
+          mimeType: "image/png",
+        });
+
+        for (const code of ["ENOSPC", "EACCES", "EMFILE", "ENOMEM"] as const) {
+          const fault = Object.assign(new Error(`${code}: preview scratch fault`), {
+            code,
+            syscall: "mkdir",
+          });
+
+          mocks.parentRows = [videoRow];
+          mocks.readStoredFile.mockResolvedValueOnce(Buffer.from("video-bytes"));
+          mocks.videoPosterPreview.mockRejectedValueOnce(fault);
+          await expect(
+            thumbnailHandler(
+              { params: { id: videoRow.id }, log: { warn: vi.fn(), error: vi.fn() } },
+              makeReply(),
+            ),
+          ).rejects.toBe(fault);
+
+          mocks.parentRows = [pdfRow];
+          mocks.readStoredFile.mockResolvedValueOnce(Buffer.from("pdf-bytes"));
+          mocks.pdfFirstPagePreview.mockRejectedValueOnce(fault);
+          await expect(
+            thumbnailHandler(
+              { params: { id: pdfRow.id }, log: { warn: vi.fn(), error: vi.fn() } },
+              makeReply(),
+            ),
+          ).rejects.toBe(fault);
+        }
+
+        const typeErr = new TypeError("unexpected thumbnail bug");
+        mocks.parentRows = [imgRow];
+        mocks.readStoredFile.mockResolvedValueOnce(Buffer.from("img-bytes"));
+        mocks.validateImageBuffer.mockRejectedValueOnce(typeErr);
+        await expect(
+          thumbnailHandler(
+            { params: { id: imgRow.id }, log: { warn: vi.fn(), error: vi.fn() } },
+            makeReply(),
+          ),
+        ).rejects.toBe(typeErr);
+
+        const formatDecoders = await import("../../../apps/api/src/lib/format-decoders.js");
+        const tiffHeadedDng = await sharp({
+          create: { width: 8, height: 8, channels: 3, background: { r: 10, g: 20, b: 30 } },
+        })
+          .tiff()
+          .toBuffer();
+        const dngRow = makeFileRow({
+          id: "file-dng-fault",
+          originalName: "photo.dng",
+          storedName: "stored-dng-fault.dng",
+          mimeType: "image/x-adobe-dng",
+        });
+        mocks.parentRows = [dngRow];
+        mocks.readStoredFile.mockResolvedValueOnce(tiffHeadedDng);
+        mocks.validateImageBuffer.mockResolvedValueOnce({
+          valid: true as const,
+          format: "raw",
+          width: 8,
+          height: 8,
+        });
+        const cliScratchFault = Object.assign(new Error("ENOSPC: no space left on device"), {
+          code: "ENOSPC",
+          syscall: "open",
+        });
+        const decodeSpy = vi
+          .spyOn(formatDecoders, "decodeToSharpCompat")
+          .mockRejectedValueOnce(cliScratchFault);
+        try {
+          const warn = vi.fn();
+          await expect(
+            thumbnailHandler(
+              { params: { id: dngRow.id }, log: { warn, error: vi.fn() } },
+              makeReply(),
+            ),
+          ).rejects.toBe(cliScratchFault);
+          expect(warn).not.toHaveBeenCalled();
+
+          // When the CLI decoder is missing (DecoderUnavailableError), TIFF-headed
+          // DNGs still fall back to Sharp's native reader and return a 200 thumbnail.
+          mocks.readStoredFile.mockResolvedValueOnce(tiffHeadedDng);
+          mocks.validateImageBuffer.mockResolvedValueOnce({
+            valid: true as const,
+            format: "raw",
+            width: 8,
+            height: 8,
+          });
+          decodeSpy.mockRejectedValueOnce(
+            new formatDecoders.DecoderUnavailableError("No LibRaw found."),
+          );
+          const dngReply = makeReply();
+          await thumbnailHandler(
+            { params: { id: dngRow.id }, log: { warn: vi.fn(), error: vi.fn() } },
+            dngReply,
+          );
+          expect(dngReply.statusCode).toBe(200);
+          expect(dngReply.headers["content-type"]).toBe("image/jpeg");
+
+          // DecoderOutOfMemoryError bypasses the Sharp fallback and answers 503 ENGINE_UNAVAILABLE.
+          mocks.readStoredFile.mockResolvedValueOnce(tiffHeadedDng);
+          mocks.validateImageBuffer.mockResolvedValueOnce({
+            valid: true as const,
+            format: "raw",
+            width: 8,
+            height: 8,
+          });
+          decodeSpy.mockRejectedValueOnce(
+            new formatDecoders.DecoderOutOfMemoryError("Decoder out of memory."),
+          );
+          const oomReply = makeReply();
+          await thumbnailHandler(
+            { params: { id: dngRow.id }, log: { warn: vi.fn(), error: vi.fn() } },
+            oomReply,
+          );
+          expect(oomReply.statusCode).toBe(503);
+          expect(oomReply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+        } finally {
+          decodeSpy.mockRestore();
+        }
+      });
+
+      it("logs a warning and returns 422 when video, PDF, or image thumbnail generation fails (#2870)", async () => {
+        const videoRow = makeFileRow({
+          id: "file-vid-corrupt",
+          storedName: "stored-vid-corrupt.mp4",
+          mimeType: "video/mp4",
+        });
+        mocks.parentRows = [videoRow];
+        mocks.readStoredFile.mockResolvedValueOnce(Buffer.from("corrupt-video"));
+        mocks.videoPosterPreview.mockResolvedValueOnce(null);
+        const vidWarn = vi.fn();
+        const vidReply = makeReply();
+        await thumbnailHandler(
+          { params: { id: videoRow.id }, log: { warn: vidWarn, error: vi.fn() } },
+          vidReply,
+        );
+        expect(vidReply.statusCode).toBe(422);
+        expect(vidReply.payload).toEqual({ error: "Could not generate thumbnail" });
+        expect(vidWarn).toHaveBeenCalledWith(
+          { fileId: videoRow.id, storedName: videoRow.storedName },
+          "Thumbnail generation failed",
+        );
+
+        const pdfRow = makeFileRow({
+          id: "file-pdf-corrupt",
+          storedName: "stored-pdf-corrupt.pdf",
+          mimeType: "application/pdf",
+        });
+        mocks.parentRows = [pdfRow];
+        mocks.readStoredFile.mockResolvedValueOnce(Buffer.from("corrupt-pdf"));
+        mocks.pdfFirstPagePreview.mockResolvedValueOnce(null);
+        const pdfWarn = vi.fn();
+        const pdfReply = makeReply();
+        await thumbnailHandler(
+          { params: { id: pdfRow.id }, log: { warn: pdfWarn, error: vi.fn() } },
+          pdfReply,
+        );
+        expect(pdfReply.statusCode).toBe(422);
+        expect(pdfReply.payload).toEqual({ error: "Could not generate thumbnail" });
+        expect(pdfWarn).toHaveBeenCalledWith(
+          { fileId: pdfRow.id, storedName: pdfRow.storedName },
+          "Thumbnail generation failed",
+        );
+
+        const imgRow = makeFileRow({
+          id: "file-img-corrupt",
+          storedName: "stored-img-corrupt.png",
+          mimeType: "image/png",
+        });
+        mocks.parentRows = [imgRow];
+        mocks.readStoredFile.mockResolvedValueOnce(Buffer.from("not-a-valid-png-stream"));
+
+        const warn = vi.fn();
+        const reply = makeReply();
+        await thumbnailHandler({ params: { id: imgRow.id }, log: { warn, error: vi.fn() } }, reply);
+
+        expect(reply.statusCode).toBe(422);
+        expect(reply.payload).toEqual({ error: "Could not generate thumbnail" });
+        expect(warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            err: expect.any(Error),
+            fileId: imgRow.id,
+            storedName: imgRow.storedName,
+          }),
+          "Thumbnail generation failed",
+        );
       });
     });
 

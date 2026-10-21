@@ -35,10 +35,14 @@ vi.mock("../../../apps/api/src/lib/logger.js", () => ({
 
 const videoPosterPreviewMock = vi.hoisted(() => vi.fn());
 const pdfFirstPagePreviewMock = vi.hoisted(() => vi.fn());
-vi.mock("../../../apps/api/src/modality/preview.js", () => ({
-  videoPosterPreview: videoPosterPreviewMock,
-  pdfFirstPagePreview: pdfFirstPagePreviewMock,
-}));
+vi.mock("../../../apps/api/src/modality/preview.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/modality/preview.js")>();
+  return {
+    ...actual,
+    videoPosterPreview: videoPosterPreviewMock,
+    pdfFirstPagePreview: pdfFirstPagePreviewMock,
+  };
+});
 
 const decodeHeicMock = vi.hoisted(() => vi.fn());
 vi.mock("../../../apps/api/src/lib/heic-converter.js", () => ({
@@ -190,6 +194,66 @@ describe("generatePreview", () => {
     const missing = await generatePreview(Buffer.from("pdf-bytes"), "application/pdf", "job-pdf");
     expect(missing).toBeUndefined();
     expect(putObjectMock).not.toHaveBeenCalled();
+  });
+
+  it("logs a warning and returns undefined when videoPosterPreview or putObject rejects on video/* (#2870)", async () => {
+    const scratchErr = Object.assign(new Error("ENOSPC: no space left on device"), {
+      code: "ENOSPC",
+      syscall: "mkdir",
+    });
+    videoPosterPreviewMock.mockRejectedValueOnce(scratchErr);
+
+    const key1 = await generatePreview(Buffer.from("mp4-bytes"), "video/mp4", "job-vid-err");
+    expect(key1).toBeUndefined();
+    expect(putObjectMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      { err: scratchErr, jobId: "job-vid-err", contentType: "video/mp4" },
+      "preview generation failed; result has no renderable preview",
+    );
+
+    loggerWarnMock.mockReset();
+    const putErr = Object.assign(new Error("storage write failed"), { statusCode: 503 });
+    videoPosterPreviewMock.mockResolvedValueOnce(Buffer.from("webp-poster"));
+    putObjectMock.mockRejectedValueOnce(putErr);
+
+    const key2 = await generatePreview(Buffer.from("mp4-bytes"), "video/mp4", "job-vid-put-err");
+    expect(key2).toBeUndefined();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      { err: putErr, jobId: "job-vid-put-err", contentType: "video/mp4" },
+      "preview generation failed; result has no renderable preview",
+    );
+  });
+
+  it("logs a warning and returns undefined when pdfFirstPagePreview or putObject rejects on application/pdf (#2870)", async () => {
+    const scratchErr = Object.assign(new Error("EACCES: permission denied"), {
+      code: "EACCES",
+      syscall: "mkdir",
+    });
+    pdfFirstPagePreviewMock.mockRejectedValueOnce(scratchErr);
+
+    const key1 = await generatePreview(Buffer.from("pdf-bytes"), "application/pdf", "job-pdf-err");
+    expect(key1).toBeUndefined();
+    expect(putObjectMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      { err: scratchErr, jobId: "job-pdf-err", contentType: "application/pdf" },
+      "preview generation failed; result has no renderable preview",
+    );
+
+    loggerWarnMock.mockReset();
+    const putErr = Object.assign(new Error("storage write failed"), { statusCode: 503 });
+    pdfFirstPagePreviewMock.mockResolvedValueOnce(Buffer.from("png-page"));
+    putObjectMock.mockRejectedValueOnce(putErr);
+
+    const key2 = await generatePreview(
+      Buffer.from("pdf-bytes"),
+      "application/pdf",
+      "job-pdf-put-err",
+    );
+    expect(key2).toBeUndefined();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      { err: putErr, jobId: "job-pdf-put-err", contentType: "application/pdf" },
+      "preview generation failed; result has no renderable preview",
+    );
   });
 
   it.each(["image/heic", "image/heif"])(

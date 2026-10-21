@@ -630,6 +630,61 @@ describe("Thumbnail generation", () => {
       }
     },
   );
+
+  it("returns 500, not 422, when videoPosterPreview or pdfFirstPagePreview fails with an operational scratch fault (#2870)", async () => {
+    const previewMod = await import("../../../apps/api/src/modality/preview.js");
+
+    const pdf = readFixture(fixtures.document.pdf3);
+    const { body: pdfBody, contentType: pdfCt } = createMultipartPayload([
+      { name: "file", filename: "fault-thumb.pdf", contentType: "application/pdf", content: pdf },
+    ]);
+    const pdfUploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": pdfCt, authorization: `Bearer ${adminToken}` },
+      body: pdfBody,
+    });
+    expect(pdfUploadRes.statusCode).toBe(201);
+    const pdfFileId = (JSON.parse(pdfUploadRes.body).files[0] as { id: string }).id;
+
+    const mp4 = readFixture(fixtures.video.tiny("mp4"));
+    const { body: vidBody, contentType: vidCt } = createMultipartPayload([
+      { name: "file", filename: "fault-thumb.mp4", contentType: "video/mp4", content: mp4 },
+    ]);
+    const vidUploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": vidCt, authorization: `Bearer ${adminToken}` },
+      body: vidBody,
+    });
+    expect(vidUploadRes.statusCode).toBe(201);
+    const vidFileId = (JSON.parse(vidUploadRes.body).files[0] as { id: string }).id;
+
+    const enospc = Object.assign(new Error("ENOSPC: no space left on device, mkdir"), {
+      code: "ENOSPC",
+      syscall: "mkdir",
+    });
+    const pdfSpy = vi.spyOn(previewMod, "pdfFirstPagePreview").mockRejectedValueOnce(enospc);
+    const vidSpy = vi.spyOn(previewMod, "videoPosterPreview").mockRejectedValueOnce(enospc);
+    try {
+      const pdfRes = await app.inject({
+        method: "GET",
+        url: `/api/v1/files/${pdfFileId}/thumbnail`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(pdfRes.statusCode).toBe(500);
+
+      const vidRes = await app.inject({
+        method: "GET",
+        url: `/api/v1/files/${vidFileId}/thumbnail`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(vidRes.statusCode).toBe(500);
+    } finally {
+      pdfSpy.mockRestore();
+      vidSpy.mockRestore();
+    }
+  });
 });
 
 // ── Bulk delete ──────────────────────────────────────────────────

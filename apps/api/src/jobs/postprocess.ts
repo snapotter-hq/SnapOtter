@@ -153,32 +153,33 @@ export async function generatePreview(
   jobId: string,
   toolId = "output-preview",
 ): Promise<string | undefined> {
-  // Per-modality dispatch (before the image logic)
-  if (contentType.startsWith("video/")) {
-    const poster = await videoPosterPreview(buffer);
-    if (!poster) return undefined;
-    const key = `outputs/${jobId}/preview.webp`;
-    await putObject(key, poster);
-    return key;
-  }
   if (contentType.startsWith("audio/")) return undefined; // no preview (spec 4.5)
-  if (contentType === "application/pdf") {
-    const page = await pdfFirstPagePreview(buffer);
-    if (!page) return undefined;
-    const key = `outputs/${jobId}/preview.png`;
-    await putObject(key, page);
-    return key;
-  }
-
-  // Image logic unchanged below (application/postscript is EPS's registered MIME)
-  if (!contentType.startsWith("image/") && contentType !== "application/postscript") {
-    return undefined;
-  }
-  if (BROWSER_PREVIEWABLE.has(contentType)) return undefined;
-
-  const key = `outputs/${jobId}/preview.webp`;
 
   try {
+    // Per-modality dispatch (before the image logic)
+    if (contentType.startsWith("video/")) {
+      const poster = await videoPosterPreview(buffer);
+      if (!poster) return undefined;
+      const key = `outputs/${jobId}/preview.webp`;
+      await putObject(key, poster);
+      return key;
+    }
+    if (contentType === "application/pdf") {
+      const page = await pdfFirstPagePreview(buffer);
+      if (!page) return undefined;
+      const key = `outputs/${jobId}/preview.png`;
+      await putObject(key, page);
+      return key;
+    }
+
+    // Image logic unchanged below (application/postscript is EPS's registered MIME)
+    if (!contentType.startsWith("image/") && contentType !== "application/postscript") {
+      return undefined;
+    }
+    if (BROWSER_PREVIEWABLE.has(contentType)) return undefined;
+
+    const key = `outputs/${jobId}/preview.webp`;
+
     let previewInput = buffer;
     const cliFormat = CLI_DECODE_FORMAT_BY_MIME[contentType];
     // Sharp cannot decode HEIC or CLI-encoded formats natively; use system decoder first
