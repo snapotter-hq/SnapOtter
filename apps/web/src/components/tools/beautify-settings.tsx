@@ -1381,7 +1381,7 @@ export function BeautifySettings({
   const hasFile = files.length > 0;
   const isImageBg = settings.backgroundType === "image";
   const isProcessing = processing || manualProcessing;
-  const displayError = error;
+  const displayError = currentEntry?.error ?? error;
   const manualDownloadUrl =
     currentEntry && currentEntry.processedUrl !== null
       ? (manualDownloadByEntry[currentEntry.id] ?? null)
@@ -1500,7 +1500,14 @@ export function BeautifySettings({
           return;
         }
         unsubscribe();
-        setError(err instanceof Error ? err.message : t.toolSettings.beautify.processingFailed);
+        useFileStore.getState().updateEntryById(entryId, {
+          processedUrl: null,
+          processedPreviewUrl: null,
+          processedFilename: null,
+          processedSize: null,
+          status: "failed",
+          error: err instanceof Error ? err.message : t.toolSettings.beautify.processingFailed,
+        });
       } finally {
         unsubscribe();
         if (abortRef.current === controller) {

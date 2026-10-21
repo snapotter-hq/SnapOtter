@@ -583,7 +583,7 @@ describe("self-posting tool panels: upload selected entry and land result by cap
       expect(entryB.processedUrl).toBeNull();
       expect(entryB.processedPreviewUrl).toBeNull();
       expect(entryB.processedSize).toBeNull();
-      expect(entryB.status).toBe("pending");
+      expect(entryB.status).toBe("failed");
       // Bystander entry A is untouched.
       expect(useFileStore.getState().entries[0].processedUrl).toBe(
         "/api/v1/download/compose-a/a.png",
@@ -631,7 +631,7 @@ describe("self-posting tool panels: upload selected entry and land result by cap
       ).not.toBeInTheDocument();
       const entryA = useFileStore.getState().entries[0];
       expect(entryA.processedUrl).toBeNull();
-      expect(entryA.status).toBe("pending");
+      expect(entryA.status).toBe("failed");
       expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:second.png");
       unmount();
     }
@@ -715,7 +715,7 @@ describe("self-posting tool panels: upload selected entry and land result by cap
       expect(useFileStore.getState().entries[0].processedUrl).toBeNull();
       expect(useFileStore.getState().entries[0].processedPreviewUrl).toBeNull();
       expect(useFileStore.getState().entries[0].processedSize).toBeNull();
-      expect(useFileStore.getState().entries[0].status).toBe("pending");
+      expect(useFileStore.getState().entries[0].status).toBe("failed");
 
       // Succeed again on single file, then add fileB and run multi-file batch where a.png succeeds and b.png fails.
       fireEvent.click(screen.getByTestId("watermark-image-submit"));
@@ -796,7 +796,7 @@ describe("self-posting tool panels: upload selected entry and land result by cap
       expect(entryA.processedUrl).toBeNull();
       expect(entryA.processedPreviewUrl).toBeNull();
       expect(entryA.processedSize).toBeNull();
-      expect(entryA.status).toBe("pending");
+      expect(entryA.status).toBe("failed");
 
       // Succeed on image-background again, then switch to gradient background and run via useToolProcessor:
       // manualDownloadByEntry is cleared so the standard run's downloadUrl is shown instead of the stale manual URL.
@@ -861,6 +861,7 @@ describe("self-posting tool panels: upload selected entry and land result by cap
       expect(entryA.processedPreviewUrl).toBeNull();
       expect(entryA.processedSize).toBeNull();
       expect(entryA.status).toBe("pending");
+      expect(useFileStore.getState().entries[1].status).toBe("failed");
       act(() => {
         useFileStore.getState().setSelectedIndex(0);
       });

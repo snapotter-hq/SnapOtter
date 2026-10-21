@@ -279,14 +279,16 @@ describe.each(xhrPanels)("%s panel (#2304, #2636)", (_name, Panel, submitId, fil
       xhr.responseText = "{}";
       xhr.onload?.();
     });
-    const errorAfterRun = useFileStore.getState().error;
+    const shownError = () =>
+      useFileStore.getState().currentEntry?.error ?? useFileStore.getState().error;
+    const errorAfterRun = shownError();
     expect(errorAfterRun).not.toBeNull();
     expect(useFileStore.getState().processing).toBe(false);
 
     unmount();
 
     // Its own failure message stands; the unmount adds nothing and aborts nothing.
-    expect(useFileStore.getState().error).toBe(errorAfterRun);
+    expect(shownError()).toBe(errorAfterRun);
     expect(useFileStore.getState().error).not.toBe(INTERRUPTED);
   });
 });
@@ -356,6 +358,8 @@ describe("stitch panel late XHR after reset (#2636)", () => {
       expect(useFileStore.getState().processing).toBe(true);
       expect(useFileStore.getState().processedUrl).toBeNull();
       expect(useFileStore.getState().error).toBeNull();
+      expect(useFileStore.getState().currentEntry?.status).toBe("pending");
+      expect(useFileStore.getState().currentEntry?.error).toBeNull();
     }
   });
 });
@@ -804,6 +808,8 @@ describe.each(fetchFileStorePanels)(
 
         expect(useFileStore.getState().processing).toBe(true);
         expect(useFileStore.getState().error).toBeNull();
+        expect(useFileStore.getState().currentEntry?.status).toBe("pending");
+        expect(useFileStore.getState().currentEntry?.error).toBeNull();
         expect(screen.queryByText("Server failed")).toBeNull();
         expect(screen.queryByText("Failed to fetch")).toBeNull();
       }

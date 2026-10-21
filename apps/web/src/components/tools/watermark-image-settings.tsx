@@ -166,7 +166,14 @@ export function WatermarkImageSettings() {
           return;
         }
         unsubscribe();
-        setError(err instanceof Error ? err.message : t.errors.processingFailedNoDetail);
+        useFileStore.getState().updateEntryById(entryId, {
+          processedUrl: null,
+          processedPreviewUrl: null,
+          processedFilename: null,
+          processedSize: null,
+          status: "failed",
+          error: err instanceof Error ? err.message : t.errors.processingFailedNoDetail,
+        });
       } finally {
         unsubscribe();
         if (abortRef.current === controller) abortRef.current = null;
@@ -282,6 +289,7 @@ export function WatermarkImageSettings() {
   };
 
   const hasFile = files.length > 0;
+  const displayError = currentEntry?.error ?? error;
   const activeEntryResult =
     currentEntry && currentEntry.processedUrl !== null
       ? resultsByEntry[currentEntry.id]
@@ -369,7 +377,7 @@ export function WatermarkImageSettings() {
         />
       </div>
 
-      {error && <p className="text-xs text-destructive-ink">{error}</p>}
+      {displayError && <p className="text-xs text-destructive-ink">{displayError}</p>}
 
       {originalSize != null && processedSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">

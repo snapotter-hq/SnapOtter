@@ -139,7 +139,18 @@ export function CompareSettings() {
         return;
       }
       unsubscribe();
-      setError(err instanceof Error ? err.message : t.toolSettings.compare.comparisonFailed);
+      const failedTarget = useFileStore.getState().entries.find((entry) => entry.id === entryId);
+      if (failedTarget?.processedUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(failedTarget.processedUrl);
+      }
+      useFileStore.getState().updateEntryById(entryId, {
+        processedUrl: null,
+        processedPreviewUrl: null,
+        processedFilename: null,
+        processedSize: null,
+        status: "failed",
+        error: err instanceof Error ? err.message : t.toolSettings.compare.comparisonFailed,
+      });
     } finally {
       unsubscribe();
       if (abortRef.current === controller) abortRef.current = null;
@@ -150,6 +161,7 @@ export function CompareSettings() {
   };
 
   const hasFile = files.length > 0;
+  const displayError = currentEntry?.error ?? error;
   const activeEntryResult =
     currentEntry && currentEntry.processedUrl !== null
       ? resultsByEntry[currentEntry.id]
@@ -181,7 +193,7 @@ export function CompareSettings() {
         </button>
       </div>
 
-      {error && <p className="text-xs text-destructive-ink">{error}</p>}
+      {displayError && <p className="text-xs text-destructive-ink">{displayError}</p>}
 
       {similarity !== null && (
         <div className="p-3 rounded-lg bg-muted">

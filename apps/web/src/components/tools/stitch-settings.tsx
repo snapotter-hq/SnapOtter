@@ -112,6 +112,21 @@ export function StitchSettings() {
       unsubscribe();
     };
 
+    const failEntry = (message: string) => {
+      try {
+        useFileStore.getState().updateEntryById(entryId, {
+          processedUrl: null,
+          processedPreviewUrl: null,
+          processedFilename: null,
+          processedSize: null,
+          status: "failed",
+          error: message,
+        });
+      } finally {
+        setProcessing(false);
+      }
+    };
+
     try {
       const formData = new FormData();
       for (const file of files) {
@@ -160,8 +175,7 @@ export function StitchSettings() {
           try {
             result = parseResultBody<StitchResult>(xhr.responseText, RESULT_FIELDS);
           } catch (err) {
-            setError(t.errors.invalidResponse);
-            setProcessing(false);
+            failEntry(t.errors.invalidResponse);
             reportMalformedResult(err, { status: xhr.status, toolId: "stitch" });
             return;
           }
@@ -181,32 +195,32 @@ export function StitchSettings() {
             }));
             setProcessing(false);
           } catch (err) {
-            setError(jobFailureMessage({ reason: "trackingFailed" }, t.errors));
-            setProcessing(false);
+            try {
+              failEntry(jobFailureMessage({ reason: "trackingFailed" }, t.errors));
+            } catch (teardownErr) {
+              console.error("Ending the run after a result handling error failed", teardownErr);
+            }
             throw err;
           }
         } else {
+          let message: string;
           try {
             const body = JSON.parse(xhr.responseText);
-            setError(
-              failedAnswerMessage(
-                t,
-                body,
-                xhr.status,
-                formatMessage(t.errors.failedWithStatus, { status: xhr.status }),
-              ),
+            message = failedAnswerMessage(
+              t,
+              body,
+              xhr.status,
+              formatMessage(t.errors.failedWithStatus, { status: xhr.status }),
             );
           } catch {
-            setError(
-              failedAnswerMessage(
-                t,
-                null,
-                xhr.status,
-                formatMessage(t.errors.failedWithStatus, { status: xhr.status }),
-              ),
+            message = failedAnswerMessage(
+              t,
+              null,
+              xhr.status,
+              formatMessage(t.errors.failedWithStatus, { status: xhr.status }),
             );
           }
-          setProcessing(false);
+          failEntry(message);
         }
       };
 
@@ -214,8 +228,7 @@ export function StitchSettings() {
         endSubscription();
         if (xhrRef.current !== xhr || storeReset) return;
         xhrRef.current = null;
-        setError(t.errors.network);
-        setProcessing(false);
+        failEntry(t.errors.network);
       };
 
       xhr.send(formData);
@@ -223,13 +236,13 @@ export function StitchSettings() {
       endSubscription();
       if (xhrRef.current === xhr) xhrRef.current = null;
       if (!storeReset) {
-        setError(err instanceof Error ? err.message : t.toolSettings.stitch.stitchFailed);
-        setProcessing(false);
+        failEntry(err instanceof Error ? err.message : t.toolSettings.stitch.stitchFailed);
       }
     }
   };
 
   const hasEnoughFiles = files.length >= 2;
+  const displayError = currentEntry?.error ?? error;
   const downloadUrl =
     currentEntry && currentEntry.processedUrl !== null
       ? (downloadByEntry[currentEntry.id] ?? null)
@@ -418,7 +431,7 @@ export function StitchSettings() {
         </div>
       )}
 
-      {error && <p className="text-xs text-destructive-ink">{error}</p>}
+      {displayError && <p className="text-xs text-destructive-ink">{displayError}</p>}
 
       {processing && (
         <div className="space-y-1">
