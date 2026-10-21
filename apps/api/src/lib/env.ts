@@ -191,9 +191,9 @@ const envSchema = z
       .enum(["true", "false"])
       .default("false")
       .transform((v) => v === "true"),
-    SAML_ENTITY_ID: z.string().default(""),
-    SAML_CALLBACK_URL: z.string().default(""),
-    SAML_IDP_SSO_URL: z.string().default(""),
+    SAML_ENTITY_ID: z.string().trim().default(""),
+    SAML_CALLBACK_URL: z.string().trim().default(""),
+    SAML_IDP_SSO_URL: z.string().trim().default(""),
     SAML_IDP_CERTIFICATE: z.string().default(""),
     SAML_AUTO_CREATE_USERS: z
       .enum(["true", "false"])

@@ -143,6 +143,22 @@ describe("loadEnv edge validation", () => {
     );
   });
 
+  it.each(["", "   ", "\t\n "])(
+    "rejects enabled SAML when SAML_IDP_SSO_URL is blank %j (#2876)",
+    (ssoUrl) => {
+      expectLoadEnvError(
+        {
+          SAML_ENABLED: "true",
+          SAML_IDP_SSO_URL: ssoUrl,
+          SAML_IDP_CERTIFICATE: "MIIC",
+          EXTERNAL_URL: "http://snapotter.lan:1349",
+        },
+        "SAML_IDP_SSO_URL is required when SAML_ENABLED=true",
+        ["SAML_IDP_SSO_URL"],
+      );
+    },
+  );
+
   it.each([
     "keycloak.lan:8080/realms/x/protocol/saml",
     "localhost:8080/sso",
@@ -153,7 +169,6 @@ describe("loadEnv edge validation", () => {
     "javascript:alert(1)",
     "http://",
     "https://",
-    "   ",
   ])("rejects enabled SAML when SAML_IDP_SSO_URL is %j (#2869)", (ssoUrl) => {
     expectLoadEnvError(
       {
@@ -168,21 +183,31 @@ describe("loadEnv edge validation", () => {
   });
 
   it.each([
-    "https://idp.example.com/sso",
-    "http://keycloak.lan:8080/realms/x/protocol/saml",
-    "HTTP://Keycloak.lan:8080/realms/x/protocol/saml",
-    " https://idp.example.com/sso\n",
-  ])("accepts enabled SAML when SAML_IDP_SSO_URL is %j (#2869)", (ssoUrl) => {
-    restoreEnv();
-    const env = loadEnv({
-      ...process.env,
-      SAML_ENABLED: "true",
-      SAML_IDP_SSO_URL: ssoUrl,
-      SAML_IDP_CERTIFICATE: "MIIC",
-      EXTERNAL_URL: "http://snapotter.lan:1349",
-    });
-    expect(env.SAML_IDP_SSO_URL).toBe(ssoUrl);
-  });
+    ["https://idp.example.com/sso", "https://idp.example.com/sso"],
+    [
+      "http://keycloak.lan:8080/realms/x/protocol/saml",
+      "http://keycloak.lan:8080/realms/x/protocol/saml",
+    ],
+    [
+      "HTTP://Keycloak.lan:8080/realms/x/protocol/saml",
+      "HTTP://Keycloak.lan:8080/realms/x/protocol/saml",
+    ],
+    [" https://idp.example.com/sso\n", "https://idp.example.com/sso"],
+    ["\thttps://idp.example.com/sso ", "https://idp.example.com/sso"],
+  ])(
+    "accepts and trims SAML_IDP_SSO_URL %j to %j when SAML is enabled (#2869, #2876)",
+    (ssoUrl, expected) => {
+      restoreEnv();
+      const env = loadEnv({
+        ...process.env,
+        SAML_ENABLED: "true",
+        SAML_IDP_SSO_URL: ssoUrl,
+        SAML_IDP_CERTIFICATE: "MIIC",
+        EXTERNAL_URL: "http://snapotter.lan:1349",
+      });
+      expect(env.SAML_IDP_SSO_URL).toBe(expected);
+    },
+  );
 
   it.each([
     "snapotter.lan:1349/api/auth/saml/callback",
@@ -195,7 +220,6 @@ describe("loadEnv edge validation", () => {
     "javascript:alert(1)",
     "http://",
     "https://",
-    "   ",
   ])("rejects enabled SAML when SAML_CALLBACK_URL is %j (#2869)", (callbackUrl) => {
     expectLoadEnvError(
       {
@@ -211,22 +235,59 @@ describe("loadEnv edge validation", () => {
   });
 
   it.each([
-    "",
-    "https://example.com/api/auth/saml/callback",
-    "http://snapotter.lan:1349/api/auth/saml/callback",
-    "HTTP://Snapotter.lan:1349/api/auth/saml/callback",
-    " https://example.com/api/auth/saml/callback\n",
-  ])("accepts enabled SAML when SAML_CALLBACK_URL is %j (#2869)", (callbackUrl) => {
+    ["", ""],
+    ["   ", ""],
+    ["\t\n ", ""],
+    ["https://example.com/api/auth/saml/callback", "https://example.com/api/auth/saml/callback"],
+    [
+      "http://snapotter.lan:1349/api/auth/saml/callback",
+      "http://snapotter.lan:1349/api/auth/saml/callback",
+    ],
+    [
+      "HTTP://Snapotter.lan:1349/api/auth/saml/callback",
+      "HTTP://Snapotter.lan:1349/api/auth/saml/callback",
+    ],
+    [" https://example.com/api/auth/saml/callback\n", "https://example.com/api/auth/saml/callback"],
+  ])(
+    "accepts and trims SAML_CALLBACK_URL %j to %j when SAML is enabled (#2869, #2876)",
+    (callbackUrl, expected) => {
+      restoreEnv();
+      const env = loadEnv({
+        ...process.env,
+        SAML_ENABLED: "true",
+        SAML_IDP_SSO_URL: "https://idp.example.com/sso",
+        SAML_IDP_CERTIFICATE: "MIIC",
+        SAML_CALLBACK_URL: callbackUrl,
+        EXTERNAL_URL: "http://snapotter.lan:1349",
+      });
+      expect(env.SAML_CALLBACK_URL).toBe(expected);
+    },
+  );
+
+  it.each([
+    ["", ""],
+    ["   ", ""],
+    ["\t\n ", ""],
+    [
+      "https://sp.example.com/api/auth/saml/metadata",
+      "https://sp.example.com/api/auth/saml/metadata",
+    ],
+    [
+      " https://sp.example.com/api/auth/saml/metadata\n",
+      "https://sp.example.com/api/auth/saml/metadata",
+    ],
+    ["\turn:snapotter:sp ", "urn:snapotter:sp"],
+  ])("trims SAML_ENTITY_ID %j to %j (#2876)", (entityId, expected) => {
     restoreEnv();
     const env = loadEnv({
       ...process.env,
       SAML_ENABLED: "true",
       SAML_IDP_SSO_URL: "https://idp.example.com/sso",
       SAML_IDP_CERTIFICATE: "MIIC",
-      SAML_CALLBACK_URL: callbackUrl,
+      SAML_ENTITY_ID: entityId,
       EXTERNAL_URL: "http://snapotter.lan:1349",
     });
-    expect(env.SAML_CALLBACK_URL).toBe(callbackUrl);
+    expect(env.SAML_ENTITY_ID).toBe(expected);
   });
 
   it("leaves SAML_IDP_SSO_URL and SAML_CALLBACK_URL unchecked when SAML_ENABLED is false (#2869)", () => {
@@ -234,11 +295,13 @@ describe("loadEnv edge validation", () => {
     const env = loadEnv({
       ...process.env,
       SAML_ENABLED: "false",
-      SAML_IDP_SSO_URL: "keycloak.lan:8080/realms/x/protocol/saml",
-      SAML_CALLBACK_URL: "snapotter.lan:1349/api/auth/saml/callback",
+      SAML_IDP_SSO_URL: " keycloak.lan:8080/realms/x/protocol/saml\n",
+      SAML_CALLBACK_URL: " snapotter.lan:1349/api/auth/saml/callback\n",
+      SAML_ENTITY_ID: " urn:snapotter:sp\n",
     });
     expect(env.SAML_IDP_SSO_URL).toBe("keycloak.lan:8080/realms/x/protocol/saml");
     expect(env.SAML_CALLBACK_URL).toBe("snapotter.lan:1349/api/auth/saml/callback");
+    expect(env.SAML_ENTITY_ID).toBe("urn:snapotter:sp");
   });
 
   it("rejects malformed encryption keys before settings encryption is used", () => {

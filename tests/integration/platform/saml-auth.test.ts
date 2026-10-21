@@ -16,6 +16,7 @@ import { asc, DrizzleQueryError, eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
+import { loadEnv } from "../../../apps/api/src/lib/env.js";
 import { classifyError } from "../../../apps/api/src/lib/error-report.js";
 import { UsernameRaceExhaustedError } from "../../../apps/api/src/lib/external-auth-resolver.js";
 import { buildBeforeSend } from "../../../apps/api/src/lib/sentry-scrub.js";
@@ -179,6 +180,73 @@ describe("SAML metadata", () => {
     expect(res.statusCode).toBe(200);
     expect(res.headers["content-type"]).toContain("xml");
     expect(res.body).toContain("EntityDescriptor");
+  });
+
+  it("passes trimmed SAML_IDP_SSO_URL, SAML_CALLBACK_URL, and SAML_ENTITY_ID from loadEnv to SAML and falls back when overrides are whitespace-only (#2876)", async () => {
+    const prevSsoUrl = env.SAML_IDP_SSO_URL;
+    const prevCallbackUrl = env.SAML_CALLBACK_URL;
+    const prevEntityId = env.SAML_ENTITY_ID;
+    try {
+      const configured = loadEnv({
+        ...process.env,
+        SAML_ENABLED: "true",
+        BASE_PATH: env.BASE_PATH,
+        EXTERNAL_URL: env.EXTERNAL_URL,
+        SAML_IDP_CERTIFICATE: env.SAML_IDP_CERTIFICATE,
+        SAML_IDP_SSO_URL: " https://idp.example.com/sso\n",
+        SAML_CALLBACK_URL: " https://sp.example.com/api/auth/saml/callback\n",
+        SAML_ENTITY_ID: " urn:snapotter:custom-sp\n",
+      });
+      env.SAML_IDP_SSO_URL = configured.SAML_IDP_SSO_URL;
+      env.SAML_CALLBACK_URL = configured.SAML_CALLBACK_URL;
+      env.SAML_ENTITY_ID = configured.SAML_ENTITY_ID;
+      samlCtorMock.mockClear();
+      samlMock.generateServiceProviderMetadata.mockReturnValue(
+        '<?xml version="1.0"?><EntityDescriptor entityID="sp"/>',
+      );
+
+      const res = await testApp.app.inject({ method: "GET", url: "/api/auth/saml/metadata" });
+      expect(res.statusCode).toBe(200);
+      expect(samlCtorMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          entryPoint: "https://idp.example.com/sso",
+          callbackUrl: "https://sp.example.com/api/auth/saml/callback",
+          issuer: "urn:snapotter:custom-sp",
+        }),
+      );
+
+      const blankOverrides = loadEnv({
+        ...process.env,
+        SAML_ENABLED: "true",
+        BASE_PATH: env.BASE_PATH,
+        EXTERNAL_URL: env.EXTERNAL_URL,
+        SAML_IDP_CERTIFICATE: env.SAML_IDP_CERTIFICATE,
+        SAML_IDP_SSO_URL: " https://idp.example.com/sso\n",
+        SAML_CALLBACK_URL: "   ",
+        SAML_ENTITY_ID: "   ",
+      });
+      env.SAML_IDP_SSO_URL = blankOverrides.SAML_IDP_SSO_URL;
+      env.SAML_CALLBACK_URL = blankOverrides.SAML_CALLBACK_URL;
+      env.SAML_ENTITY_ID = blankOverrides.SAML_ENTITY_ID;
+      samlCtorMock.mockClear();
+
+      const fallbackRes = await testApp.app.inject({
+        method: "GET",
+        url: "/api/auth/saml/metadata",
+      });
+      expect(fallbackRes.statusCode).toBe(200);
+      expect(samlCtorMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          entryPoint: "https://idp.example.com/sso",
+          callbackUrl: `${env.EXTERNAL_URL}/api/auth/saml/callback`,
+          issuer: `${env.EXTERNAL_URL}/api/auth/saml/metadata`,
+        }),
+      );
+    } finally {
+      env.SAML_IDP_SSO_URL = prevSsoUrl;
+      env.SAML_CALLBACK_URL = prevCallbackUrl;
+      env.SAML_ENTITY_ID = prevEntityId;
+    }
   });
 });
 
