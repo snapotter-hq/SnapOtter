@@ -473,7 +473,37 @@ export function EraseObjectSettings({
       onMaskCenter(maskCenter);
     }
 
+    const clearStaleProcessed = () => {
+      const target = useFileStore.getState().entries.find((e) => e.id === capturedEntryId);
+      if (
+        !target ||
+        (target.processedUrl === null &&
+          target.processedPreviewUrl === null &&
+          target.processedFilename === null &&
+          target.processedSize === null &&
+          target.status === "pending" &&
+          target.error === null)
+      ) {
+        return;
+      }
+      if (target.processedUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(target.processedUrl);
+      }
+      if (target.processedPreviewUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(target.processedPreviewUrl);
+      }
+      useFileStore.getState().updateEntryById(capturedEntryId, {
+        processedUrl: null,
+        processedPreviewUrl: null,
+        processedFilename: null,
+        processedSize: null,
+        status: "pending",
+        error: null,
+      });
+    };
+
     setError(null);
+    clearStaleProcessed();
     setProcessing(true);
     const runTimer = startRunProgress();
 
@@ -533,7 +563,12 @@ export function EraseObjectSettings({
       settled = true;
       let first: { cause: unknown } | null = null;
       let second: { cause: unknown } | null = null;
-      for (const step of [...(before ? [before] : []), () => setError(message), finishUi]) {
+      for (const step of [
+        ...(before ? [before] : []),
+        clearStaleProcessed,
+        () => setError(message),
+        finishUi,
+      ]) {
         try {
           step();
         } catch (err) {
@@ -707,6 +742,7 @@ export function EraseObjectSettings({
             // throw from setError must not leave the run stuck at processing.
             let teardownError: { cause: unknown } | null = null;
             for (const teardown of [
+              clearStaleProcessed,
               () => setError(jobFailureMessage({ reason: "trackingFailed" }, t.errors)),
               finishUi,
             ]) {
@@ -847,6 +883,16 @@ export function EraseObjectSettings({
       }
     });
 
+    const revokeEntryBlobs = (targetId: string) => {
+      const currentTarget = useFileStore.getState().entries.find((e) => e.id === targetId);
+      if (currentTarget?.processedUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(currentTarget.processedUrl);
+      }
+      if (currentTarget?.processedPreviewUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(currentTarget.processedPreviewUrl);
+      }
+    };
+
     // A store write that throws anywhere in here (#1354) ends the batch: a
     // store that can't record a file's outcome gets no more files sent to it.
     // The teardown below runs whatever threw, so the run can't stay at
@@ -875,7 +921,15 @@ export function EraseObjectSettings({
           }),
         );
 
-        useFileStore.getState().updateEntryById(entryId, { status: "processing", error: null });
+        revokeEntryBlobs(entryId);
+        useFileStore.getState().updateEntryById(entryId, {
+          processedUrl: null,
+          processedPreviewUrl: null,
+          processedFilename: null,
+          processedSize: null,
+          status: "processing",
+          error: null,
+        });
 
         try {
           await processOneFile(
@@ -891,7 +945,12 @@ export function EraseObjectSettings({
           );
         } catch (err) {
           if (filesGone) break;
+          revokeEntryBlobs(entryId);
           useFileStore.getState().updateEntryById(entryId, {
+            processedUrl: null,
+            processedPreviewUrl: null,
+            processedFilename: null,
+            processedSize: null,
             status: "failed",
             error: err instanceof Error ? err.message : t.errors.processingFailedNoDetail,
             errorCategory: feedbackCategoryOf(err),
@@ -940,7 +999,12 @@ export function EraseObjectSettings({
           if (
             useFileStore.getState().entries.find((e) => e.id === entryId)?.status === "processing"
           ) {
+            revokeEntryBlobs(entryId);
             useFileStore.getState().updateEntryById(entryId, {
+              processedUrl: null,
+              processedPreviewUrl: null,
+              processedFilename: null,
+              processedSize: null,
               status: "failed",
               error: trackingFailed,
               errorCategory: null,

@@ -768,7 +768,8 @@ describe("erase-object single file: every other way the request ends", () => {
   });
 
   it("keeps a claim and leaves a retry running when a stream-completed run's XHR answers late (#2931)", async () => {
-    renderPanel();
+    useFileStore.getState().setFiles([image("photo.png"), image("second.png")]);
+    renderPanel(1);
     const first = await submit();
     act(() => {
       FakeEventSource.instances[0].onmessage?.({
@@ -776,9 +777,10 @@ describe("erase-object single file: every other way the request ends", () => {
       });
     });
     act(() => useFileStore.getState().markClaimed(0));
-    expect(entry().claimed).toBe(true);
+    expect(entry(0).claimed).toBe(true);
 
-    // A second run starts before the first request's late 200 arrives.
+    // Select the second file and start a second run before the first request's late 200 arrives.
+    act(() => useFileStore.getState().setSelectedIndex(1));
     const second = await submit(2);
     expect(useFileStore.getState().processing).toBe(true);
     expect(screen.getByRole("status")).toHaveTextContent("0%");
@@ -791,8 +793,8 @@ describe("erase-object single file: every other way the request ends", () => {
       savedFileId: "file-stale",
     });
 
-    expect(entry().claimed).toBe(true);
-    expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+    expect(entry(0).claimed).toBe(true);
+    expect(entry(0).processedUrl).toBe(DOWNLOAD_URL);
     expect(useFileStore.getState().lastSavedLibraryFileId).toBeNull();
     expect(useFileStore.getState().processing).toBe(true);
 
@@ -807,7 +809,7 @@ describe("erase-object single file: every other way the request ends", () => {
       originalSize: 1000,
       processedSize: 850,
     });
-    expect(entry().processedUrl).toBe("/api/v1/download/job-2/photo.png");
+    expect(entry(1).processedUrl).toBe("/api/v1/download/job-2/photo.png");
     expect(useFileStore.getState().processing).toBe(false);
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
@@ -3081,5 +3083,281 @@ describe("erase-object single file: leaving the page mid-run (#1975)", () => {
     expect(FakeXhr.instances).toHaveLength(0);
     expect(useFileStore.getState().processing).toBe(false);
     expect(entry(0).status).toBe("pending");
+  });
+});
+
+describe("erase-object re-runs clear stale processed fields (#3281)", () => {
+  it("single file: clears processedUrl, processedPreviewUrl, processedFilename, and processedSize on kickoff and keeps them null when the re-run fails", async () => {
+    renderPanel();
+
+    const first = await submit(1);
+    first.respond(200, {
+      downloadUrl: DOWNLOAD_URL,
+      previewUrl: "/api/v1/preview/job-1/photo.png",
+      originalSize: 2048,
+      processedSize: 1024,
+    });
+    act(() => {
+      useFileStore.getState().updateEntry(0, { processedFilename: "photo-erased.png" });
+    });
+
+    expect(entry().status).toBe("completed");
+    expect(entry().processedUrl).toBe(DOWNLOAD_URL);
+    expect(entry().processedPreviewUrl).toBe("/api/v1/preview/job-1/photo.png");
+    expect(entry().processedFilename).toBe("photo-erased.png");
+    expect(entry().processedSize).toBe(1024);
+    expect(useFileStore.getState().processedUrl).toBe(DOWNLOAD_URL);
+    expect(useFileStore.getState().processedPreviewUrl).toBe("/api/v1/preview/job-1/photo.png");
+    expect(useFileStore.getState().processedSize).toBe(1024);
+    expect(screen.getByTestId("erase-object-download")).toBeInTheDocument();
+    expect(screen.getByText("Processed: 1.0 KB")).toBeInTheDocument();
+    vi.mocked(URL.revokeObjectURL).mockClear();
+
+    const second = await submit(2);
+
+    // Server URLs are not passed to URL.revokeObjectURL on re-run kickoff.
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+
+    // While the second run is in flight, the first run's processed fields and UI are cleared.
+    expect(entry().status).toBe("pending");
+    expect(entry().processedUrl).toBeNull();
+    expect(entry().processedPreviewUrl).toBeNull();
+    expect(entry().processedFilename).toBeNull();
+    expect(entry().processedSize).toBeNull();
+    expect(useFileStore.getState().processedUrl).toBeNull();
+    expect(useFileStore.getState().processedPreviewUrl).toBeNull();
+    expect(useFileStore.getState().processedSize).toBeNull();
+    expect(screen.queryByTestId("erase-object-download")).not.toBeInTheDocument();
+    expect(screen.queryByText("Processed: 1.0 KB")).not.toBeInTheDocument();
+
+    second.respond(422, { error: "Second erase failed" });
+
+    // After the second run fails, the stale processed fields stay null.
+    expect(entry().processedUrl).toBeNull();
+    expect(entry().processedPreviewUrl).toBeNull();
+    expect(entry().processedFilename).toBeNull();
+    expect(entry().processedSize).toBeNull();
+    expect(useFileStore.getState().processedUrl).toBeNull();
+    expect(useFileStore.getState().processedPreviewUrl).toBeNull();
+    expect(useFileStore.getState().processedSize).toBeNull();
+    expect(screen.getByText("Second erase failed")).toBeInTheDocument();
+    expect(screen.queryByTestId("erase-object-download")).not.toBeInTheDocument();
+    expect(screen.queryByText("Processed: 1.0 KB")).not.toBeInTheDocument();
+  });
+
+  it("single file: clears entry error and errorCategory from a prior batch failure on kickoff and does not arm processing if kickoff reset throws", async () => {
+    const unhandled = takeOverUnhandledRejections();
+    const elapsed = watchElapsedInterval();
+    try {
+      renderPanel();
+      act(() => {
+        useFileStore.getState().updateEntry(0, {
+          status: "failed",
+          error: "Prior batch failure",
+          errorCategory: "timeout",
+        });
+      });
+
+      breakNextEntryWrite();
+      fireEvent.click(screen.getByTestId("erase-object-submit"));
+      await waitFor(() => expect(unhandled.rejections).toHaveLength(1));
+
+      expect(unhandled.rejections[0]).toMatchObject({ message: "boom" });
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(elapsed.handles).toHaveLength(0);
+      expect(FakeXhr.instances).toHaveLength(0);
+
+      // Next run succeeds in clearing the prior failure at kickoff.
+      const xhr = await submit(1);
+      expect(entry().status).toBe("pending");
+      expect(entry().error).toBeNull();
+      expect(entry().errorCategory).toBeNull();
+      xhr.respond(200, GOOD_BODY);
+      expect(entry().status).toBe("completed");
+    } finally {
+      elapsed.restore();
+      unhandled.restore();
+    }
+  });
+
+  it("single file: clears processed fields when sync 200 or SSE applyResult throws after updating the entry", async () => {
+    renderPanel();
+    const syncXhr = await submit(1);
+    vi.spyOn(useFileStore.getState(), "markClaimedById").mockImplementationOnce(() => {
+      throw new Error("claim broke");
+    });
+
+    expect(() =>
+      syncXhr.respond(200, {
+        ...GOOD_BODY,
+        previewUrl: "/api/v1/preview/job-1/photo.png",
+        savedFileId: "file-2",
+      }),
+    ).toThrow("claim broke");
+    await act(async () => {});
+
+    expect(entry().status).toBe("pending");
+    expect(entry().processedUrl).toBeNull();
+    expect(entry().processedPreviewUrl).toBeNull();
+    expect(entry().processedFilename).toBeNull();
+    expect(entry().processedSize).toBeNull();
+    expect(useFileStore.getState().error).toBe(en.errors.jobTrackingFailed);
+
+    const streamXhr = await submit(2);
+    streamXhr.respond(202, { jobId: "job-2", async: true });
+    vi.spyOn(useFileStore.getState(), "markClaimedById").mockImplementationOnce(() => {
+      throw new Error("stream claim broke");
+    });
+
+    expect(() =>
+      act(() => {
+        FakeEventSource.instances[1].onmessage?.({
+          data: JSON.stringify({
+            type: "single",
+            phase: "complete",
+            result: {
+              ...GOOD_BODY,
+              previewUrl: "/api/v1/preview/job-2/photo.png",
+              savedFileId: "file-3",
+            },
+          }),
+        });
+      }),
+    ).toThrow("stream claim broke");
+    await act(async () => {});
+
+    expect(entry().status).toBe("pending");
+    expect(entry().processedUrl).toBeNull();
+    expect(entry().processedPreviewUrl).toBeNull();
+    expect(entry().processedFilename).toBeNull();
+    expect(entry().processedSize).toBeNull();
+    expect(useFileStore.getState().error).toBe(en.errors.jobTrackingFailed);
+  });
+
+  it("batch: clears processedUrl, processedPreviewUrl, processedFilename, and processedSize on kickoff, catch, and batchError teardown", async () => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    renderPanel(2);
+
+    // Seed entry 0 and entry 1 with completed results from a previous run.
+    act(() => {
+      for (const idx of [0, 1]) {
+        useFileStore.getState().updateEntry(idx, {
+          processedUrl: `/api/v1/download/job-${idx}/out.png`,
+          processedPreviewUrl: `/api/v1/preview/job-${idx}/out.png`,
+          processedFilename: `out-${idx}.png`,
+          originalSize: 2048,
+          processedSize: 1024,
+          status: "completed",
+        });
+      }
+    });
+
+    const first = await submit(1);
+
+    // While entry 0 is processing, its stale processed fields are cleared.
+    expect(entry(0).status).toBe("processing");
+    expect(entry(0).processedUrl).toBeNull();
+    expect(entry(0).processedPreviewUrl).toBeNull();
+    expect(entry(0).processedFilename).toBeNull();
+    expect(entry(0).processedSize).toBeNull();
+    expect(useFileStore.getState().processedUrl).toBeNull();
+    expect(useFileStore.getState().processedPreviewUrl).toBeNull();
+    expect(useFileStore.getState().processedSize).toBeNull();
+
+    // Repopulate processed fields mid-flight to verify the catch block also clears them on failure.
+    act(() => {
+      useFileStore.getState().updateEntry(0, {
+        processedUrl: "/api/v1/download/stale/out.png",
+        processedPreviewUrl: "/api/v1/preview/stale/out.png",
+        processedFilename: "stale.png",
+        processedSize: 999,
+      });
+    });
+
+    first.respond(422, { error: "Batch file 1 failed" });
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+
+    expect(entry(0).status).toBe("failed");
+    expect(entry(0).error).toBe("Batch file 1 failed");
+    expect(entry(0).processedUrl).toBeNull();
+    expect(entry(0).processedPreviewUrl).toBeNull();
+    expect(entry(0).processedFilename).toBeNull();
+    expect(entry(0).processedSize).toBeNull();
+
+    // Entry 1's stale processed fields are also cleared as soon as its turn starts.
+    expect(entry(1).status).toBe("processing");
+    expect(entry(1).processedUrl).toBeNull();
+    expect(entry(1).processedPreviewUrl).toBeNull();
+    expect(entry(1).processedFilename).toBeNull();
+    expect(entry(1).processedSize).toBeNull();
+
+    // Repopulate entry 1's processed fields while it is processing, then make the catch block's
+    // updateEntry throw so batchError teardown settles entry 1 and clears its processed fields.
+    act(() => {
+      useFileStore.getState().updateEntry(1, {
+        processedUrl: "blob:stale-batch-error",
+        processedPreviewUrl: "blob:stale-batch-preview",
+        processedFilename: "stale-2.png",
+        processedSize: 888,
+      });
+    });
+    vi.mocked(URL.revokeObjectURL).mockClear();
+    const unhandled = takeOverUnhandledRejections();
+    try {
+      breakNextEntryWrite();
+      FakeXhr.instances[1].respond(422, { error: "Batch file 2 failed" });
+      await waitFor(() => expect(unhandled.rejections).toHaveLength(1));
+
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:stale-batch-error");
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:stale-batch-preview");
+      expect(entry(1).status).toBe("failed");
+      expect(entry(1).error).toBe(en.errors.jobTrackingFailed);
+      expect(entry(1).processedUrl).toBeNull();
+      expect(entry(1).processedPreviewUrl).toBeNull();
+      expect(entry(1).processedFilename).toBeNull();
+      expect(entry(1).processedSize).toBeNull();
+    } finally {
+      unhandled.restore();
+    }
+  });
+
+  it("revokes blob: processedUrl and processedPreviewUrl on single-file and batch re-runs", async () => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    const { unmount } = renderPanel(1);
+
+    act(() => {
+      useFileStore.getState().updateEntry(0, {
+        processedUrl: "blob:single-out",
+        processedPreviewUrl: "blob:single-preview",
+        processedSize: 512,
+        status: "completed",
+      });
+    });
+    vi.mocked(URL.revokeObjectURL).mockClear();
+
+    const singleXhr = await submit(1);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:single-out");
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:single-preview");
+    singleXhr.respond(200, GOOD_BODY);
+    unmount();
+
+    renderPanel(2);
+    act(() => {
+      useFileStore.getState().updateEntry(0, {
+        processedUrl: "blob:batch-out",
+        processedPreviewUrl: "blob:batch-preview",
+        processedSize: 512,
+        status: "completed",
+      });
+    });
+    vi.mocked(URL.revokeObjectURL).mockClear();
+
+    const batchFirst = await submit(2);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:batch-out");
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:batch-preview");
+    batchFirst.respond(200, GOOD_BODY);
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(3));
+    FakeXhr.instances[2].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
   });
 });
