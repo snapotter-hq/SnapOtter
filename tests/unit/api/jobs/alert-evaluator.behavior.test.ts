@@ -464,6 +464,60 @@ describe("alert evaluator behavior", () => {
     );
   });
 
+  it("treats a non-string stored authHeader as empty and still delivers to all enabled destinations (#3064)", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
+    const { evaluateAlerts } = await loadAlertEvaluator();
+
+    getSettingStringMock
+      .mockResolvedValueOnce(
+        JSON.stringify([
+          {
+            name: "Corrupt Auth Hook",
+            url: "https://example.test/alerts-1",
+            authHeader: 123,
+            enabled: true,
+            type: "alerts",
+          },
+          {
+            name: "Valid Auth Hook",
+            url: "https://example.test/alerts-2",
+            authHeader: "enc:token",
+            enabled: true,
+            type: "alerts",
+          },
+        ]),
+      )
+      .mockResolvedValueOnce("");
+    statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
+    selectMock.mockReturnValue(queryChain([{ count: 0 }]));
+    getActiveLicenseMock.mockReturnValue(null);
+    decryptSettingMock.mockImplementation((value: string) => {
+      if (typeof value !== "string") throw new TypeError("value.startsWith is not a function");
+      return Promise.resolve("Bearer decrypted");
+    });
+    deliverWebhookMock.mockResolvedValue({ success: true });
+
+    await expect(evaluateAlerts()).resolves.toBeUndefined();
+
+    expect(decryptSettingMock).toHaveBeenCalledTimes(1);
+    expect(decryptSettingMock).toHaveBeenCalledWith("enc:token");
+    expect(deliverWebhookMock).toHaveBeenCalledTimes(2);
+    expect(deliverWebhookMock).toHaveBeenNthCalledWith(
+      1,
+      "https://example.test/alerts-1",
+      "",
+      [{ condition: "backup_never_run" }],
+      { maxRetries: 1 },
+    );
+    expect(deliverWebhookMock).toHaveBeenNthCalledWith(
+      2,
+      "https://example.test/alerts-2",
+      "Bearer decrypted",
+      [{ condition: "backup_never_run" }],
+      { maxRetries: 1 },
+    );
+  });
+
   it("logs, reports an operational error, and skips delivery when decryptSetting returns null", async () => {
     vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});

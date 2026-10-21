@@ -8,6 +8,7 @@ const isEnterpriseFeatureEnabledMock = vi.hoisted(() => vi.fn());
 const requirePermissionMock = vi.hoisted(() => vi.fn());
 const auditFnMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const validateFetchUrlMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const deliverWebhookMock = vi.hoisted(() => vi.fn());
 const loggerMock = vi.hoisted(() => ({
   info: vi.fn(),
   warn: vi.fn(),
@@ -52,6 +53,10 @@ vi.mock("../../../apps/api/src/lib/logger.js", () => ({
 
 vi.mock("../../../apps/api/src/lib/ssrf.js", () => ({
   validateFetchUrl: validateFetchUrlMock,
+}));
+
+vi.mock("../../../apps/api/src/lib/webhook-delivery.js", () => ({
+  deliverWebhook: deliverWebhookMock,
 }));
 
 vi.mock("../../../apps/api/src/permissions.js", () => ({
@@ -571,6 +576,65 @@ describe("enterprise settings JSON resilience (#2554)", () => {
         expect(insertMock).not.toHaveBeenCalled();
         expect(updateMock).not.toHaveBeenCalled();
         expect(auditFnMock).not.toHaveBeenCalled();
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  describe("POST /api/v1/enterprise/webhooks/:index/test (#3064)", () => {
+    it("treats a non-string stored authHeader as empty instead of throwing 500 TypeError", async () => {
+      isEnterpriseFeatureEnabledMock.mockResolvedValue(true);
+      requirePermissionMock.mockResolvedValue({ id: "admin-1", username: "admin" });
+      mockSelectRow(
+        JSON.stringify([
+          {
+            name: "Corrupt Auth Hook",
+            url: "https://example.com/hook",
+            authHeader: 123,
+            eventFilter: [],
+            batchIntervalSeconds: 30,
+            enabled: true,
+            type: "alerts",
+          },
+        ]),
+      );
+      deliverWebhookMock.mockResolvedValueOnce({
+        success: true,
+        statusCode: 200,
+        attempts: 1,
+      });
+
+      const { registerWebhookRoutes } = await import(
+        "../../../apps/api/src/routes/enterprise/webhooks.js"
+      );
+      const app = Fastify();
+      await registerWebhookRoutes(app);
+
+      try {
+        const res = await app.inject({
+          method: "POST",
+          url: "/api/v1/enterprise/webhooks/0/test",
+        });
+
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toEqual({
+          ok: true,
+          statusCode: 200,
+          error: undefined,
+        });
+        expect(deliverWebhookMock).toHaveBeenCalledTimes(1);
+        expect(deliverWebhookMock).toHaveBeenCalledWith(
+          "https://example.com/hook",
+          "",
+          [
+            expect.objectContaining({
+              condition: "test_ping",
+              message: "This is a test webhook from SnapOtter",
+            }),
+          ],
+          { maxRetries: 0 },
+        );
       } finally {
         await app.close();
       }
