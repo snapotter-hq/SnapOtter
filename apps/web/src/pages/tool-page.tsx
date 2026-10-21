@@ -674,13 +674,15 @@ function ToolPageContent({
   );
 
   const handleUndo = useCallback(() => {
+    if (!allowIntake()) return;
     undoProcessing();
     setEraserSliderInitPos(null);
-  }, [undoProcessing]);
+  }, [allowIntake, undoProcessing]);
 
   const startOver = useCallback(() => {
+    if (!allowIntake()) return;
     reset();
-  }, [reset]);
+  }, [allowIntake, reset]);
 
   const handleClearAll = useCallback(() => {
     if (!allowIntake()) return;

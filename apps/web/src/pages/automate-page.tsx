@@ -34,6 +34,7 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { PipelineBuilder } from "@/components/tools/pipeline-builder";
 import { ToolPalette } from "@/components/tools/tool-palette";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useIntakeGuard } from "@/hooks/use-intake-guard";
 import { useMobile } from "@/hooks/use-mobile";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { usePipelineProcessor } from "@/hooks/use-pipeline-processor";
@@ -167,6 +168,9 @@ function AutomatePageContent({
   } = usePipelineStore();
 
   const { processSingle, processAll, processing, error, progress } = usePipelineProcessor();
+  const { allowIntake } = useIntakeGuard();
+  const allowIntakeRef = useRef(allowIntake);
+  allowIntakeRef.current = allowIntake;
   const isMobile = useMobile();
   const location = useLocation();
   const navigate = useNavigate();
@@ -325,8 +329,14 @@ function AutomatePageContent({
     }
   }, [steps.length]);
 
+  const handleOpenLibrary = useCallback(() => {
+    if (!allowIntake()) return;
+    setLibraryModalOpen(true);
+  }, [allowIntake]);
+
   const handleLibraryImport = useCallback(
     (imported: File[]) => {
+      if (!allowIntake()) return;
       libraryImportAbortRef.current?.abort();
       setLibraryImportFailed(null);
       if (files.length === 0) {
@@ -336,39 +346,43 @@ function AutomatePageContent({
         addFiles(imported);
       }
     },
-    [libraryImportAbortRef, files.length, resetFiles, setFiles, addFiles],
+    [allowIntake, libraryImportAbortRef, files.length, resetFiles, setFiles, addFiles],
   );
 
   const handleFiles = useCallback(
     (newFiles: File[]) => {
+      if (!allowIntake()) return;
       libraryImportAbortRef.current?.abort();
       setLibraryImportFailed(null);
       resetFiles();
       setFiles(newFiles);
     },
-    [libraryImportAbortRef, setFiles, resetFiles],
+    [allowIntake, libraryImportAbortRef, setFiles, resetFiles],
   );
 
   const handleAddMore = useCallback(() => {
+    if (!allowIntake()) return;
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
     input.onchange = (e) => {
       const picked = Array.from((e.target as HTMLInputElement).files || []);
       if (picked.length > 0) {
+        if (!allowIntakeRef.current()) return;
         libraryImportAbortRef.current?.abort();
         setLibraryImportFailed(null);
         addFiles(picked);
       }
     };
     input.click();
-  }, [libraryImportAbortRef, addFiles]);
+  }, [allowIntake, libraryImportAbortRef, addFiles]);
 
   const handleClearFiles = useCallback(() => {
+    if (!allowIntake()) return;
     libraryImportAbortRef.current?.abort();
     setLibraryImportFailed(null);
     resetFiles();
-  }, [libraryImportAbortRef, resetFiles]);
+  }, [allowIntake, libraryImportAbortRef, resetFiles]);
 
   const handleProcess = useCallback(() => {
     if (files.length === 0 || steps.length === 0) return;
@@ -855,7 +869,7 @@ function AutomatePageContent({
                 />
                 <button
                   type="button"
-                  onClick={() => setLibraryModalOpen(true)}
+                  onClick={handleOpenLibrary}
                   className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-primary-ink border border-dashed border-primary/40 rounded-lg hover:bg-primary/5 transition-colors"
                 >
                   <FolderOpen className="h-4 w-4" />
@@ -879,7 +893,7 @@ function AutomatePageContent({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setLibraryModalOpen(true)}
+                  onClick={handleOpenLibrary}
                   className="text-xs text-primary-ink hover:text-primary-ink-strong"
                 >
                   {t.automate.libraryButton}
@@ -1239,7 +1253,7 @@ function AutomatePageContent({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setLibraryModalOpen(true)}
+                  onClick={handleOpenLibrary}
                   className="text-xs text-primary-ink hover:text-primary-ink-strong flex items-center gap-1"
                 >
                   <FolderOpen className="h-3 w-3" />
@@ -1260,7 +1274,7 @@ function AutomatePageContent({
                 </span>
                 <button
                   type="button"
-                  onClick={() => setLibraryModalOpen(true)}
+                  onClick={handleOpenLibrary}
                   className="text-xs text-primary-ink hover:text-primary-ink-strong flex items-center gap-1"
                 >
                   <FolderOpen className="h-3 w-3" />
@@ -1512,7 +1526,7 @@ function AutomatePageContent({
                         </div>
                         <button
                           type="button"
-                          onClick={() => setLibraryModalOpen(true)}
+                          onClick={handleOpenLibrary}
                           className="flex items-center gap-2 px-4 py-1.5 text-sm text-primary-ink border border-dashed border-primary/40 rounded-lg hover:bg-primary/5 transition-colors"
                         >
                           <FolderOpen className="h-4 w-4" />
