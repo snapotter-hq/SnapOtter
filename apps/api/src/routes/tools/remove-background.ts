@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { extname, join } from "node:path";
 import { removeBackground } from "@snapotter/ai";
 import {
   BG_REMOVAL_MODELS,
@@ -9,9 +9,12 @@ import {
   HEX_COLOR_PATTERN,
   hasServerErrorStatus,
   isToolInputError,
+  markToolInputError,
   TOOL_BUNDLE_MAP,
+  ToolInputError,
 } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import sharp from "sharp";
 import { z } from "zod";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob, insertToolJobAlias } from "../../jobs/enqueue.js";
@@ -34,6 +37,7 @@ import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import {
+  DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
   needsCliDecode,
@@ -49,8 +53,10 @@ import {
   getObjectBuffer,
   isMissingObjectError,
   isValidObjectKey,
+  normalizeOperationalWriteError,
   putObject,
 } from "../../lib/object-storage.js";
+import { decompressSvgz, isSvgzClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
 import {
   discardUnenqueuedUploads,
   hasPersistedJobRow,
@@ -580,10 +586,72 @@ export function registerRemoveBackground(app: FastifyInstance) {
               .send({ error: `Invalid background image: ${bgValidation.reason}` });
           }
           if (bgValidation.format === "heif") {
-            bgImageBuffer = await decodeHeic(bgImageBuffer);
+            try {
+              bgImageBuffer = await decodeHeic(bgImageBuffer);
+            } catch (rawErr) {
+              const err = normalizeOperationalWriteError(rawErr);
+              if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+              throw err instanceof Error
+                ? markToolInputError(err)
+                : new ToolInputError(String(err));
+            }
           }
+          let fallbackFormat: string | undefined;
           if (needsCliDecode(bgValidation.format)) {
-            bgImageBuffer = await decodeToSharpCompat(bgImageBuffer, bgValidation.format);
+            const fileExt = extname(bgFilename).toLowerCase().replace(/^\./, "") || undefined;
+            try {
+              bgImageBuffer = await decodeToSharpCompat(
+                bgImageBuffer,
+                bgValidation.format,
+                fileExt,
+              );
+            } catch (rawDecodeErr) {
+              const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+              if (
+                decodeErr instanceof DecoderOutOfMemoryError ||
+                (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+              ) {
+                throw decodeErr;
+              }
+              try {
+                const meta = await sharp(bgImageBuffer).metadata();
+                fallbackFormat = meta.format;
+              } catch (err) {
+                if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
+                  throw decodeErr;
+                }
+                throw await asInputErrorIfUndecodable(bgImageBuffer, err);
+              }
+            }
+          }
+          let isSvg = bgValidation.format === "svg" || fallbackFormat === "svg";
+          if (
+            !isSvg &&
+            bgValidation.format === "png" &&
+            bgFilename.toLowerCase().endsWith(".apng")
+          ) {
+            const meta = await sharp(bgImageBuffer)
+              .metadata()
+              .catch(() => null);
+            if (meta?.format === "svg") isSvg = true;
+          }
+          if (isSvg) {
+            try {
+              bgImageBuffer = decompressSvgz(bgImageBuffer);
+              bgImageBuffer = sanitizeSvg(bgImageBuffer);
+            } catch (err) {
+              if (
+                isSvgzClientError(err) ||
+                (err instanceof Error && err.message.includes("SVGZ file does not contain"))
+              ) {
+                return reply.status(400).send({
+                  error: err instanceof Error ? err.message : "Invalid SVG",
+                });
+              }
+              throw err;
+            }
+          } else {
+            bgImageBuffer = await autoOrient(bgImageBuffer, request.log);
           }
         }
 
@@ -637,7 +705,8 @@ export function registerRemoveBackground(app: FastifyInstance) {
           savedFileId,
           autoSaveError: autoSaveResult.error,
         });
-      } catch (err) {
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(rawErr);
         if (isDecoderUnavailable(err)) throw err;
         if (hasServerErrorStatus(err)) throw err;
         if (!isToolInputError(err)) {

@@ -11,6 +11,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { gzipSync } from "node:zlib";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { env } from "../../../../apps/api/src/config.js";
@@ -436,6 +437,47 @@ describe("Remove Background", () => {
 
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).error).toMatch(/^Invalid background image:/);
+  });
+
+  it("effects route decompresses and sanitizes an .svgz backgroundImage (#2845)", async () => {
+    const jobId = randomUUID();
+    await seedPhase1Cache(jobId, "test");
+
+    const svgzBg = gzipSync(
+      Buffer.from(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><script>alert(1)</script><rect width="20" height="20" fill="#00ff00"/></svg>',
+      ),
+    );
+
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "backgroundImage",
+        filename: "bg.svgz",
+        contentType: "image/svg+xml",
+        content: svgzBg,
+      },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          jobId,
+          filename: "test.png",
+          backgroundType: "image",
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/remove-background/effects",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).downloadUrl).toContain("/api/v1/download/");
   });
 
   it("effects route lets a storage fault reading the mask reach the error handler (#2119)", async () => {
