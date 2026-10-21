@@ -1,9 +1,11 @@
 import { Download, Loader2 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
+import { useFileStore } from "@/stores/file-store";
 
 const BARCODE_TYPES = [
   { value: "code128", label: "Code 128" },
@@ -20,22 +22,48 @@ const INPUT_CLASS =
 export function BarcodeGenerateSettings() {
   const { t } = useTranslation();
   const ts = t.toolSettings["barcode-generate"];
+  const { processing, error, setProcessing, setError } = useFileStore();
 
   const [text, setText] = useState("");
   const [type, setType] = useState("code128");
   const [scale, setScale] = useState(3);
   const [includeText, setIncludeText] = useState(true);
 
-  const [generating, setGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const canGenerate = text.trim().length > 0 && !generating;
+  useSettleOnUnmount(
+    () => abortRef.current !== null,
+    () => abortRef.current?.abort(),
+  );
+
+  const canGenerate = text.trim().length > 0 && !processing;
 
   const handleGenerate = useCallback(async () => {
-    setGenerating(true);
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setProcessing(true);
     setError(null);
     setResultUrl(null);
+
+    let storeReset = false;
+    const startStopCount = useFileStore.getState().stopCount;
+    const unsubscribe = useFileStore.subscribe((state) => {
+      if (!state.processing || state.stopCount !== startStopCount) {
+        storeReset = true;
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+        }
+        unsubscribe();
+        if (state.processing) {
+          setProcessing(false);
+        }
+        controller.abort();
+      }
+    });
+    controller.signal.addEventListener("abort", unsubscribe, { once: true });
 
     try {
       const res = await fetch(appUrl("/api/v1/tools/image/barcode-generate"), {
@@ -45,6 +73,7 @@ export function BarcodeGenerateSettings() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ text: text.trim(), type, scale, includeText }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -60,15 +89,30 @@ export function BarcodeGenerateSettings() {
       }
 
       const data = resolveServerUrls(await res.json());
+      if (controller.signal.aborted || storeReset) return;
       if (data.downloadUrl) {
         setResultUrl(data.downloadUrl);
       }
     } catch (err) {
+      if (
+        controller.signal.aborted ||
+        storeReset ||
+        (err instanceof DOMException && err.name === "AbortError")
+      ) {
+        return;
+      }
+      unsubscribe();
       setError(err instanceof Error ? err.message : ts.generateFailed);
     } finally {
-      setGenerating(false);
+      unsubscribe();
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+      }
+      if (!controller.signal.aborted && !storeReset) {
+        setProcessing(false);
+      }
     }
-  }, [text, type, scale, includeText, t, ts]);
+  }, [text, type, scale, includeText, setProcessing, setError, t, ts]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,7 +215,7 @@ export function BarcodeGenerateSettings() {
         disabled={!canGenerate}
         className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
-        {generating && <Loader2 className="h-4 w-4 animate-spin" />}
+        {processing && <Loader2 className="h-4 w-4 animate-spin" />}
         {ts.submit}
       </button>
     </form>

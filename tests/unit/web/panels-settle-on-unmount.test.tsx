@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { en } from "@snapotter/shared";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { type ComponentType, StrictMode } from "react";
+import { act, cleanup, fireEvent, render, renderHook, screen } from "@testing-library/react";
+import { type ComponentType, type ReactNode, StrictMode } from "react";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/analytics", async () => {
@@ -10,6 +11,7 @@ vi.mock("@/lib/analytics", async () => {
   return analyticsModuleMock();
 });
 
+import { BarcodeGenerateSettings } from "@/components/tools/barcode-generate-settings";
 import { BeautifySettings } from "@/components/tools/beautify-settings";
 import { BulkRenameSettings } from "@/components/tools/bulk-rename-settings";
 import { CollageSettings } from "@/components/tools/collage-settings";
@@ -24,6 +26,8 @@ import { PassportPhotoSettings } from "@/components/tools/passport-photo-setting
 import { SplitSettings } from "@/components/tools/split-settings";
 import { StitchSettings } from "@/components/tools/stitch-settings";
 import { WatermarkImageSettings } from "@/components/tools/watermark-image-settings";
+import { useIntakeGuard } from "@/hooks/use-intake-guard";
+import { useWorkInFlight } from "@/hooks/use-work-in-flight";
 import { captureHandledError } from "@/lib/analytics";
 import { useBase64Store } from "@/stores/base64-store";
 import { useCollageStore } from "@/stores/collage-store";
@@ -573,6 +577,23 @@ interface FetchFileStorePanelCase {
 
 const fetchFileStorePanels: FetchFileStorePanelCase[] = [
   {
+    name: "barcode-generate",
+    Panel: BarcodeGenerateSettings,
+    submitId: "barcode-generate-submit",
+    needsSecondaryFile: false,
+    prepare: () => {
+      fireEvent.change(screen.getByTestId("barcode-input-text"), { target: { value: "12345" } });
+    },
+    goodResponse: () =>
+      new Response(
+        JSON.stringify({
+          jobId: "j-barcode",
+          downloadUrl: "/api/v1/download/j-barcode/barcode.png",
+        }),
+        { status: 200 },
+      ),
+  },
+  {
     name: "beautify (image background)",
     Panel: BeautifySettings,
     submitId: "beautify-submit",
@@ -831,6 +852,104 @@ describe("beautify image-background reset or removeFile while mounted (#2711)", 
     expect(screen.getByTestId("beautify-submit")).toHaveTextContent(
       en.toolSettings.beautify.submit,
     );
+    unmount();
+  });
+});
+
+describe("barcode-generate reset or stopRuns while mounted (#3203)", () => {
+  it("aborts in-flight fetch, clears processing, re-enables barcode-generate-submit, and ignores late responses when useFileStore resets or stops runs mid-flight", async () => {
+    let resolveFetch: (res: Response) => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        (_url: string, init?: RequestInit) =>
+          new Promise<Response>((resolve) => {
+            fetchSignals.push(init?.signal ?? undefined);
+            resolveFetch = resolve;
+          }),
+      ),
+    );
+
+    useFileStore.getState().reset();
+    const { unmount } = render(<BarcodeGenerateSettings />);
+    const routerWrapper = ({ children }: { children: ReactNode }) => (
+      <MemoryRouter initialEntries={["/image/barcode-generate"]}>{children}</MemoryRouter>
+    );
+    fireEvent.change(screen.getByTestId("barcode-input-text"), { target: { value: "12345" } });
+    fireEvent.click(screen.getByTestId("barcode-generate-submit"));
+
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(renderHook(() => useWorkInFlight(), { wrapper: routerWrapper }).result.current).toEqual({
+      kind: "processing",
+    });
+    expect(
+      renderHook(() => useIntakeGuard(), { wrapper: routerWrapper }).result.current.running,
+    ).toBe(true);
+    expect(screen.getByTestId("barcode-generate-submit")).toBeDisabled();
+    expect(fetchSignals[0]).toBeInstanceOf(AbortSignal);
+    expect(fetchSignals[0]?.aborted).toBe(false);
+
+    act(() => {
+      useFileStore.getState().reset();
+    });
+
+    expect(fetchSignals[0]?.aborted).toBe(true);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(
+      renderHook(() => useWorkInFlight(), { wrapper: routerWrapper }).result.current,
+    ).toBeNull();
+    expect(
+      renderHook(() => useIntakeGuard(), { wrapper: routerWrapper }).result.current.running,
+    ).toBe(false);
+    expect(screen.getByTestId("barcode-generate-submit")).toBeEnabled();
+
+    await act(async () => {
+      resolveFetch(
+        new Response(
+          JSON.stringify({
+            jobId: "j-barcode",
+            downloadUrl: "/api/v1/download/j-barcode/barcode.png",
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+
+    expect(screen.queryByTestId("barcode-generate-download")).toBeNull();
+    expect(useFileStore.getState().error).toBeNull();
+
+    // Starting another run and calling stopRuns() also aborts and clears processing.
+    fireEvent.click(screen.getByTestId("barcode-generate-submit"));
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(screen.getByTestId("barcode-generate-submit")).toBeDisabled();
+    expect(fetchSignals[1]?.aborted).toBe(false);
+
+    act(() => {
+      useFileStore.getState().stopRuns();
+    });
+
+    expect(fetchSignals[1]?.aborted).toBe(true);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(screen.getByTestId("barcode-generate-submit")).toBeEnabled();
+
+    await act(async () => {
+      resolveFetch(new Response(JSON.stringify({ error: "Late failure" }), { status: 500 }));
+    });
+
+    expect(useFileStore.getState().error).toBeNull();
+    expect(screen.queryByText("Late failure")).toBeNull();
+
+    // Non-controller AbortError (e.g. window.stop()) clears processing without surfacing an error.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new DOMException("Stopped", "AbortError"))),
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("barcode-generate-submit"));
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().error).toBeNull();
+    expect(screen.getByTestId("barcode-generate-submit")).toBeEnabled();
     unmount();
   });
 });
