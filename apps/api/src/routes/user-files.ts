@@ -559,7 +559,12 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           SELECT f.id, f.original_name, f.mime_type, f.size, f.width, f.height,
                  f.version, f.parent_id, f.tool_chain, f.created_at
           FROM user_files f
-          WHERE f.id = (SELECT id FROM ancestors WHERE parent_id IS NULL LIMIT 1)
+          WHERE f.id = (
+            SELECT a.id FROM ancestors a
+            WHERE a.parent_id IS NULL
+               OR NOT EXISTS (SELECT 1 FROM user_files p WHERE p.id = a.parent_id)
+            LIMIT 1
+          )
           UNION ALL
           SELECT child.id, child.original_name, child.mime_type, child.size,
                  child.width, child.height, child.version, child.parent_id,
@@ -1028,16 +1033,25 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     // Persist to disk
     const storedName = await saveFile(safeResultBuffer, resultName);
 
-    // Lock the quota rows, insert the version row, and charge storage_used in
-    // one transaction (#1537), matching /api/v1/files/upload (#1473).
+    // Lock the quota rows, re-verify the parent row still exists, insert the
+    // version row, and charge storage_used in one transaction (#1537, #2939),
+    // matching /api/v1/files/upload (#1473) and stageAutoSaveToLibrary (#2927).
     const id = randomUUID();
     let committed:
       | { row: typeof schema.userFiles.$inferSelect | undefined }
-      | { overQuota: string };
+      | { overQuota: string }
+      | { parentDeleted: true };
     try {
       committed = await db.transaction(async (tx) => {
         const overQuota = await quotaRefusal(tx, userId, fileSize, true);
         if (overQuota) return { overQuota };
+        const [currentParent] = await tx
+          .select({ id: schema.userFiles.id })
+          .from(schema.userFiles)
+          .where(eq(schema.userFiles.id, parentId))
+          .limit(1)
+          .for("no key update");
+        if (!currentParent) return { parentDeleted: true };
         const [inserted] = await tx
           .insert(schema.userFiles)
           .values({
@@ -1067,6 +1081,10 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     if ("overQuota" in committed) {
       await discardStagedBlob(request, "/api/v1/files/save-result", storedName);
       return sendOverQuota(reply, committed.overQuota);
+    }
+    if ("parentDeleted" in committed) {
+      await discardStagedBlob(request, "/api/v1/files/save-result", storedName);
+      return reply.status(404).send({ error: "Parent file not found" });
     }
 
     return reply.status(201).send({ file: committed.row ? serializeFile(committed.row) : null });

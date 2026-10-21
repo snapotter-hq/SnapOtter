@@ -21,7 +21,12 @@ const mocks = vi.hoisted(() => ({
   ),
   deleteWhereSpy: vi.fn(() => Promise.resolve()),
   parentRows: [] as unknown[],
+  txParentRows: null as unknown[] | null,
+  txParentWhereSpy: vi.fn(),
+  txParentForSpy: vi.fn(),
+  deleteParentDuringSave: false,
   insertedValues: undefined as Record<string, unknown> | undefined,
+  deleteStoredFile: vi.fn<(_name: string) => Promise<void>>(() => Promise.resolve()),
   getCachedThumbnail: vi.fn<() => Promise<Buffer | null>>(() => Promise.resolve(null)),
   isStorageServiceFault: vi.fn<(_e: unknown) => boolean>(() => false),
   saveFile: vi.fn(() => Promise.resolve("stored-result.png")),
@@ -98,6 +103,21 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
     }),
     transaction: async (fn: (tx: unknown) => Promise<unknown>) => {
       const tx = {
+        select: () => ({
+          from: () => ({
+            where: (cond: unknown) => {
+              mocks.txParentWhereSpy(cond);
+              return {
+                limit: () => ({
+                  for: async (mode: unknown) => {
+                    mocks.txParentForSpy(mode);
+                    return mocks.txParentRows ?? mocks.parentRows;
+                  },
+                }),
+              };
+            },
+          }),
+        }),
         insert: () => ({
           values: (vals: Record<string, unknown>) => {
             mocks.insertedValues = vals;
@@ -136,7 +156,7 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
 }));
 
 vi.mock("../../../apps/api/src/lib/file-storage.js", () => ({
-  deleteStoredFile: vi.fn(() => Promise.resolve()),
+  deleteStoredFile: mocks.deleteStoredFile,
   getCachedThumbnail: mocks.getCachedThumbnail,
   isStorageServiceFault: mocks.isStorageServiceFault,
   readStoredFile: mocks.readStoredFile,
@@ -517,6 +537,7 @@ describe("user files route logic", () => {
   describe("route handler behavior", () => {
     type RouteHandler = (request: unknown, reply: unknown) => Promise<unknown>;
     let listHandler: RouteHandler;
+    let detailHandler: RouteHandler;
     let deleteHandler: RouteHandler;
     let saveResultHandler: RouteHandler;
     let downloadHandler: RouteHandler;
@@ -527,6 +548,7 @@ describe("user files route logic", () => {
         get: vi.fn((path: string, arg2: unknown, arg3?: unknown) => {
           const handler = (typeof arg2 === "function" ? arg2 : arg3) as RouteHandler;
           if (path === "/api/v1/files") listHandler = handler;
+          if (path === "/api/v1/files/:id") detailHandler = handler;
           if (path === "/api/v1/files/:id/download") downloadHandler = handler;
           if (path === "/api/v1/files/:id/thumbnail") thumbnailHandler = handler;
         }),
@@ -546,13 +568,21 @@ describe("user files route logic", () => {
     beforeEach(() => {
       vi.clearAllMocks();
       mocks.parentRows = [];
+      mocks.txParentRows = null;
+      mocks.deleteParentDuringSave = false;
       mocks.insertedValues = undefined;
       mocks.requireFileAccess.mockResolvedValue({ id: "user-1", role: "admin" });
       mocks.hasEffectivePermission.mockResolvedValue(true);
       mocks.quotaRefusal.mockResolvedValue(null);
+      mocks.deleteStoredFile.mockResolvedValue();
       mocks.getCachedThumbnail.mockResolvedValue(null);
       mocks.isStorageServiceFault.mockReturnValue(false);
-      mocks.saveFile.mockResolvedValue("stored-result.png");
+      mocks.saveFile.mockImplementation(async () => {
+        if (mocks.deleteParentDuringSave) {
+          mocks.txParentRows = [];
+        }
+        return "stored-result.png";
+      });
       mocks.saveThumbnail.mockResolvedValue();
       mocks.streamStoredFile.mockImplementation(async () => Readable.from([Buffer.from("bytes")]));
       mocks.videoPosterPreview.mockResolvedValue(Buffer.from("webp-poster"));
@@ -697,6 +727,69 @@ describe("user files route logic", () => {
         const queryText = String(mocks.executeSpy.mock.calls[0]?.[0] ?? "");
         expect(queryText).toMatch(
           /NOT EXISTS\s*\(\s*SELECT 1 FROM user_files p WHERE p\.id = a\.parent_id\s*\)/i,
+        );
+      });
+    });
+
+    describe("GET /api/v1/files/:id version chain query (#2939)", () => {
+      it("seeds the version chain CTE from the top surviving ancestor when the root parent row is missing (#2939)", async () => {
+        const orphanRow: UserFileRow = {
+          id: "orphan-v2",
+          userId: "user-1",
+          originalName: "photo.png",
+          storedName: "stored-v2.png",
+          mimeType: "image/png",
+          size: 512,
+          width: 200,
+          height: 150,
+          version: 2,
+          parentId: "deleted-v1",
+          toolChain: ["resize"],
+          createdAt: new Date("2025-06-01T12:00:00Z"),
+        };
+        mocks.parentRows = [orphanRow];
+        mocks.executeSpy.mockResolvedValueOnce({
+          rows: [
+            {
+              id: "orphan-v2",
+              original_name: "photo.png",
+              mime_type: "image/png",
+              size: 512,
+              width: 200,
+              height: 150,
+              version: 2,
+              parent_id: "deleted-v1",
+              tool_chain: ["resize"],
+              created_at: new Date("2025-06-01T12:00:00Z"),
+            },
+          ],
+        });
+
+        const reply = makeReply();
+        await detailHandler({ params: { id: "orphan-v2" } }, reply);
+
+        expect(reply.statusCode).toBe(200);
+        expect(reply.payload).toMatchObject({
+          file: { id: "orphan-v2", version: 2, parentId: "deleted-v1" },
+          versions: [
+            {
+              id: "orphan-v2",
+              originalName: "photo.png",
+              mimeType: "image/png",
+              size: 512,
+              width: 200,
+              height: 150,
+              version: 2,
+              parentId: "deleted-v1",
+              toolChain: ["resize"],
+              createdAt: "2025-06-01T12:00:00.000Z",
+            },
+          ],
+        });
+        expect(mocks.executeSpy).toHaveBeenCalledTimes(1);
+        const queryText = String(mocks.executeSpy.mock.calls[0]?.[0] ?? "");
+        expect(queryText).toMatch(
+          /WHERE\s+a\.parent_id\s+IS\s+NULL\s+OR\s+NOT\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+user_files\s+p\s+WHERE\s+p\.id\s*=\s*a\.parent_id\s*\)/i,
         );
       });
     });
@@ -884,6 +977,48 @@ describe("user files route logic", () => {
           expect(mocks.insertedValues?.mimeType).toBe("application/octet-stream");
         },
       );
+
+      it("discards the staged blob and returns 404 when the parent file is deleted before the transaction commits (#2939)", async () => {
+        mocks.parentRows = [makeParent()];
+        mocks.deleteParentDuringSave = true;
+
+        const reply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "output.png",
+            parentId: "parent-1",
+            toolId: "resize",
+          }),
+          reply,
+        );
+
+        expect(reply.statusCode).toBe(404);
+        expect(reply.payload).toEqual({ error: "Parent file not found" });
+        expect(mocks.txParentWhereSpy).toHaveBeenCalledWith({
+          op: "eq",
+          col: "id",
+          val: "parent-1",
+        });
+        expect(mocks.txParentForSpy).toHaveBeenCalledWith("no key update");
+        expect(mocks.insertedValues).toBeUndefined();
+        expect(mocks.deleteStoredFile).toHaveBeenCalledWith("stored-result.png");
+
+        const discardErr = new Error("simulated discard failure");
+        mocks.deleteStoredFile.mockRejectedValueOnce(discardErr);
+        const req2 = makeSaveResultRequest({
+          filename: "output.png",
+          parentId: "parent-1",
+          toolId: "resize",
+        });
+        const reply2 = makeReply();
+        await saveResultHandler(req2, reply2);
+        expect(reply2.statusCode).toBe(404);
+        expect(reply2.payload).toEqual({ error: "Parent file not found" });
+        expect(req2.log.error).toHaveBeenCalledWith(
+          { err: discardErr, storedName: "stored-result.png" },
+          "Failed to discard a staged upload",
+        );
+      });
     });
 
     describe("GET /api/v1/files/:id/thumbnail cache write failure logging (#1633)", () => {

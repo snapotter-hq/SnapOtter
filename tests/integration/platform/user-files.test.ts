@@ -5,7 +5,7 @@
  * bulk delete, save-result versioning, search, and pagination.
  */
 
-import { chmod, unlink } from "node:fs/promises";
+import { chmod, stat, unlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { eq } from "drizzle-orm";
@@ -15,7 +15,22 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 const hooks = vi.hoisted(() => ({
   reportError: vi.fn(),
   svgUnexpectedError: false,
+  afterSaveFile: null as ((storedName: string) => Promise<void>) | null,
 }));
+
+vi.mock("../../../apps/api/src/lib/file-storage.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/file-storage.js")>();
+  return {
+    ...actual,
+    saveFile: async (...args: Parameters<typeof actual.saveFile>) => {
+      const storedName = await actual.saveFile(...args);
+      if (hooks.afterSaveFile) {
+        await hooks.afterSaveFile(storedName);
+      }
+      return storedName;
+    },
+  };
+});
 
 vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
@@ -1214,5 +1229,155 @@ describe("Save result", () => {
     expect(v3Res.statusCode).toBe(201);
     const v3 = JSON.parse(v3Res.body).file;
     expect(v3.originalName).toBe("vector-parent.svgz");
+  });
+
+  it("discards the staged blob and returns 404 when the parent file is deleted while save-result is staging (#2939)", async () => {
+    const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "race-parent.png",
+        contentType: "image/png",
+        content: PNG,
+      },
+    ]);
+    const uploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+      body: uploadBody,
+    });
+    expect(uploadRes.statusCode).toBe(201);
+    const v1Id = (JSON.parse(uploadRes.body).files[0] as { id: string }).id;
+
+    const [v1Row] = await db
+      .select({ userId: schema.userFiles.userId })
+      .from(schema.userFiles)
+      .where(eq(schema.userFiles.id, v1Id));
+    const ownerId = v1Row.userId ?? "";
+
+    let stagedStoredName: string | null = null;
+    hooks.afterSaveFile = async (storedName) => {
+      stagedStoredName = storedName;
+      const delRes = await app.inject({
+        method: "DELETE",
+        url: "/api/v1/files",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${adminToken}`,
+        },
+        payload: { ids: [v1Id] },
+      });
+      expect(delRes.statusCode).toBe(200);
+      expect(JSON.parse(delRes.body)).toEqual({ deleted: 1 });
+    };
+
+    try {
+      const [userBeforeSave] = await db
+        .select({ storageUsed: schema.users.storageUsed })
+        .from(schema.users)
+        .where(eq(schema.users.id, ownerId));
+
+      const { body: saveBody, contentType: saveCt } = createMultipartPayload([
+        { name: "file", filename: "race-v2.png", contentType: "image/png", content: TINY_PNG },
+        { name: "parentId", content: v1Id },
+        { name: "toolId", content: "resize" },
+      ]);
+      const saveRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/files/save-result",
+        headers: { "content-type": saveCt, authorization: `Bearer ${adminToken}` },
+        body: saveBody,
+      });
+
+      expect(saveRes.statusCode).toBe(404);
+      expect(JSON.parse(saveRes.body)).toEqual({ error: "Parent file not found" });
+      expect(stagedStoredName).toBeTruthy();
+      await expect(stat(getStoredFilePath(stagedStoredName ?? ""))).rejects.toMatchObject({
+        code: "ENOENT",
+      });
+
+      const orphanChildren = await db
+        .select()
+        .from(schema.userFiles)
+        .where(eq(schema.userFiles.parentId, v1Id));
+      expect(orphanChildren).toEqual([]);
+
+      const [userAfterSave] = await db
+        .select({ storageUsed: schema.users.storageUsed })
+        .from(schema.users)
+        .where(eq(schema.users.id, ownerId));
+      // v1 was deleted inside afterSaveFile, so userAfterSave.storageUsed must equal
+      // userBeforeSave.storageUsed minus v1's size (no charge from the aborted v2).
+      expect(userAfterSave.storageUsed).toBe(userBeforeSave.storageUsed - PNG.length);
+    } finally {
+      hooks.afterSaveFile = null;
+    }
+  });
+
+  it("returns the surviving version chain from GET /api/v1/files/:id when the root parent row is missing (#2939)", async () => {
+    const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+      { name: "file", filename: "detail-orphan-root.png", contentType: "image/png", content: PNG },
+    ]);
+    const uploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+      body: uploadBody,
+    });
+    expect(uploadRes.statusCode).toBe(201);
+    const v1Id = (JSON.parse(uploadRes.body).files[0] as { id: string }).id;
+
+    const { body: v2Body, contentType: v2Ct } = createMultipartPayload([
+      { name: "file", filename: "v2.png", contentType: "image/png", content: PNG },
+      { name: "parentId", content: v1Id },
+      { name: "toolId", content: "resize" },
+    ]);
+    const v2Res = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/save-result",
+      headers: { "content-type": v2Ct, authorization: `Bearer ${adminToken}` },
+      body: v2Body,
+    });
+    expect(v2Res.statusCode).toBe(201);
+    const v2 = JSON.parse(v2Res.body).file as { id: string };
+
+    const { body: v3Body, contentType: v3Ct } = createMultipartPayload([
+      { name: "file", filename: "v3.png", contentType: "image/png", content: TINY_PNG },
+      { name: "parentId", content: v2.id },
+      { name: "toolId", content: "compress" },
+    ]);
+    const v3Res = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/save-result",
+      headers: { "content-type": v3Ct, authorization: `Bearer ${adminToken}` },
+      body: v3Body,
+    });
+    expect(v3Res.statusCode).toBe(201);
+    const v3 = JSON.parse(v3Res.body).file as { id: string };
+
+    const [v1Row] = await db
+      .select({ storedName: schema.userFiles.storedName })
+      .from(schema.userFiles)
+      .where(eq(schema.userFiles.id, v1Id));
+    await unlink(getStoredFilePath(v1Row.storedName));
+    await db.delete(schema.userFiles).where(eq(schema.userFiles.id, v1Id));
+
+    for (const targetId of [v2.id, v3.id]) {
+      const detailRes = await app.inject({
+        method: "GET",
+        url: `/api/v1/files/${targetId}`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(detailRes.statusCode).toBe(200);
+      const detail = JSON.parse(detailRes.body) as {
+        file: { id: string };
+        versions: { id: string; version: number; parentId: string | null }[];
+      };
+      expect(detail.file.id).toBe(targetId);
+      expect(detail.versions.map((v) => ({ id: v.id, version: v.version }))).toEqual([
+        { id: v2.id, version: 2 },
+        { id: v3.id, version: 3 },
+      ]);
+    }
   });
 });
