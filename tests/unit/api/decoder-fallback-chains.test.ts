@@ -16,6 +16,7 @@ import { afterAll, afterEach, describe, expect, it } from "vitest";
 import {
   asDecoderUnavailable,
   DecoderUnavailableError,
+  decodeAnyFormat,
   decodeToSharpCompat,
   isDecoderUnavailable,
   lacksFormatSupport,
@@ -601,6 +602,45 @@ esac`,
 
     expect(isDecoderUnavailable(err)).toBe(false);
     expect(String(err.message)).toMatch(/raw-in-[0-9a-f-]+\.raf: corrupt RAF/);
+  });
+
+  it.each(["0 0", "0 10", "10 0", "-10 10", "10 -10"])(
+    "rejects non-positive exiftool dimensions (%s) in preflightEncodedDimensions (#3333)",
+    async (exiftoolOutput) => {
+      useShims({
+        exiftool: `echo "${exiftoolOutput}"\nexit 0`,
+        dcraw_emu: 'echo "Cannot open $5: corrupt RAW" >&2\nexit 2',
+        magick: magickNoDelegate,
+      });
+
+      const err = await decodeToSharpCompat(
+        readFixture(fixtures.image.formats("dng")),
+        "raw",
+        "dng",
+        { maxPixels: 1000 },
+      ).catch((e) => e);
+
+      expect(isDecoderUnavailable(err)).toBe(false);
+      expect(String(err.message)).toBe(
+        "Cannot safely decode RAW: encoded dimensions are unavailable for the configured image safety limits",
+      );
+    },
+  );
+
+  it("rejects non-positive exiftool dimensions in decodeAnyFormat when maxDimension is set (#3333)", async () => {
+    useShims({
+      exiftool: 'echo "0 0"\nexit 0',
+      magick: magickNoDelegate,
+    });
+
+    const err = await decodeAnyFormat(readFixture(fixtures.image.formats("avif")), "avif", {
+      maxDimension: 1000,
+    }).catch((e) => e);
+
+    expect(isDecoderUnavailable(err)).toBe(false);
+    expect(String(err.message)).toBe(
+      "Cannot safely decode AVIF: encoded dimensions are unavailable for the configured image safety limits",
+    );
   });
 });
 

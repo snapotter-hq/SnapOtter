@@ -448,7 +448,7 @@ async function preflightEncodedDimensions(
         },
       );
       const values = String(stdout).trim().split(/\s+/).map(Number);
-      if (values.length >= 2 && values.every(Number.isFinite)) {
+      if (values.length >= 2 && values.every((v) => Number.isFinite(v) && v > 0)) {
         assertDimensionsWithinLimit(values[0], values[1], options);
         return;
       }
