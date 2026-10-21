@@ -1,6 +1,6 @@
 ---
 description: "Eksiksiz REST API başvurusu. Araç uç noktaları, toplu işleme, işlem hatları, dosya kitaplığı, kimlik doğrulama, ekipler ve yönetici işlemleri."
-i18n_output_hash: adc97a926169
+i18n_output_hash: 7073be9e2973
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -532,7 +532,7 @@ Bir araç sonucunu kitaplığa otomatik kaydetmek için, mevcut bir kitaplık do
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | Yönetici (`teams:manage`) | Ekipleri listele |
 | `POST` | `/api/v1/teams` | Yönetici (`teams:manage`) | Ekip oluştur |
-| `PUT` | `/api/v1/teams/:id` | Yönetici (`teams:manage`) | Ekibi yeniden adlandır |
+| `PUT` | `/api/v1/teams/:id` | Yönetici (`teams:manage`) | Ekibi güncelle (en az bir alan zorunlu) |
 | `DELETE` | `/api/v1/teams/:id` | Yönetici (`teams:manage`) | Ekibi sil (varsayılan ekip veya üyeleri olan ekipler silinemez) |
 
 ## Ayarlar {#settings}

@@ -1,6 +1,6 @@
 ---
 description: "전체 REST API 레퍼런스. 도구 엔드포인트, 배치 처리, 파이프라인, 파일 라이브러리, 인증, 팀, 관리 작업."
-i18n_output_hash: a0ba9192fc24
+i18n_output_hash: e9e5716e1b88
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -532,7 +532,7 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | 관리자(`teams:manage`) | 팀 목록 |
 | `POST` | `/api/v1/teams` | 관리자(`teams:manage`) | 팀 생성 |
-| `PUT` | `/api/v1/teams/:id` | 관리자(`teams:manage`) | 팀 이름 변경 |
+| `PUT` | `/api/v1/teams/:id` | 관리자(`teams:manage`) | 팀 업데이트(최소 하나의 필드 필요) |
 | `DELETE` | `/api/v1/teams/:id` | 관리자(`teams:manage`) | 팀 삭제(기본 팀 또는 멤버가 있는 팀은 삭제 불가) |
 
 ## 설정 {#settings}

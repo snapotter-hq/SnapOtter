@@ -1,6 +1,6 @@
 ---
 description: "مرجع REST API الكامل. نقاط نهاية الأدوات، والمعالجة الدفعية، وخطوط المعالجة، ومكتبة الملفات، والمصادقة، والفرق، وعمليات الإدارة."
-i18n_output_hash: 237d2763b477
+i18n_output_hash: 0337915a41b5
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -532,7 +532,7 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | مسؤول (`teams:manage`) | سرد الفرق |
 | `POST` | `/api/v1/teams` | مسؤول (`teams:manage`) | إنشاء فريق |
-| `PUT` | `/api/v1/teams/:id` | مسؤول (`teams:manage`) | إعادة تسمية فريق |
+| `PUT` | `/api/v1/teams/:id` | مسؤول (`teams:manage`) | تحديث فريق (يلزم حقل واحد على الأقل) |
 | `DELETE` | `/api/v1/teams/:id` | مسؤول (`teams:manage`) | حذف فريق (لا يمكن حذف الفريق الافتراضي أو الفرق التي بها أعضاء) |
 
 ## الإعدادات {#settings}

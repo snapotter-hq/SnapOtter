@@ -1,6 +1,6 @@
 ---
 description: "完全な REST API リファレンス。ツールエンドポイント、バッチ処理、パイプライン、ファイルライブラリ、認証、チーム、管理者操作。"
-i18n_output_hash: 2d7929cfaf11
+i18n_output_hash: dad01b4388a0
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -532,7 +532,7 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | Admin（`teams:manage`） | チームを一覧表示 |
 | `POST` | `/api/v1/teams` | Admin（`teams:manage`） | チームを作成 |
-| `PUT` | `/api/v1/teams/:id` | Admin（`teams:manage`） | チームを名前変更 |
+| `PUT` | `/api/v1/teams/:id` | Admin（`teams:manage`） | チームを更新（少なくとも 1 つのフィールドが必要） |
 | `DELETE` | `/api/v1/teams/:id` | Admin（`teams:manage`） | チームを削除（デフォルトチームやメンバーがいるチームは削除不可） |
 
 ## 設定 {#settings}

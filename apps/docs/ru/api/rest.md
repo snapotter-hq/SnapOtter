@@ -1,6 +1,6 @@
 ---
 description: "Полный справочник REST API. Эндпоинты инструментов, пакетная обработка, конвейеры, файловая библиотека, аутентификация, команды и административные операции."
-i18n_output_hash: 1817d0be8df0
+i18n_output_hash: 78d3e26dd0f9
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -532,7 +532,7 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | Admin (`teams:manage`) | Список команд |
 | `POST` | `/api/v1/teams` | Admin (`teams:manage`) | Создание команды |
-| `PUT` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Переименование команды |
+| `PUT` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Обновление команды (требуется хотя бы одно поле) |
 | `DELETE` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Удаление команды (нельзя удалить команду по умолчанию или команды с участниками) |
 
 ## Настройки {#settings}

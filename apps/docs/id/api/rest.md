@@ -1,6 +1,6 @@
 ---
 description: "Referensi REST API lengkap. Endpoint tool, pemrosesan batch, pipeline, pustaka file, autentikasi, tim, dan operasi admin."
-i18n_output_hash: 2842b40a7d7c
+i18n_output_hash: 13c3fb90efaa
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -532,7 +532,7 @@ Untuk menyimpan otomatis hasil tool ke pustaka, sertakan `fileId` sebagai field 
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | Admin (`teams:manage`) | Daftar tim |
 | `POST` | `/api/v1/teams` | Admin (`teams:manage`) | Buat tim |
-| `PUT` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Ganti nama tim |
+| `PUT` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Perbarui tim (setidaknya satu field diperlukan) |
 | `DELETE` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Hapus tim (tidak dapat menghapus tim default atau tim dengan anggota) |
 
 ## Pengaturan {#settings}

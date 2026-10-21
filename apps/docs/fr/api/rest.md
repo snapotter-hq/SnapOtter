@@ -1,6 +1,6 @@
 ---
 description: "Référence complète de l'API REST. Points de terminaison des outils, traitement par lots, pipelines, bibliothèque de fichiers, authentification, équipes et opérations d'administration."
-i18n_output_hash: 2fafe1ab0449
+i18n_output_hash: bbd256b3ed19
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -532,7 +532,7 @@ Pour enregistrer automatiquement le résultat d'un outil dans la bibliothèque, 
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | Admin (`teams:manage`) | Liste les équipes |
 | `POST` | `/api/v1/teams` | Admin (`teams:manage`) | Crée une équipe |
-| `PUT` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Renomme une équipe |
+| `PUT` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Met à jour une équipe (au moins un champ requis) |
 | `DELETE` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Supprime une équipe (impossible de supprimer l'équipe par défaut ou les équipes ayant des membres) |
 
 ## Paramètres {#settings}

@@ -1,6 +1,6 @@
 ---
 description: "เอกสารอ้างอิง REST API ฉบับสมบูรณ์ เอนด์พอยต์ของเครื่องมือ การประมวลผลแบบแบตช์ ไปป์ไลน์ คลังไฟล์ การยืนยันตัวตน ทีม และการดำเนินงานของผู้ดูแลระบบ"
-i18n_output_hash: 386c0b519133
+i18n_output_hash: 4da135698825
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -532,7 +532,7 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | ผู้ดูแลระบบ (`teams:manage`) | แสดงรายการทีม |
 | `POST` | `/api/v1/teams` | ผู้ดูแลระบบ (`teams:manage`) | สร้างทีม |
-| `PUT` | `/api/v1/teams/:id` | ผู้ดูแลระบบ (`teams:manage`) | เปลี่ยนชื่อทีม |
+| `PUT` | `/api/v1/teams/:id` | ผู้ดูแลระบบ (`teams:manage`) | อัปเดตทีม (ต้องระบุอย่างน้อยหนึ่งฟิลด์) |
 | `DELETE` | `/api/v1/teams/:id` | ผู้ดูแลระบบ (`teams:manage`) | ลบทีม (ไม่สามารถลบทีมเริ่มต้นหรือทีมที่มีสมาชิก) |
 
 ## การตั้งค่า {#settings}

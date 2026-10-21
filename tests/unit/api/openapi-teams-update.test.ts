@@ -6,14 +6,62 @@
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { SUPPORTED_LOCALES } from "@snapotter/shared";
 import { load } from "js-yaml";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
+import { SUPPORTED_LOCALES } from "../../../packages/shared/src/i18n/index.js";
+import { createDocsAdapter } from "../../../scripts/i18n/adapters/docs-md.mjs";
 import { hash } from "../../../scripts/i18n/lib/hash.mjs";
 
 const SPEC_DIR = path.resolve(import.meta.dirname, "../../../apps/api/src");
+const DOCS_DIR = path.resolve(import.meta.dirname, "../../../apps/docs");
 const SUMMARY_ID = "paths./api/v1/teams/{id}.put.summary";
 const LOCALES = SUPPORTED_LOCALES.map((l) => l.code).filter((code) => code !== "en");
+
+const STALE_RENAME_DESCRIPTIONS: Record<string, string> = {
+  ar: "إعادة تسمية فريق",
+  de: "Team umbenennen",
+  es: "Renombrar equipo",
+  fr: "Renomme une équipe",
+  hi: "टीम का नाम बदलें",
+  id: "Ganti nama tim",
+  it: "Rinomina un team",
+  ja: "チームを名前変更",
+  ko: "팀 이름 변경",
+  nl: "Team hernoemen",
+  pl: "Zmień nazwę zespołu",
+  "pt-BR": "Renomeia um time",
+  ru: "Переименование команды",
+  sv: "Byt namn på team",
+  th: "เปลี่ยนชื่อทีม",
+  tr: "Ekibi yeniden adlandır",
+  uk: "Перейменувати команду",
+  vi: "Đổi tên nhóm",
+  "zh-CN": "重命名团队",
+  "zh-TW": "重新命名團隊",
+};
+
+const EXPECTED_REST_DOC_DESCRIPTIONS: Record<string, string> = {
+  ar: "تحديث فريق (يلزم حقل واحد على الأقل)",
+  de: "Team aktualisieren (mindestens ein Feld erforderlich)",
+  es: "Actualizar equipo (se requiere al menos un campo)",
+  fr: "Met à jour une équipe (au moins un champ requis)",
+  hi: "टीम अपडेट करें (कम से कम एक फ़ील्ड आवश्यक है)",
+  id: "Perbarui tim (setidaknya satu field diperlukan)",
+  it: "Aggiorna un team (è richiesto almeno un campo)",
+  ja: "チームを更新（少なくとも 1 つのフィールドが必要）",
+  ko: "팀 업데이트(최소 하나의 필드 필요)",
+  nl: "Team bijwerken (minstens één veld vereist)",
+  pl: "Zaktualizuj zespół (wymagane co najmniej jedno pole)",
+  "pt-BR": "Atualiza um time (pelo menos um campo obrigatório)",
+  ru: "Обновление команды (требуется хотя бы одно поле)",
+  sv: "Uppdatera team (minst ett fält krävs)",
+  th: "อัปเดตทีม (ต้องระบุอย่างน้อยหนึ่งฟิลด์)",
+  tr: "Ekibi güncelle (en az bir alan zorunlu)",
+  uk: "Оновити команду (потрібне щонайменше одне поле)",
+  vi: "Cập nhật nhóm (bắt buộc ít nhất một trường)",
+  "zh-CN": "更新团队（至少需要一个字段）",
+  "zh-TW": "更新團隊（至少需要一個欄位）",
+};
 
 interface Operation {
   summary?: string;
@@ -120,4 +168,59 @@ describe("PUT /api/v1/teams/{id} in the API reference (#2011)", () => {
     expect(stamp.outputHash).toBe(hash(putTeam(`openapi.${locale}.yaml`).summary ?? ""));
     expect(stamp.stale).toBeUndefined();
   });
+});
+
+function putTeamDocDescription(relPath: string): string {
+  const doc = readFileSync(path.join(DOCS_DIR, relPath), "utf8");
+  const rows = doc.split("\n").filter((line) => line.startsWith("| `PUT` | `/api/v1/teams/:id` |"));
+  if (rows.length !== 1) {
+    throw new Error(`${relPath} expected 1 PUT /api/v1/teams/:id row, found ${rows.length}`);
+  }
+  const cells = rows[0].split("|");
+  if (cells.length < 6) {
+    throw new Error(`${relPath} has malformed PUT /api/v1/teams/:id row: ${rows[0]}`);
+  }
+  return cells[4].trim();
+}
+
+describe("PUT /api/v1/teams/:id in the REST guide (#2006, #3338)", () => {
+  const docsAdapter = createDocsAdapter({ root: DOCS_DIR });
+  let expectedRestDocSourceHash = "";
+
+  beforeAll(async () => {
+    const extracted = await docsAdapter.extract();
+    const sourceUnit = extracted.find((u: { id: string }) => u.id === "api/rest.md");
+    expect(sourceUnit).toBeDefined();
+    expectedRestDocSourceHash = hash(sourceUnit?.sourceText ?? "");
+  });
+
+  it("documents the English route as a partial update requiring at least one field", () => {
+    expect(putTeamDocDescription("api/rest.md")).toBe("Update team (at least one field required)");
+  });
+
+  it.each(LOCALES)(
+    "%s rest.md describes PUT /api/v1/teams/:id as an update with a required-field note and fresh i18n hashes",
+    async (locale) => {
+      const staleRename = STALE_RENAME_DESCRIPTIONS[locale];
+      expect(staleRename).toBeTruthy();
+      const description = putTeamDocDescription(`${locale}/api/rest.md`);
+      expect(description).not.toBe(staleRename);
+      expect(description).not.toContain(staleRename);
+      expect(description).not.toBe(putTeamDocDescription("api/rest.md"));
+      expect(description).toBe(EXPECTED_REST_DOC_DESCRIPTIONS[locale]);
+      expect(description).toMatch(/^[^\s（(].*[（(].+[）)]$/);
+
+      const loaded = await docsAdapter.load(locale);
+      const entry = loaded.get("api/rest.md");
+      expect(entry).toBeDefined();
+      expect(entry?.provenance).toBe("human");
+      expect(entry?.sourceHash).toBe(expectedRestDocSourceHash);
+      expect(entry?.outputHash).toBe(hash(entry?.text ?? ""));
+      expect(entry?.stale).toBe(false);
+
+      const rawDoc = readFileSync(path.join(DOCS_DIR, locale, "api/rest.md"), "utf8");
+      expect(rawDoc.match(/^i18n_output_hash:\s*(\S+)$/m)?.[1]).toBe(hash(entry?.text ?? ""));
+      expect(rawDoc).not.toMatch(/^i18n_(stale|fallback):/m);
+    },
+  );
 });

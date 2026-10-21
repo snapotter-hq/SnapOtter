@@ -1,6 +1,6 @@
 ---
 description: "Volledige REST API-referentie. Tool-endpoints, batchverwerking, pipelines, bestandsbibliotheek, authenticatie, teams en beheerbewerkingen."
-i18n_output_hash: 603b4e591233
+i18n_output_hash: ca07d4ef1270
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -532,7 +532,7 @@ Om een tool-resultaat automatisch op te slaan in de bibliotheek, voeg je `fileId
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | Admin (`teams:manage`) | Teams weergeven |
 | `POST` | `/api/v1/teams` | Admin (`teams:manage`) | Team aanmaken |
-| `PUT` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Team hernoemen |
+| `PUT` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Team bijwerken (minstens één veld vereist) |
 | `DELETE` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Team verwijderen (het standaardteam of teams met leden kunnen niet worden verwijderd) |
 
 ## Instellingen {#settings}

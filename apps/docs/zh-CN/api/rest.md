@@ -1,6 +1,6 @@
 ---
 description: "完整的 REST API 参考。工具端点、批处理、流水线、文件库、身份验证、团队以及管理操作。"
-i18n_output_hash: 966f6abf5f2a
+i18n_output_hash: eed3bd4e7b11
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -532,7 +532,7 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | 管理员（`teams:manage`） | 列出团队 |
 | `POST` | `/api/v1/teams` | 管理员（`teams:manage`） | 创建团队 |
-| `PUT` | `/api/v1/teams/:id` | 管理员（`teams:manage`） | 重命名团队 |
+| `PUT` | `/api/v1/teams/:id` | 管理员（`teams:manage`） | 更新团队（至少需要一个字段） |
 | `DELETE` | `/api/v1/teams/:id` | 管理员（`teams:manage`） | 删除团队（无法删除默认团队或有成员的团队） |
 
 ## 设置 {#settings}

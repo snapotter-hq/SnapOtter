@@ -1,6 +1,6 @@
 ---
 description: "完整的 REST API 參考。工具端點、批次處理、管線、檔案庫、驗證、團隊與管理操作。"
-i18n_output_hash: 29e1acd2135e
+i18n_output_hash: 0dccf94f5eb5
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -532,7 +532,7 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | Admin（`teams:manage`） | 列出團隊 |
 | `POST` | `/api/v1/teams` | Admin（`teams:manage`） | 建立團隊 |
-| `PUT` | `/api/v1/teams/:id` | Admin（`teams:manage`） | 重新命名團隊 |
+| `PUT` | `/api/v1/teams/:id` | Admin（`teams:manage`） | 更新團隊（至少需要一個欄位） |
 | `DELETE` | `/api/v1/teams/:id` | Admin（`teams:manage`） | 刪除團隊（無法刪除預設團隊或含成員的團隊） |
 
 ## 設定 {#settings}

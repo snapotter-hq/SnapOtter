@@ -1,6 +1,6 @@
 ---
 description: "Kompletna dokumentacja API REST. Punkty końcowe narzędzi, przetwarzanie wsadowe, potoki, biblioteka plików, uwierzytelnianie, zespoły i operacje administracyjne."
-i18n_output_hash: 672efd252a6f
+i18n_output_hash: 8ebd79220cdc
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -532,7 +532,7 @@ Aby automatycznie zapisać wynik narzędzia w bibliotece, dołącz `fileId` jako
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | Administrator (`teams:manage`) | Lista zespołów |
 | `POST` | `/api/v1/teams` | Administrator (`teams:manage`) | Utwórz zespół |
-| `PUT` | `/api/v1/teams/:id` | Administrator (`teams:manage`) | Zmień nazwę zespołu |
+| `PUT` | `/api/v1/teams/:id` | Administrator (`teams:manage`) | Zaktualizuj zespół (wymagane co najmniej jedno pole) |
 | `DELETE` | `/api/v1/teams/:id` | Administrator (`teams:manage`) | Usuń zespół (nie można usunąć domyślnego zespołu ani zespołów z członkami) |
 
 ## Ustawienia {#settings}

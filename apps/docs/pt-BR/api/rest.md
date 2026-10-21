@@ -1,6 +1,6 @@
 ---
 description: "Referência completa da API REST. Endpoints de ferramentas, processamento em lote, pipelines, biblioteca de arquivos, autenticação, times e operações administrativas."
-i18n_output_hash: 82e10114b59a
+i18n_output_hash: 13383c9ddff3
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -532,7 +532,7 @@ Para salvar automaticamente o resultado de uma ferramenta na biblioteca, inclua 
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | Admin (`teams:manage`) | Lista os times |
 | `POST` | `/api/v1/teams` | Admin (`teams:manage`) | Cria um time |
-| `PUT` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Renomeia um time |
+| `PUT` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Atualiza um time (pelo menos um campo obrigatório) |
 | `DELETE` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Exclui um time (não é possível excluir o time padrão ou times com membros) |
 
 ## Configurações {#settings}

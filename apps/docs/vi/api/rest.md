@@ -1,6 +1,6 @@
 ---
 description: "Tài liệu tham khảo REST API đầy đủ. Endpoint công cụ, xử lý hàng loạt, pipeline, thư viện tệp, xác thực, nhóm và các thao tác quản trị."
-i18n_output_hash: e747b3ba9a30
+i18n_output_hash: 305ce33bf0ed
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -532,7 +532,7 @@ Lưu trữ tệp bền vững kèm lịch sử phiên bản.
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | Admin (`teams:manage`) | Liệt kê nhóm |
 | `POST` | `/api/v1/teams` | Admin (`teams:manage`) | Tạo nhóm |
-| `PUT` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Đổi tên nhóm |
+| `PUT` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Cập nhật nhóm (bắt buộc ít nhất một trường) |
 | `DELETE` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Xóa nhóm (không thể xóa nhóm mặc định hoặc nhóm có thành viên) |
 
 ## Cài đặt {#settings}

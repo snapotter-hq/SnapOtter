@@ -1,6 +1,6 @@
 ---
 description: "Повний довідник REST API. Кінцеві точки інструментів, пакетна обробка, конвеєри, бібліотека файлів, автентифікація, команди й адміністративні операції."
-i18n_output_hash: 7a53f20ff041
+i18n_output_hash: e25fe07bc63c
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -532,7 +532,7 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | Адмін (`teams:manage`) | Список команд |
 | `POST` | `/api/v1/teams` | Адмін (`teams:manage`) | Створити команду |
-| `PUT` | `/api/v1/teams/:id` | Адмін (`teams:manage`) | Перейменувати команду |
+| `PUT` | `/api/v1/teams/:id` | Адмін (`teams:manage`) | Оновити команду (потрібне щонайменше одне поле) |
 | `DELETE` | `/api/v1/teams/:id` | Адмін (`teams:manage`) | Видалити команду (не можна видалити команду за замовчуванням або команди з учасниками) |
 
 ## Налаштування {#settings}

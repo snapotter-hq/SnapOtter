@@ -1,6 +1,6 @@
 ---
 description: "Vollständige REST-API-Referenz. Tool-Endpunkte, Stapelverarbeitung, Pipelines, Dateibibliothek, Authentifizierung, Teams und Admin-Operationen."
-i18n_output_hash: c529dec65ef4
+i18n_output_hash: 7d5fe4ec5c6c
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -532,7 +532,7 @@ Um ein Tool-Ergebnis automatisch in der Bibliothek zu speichern, fügen Sie `fil
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | Admin (`teams:manage`) | Teams auflisten |
 | `POST` | `/api/v1/teams` | Admin (`teams:manage`) | Team erstellen |
-| `PUT` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Team umbenennen |
+| `PUT` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Team aktualisieren (mindestens ein Feld erforderlich) |
 | `DELETE` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Team löschen (Standard-Team oder Teams mit Mitgliedern können nicht gelöscht werden) |
 
 ## Einstellungen {#settings}

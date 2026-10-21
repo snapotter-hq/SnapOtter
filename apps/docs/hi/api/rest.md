@@ -1,6 +1,6 @@
 ---
 description: "संपूर्ण REST API संदर्भ। टूल एंडपॉइंट, बैच प्रोसेसिंग, पाइपलाइन, फ़ाइल लाइब्रेरी, प्रमाणीकरण, टीमें और एडमिन संचालन।"
-i18n_output_hash: 85298439c862
+i18n_output_hash: 1e5bfc233226
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -532,7 +532,7 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | एडमिन (`teams:manage`) | टीमों की सूची बनाएँ |
 | `POST` | `/api/v1/teams` | एडमिन (`teams:manage`) | टीम बनाएँ |
-| `PUT` | `/api/v1/teams/:id` | एडमिन (`teams:manage`) | टीम का नाम बदलें |
+| `PUT` | `/api/v1/teams/:id` | एडमिन (`teams:manage`) | टीम अपडेट करें (कम से कम एक फ़ील्ड आवश्यक है) |
 | `DELETE` | `/api/v1/teams/:id` | एडमिन (`teams:manage`) | टीम हटाएँ (डिफ़ॉल्ट टीम या सदस्यों वाली टीमें नहीं हटा सकते) |
 
 ## सेटिंग्स {#settings}

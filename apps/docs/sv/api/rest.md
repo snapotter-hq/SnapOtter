@@ -1,6 +1,6 @@
 ---
 description: "Fullständig REST API-referens. Verktygsslutpunkter, batchbearbetning, pipelines, filbibliotek, autentisering, team och adminåtgärder."
-i18n_output_hash: 08efb76e24bd
+i18n_output_hash: eec3c6ab131b
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -532,7 +532,7 @@ För att automatiskt spara ett verktygsresultat till biblioteket, inkludera `fil
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/teams` | Admin (`teams:manage`) | Lista team |
 | `POST` | `/api/v1/teams` | Admin (`teams:manage`) | Skapa team |
-| `PUT` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Byt namn på team |
+| `PUT` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Uppdatera team (minst ett fält krävs) |
 | `DELETE` | `/api/v1/teams/:id` | Admin (`teams:manage`) | Ta bort team (kan inte ta bort standardteamet eller team med medlemmar) |
 
 ## Inställningar {#settings}
