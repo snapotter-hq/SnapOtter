@@ -115,4 +115,48 @@ describe("file-validation extension extraction + TGA (L216, L228)", () => {
     const res = await validateImageBuffer(buf);
     expect(res).toEqual({ valid: false, reason: "Unrecognized image format" });
   });
+
+  it("ignores extensionless and leading-dot filenames that spell an extension (#3245)", async () => {
+    const pngBuf = await png(10, 10);
+    for (const name of ["tga", ".tga", "tga.", "dng", ".dng", "svgz", ".svgz", "apng", ".apng"]) {
+      await expect(validateImageBuffer(pngBuf, name)).resolves.toEqual({
+        valid: true,
+        format: "png",
+        width: 10,
+        height: 10,
+      });
+    }
+
+    const tiffBuf = await sharp({
+      create: { width: 10, height: 10, channels: 3, background: { r: 10, g: 20, b: 30 } },
+    })
+      .tiff()
+      .toBuffer();
+    for (const name of ["dng", ".dng", "dng."]) {
+      await expect(validateImageBuffer(tiffBuf, name)).resolves.toEqual({
+        valid: true,
+        format: "tiff",
+        width: 10,
+        height: 10,
+      });
+    }
+
+    const textBuf = Buffer.from("hello");
+    const gzipNonSvg = Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0x00]);
+    for (const [buf, name] of [
+      [textBuf, "tga"],
+      [textBuf, ".tga"],
+      [textBuf, "dng"],
+      [textBuf, ".dng"],
+      [textBuf, "apng"],
+      [textBuf, ".apng"],
+      [gzipNonSvg, "svgz"],
+      [gzipNonSvg, ".svgz"],
+    ] as const) {
+      await expect(validateImageBuffer(buf, name)).resolves.toEqual({
+        valid: false,
+        reason: "Unrecognized image format",
+      });
+    }
+  });
 });

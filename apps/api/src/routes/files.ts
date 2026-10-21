@@ -149,7 +149,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
 
           // Try image validation; non-image files are accepted with format from extension
           const validation = await validateImageBuffer(buffer, part.filename).catch(() => null);
-          const isValidImage = validation?.valid === true;
+          const isValidImage = validation?.valid === true && !validation.nameOnly;
 
           // Sanitize SVG uploads to prevent XXE, SSRF, and script injection.
           // Keyed on content, NOT on isValidImage: a hostile SVG (a DOCTYPE with

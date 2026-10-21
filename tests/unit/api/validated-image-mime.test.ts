@@ -47,6 +47,9 @@ describe("validatedImageMime", () => {
   it("falls back to a generic RAW type when the name isn't a RAW extension", () => {
     expect(validatedImageMime(found("raw"), "shot.png")).toBe("image/x-dcraw");
     expect(validatedImageMime(found("raw"), "shot")).toBe("image/x-dcraw");
+    expect(validatedImageMime(found("raw"), "dng")).toBe("image/x-dcraw");
+    expect(validatedImageMime(found("raw"), ".dng")).toBe("image/x-dcraw");
+    expect(validatedImageMime(found("raw"), "cr2.")).toBe("image/x-dcraw");
     expect(validatedImageMime(found("raw"))).toBe("image/x-dcraw");
   });
 
@@ -54,6 +57,9 @@ describe("validatedImageMime", () => {
     expect(validatedImageMime(found("heif"), "photo.HEIC")).toBe("image/heic");
     expect(validatedImageMime(found("heif"), "photo.heif")).toBe("image/heif");
     expect(validatedImageMime(found("heif"), "photo.png")).toBe("image/heif");
+    expect(validatedImageMime(found("heif"), "heic")).toBe("image/heif");
+    expect(validatedImageMime(found("heif"), ".heic")).toBe("image/heif");
+    expect(validatedImageMime(found("heif"), "heic.")).toBe("image/heif");
     expect(validatedImageMime(found("heif"))).toBe("image/heif");
   });
 

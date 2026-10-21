@@ -943,11 +943,18 @@ describe("files route logic", () => {
     });
 
     it("returns an empty format string for extensionless non-image files (#2745)", async () => {
+      const nonSvgGzip = gzipSync(Buffer.from("hello"));
       const req = makeRequest([
         filePart("README", Buffer.from("hello")),
         filePart("README.", Buffer.from("trailing-dot")),
         filePart(undefined, Buffer.from("world")),
         filePart(".gitignore", Buffer.from("node_modules\n")),
+        filePart("tga", Buffer.from("hello")),
+        filePart(".tga", Buffer.from("hello")),
+        filePart("dng", Buffer.from("hello")),
+        filePart(".dng", Buffer.from("hello")),
+        filePart("notes.dng", Buffer.from("hello")),
+        filePart("archive.svgz", nonSvgGzip),
         filePart("Archive.ZIP", Buffer.from("not-an-image")),
         filePart(
           "logo",
@@ -966,6 +973,12 @@ describe("files route logic", () => {
           { name: "README.", size: 12, format: "" },
           { name: "upload", size: 5, format: "" },
           { name: ".gitignore", size: 13, format: "" },
+          { name: "tga", size: 5, format: "" },
+          { name: ".tga", size: 5, format: "" },
+          { name: "dng", size: 5, format: "" },
+          { name: ".dng", size: 5, format: "" },
+          { name: "notes.dng", size: 5, format: "dng" },
+          { name: "archive.svgz", size: nonSvgGzip.length, format: "svgz" },
           { name: "Archive.ZIP", size: 12, format: "zip" },
           {
             name: "logo",

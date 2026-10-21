@@ -1,3 +1,4 @@
+import { extname } from "node:path";
 import { createGunzip } from "node:zlib";
 import { extToMime, formatToMime } from "@snapotter/image-engine";
 import { CAMERA_RAW_INPUTS } from "@snapotter/shared";
@@ -214,7 +215,7 @@ export function isRawExtension(ext: string): boolean {
 export function validatedImageMime(validation: ValidationResult, filename?: string): string | null {
   if (validation.nameOnly) return null;
   const { format } = validation;
-  const ext = filename?.includes(".") ? (filename.split(".").pop()?.toLowerCase() ?? "") : "";
+  const ext = filename ? extname(filename).toLowerCase().replace(/^\./, "") : "";
   if (format === "raw") {
     const rawMime = isRawExtension(ext) ? extToMime(ext) : "";
     return rawMime.startsWith("image/") ? rawMime : "image/x-dcraw";
@@ -255,7 +256,7 @@ export async function validateImageBuffer(
   }
 
   // Extract extension from filename for extension-based detection
-  const ext = filename ? (filename.split(".").pop()?.toLowerCase() ?? "") : "";
+  const ext = filename ? extname(filename).toLowerCase().replace(/^\./, "") : "";
 
   // 2. Format detection (magic bytes for raster, text check for SVG, text check for HDR)
   let detectedFormat =
