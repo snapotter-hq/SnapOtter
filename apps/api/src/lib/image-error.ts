@@ -7,6 +7,7 @@ import type {
   ToolProcessCtx,
   ToolProcessV2,
 } from "../routes/tool-factory.js";
+import { isBinarySpawnFailure } from "./binary-overrides.js";
 import { isOperationalErrno } from "./error-report.js";
 import { logger } from "./logger.js";
 
@@ -48,15 +49,16 @@ type ImageProcess<T> = (
  * untouched so their class is not masked.
  *
  * An environmental errno (a full disk or a permission error while writing a
- * temp file or spawning an encoder) is the host's problem, not our code, so it
- * becomes an operational SafeError instead of a bug (#1450). Its code is the
- * errno, so reportError still groups it with every other ENOSPC or EACCES, and
- * the message is a sentence written for the user rather than Node's text,
- * which can carry temp paths.
+ * temp file) is the host's problem, not our code, so it becomes an operational
+ * SafeError instead of a bug (#1450). Its code is the errno, so reportError
+ * still groups it with every other ENOSPC or EACCES, and the message is a
+ * sentence written for the user rather than Node's text, which can carry temp
+ * paths. Binary spawn failures (`isBinarySpawnFailure`) pass through untouched
+ * so `worker.ts` converts them to `503 ENGINE_UNAVAILABLE` (#3360).
  */
 function isPassthroughError(err: unknown): boolean {
   if (err === "timeout") return true;
-  if (isSafeMessageError(err) || isToolInputError(err)) return true;
+  if (isSafeMessageError(err) || isToolInputError(err) || isBinarySpawnFailure(err)) return true;
   if (!(err instanceof Error)) return false;
   return (
     err.name === "InputValidationError" ||

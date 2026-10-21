@@ -186,11 +186,16 @@ describe("withImageEncodeContextV2", () => {
     });
   });
 
-  it("passes SafeError, ToolInputError, and InputValidationError through unchanged", async () => {
+  it("passes SafeError, ToolInputError, InputValidationError, and binary spawn failures through unchanged", async () => {
     const safe = new SafeError("Process killed", { kind: "operational" });
     const inputErr = markToolInputError(new Error("Bad input"));
     const valErr = new InputValidationError("Provide at least two images");
-    for (const err of [safe, inputErr, valErr]) {
+    const spawnErr = Object.assign(new Error("spawn ffmpeg ENOENT"), {
+      code: "ENOENT",
+      syscall: "spawn ffmpeg",
+      path: "ffmpeg",
+    });
+    for (const err of [safe, inputErr, valErr, spawnErr]) {
       const wrapped = withImageEncodeContextV2(
         "Failed",
         () => "v2",
@@ -239,7 +244,7 @@ describe("withAiImageEncodeContext", () => {
     });
   });
 
-  it("passes AbortError, AnimatedRemovalCanceledError, Canceled, and 400 status errors through unchanged", async () => {
+  it("passes AbortError, AnimatedRemovalCanceledError, Canceled, 400 status, and binary spawn errors through unchanged", async () => {
     const abortErr = Object.assign(new Error("The operation was aborted"), { name: "AbortError" });
     const animCanceled = Object.assign(new Error("canceled"), {
       name: "AnimatedRemovalCanceledError",
@@ -247,8 +252,21 @@ describe("withAiImageEncodeContext", () => {
     const canceledErr = new Error("Canceled");
     const timeoutErr = new Error("Timed out after 10s");
     const status400Err = Object.assign(new Error("SVG exceeds limit"), { statusCode: 400 });
+    const spawnErr = Object.assign(new Error("spawn python3 ENOMEM"), {
+      code: "ENOMEM",
+      syscall: "spawn python3",
+      path: "python3",
+    });
 
-    for (const err of [abortErr, animCanceled, canceledErr, timeoutErr, status400Err, "timeout"]) {
+    for (const err of [
+      abortErr,
+      animCanceled,
+      canceledErr,
+      timeoutErr,
+      status400Err,
+      spawnErr,
+      "timeout",
+    ]) {
       const wrapped = withAiImageEncodeContext(
         "Failed",
         () => "ai",
@@ -296,10 +314,17 @@ describe("withImageEncodeContext and environmental errnos (#1450)", () => {
   });
 
   it.each([
-    // A missing file or binary can be our own wrong path: the same line
-    // error-report.ts draws by keeping ENOENT out of the operational set.
+    // A missing file on open/read can be our own wrong path: the same line
+    // error-report.ts draws by keeping non-spawn ENOENT out of the operational set.
     [
-      "a missing binary (ENOENT)",
+      "a missing file on open (ENOENT)",
+      Object.assign(new Error("ENOENT: no such file or directory, open '/tmp/x.png'"), {
+        code: "ENOENT",
+        syscall: "open",
+      }),
+    ],
+    [
+      "a bare ENOENT without a spawn syscall",
       Object.assign(new Error("spawn magick ENOENT"), { code: "ENOENT" }),
     ],
     // An encoder that fails on its own (even on a full disk) exits non-zero,
@@ -314,6 +339,25 @@ describe("withImageEncodeContext and environmental errnos (#1450)", () => {
     expect(thrown).toMatchObject({ name: "SafeError", kind: "bug", code: "webp" });
     expect(classifyError(thrown, "worker")).toBe("bug");
   });
+
+  it.each([
+    ["ENOENT", "spawn heif-enc"],
+    ["ENOMEM", "spawn"],
+    ["EACCES", "spawn /usr/bin/magick"],
+    ["ENOEXEC", "spawn cjxl"],
+    ["ENOTDIR", "spawnSync opj_compress"],
+  ])(
+    "passes a binary spawn failure (%s, %s) through unchanged so worker.ts converts it to 503 ENGINE_UNAVAILABLE (#3360)",
+    async (code, syscall) => {
+      const spawnErr = Object.assign(new Error(`${syscall} ${code}`), {
+        code,
+        syscall,
+        path: "heif-enc",
+      });
+
+      await expect(failingWith(spawnErr)(input, settings, "in.png")).rejects.toBe(spawnErr);
+    },
+  );
 
   it("wraps a thrown non-Error with an errno-looking code as a bug, not a pass-through", async () => {
     const thrown = await failingWith({ code: "ENOSPC" })(input, settings, "in.png").catch(
@@ -356,6 +400,31 @@ describe("withImageEncodeContext and environmental errnos (#1450)", () => {
       }
     },
   );
+
+  it("convert's HEIC path passes a real heif-enc spawn ENOENT through unchanged (#3360)", async () => {
+    const previousPath = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      registerConvert({
+        post: () => undefined,
+        get: () => undefined,
+      } as unknown as FastifyInstance);
+      const convert = getToolConfig("convert");
+      const thrown = await convert
+        ?.process(readFixture(fixtures.image.base.png200), { format: "heic" }, "in.png")
+        .catch((e: unknown) => e);
+
+      expect(isSafeMessageError(thrown)).toBe(false);
+      expect(thrown).toMatchObject({
+        code: "ENOENT",
+        syscall: "spawn heif-enc",
+      });
+      expect(classifyError(thrown, "worker")).toBe("operational");
+    } finally {
+      if (previousPath === undefined) delete process.env.PATH;
+      else process.env.PATH = previousPath;
+    }
+  });
 });
 
 describe("asInputErrorIfUndecodable", () => {
@@ -427,6 +496,19 @@ describe("asInputErrorIfUndecodable", () => {
 
     const enospc = Object.assign(new Error("ENOSPC: no space left on device"), { code: "ENOSPC" });
     expect(await asInputErrorIfUndecodable(truncatedJpg, enospc)).toBe(enospc);
+
+    for (const [code, syscall] of [
+      ["ENOENT", "spawn heif-enc"],
+      ["ENOMEM", "spawn"],
+      ["EACCES", "spawn /usr/bin/magick"],
+    ] as const) {
+      const spawnErr = Object.assign(new Error(`${syscall} ${code}`), {
+        code,
+        syscall,
+        path: "heif-enc",
+      });
+      expect(await asInputErrorIfUndecodable(truncatedJpg, spawnErr)).toBe(spawnErr);
+    }
   });
 });
 
