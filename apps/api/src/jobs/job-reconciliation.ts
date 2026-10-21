@@ -426,6 +426,41 @@ async function failWithoutOutput(row: StrandedRow): Promise<StrandedJobOutcome> 
 }
 
 /**
+ * Fail non-terminal rows with no `tool_id` at startup (inline batch parents
+ * and SSE progress placeholders that were never enqueued to BullMQ), while
+ * skipping single-file `clientJobId` alias rows whose target `artifactJobId`
+ * or `pipelineFlowId` row is still non-terminal (#2700). Those alias rows are
+ * settled alongside their target by the worker or `reconcileStrandedJobs`,
+ * whereas dangling pre-enqueue alias rows (whose target was never inserted)
+ * and alias rows pointing at an already-terminal target are cleaned up here.
+ */
+export async function reconcileOrphanedJobsAtStartup(): Promise<number> {
+  const result = await db.execute(
+    sql`UPDATE jobs
+      SET status = 'failed',
+          error = '{"message":"Orphaned job reconciled at startup"}'::jsonb,
+          completed_at = now()
+      WHERE status IN ('processing', 'queued')
+        AND (tool_id IS NULL OR tool_id = '')
+        AND NOT (
+          type = 'single'
+          AND EXISTS (
+            SELECT 1
+            FROM jobs AS target
+            WHERE target.id IN (
+              jobs.settings->>'artifactJobId',
+              jobs.settings->>'pipelineFlowId'
+            )
+              AND target.status IN ('processing', 'queued')
+              AND target.tool_id IS NOT NULL
+              AND target.tool_id <> ''
+          )
+        )`,
+  );
+  return (result as { rowCount?: number }).rowCount ?? 0;
+}
+
+/**
  * Resolve every job row that is non-terminal but has no live queue entry.
  *
  * Runs at boot and on a repeatable system job, so a database that was

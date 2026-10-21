@@ -29,8 +29,9 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { sharedRedis } from "../../../apps/api/src/jobs/connection.js";
-import { upsertToolJobAlias } from "../../../apps/api/src/jobs/enqueue.js";
+import { insertToolJobAlias, upsertToolJobAlias } from "../../../apps/api/src/jobs/enqueue.js";
 import {
+  reconcileOrphanedJobsAtStartup,
   reconcileStrandedJobs,
   UNRECOVERABLE_STRANDED_JOB_ERROR,
 } from "../../../apps/api/src/jobs/job-reconciliation.js";
@@ -2266,6 +2267,280 @@ describe("stranded-job reconciliation", () => {
         await queue.remove(secondRunJobId).catch(() => {});
         await queue.remove(longToolJobId).catch(() => {});
         await queue.remove(longPipelineFlowId).catch(() => {});
+      }
+    });
+  });
+
+  describe("startup orphaned-job reconciliation (#2700)", () => {
+    it("skips clientJobId alias rows whose target artifactJobId or pipelineFlowId is still reconcilable or live so reconcileStrandedJobs settles them alongside their target", async () => {
+      const user = await createUserAndLogin(testApp.app, `startup-orphan-alias-${Date.now()}`);
+
+      // 1. Recoverable single-tool job + clientJobId alias row (both in processing, output on disk).
+      const recoverableToolJobId = await seedJob({
+        userId: user.userId,
+        toolId: "convert",
+        pool: "image",
+        type: "tool",
+        status: "processing",
+      });
+      await seedOutput(recoverableToolJobId, "recovered-tool.avif", Buffer.from("avif-bytes"));
+      const recoverableToolAliasId = randomUUID();
+      await upsertToolJobAlias({
+        jobId: recoverableToolJobId,
+        clientJobId: recoverableToolAliasId,
+        userId: user.userId,
+        pool: "image",
+      });
+      await db
+        .update(schema.jobs)
+        .set({ status: "processing" })
+        .where(eq(schema.jobs.id, recoverableToolAliasId));
+
+      // 2. Recoverable single-file pipeline job + clientJobId alias row (both in processing, output on disk).
+      const recoverablePipelineId = await seedJob({
+        userId: user.userId,
+        toolId: "pipeline",
+        pool: "image",
+        type: "pipeline",
+        status: "processing",
+      });
+      await seedOutput(recoverablePipelineId, "recovered-pipe.png", Buffer.from("png-bytes"));
+      const recoverablePipelineAliasId = randomUUID();
+      await db.insert(schema.jobs).values({
+        id: recoverablePipelineAliasId,
+        userId: user.userId,
+        pool: "image",
+        type: "single",
+        status: "processing",
+        inputRefs: [],
+        settings: { pipelineFlowId: recoverablePipelineId },
+      });
+
+      // 3. Unrecoverable stranded single-tool job (no output on disk) + clientJobId alias row.
+      const unrecoverableToolJobId = await seedJob({
+        userId: user.userId,
+        toolId: "resize",
+        pool: "image",
+        type: "tool",
+        status: "processing",
+      });
+      const unrecoverableToolAliasId = randomUUID();
+      await upsertToolJobAlias({
+        jobId: unrecoverableToolJobId,
+        clientJobId: unrecoverableToolAliasId,
+        userId: user.userId,
+        pool: "image",
+      });
+      await db
+        .update(schema.jobs)
+        .set({ status: "processing", progress: { percent: 35, stage: "Resizing..." } })
+        .where(eq(schema.jobs.id, unrecoverableToolAliasId));
+
+      // 4. Live single-tool job + live pipeline job still queued in BullMQ across restart, with their alias rows.
+      const liveToolJobId = await seedJob({
+        userId: user.userId,
+        toolId: "convert",
+        pool: "image",
+        type: "tool",
+        status: "queued",
+      });
+      const liveToolAliasId = randomUUID();
+      await upsertToolJobAlias({
+        jobId: liveToolJobId,
+        clientJobId: liveToolAliasId,
+        userId: user.userId,
+        pool: "image",
+      });
+
+      const livePipelineId = await seedJob({
+        userId: user.userId,
+        toolId: "pipeline",
+        pool: "image",
+        type: "pipeline",
+        status: "processing",
+      });
+      const livePipelineAliasId = randomUUID();
+      await db.insert(schema.jobs).values({
+        id: livePipelineAliasId,
+        userId: user.userId,
+        pool: "image",
+        type: "single",
+        status: "processing",
+        inputRefs: [],
+        settings: { pipelineFlowId: livePipelineId },
+      });
+
+      // 5. Dangling pre-enqueue alias row created by insertToolJobAlias whose target jobId was never inserted (#2617).
+      const danglingAliasId = randomUUID();
+      await insertToolJobAlias({
+        jobId: randomUUID(),
+        clientJobId: danglingAliasId,
+        userId: user.userId,
+        pool: "image",
+      });
+
+      // 6. Alias row whose target artifactJobId is already terminal (completed/canceled before crash).
+      const settledTargetJobId = await seedJob({
+        userId: user.userId,
+        toolId: "convert",
+        pool: "image",
+        type: "tool",
+        status: "canceled",
+      });
+      const settledTargetAliasId = randomUUID();
+      await upsertToolJobAlias({
+        jobId: settledTargetJobId,
+        clientJobId: settledTargetAliasId,
+        userId: user.userId,
+        pool: "image",
+      });
+
+      // 7. Non-single batch row, self-referential single row, empty-toolId target alias row, and plain SSE placeholder.
+      const nonSingleBatchId = randomUUID();
+      const selfRefAliasId = randomUUID();
+      const emptyToolTargetId = await seedJob({
+        userId: user.userId,
+        toolId: "",
+        pool: null,
+        type: "tool",
+        status: "processing",
+      });
+      const emptyToolAliasId = randomUUID();
+      const plainPlaceholderId = await seedJob({
+        userId: user.userId,
+        toolId: null,
+        pool: null,
+        type: "single",
+        status: "processing",
+      });
+      const alreadyCanceledPlaceholderId = await seedJob({
+        userId: user.userId,
+        toolId: null,
+        pool: null,
+        type: "single",
+        status: "canceled",
+      });
+      await db
+        .update(schema.jobs)
+        .set({ error: { message: "Canceled" } })
+        .where(eq(schema.jobs.id, alreadyCanceledPlaceholderId));
+      await db.insert(schema.jobs).values([
+        {
+          id: nonSingleBatchId,
+          userId: user.userId,
+          type: "batch",
+          status: "processing",
+          inputRefs: [],
+          settings: { artifactJobId: liveToolJobId },
+        },
+        {
+          id: selfRefAliasId,
+          userId: user.userId,
+          type: "single",
+          status: "processing",
+          inputRefs: [],
+          settings: { artifactJobId: selfRefAliasId },
+        },
+        {
+          id: emptyToolAliasId,
+          userId: user.userId,
+          type: "single",
+          status: "processing",
+          inputRefs: [],
+          settings: { artifactJobId: emptyToolTargetId },
+        },
+      ]);
+
+      const queue = getQueue("image");
+      await queue.add("convert", { jobId: liveToolJobId } as never, {
+        jobId: liveToolJobId,
+        delay: 10 * 60_000,
+      });
+      await queue.add("pipeline-finalize", { jobId: livePipelineId } as never, {
+        jobId: livePipelineId,
+        delay: 10 * 60_000,
+      });
+
+      try {
+        // Step 1: Run startup orphan sweep BEFORE reconcileStrandedJobs (matching apps/api/src/index.ts).
+        const orphanedCount = await reconcileOrphanedJobsAtStartup();
+        expect(orphanedCount).toBeGreaterThanOrEqual(7);
+
+        // Alias rows with non-terminal target jobs must remain non-terminal so reconcileStrandedJobs or the worker can settle them.
+        expect((await readJob(recoverableToolAliasId)).status).toBe("processing");
+        expect((await readJob(recoverablePipelineAliasId)).status).toBe("processing");
+        expect((await readJob(unrecoverableToolAliasId)).status).toBe("processing");
+        expect((await readJob(liveToolAliasId)).status).toBe("queued");
+        expect((await readJob(livePipelineAliasId)).status).toBe("processing");
+
+        // Genuinely orphaned rows (dangling target, terminal target, non-single, self-ref, empty-toolId, plain placeholder) are failed at startup.
+        for (const orphanId of [
+          danglingAliasId,
+          settledTargetAliasId,
+          nonSingleBatchId,
+          selfRefAliasId,
+          emptyToolTargetId,
+          emptyToolAliasId,
+          plainPlaceholderId,
+        ]) {
+          const orphanRow = await readJob(orphanId);
+          expect(orphanRow.status, `orphan ${orphanId} was not failed at startup`).toBe("failed");
+          expect(orphanRow.error).toEqual({ message: "Orphaned job reconciled at startup" });
+          expect(orphanRow.completedAt).not.toBeNull();
+        }
+        const alreadyCanceledAfter = await readJob(alreadyCanceledPlaceholderId);
+        expect(alreadyCanceledAfter.status).toBe("canceled");
+        expect(alreadyCanceledAfter.error).toEqual({ message: "Canceled" });
+
+        // Immediate second startup sweep is a no-op once orphaned rows are settled.
+        expect(await reconcileOrphanedJobsAtStartup()).toBe(0);
+
+        // Step 2: Run reconcileStrandedJobs({ graceMs: 0 }) and verify alias rows settle alongside their targets.
+        const summary = await reconcileStrandedJobs({ graceMs: 0 });
+        expect(summary.outcomes.find((o) => o.jobId === recoverableToolJobId)?.resolution).toBe(
+          "recovered",
+        );
+        expect(summary.outcomes.find((o) => o.jobId === recoverablePipelineId)?.resolution).toBe(
+          "recovered",
+        );
+        expect(summary.outcomes.find((o) => o.jobId === unrecoverableToolJobId)?.resolution).toBe(
+          "failed",
+        );
+        expect(summary.outcomes.find((o) => o.jobId === liveToolJobId)?.resolution).toBe("live");
+        expect(summary.outcomes.find((o) => o.jobId === livePipelineId)?.resolution).toBe("live");
+
+        const recoveredToolRow = await readJob(recoverableToolJobId);
+        const recoveredToolAliasRow = await readJob(recoverableToolAliasId);
+        expect(recoveredToolRow.status).toBe("completed");
+        expect(recoveredToolAliasRow.status).toBe("completed");
+        expect(recoveredToolAliasRow.error).toBeNull();
+        expect(recoveredToolAliasRow.progress).toEqual(recoveredToolRow.progress);
+        expect(resultOf(recoveredToolAliasRow).downloadUrl).toBe(
+          `/api/v1/download/${recoverableToolJobId}/recovered-tool.avif`,
+        );
+
+        const recoveredPipeRow = await readJob(recoverablePipelineId);
+        const recoveredPipeAliasRow = await readJob(recoverablePipelineAliasId);
+        expect(recoveredPipeRow.status).toBe("completed");
+        expect(recoveredPipeAliasRow.status).toBe("completed");
+        expect(recoveredPipeAliasRow.error).toBeNull();
+        expect(recoveredPipeAliasRow.progress).toEqual(recoveredPipeRow.progress);
+        expect(resultOf(recoveredPipeAliasRow).downloadUrl).toBe(
+          `/api/v1/download/${recoverablePipelineId}/recovered-pipe.png`,
+        );
+
+        const failedToolAliasRow = await readJob(unrecoverableToolAliasId);
+        expect(failedToolAliasRow.status).toBe("failed");
+        expect(failedToolAliasRow.error).toEqual({ message: UNRECOVERABLE_STRANDED_JOB_ERROR });
+        expect(failedToolAliasRow.progress).toEqual({ percent: 0 });
+
+        expect((await readJob(liveToolJobId)).status).toBe("queued");
+        expect((await readJob(liveToolAliasId)).status).toBe("queued");
+        expect((await readJob(livePipelineId)).status).toBe("processing");
+        expect((await readJob(livePipelineAliasId)).status).toBe("processing");
+      } finally {
+        await queue.remove(liveToolJobId).catch(() => {});
+        await queue.remove(livePipelineId).catch(() => {});
       }
     });
   });

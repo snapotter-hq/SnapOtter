@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const getQueueMock = vi.hoisted(() => vi.fn());
@@ -9,6 +11,7 @@ const reportErrorMock = vi.hoisted(() => vi.fn());
 const loggerErrorMock = vi.hoisted(() => vi.fn());
 const loggerWarnMock = vi.hoisted(() => vi.fn());
 const clearTerminalReplayKeyMock = vi.hoisted(() => vi.fn());
+const dbExecuteMock = vi.hoisted(() => vi.fn());
 const dbSelectRows = vi.hoisted(() => ({ rows: [] as unknown[] }));
 const dbStepRowsById = vi.hoisted(
   () =>
@@ -36,6 +39,7 @@ async function loadJobReconciliation() {
   loggerErrorMock.mockReset();
   loggerWarnMock.mockReset();
   clearTerminalReplayKeyMock.mockReset().mockResolvedValue(undefined);
+  dbExecuteMock.mockReset().mockResolvedValue({ rowCount: 0 });
   dbSelectRows.rows = [];
   dbStepRowsById.clear();
   dbUpdateSetCalls.length = 0;
@@ -79,6 +83,7 @@ async function loadJobReconciliation() {
 
   vi.doMock("../../../../apps/api/src/db/index.js", () => ({
     db: {
+      execute: dbExecuteMock,
       select: vi.fn(() => ({
         from: vi.fn(() => ({
           where: vi.fn((cond: unknown) => {
@@ -770,5 +775,40 @@ describe("reconcileStrandedJobs per-row fault isolation (#1498)", () => {
         }),
       },
     });
+  });
+
+  it("reconciles startup orphaned rows while skipping single-file clientJobId aliases with non-terminal targets (#2700)", async () => {
+    const mod = await loadJobReconciliation();
+    expect(typeof mod.reconcileOrphanedJobsAtStartup).toBe("function");
+
+    dbExecuteMock
+      .mockResolvedValueOnce({ rowCount: 3 })
+      .mockResolvedValueOnce({ rowCount: 0 })
+      .mockResolvedValueOnce({});
+
+    await expect(mod.reconcileOrphanedJobsAtStartup()).resolves.toBe(3);
+    await expect(mod.reconcileOrphanedJobsAtStartup()).resolves.toBe(0);
+    await expect(mod.reconcileOrphanedJobsAtStartup()).resolves.toBe(0);
+
+    expect(dbExecuteMock).toHaveBeenCalledTimes(3);
+    const query = dbExecuteMock.mock.calls[0]?.[0] as { strings?: string[]; vals?: unknown[] };
+    const sqlText = (query?.strings ?? []).join(" ");
+    expect(sqlText).toContain("UPDATE jobs");
+    expect(sqlText).toContain("status = 'failed'");
+    expect(sqlText).toContain('\'{"message":"Orphaned job reconciled at startup"}\'::jsonb');
+    expect(sqlText).toContain("completed_at = now()");
+    expect(sqlText).toContain("status IN ('processing', 'queued')");
+    expect(sqlText).toContain("(tool_id IS NULL OR tool_id = '')");
+    expect(sqlText).toContain("AND NOT (");
+    expect(sqlText).toContain("type = 'single'");
+    expect(sqlText).toContain("jobs.settings->>'artifactJobId'");
+    expect(sqlText).toContain("jobs.settings->>'pipelineFlowId'");
+    expect(sqlText).toContain("target.status IN ('processing', 'queued')");
+    expect(sqlText).toContain("AND target.tool_id IS NOT NULL");
+    expect(sqlText).toContain("AND target.tool_id <> ''");
+
+    const indexSource = readFileSync(join(process.cwd(), "apps/api/src/index.ts"), "utf8");
+    expect(indexSource).toContain("reconcileOrphanedJobsAtStartup()");
+    expect(indexSource).not.toContain("Orphaned job reconciled at startup");
   });
 });

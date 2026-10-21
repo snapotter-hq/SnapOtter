@@ -19,7 +19,10 @@ import {
 import { startCancelListener, stopCancelListener } from "./jobs/cancel.js";
 import { assertRedisCompatible, closeRedis, pingRedis } from "./jobs/connection.js";
 import { closeFlowProducer, closeQueueEvents, warmQueueEvents } from "./jobs/enqueue.js";
-import { reconcileStrandedJobs } from "./jobs/job-reconciliation.js";
+import {
+  reconcileOrphanedJobsAtStartup,
+  reconcileStrandedJobs,
+} from "./jobs/job-reconciliation.js";
 import { closeQueues, perPoolHealth, queueCounts } from "./jobs/queues.js";
 import { enqueueSystemJob, SYSTEM_JOBS, scheduleSystemJobs } from "./jobs/system-jobs.js";
 import { closeWorkers, startWorkers } from "./jobs/worker.js";
@@ -734,15 +737,13 @@ startWorkers();
 // Reconcile orphaned job rows. A jobs row created without a tool_id/pool (e.g. an
 // SSE-progress placeholder for a clientJobId whose client then disconnected) is
 // never enqueued to BullMQ, so unlike a genuinely interrupted job (which BullMQ's
-// stalled-detection requeues) it would sit in 'processing'/'queued' forever --
+// stalled-detection requeues) it would sit in 'processing'/'queued' forever,
 // inflating the per-user concurrent-job count and the upgrade-check in-flight gate.
-// Only rows with an empty tool_id are touched, so real jobs are never affected.
-void db
-  .execute(
-    sql`UPDATE jobs SET status = 'failed', error = '{"message":"Orphaned job reconciled at startup"}'::jsonb, completed_at = now() WHERE status IN ('processing','queued') AND (tool_id IS NULL OR tool_id = '')`,
-  )
-  .then((r) => {
-    const n = (r as { rowCount?: number }).rowCount ?? 0;
+// Single-file clientJobId alias rows whose target artifactJobId or pipelineFlowId
+// is still non-terminal are skipped so reconcileStrandedJobs or the worker can
+// settle them alongside their target (#2700).
+void reconcileOrphanedJobsAtStartup()
+  .then((n) => {
     if (n > 0) app.log.info({ count: n }, "Reconciled orphaned job rows at startup");
   })
   .catch((err) => app.log.warn({ err }, "Orphaned-job reconciliation failed"));
