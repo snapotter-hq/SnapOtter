@@ -23,8 +23,24 @@ import { writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { FastifyInstance } from "fastify";
+import { phase1SettingsSchema } from "../../apps/api/src/routes/tools/remove-background.js";
 import { PYTHON_SIDECAR_TOOLS, TOOLS } from "../../packages/shared/src/constants.js";
 import { deriveAxes, type PictAxis } from "../helpers/zod-pict.js";
+
+/**
+ * Returns the Zod schema that governs single-file HTTP requests to a tool's
+ * primary route (`POST /api/v1/tools/:modality/:toolId`).
+ *
+ * `remove-background` registers `pipelineSettingsSchema` in `toolRegistry` for
+ * pipelines and batch runs, while its HTTP route (Phase 1) only accepts
+ * `phase1SettingsSchema` (#2281, #2985).
+ */
+export function httpSettingsSchemaFor(
+  toolId: string,
+  registeredSchema: Parameters<typeof deriveAxes>[0] | undefined,
+): Parameters<typeof deriveAxes>[0] | undefined {
+  return toolId === "remove-background" ? phase1SettingsSchema : registeredSchema;
+}
 
 export interface ToolContract {
   id: string;
@@ -304,12 +320,13 @@ async function main(): Promise<void> {
           skipStructuralValidation?: boolean;
         }
       | undefined;
+    const settingsSchema = httpSettingsSchemaFor(tool.id, config?.settingsSchema);
     let axes: PictAxis[] = [];
     let bounds = new Map<string, FieldBounds>();
-    if (config?.settingsSchema) {
-      bounds = readFieldBounds(config.settingsSchema);
+    if (settingsSchema) {
+      bounds = readFieldBounds(settingsSchema);
       try {
-        axes = deriveAxes(config.settingsSchema);
+        axes = deriveAxes(settingsSchema);
       } catch (error) {
         // A Zod upgrade that breaks axis derivation must be visible, not silent.
         console.error(`axis derivation failed for ${tool.id}: ${(error as Error).message}`);

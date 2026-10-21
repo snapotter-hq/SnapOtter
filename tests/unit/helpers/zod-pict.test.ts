@@ -10,6 +10,7 @@ import { registerContentAwareResize } from "../../../apps/api/src/routes/tools/c
 import { registerCrop } from "../../../apps/api/src/routes/tools/crop.js";
 import { registerToolRoutes } from "../../../apps/api/src/routes/tools/index.js";
 import { registerOptimizeForWeb } from "../../../apps/api/src/routes/tools/optimize-for-web.js";
+import { phase1SettingsSchema } from "../../../apps/api/src/routes/tools/remove-background.js";
 import { registerResize } from "../../../apps/api/src/routes/tools/resize.js";
 import { registerSmartCrop } from "../../../apps/api/src/routes/tools/smart-crop.js";
 import { registerVideoToGif } from "../../../apps/api/src/routes/tools/video-to-gif.js";
@@ -19,6 +20,7 @@ import { pairwise } from "../../helpers/pairwise.js";
 import { defaultSettingsFor } from "../../helpers/tool-default-settings.js";
 import { compactCase, deriveAxes } from "../../helpers/zod-pict.js";
 import {
+  httpSettingsSchemaFor,
   invalidProbesFor,
   readFieldBounds,
   type ToolContract,
@@ -355,8 +357,9 @@ describe("extract-tool-contract literal unions and full tool-contract.json sync 
 
     for (const tool of TOOLS) {
       const config = getToolConfig(tool.id);
-      const rawAxes = config?.settingsSchema ? deriveAxes(config.settingsSchema) : [];
-      const bounds = config?.settingsSchema ? readFieldBounds(config.settingsSchema) : new Map();
+      const settingsSchema = httpSettingsSchemaFor(tool.id, config?.settingsSchema);
+      const rawAxes = settingsSchema ? deriveAxes(settingsSchema) : [];
+      const bounds = settingsSchema ? readFieldBounds(settingsSchema) : new Map();
       const expectedProbes = invalidProbesFor(rawAxes, bounds);
       const expected: ToolContract = JSON.parse(
         JSON.stringify({
@@ -378,19 +381,60 @@ describe("extract-tool-contract literal unions and full tool-contract.json sync 
       );
       expect(byId.get(tool.id), `${tool.id} contract in tool-contract.json`).toEqual(expected);
 
-      if (config?.settingsSchema) {
+      if (settingsSchema) {
         const base = defaultSettingsFor(tool.id) as Record<string, unknown>;
         expect(
-          config.settingsSchema.safeParse(base).success,
+          settingsSchema.safeParse(base).success,
           `${tool.id} defaultSettingsFor must satisfy settingsSchema before probing`,
         ).toBe(true);
         for (const probe of expectedProbes) {
           expect(
-            config.settingsSchema.safeParse({ ...base, [probe.key]: probe.value }).success,
+            settingsSchema.safeParse({ ...base, [probe.key]: probe.value }).success,
             `${tool.id} schema must reject invalidProbe ${JSON.stringify(probe)}`,
           ).toBe(false);
         }
       }
+    }
+  });
+
+  it("derives remove-background HTTP contract from phase1SettingsSchema so api-sweep sends no Phase 2 fields (#2985)", () => {
+    const contracts = JSON.parse(
+      readFileSync(join(process.cwd(), "tests/qa/tool-contract.json"), "utf8"),
+    ) as ToolContract[];
+    const removeBg = contracts.find((contract) => contract.id === "remove-background");
+    expect(removeBg).toBeDefined();
+    if (!removeBg) return;
+
+    expect(removeBg.axes.map((axis) => axis.key)).toEqual(["model", "edgeRefine", "decontaminate"]);
+
+    for (const axis of removeBg.axes) {
+      for (const value of axis.values) {
+        const payload = value === null || value === undefined ? {} : { [axis.key]: value };
+        expect(
+          phase1SettingsSchema.safeParse(payload).success,
+          `remove-background Phase 1 must accept ${axis.key}=${JSON.stringify(value)}`,
+        ).toBe(true);
+      }
+    }
+
+    const normalizedAxes = removeBg.axes.map((axis) => ({
+      key: axis.key,
+      values: axis.values.map((v) => (v === null ? undefined : v)),
+    }));
+    for (const combo of pairwise(normalizedAxes)) {
+      const compact = compactCase(combo);
+      expect(
+        phase1SettingsSchema.safeParse(compact).success,
+        `remove-background Phase 1 must accept pairwise combo ${JSON.stringify(compact)}`,
+      ).toBe(true);
+    }
+
+    for (const probe of removeBg.invalidProbes) {
+      expect(["model", "edgeRefine", "decontaminate"]).toContain(probe.key);
+      expect(
+        phase1SettingsSchema.safeParse({ [probe.key]: probe.value }).success,
+        `remove-background Phase 1 must reject invalidProbe ${JSON.stringify(probe)}`,
+      ).toBe(false);
     }
   });
 });

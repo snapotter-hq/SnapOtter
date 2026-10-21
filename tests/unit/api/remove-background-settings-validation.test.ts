@@ -354,6 +354,157 @@ describe("remove-background Phase 1 settings validation (#2281)", () => {
     expect(verifyAiMatch).not.toBeNull();
     const verifyAiSettings = parseObjectLiteral(verifyAiMatch?.[1] ?? "");
     expect(phase1SettingsSchema.safeParse(verifyAiSettings).success).toBe(true);
+
+    const installCompleteSource = readFileSync(
+      path.join(REPO_ROOT, "tests/qa/verify-ai-install-complete.mts"),
+      "utf8",
+    );
+    const installCompleteMatch = installCompleteSource.match(
+      /\{\s*toolId:\s*"remove-background"[^}]*?settings:\s*(\{[^}]*\})/,
+    );
+    expect(installCompleteMatch).not.toBeNull();
+    const installCompleteSettings = parseObjectLiteral(installCompleteMatch?.[1] ?? "");
+    expect(phase1SettingsSchema.safeParse(installCompleteSettings)).toEqual({
+      success: true,
+      data: {},
+    });
+  });
+
+  it("verify-ai-install-complete runOneTool sets process.exitCode = 1 when a smoke run fails or returns an unexpected status (#2985)", async () => {
+    const mod = (await import("../../qa/verify-ai-install-complete.mjs")) as {
+      ONE_TOOL_PER_BUNDLE?: Record<string, { toolId: string; file: string; settings: object }>;
+      runOneTool?: (token: string, bundleId: string) => Promise<void>;
+    };
+    expect(mod.ONE_TOOL_PER_BUNDLE?.["background-removal"]?.settings).toEqual({});
+    expect(typeof mod.runOneTool).toBe("function");
+    if (!mod.runOneTool) return;
+
+    const prevExitCode = process.exitCode;
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      // 1. Unexpected HTTP status (e.g. 400) sets process.exitCode = 1 and posts Phase 1 settings
+      process.exitCode = undefined;
+      let postedUrl = "";
+      let postedSettings = "";
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+          postedUrl = String(input);
+          const form = init?.body as FormData;
+          postedSettings = String(form.get("settings") ?? "");
+          return new Response(JSON.stringify({ error: "Invalid settings" }), { status: 400 });
+        }),
+      );
+      await mod.runOneTool("tok", "background-removal");
+      expect(postedUrl).toMatch(/\/api\/v1\/tools\/image\/remove-background$/);
+      expect(postedSettings).toBe("{}");
+      expect(process.exitCode).toBe(1);
+
+      // 2. Async 202 followed by SSE failure event sets process.exitCode = 1
+      process.exitCode = undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.endsWith("/progress")) {
+            const stream = new ReadableStream({
+              start(controller) {
+                controller.enqueue(
+                  new TextEncoder().encode(
+                    'data: {"phase":"failed","error":"sidecar crashed"}\n\n',
+                  ),
+                );
+                controller.close();
+              },
+            });
+            return new Response(stream, { status: 200 });
+          }
+          return new Response(JSON.stringify({ jobId: "job-fail" }), { status: 202 });
+        }),
+      );
+      await mod.runOneTool("tok", "background-removal");
+      expect(process.exitCode).toBe(1);
+
+      // 3. Async 202 followed by SSE stream closing without completion (timeout) sets process.exitCode = 1
+      process.exitCode = undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.endsWith("/progress")) {
+            const stream = new ReadableStream({
+              start(controller) {
+                controller.close();
+              },
+            });
+            return new Response(stream, { status: 200 });
+          }
+          return new Response(JSON.stringify({ jobId: "job-timeout" }), { status: 202 });
+        }),
+      );
+      await mod.runOneTool("tok", "background-removal");
+      expect(process.exitCode).toBe(1);
+
+      // 4. Async 202 followed by SSE response with null body (done.error) sets process.exitCode = 1
+      process.exitCode = undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.endsWith("/progress")) {
+            return new Response(null, { status: 200 });
+          }
+          return new Response(JSON.stringify({ jobId: "job-no-body" }), { status: 202 });
+        }),
+      );
+      await mod.runOneTool("tok", "background-removal");
+      expect(process.exitCode).toBe(1);
+
+      // 5. Sync 200 without downloadUrl sets process.exitCode = 1
+      process.exitCode = undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(JSON.stringify({}), { status: 200 })),
+      );
+      await mod.runOneTool("tok", "background-removal");
+      expect(process.exitCode).toBe(1);
+
+      // 6. Sync 200 with downloadUrl leaves process.exitCode unset
+      process.exitCode = undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(JSON.stringify({ downloadUrl: "/dl" }), { status: 200 })),
+      );
+      await mod.runOneTool("tok", "background-removal");
+      expect(process.exitCode).toBeUndefined();
+
+      // 7. Async 202 followed by SSE complete event leaves process.exitCode unset
+      process.exitCode = undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.endsWith("/progress")) {
+            const stream = new ReadableStream({
+              start(controller) {
+                controller.enqueue(
+                  new TextEncoder().encode('data: {"phase":"complete","downloadUrl":"/dl"}\n\n'),
+                );
+                controller.close();
+              },
+            });
+            return new Response(stream, { status: 200 });
+          }
+          return new Response(JSON.stringify({ jobId: "job-ok" }), { status: 202 });
+        }),
+      );
+      await mod.runOneTool("tok", "background-removal");
+      expect(process.exitCode).toBeUndefined();
+    } finally {
+      vi.unstubAllGlobals();
+      logSpy.mockRestore();
+      process.exitCode = prevExitCode;
+    }
   });
 
   it("bench-ai.sh passes Phase 1 settings to single-file remove-background and posts batch runs to /batch (#2976)", async () => {

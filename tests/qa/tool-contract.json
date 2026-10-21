@@ -2089,34 +2089,6 @@
         ]
       },
       {
-        "key": "backgroundType",
-        "values": ["transparent", "color", "gradient", "blur", null]
-      },
-      {
-        "key": "gradientAngle",
-        "values": [0, 50, 100, null]
-      },
-      {
-        "key": "blurEnabled",
-        "values": [true, false, null]
-      },
-      {
-        "key": "blurIntensity",
-        "values": [0, 50, 100, null]
-      },
-      {
-        "key": "shadowEnabled",
-        "values": [true, false, null]
-      },
-      {
-        "key": "shadowOpacity",
-        "values": [0, 50, 100, null]
-      },
-      {
-        "key": "outputFormat",
-        "values": ["png", "webp", "avif", null]
-      },
-      {
         "key": "edgeRefine",
         "values": [0, 2, 3, null]
       },
@@ -2133,71 +2105,6 @@
       },
       {
         "key": "model",
-        "value": 12345,
-        "why": "wrong type"
-      },
-      {
-        "key": "backgroundType",
-        "value": "__snapotter_qa_not_a_member__",
-        "why": "enum outsider"
-      },
-      {
-        "key": "backgroundType",
-        "value": 12345,
-        "why": "wrong type"
-      },
-      {
-        "key": "gradientAngle",
-        "value": "not-a-number",
-        "why": "wrong type"
-      },
-      {
-        "key": "blurEnabled",
-        "value": "yes-please",
-        "why": "wrong type"
-      },
-      {
-        "key": "blurIntensity",
-        "value": -1,
-        "why": "below declared min"
-      },
-      {
-        "key": "blurIntensity",
-        "value": 101,
-        "why": "above declared max"
-      },
-      {
-        "key": "blurIntensity",
-        "value": "not-a-number",
-        "why": "wrong type"
-      },
-      {
-        "key": "shadowEnabled",
-        "value": "yes-please",
-        "why": "wrong type"
-      },
-      {
-        "key": "shadowOpacity",
-        "value": -1,
-        "why": "below declared min"
-      },
-      {
-        "key": "shadowOpacity",
-        "value": 101,
-        "why": "above declared max"
-      },
-      {
-        "key": "shadowOpacity",
-        "value": "not-a-number",
-        "why": "wrong type"
-      },
-      {
-        "key": "outputFormat",
-        "value": "__snapotter_qa_not_a_member__",
-        "why": "enum outsider"
-      },
-      {
-        "key": "outputFormat",
         "value": 12345,
         "why": "wrong type"
       },
