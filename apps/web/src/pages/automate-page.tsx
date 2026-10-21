@@ -1,4 +1,9 @@
-import { ANALYTICS_EVENTS, modalityForExtension, type PipelineTemplate } from "@snapotter/shared";
+import {
+  ANALYTICS_EVENTS,
+  modalityForExtension,
+  type PipelineTemplate,
+  type TranslationKeys,
+} from "@snapotter/shared";
 import {
   CheckCircle2,
   ChevronDown,
@@ -192,7 +197,11 @@ function AutomatePageContent({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [listLoadFailed, setListLoadFailed] = useState(false);
   const listFetchSeqRef = useRef(0);
+  const importErrorSeqRef = useRef(0);
+  const initialLoadErrorRef = useRef<((tr: TranslationKeys) => string) | null>(null);
   const deletingIdsRef = useRef<Set<string>>(new Set());
+  const tRef = useRef(t);
+  tRef.current = t;
 
   const hasFile = files.length > 0;
   const hasProcessed = !!processedUrl || currentEntry?.status === "completed";
@@ -209,6 +218,13 @@ function AutomatePageContent({
   useEffect(() => {
     let cancelled = false;
     const seq = ++listFetchSeqRef.current;
+    const recordInitialLoadError = (formatter: (tr: TranslationKeys) => string) => {
+      setListLoadFailed(true);
+      initialLoadErrorRef.current = formatter;
+      if (importErrorSeqRef.current === 0) {
+        setImportError(formatter(tRef.current));
+      }
+    };
     (async () => {
       let res: Response;
       try {
@@ -217,16 +233,16 @@ function AutomatePageContent({
         });
       } catch {
         if (cancelled || seq !== listFetchSeqRef.current) return;
-        setListLoadFailed(true);
-        setImportError(t.errors.networkError);
+        recordInitialLoadError((tr) => tr.errors.networkError);
         return;
       }
 
       if (!res.ok) {
         const body = await res.json().catch(() => null);
         if (cancelled || seq !== listFetchSeqRef.current) return;
-        setListLoadFailed(true);
-        setImportError(failedAnswerMessage(t, body, res.status, t.automate.loadFailed));
+        recordInitialLoadError((tr) =>
+          failedAnswerMessage(tr, body, res.status, tr.automate.loadFailed),
+        );
         return;
       }
 
@@ -235,24 +251,28 @@ function AutomatePageContent({
         const pipelines = (data as { pipelines?: unknown } | null)?.pipelines;
         if (!Array.isArray(pipelines)) {
           if (cancelled || seq !== listFetchSeqRef.current) return;
-          setListLoadFailed(true);
-          setImportError(t.automate.loadFailed);
+          recordInitialLoadError((tr) => tr.automate.loadFailed);
           return;
         }
         if (cancelled || seq !== listFetchSeqRef.current) return;
+        initialLoadErrorRef.current = null;
         setListLoadFailed(false);
-        setImportError(null);
         setSavedPipelines(pipelines);
       } catch {
         if (cancelled || seq !== listFetchSeqRef.current) return;
-        setListLoadFailed(true);
-        setImportError(t.automate.loadFailed);
+        recordInitialLoadError((tr) => tr.automate.loadFailed);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [setSavedPipelines, t]);
+  }, [setSavedPipelines]);
+
+  useEffect(() => {
+    if (initialLoadErrorRef.current && importErrorSeqRef.current === 0) {
+      setImportError(initialLoadErrorRef.current(t));
+    }
+  }, [t]);
 
   useEffect(() => {
     const state = location.state as { libraryFileIds?: string[] } | null;
@@ -432,13 +452,14 @@ function AutomatePageContent({
       setSaveName("");
       setSaveDescription("");
       setShowSaveForm(false);
-      listFetchSeqRef.current += 1;
+      const seq = ++listFetchSeqRef.current;
 
       try {
         const listRes = await fetch(appUrl("/api/v1/pipeline/list"), {
           headers: formatHeaders(),
         });
         if (!listRes.ok) {
+          if (seq !== listFetchSeqRef.current) return;
           setListLoadFailed(true);
           setSaveError(t.automate.saveListRefreshFailed);
           return;
@@ -446,14 +467,20 @@ function AutomatePageContent({
         const listData: unknown = await listRes.json();
         const pipelines = (listData as { pipelines?: unknown } | null)?.pipelines;
         if (!Array.isArray(pipelines)) {
+          if (seq !== listFetchSeqRef.current) return;
           setListLoadFailed(true);
           setSaveError(t.automate.saveListRefreshFailed);
           return;
         }
+        if (seq !== listFetchSeqRef.current) return;
+        initialLoadErrorRef.current = null;
         setListLoadFailed(false);
-        setImportError(null);
+        if (importErrorSeqRef.current === 0) {
+          setImportError(null);
+        }
         setSavedPipelines(pipelines);
       } catch {
+        if (seq !== listFetchSeqRef.current) return;
         setListLoadFailed(true);
         setSaveError(t.automate.saveListRefreshFailed);
       }
@@ -466,6 +493,8 @@ function AutomatePageContent({
     async (id: string) => {
       if (deletingIdsRef.current.has(id)) return;
       deletingIdsRef.current.add(id);
+      const errorSeq = ++importErrorSeqRef.current;
+      initialLoadErrorRef.current = null;
       setImportError(null);
       try {
         let res: Response;
@@ -475,39 +504,55 @@ function AutomatePageContent({
             headers: formatHeaders(),
           });
         } catch {
-          setImportError(t.errors.networkError);
+          if (errorSeq === importErrorSeqRef.current) {
+            setImportError(t.errors.networkError);
+          }
           return;
         }
 
         if (!res.ok) {
           const body = await res.json().catch(() => null);
-          setImportError(failedAnswerMessage(t, body, res.status, t.automate.deleteFailed));
+          if (errorSeq === importErrorSeqRef.current) {
+            setImportError(failedAnswerMessage(t, body, res.status, t.automate.deleteFailed));
+          }
           return;
         }
 
-        listFetchSeqRef.current += 1;
+        const seq = ++listFetchSeqRef.current;
         try {
           const listRes = await fetch(appUrl("/api/v1/pipeline/list"), {
             headers: formatHeaders(),
           });
           if (!listRes.ok) {
+            if (seq !== listFetchSeqRef.current) return;
             setListLoadFailed(true);
-            setImportError(t.automate.deleteListRefreshFailed);
+            if (errorSeq === importErrorSeqRef.current) {
+              setImportError(t.automate.deleteListRefreshFailed);
+            }
             return;
           }
           const listData: unknown = await listRes.json();
           const pipelines = (listData as { pipelines?: unknown } | null)?.pipelines;
           if (!Array.isArray(pipelines)) {
+            if (seq !== listFetchSeqRef.current) return;
             setListLoadFailed(true);
-            setImportError(t.automate.deleteListRefreshFailed);
+            if (errorSeq === importErrorSeqRef.current) {
+              setImportError(t.automate.deleteListRefreshFailed);
+            }
             return;
           }
+          if (seq !== listFetchSeqRef.current) return;
           setListLoadFailed(false);
-          setImportError(null);
+          if (errorSeq === importErrorSeqRef.current) {
+            setImportError(null);
+          }
           setSavedPipelines(pipelines);
         } catch {
+          if (seq !== listFetchSeqRef.current) return;
           setListLoadFailed(true);
-          setImportError(t.automate.deleteListRefreshFailed);
+          if (errorSeq === importErrorSeqRef.current) {
+            setImportError(t.automate.deleteListRefreshFailed);
+          }
         }
       } finally {
         deletingIdsRef.current.delete(id);
@@ -555,13 +600,15 @@ function AutomatePageContent({
   }, []);
 
   const handleImportPipeline = useCallback(async () => {
-    setImportError(null);
     const input = document.createElement("input");
     input.type = "file";
     input.accept = ".json";
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
+      const errorSeq = ++importErrorSeqRef.current;
+      initialLoadErrorRef.current = null;
+      setImportError(null);
       // Each stage fails on its own and gets its own message (#1956): a file
       // that won't parse is a bad file, a save request that got no answer is
       // a network error, and a failed refresh after a good save must say
@@ -570,9 +617,12 @@ function AutomatePageContent({
       try {
         data = JSON.parse(await file.text());
       } catch {
-        setImportError(t.automate.couldNotRead);
+        if (errorSeq === importErrorSeqRef.current) {
+          setImportError(t.automate.couldNotRead);
+        }
         return;
       }
+      if (errorSeq !== importErrorSeqRef.current) return;
 
       if (
         !data ||
@@ -613,40 +663,56 @@ function AutomatePageContent({
           }),
         });
       } catch {
-        setImportError(t.errors.networkError);
+        if (errorSeq === importErrorSeqRef.current) {
+          setImportError(t.errors.networkError);
+        }
         return;
       }
 
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        setImportError(failedAnswerMessage(t, body, res.status, t.automate.importFailed));
+        if (errorSeq === importErrorSeqRef.current) {
+          setImportError(failedAnswerMessage(t, body, res.status, t.automate.importFailed));
+        }
         return;
       }
 
-      listFetchSeqRef.current += 1;
+      const seq = ++listFetchSeqRef.current;
       try {
         const listRes = await fetch(appUrl("/api/v1/pipeline/list"), {
           headers: formatHeaders(),
         });
         if (!listRes.ok) {
+          if (seq !== listFetchSeqRef.current) return;
           setListLoadFailed(true);
-          setImportError(t.automate.importListRefreshFailed);
+          if (errorSeq === importErrorSeqRef.current) {
+            setImportError(t.automate.importListRefreshFailed);
+          }
           return;
         }
         const listData: unknown = await listRes.json();
         const pipelines = (listData as { pipelines?: unknown } | null)?.pipelines;
         if (!Array.isArray(pipelines)) {
           // An OK answer without the list (a proxy's `{}`) must not blank it.
+          if (seq !== listFetchSeqRef.current) return;
           setListLoadFailed(true);
-          setImportError(t.automate.importListRefreshFailed);
+          if (errorSeq === importErrorSeqRef.current) {
+            setImportError(t.automate.importListRefreshFailed);
+          }
           return;
         }
+        if (seq !== listFetchSeqRef.current) return;
         setListLoadFailed(false);
-        setImportError(null);
+        if (errorSeq === importErrorSeqRef.current) {
+          setImportError(null);
+        }
         setSavedPipelines(pipelines);
       } catch {
+        if (seq !== listFetchSeqRef.current) return;
         setListLoadFailed(true);
-        setImportError(t.automate.importListRefreshFailed);
+        if (errorSeq === importErrorSeqRef.current) {
+          setImportError(t.automate.importListRefreshFailed);
+        }
       }
     };
     input.click();
@@ -1106,7 +1172,11 @@ function AutomatePageContent({
               <div className="text-xs text-destructive-ink bg-red-50 dark:bg-red-950/30 rounded px-2 py-1.5 mb-1.5 flex items-start gap-1.5">
                 <button
                   type="button"
-                  onClick={() => setImportError(null)}
+                  onClick={() => {
+                    importErrorSeqRef.current += 1;
+                    initialLoadErrorRef.current = null;
+                    setImportError(null);
+                  }}
                   aria-label={t.common.close}
                   className="shrink-0 mt-0.5 hover:opacity-80"
                 >

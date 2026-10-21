@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { en } from "@snapotter/shared";
+import { de } from "@snapotter/shared/i18n/de.js";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -786,5 +787,130 @@ describe("automate initial saved pipelines load (#1987)", () => {
     resolveInitialList(new Response(JSON.stringify({ pipelines: [] })));
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(usePipelineStore.getState().savedPipelines).toHaveLength(1);
+  });
+
+  it("keeps an import error on screen and still populates savedPipelines when a slow initial list fetch resolves after the import fails (#2980)", async () => {
+    let resolveInitialList: (res: Response) => void = () => {};
+    server = {
+      initialList: () =>
+        new Promise<Response>((resolve) => {
+          resolveInitialList = resolve;
+        }),
+      save: () =>
+        new Response(JSON.stringify({ error: "Step 1: Tool not found" }), { status: 400 }),
+      list: listOk,
+    };
+
+    await importFile(JSON.stringify(PIPELINE));
+    await waitFor(() => expect(screen.getByText("Step 1: Tool not found")).toBeInTheDocument());
+
+    await act(async () => {
+      resolveInitialList(new Response(JSON.stringify({ pipelines: [SAVED] })));
+    });
+    expect(screen.getByText("Step 1: Tool not found")).toBeInTheDocument();
+    expect(usePipelineStore.getState().savedPipelines.map((p) => p.id)).toEqual(["p1"]);
+  });
+
+  it("keeps an import error on screen and records listLoadFailed when a slow initial list fetch fails after the import fails (#2980)", async () => {
+    let resolveInitialList: (res: Response) => void = () => {};
+    server = {
+      initialList: () =>
+        new Promise<Response>((resolve) => {
+          resolveInitialList = resolve;
+        }),
+      save: () =>
+        new Response(JSON.stringify({ error: "Step 1: Tool not found" }), { status: 400 }),
+      list: listOk,
+    };
+
+    await importFile(JSON.stringify(PIPELINE));
+    await waitFor(() => expect(screen.getByText("Step 1: Tool not found")).toBeInTheDocument());
+
+    await act(async () => {
+      resolveInitialList(new Response("busy", { status: 503 }));
+    });
+    expect(screen.getByText("Step 1: Tool not found")).toBeInTheDocument();
+    expect(screen.queryByText(en.automate.loadFailed)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText(en.common.close));
+    expect(screen.queryByText(en.automate.noSavedPipelines)).not.toBeInTheDocument();
+  });
+
+  it("keeps a delete error on screen when a slow initial list fetch resolves after the delete fails (#2980)", async () => {
+    let resolveInitialList: (res: Response) => void = () => {};
+    server = {
+      initialList: () =>
+        new Promise<Response>((resolve) => {
+          resolveInitialList = resolve;
+        }),
+      save: savedOk,
+      list: listOk,
+      delete: () =>
+        new Response(JSON.stringify({ error: "Not authorized to delete this pipeline" }), {
+          status: 403,
+        }),
+    };
+
+    await deleteFirstSavedPipeline();
+    await waitFor(() =>
+      expect(screen.getByText("Not authorized to delete this pipeline")).toBeInTheDocument(),
+    );
+
+    await act(async () => {
+      resolveInitialList(new Response(JSON.stringify({ pipelines: [] })));
+    });
+    expect(screen.getByText("Not authorized to delete this pipeline")).toBeInTheDocument();
+  });
+
+  it("does not re-fetch /api/v1/pipeline/list when a non-English locale finishes loading, and translates an initial load error into that locale (#2980)", async () => {
+    storageMap.set("snapotter-locale", "de");
+    server = {
+      initialList: () => new Response("<html>502</html>", { status: 502 }),
+      save: savedOk,
+      list: listOk,
+    };
+    renderAutomate();
+
+    await screen.findByText(de.automate.importButton);
+    await waitFor(() => expect(screen.getByText(de.automate.loadFailed)).toBeInTheDocument());
+    const listCalls = vi
+      .mocked(fetch)
+      .mock.calls.filter(([input]) => String(input).includes("/pipeline/list"));
+    expect(listCalls).toHaveLength(1);
+  });
+
+  it("preserves an active delete error when the user cancels the import file picker or saves a pipeline in the builder (#2980)", async () => {
+    server = {
+      save: savedOk,
+      list: listOk,
+      delete: () =>
+        new Response(JSON.stringify({ error: "Not authorized to delete this pipeline" }), {
+          status: 403,
+        }),
+    };
+    usePipelineStore.getState().loadSteps([{ toolId: "resize", settings: {} }]);
+    await deleteFirstSavedPipeline();
+    await waitFor(() =>
+      expect(screen.getByText("Not authorized to delete this pipeline")).toBeInTheDocument(),
+    );
+
+    // Clicking Import without picking a file must not wipe the delete error.
+    const realCreate = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation(((tag: string) => {
+      const el = realCreate(tag);
+      if (tag === "input") (el as HTMLInputElement).click = () => {};
+      return el;
+    }) as typeof document.createElement);
+    fireEvent.click(screen.getByText(en.automate.importButton));
+    expect(screen.getByText("Not authorized to delete this pipeline")).toBeInTheDocument();
+
+    // Saving a pipeline in the builder refreshes the list without clearing the delete error.
+    fireEvent.click(screen.getByText(en.automate.saveButton));
+    fireEvent.change(screen.getByPlaceholderText(en.automate.pipelineName), {
+      target: { value: "Builder Save" },
+    });
+    fireEvent.click(screen.getByText(en.common.save));
+    await waitFor(() => expect(usePipelineStore.getState().savedPipelines).toHaveLength(1));
+    expect(screen.getByText("Not authorized to delete this pipeline")).toBeInTheDocument();
   });
 });
