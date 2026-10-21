@@ -36,7 +36,8 @@ function resolveMaxCpuUpscaleMp(): number {
 
 function formatExceededMp(actual: number, limit: number): string {
   const oneDec = actual.toFixed(1);
-  return Number(oneDec) <= limit ? actual.toFixed(2) : oneDec;
+  if (Number(oneDec) > limit) return oneDec;
+  return Math.max(limit + 0.01, Math.round(actual * 100) / 100).toFixed(2);
 }
 
 export interface UpscaleOptions {

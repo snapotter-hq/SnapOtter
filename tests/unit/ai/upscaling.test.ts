@@ -627,7 +627,7 @@ describe("upscale", () => {
       await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 })).resolves.toBeDefined();
     });
 
-    it("allows exact 4.0 MP input at 4x (64.0 MP output) on CPU and formats near-boundary 4.02 MP with 2 decimals", async () => {
+    it("allows exact 4.0 MP input at 4x (64.0 MP output) on CPU and formats near-boundary exceeded MP with 2 decimals (#3061)", async () => {
       vi.mocked(sharp).mockImplementation(
         () =>
           ({
@@ -640,6 +640,33 @@ describe("upscale", () => {
 
       await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4 })).resolves.toBeDefined();
 
+      // 2001x2000 = 4.002 MP: sub-half-centimegapixel excess must clamp up to 4.01 MP
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 2001, height: 2000 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 })).rejects.toThrow(
+        "Image is too large for CPU upscaling (4.01 MP, max 4 MP on CPU). Resize the image, use Fast (Lanczos) quality, or use a GPU host.",
+      );
+
+      // 4005x1000 = 4.005 MP: IEEE-754 (4.005).toFixed(2) === "4.00", must round to 4.01 MP
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 4005, height: 1000 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 })).rejects.toThrow(
+        "Image is too large for CPU upscaling (4.01 MP, max 4 MP on CPU). Resize the image, use Fast (Lanczos) quality, or use a GPU host.",
+      );
+
+      // 2010x2000 = 4.02 MP
       vi.mocked(sharp).mockImplementation(
         () =>
           ({
@@ -650,6 +677,46 @@ describe("upscale", () => {
       );
       await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 })).rejects.toThrow(
         /4\.02 MP, max 4 MP on CPU/,
+      );
+
+      // 4050x1000 = 4.05 MP ((4.05).toFixed(1) === "4.0" in IEEE-754 -> 4.05 MP) vs 4051x1000 = 4.051 MP -> 4.1 MP (1-decimal)
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 4050, height: 1000 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 })).rejects.toThrow(
+        "Image is too large for CPU upscaling (4.05 MP, max 4 MP on CPU). Resize the image, use Fast (Lanczos) quality, or use a GPU host.",
+      );
+
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 4051, height: 1000 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+      await expect(upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 2 })).rejects.toThrow(
+        "Image is too large for CPU upscaling (4.1 MP, max 4 MP on CPU). Resize the image, use Fast (Lanczos) quality, or use a GPU host.",
+      );
+
+      // Output ceiling near-boundary: 4,000,100 px at 4x (model=lanczos) = 64.0016 MP -> 64.01 MP
+      vi.mocked(sharp).mockImplementation(
+        () =>
+          ({
+            png: vi.fn().mockReturnThis(),
+            toBuffer: vi.fn().mockResolvedValue(Buffer.from("mock-png-data")),
+            metadata: vi.fn().mockResolvedValue({ width: 40_001, height: 100 }),
+          }) as unknown as ReturnType<typeof sharp>,
+      );
+      await expect(
+        upscale(FAKE_INPUT, FAKE_OUTPUT_DIR, { scale: 4, model: "lanczos" }),
+      ).rejects.toThrow(
+        "Upscaled output is too large for CPU upscaling (64.01 MP at 4x, max 64 MP on CPU). Use a smaller image, lower scale factor, or a GPU host.",
       );
     });
 
