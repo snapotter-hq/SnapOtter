@@ -140,6 +140,8 @@ function isGroupRename(op: ScimPatchOp): boolean {
   return op.op.toLowerCase() === "replace" && op.path === "displayName";
 }
 
+class DefaultTeamMemberRemovalError extends Error {}
+
 /** What a group sync did to its members beyond the plain adds. */
 interface MemberSync {
   /** Member ids that matched no user, skipped (#1683). */
@@ -1383,15 +1385,44 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
 
       // All or nothing. The rename and both membership steps used to write
       // straight to the database, so a failure after the rename left the
-      // group renamed and emptied behind a 500 (#1682).
+      // group renamed and emptied behind a 500 (#1682). Lock the team row
+      // first so a concurrent delete or rename to Default is caught before
+      // any member writes run (#3300).
+      type PutOutcome =
+        | "not-found"
+        | {
+            updatedTeam: typeof schema.teams.$inferSelect;
+            teamMembers: Array<{ id: string; username: string }>;
+          };
+      let outcome: PutOutcome;
       try {
-        await db.transaction(async (tx) => {
-          if (renames) {
+        outcome = await db.transaction(async (tx) => {
+          const [locked] = await tx
+            .select()
+            .from(schema.teams)
+            .where(eq(schema.teams.id, id))
+            .for("update");
+          if (!locked) {
+            return "not-found" as const;
+          }
+          if (
+            (id === schema.DEFAULT_TEAM_ID || locked.name === "Default") &&
+            body.members !== undefined
+          ) {
+            throw new DefaultTeamMemberRemovalError();
+          }
+
+          let updatedTeam = locked;
+          if (displayName !== undefined && displayName !== locked.name) {
             await tx.update(schema.teams).set({ name: displayName }).where(eq(schema.teams.id, id));
+            updatedTeam = { ...locked, name: displayName };
           }
 
           // Replace membership: remove all current members, add new ones
           if (members !== undefined) {
+            if (id === schema.DEFAULT_TEAM_ID || updatedTeam.name === "Default") {
+              throw new DefaultTeamMemberRemovalError();
+            }
             // Find the default team to move removed members to
             const [defaultTeam] = await tx
               .select()
@@ -1408,8 +1439,20 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
             // Add new members
             await addMembers(tx, id, members, sync);
           }
+
+          const teamMembers = await tx
+            .select({ id: schema.users.id, username: schema.users.username })
+            .from(schema.users)
+            .where(eq(schema.users.team, id));
+          return { updatedTeam, teamMembers };
         });
       } catch (err) {
+        if (err instanceof DefaultTeamMemberRemovalError) {
+          request.log.warn({ teamId: id }, "Attempted to modify Default team members via PUT");
+          return reply
+            .status(400)
+            .send(scimError(400, "Cannot remove members from the Default team"));
+        }
         // The pre-check can't close the race: two concurrent renames onto
         // the same displayName both pass it before either UPDATE commits
         // (issue #968), so the loser's 23505 maps to the pre-check's 409.
@@ -1418,11 +1461,11 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
         throw err;
       }
 
-      const [updatedTeam] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
-      const teamMembers = await db
-        .select({ id: schema.users.id, username: schema.users.username })
-        .from(schema.users)
-        .where(eq(schema.users.team, id));
+      if (outcome === "not-found") {
+        return reply.status(404).send(scimError(404, "Group not found"));
+      }
+
+      const { updatedTeam, teamMembers } = outcome;
       const settled = settleMemberSync(sync, teamMembers);
       warnMemberSync(request.log, id, "replaced", settled);
 
@@ -1493,15 +1536,40 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
       // All or nothing. Each operation used to write straight to the database,
       // so member changes from earlier operations stayed committed when a
       // later rename collided, while the IdP read the error as the whole
-      // request rejected (#1543). The transaction rolls them back instead.
+      // request rejected (#1543). Lock the team row first so a concurrent
+      // delete or rename to Default is caught before any member writes run
+      // (#3300).
+      type PatchOutcome =
+        | "not-found"
+        | {
+            updatedTeam: typeof schema.teams.$inferSelect;
+            teamMembers: Array<{ id: string; username: string }>;
+          };
+      let outcome: PatchOutcome;
       try {
-        await db.transaction(async (tx) => {
+        outcome = await db.transaction(async (tx) => {
+          const [locked] = await tx
+            .select()
+            .from(schema.teams)
+            .where(eq(schema.teams.id, id))
+            .for("update");
+          if (!locked) {
+            return "not-found" as const;
+          }
+          if ((id === schema.DEFAULT_TEAM_ID || locked.name === "Default") && hasMemberRemoval) {
+            throw new DefaultTeamMemberRemovalError();
+          }
+
+          let updatedTeam = locked;
           for (const op of operations) {
             const opType = op.op.toLowerCase();
 
             if (opType === "add" && op.path === "members") {
               await addMembers(tx, id, op.value as ScimMember[], sync);
             } else if (opType === "remove" && op.path === "members") {
+              if (id === schema.DEFAULT_TEAM_ID || updatedTeam.name === "Default") {
+                throw new DefaultTeamMemberRemovalError();
+              }
               // Removed members go to the Default team. A member list removes
               // those; no list removes every member (RFC 7644 3.5.2.2).
               const listed = (op.value as ScimMember[] | undefined)?.map((member) => member.value);
@@ -1517,11 +1585,16 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
                 .where(listed ? and(inGroup, inArray(schema.users.id, listed)) : inGroup);
             } else if (opType === "replace") {
               if (isGroupRename(op)) {
+                const nextName = groupRenameTarget(op);
                 await tx
                   .update(schema.teams)
-                  .set({ name: groupRenameTarget(op) })
+                  .set({ name: nextName })
                   .where(eq(schema.teams.id, id));
+                updatedTeam = { ...updatedTeam, name: nextName };
               } else if (op.path === "members") {
+                if (id === schema.DEFAULT_TEAM_ID || updatedTeam.name === "Default") {
+                  throw new DefaultTeamMemberRemovalError();
+                }
                 // Full member replacement
                 const members = op.value as ScimMember[];
                 const [defaultTeam] = await tx
@@ -1541,8 +1614,23 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
               }
             }
           }
+
+          const teamMembers = await tx
+            .select({ id: schema.users.id, username: schema.users.username })
+            .from(schema.users)
+            .where(eq(schema.users.team, id));
+          return { updatedTeam, teamMembers };
         });
       } catch (err) {
+        if (err instanceof DefaultTeamMemberRemovalError) {
+          request.log.warn(
+            { teamId: id },
+            "Attempted to remove members from Default team via PATCH",
+          );
+          return reply
+            .status(400)
+            .send(scimError(400, "Cannot remove members from the Default team"));
+        }
         // No conflict pre-check on the rename path, so before issue #968 a
         // rename onto a taken name surfaced the 23505 as a 500.
         const conflict = groupWriteConflict(err, request.log, id);
@@ -1550,11 +1638,11 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
         throw err;
       }
 
-      const [updatedTeam] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
-      const teamMembers = await db
-        .select({ id: schema.users.id, username: schema.users.username })
-        .from(schema.users)
-        .where(eq(schema.users.team, id));
+      if (outcome === "not-found") {
+        return reply.status(404).send(scimError(404, "Group not found"));
+      }
+
+      const { updatedTeam, teamMembers } = outcome;
       const settled = settleMemberSync(sync, teamMembers);
       warnMemberSync(request.log, id, "patched", settled);
 

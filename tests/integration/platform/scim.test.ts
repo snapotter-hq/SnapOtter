@@ -7,12 +7,7 @@ import {
   hashPassword,
   verifyPassword,
 } from "../../../apps/api/src/plugins/auth.js";
-import {
-  raceInserts,
-  raceRowLocks,
-  raceUpdates,
-  waitForLockWaiters,
-} from "../../helpers/pg-race.js";
+import { raceInserts, raceRowLocks, waitForLockWaiters } from "../../helpers/pg-race.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 const SCIM_TOKEN = `so_scim_v2_${"a".repeat(64)}`;
@@ -3444,7 +3439,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
           payload: { displayName: target },
         });
 
-      const results = await raceUpdates("teams", 2, () =>
+      const results = await raceRowLocks("teams", 2, () =>
         Promise.all([rename(a.id), rename(b.id)]),
       );
       const statuses = results.map((r) => r.statusCode).sort();
@@ -4352,6 +4347,291 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         expect(regUser?.team).toBe(DEFAULT_TEAM_ID);
       } finally {
         await db.delete(schema.users).where(eq(schema.users.username, regUsername));
+      }
+    });
+
+    it("returns SCIM 404 and leaves members untouched when a group is deleted before PUT locks the team row (#3300)", async () => {
+      const member = await createScimUser({ userName: uniqueName("scim-put-del-race-m") });
+      const group = await createScimGroup({
+        displayName: uniqueName("scim-put-del-race-grp"),
+      });
+
+      const res = await raceRowLocks(
+        "teams",
+        1,
+        () =>
+          crudApp.app.inject({
+            method: "PUT",
+            url: `/api/v1/scim/v2/Groups/${group.id}`,
+            headers: authHeaders(),
+            payload: {
+              displayName: uniqueName("scim-put-del-race-renamed"),
+              members: [{ value: member.id }],
+            },
+          }),
+        (tx) => tx.delete(schema.teams).where(eq(schema.teams.id, group.id)),
+      );
+
+      expect(res.statusCode, res.body).toBe(404);
+      expect(JSON.parse(res.body)).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 404,
+        detail: "Group not found",
+      });
+      expect((await userRow(member.id))?.team).toBe(DEFAULT_TEAM_ID);
+
+      const syncedAuditRows = await db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.action, "SCIM_GROUP_SYNCED"),
+            sql`${schema.auditLog.details}->>'teamId' = ${group.id}`,
+            sql`${schema.auditLog.details}->>'action' = 'replaced'`,
+          ),
+        );
+      expect(syncedAuditRows).toHaveLength(0);
+    });
+
+    it("returns SCIM 404 and leaves members untouched when a group is deleted before PATCH locks the team row (#3300)", async () => {
+      const member = await createScimUser({ userName: uniqueName("scim-patch-del-race-m") });
+      const group = await createScimGroup({
+        displayName: uniqueName("scim-patch-del-race-grp"),
+      });
+
+      const res = await raceRowLocks(
+        "teams",
+        1,
+        () =>
+          crudApp.app.inject({
+            method: "PATCH",
+            url: `/api/v1/scim/v2/Groups/${group.id}`,
+            headers: authHeaders(),
+            payload: {
+              schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+              Operations: [
+                {
+                  op: "replace",
+                  path: "displayName",
+                  value: uniqueName("scim-patch-del-race-renamed"),
+                },
+                { op: "add", path: "members", value: [{ value: member.id }] },
+              ],
+            },
+          }),
+        (tx) => tx.delete(schema.teams).where(eq(schema.teams.id, group.id)),
+      );
+
+      expect(res.statusCode, res.body).toBe(404);
+      expect(JSON.parse(res.body)).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 404,
+        detail: "Group not found",
+      });
+      expect((await userRow(member.id))?.team).toBe(DEFAULT_TEAM_ID);
+
+      const syncedAuditRows = await db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.action, "SCIM_GROUP_SYNCED"),
+            sql`${schema.auditLog.details}->>'teamId' = ${group.id}`,
+            sql`${schema.auditLog.details}->>'action' = 'patched'`,
+          ),
+        );
+      expect(syncedAuditRows).toHaveLength(0);
+    });
+
+    it("rejects PUT member replacement with SCIM 400 when the group is renamed to Default before or during the transaction (#3300)", async () => {
+      const member = await createScimUser({ userName: uniqueName("scim-put-def-race-m") });
+      const group = await createScimGroup({
+        displayName: uniqueName("scim-put-def-race-grp"),
+        members: [{ value: member.id }],
+      });
+      await db
+        .update(schema.teams)
+        .set({ name: "OriginalDefaultPut" })
+        .where(eq(schema.teams.id, DEFAULT_TEAM_ID));
+
+      try {
+        // 1. Renamed to Default by a concurrent transaction before the row lock is acquired
+        const res = await raceRowLocks(
+          "teams",
+          1,
+          () =>
+            crudApp.app.inject({
+              method: "PUT",
+              url: `/api/v1/scim/v2/Groups/${group.id}`,
+              headers: authHeaders(),
+              payload: {
+                displayName: uniqueName("scim-put-def-race-skipped-rename"),
+                members: [],
+              },
+            }),
+          (tx) =>
+            tx.update(schema.teams).set({ name: "Default" }).where(eq(schema.teams.id, group.id)),
+        );
+
+        expect(res.statusCode, res.body).toBe(400);
+        expect(JSON.parse(res.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 400,
+          detail: "Cannot remove members from the Default team",
+        });
+        const [lockedTeamRow] = await db
+          .select()
+          .from(schema.teams)
+          .where(eq(schema.teams.id, group.id));
+        expect(lockedTeamRow?.name).toBe("Default");
+        expect((await userRow(member.id))?.team).toBe(group.id);
+
+        // 2. Renamed to Default by the PUT request itself while replacing members
+        await db
+          .update(schema.teams)
+          .set({ name: group.displayName })
+          .where(eq(schema.teams.id, group.id));
+
+        const samePutRes = await crudApp.app.inject({
+          method: "PUT",
+          url: `/api/v1/scim/v2/Groups/${group.id}`,
+          headers: authHeaders(),
+          payload: {
+            displayName: "Default",
+            members: [],
+          },
+        });
+
+        expect(samePutRes.statusCode, samePutRes.body).toBe(400);
+        expect(JSON.parse(samePutRes.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 400,
+          detail: "Cannot remove members from the Default team",
+        });
+        const [teamRowDb] = await db
+          .select()
+          .from(schema.teams)
+          .where(eq(schema.teams.id, group.id));
+        expect(teamRowDb?.name).toBe(group.displayName);
+        expect((await userRow(member.id))?.team).toBe(group.id);
+
+        const syncedAuditRows = await db
+          .select()
+          .from(schema.auditLog)
+          .where(
+            and(
+              eq(schema.auditLog.action, "SCIM_GROUP_SYNCED"),
+              sql`${schema.auditLog.details}->>'teamId' = ${group.id}`,
+              sql`${schema.auditLog.details}->>'action' = 'replaced'`,
+            ),
+          );
+        expect(syncedAuditRows).toHaveLength(0);
+      } finally {
+        await db
+          .update(schema.users)
+          .set({ team: DEFAULT_TEAM_ID })
+          .where(eq(schema.users.team, group.id));
+        await db.delete(schema.teams).where(eq(schema.teams.id, group.id));
+        await db
+          .update(schema.teams)
+          .set({ name: "Default" })
+          .where(eq(schema.teams.id, DEFAULT_TEAM_ID));
+      }
+    });
+
+    it("rejects PATCH member removal with SCIM 400 when the group is renamed to Default before or during the transaction (#3300)", async () => {
+      const member = await createScimUser({ userName: uniqueName("scim-patch-def-race-m") });
+      const group = await createScimGroup({
+        displayName: uniqueName("scim-patch-def-race-grp"),
+        members: [{ value: member.id }],
+      });
+      await db
+        .update(schema.teams)
+        .set({ name: "OriginalDefaultPatch" })
+        .where(eq(schema.teams.id, DEFAULT_TEAM_ID));
+
+      try {
+        // 1. Renamed to Default by a concurrent transaction before the row lock is acquired
+        const raceRes = await raceRowLocks(
+          "teams",
+          1,
+          () =>
+            crudApp.app.inject({
+              method: "PATCH",
+              url: `/api/v1/scim/v2/Groups/${group.id}`,
+              headers: authHeaders(),
+              payload: {
+                schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+                Operations: [{ op: "remove", path: "members", value: [{ value: member.id }] }],
+              },
+            }),
+          (tx) =>
+            tx.update(schema.teams).set({ name: "Default" }).where(eq(schema.teams.id, group.id)),
+        );
+
+        expect(raceRes.statusCode, raceRes.body).toBe(400);
+        expect(JSON.parse(raceRes.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 400,
+          detail: "Cannot remove members from the Default team",
+        });
+        expect((await userRow(member.id))?.team).toBe(group.id);
+
+        // 2. Renamed to Default by an earlier op in the same PATCH before removing or replacing members
+        await db
+          .update(schema.teams)
+          .set({ name: group.displayName })
+          .where(eq(schema.teams.id, group.id));
+
+        for (const memberOp of [
+          { op: "remove", path: "members", value: [{ value: member.id }] },
+          { op: "replace", path: "members", value: [] },
+        ]) {
+          const multiOpRes = await crudApp.app.inject({
+            method: "PATCH",
+            url: `/api/v1/scim/v2/Groups/${group.id}`,
+            headers: authHeaders(),
+            payload: {
+              schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+              Operations: [{ op: "replace", path: "displayName", value: "Default" }, memberOp],
+            },
+          });
+
+          expect(multiOpRes.statusCode, multiOpRes.body).toBe(400);
+          expect(JSON.parse(multiOpRes.body)).toEqual({
+            schemas: [SCIM_ERROR_SCHEMA],
+            status: 400,
+            detail: "Cannot remove members from the Default team",
+          });
+          const [teamRowDb] = await db
+            .select()
+            .from(schema.teams)
+            .where(eq(schema.teams.id, group.id));
+          expect(teamRowDb?.name).toBe(group.displayName);
+          expect((await userRow(member.id))?.team).toBe(group.id);
+        }
+
+        const syncedAuditRows = await db
+          .select()
+          .from(schema.auditLog)
+          .where(
+            and(
+              eq(schema.auditLog.action, "SCIM_GROUP_SYNCED"),
+              sql`${schema.auditLog.details}->>'teamId' = ${group.id}`,
+              sql`${schema.auditLog.details}->>'action' = 'patched'`,
+            ),
+          );
+        expect(syncedAuditRows).toHaveLength(0);
+      } finally {
+        await db
+          .update(schema.users)
+          .set({ team: DEFAULT_TEAM_ID })
+          .where(eq(schema.users.team, group.id));
+        await db.delete(schema.teams).where(eq(schema.teams.id, group.id));
+        await db
+          .update(schema.teams)
+          .set({ name: "Default" })
+          .where(eq(schema.teams.id, DEFAULT_TEAM_ID));
       }
     });
   });
