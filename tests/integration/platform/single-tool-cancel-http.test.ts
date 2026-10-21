@@ -285,18 +285,68 @@ describe("route-stamped alias metadata (#808)", () => {
     expect(((after?.settings ?? {}) as { artifactJobId?: string }).artifactJobId).toBe(
       firstArtifact,
     );
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).not.toBeNull();
   });
 
-  it("re-points the alias at the newest artifact when a clientJobId is reused", async () => {
+  it("re-points the alias at the newest artifact and clears the terminal replay key when a clientJobId is reused (#2740)", async () => {
     const clientJobId = randomUUID();
     await runResize(clientJobId, adminToken);
     const first = await jobRow(clientJobId);
     const firstArtifact = ((first?.settings ?? {}) as { artifactJobId?: string }).artifactJobId;
     expect(typeof firstArtifact).toBe("string");
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).not.toBeNull();
 
-    // Clear run 1's terminal frame so runResize waits on run 2's own.
-    await sharedRedis().del(`${bullPrefix()}:terminal:${clientJobId}`);
-    await runResize(clientJobId, adminToken);
+    const queue = getQueue("image");
+    await queue.pause();
+    enqueueMock.timeoutOnce = true;
+    let ssePromise: ReturnType<typeof app.inject> | undefined;
+    try {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/resize",
+        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        body,
+      });
+      expect(res.statusCode).toBe(202);
+
+      // Re-pointing the alias cleared run 1's cached terminal frame in Redis (#2740).
+      expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBeNull();
+
+      // Opening the SSE stream while run 2 is queued must replay run 2's
+      // nonterminal progress and stay open for run 2's completion (#2740).
+      ssePromise = app.inject({
+        method: "GET",
+        url: `/api/v1/jobs/${clientJobId}/progress`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      await new Promise((r) => setTimeout(r, 50));
+    } finally {
+      enqueueMock.timeoutOnce = false;
+      await queue.resume();
+    }
+
+    await waitForTerminalFrame(clientJobId);
+    const sseRes = await ssePromise;
+    const sseFrames = (sseRes?.body ?? "")
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith("data: "))
+      .map((line) => JSON.parse(line.slice(6)) as Record<string, unknown>)
+      .filter((frame) => frame.type !== "heartbeat");
+    expect(sseFrames[0]).toMatchObject({
+      jobId: clientJobId,
+      type: "single",
+      phase: "processing",
+    });
+    expect(sseFrames.at(-1)).toMatchObject({
+      jobId: clientJobId,
+      type: "single",
+      phase: "complete",
+    });
 
     const reused = await jobRow(clientJobId);
     const secondArtifact = ((reused?.settings ?? {}) as { artifactJobId?: string }).artifactJobId;
@@ -315,9 +365,10 @@ describe("route-stamped alias metadata (#808)", () => {
 
     // A second user submits their own run under the first user's id. The
     // alias claim is refused, so the run falls back to its own server jobId
-    // and leaves the first user's channel untouched (#895).
+    // and leaves the first user's channel and Redis terminal key untouched (#895, #2740).
+    const terminalBefore = await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`);
+    expect(terminalBefore).not.toBeNull();
     const attacker = await createUserAndLogin(app, `single-cancel-reuse-${Date.now()}`);
-    await sharedRedis().del(`${bullPrefix()}:terminal:${clientJobId}`);
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
       { name: "settings", content: JSON.stringify({ width: 25 }) },
@@ -333,7 +384,7 @@ describe("route-stamped alias metadata (#808)", () => {
     const { jobId: attackerJobId } = JSON.parse(res.body) as { jobId: string };
     expect(attackerJobId).not.toBe(clientJobId);
     await waitForTerminalFrame(attackerJobId);
-    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBeNull();
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBe(terminalBefore);
 
     const after = await jobRow(clientJobId);
     expect(after?.userId).toBe(owner.userId);

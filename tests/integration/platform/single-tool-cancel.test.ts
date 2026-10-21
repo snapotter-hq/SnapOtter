@@ -1360,7 +1360,7 @@ describe("requestCancel through a single-tool alias (#808)", () => {
       userId: owner,
     });
     await waitFor(async () => (invoked.includes("reuse-2") ? true : undefined));
-    await sharedRedis().del(`${bullPrefix()}:terminal:${clientJobId}`);
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBeNull();
 
     // Run 2's enqueue re-pointed the alias and reset its stale terminal
     // state (#886), so the cancel resolves the live job and this run's
@@ -1513,14 +1513,24 @@ describe("requestCancel through a single-tool alias (#808)", () => {
 
     expect(await requestCancel(clientJobId)).toBe(true);
     expect((await jobRow(clientJobId))?.status).toBe("canceled");
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).not.toBeNull();
 
-    await enqueueSingleRun({
-      jobId,
-      mode: "fast",
-      tag: "window-cancel",
-      clientJobId,
-      userId: owner,
-    });
+    const queue = getQueue("image");
+    await queue.pause();
+    try {
+      await enqueueSingleRun({
+        jobId,
+        mode: "fast",
+        tag: "window-cancel",
+        clientJobId,
+        userId: owner,
+      });
+      // Re-stamping the same run's alias in upsertToolJobAlias must not wipe
+      // the validation-window cancel's terminal replay key (#2740).
+      expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).not.toBeNull();
+    } finally {
+      await queue.resume();
+    }
     expect((await terminalRow(jobId)).status).toBe("canceled");
     expect(invoked).not.toContain("window-cancel");
   });

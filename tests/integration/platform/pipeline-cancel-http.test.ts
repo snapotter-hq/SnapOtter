@@ -156,8 +156,6 @@ describe("route-stamped cancel metadata (#771)", () => {
     const firstFlow = ((first?.settings ?? {}) as { pipelineFlowId?: string }).pipelineFlowId;
     expect(typeof firstFlow).toBe("string");
 
-    // Clear run 1's terminal frame so runPipeline waits on run 2's own.
-    await sharedRedis().del(`${bullPrefix()}:terminal:${clientJobId}`);
     await runPipeline(clientJobId);
 
     // The reused id must not 500, and its pointer must follow the newest
@@ -365,8 +363,8 @@ describe("HTTP cancel on route-created pipeline rows", () => {
     expect(first?.completedAt).not.toBeNull();
     expect(first?.error).toEqual({ message: "prior error" });
     expect(first?.createdAt.getTime()).toBe(staleCreatedAt.getTime());
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).not.toBeNull();
 
-    await sharedRedis().del(`${bullPrefix()}:terminal:${clientJobId}`);
     enqueueMock.captureFlowOnce = true;
     enqueueMock.timeoutOnce = true;
     enqueueMock.capturedFlow = null;
@@ -387,6 +385,18 @@ describe("HTTP cancel on route-created pipeline rows", () => {
         body,
       });
       expect(execRes.statusCode).toBe(202);
+
+      // Re-pointing the alias cleared run 1's cached terminal frame in Redis (#2740).
+      expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBeNull();
+
+      // Opening the SSE stream while run 2 is in flight must replay run 2's
+      // nonterminal progress and stay open, not replay run 1's terminal frame (#2740).
+      const ssePromise = app.inject({
+        method: "GET",
+        url: `/api/v1/jobs/${clientJobId}/progress`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      await new Promise((r) => setTimeout(r, 50));
 
       // The alias row was reset on re-point and accepted run 2's initial
       // nonterminal progress write instead of staying terminal from run 1.
@@ -432,6 +442,25 @@ describe("HTTP cancel on route-created pipeline rows", () => {
         phase: "failed",
         error: "Canceled",
       });
+      const sseRes = await ssePromise;
+      const sseFrames = sseRes.body
+        .split(/\r?\n/)
+        .filter((line) => line.startsWith("data: "))
+        .map((line) => JSON.parse(line.slice(6)) as Record<string, unknown>)
+        .filter((frame) => frame.type !== "heartbeat");
+      expect(sseFrames[0]).toMatchObject({
+        jobId: clientJobId,
+        type: "single",
+        phase: "processing",
+        percent: 0,
+        stage: "Preparing pipeline...",
+      });
+      expect(sseFrames.at(-1)).toMatchObject({
+        jobId: clientJobId,
+        type: "single",
+        phase: "failed",
+        error: "Canceled",
+      });
       expect((await jobRow(secondFlow as string))?.status).toBe("canceled");
       expect((await jobRow(clientJobId))?.status).toBe("canceled");
     } finally {
@@ -465,9 +494,11 @@ describe("HTTP cancel on route-created pipeline rows", () => {
 
     // A second user submits their own pipeline under the first user's id.
     // The claim is refused, so the second run falls back to its own flow id
-    // and never publishes or persists on the first user's channel (#895).
+    // and never publishes, persists, or clears the terminal key on the first
+    // user's channel (#895, #2740).
+    const terminalBefore = await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`);
+    expect(terminalBefore).not.toBeNull();
     const attacker = await createUserAndLogin(app, `alias-reuse-${Date.now()}`);
-    await sharedRedis().del(`${bullPrefix()}:terminal:${clientJobId}`);
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
       {
@@ -486,7 +517,7 @@ describe("HTTP cancel on route-created pipeline rows", () => {
     const { jobId: attackerFlowId } = JSON.parse(res.body) as { jobId: string };
     expect(attackerFlowId).not.toBe(clientJobId);
     await waitForTerminalFrame(attackerFlowId);
-    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBeNull();
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBe(terminalBefore);
 
     const after = await jobRow(clientJobId);
     expect(after?.userId).toBe(ownerBefore);

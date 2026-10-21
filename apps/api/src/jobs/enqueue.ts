@@ -13,6 +13,7 @@ import { db, schema } from "../db/index.js";
 import { assertAiJobQuota } from "../lib/ai-quota.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { toStorableJson } from "../lib/storable-json.js";
+import { clearTerminalReplayKey } from "../routes/progress.js";
 import { createBullMQConnection } from "./connection.js";
 import { getQueue } from "./queues.js";
 import { POOLS, type Pool, queueName, type ToolJobData, type ToolJobResult } from "./types.js";
@@ -203,7 +204,7 @@ export async function upsertToolJobAlias(args: {
     ? or(isNull(schema.jobs.userId), eq(schema.jobs.userId, args.userId))
     : isNull(schema.jobs.userId);
   const isRepoint = sql`${schema.jobs.settings}->>'artifactJobId' is distinct from ${args.jobId}`;
-  const res = await db
+  const rows = await db
     .insert(schema.jobs)
     .values({
       id: args.clientJobId,
@@ -227,8 +228,9 @@ export async function upsertToolJobAlias(args: {
         progress: sql`CASE WHEN ${isRepoint} THEN NULL ELSE ${schema.jobs.progress} END`,
       },
       setWhere: and(eq(schema.jobs.type, "single"), claimableOwner),
-    });
-  if (((res as { rowCount?: number | null })?.rowCount ?? 0) === 0) {
+    })
+    .returning({ status: schema.jobs.status });
+  if (rows.length === 0) {
     // The claim was skipped (foreign owner or non-alias collision). The
     // run falls back to the server jobId, so neither SSE progress nor
     // cancel by clientJobId resolves here; log the refusal instead of
@@ -237,6 +239,11 @@ export async function upsertToolJobAlias(args: {
       `alias claim skipped for clientJobId ${args.clientJobId} (job ${args.jobId}); progress and cancel fell back to the server job id`,
     );
     return false;
+  }
+  if (rows[0].status === "queued" || rows[0].status === "processing") {
+    await clearTerminalReplayKey(args.clientJobId).catch((err) => {
+      console.warn("terminal replay key clear failed", args.clientJobId, err);
+    });
   }
   return true;
 }

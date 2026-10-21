@@ -17,6 +17,7 @@ const propagationInjectMock = vi.hoisted(() => vi.fn());
 const selectMock = vi.hoisted(() => vi.fn());
 const updateSetMock = vi.hoisted(() => vi.fn());
 const updateMock = vi.hoisted(() => vi.fn());
+const clearTerminalReplayKeyMock = vi.hoisted(() => vi.fn());
 
 // Chain builder for `db.select(...).from(...).where(...).limit(...)`.
 function selectChain<T>(result: T) {
@@ -56,6 +57,7 @@ async function loadEnqueueModule(
   selectMock.mockReset();
   updateSetMock.mockReset();
   updateMock.mockReset();
+  clearTerminalReplayKeyMock.mockReset().mockResolvedValue(undefined);
 
   queueEventRun.mockReset();
   queueEventOn.mockReset();
@@ -63,14 +65,24 @@ async function loadEnqueueModule(
 
   queueAdd.mockImplementation(async (_name: string, data: unknown) => ({ id: "job-1", data }));
   onConflictDoNothingMock.mockResolvedValue({ rowCount: 1 });
-  onConflictDoUpdateMock.mockResolvedValue({ rowCount: 1 });
+  onConflictDoUpdateMock.mockResolvedValue([{ status: "queued" }]);
   insertedValues.mockImplementation(() => {
+    const wrapConflictUpdate = (...args: unknown[]) => {
+      const rawPromise = Promise.resolve(onConflictDoUpdateMock(...args)).then((val) => {
+        if (Array.isArray(val)) return val;
+        const rc = (val as { rowCount?: number } | undefined)?.rowCount ?? 1;
+        return rc === 0 ? [] : [{ status: "queued" }];
+      });
+      return Object.assign(rawPromise, {
+        returning: () => rawPromise,
+      });
+    };
     const p = Promise.resolve(undefined) as Promise<undefined> & {
       onConflictDoNothing: typeof onConflictDoNothingMock;
-      onConflictDoUpdate: typeof onConflictDoUpdateMock;
+      onConflictDoUpdate: typeof wrapConflictUpdate;
     };
     p.onConflictDoNothing = onConflictDoNothingMock;
-    p.onConflictDoUpdate = onConflictDoUpdateMock;
+    p.onConflictDoUpdate = wrapConflictUpdate;
     return p;
   });
   queueEventClose.mockResolvedValue(undefined);
@@ -180,6 +192,10 @@ async function loadEnqueueModule(
       add: queueAdd,
       getJob,
     })),
+  }));
+
+  vi.doMock("../../../../apps/api/src/routes/progress.js", () => ({
+    clearTerminalReplayKey: clearTerminalReplayKeyMock,
   }));
 
   const mod = await import("../../../../apps/api/src/jobs/enqueue.js");
@@ -681,6 +697,7 @@ describe("alias claim outcomes (#895)", () => {
     );
     expect(data.clientJobId).toBeUndefined();
     expect(job.data.clientJobId).toBeUndefined();
+    expect(clearTerminalReplayKeyMock).not.toHaveBeenCalled();
     expect(queueAdd).toHaveBeenCalledWith(
       "resize",
       expect.objectContaining({ jobId: "job-refused", clientJobId: undefined }),
@@ -708,6 +725,11 @@ describe("alias claim outcomes (#895)", () => {
 
     expect(data.clientJobId).toBe("owned-alias-id");
     expect(job.data.clientJobId).toBe("owned-alias-id");
+    expect(clearTerminalReplayKeyMock).toHaveBeenCalledTimes(1);
+    expect(clearTerminalReplayKeyMock).toHaveBeenCalledWith("owned-alias-id");
+    expect(clearTerminalReplayKeyMock.mock.invocationCallOrder[0]).toBeLessThan(
+      queueAdd.mock.invocationCallOrder[0],
+    );
     expect(queueAdd).toHaveBeenCalledWith(
       "resize",
       expect.objectContaining({ jobId: "job-claimed", clientJobId: "owned-alias-id" }),
@@ -746,5 +768,40 @@ describe("alias claim outcomes (#895)", () => {
     expect(conflictArg.set.completedAt).toBeDefined();
     expect(conflictArg.set.error).toBeDefined();
     expect(conflictArg.set.progress).toBeDefined();
+    expect(clearTerminalReplayKeyMock).toHaveBeenCalledTimes(1);
+    expect(clearTerminalReplayKeyMock).toHaveBeenCalledWith("reused-client-id");
+  });
+
+  it("upsertToolJobAlias preserves the terminal replay key when a same-run validation-window cancel already settled the row (#2740)", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { mod } = await loadEnqueueModule();
+    onConflictDoUpdateMock.mockResolvedValueOnce([{ status: "canceled" }]);
+
+    await expect(
+      mod.upsertToolJobAlias({
+        jobId: "job-same",
+        clientJobId: "window-canceled-id",
+        userId: "user-1",
+        pool: "image",
+      }),
+    ).resolves.toBe(true);
+    expect(clearTerminalReplayKeyMock).not.toHaveBeenCalled();
+
+    onConflictDoUpdateMock.mockResolvedValueOnce([{ status: "queued" }]);
+    clearTerminalReplayKeyMock.mockRejectedValueOnce(new Error("redis del fault"));
+
+    await expect(
+      mod.upsertToolJobAlias({
+        jobId: "job-next",
+        clientJobId: "reused-id",
+        userId: "user-1",
+        pool: "image",
+      }),
+    ).resolves.toBe(true);
+    expect(warnSpy).toHaveBeenCalledWith(
+      "terminal replay key clear failed",
+      "reused-id",
+      expect.any(Error),
+    );
   });
 });

@@ -78,7 +78,12 @@ import { engineUnavailable } from "../modality/image-input.js";
 import { inputHandlerFor } from "../modality/input-handler.js";
 import { hasEffectivePermission, hasEffectiveToolAccess } from "../permissions.js";
 import { type AuthUser, requireAuth } from "../plugins/auth.js";
-import { failBatchJob, updateJobProgress, updateSingleFileProgress } from "./progress.js";
+import {
+  clearTerminalReplayKey,
+  failBatchJob,
+  updateJobProgress,
+  updateSingleFileProgress,
+} from "./progress.js";
 import { getRegisteredToolIds, getToolConfig } from "./tool-factory.js";
 
 /**
@@ -737,6 +742,12 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           }
 
           if (clientJobId) {
+            await clearTerminalReplayKey(clientJobId).catch((err) => {
+              request.log.warn(
+                { err, clientJobId, pipelineFlowId: jobId },
+                "failed to clear terminal replay key for pipeline alias",
+              );
+            });
             // Report initial progress. Awaited: this write settles the
             // client-facing row the SSE replays, which is the evidence a
             // degraded client's fresh connection relies on (#766). Dropped

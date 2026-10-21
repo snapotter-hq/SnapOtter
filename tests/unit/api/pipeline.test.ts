@@ -9,8 +9,17 @@ import { gzipSync } from "node:zlib";
 import Fastify, { type FastifyRequest } from "fastify";
 import { describe, expect, it, vi } from "vitest";
 
-const insertValuesMock = vi.hoisted(() =>
+const onConflictDoUpdateMock = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<{ rowCount: number }>>(async () => ({ rowCount: 1 })),
+);
+const insertValuesMock = vi.hoisted(() =>
+  vi.fn((..._args: unknown[]) => {
+    const p = Promise.resolve({ rowCount: 1 }) as Promise<{ rowCount: number }> & {
+      onConflictDoUpdate: typeof onConflictDoUpdateMock;
+    };
+    p.onConflictDoUpdate = onConflictDoUpdateMock;
+    return p;
+  }),
 );
 const updateSetMock = vi.hoisted(() => vi.fn());
 const reportErrorMock = vi.hoisted(() => vi.fn());
@@ -20,7 +29,9 @@ const spoolMultipartFileSpy = vi.hoisted(() => vi.fn());
 const storeValidatedOcrPdfSpy = vi.hoisted(() => vi.fn());
 const recordChildOutcomeMock = vi.hoisted(() => vi.fn(async () => {}));
 const failBatchJobMock = vi.hoisted(() => vi.fn(async () => true));
+const clearTerminalReplayKeyMock = vi.hoisted(() => vi.fn(async () => {}));
 const updateJobProgressMock = vi.hoisted(() => vi.fn());
+const updateSingleFileProgressMock = vi.hoisted(() => vi.fn(async () => {}));
 const flowAddMock = vi.hoisted(() => vi.fn(async () => {}));
 const putObjectMock = vi.hoisted(() => vi.fn(async () => {}));
 const deleteObjectMock = vi.hoisted(() => vi.fn(async () => {}));
@@ -199,9 +210,10 @@ vi.mock("../../../apps/api/src/jobs/batch-progress.js", () => ({
 }));
 
 vi.mock("../../../apps/api/src/routes/progress.js", () => ({
+  clearTerminalReplayKey: clearTerminalReplayKeyMock,
   failBatchJob: failBatchJobMock,
   updateJobProgress: updateJobProgressMock,
-  updateSingleFileProgress: vi.fn(),
+  updateSingleFileProgress: updateSingleFileProgressMock,
 }));
 
 vi.mock("../../../apps/api/src/plugins/auth.js", () => ({
@@ -1550,5 +1562,84 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
         inputRefs: [`uploads/${flowId}/photo.png`],
       }),
     );
+  });
+
+  it("clears the Redis terminal replay key when claiming a clientJobId alias row and skips it when refused (#2740)", async () => {
+    vi.clearAllMocks();
+    onConflictDoUpdateMock.mockResolvedValueOnce({ rowCount: 1 });
+
+    const claimedReply = await invokePipelineExecuteRoute([
+      { type: "file", filename: "photo.png", content: Buffer.from("photo-png-bytes") },
+      {
+        type: "field",
+        fieldname: "pipeline",
+        value: JSON.stringify({
+          steps: [{ toolId: executeTestToolId, settings: {} }],
+        }),
+      },
+      { type: "field", fieldname: "clientJobId", value: "reused-pipeline-alias" },
+    ]);
+
+    expect(claimedReply.statusCode).toBe(202);
+    expect(claimedReply.payload).toEqual({ jobId: "reused-pipeline-alias", async: true });
+    expect(clearTerminalReplayKeyMock).toHaveBeenCalledTimes(1);
+    expect(clearTerminalReplayKeyMock).toHaveBeenCalledWith("reused-pipeline-alias");
+    expect(updateSingleFileProgressMock).toHaveBeenCalledWith(
+      expect.objectContaining({ jobId: "reused-pipeline-alias", phase: "processing" }),
+    );
+    expect(onConflictDoUpdateMock.mock.invocationCallOrder[0]).toBeLessThan(
+      clearTerminalReplayKeyMock.mock.invocationCallOrder[0],
+    );
+    expect(clearTerminalReplayKeyMock.mock.invocationCallOrder[0]).toBeLessThan(
+      updateSingleFileProgressMock.mock.invocationCallOrder[0],
+    );
+    expect(updateSingleFileProgressMock.mock.invocationCallOrder[0]).toBeLessThan(
+      flowAddMock.mock.invocationCallOrder[0],
+    );
+
+    vi.clearAllMocks();
+    onConflictDoUpdateMock.mockResolvedValueOnce({ rowCount: 1 });
+    clearTerminalReplayKeyMock.mockRejectedValueOnce(new Error("redis del fault"));
+
+    const faultTolerantReply = await invokePipelineExecuteRoute([
+      { type: "file", filename: "photo.png", content: Buffer.from("photo-png-bytes") },
+      {
+        type: "field",
+        fieldname: "pipeline",
+        value: JSON.stringify({
+          steps: [{ toolId: executeTestToolId, settings: {} }],
+        }),
+      },
+      { type: "field", fieldname: "clientJobId", value: "reused-pipeline-alias-fault" },
+    ]);
+
+    expect(faultTolerantReply.statusCode).toBe(202);
+    expect(faultTolerantReply.payload).toEqual({
+      jobId: "reused-pipeline-alias-fault",
+      async: true,
+    });
+    expect(updateSingleFileProgressMock).toHaveBeenCalledWith(
+      expect.objectContaining({ jobId: "reused-pipeline-alias-fault", phase: "processing" }),
+    );
+
+    vi.clearAllMocks();
+    onConflictDoUpdateMock.mockResolvedValueOnce({ rowCount: 0 });
+
+    const refusedReply = await invokePipelineExecuteRoute([
+      { type: "file", filename: "photo.png", content: Buffer.from("photo-png-bytes") },
+      {
+        type: "field",
+        fieldname: "pipeline",
+        value: JSON.stringify({
+          steps: [{ toolId: executeTestToolId, settings: {} }],
+        }),
+      },
+      { type: "field", fieldname: "clientJobId", value: "refused-pipeline-alias" },
+    ]);
+
+    expect(refusedReply.statusCode).toBe(202);
+    expect((refusedReply.payload as { jobId?: string })?.jobId).not.toBe("refused-pipeline-alias");
+    expect(clearTerminalReplayKeyMock).not.toHaveBeenCalled();
+    expect(updateSingleFileProgressMock).not.toHaveBeenCalled();
   });
 });
