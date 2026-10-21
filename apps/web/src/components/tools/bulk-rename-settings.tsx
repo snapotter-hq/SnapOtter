@@ -6,6 +6,26 @@ import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
+
+function createUniqueNamer(): (name: string) => string {
+  const used = new Set<string>();
+  const key = (name: string) => name.normalize("NFC").toLowerCase();
+  return (name) => {
+    if (!used.has(key(name))) {
+      used.add(key(name));
+      return name;
+    }
+    const dotIdx = name.lastIndexOf(".");
+    const base = dotIdx > 0 ? name.slice(0, dotIdx) : name;
+    const ext = dotIdx > 0 ? name.slice(dotIdx) : "";
+    let counter = 1;
+    while (used.has(key(`${base}_${counter}${ext}`))) counter++;
+    const candidate = `${base}_${counter}${ext}`;
+    used.add(key(candidate));
+    return candidate;
+  };
+}
+
 export function BulkRenameSettings() {
   const { t } = useTranslation();
   const { files, processing, error, setProcessing, setError } = useFileStore();
@@ -97,6 +117,7 @@ export function BulkRenameSettings() {
   const hasFiles = files.length > 0;
 
   // Preview names
+  const uniqueName = createUniqueNamer();
   const previewNames = hasFiles
     ? files.slice(0, 5).map((f, i) => {
         const dotIdx = f.name.lastIndexOf(".");
@@ -104,11 +125,11 @@ export function BulkRenameSettings() {
         const stem = ext ? f.name.slice(0, -ext.length) : f.name;
         const idx = startIndex + i;
         const padded = String(idx).padStart(String(files.length + startIndex).length, "0");
-        return (
+        return uniqueName(
           pattern
             .replace(/\{\{index\}\}/g, String(idx))
             .replace(/\{\{padded\}\}/g, padded)
-            .replace(/\{\{original\}\}/g, () => stem) + ext
+            .replace(/\{\{original\}\}/g, () => stem) + ext,
         );
       })
     : [];
