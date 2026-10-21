@@ -191,6 +191,7 @@ describe("CurvesSection control point dragging (#2677)", () => {
       },
       true,
     );
+    useEditorStore.temporal.getState().clear();
   });
 
   afterEach(() => {
@@ -351,5 +352,98 @@ describe("CurvesSection control point dragging (#2677)", () => {
       { x: 0, y: 0 },
       { x: 255, y: 255 },
     ]);
+  });
+
+  it("syncs the Curves preset dropdown when dragging an existing preset point, switching channels, resetting, or undoing (#3177)", () => {
+    const { container, getByText } = render(<AdjustmentsPanel />);
+    const canvas = getCurvesCanvas(container);
+    const selects = Array.from(container.querySelectorAll("select")) as HTMLSelectElement[];
+    // Levels has 1 channel select; Curves has channel select + preset select.
+    const presetSelect = selects.find((s) =>
+      Array.from(s.options).some((o) => o.value === "darken"),
+    );
+    const curvesChannelSelect = selects.find(
+      (s) => s !== presetSelect && s.parentElement === presetSelect?.parentElement,
+    );
+    if (!presetSelect || !curvesChannelSelect) {
+      throw new Error("Curves channel or preset select not found");
+    }
+
+    expect(presetSelect.value).toBe("linear");
+
+    // 1. Select the Darken preset: [(0, 0), (128, 96), (255, 220)].
+    fireEvent.change(presetSelect, { target: { value: "darken" } });
+    expect(presetSelect.value).toBe("darken");
+    expect(useEditorStore.getState().curves.rgb).toEqual([
+      { x: 0, y: 0 },
+      { x: 128, y: 96 },
+      { x: 255, y: 220 },
+    ]);
+
+    // 2. Drag the existing midpoint at (128, 96) -> clientX = 128, clientY = 255 - 96 = 159.
+    fireEvent.mouseDown(canvas, { clientX: 128, clientY: 159 });
+    fireEvent.mouseMove(canvas, { clientX: 140, clientY: 105 });
+    fireEvent.mouseUp(canvas);
+    expect(useEditorStore.getState().curves.rgb).toEqual([
+      { x: 0, y: 0 },
+      { x: 140, y: 150 },
+      { x: 255, y: 220 },
+    ]);
+
+    // Preset dropdown must switch to "Custom" so Darken can be re-selected.
+    expect(presetSelect.value).toBe("Custom");
+
+    // Re-selecting Darken restores the preset points.
+    fireEvent.change(presetSelect, { target: { value: "darken" } });
+    expect(presetSelect.value).toBe("darken");
+    expect(useEditorStore.getState().curves.rgb).toEqual([
+      { x: 0, y: 0 },
+      { x: 128, y: 96 },
+      { x: 255, y: 220 },
+    ]);
+
+    // 3. Switching channels reflects the target channel's curve preset ("linear" on red).
+    fireEvent.change(curvesChannelSelect, { target: { value: "red" } });
+    expect(curvesChannelSelect.value).toBe("red");
+    expect(presetSelect.value).toBe("linear");
+
+    // Switch back to rgb: preset reflects "darken" again.
+    fireEvent.change(curvesChannelSelect, { target: { value: "rgb" } });
+    expect(presetSelect.value).toBe("darken");
+
+    // 4. Undo/redo and Reset All keep the preset select in sync with curves[channel].
+    act(() => {
+      useEditorStore.temporal.getState().undo();
+    });
+    expect(presetSelect.value).toBe("Custom");
+
+    act(() => {
+      useEditorStore.temporal.getState().redo();
+    });
+    expect(presetSelect.value).toBe("darken");
+
+    fireEvent.click(getByText("Reset All"));
+    expect(presetSelect.value).toBe("linear");
+
+    // 5. Adding a midpoint on canvas switches preset to "Custom", and double-clicking
+    // that midpoint removes it and restores the "linear" preset automatically.
+    fireEvent.mouseDown(canvas, { clientX: 128, clientY: 159 });
+    fireEvent.mouseUp(canvas);
+    expect(presetSelect.value).toBe("Custom");
+
+    // Choosing "Custom" directly is a no-op that preserves the hand-edited points.
+    fireEvent.change(presetSelect, { target: { value: "Custom" } });
+    expect(useEditorStore.getState().curves.rgb).toEqual([
+      { x: 0, y: 0 },
+      { x: 128, y: 96 },
+      { x: 255, y: 255 },
+    ]);
+
+    fireEvent.doubleClick(canvas, { clientX: 128, clientY: 159 });
+    expect(useEditorStore.getState().curves.rgb).toEqual([
+      { x: 0, y: 0 },
+      { x: 255, y: 255 },
+    ]);
+    expect(presetSelect.value).toBe("linear");
   });
 });

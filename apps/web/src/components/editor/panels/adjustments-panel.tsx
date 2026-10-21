@@ -522,11 +522,21 @@ function CurvesSection() {
   const [channel, setChannel] = useState<CurveChannel>("rgb");
   const curves = useEditorStore((s) => s.curves);
   const setStoreCurves = useEditorStore((s) => s.setCurves);
-  const [preset, setPreset] = useState<CurvePresetSelection>("linear");
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const currentPoints = curves[channel];
+
+  const preset = useMemo<CurvePresetSelection>(() => {
+    const matched = CURVE_PRESET_IDS.find((id) => {
+      const presetPoints = CURVE_PRESETS[id];
+      return (
+        presetPoints.length === currentPoints.length &&
+        presetPoints.every((p, i) => p.x === currentPoints[i].x && p.y === currentPoints[i].y)
+      );
+    });
+    return matched ?? "Custom";
+  }, [currentPoints]);
 
   const lut = useMemo(() => curveLut(currentPoints), [currentPoints]);
 
@@ -648,7 +658,6 @@ function CurvesSection() {
           (a, b) => a.x - b.x,
         );
         setStoreCurves(channel, newPoints);
-        setPreset("Custom");
         const newIdx = newPoints.findIndex((p) => p.x === pos.x);
         setDraggingIndex(newIdx !== -1 ? newIdx : null);
       }
@@ -688,7 +697,6 @@ function CurvesSection() {
       if (idx >= 0 && currentPoints.length > 2) {
         const newPoints = currentPoints.filter((_, i) => i !== idx);
         setStoreCurves(channel, newPoints);
-        setPreset("Custom");
       }
     },
     [getCanvasPos, findNearPoint, currentPoints, channel, setStoreCurves],
@@ -696,7 +704,6 @@ function CurvesSection() {
 
   const handlePresetChange = useCallback(
     (name: CurvePresetSelection) => {
-      setPreset(name);
       if (name === "Custom") return;
       const presetPoints = CURVE_PRESETS[name];
       if (presetPoints) {
