@@ -439,7 +439,9 @@ export function warnIfExternalUrlCanonicalized(
 }
 
 export function resolveConcurrency(env: Env): number {
-  if (env.CONCURRENT_JOBS > 0) return env.CONCURRENT_JOBS;
+  if (Number.isFinite(env.CONCURRENT_JOBS) && env.CONCURRENT_JOBS >= 1) {
+    return Math.floor(env.CONCURRENT_JOBS);
+  }
   return Math.max(2, availableParallelism() - 1);
 }
 

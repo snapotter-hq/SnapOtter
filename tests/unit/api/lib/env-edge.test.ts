@@ -267,6 +267,8 @@ describe("worker sizing helpers", () => {
     const env = loadEnv();
 
     expect(resolveConcurrency({ ...env, CONCURRENT_JOBS: 7 })).toBe(7);
+    expect(resolveConcurrency({ ...env, CONCURRENT_JOBS: 1 })).toBe(1);
+    expect(resolveConcurrency({ ...env, CONCURRENT_JOBS: 2.7 })).toBe(2);
     expect(resolveWorkerThreads({ ...env, MAX_WORKER_THREADS: 9 })).toBe(9);
     expect(resolveWorkerThreads({ ...env, MAX_WORKER_THREADS: 1 })).toBe(1);
     expect(resolveWorkerThreads({ ...env, MAX_WORKER_THREADS: 2.7 })).toBe(2);
@@ -274,9 +276,16 @@ describe("worker sizing helpers", () => {
 
   it("falls back to at least two workers when overrides are zero, below 1, or non-finite", () => {
     const env = loadEnv();
+    const autoConcurrency = resolveConcurrency({ ...env, CONCURRENT_JOBS: 0 });
     const autoThreads = resolveWorkerThreads({ ...env, MAX_WORKER_THREADS: 0 });
 
-    expect(resolveConcurrency({ ...env, CONCURRENT_JOBS: 0 })).toBeGreaterThanOrEqual(2);
+    expect(autoConcurrency).toBeGreaterThanOrEqual(2);
+    expect(resolveConcurrency({ ...env, CONCURRENT_JOBS: -3 })).toBe(autoConcurrency);
+    expect(resolveConcurrency({ ...env, CONCURRENT_JOBS: 0.5 })).toBe(autoConcurrency);
+    expect(resolveConcurrency({ ...env, CONCURRENT_JOBS: Number.POSITIVE_INFINITY })).toBe(
+      autoConcurrency,
+    );
+    expect(resolveConcurrency({ ...env, CONCURRENT_JOBS: Number.NaN })).toBe(autoConcurrency);
     expect(autoThreads).toBeGreaterThanOrEqual(2);
     expect(resolveWorkerThreads({ ...env, MAX_WORKER_THREADS: -3 })).toBe(autoThreads);
     expect(resolveWorkerThreads({ ...env, MAX_WORKER_THREADS: 0.5 })).toBe(autoThreads);
