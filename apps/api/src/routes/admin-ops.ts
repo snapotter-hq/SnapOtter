@@ -17,6 +17,7 @@ import { db, schema } from "../db/index.js";
 import { formatZodErrors } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
 import { metricsText } from "../lib/metrics.js";
+import { upsertSetting } from "../lib/settings-helpers.js";
 import { buildSupportBundle } from "../lib/support-bundle.js";
 import { requirePermission } from "../permissions.js";
 
@@ -202,7 +203,7 @@ export async function adminOpsRoutes(app: FastifyInstance): Promise<void> {
 
   const backupStatusSchema = z.object({
     type: z.string().min(1),
-    sizeBytes: z.number().optional(),
+    sizeBytes: z.number().int().nonnegative().optional(),
     notes: z.string().optional(),
   });
 
@@ -270,19 +271,7 @@ export async function adminOpsRoutes(app: FastifyInstance): Promise<void> {
       notes: parsed.data.notes ?? "",
     });
 
-    const [existing] = await db
-      .select()
-      .from(schema.settings)
-      .where(eq(schema.settings.key, BACKUP_KEY));
-
-    if (existing) {
-      await db
-        .update(schema.settings)
-        .set({ value: payload, updatedAt: new Date() })
-        .where(eq(schema.settings.key, BACKUP_KEY));
-    } else {
-      await db.insert(schema.settings).values({ key: BACKUP_KEY, value: payload });
-    }
+    await upsertSetting(BACKUP_KEY, payload);
 
     return { success: true, timestamp };
   });

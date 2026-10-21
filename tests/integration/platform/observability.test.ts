@@ -155,6 +155,58 @@ describe("GET/POST /api/v1/admin/backup-status (#3039)", () => {
     expect(res.json().code).toBe("VALIDATION_ERROR");
   });
 
+  it("rejects negative or fractional sizeBytes with 400 VALIDATION_ERROR (#3053)", async () => {
+    for (const invalidSize of [-5, -1, 1.5]) {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/admin/backup-status",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": "application/json",
+        },
+        payload: { type: "full", sizeBytes: invalidSize },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.json().code).toBe("VALIDATION_ERROR");
+    }
+  });
+
+  it("handles concurrent POST requests when backup_last_completed is absent without unique-constraint failure (#3053)", async () => {
+    try {
+      await db.delete(schema.settings).where(eq(schema.settings.key, "backup_last_completed"));
+
+      const responses = await Promise.all(
+        Array.from({ length: 8 }, (_, idx) =>
+          app.inject({
+            method: "POST",
+            url: "/api/v1/admin/backup-status",
+            headers: {
+              authorization: `Bearer ${adminToken}`,
+              "content-type": "application/json",
+            },
+            payload: { type: "full", sizeBytes: idx * 1024, notes: `run-${idx}` },
+          }),
+        ),
+      );
+
+      for (const res of responses) {
+        expect(res.statusCode).toBe(200);
+        expect(res.json().success).toBe(true);
+      }
+
+      const getRes = await app.inject({
+        method: "GET",
+        url: "/api/v1/admin/backup-status",
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(getRes.statusCode).toBe(200);
+      expect(getRes.json().status).toBe("ok");
+      expect(getRes.json().lastBackup?.type).toBe("full");
+    } finally {
+      await db.delete(schema.settings).where(eq(schema.settings.key, "backup_last_completed"));
+    }
+  });
+
   it("returns critical when no backup has been recorded and ok after POST insert and update", async () => {
     const warnSpy = vi.spyOn(logger, "warn");
     try {

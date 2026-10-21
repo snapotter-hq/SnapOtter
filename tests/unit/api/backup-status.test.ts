@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const selectMock = vi.hoisted(() => vi.fn());
+const upsertSettingMock = vi.hoisted(() => vi.fn());
 const requirePermissionMock = vi.hoisted(() => vi.fn());
 const requirePermissionFactoryMock = vi.hoisted(() =>
   vi.fn((_permission: string) => requirePermissionMock),
@@ -28,6 +29,10 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
       value: "settings.value",
     },
   },
+}));
+
+vi.mock("../../../apps/api/src/lib/settings-helpers.js", () => ({
+  upsertSetting: upsertSettingMock,
 }));
 
 vi.mock("../../../apps/api/src/lib/logger.js", () => ({
@@ -220,6 +225,149 @@ describe("GET /api/v1/admin/backup-status (#3039)", () => {
       });
     }
     expect(loggerMock.warn).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+});
+
+describe("POST /api/v1/admin/backup-status (#3053)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
+  });
+
+  it("stops when requirePermission rejects the request", async () => {
+    requirePermissionMock.mockImplementation(
+      async (_req: unknown, reply: { status: (c: number) => { send: (b: unknown) => void } }) => {
+        reply.status(403).send({ error: "Forbidden" });
+        return null;
+      },
+    );
+
+    const { adminOpsRoutes } = await import("../../../apps/api/src/routes/admin-ops.js");
+    const app = Fastify();
+    await adminOpsRoutes(app);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/admin/backup-status",
+      payload: { type: "full" },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(requirePermissionFactoryMock).toHaveBeenCalledWith("system:health");
+    expect(upsertSettingMock).not.toHaveBeenCalled();
+    expect(selectMock).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it("rejects empty type or negative, fractional, or non-number sizeBytes with 400 VALIDATION_ERROR", async () => {
+    requirePermissionMock.mockResolvedValue({ id: "admin-1", username: "admin" });
+
+    const { adminOpsRoutes } = await import("../../../apps/api/src/routes/admin-ops.js");
+    const app = Fastify();
+    await adminOpsRoutes(app);
+
+    for (const invalidPayload of [
+      {},
+      { type: "" },
+      { type: "full", sizeBytes: -5 },
+      { type: "full", sizeBytes: -1 },
+      { type: "full", sizeBytes: -0.5 },
+      { type: "full", sizeBytes: 0.5 },
+      { type: "full", sizeBytes: 1.5 },
+      { type: "full", sizeBytes: 4096.25 },
+      { type: "full", sizeBytes: null },
+      { type: "full", sizeBytes: "1024" },
+    ]) {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/admin/backup-status",
+        payload: invalidPayload,
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json()).toMatchObject({
+        error: "Invalid backup status",
+        code: "VALIDATION_ERROR",
+      });
+    }
+
+    expect(upsertSettingMock).not.toHaveBeenCalled();
+    expect(selectMock).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it("persists backup_last_completed atomically via upsertSetting for omitted, zero, and positive integer sizeBytes", async () => {
+    requirePermissionMock.mockResolvedValue({ id: "admin-1", username: "admin" });
+    upsertSettingMock.mockResolvedValue(undefined);
+
+    const { adminOpsRoutes } = await import("../../../apps/api/src/routes/admin-ops.js");
+    const app = Fastify();
+    await adminOpsRoutes(app);
+
+    const omittedRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/admin/backup-status",
+      payload: { type: "full" },
+    });
+    expect(omittedRes.statusCode).toBe(200);
+    const omittedBody = omittedRes.json();
+    expect(omittedBody).toEqual({
+      success: true,
+      timestamp: expect.any(String),
+    });
+    expect(upsertSettingMock).toHaveBeenNthCalledWith(
+      1,
+      "backup_last_completed",
+      JSON.stringify({
+        timestamp: omittedBody.timestamp,
+        type: "full",
+        sizeBytes: null,
+        notes: "",
+      }),
+    );
+
+    const zeroRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/admin/backup-status",
+      payload: { type: "incremental", sizeBytes: 0, notes: "empty delta" },
+    });
+    expect(zeroRes.statusCode).toBe(200);
+    const zeroBody = zeroRes.json();
+    expect(upsertSettingMock).toHaveBeenNthCalledWith(
+      2,
+      "backup_last_completed",
+      JSON.stringify({
+        timestamp: zeroBody.timestamp,
+        type: "incremental",
+        sizeBytes: 0,
+        notes: "empty delta",
+      }),
+    );
+
+    const largeSizeBytes = 10_737_418_240; // 10 GiB (> INT32_MAX)
+    const positiveRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/admin/backup-status",
+      payload: { type: "full", sizeBytes: largeSizeBytes, notes: "weekly" },
+    });
+    expect(positiveRes.statusCode).toBe(200);
+    const positiveBody = positiveRes.json();
+    expect(upsertSettingMock).toHaveBeenNthCalledWith(
+      3,
+      "backup_last_completed",
+      JSON.stringify({
+        timestamp: positiveBody.timestamp,
+        type: "full",
+        sizeBytes: largeSizeBytes,
+        notes: "weekly",
+      }),
+    );
+
+    expect(selectMock).not.toHaveBeenCalled();
 
     await app.close();
   });
