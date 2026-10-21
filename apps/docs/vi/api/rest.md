@@ -1,7 +1,7 @@
 ---
 description: "Tài liệu tham khảo REST API đầy đủ. Endpoint công cụ, xử lý hàng loạt, pipeline, thư viện tệp, xác thực, nhóm và các thao tác quản trị."
-i18n_output_hash: a2d3795ef769
-i18n_source_hash: 899149b272e4
+i18n_output_hash: e747b3ba9a30
+i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
 
@@ -179,7 +179,7 @@ Mọi công cụ AI đều chạy trên phần cứng của bạn: mặc định
 
 | ID công cụ | Tên | Mô hình AI | Cài đặt chính |
 |---------|------|---------|-------------|
-| `remove-background` | Xóa nền | rembg (BiRefNet / U2-Net) | `model`, `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
+| `remove-background` | Xóa nền | rembg (BiRefNet / U2-Net) | Giai đoạn 1: `model`, `edgeRefine` (0-3), `decontaminate`. Giai đoạn 2 (`/api/v1/tools/image/remove-background/effects`), `/batch` và pipeline: `backgroundType` (transparent/color/gradient/blur, cùng image trên `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
 | `upscale` | Phóng to ảnh | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Xóa vật thể | LaMa (ONNX) | Mặt nạ được gửi làm phần tệp thứ hai (tên trường `mask`), `format`, `quality` |
 | `ocr` | OCR / Trích xuất văn bản | Tesseract (nhanh); RapidOCR + PP-OCR ONNX (cân bằng/tốt nhất) | `quality` (nhanh/cân bằng/tốt nhất), `language`, `enhance` |
@@ -243,7 +243,7 @@ Mọi công cụ AI đều chạy trên phần cứng của bạn: mặc định
 |---------|------|-------------|
 | `svg-to-raster` | SVG sang Raster | `format` (png/jpeg/webp/avif/tiff/gif/heif), `width`, `height`, `scale`, `dpi`, `background` |
 | `vectorize` | Ảnh sang SVG | `colorMode` (bw/color), `threshold`, `colorPrecision`, `filterSpeckle`, `pathMode` (none/polygon/spline) |
-| `gif-tools` | Công cụ GIF | `action` (resize/optimize/reverse/speed/extract-frames/rotate/add-text), tham số theo từng hành động |
+| `gif-tools` | Công cụ GIF | `mode` (resize/optimize/speed/reverse/extract/rotate), `width`, `height`, `percentage`, `colors` (2/4/16/256), `dither`, `effort`, `speedFactor`, `extractMode` (single/range/all), `frameNumber`, `frameStart`, `frameEnd`, `extractFormat` (png/webp), `angle` (90/180/270), `flipH`, `flipV`, `loop` |
 | `gif-webp` | Trình chuyển đổi GIF/WebP | `quality` (1-100), `lossless` (bool), `resizePercent` (10-100) |
 
 ### Công cụ Video {#video-tools}

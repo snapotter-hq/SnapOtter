@@ -1,7 +1,7 @@
 ---
 description: "Полный справочник REST API. Эндпоинты инструментов, пакетная обработка, конвейеры, файловая библиотека, аутентификация, команды и административные операции."
-i18n_output_hash: b2ec4e36cb9f
-i18n_source_hash: 899149b272e4
+i18n_output_hash: 1817d0be8df0
+i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
 
@@ -179,7 +179,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 | ID инструмента | Название | AI-модель | Ключевые настройки |
 |---------|------|---------|-------------|
-| `remove-background` | Удаление фона | rembg (BiRefNet / U2-Net) | `model`, `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
+| `remove-background` | Удаление фона | rembg (BiRefNet / U2-Net) | Этап 1: `model`, `edgeRefine` (0-3), `decontaminate`. Этап 2 (`/api/v1/tools/image/remove-background/effects`), `/batch` и конвейеры: `backgroundType` (transparent/color/gradient/blur, а также image на `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
 | `upscale` | Апскейл изображения | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Ластик объектов | LaMa (ONNX) | Маска отправляется как вторая файловая часть (fieldname `mask`), `format`, `quality` |
 | `ocr` | OCR / Извлечение текста | Tesseract (быстрый); RapidOCR + PP-OCR ONNX (сбалансированный/лучший) | `quality` (быстрый/сбалансированный/лучший), `language`, `enhance` |
@@ -243,7 +243,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 |---------|------|-------------|
 | `svg-to-raster` | SVG в растр | `format` (png/jpeg/webp/avif/tiff/gif/heif), `width`, `height`, `scale`, `dpi`, `background` |
 | `vectorize` | Изображение в SVG | `colorMode` (bw/color), `threshold`, `colorPrecision`, `filterSpeckle`, `pathMode` (none/polygon/spline) |
-| `gif-tools` | Инструменты GIF | `action` (resize/optimize/reverse/speed/extract-frames/rotate/add-text), параметры конкретного действия |
+| `gif-tools` | Инструменты GIF | `mode` (resize/optimize/speed/reverse/extract/rotate), `width`, `height`, `percentage`, `colors` (2/4/16/256), `dither`, `effort`, `speedFactor`, `extractMode` (single/range/all), `frameNumber`, `frameStart`, `frameEnd`, `extractFormat` (png/webp), `angle` (90/180/270), `flipH`, `flipV`, `loop` |
 | `gif-webp` | Конвертер GIF/WebP | `quality` (1-100), `lossless` (bool), `resizePercent` (10-100) |
 
 ### Инструменты для видео {#video-tools}

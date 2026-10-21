@@ -240,7 +240,7 @@ All AI tools run on your hardware: CPU by default, or NVIDIA CUDA when a support
 |---------|------|-------------|
 | `svg-to-raster` | SVG to Raster | `format` (png/jpeg/webp/avif/tiff/gif/heif), `width`, `height`, `scale`, `dpi`, `background` |
 | `vectorize` | Image to SVG | `colorMode` (bw/color), `threshold`, `colorPrecision`, `filterSpeckle`, `pathMode` (none/polygon/spline) |
-| `gif-tools` | GIF Tools | `action` (resize/optimize/reverse/speed/extract-frames/rotate/add-text), action-specific params |
+| `gif-tools` | GIF Tools | `mode` (resize/optimize/speed/reverse/extract/rotate), `width`, `height`, `percentage`, `colors` (2/4/16/256), `dither`, `effort`, `speedFactor`, `extractMode` (single/range/all), `frameNumber`, `frameStart`, `frameEnd`, `extractFormat` (png/webp), `angle` (90/180/270), `flipH`, `flipV`, `loop` |
 | `gif-webp` | GIF/WebP Converter | `quality` (1-100), `lossless` (bool), `resizePercent` (10-100) |
 
 ### Video Tools {#video-tools}

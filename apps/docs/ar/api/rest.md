@@ -1,7 +1,7 @@
 ---
 description: "مرجع REST API الكامل. نقاط نهاية الأدوات، والمعالجة الدفعية، وخطوط المعالجة، ومكتبة الملفات، والمصادقة، والفرق، وعمليات الإدارة."
-i18n_output_hash: 89f2ba5743eb
-i18n_source_hash: 899149b272e4
+i18n_output_hash: 237d2763b477
+i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
 
@@ -179,7 +179,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 | معرّف الأداة | الاسم | نموذج الذكاء الاصطناعي | الإعدادات الرئيسية |
 |---------|------|---------|-------------|
-| `remove-background` | إزالة الخلفية | rembg (BiRefNet / U2-Net) | `model`، `backgroundType` (transparent/color/gradient/blur/image)، `backgroundColor`، `gradientColor1`، `gradientColor2`، `gradientAngle`، `blurEnabled`، `blurIntensity`، `shadowEnabled`، `shadowOpacity` |
+| `remove-background` | إزالة الخلفية | rembg (BiRefNet / U2-Net) | المرحلة 1: `model`، `edgeRefine` (0-3)، `decontaminate`. المرحلة 2 (`/api/v1/tools/image/remove-background/effects`) و`/batch` وخطوط المعالجة: `backgroundType` (transparent/color/gradient/blur، بالإضافة إلى image على `/effects`)، `backgroundColor`، `gradientColor1`، `gradientColor2`، `gradientAngle`، `blurEnabled`، `blurIntensity`، `shadowEnabled`، `shadowOpacity`، `outputFormat` (png/webp/avif) |
 | `upscale` | تكبير الصورة | RealESRGAN | `scale` (2/4)، `model`، `faceEnhance`، `denoise`، `format`، `quality` |
 | `erase-object` | ممحاة الكائنات | LaMa (ONNX) | يُرسل القناع كجزء الملف الثاني (اسم الحقل `mask`)، `format`، `quality` |
 | `ocr` | OCR / استخراج النص | Tesseract (سريع)؛ RapidOCR + PP-OCR ONNX (متوازن/الأفضل) | `quality` (سريع/متوازن/الأفضل)، `language`، `enhance` |
@@ -243,7 +243,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 |---------|------|-------------|
 | `svg-to-raster` | SVG إلى صورة نقطية | `format` (png/jpeg/webp/avif/tiff/gif/heif)، `width`، `height`، `scale`، `dpi`، `background` |
 | `vectorize` | صورة إلى SVG | `colorMode` (bw/color)، `threshold`، `colorPrecision`، `filterSpeckle`، `pathMode` (none/polygon/spline) |
-| `gif-tools` | أدوات GIF | `action` (resize/optimize/reverse/speed/extract-frames/rotate/add-text)، معاملات خاصة بالإجراء |
+| `gif-tools` | أدوات GIF | `mode` (resize/optimize/speed/reverse/extract/rotate)، `width`، `height`، `percentage`، `colors` (2/4/16/256)، `dither`، `effort`، `speedFactor`، `extractMode` (single/range/all)، `frameNumber`، `frameStart`، `frameEnd`، `extractFormat` (png/webp)، `angle` (90/180/270)، `flipH`، `flipV`، `loop` |
 | `gif-webp` | محوِّل GIF/WebP | `quality` (1-100)، `lossless` (منطقي)، `resizePercent` (10-100) |
 
 ### أدوات الفيديو {#video-tools}

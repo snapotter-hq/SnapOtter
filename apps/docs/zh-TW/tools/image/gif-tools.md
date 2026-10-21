@@ -1,8 +1,8 @@
 ---
 description: "在單一工具中對動態 GIF 進行縮放、最佳化、變速、反轉、旋轉並擷取影格。"
-i18n_source_hash: 5e525e80db92
+i18n_source_hash: 1b2831fe24f0
 i18n_provenance: human
-i18n_output_hash: f09b6c1fd108
+i18n_output_hash: 0c3e33cac0ab
 ---
 
 # GIF 工具 {#gif-tools}
@@ -34,7 +34,7 @@ i18n_output_hash: f09b6c1fd108
 
 | 參數 | 型別 | 必填 | 預設值 | 說明 |
 |-----------|------|----------|---------|-------------|
-| colors | number | 否 | 256 | 調色盤中的最大顏色數（2 到 256） |
+| colors | number | 否 | 256 | 調色盤中的最大顏色數（2、4、16 或 256） |
 | dither | number | 否 | 1.0 | 抖動強度（0 到 1，0 表示停用抖動） |
 | effort | number | 否 | 7 | 最佳化強度等級（1 到 10，越高越慢但檔案越小） |
 
@@ -77,7 +77,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
   -F "file=@large.gif" \
-  -F 'settings={"mode":"optimize","colors":128,"effort":9}'
+  -F 'settings={"mode":"optimize","colors":16,"effort":9}'
 ```
 
 ### 加速 {#speed-up}

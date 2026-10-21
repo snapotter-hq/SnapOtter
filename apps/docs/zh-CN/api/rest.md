@@ -1,7 +1,7 @@
 ---
 description: "完整的 REST API 参考。工具端点、批处理、流水线、文件库、身份验证、团队以及管理操作。"
-i18n_output_hash: c43973438a42
-i18n_source_hash: 899149b272e4
+i18n_output_hash: 966f6abf5f2a
+i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
 
@@ -179,7 +179,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 | 工具 ID | 名称 | AI 模型 | 主要设置 |
 |---------|------|---------|-------------|
-| `remove-background` | 移除背景 | rembg (BiRefNet / U2-Net) | `model`、`backgroundType`（transparent/color/gradient/blur/image）、`backgroundColor`、`gradientColor1`、`gradientColor2`、`gradientAngle`、`blurEnabled`、`blurIntensity`、`shadowEnabled`、`shadowOpacity` |
+| `remove-background` | 移除背景 | rembg (BiRefNet / U2-Net) | 阶段 1：`model`、`edgeRefine`（0-3）、`decontaminate`。阶段 2（`/api/v1/tools/image/remove-background/effects`）、`/batch` 和流水线：`backgroundType`（transparent/color/gradient/blur，`/effects` 还支持 image）、`backgroundColor`、`gradientColor1`、`gradientColor2`、`gradientAngle`、`blurEnabled`、`blurIntensity`、`shadowEnabled`、`shadowOpacity`、`outputFormat`（png/webp/avif） |
 | `upscale` | 图片放大 | RealESRGAN | `scale`（2/4）、`model`、`faceEnhance`、`denoise`、`format`、`quality` |
 | `erase-object` | 对象擦除 | LaMa (ONNX) | 蒙版作为第二个文件部分发送（字段名 `mask`）、`format`、`quality` |
 | `ocr` | OCR / 文本提取 | Tesseract（快速）； RapidOCR + PP-OCR ONNX（平衡/最佳） | `quality`（快速/平衡/最佳）、`language`、`enhance` |
@@ -243,7 +243,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 |---------|------|-------------|
 | `svg-to-raster` | SVG 转位图 | `format`（png/jpeg/webp/avif/tiff/gif/heif）、`width`、`height`、`scale`、`dpi`、`background` |
 | `vectorize` | 图片转 SVG | `colorMode`（bw/color）、`threshold`、`colorPrecision`、`filterSpeckle`、`pathMode`（none/polygon/spline） |
-| `gif-tools` | GIF 工具 | `action`（resize/optimize/reverse/speed/extract-frames/rotate/add-text）、动作专属参数 |
+| `gif-tools` | GIF 工具 | `mode`（resize/optimize/speed/reverse/extract/rotate）、`width`、`height`、`percentage`、`colors`（2/4/16/256）、`dither`、`effort`、`speedFactor`、`extractMode`（single/range/all）、`frameNumber`、`frameStart`、`frameEnd`、`extractFormat`（png/webp）、`angle`（90/180/270）、`flipH`、`flipV`、`loop` |
 | `gif-webp` | GIF/WebP 转换器 | `quality`（1-100）、`lossless`（bool）、`resizePercent`（10-100） |
 
 ### 视频工具 {#video-tools}

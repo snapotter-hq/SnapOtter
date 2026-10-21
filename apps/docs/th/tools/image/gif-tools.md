@@ -1,8 +1,8 @@
 ---
 description: "ปรับขนาด ปรับให้เหมาะสม เปลี่ยนความเร็ว ย้อนกลับ หมุน และแยกเฟรมจาก GIF เคลื่อนไหวในเครื่องมือเดียว"
-i18n_source_hash: 5e525e80db92
+i18n_source_hash: 1b2831fe24f0
 i18n_provenance: human
-i18n_output_hash: f7c699b57e43
+i18n_output_hash: 55a5122bff5f
 ---
 
 # GIF Tools {#gif-tools}
@@ -34,7 +34,7 @@ i18n_output_hash: f7c699b57e43
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| colors | number | No | 256 | จำนวนสีสูงสุดในจานสี (2 ถึง 256) |
+| colors | number | No | 256 | จำนวนสีสูงสุดในจานสี (2, 4, 16 หรือ 256) |
 | dither | number | No | 1.0 | ความเข้มของ dithering (0 ถึง 1 โดย 0 ปิดการใช้งาน dithering) |
 | effort | number | No | 7 | ระดับความพยายามในการปรับให้เหมาะสม (1 ถึง 10 ยิ่งสูง = ช้าลงแต่เล็กลง) |
 
@@ -77,7 +77,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
   -F "file=@large.gif" \
-  -F 'settings={"mode":"optimize","colors":128,"effort":9}'
+  -F 'settings={"mode":"optimize","colors":16,"effort":9}'
 ```
 
 ### Speed Up {#speed-up}

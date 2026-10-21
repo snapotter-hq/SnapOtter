@@ -4,6 +4,7 @@ import { MAX_RESIZE_OUTPUT_DIMENSION } from "@snapotter/image-engine";
 import type { FastifyInstance } from "fastify";
 import { load } from "js-yaml";
 import { beforeAll, describe, expect, it } from "vitest";
+import type { z } from "zod";
 import { settingsSchema as beautifySettingsSchema } from "../../../apps/api/src/lib/beautify/constants.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerColorAdjustments } from "../../../apps/api/src/routes/tools/adjust-colors.js";
@@ -17,6 +18,9 @@ import { registerOptimizeForWeb } from "../../../apps/api/src/routes/tools/optim
 import { registerResize } from "../../../apps/api/src/routes/tools/resize.js";
 import { registerRotate } from "../../../apps/api/src/routes/tools/rotate.js";
 import { registerSplit } from "../../../apps/api/src/routes/tools/split.js";
+import { SUPPORTED_LOCALES } from "../../../packages/shared/src/i18n/index.js";
+import { createDocsAdapter } from "../../../scripts/i18n/adapters/docs-md.mjs";
+import { hash } from "../../../scripts/i18n/lib/hash.mjs";
 import { deriveAxes } from "../../helpers/zod-pict.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
@@ -162,7 +166,7 @@ describe("Sharp-backed image settings schemas", () => {
     }
   });
 
-  it("keeps gif-tools optimize colors in OpenAPI, docs, bench.sh, and tool-contract.json aligned with the schema (#2919)", () => {
+  it("keeps gif-tools optimize colors and mode parameters in OpenAPI, docs, bench.sh, and tool-contract.json aligned with the schema (#2919, #2946)", async () => {
     const config = getToolConfig("gif-tools");
     if (!config) throw new Error("gif-tools must be registered");
 
@@ -193,7 +197,27 @@ describe("Sharp-backed image settings schemas", () => {
     );
     expect(settingsDesc).not.toContain("2-256");
 
-    const doc = readFileSync(path.join(REPO_ROOT, "apps/docs/tools/image/gif-tools.md"), "utf8");
+    const docsRoot = path.join(REPO_ROOT, "apps/docs");
+    const localeCodes = SUPPORTED_LOCALES.map((l) => l.code).filter((c) => c !== "en");
+    expect(localeCodes).toHaveLength(20);
+
+    const docsAdapter = createDocsAdapter({ root: docsRoot });
+    const extractedUnits = await docsAdapter.extract();
+    const expectedGifDocSourceHash = hash(
+      extractedUnits.find((u: { id: string }) => u.id === "tools/image/gif-tools.md")?.sourceText ??
+        "",
+    );
+    const expectedRestDocSourceHash = hash(
+      extractedUnits.find((u: { id: string }) => u.id === "api/rest.md")?.sourceText ?? "",
+    );
+    const stripI18nFrontmatter = (text: string): string => {
+      const m = text.match(/^---\n([\s\S]*?)\n---\n?/);
+      if (!m) return text;
+      const kept = m[1].split("\n").filter((line) => !/^i18n_[A-Za-z0-9_]+:/.test(line));
+      return kept.length > 0 ? `---\n${kept.join("\n")}\n---\n${text.slice(m[0].length)}` : text;
+    };
+
+    const doc = readFileSync(path.join(docsRoot, "tools/image/gif-tools.md"), "utf8");
     expect(doc).toContain(
       "| colors | number | No | 256 | Maximum number of colors in palette (2, 4, 16, or 256) |",
     );
@@ -204,6 +228,83 @@ describe("Sharp-backed image settings schemas", () => {
       const parsed = JSON.parse(match[1]) as Record<string, unknown>;
       expect(parsed).toHaveProperty("colors");
       expect(parses("gif-tools", parsed)).toBe(true);
+    }
+
+    for (const locale of localeCodes) {
+      const localizedDoc = readFileSync(
+        path.join(docsRoot, locale, "tools/image/gif-tools.md"),
+        "utf8",
+      );
+      const colorsRow = localizedDoc.split("\n").find((line) => line.startsWith("| colors |"));
+      expect(colorsRow, locale).toBeDefined();
+      const colorsDescription = colorsRow?.split("|")[5] ?? "";
+      const numbersInColorsDesc = [...colorsDescription.matchAll(/\d+/g)].map((m) => Number(m[0]));
+      expect(numbersInColorsDesc, locale).toEqual([2, 4, 16, 256]);
+
+      const localizedOptimizeMatches = [
+        ...localizedDoc.matchAll(/-F 'settings=(\{"mode":"optimize"[^']*\})'/g),
+      ];
+      expect(localizedOptimizeMatches.length, locale).toBeGreaterThan(0);
+      for (const match of localizedOptimizeMatches) {
+        const parsed = JSON.parse(match[1]) as Record<string, unknown>;
+        expect(parsed, locale).toHaveProperty("colors");
+        expect(parses("gif-tools", parsed), locale).toBe(true);
+      }
+
+      expect(
+        localizedDoc.match(/^i18n_source_hash:\s*(\S+)$/m)?.[1],
+        `${locale}:tools/image/gif-tools.md sourceHash`,
+      ).toBe(expectedGifDocSourceHash);
+      expect(
+        localizedDoc.match(/^i18n_output_hash:\s*(\S+)$/m)?.[1],
+        `${locale}:tools/image/gif-tools.md outputHash`,
+      ).toBe(hash(stripI18nFrontmatter(localizedDoc)));
+      expect(localizedDoc, locale).not.toMatch(/^i18n_(stale|fallback):/m);
+    }
+
+    const gifObjectSchema = config.settingsSchema as unknown as z.ZodObject<
+      Record<string, z.ZodTypeAny> & {
+        mode: z.ZodDefault<z.ZodEnum<[string, ...string[]]>>;
+      }
+    >;
+    const expectedGifKeys = Object.keys(gifObjectSchema.shape);
+    const expectedGifModes = gifObjectSchema.shape.mode._def.innerType.options;
+    expect(expectedGifModes).toEqual([
+      "resize",
+      "optimize",
+      "speed",
+      "reverse",
+      "extract",
+      "rotate",
+    ]);
+
+    for (const relPath of [
+      "api/rest.md",
+      ...localeCodes.map((locale) => `${locale}/api/rest.md`),
+    ]) {
+      const restDoc = readFileSync(path.join(docsRoot, relPath), "utf8");
+      const gifRow = restDoc.split("\n").find((line) => line.startsWith("| `gif-tools` |"));
+      expect(gifRow, relPath).toBeDefined();
+      const keySettingsCell = gifRow?.split("|")[3] ?? "";
+      expect(keySettingsCell, relPath).not.toContain("`action`");
+      expect(keySettingsCell, relPath).not.toContain("extract-frames");
+      expect(keySettingsCell, relPath).not.toContain("add-text");
+      const documentedKeys = [...keySettingsCell.matchAll(/`([a-zA-Z]\w*)`/g)].map((m) => m[1]);
+      expect(documentedKeys, relPath).toEqual(expectedGifKeys);
+      expect(keySettingsCell, relPath).toMatch(
+        new RegExp(`[（(]${expectedGifModes.join("/")}[）)]`),
+      );
+      expect(keySettingsCell, relPath).toMatch(/[（(]2\/4\/16\/256[）)]/);
+
+      if (relPath !== "api/rest.md") {
+        expect(restDoc.match(/^i18n_source_hash:\s*(\S+)$/m)?.[1], `${relPath} sourceHash`).toBe(
+          expectedRestDocSourceHash,
+        );
+        expect(restDoc.match(/^i18n_output_hash:\s*(\S+)$/m)?.[1], `${relPath} outputHash`).toBe(
+          hash(stripI18nFrontmatter(restDoc)),
+        );
+        expect(restDoc, relPath).not.toMatch(/^i18n_(stale|fallback):/m);
+      }
     }
 
     const bench = readFileSync(path.join(REPO_ROOT, "tests/benchmark/bench.sh"), "utf8");

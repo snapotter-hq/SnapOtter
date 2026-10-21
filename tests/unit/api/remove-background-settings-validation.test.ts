@@ -10,6 +10,7 @@ import {
   phase1SettingsSchema,
   registerRemoveBackground,
 } from "../../../apps/api/src/routes/tools/remove-background.js";
+import { SUPPORTED_LOCALES } from "../../../packages/shared/src/i18n/index.js";
 import { pairwise } from "../../helpers/pairwise.js";
 import {
   defaultSettingsFor,
@@ -453,21 +454,31 @@ describe("remove-background Phase 1 settings validation (#2281)", () => {
       ).toBe(true);
     }
 
-    const restDoc = readFileSync(path.join(REPO_ROOT, "apps/docs/api/rest.md"), "utf8");
-    const removeBgRow = restDoc
-      .split("\n")
-      .find((line) => line.startsWith("| `remove-background` |"));
-    expect(removeBgRow).toBeDefined();
-    const keySettingsCell = removeBgRow?.split("|")[4] ?? "";
-    const [restPhase1, restPhase2] = keySettingsCell.split("Phase 2");
-    expect(restPhase1).toBeDefined();
-    expect(restPhase2).toBeDefined();
-    const restPhase1Keys = [...(restPhase1?.matchAll(/`([a-zA-Z]\w*)`/g) ?? [])].map((m) => m[1]);
-    const restPhase2Keys = [...(restPhase2?.matchAll(/`([a-zA-Z]\w*)`/g) ?? [])].map((m) => m[1]);
-    expect(restPhase1Keys).toEqual(expectedPhase1Keys);
-    expect(restPhase2Keys).toEqual(
-      expectedPhase2Keys.filter((k) => k !== "jobId" && k !== "filename"),
+    const expectedPhase2DocKeys = expectedPhase2Keys.filter(
+      (k) => k !== "jobId" && k !== "filename",
     );
-    expect(restPhase2).toContain("`/api/v1/tools/image/remove-background/effects`");
+    const docsRoot = path.join(REPO_ROOT, "apps/docs");
+    const localeCodes = SUPPORTED_LOCALES.map((l) => l.code).filter((c) => c !== "en");
+    for (const relPath of [
+      "api/rest.md",
+      ...localeCodes.map((locale) => `${locale}/api/rest.md`),
+    ]) {
+      const restDoc = readFileSync(path.join(docsRoot, relPath), "utf8");
+      const removeBgRow = restDoc
+        .split("\n")
+        .find((line) => line.startsWith("| `remove-background` |"));
+      expect(removeBgRow, relPath).toBeDefined();
+      const keySettingsCell = removeBgRow?.split("|")[4] ?? "";
+      const phaseParts = keySettingsCell.split("`/api/v1/tools/image/remove-background/effects`");
+      expect(phaseParts, relPath).toHaveLength(2);
+      const [restPhase1, restPhase2] = phaseParts;
+      const restPhase1Keys = [...(restPhase1?.matchAll(/`([a-zA-Z]\w*)`/g) ?? [])].map((m) => m[1]);
+      const restPhase2Keys = [...(restPhase2?.matchAll(/`([a-zA-Z]\w*)`/g) ?? [])].map((m) => m[1]);
+      expect(restPhase1Keys, relPath).toEqual(expectedPhase1Keys);
+      expect(restPhase2Keys, relPath).toEqual(expectedPhase2DocKeys);
+      expect(restPhase1, relPath).toMatch(/[（(]0-3[）)]/);
+      expect(restPhase2, relPath).not.toContain("transparent/color/gradient/blur/image");
+      expect(restPhase2, relPath).toMatch(/[（(]png\/webp\/avif[）)]/);
+    }
   });
 });

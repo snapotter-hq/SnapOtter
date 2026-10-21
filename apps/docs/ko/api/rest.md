@@ -1,7 +1,7 @@
 ---
 description: "전체 REST API 레퍼런스. 도구 엔드포인트, 배치 처리, 파이프라인, 파일 라이브러리, 인증, 팀, 관리 작업."
-i18n_output_hash: a4289adc1b56
-i18n_source_hash: 899149b272e4
+i18n_output_hash: a0ba9192fc24
+i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
 
@@ -179,7 +179,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 | 도구 ID | 이름 | AI 모델 | 주요 설정 |
 |---------|------|---------|-------------|
-| `remove-background` | 배경 제거 | rembg(BiRefNet / U2-Net) | `model`, `backgroundType`(transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
+| `remove-background` | 배경 제거 | rembg(BiRefNet / U2-Net) | 1단계: `model`, `edgeRefine`(0-3), `decontaminate`. 2단계(`/api/v1/tools/image/remove-background/effects`), `/batch` 및 파이프라인: `backgroundType`(transparent/color/gradient/blur, `/effects`에서는 image 추가), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat`(png/webp/avif) |
 | `upscale` | 이미지 업스케일 | RealESRGAN | `scale`(2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | 오브젝트 지우개 | LaMa(ONNX) | 마스크는 두 번째 파일 파트로 전송(필드명 `mask`), `format`, `quality` |
 | `ocr` | OCR / 텍스트 추출 | Tesseract(빠름); RapidOCR + PP-OCR ONNX(균형 잡힌/최고) | `quality`(빠름/균형/최고), `language`, `enhance` |
@@ -243,7 +243,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 |---------|------|-------------|
 | `svg-to-raster` | SVG를 래스터로 | `format`(png/jpeg/webp/avif/tiff/gif/heif), `width`, `height`, `scale`, `dpi`, `background` |
 | `vectorize` | 이미지를 SVG로 | `colorMode`(bw/color), `threshold`, `colorPrecision`, `filterSpeckle`, `pathMode`(none/polygon/spline) |
-| `gif-tools` | GIF 도구 | `action`(resize/optimize/reverse/speed/extract-frames/rotate/add-text), 액션별 매개변수 |
+| `gif-tools` | GIF 도구 | `mode`(resize/optimize/speed/reverse/extract/rotate), `width`, `height`, `percentage`, `colors`(2/4/16/256), `dither`, `effort`, `speedFactor`, `extractMode`(single/range/all), `frameNumber`, `frameStart`, `frameEnd`, `extractFormat`(png/webp), `angle`(90/180/270), `flipH`, `flipV`, `loop` |
 | `gif-webp` | GIF/WebP 변환기 | `quality`(1-100), `lossless`(bool), `resizePercent`(10-100) |
 
 ### 비디오 도구 {#video-tools}

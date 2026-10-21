@@ -1,7 +1,7 @@
 ---
 description: "完全な REST API リファレンス。ツールエンドポイント、バッチ処理、パイプライン、ファイルライブラリ、認証、チーム、管理者操作。"
-i18n_output_hash: aa42f6d4ddbe
-i18n_source_hash: 899149b272e4
+i18n_output_hash: 2d7929cfaf11
+i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
 
@@ -179,7 +179,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 | ツール ID | 名前 | AI モデル | 主な設定 |
 |---------|------|---------|-------------|
-| `remove-background` | 背景の削除 | rembg（BiRefNet / U2-Net） | `model`, `backgroundType`（transparent/color/gradient/blur/image）, `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
+| `remove-background` | 背景の削除 | rembg（BiRefNet / U2-Net） | フェーズ 1: `model`, `edgeRefine`（0-3）, `decontaminate`。フェーズ 2（`/api/v1/tools/image/remove-background/effects`）、`/batch`、およびパイプライン: `backgroundType`（transparent/color/gradient/blur、`/effects` ではさらに image）, `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat`（png/webp/avif） |
 | `upscale` | 画像のアップスケール | RealESRGAN | `scale`（2/4）, `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | オブジェクト消しゴム | LaMa（ONNX） | マスクは 2 番目のファイルパートとして送信（フィールド名 `mask`）, `format`, `quality` |
 | `ocr` | OCR / テキスト抽出 | Tesseract (高速); RapidOCR + PP-OCR ONNX (バランス/ベスト) | `quality` (高速/バランス/最高)、`language`、`enhance` |
@@ -243,7 +243,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 |---------|------|-------------|
 | `svg-to-raster` | SVG からラスター | `format`（png/jpeg/webp/avif/tiff/gif/heif）, `width`, `height`, `scale`, `dpi`, `background` |
 | `vectorize` | 画像から SVG | `colorMode`（bw/color）, `threshold`, `colorPrecision`, `filterSpeckle`, `pathMode`（none/polygon/spline） |
-| `gif-tools` | GIF ツール | `action`（resize/optimize/reverse/speed/extract-frames/rotate/add-text）, アクション固有のパラメータ |
+| `gif-tools` | GIF ツール | `mode`（resize/optimize/speed/reverse/extract/rotate）, `width`, `height`, `percentage`, `colors`（2/4/16/256）, `dither`, `effort`, `speedFactor`, `extractMode`（single/range/all）, `frameNumber`, `frameStart`, `frameEnd`, `extractFormat`（png/webp）, `angle`（90/180/270）, `flipH`, `flipV`, `loop` |
 | `gif-webp` | GIF/WebP コンバーター | `quality`（1-100）, `lossless`（bool）, `resizePercent`（10-100） |
 
 ### 動画ツール {#video-tools}

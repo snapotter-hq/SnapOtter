@@ -1,8 +1,8 @@
 ---
 description: "Animasyonlu GIF'leri tek bir araçta yeniden boyutlandırın, optimize edin, hızını değiştirin, tersine çevirin, döndürün ve karelerini çıkarın."
-i18n_source_hash: 5e525e80db92
+i18n_source_hash: 1b2831fe24f0
 i18n_provenance: human
-i18n_output_hash: 6e3b278b30bf
+i18n_output_hash: 5f5fba67fafa
 ---
 
 # GIF Araçları {#gif-tools}
@@ -34,7 +34,7 @@ Animasyonlu GIF'leri yeniden boyutlandırın, optimize edin, hızını değişti
 
 | Parametre | Tür | Zorunlu | Varsayılan | Açıklama |
 |-----------|------|----------|---------|-------------|
-| colors | number | Hayır | 256 | Palette bulunan maksimum renk sayısı (2 ile 256 arası) |
+| colors | number | Hayır | 256 | Palette bulunan maksimum renk sayısı (2, 4, 16 veya 256) |
 | dither | number | Hayır | 1.0 | Titreme (dithering) gücü (0 ile 1 arası; 0 titremeyi devre dışı bırakır) |
 | effort | number | Hayır | 7 | Optimizasyon çaba düzeyi (1 ile 10 arası; daha yüksek = daha yavaş ama daha küçük) |
 
@@ -77,7 +77,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
   -F "file=@large.gif" \
-  -F 'settings={"mode":"optimize","colors":128,"effort":9}'
+  -F 'settings={"mode":"optimize","colors":16,"effort":9}'
 ```
 
 ### Hızlandırma {#speed-up}

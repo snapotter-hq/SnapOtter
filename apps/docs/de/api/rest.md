@@ -1,7 +1,7 @@
 ---
 description: "Vollständige REST-API-Referenz. Tool-Endpunkte, Stapelverarbeitung, Pipelines, Dateibibliothek, Authentifizierung, Teams und Admin-Operationen."
-i18n_output_hash: 8efd33eca67a
-i18n_source_hash: 899149b272e4
+i18n_output_hash: c529dec65ef4
+i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
 
@@ -179,7 +179,7 @@ Alle KI-Tools laufen auf Ihrer Hardware: standardmäßig auf der CPU oder auf NV
 
 | Tool-ID | Name | KI-Modell | Wichtige Einstellungen |
 |---------|------|---------|-------------|
-| `remove-background` | Hintergrund entfernen | rembg (BiRefNet / U2-Net) | `model`, `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
+| `remove-background` | Hintergrund entfernen | rembg (BiRefNet / U2-Net) | Phase 1: `model`, `edgeRefine` (0-3), `decontaminate`. Phase 2 (`/api/v1/tools/image/remove-background/effects`), `/batch` und Pipelines: `backgroundType` (transparent/color/gradient/blur, plus image auf `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
 | `upscale` | Bild-Hochskalierung | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Objekt-Radierer | LaMa (ONNX) | Maske als zweiter Datei-Teil gesendet (Feldname `mask`), `format`, `quality` |
 | `ocr` | OCR / Textextraktion | Tesseract (schnell); RapidOCR + PP-OCR ONNX (ausgewogen/am besten) | `quality` (schnell/ausgewogen/am besten), `language`, `enhance` |
@@ -243,7 +243,7 @@ Alle KI-Tools laufen auf Ihrer Hardware: standardmäßig auf der CPU oder auf NV
 |---------|------|-------------|
 | `svg-to-raster` | SVG zu Raster | `format` (png/jpeg/webp/avif/tiff/gif/heif), `width`, `height`, `scale`, `dpi`, `background` |
 | `vectorize` | Bild zu SVG | `colorMode` (bw/color), `threshold`, `colorPrecision`, `filterSpeckle`, `pathMode` (none/polygon/spline) |
-| `gif-tools` | GIF-Tools | `action` (resize/optimize/reverse/speed/extract-frames/rotate/add-text), aktionsspezifische Parameter |
+| `gif-tools` | GIF-Tools | `mode` (resize/optimize/speed/reverse/extract/rotate), `width`, `height`, `percentage`, `colors` (2/4/16/256), `dither`, `effort`, `speedFactor`, `extractMode` (single/range/all), `frameNumber`, `frameStart`, `frameEnd`, `extractFormat` (png/webp), `angle` (90/180/270), `flipH`, `flipV`, `loop` |
 | `gif-webp` | GIF/WebP-Konverter | `quality` (1-100), `lossless` (bool), `resizePercent` (10-100) |
 
 ### Video-Tools {#video-tools}

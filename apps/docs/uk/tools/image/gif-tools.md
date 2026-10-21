@@ -1,8 +1,8 @@
 ---
 description: "Змінюйте розмір, оптимізуйте, змінюйте швидкість, реверсуйте, обертайте та витягуйте кадри з анімованих GIF в одному інструменті."
-i18n_source_hash: 5e525e80db92
+i18n_source_hash: 1b2831fe24f0
 i18n_provenance: human
-i18n_output_hash: 43dbcd5be0be
+i18n_output_hash: 195e473f9eac
 ---
 
 # GIF Tools {#gif-tools}
@@ -34,7 +34,7 @@ i18n_output_hash: 43dbcd5be0be
 
 | Параметр | Тип | Обовʼязковий | За замовчуванням | Опис |
 |-----------|------|----------|---------|-------------|
-| colors | number | Ні | 256 | Максимальна кількість кольорів у палітрі (від 2 до 256) |
+| colors | number | Ні | 256 | Максимальна кількість кольорів у палітрі (2, 4, 16 або 256) |
 | dither | number | Ні | 1.0 | Сила дизерингу (від 0 до 1, де 0 вимикає дизеринг) |
 | effort | number | Ні | 7 | Рівень зусиль оптимізації (від 1 до 10, вище = повільніше, але менше) |
 
@@ -77,7 +77,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
   -F "file=@large.gif" \
-  -F 'settings={"mode":"optimize","colors":128,"effort":9}'
+  -F 'settings={"mode":"optimize","colors":16,"effort":9}'
 ```
 
 ### Прискорення {#speed-up}

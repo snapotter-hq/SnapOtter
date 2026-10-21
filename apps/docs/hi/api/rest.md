@@ -1,7 +1,7 @@
 ---
 description: "संपूर्ण REST API संदर्भ। टूल एंडपॉइंट, बैच प्रोसेसिंग, पाइपलाइन, फ़ाइल लाइब्रेरी, प्रमाणीकरण, टीमें और एडमिन संचालन।"
-i18n_output_hash: 40efba210bee
-i18n_source_hash: 899149b272e4
+i18n_output_hash: 85298439c862
+i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
 
@@ -179,7 +179,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 | टूल ID | नाम | AI मॉडल | मुख्य सेटिंग्स |
 |---------|------|---------|-------------|
-| `remove-background` | बैकग्राउंड हटाएँ | rembg (BiRefNet / U2-Net) | `model`, `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
+| `remove-background` | बैकग्राउंड हटाएँ | rembg (BiRefNet / U2-Net) | चरण 1: `model`, `edgeRefine` (0-3), `decontaminate`। चरण 2 (`/api/v1/tools/image/remove-background/effects`), `/batch`, और पाइपलाइन: `backgroundType` (transparent/color/gradient/blur, साथ ही `/effects` पर image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
 | `upscale` | इमेज अपस्केलिंग | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | ऑब्जेक्ट इरेज़र | LaMa (ONNX) | मास्क दूसरे फ़ाइल भाग के रूप में भेजा जाता है (फ़ील्डनाम `mask`), `format`, `quality` |
 | `ocr` | OCR / टेक्स्ट एक्सट्रैक्शन | Tesseract (तेज़); RapidOCR + PP-OCR ONNX (संतुलित/सर्वोत्तम) | `quality` (तेज़/संतुलित/सर्वोत्तम), `language`, `enhance` |
@@ -243,7 +243,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 |---------|------|-------------|
 | `svg-to-raster` | SVG से रास्टर | `format` (png/jpeg/webp/avif/tiff/gif/heif), `width`, `height`, `scale`, `dpi`, `background` |
 | `vectorize` | इमेज से SVG | `colorMode` (bw/color), `threshold`, `colorPrecision`, `filterSpeckle`, `pathMode` (none/polygon/spline) |
-| `gif-tools` | GIF टूल | `action` (resize/optimize/reverse/speed/extract-frames/rotate/add-text), क्रिया-विशिष्ट पैरामीटर |
+| `gif-tools` | GIF टूल | `mode` (resize/optimize/speed/reverse/extract/rotate), `width`, `height`, `percentage`, `colors` (2/4/16/256), `dither`, `effort`, `speedFactor`, `extractMode` (single/range/all), `frameNumber`, `frameStart`, `frameEnd`, `extractFormat` (png/webp), `angle` (90/180/270), `flipH`, `flipV`, `loop` |
 | `gif-webp` | GIF/WebP कन्वर्टर | `quality` (1-100), `lossless` (bool), `resizePercent` (10-100) |
 
 ### वीडियो टूल {#video-tools}

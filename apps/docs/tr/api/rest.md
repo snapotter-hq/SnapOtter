@@ -1,7 +1,7 @@
 ---
 description: "Eksiksiz REST API başvurusu. Araç uç noktaları, toplu işleme, işlem hatları, dosya kitaplığı, kimlik doğrulama, ekipler ve yönetici işlemleri."
-i18n_output_hash: 4ae115bf377e
-i18n_source_hash: 899149b272e4
+i18n_output_hash: adc97a926169
+i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
 
@@ -179,7 +179,7 @@ Tüm yapay zeka araçları kendi donanımınızda çalışır: varsayılan olara
 
 | Araç Kimliği | Ad | Yapay Zeka Modeli | Anahtar ayarlar |
 |---------|------|---------|-------------|
-| `remove-background` | Arka Planı Kaldır | rembg (BiRefNet / U2-Net) | `model`, `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
+| `remove-background` | Arka Planı Kaldır | rembg (BiRefNet / U2-Net) | Aşama 1: `model`, `edgeRefine` (0-3), `decontaminate`. Aşama 2 (`/api/v1/tools/image/remove-background/effects`), `/batch` ve işlem hatları: `backgroundType` (transparent/color/gradient/blur ve `/effects` üzerinde image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
 | `upscale` | Görüntü Ölçek Büyütme | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Nesne Silici | LaMa (ONNX) | Maske ikinci dosya parçası olarak gönderilir (alan adı `mask`), `format`, `quality` |
 | `ocr` | OCR / Metin Çıkarma | Tesseract (hızlı); RapidOCR + PP-OCR ONNX (dengeli/en iyi) | `quality` (hızlı/dengeli/en iyi), `language`, `enhance` |
@@ -243,7 +243,7 @@ Tüm yapay zeka araçları kendi donanımınızda çalışır: varsayılan olara
 |---------|------|-------------|
 | `svg-to-raster` | SVG'den Rastere | `format` (png/jpeg/webp/avif/tiff/gif/heif), `width`, `height`, `scale`, `dpi`, `background` |
 | `vectorize` | Görüntüden SVG'ye | `colorMode` (bw/color), `threshold`, `colorPrecision`, `filterSpeckle`, `pathMode` (none/polygon/spline) |
-| `gif-tools` | GIF Araçları | `action` (resize/optimize/reverse/speed/extract-frames/rotate/add-text), eyleme özgü parametreler |
+| `gif-tools` | GIF Araçları | `mode` (resize/optimize/speed/reverse/extract/rotate), `width`, `height`, `percentage`, `colors` (2/4/16/256), `dither`, `effort`, `speedFactor`, `extractMode` (single/range/all), `frameNumber`, `frameStart`, `frameEnd`, `extractFormat` (png/webp), `angle` (90/180/270), `flipH`, `flipV`, `loop` |
 | `gif-webp` | GIF/WebP Dönüştürücü | `quality` (1-100), `lossless` (bool), `resizePercent` (10-100) |
 
 ### Video Araçları {#video-tools}

@@ -1,7 +1,7 @@
 ---
 description: "Referensi REST API lengkap. Endpoint tool, pemrosesan batch, pipeline, pustaka file, autentikasi, tim, dan operasi admin."
-i18n_output_hash: 7793faea1aad
-i18n_source_hash: 899149b272e4
+i18n_output_hash: 2842b40a7d7c
+i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
 
@@ -179,7 +179,7 @@ Semua tool AI berjalan di perangkat keras Anda: CPU secara default, atau NVIDIA 
 
 | ID Tool | Nama | Model AI | Pengaturan utama |
 |---------|------|---------|-------------|
-| `remove-background` | Remove Background | rembg (BiRefNet / U2-Net) | `model`, `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
+| `remove-background` | Remove Background | rembg (BiRefNet / U2-Net) | Fase 1: `model`, `edgeRefine` (0-3), `decontaminate`. Fase 2 (`/api/v1/tools/image/remove-background/effects`), `/batch`, dan pipeline: `backgroundType` (transparent/color/gradient/blur, ditambah image pada `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
 | `upscale` | Image Upscaling | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Object Eraser | LaMa (ONNX) | Mask dikirim sebagai bagian file kedua (fieldname `mask`), `format`, `quality` |
 | `ocr` | OCR / Ekstraksi Teks | Tesseract (cepat); RapidOCR + PP-OCR ONNX (seimbang/terbaik) | `quality` (cepat/seimbang/terbaik), `language`, `enhance` |
@@ -243,7 +243,7 @@ Semua tool AI berjalan di perangkat keras Anda: CPU secara default, atau NVIDIA 
 |---------|------|-------------|
 | `svg-to-raster` | SVG to Raster | `format` (png/jpeg/webp/avif/tiff/gif/heif), `width`, `height`, `scale`, `dpi`, `background` |
 | `vectorize` | Image to SVG | `colorMode` (bw/color), `threshold`, `colorPrecision`, `filterSpeckle`, `pathMode` (none/polygon/spline) |
-| `gif-tools` | GIF Tools | `action` (resize/optimize/reverse/speed/extract-frames/rotate/add-text), parameter spesifik aksi |
+| `gif-tools` | GIF Tools | `mode` (resize/optimize/speed/reverse/extract/rotate), `width`, `height`, `percentage`, `colors` (2/4/16/256), `dither`, `effort`, `speedFactor`, `extractMode` (single/range/all), `frameNumber`, `frameStart`, `frameEnd`, `extractFormat` (png/webp), `angle` (90/180/270), `flipH`, `flipV`, `loop` |
 | `gif-webp` | GIF/WebP Converter | `quality` (1-100), `lossless` (bool), `resizePercent` (10-100) |
 
 ### Tool Video {#video-tools}

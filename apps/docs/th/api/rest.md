@@ -1,7 +1,7 @@
 ---
 description: "เอกสารอ้างอิง REST API ฉบับสมบูรณ์ เอนด์พอยต์ของเครื่องมือ การประมวลผลแบบแบตช์ ไปป์ไลน์ คลังไฟล์ การยืนยันตัวตน ทีม และการดำเนินงานของผู้ดูแลระบบ"
-i18n_output_hash: 34c52fe6305e
-i18n_source_hash: 899149b272e4
+i18n_output_hash: 386c0b519133
+i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
 
@@ -179,7 +179,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 
 | Tool ID | ชื่อ | โมเดล AI | การตั้งค่าหลัก |
 |---------|------|---------|-------------|
-| `remove-background` | ลบพื้นหลัง | rembg (BiRefNet / U2-Net) | `model`, `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
+| `remove-background` | ลบพื้นหลัง | rembg (BiRefNet / U2-Net) | ระยะที่ 1: `model`, `edgeRefine` (0-3), `decontaminate` ระยะที่ 2 (`/api/v1/tools/image/remove-background/effects`), `/batch` และไปป์ไลน์: `backgroundType` (transparent/color/gradient/blur รวมถึง image บน `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
 | `upscale` | ขยายภาพ | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | ลบวัตถุ | LaMa (ONNX) | ส่ง Mask เป็นส่วนไฟล์ที่สอง (fieldname `mask`), `format`, `quality` |
 | `ocr` | OCR / การแยกข้อความ | Tesseract (เร็ว); RapidOCR + PP-OCR ONNX (สมดุล/ดีที่สุด) | `quality` (เร็ว/สมดุล/ดีที่สุด), `language`, `enhance` |
@@ -243,7 +243,7 @@ curl -X POST http://localhost:1349/api/v1/tools/<section>/<toolId>/batch \
 |---------|------|-------------|
 | `svg-to-raster` | SVG เป็นแรสเตอร์ | `format` (png/jpeg/webp/avif/tiff/gif/heif), `width`, `height`, `scale`, `dpi`, `background` |
 | `vectorize` | รูปภาพเป็น SVG | `colorMode` (bw/color), `threshold`, `colorPrecision`, `filterSpeckle`, `pathMode` (none/polygon/spline) |
-| `gif-tools` | เครื่องมือ GIF | `action` (resize/optimize/reverse/speed/extract-frames/rotate/add-text), พารามิเตอร์เฉพาะแอ็กชัน |
+| `gif-tools` | เครื่องมือ GIF | `mode` (resize/optimize/speed/reverse/extract/rotate), `width`, `height`, `percentage`, `colors` (2/4/16/256), `dither`, `effort`, `speedFactor`, `extractMode` (single/range/all), `frameNumber`, `frameStart`, `frameEnd`, `extractFormat` (png/webp), `angle` (90/180/270), `flipH`, `flipV`, `loop` |
 | `gif-webp` | ตัวแปลง GIF/WebP | `quality` (1-100), `lossless` (bool), `resizePercent` (10-100) |
 
 ### เครื่องมือวิดีโอ {#video-tools}

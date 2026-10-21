@@ -1,8 +1,8 @@
 ---
 description: "アニメーション GIF のリサイズ、最適化、速度変更、逆再生、回転、フレーム抽出を 1 つのツールで行います。"
-i18n_source_hash: 5e525e80db92
+i18n_source_hash: 1b2831fe24f0
 i18n_provenance: human
-i18n_output_hash: 2f1d49287380
+i18n_output_hash: 96c9ee2194b9
 ---
 
 # GIF ツール {#gif-tools}
@@ -34,7 +34,7 @@ i18n_output_hash: 2f1d49287380
 
 | パラメーター | 型 | 必須 | デフォルト | 説明 |
 |-----------|------|----------|---------|-------------|
-| colors | number | いいえ | 256 | パレット内の最大色数（2 から 256） |
+| colors | number | いいえ | 256 | パレット内の最大色数（2、4、16、または 256） |
 | dither | number | いいえ | 1.0 | ディザリングの強度（0 から 1、0 でディザリングを無効化） |
 | effort | number | いいえ | 7 | 最適化の労力レベル（1 から 10、高いほど遅いが小さくなる） |
 
@@ -77,7 +77,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
   -F "file=@large.gif" \
-  -F 'settings={"mode":"optimize","colors":128,"effort":9}'
+  -F 'settings={"mode":"optimize","colors":16,"effort":9}'
 ```
 
 ### 高速化 {#speed-up}

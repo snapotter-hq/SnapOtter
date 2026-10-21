@@ -1,8 +1,8 @@
 ---
 description: "애니메이션 GIF의 크기 조정, 최적화, 속도 변경, 반전, 회전, 프레임 추출을 하나의 도구에서 처리합니다."
-i18n_source_hash: 5e525e80db92
+i18n_source_hash: 1b2831fe24f0
 i18n_provenance: human
-i18n_output_hash: 95ee0097576e
+i18n_output_hash: 78a746894d96
 ---
 
 # GIF 도구 {#gif-tools}
@@ -34,7 +34,7 @@ i18n_output_hash: 95ee0097576e
 
 | 파라미터 | 타입 | 필수 | 기본값 | 설명 |
 |-----------|------|----------|---------|-------------|
-| colors | number | 아니오 | 256 | 팔레트의 최대 색상 수(2에서 256) |
+| colors | number | 아니오 | 256 | 팔레트의 최대 색상 수(2, 4, 16 또는 256) |
 | dither | number | 아니오 | 1.0 | 디더링 강도(0에서 1, 0이면 디더링 비활성화) |
 | effort | number | 아니오 | 7 | 최적화 노력 수준(1에서 10, 높을수록 느리지만 더 작음) |
 
@@ -77,7 +77,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
   -F "file=@large.gif" \
-  -F 'settings={"mode":"optimize","colors":128,"effort":9}'
+  -F 'settings={"mode":"optimize","colors":16,"effort":9}'
 ```
 
 ### 속도 높이기 {#speed-up}

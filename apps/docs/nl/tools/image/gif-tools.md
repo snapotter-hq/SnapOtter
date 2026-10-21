@@ -1,8 +1,8 @@
 ---
 description: "Vergroot/verklein, optimaliseer, wijzig de snelheid, keer om, roteer en extraheer frames uit geanimeerde GIF's in één enkel hulpmiddel."
-i18n_source_hash: 5e525e80db92
+i18n_source_hash: 1b2831fe24f0
 i18n_provenance: human
-i18n_output_hash: d26467ae5a9b
+i18n_output_hash: 584b8c599d03
 ---
 
 # GIF-tools {#gif-tools}
@@ -34,7 +34,7 @@ Vergroot/verklein, optimaliseer, wijzig de snelheid, keer om, extraheer frames e
 
 | Parameter | Type | Vereist | Standaard | Beschrijving |
 |-----------|------|----------|---------|-------------|
-| colors | number | Nee | 256 | Maximaal aantal kleuren in het palet (2 tot 256) |
+| colors | number | Nee | 256 | Maximaal aantal kleuren in het palet (2, 4, 16 of 256) |
 | dither | number | Nee | 1.0 | Ditheringsterkte (0 tot 1, waarbij 0 dithering uitschakelt) |
 | effort | number | Nee | 7 | Optimalisatie-inspanningsniveau (1 tot 10, hoger = langzamer maar kleiner) |
 
@@ -77,7 +77,7 @@ curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
 ```bash
 curl -X POST http://localhost:1349/api/v1/tools/image/gif-tools \
   -F "file=@large.gif" \
-  -F 'settings={"mode":"optimize","colors":128,"effort":9}'
+  -F 'settings={"mode":"optimize","colors":16,"effort":9}'
 ```
 
 ### Versnellen {#speed-up}

@@ -1,7 +1,7 @@
 ---
 description: "Referencia completa de la API REST. Endpoints de herramientas, procesamiento por lotes, pipelines, biblioteca de archivos, autenticación, equipos y operaciones de administración."
-i18n_output_hash: a9129e12a29c
-i18n_source_hash: 899149b272e4
+i18n_output_hash: 074b8e1ed10f
+i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
 
@@ -179,7 +179,7 @@ Todas las herramientas de IA se ejecutan en tu hardware: CPU por defecto, o NVID
 
 | ID de herramienta | Nombre | Modelo de IA | Ajustes clave |
 |---------|------|---------|-------------|
-| `remove-background` | Eliminar fondo | rembg (BiRefNet / U2-Net) | `model`, `backgroundType` (transparent/color/gradient/blur/image), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity` |
+| `remove-background` | Eliminar fondo | rembg (BiRefNet / U2-Net) | Fase 1: `model`, `edgeRefine` (0-3), `decontaminate`. Fase 2 (`/api/v1/tools/image/remove-background/effects`), `/batch` y pipelines: `backgroundType` (transparent/color/gradient/blur, además de image en `/effects`), `backgroundColor`, `gradientColor1`, `gradientColor2`, `gradientAngle`, `blurEnabled`, `blurIntensity`, `shadowEnabled`, `shadowOpacity`, `outputFormat` (png/webp/avif) |
 | `upscale` | Escalado de imagen | RealESRGAN | `scale` (2/4), `model`, `faceEnhance`, `denoise`, `format`, `quality` |
 | `erase-object` | Borrador de objetos | LaMa (ONNX) | Máscara enviada como segunda parte de archivo (nombre de campo `mask`), `format`, `quality` |
 | `ocr` | OCR / Extracción de texto | Tesseract (rápido); RapidOCR + PP-OCR ONNX (equilibrado/mejor) | `quality` (rápido/equilibrado/mejor), `language`, `enhance` |
@@ -243,7 +243,7 @@ Todas las herramientas de IA se ejecutan en tu hardware: CPU por defecto, o NVID
 |---------|------|-------------|
 | `svg-to-raster` | SVG a ráster | `format` (png/jpeg/webp/avif/tiff/gif/heif), `width`, `height`, `scale`, `dpi`, `background` |
 | `vectorize` | Imagen a SVG | `colorMode` (bw/color), `threshold`, `colorPrecision`, `filterSpeckle`, `pathMode` (none/polygon/spline) |
-| `gif-tools` | Herramientas GIF | `action` (resize/optimize/reverse/speed/extract-frames/rotate/add-text), parámetros específicos de cada acción |
+| `gif-tools` | Herramientas GIF | `mode` (resize/optimize/speed/reverse/extract/rotate), `width`, `height`, `percentage`, `colors` (2/4/16/256), `dither`, `effort`, `speedFactor`, `extractMode` (single/range/all), `frameNumber`, `frameStart`, `frameEnd`, `extractFormat` (png/webp), `angle` (90/180/270), `flipH`, `flipV`, `loop` |
 | `gif-webp` | Conversor GIF/WebP | `quality` (1-100), `lossless` (bool), `resizePercent` (10-100) |
 
 ### Herramientas de vídeo {#video-tools}
