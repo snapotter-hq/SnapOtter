@@ -633,3 +633,74 @@ describe("S3Client requestHandler timeouts (#2755)", () => {
     );
   });
 });
+
+describe("getGenericObjectStream (#2850)", () => {
+  afterEach(() => {
+    configureS3({
+      bucket: "b",
+      region: "us-east-1",
+      endpoint: "",
+      accessKeyId: "k",
+      secretAccessKey: "s",
+      forcePathStyle: true,
+      prefix: "",
+    });
+  });
+
+  it("rejects when S3 returns a response without a body across getGenericObjectStream, getObject, and getObjectStream", async () => {
+    send.mockResolvedValueOnce({});
+    await expect(getGenericObjectStream("outputs/job-1/result.png")).rejects.toThrow(
+      "S3 object response for outputs/job-1/result.png did not include a body",
+    );
+    expect(send.mock.calls[0]?.[0]?.input).toEqual({
+      Bucket: "b",
+      Key: "outputs/job-1/result.png",
+    });
+
+    send.mockResolvedValueOnce({});
+    await expect(getObject("photo.png")).rejects.toThrow(
+      "S3 object response for files/photo.png did not include a body",
+    );
+
+    send.mockResolvedValueOnce({});
+    await expect(getObjectStream("photo.png")).rejects.toThrow(
+      "S3 object response for files/photo.png did not include a body",
+    );
+  });
+
+  it("includes the configured prefix in the missing-body error and forwards closed and open-ended Range headers", async () => {
+    configureS3({
+      bucket: "b",
+      region: "us-east-1",
+      endpoint: "",
+      accessKeyId: "k",
+      secretAccessKey: "s",
+      forcePathStyle: true,
+      prefix: "tenant-a",
+    });
+    send.mockResolvedValueOnce({});
+    await expect(
+      getGenericObjectStream("outputs/job-1/result.png", { start: 0, end: 63 }),
+    ).rejects.toThrow(
+      "S3 object response for tenant-a/outputs/job-1/result.png did not include a body",
+    );
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]?.[0]?.input).toEqual({
+      Bucket: "b",
+      Key: "tenant-a/outputs/job-1/result.png",
+      Range: "bytes=0-63",
+    });
+
+    const openRangeStream = new PassThrough();
+    send.mockResolvedValueOnce({ Body: openRangeStream });
+    await expect(getGenericObjectStream("outputs/job-1/result.png", { start: 64 })).resolves.toBe(
+      openRangeStream,
+    );
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls[1]?.[0]?.input).toEqual({
+      Bucket: "b",
+      Key: "tenant-a/outputs/job-1/result.png",
+      Range: "bytes=64-",
+    });
+  });
+});

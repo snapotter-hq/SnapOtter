@@ -393,15 +393,16 @@ export async function getGenericObjectStream(
   key: string,
   range?: { start: number; end?: number },
 ): Promise<Readable> {
+  const fullKey = genericKey(key);
   const params: { Bucket: string; Key: string; Range?: string } = {
     Bucket: cfg().bucket,
-    Key: genericKey(key),
+    Key: fullKey,
   };
   if (range) {
     params.Range = `bytes=${range.start}-${range.end ?? ""}`;
   }
   const response = await getClient().send(new GetObjectCommand(params));
-  return armResponseBodyTimeout(response.Body) as Readable;
+  return requireObjectBody(response, fullKey) as Readable;
 }
 
 export async function getGenericObjectSize(key: string): Promise<number> {
