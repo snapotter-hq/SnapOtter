@@ -326,10 +326,37 @@ export async function putObjectStream(
   source: Readable,
   opts: { maxBytes?: number; signal?: AbortSignal } = {},
 ): Promise<number> {
+  // The first failure on the reading side: an over-limit file, a background
+  // createReadStream open failing while setup awaits run (#3326), the client's
+  // upload breaking off, or an abort. S3's multipart upload can replace it with
+  // the error from aborting itself (lib-storage throws that instead), which
+  // would pass a client's 413 off as a storage outage.
+  let sourceError: unknown = source.errored ?? undefined;
+  let destroyingSource = false;
+  const onSourceError = (err: unknown) => {
+    if (!destroyingSource) {
+      sourceError ??= err;
+    }
+  };
+  source.on("error", onSourceError);
+  const throwIfSourceErrored = () => {
+    if (!destroyingSource && source.errored) {
+      sourceError ??= source.errored;
+    }
+    if (sourceError !== undefined) {
+      throw sourceError;
+    }
+  };
   const destroySource = () => {
+    destroyingSource = true;
     if (!source.destroyed) {
-      if (source.listenerCount("error") === 0) source.once("error", () => {});
       source.destroy();
+    }
+  };
+  const detachSourceErrorListener = () => {
+    source.off("error", onSourceError);
+    if (destroyingSource && source.listenerCount("error") === 0) {
+      source.on("error", () => {});
     }
   };
   let p = "";
@@ -338,38 +365,43 @@ export async function putObjectStream(
     if (!isS3Enabled()) p = localPath(key);
   } catch (err) {
     destroySource();
+    detachSourceErrorListener();
     throw err;
   }
   const abortSource = () => {
+    destroyingSource = true;
     const reason =
       opts.signal?.reason instanceof Error
         ? opts.signal.reason
         : Object.assign(new Error("The operation was aborted"), { name: "AbortError" });
-    // An abort can arrive while local capacity/directory checks are still
-    // running, before pipeline() has attached its own error listener. Keep that
-    // early destroy from becoming an uncaught process-level stream error while
-    // preserving the caller's exact reason for consumers that do observe it.
-    if (source.listenerCount("error") === 0) source.once("error", () => {});
     source.destroy(reason);
   };
   let written = 0;
-  // The first failure on the reading side: an over-limit file, the client's
-  // upload breaking off, an abort. S3's multipart upload can replace it with
-  // the error from aborting itself (lib-storage throws that instead), which
-  // would pass a client's 413 off as a storage outage.
-  let sourceError: unknown;
   const counter = async function* (src: AsyncIterable<Buffer>) {
     try {
+      throwIfSourceErrored();
       for await (const chunk of src) {
         opts.signal?.throwIfAborted();
+        throwIfSourceErrored();
         written += chunk.length;
         if (opts.maxBytes !== undefined && written > opts.maxBytes) {
           throw objectSizeLimitError(opts.maxBytes);
         }
-        yield chunk;
+        let consumerContinued = false;
+        try {
+          yield chunk;
+          consumerContinued = true;
+        } finally {
+          if (!consumerContinued) {
+            destroyingSource = true;
+          }
+        }
       }
+      throwIfSourceErrored();
     } catch (err) {
-      sourceError ??= err;
+      if (!destroyingSource || opts.signal?.aborted) {
+        sourceError ??= err;
+      }
       throw err;
     }
   };
@@ -380,11 +412,14 @@ export async function putObjectStream(
     try {
       try {
         opts.signal?.throwIfAborted();
+        throwIfSourceErrored();
         s3 = await getS3();
         opts.signal?.throwIfAborted();
+        throwIfSourceErrored();
         streamStarted = true;
         await s3.putGenericObjectStream(key, counter(source), opts.signal);
         opts.signal?.throwIfAborted();
+        throwIfSourceErrored();
         return written;
       } catch (error) {
         destroySource();
@@ -393,30 +428,37 @@ export async function putObjectStream(
             logger.warn({ err, key }, "Failed to delete partial S3 upload");
           });
         }
+        const isSourceFailure =
+          sourceError !== undefined && (streamStarted || error === sourceError);
         const sourceAbortedBySignal =
           Boolean(opts.signal?.aborted) &&
           (sourceError === opts.signal?.reason ||
             (sourceError as { name?: unknown } | null)?.name === "AbortError" ||
             timeoutCause(sourceError) !== null);
-        throw sourceError !== undefined && !sourceAbortedBySignal
+        throw isSourceFailure && !sourceAbortedBySignal
           ? localWriteFault(sourceError)
-          : s3WriteFault(sourceError ?? error);
+          : s3WriteFault(isSourceFailure ? sourceError : error);
       }
     } finally {
       opts.signal?.removeEventListener("abort", abortSource);
+      detachSourceErrorListener();
     }
   }
   const stagingDir = join(dirname(p), ".snapotter-staging");
   const stagingPath = join(stagingDir, `${basename(p)}.${randomUUID()}.partial`);
   let stagingOwned = false;
+  let streamStarted = false;
   opts.signal?.addEventListener("abort", abortSource, { once: true });
   try {
     try {
       opts.signal?.throwIfAborted();
+      throwIfSourceErrored();
       await assertLocalCapacity();
       opts.signal?.throwIfAborted();
+      throwIfSourceErrored();
       await mkdir(dirname(p), { recursive: true });
       opts.signal?.throwIfAborted();
+      throwIfSourceErrored();
       await writeStagedFile(
         stagingDir,
         stagingPath,
@@ -427,21 +469,33 @@ export async function putObjectStream(
         opts.signal,
       );
       opts.signal?.throwIfAborted();
-      await pipeline(counter(source), createWriteStream(stagingPath, { flags: "r+" }), {
+      throwIfSourceErrored();
+      streamStarted = true;
+      const writeStream = createWriteStream(stagingPath, { flags: "r+" });
+      writeStream.once("error", destroySource);
+      await pipeline(counter(source), writeStream, {
         signal: opts.signal,
       });
       opts.signal?.throwIfAborted();
+      throwIfSourceErrored();
       await rename(stagingPath, p);
       await rmdir(stagingDir).catch(() => {});
     } catch (err) {
       destroySource();
       if (stagingOwned) await unlink(stagingPath).catch(() => {});
       await rmdir(stagingDir).catch(() => {});
-      throw localWriteFault(err);
+      const isSourceFailure = sourceError !== undefined && (streamStarted || err === sourceError);
+      const sourceAbortedBySignal =
+        Boolean(opts.signal?.aborted) &&
+        (sourceError === opts.signal?.reason ||
+          (sourceError as { name?: unknown } | null)?.name === "AbortError" ||
+          timeoutCause(sourceError) !== null);
+      throw localWriteFault(isSourceFailure && !sourceAbortedBySignal ? sourceError : err);
     }
     return written;
   } finally {
     opts.signal?.removeEventListener("abort", abortSource);
+    detachSourceErrorListener();
   }
 }
 
@@ -751,41 +805,79 @@ export async function copyReadableToFile(
   opts: CopyReadableToFileOptions = {},
   classifySourceFault?: (error: unknown) => unknown,
 ): Promise<number> {
+  let sourceError: unknown = source.errored ?? undefined;
+  let destroyingSource = false;
+  const onSourceError = (err: unknown) => {
+    if (!destroyingSource) {
+      sourceError ??= err;
+    }
+  };
+  source.on("error", onSourceError);
+  const throwIfSourceErrored = () => {
+    if (!destroyingSource && source.errored) {
+      sourceError ??= source.errored;
+    }
+    if (sourceError !== undefined) {
+      throw sourceError;
+    }
+  };
   const destroySource = () => {
+    destroyingSource = true;
     if (!source.destroyed) {
-      if (source.listenerCount("error") === 0) source.once("error", () => {});
       source.destroy();
+    }
+  };
+  const detachSourceErrorListener = () => {
+    source.off("error", onSourceError);
+    if (destroyingSource && source.listenerCount("error") === 0) {
+      source.on("error", () => {});
     }
   };
   if (opts.maxBytes !== undefined && (!Number.isSafeInteger(opts.maxBytes) || opts.maxBytes < 0)) {
     destroySource();
+    detachSourceErrorListener();
     throw new Error("maxBytes must be a non-negative safe integer");
   }
   const stagingPath = `${destination}.${randomUUID()}.partial`;
   let stagingOwned = false;
+  let streamStarted = false;
   let written = 0;
-  let sourceError: unknown;
   const countAndLimit = async function* (chunks: AsyncIterable<Buffer | Uint8Array | string>) {
     try {
+      throwIfSourceErrored();
       for await (const chunk of chunks) {
         opts.signal?.throwIfAborted();
+        throwIfSourceErrored();
         const bytes = typeof chunk === "string" ? Buffer.byteLength(chunk) : chunk.byteLength;
         written += bytes;
         if (opts.maxBytes !== undefined && written > opts.maxBytes) {
           throw objectSizeLimitError(opts.maxBytes);
         }
-        yield chunk;
+        let consumerContinued = false;
+        try {
+          yield chunk;
+          consumerContinued = true;
+        } finally {
+          if (!consumerContinued) {
+            destroyingSource = true;
+          }
+        }
       }
+      throwIfSourceErrored();
     } catch (err) {
-      sourceError ??= err;
+      if (!destroyingSource || opts.signal?.aborted) {
+        sourceError ??= err;
+      }
       throw err;
     }
   };
 
   try {
     opts.signal?.throwIfAborted();
+    throwIfSourceErrored();
     await mkdir(dirname(destination), { recursive: true });
     opts.signal?.throwIfAborted();
+    throwIfSourceErrored();
     // Create the staging inode before constructing the stream. A write stream
     // opened with `wx` may fail the pipeline before its asynchronous open has
     // completed; cleanup can then observe ENOENT and the delayed open can leave
@@ -794,20 +886,36 @@ export async function copyReadableToFile(
     await writeFile(stagingPath, Buffer.alloc(0), { flag: "wx", mode: 0o600 });
     stagingOwned = true;
     opts.signal?.throwIfAborted();
-    await pipeline(countAndLimit(source), createWriteStream(stagingPath, { flags: "r+" }), {
+    throwIfSourceErrored();
+    streamStarted = true;
+    const writeStream = createWriteStream(stagingPath, { flags: "r+" });
+    writeStream.once("error", destroySource);
+    await pipeline(countAndLimit(source), writeStream, {
       signal: opts.signal,
     });
     opts.signal?.throwIfAborted();
+    throwIfSourceErrored();
     await rename(stagingPath, destination);
     return written;
   } catch (error) {
     destroySource();
     if (stagingOwned) await unlink(stagingPath).catch(() => {});
     if (opts.signal?.aborted && error === opts.signal.reason) throw error;
-    if (sourceError !== undefined && classifySourceFault) {
+    const sourceAbortedBySignal =
+      Boolean(opts.signal?.aborted) &&
+      (sourceError === opts.signal?.reason ||
+        (sourceError as { name?: unknown } | null)?.name === "AbortError" ||
+        timeoutCause(sourceError) !== null);
+    const isSourceFailure =
+      sourceError !== undefined &&
+      (streamStarted || error === sourceError) &&
+      !sourceAbortedBySignal;
+    if (isSourceFailure && classifySourceFault) {
       throw classifySourceFault(sourceError);
     }
-    throw localWriteFault(error);
+    throw localWriteFault(isSourceFailure ? sourceError : error);
+  } finally {
+    detachSourceErrorListener();
   }
 }
 

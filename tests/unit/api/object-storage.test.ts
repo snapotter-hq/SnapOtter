@@ -1,5 +1,13 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  createReadStream,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -1641,11 +1649,15 @@ describe("object-storage missing-key + robustness paths", () => {
         this.push(Buffer.from("payload"));
         this.push(null);
       },
+      destroy(_err, callback) {
+        callback(new Error("destroy-time source error"));
+      },
     });
     await expect(copyReadableToFile(source, "/tmp/unused", { maxBytes: -1 })).rejects.toThrow(
       /maxBytes/i,
     );
     expect(source.destroyed).toBe(true);
+    await new Promise<void>((resolve) => setImmediate(resolve));
   });
 
   it("destroys the source stream when putObjectStream fails before pipeline() (#2797)", async () => {
@@ -1726,6 +1738,232 @@ describe("object-storage missing-key + robustness paths", () => {
       expect(mkdirSource.destroyed).toBe(true);
     } finally {
       rmSync(blockerPath, { force: true });
+    }
+  });
+
+  it("captures a pre-pipeline source error in putObjectStream and copyReadableToFile, cleans up staging, and rejects with the classified fault (#3326)", async () => {
+    const prePipelineJobId = `pre-pipeline-err-${process.pid}`;
+    const scratch = mkdtempSync(join(tmpdir(), "snapotter-pre-pipeline-copy-"));
+    try {
+      // 1. Bare createReadStream on a missing scratch file (background fs.open fails with ENOENT during pre-pipeline setup).
+      const missingScratch = join(scratch, "nonexistent-input.bin");
+      await expect(
+        putObjectStream(
+          `outputs/${prePipelineJobId}/from-missing.bin`,
+          createReadStream(missingScratch),
+        ),
+      ).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-write-failed",
+        statusCode: 503,
+        cause: expect.objectContaining({ code: "ENOENT", syscall: "open" }),
+      });
+      await expect(objectExists(`outputs/${prePipelineJobId}/from-missing.bin`)).resolves.toBe(
+        false,
+      );
+      expect(
+        existsSync(join(env.WORKSPACE_PATH, "outputs", prePipelineJobId, ".snapotter-staging")),
+      ).toBe(false);
+
+      const copyDest = join(scratch, "copied-missing.bin");
+      await expect(
+        copyReadableToFile(createReadStream(missingScratch), copyDest),
+      ).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-write-failed",
+        statusCode: 503,
+        cause: expect.objectContaining({ code: "ENOENT", syscall: "open" }),
+      });
+      expect(existsSync(copyDest)).toBe(false);
+      expect(readdirSync(scratch)).toEqual([]);
+
+      // 2. Source emits "error" while writeFile has already created the staging .partial file (before pipeline attaches).
+      vi.resetModules();
+      let emitDuringStagingWrite: (() => void) | null = null;
+      vi.doMock("node:fs/promises", async (importOriginal) => {
+        const actual = await importOriginal<typeof import("node:fs/promises")>();
+        return {
+          ...actual,
+          writeFile: async (
+            target: Parameters<typeof actual.writeFile>[0],
+            data: Parameters<typeof actual.writeFile>[1],
+            options?: Parameters<typeof actual.writeFile>[2],
+          ) => {
+            await actual.writeFile(target, data, options);
+            if (String(target).endsWith(".partial")) {
+              emitDuringStagingWrite?.();
+              await new Promise<void>((resolve) => setImmediate(resolve));
+            }
+          },
+        };
+      });
+      try {
+        const isolatedStorage = await import("../../../apps/api/src/lib/object-storage.js");
+        const eacces = Object.assign(new Error("EACCES: permission denied, open"), {
+          code: "EACCES",
+          syscall: "open",
+        });
+        const putSource = new PassThrough();
+        emitDuringStagingWrite = () => {
+          putSource.emit("error", eacces);
+        };
+        await expect(
+          isolatedStorage.putObjectStream(`outputs/${prePipelineJobId}/staged-err.bin`, putSource),
+        ).rejects.toMatchObject({
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-not-writable",
+          statusCode: 503,
+          cause: eacces,
+        });
+        expect(putSource.destroyed).toBe(true);
+        expect(
+          existsSync(join(env.WORKSPACE_PATH, "outputs", prePipelineJobId, ".snapotter-staging")),
+        ).toBe(false);
+        await expect(
+          isolatedStorage.objectExists(`outputs/${prePipelineJobId}/staged-err.bin`),
+        ).resolves.toBe(false);
+
+        const copySource = new PassThrough();
+        emitDuringStagingWrite = () => {
+          copySource.emit("error", eacces);
+        };
+        const stagedCopyDest = join(scratch, "staged-copy.bin");
+        await expect(
+          isolatedStorage.copyReadableToFile(copySource, stagedCopyDest),
+        ).rejects.toMatchObject({
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-not-writable",
+          statusCode: 503,
+          cause: eacces,
+        });
+        expect(copySource.destroyed).toBe(true);
+        expect(existsSync(stagedCopyDest)).toBe(false);
+        expect(readdirSync(scratch)).toEqual([]);
+      } finally {
+        vi.doUnmock("node:fs/promises");
+        vi.resetModules();
+      }
+
+      // 3. Stream already errored (source.errored set) before putObjectStream or copyReadableToFile is called.
+      const preErroredCause = Object.assign(new Error("EIO: pre-errored source"), {
+        code: "EIO",
+        syscall: "read",
+      });
+      const makePreErrored = async (): Promise<PassThrough> => {
+        const s = new PassThrough();
+        s.on("error", () => {});
+        s.destroy(preErroredCause);
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        s.removeAllListeners("error");
+        return s;
+      };
+      await expect(
+        putObjectStream(`outputs/${prePipelineJobId}/pre-errored.bin`, await makePreErrored()),
+      ).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-write-failed",
+        statusCode: 503,
+        cause: preErroredCause,
+      });
+      await expect(
+        copyReadableToFile(await makePreErrored(), join(scratch, "pre-errored-copy.bin")),
+      ).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-write-failed",
+        statusCode: 503,
+        cause: preErroredCause,
+      });
+      expect(readdirSync(scratch)).toEqual([]);
+
+      // 4. Success path detaches onSourceError cleanly via source.off("error", onSourceError).
+      const okPutSource = Readable.from([Buffer.from("ok")]);
+      const putOffSpy = vi.spyOn(okPutSource, "off");
+      await expect(
+        putObjectStream(`outputs/${prePipelineJobId}/ok.bin`, okPutSource),
+      ).resolves.toBe(2);
+      expect(putOffSpy).toHaveBeenCalledWith("error", expect.any(Function));
+
+      const okCopySource = Readable.from([Buffer.from("ok")]);
+      const copyOffSpy = vi.spyOn(okCopySource, "off");
+      const okCopyDest = join(scratch, "ok-copy.bin");
+      await expect(copyReadableToFile(okCopySource, okCopyDest)).resolves.toBe(2);
+      expect(copyOffSpy).toHaveBeenCalledWith("error", expect.any(Function));
+      rmSync(okCopyDest, { force: true });
+
+      // 5. Destination WriteStream failure mid-pipeline while an un-ended source still has buffered chunks
+      // preserves the destination 503 storage-full error instead of overwriting sourceError with for-await's AbortError.
+      vi.resetModules();
+      vi.doMock("node:fs", async (importOriginal) => {
+        const actual = await importOriginal<typeof import("node:fs")>();
+        return {
+          ...actual,
+          createWriteStream: (...args: Parameters<typeof actual.createWriteStream>) => {
+            const ws = actual.createWriteStream(...args);
+            ws._write = (_chunk, _encoding, callback) => {
+              setImmediate(() => {
+                callback(
+                  Object.assign(new Error("ENOSPC: no space left on device, write"), {
+                    code: "ENOSPC",
+                    syscall: "write",
+                  }),
+                );
+              });
+            };
+            return ws;
+          },
+        };
+      });
+      try {
+        const isolatedStorage = await import("../../../apps/api/src/lib/object-storage.js");
+        const makeInfiniteSource = () =>
+          new Readable({
+            read() {
+              this.push(Buffer.alloc(32 * 1024, 0x41));
+            },
+          });
+        const multiChunkPutSource = makeInfiniteSource();
+        await expect(
+          isolatedStorage.putObjectStream(
+            `outputs/${prePipelineJobId}/dest-enospc.bin`,
+            multiChunkPutSource,
+          ),
+        ).rejects.toMatchObject({
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-full",
+          statusCode: 503,
+          cause: expect.objectContaining({ code: "ENOSPC", syscall: "write" }),
+        });
+        expect(multiChunkPutSource.destroyed).toBe(true);
+
+        const multiChunkCopySource = makeInfiniteSource();
+        await expect(
+          isolatedStorage.copyReadableToFile(
+            multiChunkCopySource,
+            join(scratch, "dest-enospc-copy.bin"),
+          ),
+        ).rejects.toMatchObject({
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-full",
+          statusCode: 503,
+          cause: expect.objectContaining({ code: "ENOSPC", syscall: "write" }),
+        });
+        expect(multiChunkCopySource.destroyed).toBe(true);
+        expect(readdirSync(scratch)).toEqual([]);
+      } finally {
+        vi.doUnmock("node:fs");
+        vi.resetModules();
+      }
+    } finally {
+      await deletePrefix(`outputs/${prePipelineJobId}`).catch(() => {});
+      rmSync(scratch, { recursive: true, force: true });
     }
   });
 

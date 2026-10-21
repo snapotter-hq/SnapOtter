@@ -5,7 +5,14 @@
 // and never touch the local filesystem. This complements the local-backend
 // mutation file, which cannot run under STORAGE_MODE="s3".
 
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  createReadStream,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import http from "node:http";
 import type net from "node:net";
 import { tmpdir } from "node:os";
@@ -319,6 +326,139 @@ describe("object-storage S3 dispatch (STORAGE_MODE=s3)", () => {
       expect(s3.putStream).not.toHaveBeenCalled();
       expect(s3.deleteObject).not.toHaveBeenCalled();
     });
+
+    it("captures a source error emitted while getS3 is pending and classifies it via localWriteFault without calling putStream or deleteObject (#3326)", async () => {
+      vi.resetModules();
+      const fresh = await import("../../../apps/api/src/lib/object-storage.js");
+
+      let markLoading!: () => void;
+      const loading = new Promise<void>((resolve) => {
+        markLoading = resolve;
+      });
+      let resolveLoad!: (mod: unknown) => void;
+      s3.load.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveLoad = resolve;
+            markLoading();
+          }),
+      );
+
+      const missingSource = createReadStream("/nonexistent/scratch-s3-3326.bin");
+      const sourceErrored = new Promise<void>((resolve) => {
+        missingSource.once("error", () => resolve());
+      });
+      const pending = fresh.putObjectStream(
+        "outputs/job-init/missing-local-scratch.bin",
+        missingSource,
+      );
+      await loading;
+      await sourceErrored;
+      resolveLoad(s3.defaultMod);
+
+      await expect(pending).rejects.toMatchObject({
+        message: STORAGE_WRITE_FAILED_MESSAGE,
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-write-failed",
+        statusCode: 503,
+        cause: expect.objectContaining({ code: "ENOENT", syscall: "open" }),
+      });
+      expect(s3.putStream).not.toHaveBeenCalled();
+      expect(s3.deleteObject).not.toHaveBeenCalled();
+
+      // Pre-errored stream at entry rejects before calling getS3().
+      s3.load.mockClear();
+      const preErrored = new PassThrough();
+      const preCause = Object.assign(new Error("EACCES: permission denied, open"), {
+        code: "EACCES",
+        syscall: "open",
+      });
+      preErrored.on("error", () => {});
+      preErrored.destroy(preCause);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      preErrored.removeAllListeners("error");
+      await expect(
+        fresh.putObjectStream("outputs/job-init/pre-errored.bin", preErrored),
+      ).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-not-writable",
+        statusCode: 503,
+        cause: preCause,
+      });
+      expect(s3.load).not.toHaveBeenCalled();
+
+      // When getS3() itself fails or signal aborts while source also has an error before streamStarted,
+      // s3WriteFault classifies getS3()'s / signal's error rather than stamping 500 on sourceError.
+      vi.resetModules();
+      const freshForOutage = await import("../../../apps/api/src/lib/object-storage.js");
+      const s3Outage = Object.assign(new Error("Service Unavailable"), {
+        name: "ServiceUnavailable",
+        $metadata: { httpStatusCode: 503 },
+      });
+      let markFailLoad!: () => void;
+      const failLoading = new Promise<void>((resolve) => {
+        markFailLoad = resolve;
+      });
+      let rejectLoad!: (err: unknown) => void;
+      s3.load.mockReset();
+      s3.load.mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectLoad = reject;
+            markFailLoad();
+          }),
+      );
+      const concurrentStream = new PassThrough();
+      const pendingOutage = freshForOutage.putObjectStream(
+        "outputs/job-init/concurrent-outage.bin",
+        concurrentStream,
+      );
+      await failLoading;
+      concurrentStream.emit(
+        "error",
+        Object.assign(new Error("ENOENT: missing"), { code: "ENOENT", syscall: "open" }),
+      );
+      rejectLoad(s3Outage);
+      await expect(pendingOutage).rejects.toMatchObject({
+        message: STORAGE_UNAVAILABLE_MESSAGE,
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause: s3Outage,
+      });
+
+      // When s3.putGenericObjectStream fails mid-stream on an open PassThrough and deleteGenericObject
+      // awaits cleanup, destroySource() closing the source does not overwrite the S3 fault with ERR_STREAM_PREMATURE_CLOSE.
+      s3.load.mockResolvedValue(s3.defaultMod);
+      const slowDown = Object.assign(new Error("Please reduce your request rate."), {
+        name: "SlowDown",
+        $metadata: { httpStatusCode: 503 },
+      });
+      s3.putStream.mockImplementationOnce(async (_key: string, src: AsyncIterable<Buffer>) => {
+        const readable = Readable.from(src);
+        readable.on("error", () => {});
+        await new Promise<void>((resolve) => readable.once("data", () => resolve()));
+        throw slowDown;
+      });
+      s3.deleteObject.mockImplementationOnce(async () => {
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      });
+      const openSource = new PassThrough();
+      openSource.write(Buffer.from("chunk-1"));
+      await expect(
+        fresh.putObjectStream("outputs/job-init/mid-s3-fail.bin", openSource),
+      ).rejects.toMatchObject({
+        message: STORAGE_UNAVAILABLE_MESSAGE,
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause: slowDown,
+      });
+    });
   });
 
   it("routes getObjectSize to the S3 backend and returns its exact number", async () => {
@@ -433,6 +573,60 @@ describe("object-storage S3 dispatch (STORAGE_MODE=s3)", () => {
         }
       },
     );
+
+    it("captures an S3 source stream error emitted during pre-pipeline scratch setup in copyObjectToFile and classifies it as 503 storage-unavailable (#3326)", async () => {
+      const scratch = mkdtempSync(join(tmpdir(), "snapotter-s3-copy-early-"));
+      const destination = join(scratch, "nested", "out.pdf");
+      const streamReset = Object.assign(new Error("EIO: S3 stream reset before pipeline"), {
+        code: "EIO",
+        syscall: "read",
+      });
+      const s3Stream = new PassThrough();
+      s3.getSize.mockResolvedValueOnce(16);
+      s3.getStream.mockImplementationOnce(async () => {
+        setImmediate(() => {
+          s3Stream.destroy(streamReset);
+        });
+        return s3Stream;
+      });
+      try {
+        await expect(
+          copyObjectToFile("uploads/job-copy/scan.pdf", destination, { maxBytes: 1024 }),
+        ).rejects.toMatchObject({
+          message: STORAGE_UNAVAILABLE_MESSAGE,
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-unavailable",
+          statusCode: 503,
+          cause: streamReset,
+        });
+        expect(existsSync(destination)).toBe(false);
+        expect(readdirSync(join(scratch, "nested"))).toEqual([]);
+
+        // Pre-errored S3 stream returned by getObjectStream is also classified as 503 storage-unavailable before mkdir.
+        const preErroredS3Stream = new PassThrough();
+        preErroredS3Stream.on("error", () => {});
+        preErroredS3Stream.destroy(streamReset);
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        preErroredS3Stream.removeAllListeners("error");
+        const preErroredDest = join(scratch, "never-created", "out.pdf");
+        s3.getSize.mockResolvedValueOnce(16);
+        s3.getStream.mockResolvedValueOnce(preErroredS3Stream);
+        await expect(
+          copyObjectToFile("uploads/job-copy/scan.pdf", preErroredDest, { maxBytes: 1024 }),
+        ).rejects.toMatchObject({
+          message: STORAGE_UNAVAILABLE_MESSAGE,
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-unavailable",
+          statusCode: 503,
+          cause: streamReset,
+        });
+        expect(existsSync(join(scratch, "never-created"))).toBe(false);
+      } finally {
+        rmSync(scratch, { recursive: true, force: true });
+      }
+    });
 
     it("keeps a local scratch write failure during S3 copyObjectToFile classified as 503 storage-write-failed", async () => {
       const scratch = mkdtempSync(join(tmpdir(), "snapotter-s3-copy-localfault-"));
