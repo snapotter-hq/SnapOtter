@@ -7,8 +7,13 @@ import {
   hashPassword,
   verifyPassword,
 } from "../../../apps/api/src/plugins/auth.js";
-import { raceInserts, raceRowLocks, raceUpdates } from "../../helpers/pg-race.js";
-import { buildTestApp, type TestApp } from "../test-server.js";
+import {
+  raceInserts,
+  raceRowLocks,
+  raceUpdates,
+  waitForLockWaiters,
+} from "../../helpers/pg-race.js";
+import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 const SCIM_TOKEN = `so_scim_v2_${"a".repeat(64)}`;
 const ADMIN_PERMISSIONS = [
@@ -4168,6 +4173,186 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         status: 400,
         detail: "Cannot remove members from the Default team",
       });
+    });
+
+    it("returns 204 once and 404 on the loser when two concurrent DELETEs race on the same group (#2922)", async () => {
+      const member = await createScimUser({ userName: uniqueName("scim-del-race-m") });
+      const group = await createScimGroup({
+        displayName: uniqueName("scim-del-race-grp"),
+        members: [{ value: member.id }],
+      });
+
+      const results = await raceRowLocks("teams", 2, () =>
+        Promise.all([
+          crudApp.app.inject({
+            method: "DELETE",
+            url: `/api/v1/scim/v2/Groups/${group.id}`,
+            headers: authHeaders(),
+          }),
+          crudApp.app.inject({
+            method: "DELETE",
+            url: `/api/v1/scim/v2/Groups/${group.id}`,
+            headers: authHeaders(),
+          }),
+        ]),
+      );
+
+      const statuses = results.map((r) => r.statusCode).sort();
+      expect(statuses).toEqual([204, 404]);
+      const notFound = results.find((r) => r.statusCode === 404);
+      expect(JSON.parse(notFound?.body ?? "{}")).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 404,
+        detail: "Group not found",
+      });
+
+      const [teamRowDb] = await db.select().from(schema.teams).where(eq(schema.teams.id, group.id));
+      expect(teamRowDb).toBeUndefined();
+      expect((await userRow(member.id))?.team).toBe(DEFAULT_TEAM_ID);
+
+      const deletedAuditRows = await db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.action, "SCIM_GROUP_SYNCED"),
+            sql`${schema.auditLog.details}->>'teamId' = ${group.id}`,
+            sql`${schema.auditLog.details}->>'action' = 'deleted'`,
+          ),
+        );
+      expect(deletedAuditRows).toHaveLength(1);
+    });
+
+    it("rejects DELETE with SCIM 400 when the group is renamed to Default before the row lock is acquired (#2922)", async () => {
+      const member = await createScimUser({ userName: uniqueName("scim-del-def-race-m") });
+      const group = await createScimGroup({
+        displayName: uniqueName("scim-del-def-race-grp"),
+        members: [{ value: member.id }],
+      });
+      await db
+        .update(schema.teams)
+        .set({ name: "OriginalDefault" })
+        .where(eq(schema.teams.id, DEFAULT_TEAM_ID));
+
+      try {
+        const res = await raceRowLocks(
+          "teams",
+          1,
+          () =>
+            crudApp.app.inject({
+              method: "DELETE",
+              url: `/api/v1/scim/v2/Groups/${group.id}`,
+              headers: authHeaders(),
+            }),
+          (tx) =>
+            tx.update(schema.teams).set({ name: "Default" }).where(eq(schema.teams.id, group.id)),
+        );
+
+        expect(res.statusCode).toBe(400);
+        expect(JSON.parse(res.body)).toEqual({
+          schemas: [SCIM_ERROR_SCHEMA],
+          status: 400,
+          detail: "Cannot delete the Default team",
+        });
+
+        const [teamRowDb] = await db
+          .select()
+          .from(schema.teams)
+          .where(eq(schema.teams.id, group.id));
+        expect(teamRowDb?.name).toBe("Default");
+        expect((await userRow(member.id))?.team).toBe(group.id);
+        const deletedAuditRows = await db
+          .select()
+          .from(schema.auditLog)
+          .where(
+            and(
+              eq(schema.auditLog.action, "SCIM_GROUP_SYNCED"),
+              sql`${schema.auditLog.details}->>'teamId' = ${group.id}`,
+              sql`${schema.auditLog.details}->>'action' = 'deleted'`,
+            ),
+          );
+        expect(deletedAuditRows).toHaveLength(0);
+      } finally {
+        await db.delete(schema.teams).where(eq(schema.teams.id, group.id));
+        await db
+          .update(schema.teams)
+          .set({ name: "Default" })
+          .where(eq(schema.teams.id, DEFAULT_TEAM_ID));
+      }
+    });
+
+    it("serializes DELETE /api/v1/scim/v2/Groups/:id with PUT /api/auth/users/:id so a member assignment is never orphaned (#2922)", async () => {
+      const adminToken = await loginAsAdmin(crudApp.app);
+      const user = await createScimUser({ userName: uniqueName("scim-del-put-user") });
+      const group = await createScimGroup({ displayName: uniqueName("scim-del-put-grp") });
+
+      const [assignRes, deleteRes] = await raceRowLocks("users", 2, async () => {
+        const assigning = crudApp.app.inject({
+          method: "PUT",
+          url: `/api/auth/users/${user.id}`,
+          headers: { authorization: `Bearer ${adminToken}` },
+          payload: { team: group.id },
+        });
+        await waitForLockWaiters(1);
+        const deleting = crudApp.app.inject({
+          method: "DELETE",
+          url: `/api/v1/scim/v2/Groups/${group.id}`,
+          headers: authHeaders(),
+        });
+        return Promise.all([assigning, deleting]);
+      });
+
+      expect(assignRes.statusCode, assignRes.body).toBe(200);
+      expect(deleteRes.statusCode, deleteRes.body).toBe(204);
+
+      const [teamRowDb] = await db.select().from(schema.teams).where(eq(schema.teams.id, group.id));
+      expect(teamRowDb).toBeUndefined();
+      expect((await userRow(user.id))?.team).toBe(DEFAULT_TEAM_ID);
+    });
+
+    it("serializes DELETE /api/v1/scim/v2/Groups/:id with POST /api/auth/register so a newly registered member is never orphaned (#2922)", async () => {
+      const adminToken = await loginAsAdmin(crudApp.app);
+      const group = await createScimGroup({ displayName: uniqueName("scim-del-reg-grp") });
+      const regUsername = uniqueName("scim-del-reg-user");
+
+      try {
+        const [registerRes, deleteRes] = await raceRowLocks("users", 2, async () => {
+          const registering = crudApp.app.inject({
+            method: "POST",
+            url: "/api/auth/register",
+            headers: { authorization: `Bearer ${adminToken}` },
+            payload: {
+              username: regUsername,
+              password: "ValidPass1",
+              role: "user",
+              team: group.displayName,
+            },
+          });
+          await waitForLockWaiters(1);
+          const deleting = crudApp.app.inject({
+            method: "DELETE",
+            url: `/api/v1/scim/v2/Groups/${group.id}`,
+            headers: authHeaders(),
+          });
+          return Promise.all([registering, deleting]);
+        });
+
+        expect(registerRes.statusCode, registerRes.body).toBe(201);
+        expect(deleteRes.statusCode, deleteRes.body).toBe(204);
+
+        const [teamRowDb] = await db
+          .select()
+          .from(schema.teams)
+          .where(eq(schema.teams.id, group.id));
+        expect(teamRowDb).toBeUndefined();
+        const [regUser] = await db
+          .select()
+          .from(schema.users)
+          .where(eq(schema.users.username, regUsername));
+        expect(regUser?.team).toBe(DEFAULT_TEAM_ID);
+      } finally {
+        await db.delete(schema.users).where(eq(schema.users.username, regUsername));
+      }
     });
   });
 });

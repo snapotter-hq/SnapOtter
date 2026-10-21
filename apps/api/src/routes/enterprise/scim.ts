@@ -1585,20 +1585,27 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
       if (!(await requireScimFeature(reply))) return;
 
       const { id } = request.params;
-      const [team] = await db.select().from(schema.teams).where(eq(schema.teams.id, id));
 
-      if (!team) {
-        return reply.status(404).send(scimError(404, "Group not found"));
-      }
+      // Lock the team row before checking its name and moving its members
+      // (#2922), and keep the member move and team delete in one transaction so
+      // a failed delete never leaves the group emptied (#2914). POST
+      // /api/auth/register and PUT /api/auth/users/:id take FOR SHARE on
+      // schema.teams before writing schema.users (#2646), so taking FOR UPDATE
+      // here serializes group deletion against member assignment, renames, and
+      // concurrent deletes in teams -> users order.
+      const removed = await db.transaction(async (tx) => {
+        const [locked] = await tx
+          .select()
+          .from(schema.teams)
+          .where(eq(schema.teams.id, id))
+          .for("update");
+        if (!locked) {
+          return "not-found" as const;
+        }
+        if (id === schema.DEFAULT_TEAM_ID || locked.name === "Default") {
+          return "default-team" as const;
+        }
 
-      if (id === schema.DEFAULT_TEAM_ID || team.name === "Default") {
-        request.log.warn({ teamId: id }, "Attempted to delete the Default team");
-        return reply.status(400).send(scimError(400, "Cannot delete the Default team"));
-      }
-
-      // Move members to the Default team and delete the group in one
-      // transaction so a failed delete never leaves the group emptied (#2914).
-      await db.transaction(async (tx) => {
         const [defaultTeam] = await tx
           .select()
           .from(schema.teams)
@@ -1611,14 +1618,23 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
           .where(eq(schema.users.team, id));
 
         await tx.delete(schema.teams).where(eq(schema.teams.id, id));
+        return locked;
       });
+
+      if (removed === "not-found") {
+        return reply.status(404).send(scimError(404, "Group not found"));
+      }
+      if (removed === "default-team") {
+        request.log.warn({ teamId: id }, "Attempted to delete the Default team");
+        return reply.status(400).send(scimError(400, "Cannot delete the Default team"));
+      }
 
       await auditLog(
         request.log,
         "SCIM_GROUP_SYNCED",
         {
           teamId: id,
-          teamName: team.name,
+          teamName: removed.name,
           action: "deleted",
         },
         request.ip,
