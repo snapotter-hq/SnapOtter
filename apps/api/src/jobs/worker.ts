@@ -60,6 +60,7 @@ import { type BatchFileNotes, pickBatchFileNotes } from "../lib/batch-file-notes
 import {
   binaryOverrideWarning,
   checkBinaryOverrides,
+  isBinarySpawnFailure,
   probeFailureLevel,
 } from "../lib/binary-overrides.js";
 import { allFailedFault, type BatchFault } from "../lib/engine-unavailable.js";
@@ -891,7 +892,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       if (span) span.addEvent("job.completed");
 
       return jobResult;
-    } catch (err) {
+    } catch (rawErr) {
       const durationMs = Date.now() - startTime;
       // A user cancel wins over a deadline that fired first: abort() on an already
       // aborted controller leaves the reason as "timeout".
@@ -902,6 +903,18 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       // message, error log and report (#2144).
       const isTimeout =
         !isCanceled && !handlerReturned && signal.aborted && signal.reason === "timeout";
+      const err =
+        !isCanceled && !isTimeout && isBinarySpawnFailure(rawErr)
+          ? new SafeError(
+              "Processing is unavailable on this server because a required engine binary could not be started.",
+              {
+                kind: "operational",
+                code: "ENGINE_UNAVAILABLE",
+                statusCode: 503,
+                cause: rawErr,
+              },
+            )
+          : rawErr;
       const errorMessage = err instanceof Error ? err.message : String(err);
       const finalError = isCanceled
         ? "Canceled"

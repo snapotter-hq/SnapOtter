@@ -116,6 +116,39 @@ describe("classifyError", () => {
     });
     expect(classifyError(translated, "worker")).toBe("operational");
   });
+  it.each([
+    ["ENOENT", "spawn"],
+    ["ENOEXEC", "spawn"],
+    ["ENOMEM", "spawn"],
+    ["ENOTDIR", "spawn /usr/bin/qpdf"],
+    ["ENOENT", "spawnSync /usr/bin/qpdf"],
+    ["ENOEXEC", "spawnSync /usr/bin/qpdf"],
+    ["EACCES", "spawnSync /usr/bin/qpdf"],
+  ])(
+    "classifies a binary spawn failure (%s, %s) as operational while keeping non-spawn errnos a bug (#2937)",
+    (code, syscall) => {
+      const spawnErr = Object.assign(new Error(`spawn /usr/bin/qpdf ${code}`), {
+        code,
+        syscall,
+        path: "/usr/bin/qpdf",
+      });
+      expect(classifyError(spawnErr, "worker")).toBe("operational");
+      expect(classifyError(spawnErr, "http")).toBe("operational");
+      expect(classifyError(spawnErr)).toBe("operational");
+    },
+  );
+  it("keeps non-spawn ENOTDIR and ENOMEM errnos classified as bug (#2937)", () => {
+    const openEnotdir = Object.assign(new Error("ENOTDIR: not a directory, open '/x/y'"), {
+      code: "ENOTDIR",
+      syscall: "open",
+    });
+    const readEnomem = Object.assign(new Error("ENOMEM: not enough memory, read"), {
+      code: "ENOMEM",
+      syscall: "read",
+    });
+    expect(classifyError(openEnotdir, "worker")).toBe("bug");
+    expect(classifyError(readEnomem, "worker")).toBe("bug");
+  });
   it("worker source: zod is a bug (schema drift) and bare resets are operational", () => {
     const zod = Object.assign(new Error("z"), { name: "ZodError", issues: [] });
     expect(classifyError(zod, "worker")).toBe("bug");

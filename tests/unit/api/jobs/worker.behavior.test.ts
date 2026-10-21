@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { isBinarySpawnFailure } from "../../../../apps/api/src/lib/binary-overrides.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
 const initialSharpConcurrency = sharp.concurrency();
@@ -693,6 +694,7 @@ describe("worker result payload behavior", () => {
       vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
         binaryOverrideWarning: vi.fn(),
         checkBinaryOverrides: vi.fn(() => []),
+        isBinarySpawnFailure,
         probeFailureLevel: vi.fn(() => "warn"),
       }));
     });
@@ -799,6 +801,54 @@ describe("worker result payload behavior", () => {
         }),
       }),
     );
+
+    // 4b. A worker-side binary spawn failure (qpdfSpawnFailure or a missing
+    // engine binary) converts to an unrecoverable 503 ENGINE_UNAVAILABLE
+    // SafeError without leaking the binary path or retrying (#2937).
+    dbSetMock.mockClear();
+    const spawnOom = Object.assign(new Error("spawn /usr/bin/qpdf ENOMEM"), {
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/usr/bin/qpdf",
+      signal: "SIGKILL" as const,
+    });
+    processV2Mock.mockRejectedValueOnce(spawnOom);
+    const rejectedSpawn = await processor({
+      ...makeJob("job-spawn-oom"),
+      opts: { attempts: 2 },
+    }).catch((e: unknown) => e);
+    expect(rejectedSpawn).toBeInstanceOf(UnrecoverableError);
+    expect((rejectedSpawn as Error).message).not.toContain("/usr/bin/qpdf");
+    expect((rejectedSpawn as { cause?: unknown }).cause).toMatchObject({
+      name: "SafeError",
+      kind: "operational",
+      code: "ENGINE_UNAVAILABLE",
+      statusCode: 503,
+      cause: spawnOom,
+    });
+    expect(dbSetMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        status: "failed",
+        error: {
+          code: "ENGINE_UNAVAILABLE",
+          httpStatus: 503,
+          message:
+            "Processing is unavailable on this server because a required engine binary could not be started.",
+        },
+      }),
+    );
+
+    // Non-spawn ENOENT (e.g. syscall: "open" inside a tool) is NOT converted
+    // to ENGINE_UNAVAILABLE or UnrecoverableError, so attempt 1 of 2 retries.
+    dbSetMock.mockClear();
+    const openEnoent = enoent("/tmp/scratch/missing.pdf");
+    processV2Mock.mockRejectedValueOnce(openEnoent);
+    const rejectedOpen = await processor({
+      ...makeJob("job-open-enoent"),
+      opts: { attempts: 2 },
+    }).catch((e: unknown) => e);
+    expect(rejectedOpen).toBe(openEnoent);
+    expect(rejectedOpen).not.toBeInstanceOf(UnrecoverableError);
 
     // 5. Losing the finalize claim before the completion commit settles the job
     // canceled (without logging "tool job failed" or retrying) and skips the
@@ -1135,6 +1185,7 @@ describe("worker result payload behavior", () => {
         vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
           binaryOverrideWarning: vi.fn(),
           checkBinaryOverrides: vi.fn(() => []),
+          isBinarySpawnFailure,
           probeFailureLevel: vi.fn(() => "warn"),
         }));
       });
@@ -1366,6 +1417,7 @@ describe("worker failure reports carry the job age (#1414)", () => {
       vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
         binaryOverrideWarning: vi.fn(),
         checkBinaryOverrides: vi.fn(() => []),
+        isBinarySpawnFailure,
         probeFailureLevel: vi.fn(() => "warn"),
       }));
     });
@@ -1520,6 +1572,7 @@ describe("worker failure reports carry the job age (#1414)", () => {
         vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
           binaryOverrideWarning: vi.fn(),
           checkBinaryOverrides: vi.fn(() => []),
+          isBinarySpawnFailure,
           probeFailureLevel: vi.fn(() => "warn"),
         }));
       });
@@ -1835,6 +1888,7 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
       vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
         binaryOverrideWarning: vi.fn(),
         checkBinaryOverrides: vi.fn(() => []),
+        isBinarySpawnFailure,
         probeFailureLevel: vi.fn(() => "warn"),
       }));
     });
@@ -2363,6 +2417,7 @@ describe("processPipelineFinalize (#3167, #2703)", () => {
       vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
         binaryOverrideWarning: vi.fn(),
         checkBinaryOverrides: vi.fn(() => []),
+        isBinarySpawnFailure,
         probeFailureLevel: vi.fn(() => "warn"),
       }));
     });
@@ -2747,6 +2802,7 @@ describe("startWorkers sharp.concurrency wiring (#2708)", () => {
       vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
         binaryOverrideWarning: vi.fn(),
         checkBinaryOverrides: vi.fn(() => []),
+        isBinarySpawnFailure,
         probeFailureLevel: vi.fn(() => "warn"),
       }));
     });
@@ -2919,6 +2975,7 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
         vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
           binaryOverrideWarning: vi.fn(),
           checkBinaryOverrides: vi.fn(() => []),
+          isBinarySpawnFailure,
           probeFailureLevel: vi.fn(() => "warn"),
         }));
       });
@@ -3066,6 +3123,7 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
       vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
         binaryOverrideWarning: vi.fn(),
         checkBinaryOverrides: vi.fn(() => []),
+        isBinarySpawnFailure,
         probeFailureLevel: vi.fn(() => "warn"),
       }));
     });

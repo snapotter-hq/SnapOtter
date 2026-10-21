@@ -1026,4 +1026,97 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
       }
     });
   });
+
+  it("settles a worker-side qpdf binary spawn failure on repair-pdf as an unrecoverable 503 ENGINE_UNAVAILABLE without leaking the binary path (#2937)", async () => {
+    const errorSpy = vi.spyOn(logger, "error");
+    let calls = 0;
+    const config = getToolConfig("repair-pdf");
+    if (!config?.processV2) throw new Error("repair-pdf has no processV2");
+    const real = config.processV2;
+    const spawnOom = Object.assign(new Error("spawn /usr/bin/qpdf ENOMEM"), {
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/usr/bin/qpdf",
+      signal: "SIGKILL" as const,
+    });
+    config.processV2 = async () => {
+      calls++;
+      throw spawnOom;
+    };
+    restoreWorker = () => {
+      config.processV2 = real;
+    };
+
+    try {
+      const clientJobId = randomUUID();
+      const res = await post("/api/v1/tools/pdf/repair-pdf", [
+        pdfPart("damaged.pdf"),
+        { name: "settings", content: "{}" },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      expect(res.statusCode, res.body).toBe(503);
+      expect(res.json()).toEqual({
+        code: "ENGINE_UNAVAILABLE",
+        error:
+          "Processing is unavailable on this server because a required engine binary could not be started.",
+      });
+      expect(res.body).not.toContain("/usr/bin/qpdf");
+      expect(calls).toBe(1);
+
+      const [aliasRow] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+      expect(aliasRow?.error).toEqual({
+        code: "ENGINE_UNAVAILABLE",
+        httpStatus: 503,
+        message:
+          "Processing is unavailable on this server because a required engine binary could not be started.",
+      });
+      const artifactId =
+        (aliasRow?.settings as { artifactJobId?: string } | null)?.artifactJobId ?? clientJobId;
+      const [artifactRow] = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, artifactId));
+      expect(artifactRow?.attempts).toBe(1);
+      expect(artifactRow?.error).toEqual({
+        code: "ENGINE_UNAVAILABLE",
+        httpStatus: 503,
+        message:
+          "Processing is unavailable on this server because a required engine binary could not be started.",
+      });
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jobId: artifactId,
+          toolId: "repair-pdf",
+          err: expect.objectContaining({
+            name: "SafeError",
+            code: "ENGINE_UNAVAILABLE",
+            statusCode: 503,
+            cause: spawnOom,
+          }),
+        }),
+        "tool job failed",
+      );
+      await vi.waitFor(() => {
+        expect(engineReports("repair-pdf")).toHaveLength(1);
+      });
+
+      const replay = await app.inject({
+        method: "GET",
+        url: `/api/v1/jobs/${clientJobId}/progress`,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const frame = JSON.parse(replay.body.match(/data: (.+)/)?.[1] ?? "{}");
+      expect(frame).toMatchObject({
+        phase: "failed",
+        code: "ENGINE_UNAVAILABLE",
+        httpStatus: 503,
+        error:
+          "Processing is unavailable on this server because a required engine binary could not be started.",
+      });
+      expect(JSON.stringify(frame)).not.toContain("/usr/bin/qpdf");
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
 });

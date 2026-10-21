@@ -20,6 +20,7 @@ import {
   isToolInputError,
 } from "@snapotter/shared";
 import { analyticsEnabled, sentryDiagnostic } from "./analytics-gate.js";
+import { isBinarySpawnFailure } from "./binary-overrides.js";
 
 export type ErrorClass = "expected" | "operational" | "bug";
 
@@ -127,6 +128,7 @@ export function classifyError(rawErr: unknown, source?: ReportContext["source"])
   if (connectivityClass(err)) return "operational";
   if (isEnvironmentalDbError(err)) return "operational";
   if (isOperationalErrno(err)) return "operational";
+  if (isBinarySpawnFailure(err)) return "operational";
   if (
     e?.name === "ReplyError" &&
     typeof e.message === "string" &&
