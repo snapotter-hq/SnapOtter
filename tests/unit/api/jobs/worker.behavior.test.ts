@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 const objectStorageMocks = vi.hoisted(() => ({
   copyObjectToFile: vi.fn(),
@@ -39,11 +39,15 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
     await vi.importActual<typeof import("../../../../packages/shared/src/tool-errors.js")>(
       "../../../../packages/shared/src/tool-errors.js",
     );
+  const { IMAGE_EXT_TO_MIME } = await vi.importActual<
+    typeof import("../../../../packages/shared/src/image-mime.js")
+  >("../../../../packages/shared/src/image-mime.js");
   vi.doMock("@snapotter/shared", () => ({
     SafeError,
     isSafeMessageError,
     isToolInputError,
     hasServerErrorStatus,
+    IMAGE_EXT_TO_MIME,
     ANALYTICS_EVENTS: {},
     TOOLS: [],
     // pdf-producer.ts builds its scrub set from COMPRESS_PRESETS at load.
@@ -2265,7 +2269,7 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
   });
 });
 
-describe("processPipelineFinalize atomic failure commits (#3167)", () => {
+describe("processPipelineFinalize (#3167, #2703)", () => {
   afterEach(() => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
@@ -2567,5 +2571,123 @@ describe("processPipelineFinalize atomic failure commits (#3167)", () => {
         steps: [],
       },
     });
+  });
+
+  it.each([
+    ["scan.tif", "edit-metadata", "image/tiff", "outputs/pf-ok/preview.webp"],
+    ["photo.jxl", "convert", "image/jxl", "outputs/pf-ok/preview.webp"],
+    ["book.epub", "to-epub", "application/epub+zip", undefined],
+    ["bundle.zip", "create-zip", "application/zip", undefined],
+  ])(
+    "resolves %s to %s on the pipeline-finalize success path and passes it to generatePreview (#2703)",
+    async (outFilename, toolId, expectedContentType, previewRef) => {
+      const generatePreviewMock = vi.fn().mockResolvedValue(previewRef);
+      const { processor, updateSingleFileProgressAtomicallyMock } =
+        await setupPipelineFinalizeProcessor({
+          "pf-ok-s0": {
+            id: "pf-ok-s0",
+            status: "completed",
+            toolId,
+            bytesIn: 512,
+            bytesOut: 256,
+            outputRefs: [`outputs/pf-ok-s0/${outFilename}`],
+            progress: { percent: 100, stage: "complete" },
+          },
+        });
+      const postprocessMod = await import("../../../../apps/api/src/jobs/postprocess.js");
+      (postprocessMod.generatePreview as ReturnType<typeof vi.fn>).mockImplementation(
+        generatePreviewMock,
+      );
+      const outBytes = Buffer.from(`bytes-${outFilename}`);
+      objectStorageMocks.getObjectBuffer.mockResolvedValueOnce(outBytes);
+      objectStorageMocks.putObject.mockResolvedValue(undefined);
+      updateSingleFileProgressAtomicallyMock.mockResolvedValueOnce(undefined);
+
+      const res = await processor({
+        id: "pf-ok",
+        name: "pipeline-finalize",
+        data: {
+          kind: "pipeline-finalize",
+          jobId: "pf-ok",
+          toolId: "pipeline",
+          userId: null,
+          pool: "image",
+          totalSteps: 1,
+          inputRefs: [],
+          filename: outFilename,
+          settings: {},
+        },
+      });
+
+      expect(generatePreviewMock).toHaveBeenCalledWith(
+        outBytes,
+        expectedContentType,
+        "pf-ok",
+        toolId,
+      );
+      expect(res).toMatchObject({
+        outputRefs: [`outputs/pf-ok/${outFilename}`],
+        filename: outFilename,
+        contentType: expectedContentType,
+        originalSize: 512,
+        processedSize: 256,
+        previewRef,
+      });
+    },
+  );
+});
+
+describe("contentTypeForFilename (#2703)", () => {
+  let contentTypeForFilename: (name: string) => string;
+
+  beforeAll(async () => {
+    ({ contentTypeForFilename } = await loadWorker());
+  });
+
+  it.each([
+    ["scan.tif", "image/tiff"],
+    ["SCAN.TIF", "image/tiff"],
+    ["photo.jxl", "image/jxl"],
+    ["favicon.ico", "image/x-icon"],
+    ["cursor.cur", "image/x-icon"],
+    ["design.psd", "image/vnd.adobe.photoshop"],
+    ["tile.jp2", "image/jp2"],
+    ["sprite.qoi", "image/qoi"],
+    ["frame.ppm", "image/x-portable-pixmap"],
+    ["texture.tga", "image/x-tga"],
+    ["raw.dng", "image/x-adobe-dng"],
+    ["vector.svgz", "image/svg+xml"],
+    ["book.epub", "application/epub+zip"],
+    ["report.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+    ["sheet.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+    ["deck.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"],
+    ["notes.odt", "application/vnd.oasis.opendocument.text"],
+    ["table.ods", "application/vnd.oasis.opendocument.spreadsheet"],
+    ["slides.odp", "application/vnd.oasis.opendocument.presentation"],
+    ["letter.rtf", "application/rtf"],
+    ["page.html", "text/html"],
+    ["page.htm", "text/html"],
+    ["readme.md", "text/markdown"],
+    ["readme.markdown", "text/markdown"],
+    ["plain.txt", "text/plain"],
+    ["data.csv", "text/csv"],
+    ["data.tsv", "text/tab-separated-values"],
+    ["config.json", "application/json"],
+    ["feed.xml", "application/xml"],
+    ["config.yaml", "application/yaml"],
+    ["config.yml", "application/yaml"],
+    ["archive.zip", "application/zip"],
+    ["captions.srt", "application/x-subrip"],
+    ["captions.vtt", "text/vtt"],
+    ["clip.m4v", "video/mp4"],
+    ["stream.ts", "video/mp2t"],
+    ["clip.ogv", "video/ogg"],
+    ["voice.opus", "audio/opus"],
+    ["track.aiff", "audio/aiff"],
+    ["unknown.xyz", "application/octet-stream"],
+    ["output", "application/octet-stream"],
+    ["pdf", "application/octet-stream"],
+  ])("maps %s to %s", (filename, expected) => {
+    expect(contentTypeForFilename(filename)).toBe(expected);
   });
 });

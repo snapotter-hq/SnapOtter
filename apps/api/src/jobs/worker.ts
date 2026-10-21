@@ -39,6 +39,7 @@ import {
   getBundleForTool,
   getOptionalBundleForTool,
   hasServerErrorStatus,
+  IMAGE_EXT_TO_MIME,
   isSafeMessageError,
   isToolInputError,
   ONBOARDING_FIRST_PROCESSED_KEY,
@@ -1310,35 +1311,61 @@ async function processPipelineStep(job: Job<ToolJobData>): Promise<ToolJobResult
  * child outcome for batch progress tracking.
  */
 /** Best-effort content type from a filename extension (for preview dispatch). */
-function contentTypeForFilename(name: string): string {
-  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+export function contentTypeForFilename(name: string): string {
+  const dot = name.lastIndexOf(".");
+  const ext = dot >= 0 ? name.slice(dot + 1).toLowerCase() : "";
   const map: Record<string, string> = {
     pdf: "application/pdf",
+    epub: "application/epub+zip",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    odt: "application/vnd.oasis.opendocument.text",
+    rtf: "application/rtf",
+    pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    odp: "application/vnd.oasis.opendocument.presentation",
+    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ods: "application/vnd.oasis.opendocument.spreadsheet",
+    html: "text/html",
+    htm: "text/html",
+    md: "text/markdown",
+    markdown: "text/markdown",
+    txt: "text/plain",
+    csv: "text/csv",
+    tsv: "text/tab-separated-values",
+    json: "application/json",
+    xml: "application/xml",
+    yaml: "application/yaml",
+    yml: "application/yaml",
+    zip: "application/zip",
+    srt: "application/x-subrip",
+    vtt: "text/vtt",
     mp4: "video/mp4",
+    m4v: "video/mp4",
     webm: "video/webm",
     mov: "video/quicktime",
     mkv: "video/x-matroska",
     avi: "video/x-msvideo",
+    "3gp": "video/3gpp",
+    flv: "video/x-flv",
+    wmv: "video/x-ms-wmv",
+    mpg: "video/mpeg",
+    mpeg: "video/mpeg",
+    ts: "video/mp2t",
+    mts: "video/mp2t",
+    m2ts: "video/mp2t",
+    ogv: "video/ogg",
     mp3: "audio/mpeg",
     wav: "audio/wav",
     ogg: "audio/ogg",
     flac: "audio/flac",
     m4a: "audio/mp4",
     aac: "audio/aac",
-    png: "image/png",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    gif: "image/gif",
-    webp: "image/webp",
-    avif: "image/avif",
-    svg: "image/svg+xml",
-    bmp: "image/bmp",
-    tiff: "image/tiff",
-    heic: "image/heic",
-    heif: "image/heif",
-    txt: "text/plain",
+    opus: "audio/opus",
+    wma: "audio/x-ms-wma",
+    aiff: "audio/aiff",
+    amr: "audio/amr",
+    ac3: "audio/ac3",
   };
-  return map[ext] ?? "application/octet-stream";
+  return map[ext] ?? IMAGE_EXT_TO_MIME[ext] ?? "application/octet-stream";
 }
 
 /**
