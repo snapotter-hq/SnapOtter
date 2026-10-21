@@ -1851,11 +1851,17 @@ describe("useCollageStore", () => {
     expect(useCollageStore.getState().backgroundColor).toBe("transparent");
   });
 
-  it("setBgPreset with custom does not overwrite backgroundColor", () => {
+  it("setBgPreset with custom does not overwrite backgroundColor or clear result metadata", () => {
     useCollageStore.getState().setBackgroundColor("#123456");
+    useCollageStore.getState().setResult("blob:result", 5000, 10000, "job-123");
     useCollageStore.getState().setBgPreset("custom");
-    expect(useCollageStore.getState().bgPreset).toBe("custom");
-    expect(useCollageStore.getState().backgroundColor).toBe("#123456");
+    const s = useCollageStore.getState();
+    expect(s.bgPreset).toBe("custom");
+    expect(s.backgroundColor).toBe("#123456");
+    expect(s.resultUrl).toBe("blob:result");
+    expect(s.resultSize).toBe(5000);
+    expect(s.originalSize).toBe(10000);
+    expect(s.jobId).toBe("job-123");
   });
 
   it("setAspectRatio updates aspect ratio", () => {
@@ -1880,9 +1886,73 @@ describe("useCollageStore", () => {
     expect(useCollageStore.getState().selectedCell).toBeNull();
   });
 
-  it("setPhase updates phase", () => {
+  it("setPhase updates phase and clears previous result metadata when starting processing (#3217)", () => {
+    useCollageStore.getState().setResult("blob:result", 5000, 10000, "job-123");
+    useCollageStore.getState().setPhase("editing");
+    expect(useCollageStore.getState().phase).toBe("editing");
+    expect(useCollageStore.getState().resultUrl).toBe("blob:result");
+    expect(useCollageStore.getState().resultSize).toBe(5000);
+    expect(useCollageStore.getState().originalSize).toBe(10000);
+    expect(useCollageStore.getState().jobId).toBe("job-123");
+
     useCollageStore.getState().setPhase("processing");
-    expect(useCollageStore.getState().phase).toBe("processing");
+    const s = useCollageStore.getState();
+    expect(s.phase).toBe("processing");
+    expect(s.resultUrl).toBeNull();
+    expect(s.resultSize).toBeNull();
+    expect(s.originalSize).toBeNull();
+    expect(s.jobId).toBeNull();
+  });
+
+  it("clears resultUrl, resultSize, originalSize, and jobId across setting and image mutators (#3217)", () => {
+    const file1 = new File(["a"], "a.png", { type: "image/png" });
+    const file2 = new File(["b"], "b.png", { type: "image/png" });
+    const file3 = new File(["c"], "c.png", { type: "image/png" });
+    useCollageStore.getState().addImages([file1, file2]);
+
+    const mutators: Array<[string, () => void]> = [
+      ["addImages", () => useCollageStore.getState().addImages([file3])],
+      ["removeImage", () => useCollageStore.getState().removeImage(0)],
+      ["clearImages", () => useCollageStore.getState().clearImages()],
+      ["setTemplateId", () => useCollageStore.getState().setTemplateId("3-h-equal")],
+      ["setCellAssignment", () => useCollageStore.getState().setCellAssignment(0, 1)],
+      ["swapCells", () => useCollageStore.getState().swapCells(0, 1)],
+      ["setCellTransform", () => useCollageStore.getState().setCellTransform(0, { zoom: 1.5 })],
+      ["resetCellTransform", () => useCollageStore.getState().resetCellTransform(0)],
+      ["setGap", () => useCollageStore.getState().setGap(16)],
+      ["setCornerRadius", () => useCollageStore.getState().setCornerRadius(8)],
+      ["setBackgroundColor", () => useCollageStore.getState().setBackgroundColor("#123456")],
+      ["setBgPreset(black)", () => useCollageStore.getState().setBgPreset("black")],
+      ["setAspectRatio", () => useCollageStore.getState().setAspectRatio("16:9")],
+      ["setOutputFormat", () => useCollageStore.getState().setOutputFormat("webp")],
+      ["setQuality", () => useCollageStore.getState().setQuality(80)],
+      ["reset", () => useCollageStore.getState().reset()],
+    ];
+
+    for (const [name, mutate] of mutators) {
+      if (useCollageStore.getState().images.length < 2) {
+        useCollageStore.getState().addImages([file1, file2]);
+      }
+      useCollageStore.getState().setResult("blob:result", 5000, 10000, "job-123");
+      mutate();
+      const s = useCollageStore.getState();
+      expect(
+        {
+          mutator: name,
+          resultUrl: s.resultUrl,
+          resultSize: s.resultSize,
+          originalSize: s.originalSize,
+          jobId: s.jobId,
+        },
+        `${name} should clear all result metadata`,
+      ).toEqual({
+        mutator: name,
+        resultUrl: null,
+        resultSize: null,
+        originalSize: null,
+        jobId: null,
+      });
+    }
   });
 
   it("setProgress updates progress", () => {

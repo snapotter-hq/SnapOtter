@@ -307,6 +307,51 @@ describe("collage: a malformed sync answer apart from our own store write", () =
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
   });
 
+  it("clears previous download link and size summary when starting a second run or editing settings (#3217)", async () => {
+    render(<CollageSettings />);
+
+    (await submit("collage-submit")).respond(200, GOOD_BODY);
+
+    await waitFor(() => expect(screen.getByTestId("collage-download")).toBeInTheDocument(), {
+      timeout: 3000,
+    });
+    expect(screen.getByText(/Input total:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Collage:/i)).toBeInTheDocument();
+
+    // Editing a setting clears both the download link and the size readout
+    act(() => {
+      useCollageStore.getState().setGap(16);
+    });
+    expect(screen.queryByTestId("collage-download")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Input total:/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Collage:/i)).not.toBeInTheDocument();
+
+    // Run again to restore a completed result, then start a second run that fails
+    FakeXhr.instances = [];
+    (await submit("collage-submit")).respond(200, GOOD_BODY);
+    await waitFor(() => expect(screen.getByTestId("collage-download")).toBeInTheDocument(), {
+      timeout: 3000,
+    });
+
+    FakeXhr.instances = [];
+    const secondXhr = await submit("collage-submit");
+    // While the second run is in flight, previous result metadata and UI are cleared
+    expect(screen.queryByTestId("collage-download")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Input total:/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Collage:/i)).not.toBeInTheDocument();
+    expect(useCollageStore.getState().resultUrl).toBeNull();
+    expect(useCollageStore.getState().resultSize).toBeNull();
+    expect(useCollageStore.getState().originalSize).toBeNull();
+    expect(useCollageStore.getState().jobId).toBeNull();
+
+    // If the second run fails, stale result link and sizes stay hidden
+    secondXhr.respondRaw(500, JSON.stringify({ error: "Server exploded" }));
+    await waitFor(() => expect(screen.getByText("Server exploded")).toBeInTheDocument());
+    expect(screen.queryByTestId("collage-download")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Input total:/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Collage:/i)).not.toBeInTheDocument();
+  });
+
   it.each([
     ["a body that does not parse", HTML_BODY, NOT_AN_OBJECT],
     ["a JSON array body", "[]", NOT_AN_OBJECT],

@@ -512,7 +512,7 @@ export function CollageSettings() {
       )}
 
       {/* Size info */}
-      {originalSize != null && resultSize != null && (
+      {resultUrl && originalSize != null && resultSize != null && (
         <div className="text-xs text-muted-foreground space-y-0.5">
           <p>
             {format(t.toolSettings.collage.inputTotalKb, {

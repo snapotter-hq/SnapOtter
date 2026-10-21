@@ -83,6 +83,13 @@ interface CollageState {
 
 const DEFAULT_TRANSFORM: CellTransform = { panX: 0, panY: 0, zoom: 1, objectFit: "cover" };
 
+const CLEARED_RESULT = {
+  resultUrl: null,
+  resultSize: null,
+  originalSize: null,
+  jobId: null,
+} as const;
+
 let nextImageId = 0;
 let activeCollageAbort: (() => void) | null = null;
 let collageRunId = 0;
@@ -132,11 +139,8 @@ export const useCollageStore = create<CollageState>((set, get) => ({
   selectedCell: null,
   phase: "upload",
   progress: 0,
-  resultUrl: null,
-  resultSize: null,
-  originalSize: null,
+  ...CLEARED_RESULT,
   error: null,
-  jobId: null,
 
   addImages: (files) => {
     cancelActiveCollageRun();
@@ -158,8 +162,7 @@ export const useCollageStore = create<CollageState>((set, get) => ({
       cellAssignments: assignments,
       cellTransforms: {},
       phase: "editing",
-      resultUrl: null,
-      resultSize: null,
+      ...CLEARED_RESULT,
       error: null,
     });
 
@@ -203,7 +206,7 @@ export const useCollageStore = create<CollageState>((set, get) => ({
       cellAssignments: assignments,
       cellTransforms: {},
       phase: "editing",
-      resultUrl: null,
+      ...CLEARED_RESULT,
     });
   },
 
@@ -219,8 +222,7 @@ export const useCollageStore = create<CollageState>((set, get) => ({
       cellAssignments: [],
       cellTransforms: {},
       phase: "upload",
-      resultUrl: null,
-      resultSize: null,
+      ...CLEARED_RESULT,
       error: null,
       selectedCell: null,
     });
@@ -231,14 +233,19 @@ export const useCollageStore = create<CollageState>((set, get) => ({
     const template = COLLAGE_TEMPLATES.find((t) => t.id === id);
     if (!template) return;
     const assignments = buildDefaultAssignments(state.images.length, template.cells.length);
-    set({ templateId: id, cellAssignments: assignments, cellTransforms: {}, resultUrl: null });
+    set({
+      templateId: id,
+      cellAssignments: assignments,
+      cellTransforms: {},
+      ...CLEARED_RESULT,
+    });
   },
 
   setCellAssignment: (cellIndex, imageIndex) => {
     const state = get();
     const newAssignments = [...state.cellAssignments];
     newAssignments[cellIndex] = imageIndex;
-    set({ cellAssignments: newAssignments, resultUrl: null });
+    set({ cellAssignments: newAssignments, ...CLEARED_RESULT });
   },
 
   swapCells: (a, b) => {
@@ -251,7 +258,11 @@ export const useCollageStore = create<CollageState>((set, get) => ({
     const tmpT = newTransforms[a];
     newTransforms[a] = newTransforms[b];
     newTransforms[b] = tmpT;
-    set({ cellAssignments: newAssignments, cellTransforms: newTransforms, resultUrl: null });
+    set({
+      cellAssignments: newAssignments,
+      cellTransforms: newTransforms,
+      ...CLEARED_RESULT,
+    });
   },
 
   setCellTransform: (cellIndex, transform) => {
@@ -262,7 +273,7 @@ export const useCollageStore = create<CollageState>((set, get) => ({
         ...state.cellTransforms,
         [cellIndex]: { ...current, ...transform },
       },
-      resultUrl: null,
+      ...CLEARED_RESULT,
     });
   },
 
@@ -270,12 +281,12 @@ export const useCollageStore = create<CollageState>((set, get) => ({
     const state = get();
     const newTransforms = { ...state.cellTransforms };
     delete newTransforms[cellIndex];
-    set({ cellTransforms: newTransforms, resultUrl: null });
+    set({ cellTransforms: newTransforms, ...CLEARED_RESULT });
   },
 
-  setGap: (v) => set({ gap: v, resultUrl: null }),
-  setCornerRadius: (v) => set({ cornerRadius: v, resultUrl: null }),
-  setBackgroundColor: (color) => set({ backgroundColor: color, resultUrl: null }),
+  setGap: (v) => set({ gap: v, ...CLEARED_RESULT }),
+  setCornerRadius: (v) => set({ cornerRadius: v, ...CLEARED_RESULT }),
+  setBackgroundColor: (color) => set({ backgroundColor: color, ...CLEARED_RESULT }),
   setBgPreset: (preset) => {
     const colors: Record<string, string> = {
       white: "#FFFFFF",
@@ -285,14 +296,14 @@ export const useCollageStore = create<CollageState>((set, get) => ({
     if (preset === "custom") {
       set({ bgPreset: preset });
     } else {
-      set({ bgPreset: preset, backgroundColor: colors[preset], resultUrl: null });
+      set({ bgPreset: preset, backgroundColor: colors[preset], ...CLEARED_RESULT });
     }
   },
-  setAspectRatio: (v) => set({ aspectRatio: v, resultUrl: null }),
-  setOutputFormat: (v) => set({ outputFormat: v, resultUrl: null }),
-  setQuality: (v) => set({ quality: v, resultUrl: null }),
+  setAspectRatio: (v) => set({ aspectRatio: v, ...CLEARED_RESULT }),
+  setOutputFormat: (v) => set({ outputFormat: v, ...CLEARED_RESULT }),
+  setQuality: (v) => set({ quality: v, ...CLEARED_RESULT }),
   setSelectedCell: (v) => set({ selectedCell: v }),
-  setPhase: (v) => set({ phase: v }),
+  setPhase: (v) => set(v === "processing" ? { phase: v, ...CLEARED_RESULT } : { phase: v }),
   setProgress: (v) => set({ progress: v }),
   setResult: (url, size, originalSize, jobId) =>
     set({ resultUrl: url, resultSize: size, originalSize, jobId, phase: "result", error: null }),
@@ -320,11 +331,8 @@ export const useCollageStore = create<CollageState>((set, get) => ({
       selectedCell: null,
       phase: "upload",
       progress: 0,
-      resultUrl: null,
-      resultSize: null,
-      originalSize: null,
+      ...CLEARED_RESULT,
       error: null,
-      jobId: null,
     });
   },
 }));
