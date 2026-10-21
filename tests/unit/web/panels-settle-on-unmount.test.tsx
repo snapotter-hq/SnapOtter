@@ -1212,9 +1212,18 @@ describe("own-store tool handlers abort and ignore late completions on store res
 
   it("collage: aborts XHR and post-XHR delay on useCollageStore.reset() or clearImages() and ignores late completion", async () => {
     useCollageStore.getState().addImages([image("one.png"), image("two.png")]);
+    useCollageStore.getState().setError("Prior error");
     render(<CollageSettings />);
+    expect(screen.getByText("Prior error")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("collage-submit"));
     expect(FakeXhr.instances).toHaveLength(1);
+    expect(useCollageStore.getState().phase).toBe("processing");
+    expect(useCollageStore.getState().error).toBeNull();
+    expect(screen.queryByText("Prior error")).not.toBeInTheDocument();
+    expect(screen.getByTestId("collage-submit")).toBeDisabled();
+    expect(screen.getByTestId("collage-submit")).toHaveTextContent(
+      en.toolSettings.collage.creating,
+    );
     const xhr = FakeXhr.instances[0];
 
     act(() => {

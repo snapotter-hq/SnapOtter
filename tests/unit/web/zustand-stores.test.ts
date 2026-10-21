@@ -1909,6 +1909,20 @@ describe("useCollageStore", () => {
     expect(s.phase).toBe("editing");
   });
 
+  it("setError(null) and setError('') clear error without overwriting phase (#2712)", () => {
+    useCollageStore.getState().setError("Previous failure");
+    useCollageStore.getState().setPhase("processing");
+    useCollageStore.getState().setError(null);
+    expect(useCollageStore.getState().error).toBeNull();
+    expect(useCollageStore.getState().phase).toBe("processing");
+
+    useCollageStore.getState().setError("Another failure");
+    useCollageStore.getState().setPhase("processing");
+    useCollageStore.getState().setError("");
+    expect(useCollageStore.getState().error).toBeNull();
+    expect(useCollageStore.getState().phase).toBe("processing");
+  });
+
   it("reset revokes all blob URLs and restores initial state", () => {
     const file1 = new File(["a"], "a.png", { type: "image/png" });
     useCollageStore.getState().addImages([file1]);

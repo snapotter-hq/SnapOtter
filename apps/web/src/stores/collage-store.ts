@@ -296,7 +296,7 @@ export const useCollageStore = create<CollageState>((set, get) => ({
   setProgress: (v) => set({ progress: v }),
   setResult: (url, size, originalSize, jobId) =>
     set({ resultUrl: url, resultSize: size, originalSize, jobId, phase: "result", error: null }),
-  setError: (e) => set({ error: e, phase: "editing" }),
+  setError: (e) => set(e ? { error: e, phase: "editing" } : { error: null }),
   reset: () => {
     cancelActiveCollageRun();
     const state = get();
