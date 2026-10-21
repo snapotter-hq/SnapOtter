@@ -2459,6 +2459,7 @@ export function ApiKeysSection() {
           onChange={(e) => setKeyName(e.target.value)}
           placeholder={t.settings.apiKeys.keyNamePlaceholder}
           aria-label={t.settings.apiKeys.keyNamePlaceholder}
+          maxLength={100}
           className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground w-48"
         />
         <button
@@ -2526,7 +2527,9 @@ export function ApiKeysSection() {
             value={expiresAt}
             onChange={(e) => setExpiresAt(e.target.value)}
             className="px-2 py-1 rounded border border-border bg-background text-xs text-foreground"
-            min={new Date().toISOString().slice(0, 16)}
+            min={new Date(Date.now() - new Date().getTimezoneOffset() * 60_000)
+              .toISOString()
+              .slice(0, 16)}
           />
         </label>
         {expiresAt && (

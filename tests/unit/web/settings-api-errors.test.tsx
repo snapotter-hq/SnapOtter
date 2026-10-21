@@ -946,6 +946,31 @@ describe("API keys (#2713)", () => {
     await expectShown(de.common.somethingWentWrong);
     expect(console.warn).toHaveBeenCalledWith(expect.any(String), delErr);
   });
+
+  it("caps the key-name field at the server's 100-character limit (#3201)", async () => {
+    renderDe(<ApiKeysSection />);
+    const input = await screen.findByPlaceholderText(s.apiKeys.keyNamePlaceholder);
+    expect(input).toHaveAttribute("maxLength", "100");
+  });
+
+  it.each([
+    ["ahead of UTC (UTC+4)", "2026-07-15T22:30:45.000Z", -240, "2026-07-16T02:30"],
+    ["behind UTC (UTC-5)", "2026-07-15T02:30:45.000Z", 300, "2026-07-14T21:30"],
+  ])(
+    "formats the expiration datetime-local min in local wall-clock time when %s (#3201)",
+    async (_label, isoNow, tzOffsetMinutes, expectedMin) => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        vi.setSystemTime(new Date(isoNow));
+        vi.spyOn(Date.prototype, "getTimezoneOffset").mockReturnValue(tzOffsetMinutes);
+        renderDe(<ApiKeysSection />);
+        const expiresInput = await screen.findByLabelText(s.apiKeys.expiresLabel);
+        expect(expiresInput).toHaveAttribute("min", expectedMin);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
 });
 
 describe("Tools: save disabled tools (#2713)", () => {
