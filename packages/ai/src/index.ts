@@ -9,7 +9,7 @@ export {
   removeBackgroundAnimated,
   resolveGifBgFormat,
 } from "./background-removal-animated.js";
-export type { DispatcherStatus } from "./bridge.js";
+export type { DispatcherRecycleReason, DispatcherStatus } from "./bridge.js";
 export {
   getDispatcherStatus,
   getDocsDispatcher,

@@ -1205,6 +1205,15 @@ describe("Health & Config", () => {
       expect(body.database).toBe("ok");
       expect(body.storage).toBeDefined();
       expect(body.queue).toBeDefined();
+      expect(body.ai?.dispatcher).toMatchObject({
+        running: expect.any(Boolean),
+        ready: expect.any(Boolean),
+        failed: expect.any(Boolean),
+        gpu: expect.any(Boolean),
+        consecutiveCrashes: expect.any(Number),
+        consecutiveScriptFailures: expect.any(Number),
+        lastRecycleReason: null,
+      });
     });
 
     it("rejects unauthenticated requests", async () => {

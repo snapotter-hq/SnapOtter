@@ -140,3 +140,81 @@ def test_main_falls_back_to_all_false_gpu_frameworks_when_probe_raises(monkeypat
     }
 
 
+def test_main_recycles_immediately_on_cuda_or_ort_failure(monkeypatch, capsys):
+    import io
+    import gpu
+
+    monkeypatch.setattr(gpu, "gpu_available", lambda: True)
+    monkeypatch.setattr(
+        gpu,
+        "gpu_frameworks_available",
+        lambda: {"torch": False, "onnx": True, "ctranslate2": False},
+        raising=False,
+    )
+    calls = []
+
+    def _fake_run(script_name, args):
+        calls.append((script_name, args))
+        return (
+            json.dumps(
+                {
+                    "success": False,
+                    "error": "[ONNXRuntimeError] : 1 : FAIL : CUDA failure 999: unknown error",
+                }
+            ),
+            0,
+        )
+
+    monkeypatch.setattr(dispatcher, "_run_script_main", _fake_run)
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        io.StringIO(
+            json.dumps({"id": "1", "script": "remove_bg", "args": ["a"]})
+            + "\n"
+            + json.dumps({"id": "2", "script": "remove_bg", "args": ["b"]})
+            + "\n"
+        ),
+    )
+    dispatcher.main()
+
+    captured = capsys.readouterr()
+    assert len(calls) == 1
+    stdout_lines = [json.loads(line) for line in captured.out.splitlines() if line.strip()]
+    assert len(stdout_lines) == 1
+    assert stdout_lines[0]["id"] == "1"
+    assert "shutting down for restart" in captured.err
+
+
+def test_main_recycles_after_consecutive_script_failures(monkeypatch, capsys):
+    import io
+    import gpu
+
+    monkeypatch.setattr(gpu, "gpu_available", lambda: False)
+    calls = []
+
+    def _fake_run(script_name, args):
+        calls.append((script_name, args))
+        return json.dumps({"success": False, "error": "corrupt input"}), 1
+
+    monkeypatch.setattr(dispatcher, "_run_script_main", _fake_run)
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        io.StringIO(
+            "".join(
+                json.dumps({"id": str(i), "script": "doc_health", "args": []}) + "\n"
+                for i in range(5)
+            )
+        ),
+    )
+    dispatcher.main()
+
+    captured = capsys.readouterr()
+    assert len(calls) == 3
+    stdout_lines = [json.loads(line) for line in captured.out.splitlines() if line.strip()]
+    assert [r["id"] for r in stdout_lines] == ["0", "1", "2"]
+    assert "shutting down for restart" in captured.err
+
+
+

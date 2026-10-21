@@ -369,4 +369,203 @@ assert main_payload == {
     "error": "An image background needs a background image",
 }, main_payload
 
+
+def _verify_dispatcher_failure_recycling():
+    import io
+
+    # 1. Immediate recycle on CUDA / ORT context-poison signatures, both exitCode=1
+    #    and exitCode=0 with {"success": False, "error": ...} (the remove_bg.py path).
+    for cuda_msg, exit_code in (
+        ("[ONNXRuntimeError] : 1 : FAIL : CUDA failure 999: unknown error", 0),
+        ("[ONNXRuntimeError] : 1 : FAIL : CUDA failure 999: unknown error", 1),
+        ("RuntimeError: cudaErrorIllegalAddress: an illegal memory access was encountered", 1),
+        ("RuntimeError: cuDNN error: CUDNN_STATUS_EXECUTION_FAILED", 1),
+        ("ORT_RUNTIME_EXCEPTION: context poisoned", 1),
+        ("RuntimeError: CUDA error: device-side assert triggered", 1),
+    ):
+        calls = []
+
+        def _fake_cuda_run(script_name, args, _msg=cuda_msg, _code=exit_code):
+            calls.append((script_name, args))
+            return json.dumps({"success": False, "error": _msg}), _code
+
+        orig_run = dispatcher._run_script_main
+        orig_stdin = sys.stdin
+        orig_stdout = sys.stdout
+        orig_stderr = sys.stderr
+        try:
+            dispatcher._run_script_main = _fake_cuda_run
+            sys.stdin = io.StringIO(
+                json.dumps({"id": "req-1", "script": "doc_health", "args": ["first"]})
+                + "\n"
+                + json.dumps({"id": "req-2", "script": "doc_health", "args": ["second"]})
+                + "\n"
+            )
+            out_buf = io.StringIO()
+            err_buf = io.StringIO()
+            sys.stdout = out_buf
+            sys.stderr = err_buf
+            dispatcher.main()
+        finally:
+            dispatcher._run_script_main = orig_run
+            sys.stdin = orig_stdin
+            sys.stdout = orig_stdout
+            sys.stderr = orig_stderr
+
+        assert len(calls) == 1, f"Expected dispatcher to recycle after 1st CUDA failure ({cuda_msg}), got {calls}"
+        responses = [json.loads(line) for line in out_buf.getvalue().splitlines() if line.strip()]
+        assert len(responses) == 1 and responses[0]["id"] == "req-1", responses
+        assert "shutting down for restart" in err_buf.getvalue(), err_buf.getvalue()
+
+    # 2. Recycle after 3 consecutive non-CUDA script failures, and reset counter on success.
+    seq_outcomes = [
+        (json.dumps({"success": False, "error": "bad input 1"}), 1),
+        (json.dumps({"success": False, "error": "bad input 2"}), 0),
+        (json.dumps({"success": True}), 0),  # resets consecutive failure count to 0
+        (json.dumps({"success": False, "error": "bad input 3"}), 1),
+        (json.dumps({"success": False, "error": "bad input 4"}), 1),
+        (json.dumps({"success": False, "error": "bad input 5"}), 0),  # 3rd consecutive failure -> recycle
+        (json.dumps({"success": True}), 0),  # must not be reached in this loop
+    ]
+    seq_calls = []
+
+    def _fake_seq_run(script_name, args):
+        idx = len(seq_calls)
+        seq_calls.append((script_name, args))
+        return seq_outcomes[idx]
+
+    orig_run = dispatcher._run_script_main
+    orig_stdin = sys.stdin
+    orig_stdout = sys.stdout
+    orig_stderr = sys.stderr
+    try:
+        dispatcher._run_script_main = _fake_seq_run
+        sys.stdin = io.StringIO(
+            "".join(
+                json.dumps({"id": f"r-{i}", "script": "doc_health", "args": [i]}) + "\n"
+                for i in range(len(seq_outcomes))
+            )
+        )
+        out_buf = io.StringIO()
+        err_buf = io.StringIO()
+        sys.stdout = out_buf
+        sys.stderr = err_buf
+        dispatcher.main()
+    finally:
+        dispatcher._run_script_main = orig_run
+        sys.stdin = orig_stdin
+        sys.stdout = orig_stdout
+        sys.stderr = orig_stderr
+
+    assert len(seq_calls) == 6, f"Expected 6 requests before 3-consecutive-failure recycle, got {len(seq_calls)}"
+    assert "shutting down for restart" in err_buf.getvalue(), err_buf.getvalue()
+
+    # 3. Direct unit checks on _extract_failure_detail and _should_recycle_after_request
+    assert dispatcher._extract_failure_detail("", 0) == ("succeeded", "")
+    assert dispatcher._extract_failure_detail("plain error text", 1) == ("failed", "plain error text")
+    assert dispatcher._extract_failure_detail('{"ok": true}', 0) == ("succeeded", "")
+    assert dispatcher._extract_failure_detail('{"error": "missing path"}', 1) == (
+        "failed",
+        "missing path",
+    )
+    for ignored_err in (
+        "canceled",
+        "invalid_script_name",
+        "script_not_allowed",
+        "feature_not_installed",
+    ):
+        assert dispatcher._extract_failure_detail(
+            json.dumps({"success": False, "error": ignored_err}), 1
+        ) == ("ignored", "")
+        # Ignored outcomes preserve consecutive_failures rather than resetting or incrementing.
+        assert dispatcher._should_recycle_after_request(
+            json.dumps({"success": False, "error": ignored_err}),
+            1,
+            consecutive_failures=2,
+            request_count=5,
+            max_requests=50,
+            max_consecutive_failures=3,
+        ) == (2, None)
+
+    assert dispatcher._should_recycle_after_request(
+        json.dumps(
+            {
+                "success": False,
+                "error": "generic failure",
+                "errorInfo": {"type": "ONNXRuntimeError"},
+            }
+        ),
+        1,
+        consecutive_failures=0,
+        request_count=1,
+    ) == (1, "cuda_error")
+
+    # Multi-line stdout with non-JSON prefix before the final JSON line
+    assert dispatcher._should_recycle_after_request(
+        'WARNING: fallback\n{"success": false, "error": "CUDA failure 999"}',
+        0,
+        consecutive_failures=0,
+        request_count=1,
+    ) == (1, "cuda_error")
+
+    # max_consecutive_failures=0 disables consecutive-failure recycling while keeping cuda_error active
+    assert dispatcher._should_recycle_after_request(
+        json.dumps({"success": False, "error": "bad input"}),
+        1,
+        consecutive_failures=5,
+        request_count=6,
+        max_requests=50,
+        max_consecutive_failures=0,
+    ) == (6, None)
+    assert dispatcher._should_recycle_after_request(
+        json.dumps({"success": False, "error": "CUDA failure 999"}),
+        1,
+        consecutive_failures=5,
+        request_count=6,
+        max_requests=50,
+        max_consecutive_failures=0,
+    ) == (6, "cuda_error")
+
+    # 4. _env_non_negative_int safely handles empty, non-numeric, negative, float, and valid strings
+    prev_env = os.environ.get("DISPATCHER_MAX_CONSECUTIVE_FAILURES")
+    try:
+        for bad_val in ("", "   ", "abc", "-1", "-5"):
+            os.environ["DISPATCHER_MAX_CONSECUTIVE_FAILURES"] = bad_val
+            assert dispatcher._env_non_negative_int("DISPATCHER_MAX_CONSECUTIVE_FAILURES", 3) == 3
+        os.environ["DISPATCHER_MAX_CONSECUTIVE_FAILURES"] = "0"
+        assert dispatcher._env_non_negative_int("DISPATCHER_MAX_CONSECUTIVE_FAILURES", 3) == 0
+        os.environ["DISPATCHER_MAX_CONSECUTIVE_FAILURES"] = "2.9"
+        assert dispatcher._env_non_negative_int("DISPATCHER_MAX_CONSECUTIVE_FAILURES", 3) == 2
+    finally:
+        if prev_env is None:
+            os.environ.pop("DISPATCHER_MAX_CONSECUTIVE_FAILURES", None)
+        else:
+            os.environ["DISPATCHER_MAX_CONSECUTIVE_FAILURES"] = prev_env
+
+    # 5. _cleanup_after_request catches RuntimeError from poisoned torch.cuda.empty_cache()
+    fake_torch = types.ModuleType("torch")
+    fake_torch.cuda = types.SimpleNamespace(
+        is_available=lambda: True,
+        empty_cache=lambda: (_ for _ in ()).throw(
+            RuntimeError("CUDA error: device-side assert triggered")
+        ),
+    )
+    prev_torch = sys.modules.get("torch")
+    orig_stderr = sys.stderr
+    try:
+        sys.modules["torch"] = fake_torch
+        err_buf = io.StringIO()
+        sys.stderr = err_buf
+        dispatcher._cleanup_after_request()
+        assert "GPU cache cleanup failed" in err_buf.getvalue(), err_buf.getvalue()
+    finally:
+        sys.stderr = orig_stderr
+        if prev_torch is None:
+            sys.modules.pop("torch", None)
+        else:
+            sys.modules["torch"] = prev_torch
+
+
+_verify_dispatcher_failure_recycling()
+
 print("WIRE OK")

@@ -207,6 +207,8 @@ describe("AI Bridge - getDispatcherStatus", () => {
     expect(status.gpu).toBe(false);
     expect(status.pid).toBeNull();
     expect(status.consecutiveCrashes).toBe(0);
+    expect(status.consecutiveScriptFailures).toBe(0);
+    expect(status.lastRecycleReason).toBeNull();
   });
 
   it("reports running after init", async () => {

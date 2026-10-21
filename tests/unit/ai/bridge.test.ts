@@ -817,6 +817,8 @@ describe("bridge - getDispatcherStatus", () => {
       gpu: false,
       pid: null,
       consecutiveCrashes: 0,
+      consecutiveScriptFailures: 0,
+      lastRecycleReason: null,
     });
   });
 });
@@ -2680,13 +2682,13 @@ describe("bridge - extractPythonError via dispatcher responses", () => {
   });
 
   it("classifies PyTorch CPU allocator errors reported on exit as operational (#2543)", async () => {
-    const mock = await setupReadyDispatcher();
     for (const oomMsg of [
       "RuntimeError: [enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes.",
       "DefaultCPUAllocator: can't allocate memory: you tried to allocate 104857600 bytes.",
       "OSError: [Errno 12] Cannot allocate memory",
       "Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 30) and data type float32",
     ]) {
+      const mock = await setupReadyDispatcher();
       const promise = runPythonWithProgress("test.py", []);
       await new Promise((r) => setTimeout(r, 10));
       const lines = mock.stdinWrites.join("").split("\n").filter(Boolean);
@@ -2704,6 +2706,7 @@ describe("bridge - extractPythonError via dispatcher responses", () => {
       expect(err.isSafeMessage).toBe(true);
       expect(err.kind).toBe("operational");
       expect(err.message).toBe(oomMsg);
+      shutdownDispatcher();
     }
   });
 
@@ -4153,5 +4156,399 @@ describe("bridge - pre-dispatch sidecar memory floor (issue #1162)", () => {
         },
       }),
     ).rejects.toThrow("feature_not_installed");
+  });
+});
+
+describe("bridge - dispatcher failure recycling and diagnostics (issue #2709)", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.mocked(spawn).mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete process.env.DISPATCHER_MAX_CONSECUTIVE_FAILURES;
+  });
+
+  it("recycles the dispatcher immediately on CUDA or ORT context-poison signatures without incrementing consecutiveCrashes", async () => {
+    const { getDispatcherStatus, initDispatcher, runPythonWithProgress, shutdownDispatcher } =
+      await import("../../../packages/ai/src/bridge.js");
+    onTestFinished(() => shutdownDispatcher());
+
+    const cudaSignatures = [
+      {
+        exitCode: 0,
+        stdout: JSON.stringify({
+          success: false,
+          error: "[ONNXRuntimeError] : 1 : FAIL : CUDA failure 999: unknown error",
+        }),
+      },
+      {
+        exitCode: 1,
+        stdout: JSON.stringify({
+          success: false,
+          error: "RuntimeError: cudaErrorIllegalAddress: an illegal memory access was encountered",
+        }),
+      },
+      {
+        exitCode: 1,
+        stdout: JSON.stringify({
+          success: false,
+          error: "cuDNN error: CUDNN_STATUS_INTERNAL_ERROR",
+        }),
+      },
+      {
+        exitCode: 1,
+        stdout: JSON.stringify({
+          success: false,
+          error: "ORT_RUNTIME_EXCEPTION: failed to run session",
+        }),
+      },
+      {
+        exitCode: 1,
+        stdout: JSON.stringify({
+          success: false,
+          error: "RuntimeError: CUDA error: device-side assert triggered",
+        }),
+      },
+      {
+        exitCode: 1,
+        stdout: JSON.stringify({
+          success: false,
+          error: "RuntimeError: CUDA failure 700",
+        }),
+      },
+    ];
+
+    // Run 6 CUDA poison recycles back-to-back (> MAX_CONSECUTIVE_CRASHES = 5)
+    // to prove recycling never trips the 5-crashes-in-60s permanent disable.
+    for (let i = 0; i < cudaSignatures.length; i++) {
+      const mock = createMockProcess();
+      vi.mocked(spawn).mockReturnValue(mock.process);
+
+      const readyPromise = initDispatcher();
+      mock.stderr.emit("data", Buffer.from('{"ready": true, "gpu": true}\n'));
+      await readyPromise;
+
+      const sig = cudaSignatures[i];
+      const reqPromise = runPythonWithProgress("test.py", []);
+      const settled = reqPromise.then(
+        (res) => ({ ok: true as const, res }),
+        (err: Error) => ({ ok: false as const, err }),
+      );
+      await new Promise((r) => setTimeout(r, 10));
+
+      const line = mock.stdinWrites.join("").split("\n").filter(Boolean)[0];
+      const { id } = JSON.parse(line);
+      mock.stdout.emit(
+        "data",
+        Buffer.from(`${JSON.stringify({ id, exitCode: sig.exitCode, stdout: sig.stdout })}\n`),
+      );
+      mock.emitEvent("close", null, "SIGTERM");
+
+      const outcome = await settled;
+      if (sig.exitCode === 0) {
+        expect(outcome.ok).toBe(true);
+      } else {
+        expect(outcome.ok).toBe(false);
+      }
+
+      const status = getDispatcherStatus();
+      expect(status.running).toBe(false);
+      expect(status.ready).toBe(false);
+      expect(status.failed).toBe(false);
+      expect(status.consecutiveCrashes).toBe(0);
+      expect(status.consecutiveScriptFailures).toBe(i + 1);
+      expect(status.lastRecycleReason).toBe("cuda_error");
+      expect(mock.process.kill).toHaveBeenCalledWith("SIGTERM");
+    }
+
+    // Subsequent successful request on a fresh dispatcher resets consecutiveScriptFailures to 0.
+    const freshMock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(freshMock.process);
+    const readyPromise = initDispatcher();
+    freshMock.stderr.emit("data", Buffer.from('{"ready": true, "gpu": true}\n'));
+    await readyPromise;
+
+    const okPromise = runPythonWithProgress("test.py", []);
+    await new Promise((r) => setTimeout(r, 10));
+    const { id } = JSON.parse(freshMock.stdinWrites.join("").trim());
+    freshMock.stdout.emit(
+      "data",
+      Buffer.from(`${JSON.stringify({ id, exitCode: 0, stdout: '{"success": true}' })}\n`),
+    );
+    await expect(okPromise).resolves.toMatchObject({ stdout: '{"success": true}' });
+
+    const finalStatus = getDispatcherStatus();
+    expect(finalStatus.running).toBe(true);
+    expect(finalStatus.ready).toBe(true);
+    expect(finalStatus.failed).toBe(false);
+    expect(finalStatus.consecutiveCrashes).toBe(0);
+    expect(finalStatus.consecutiveScriptFailures).toBe(0);
+    expect(finalStatus.lastRecycleReason).toBe("cuda_error");
+  });
+
+  it("recycles the dispatcher after 3 consecutive script failures and resets on success without tripping MAX_CONSECUTIVE_CRASHES", async () => {
+    const { getDispatcherStatus, initDispatcher, runPythonWithProgress, shutdownDispatcher } =
+      await import("../../../packages/ai/src/bridge.js");
+    onTestFinished(() => shutdownDispatcher());
+
+    const mock1 = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock1.process);
+    const ready1 = initDispatcher();
+    mock1.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+    await ready1;
+
+    async function sendAndRespond(
+      mock: ReturnType<typeof createMockProcess>,
+      exitCode: number,
+      stdout: string,
+    ) {
+      const p = runPythonWithProgress("test.py", []);
+      const settled = p.catch((e: unknown) => e);
+      await new Promise((r) => setTimeout(r, 10));
+      const lines = mock.stdinWrites.join("").split("\n").filter(Boolean);
+      const { id } = JSON.parse(lines[lines.length - 1]);
+      mock.stdout.emit("data", Buffer.from(`${JSON.stringify({ id, exitCode, stdout })}\n`));
+      return settled;
+    }
+
+    // 2 failures followed by 1 success -> resets consecutiveScriptFailures, does NOT recycle
+    await sendAndRespond(mock1, 1, '{"success": false, "error": "bad input 1"}');
+    expect(getDispatcherStatus().consecutiveScriptFailures).toBe(1);
+    expect(getDispatcherStatus().running).toBe(true);
+
+    await sendAndRespond(mock1, 0, '{"success": false, "error": "bad input 2"}');
+    expect(getDispatcherStatus().consecutiveScriptFailures).toBe(2);
+    expect(getDispatcherStatus().running).toBe(true);
+
+    // Cooperative cancel ("error": "canceled") does not count as a failure
+    await sendAndRespond(mock1, 0, '{"success": false, "error": "canceled"}');
+    expect(getDispatcherStatus().consecutiveScriptFailures).toBe(2);
+    expect(getDispatcherStatus().running).toBe(true);
+
+    await sendAndRespond(mock1, 0, '{"success": true}');
+    expect(getDispatcherStatus().consecutiveScriptFailures).toBe(0);
+    expect(getDispatcherStatus().running).toBe(true);
+    expect(getDispatcherStatus().lastRecycleReason).toBeNull();
+
+    // Now 3 consecutive failures -> recycles on the 3rd without incrementing consecutiveCrashes
+    await sendAndRespond(mock1, 1, '{"success": false, "error": "fail 1"}');
+    expect(getDispatcherStatus().consecutiveScriptFailures).toBe(1);
+    expect(getDispatcherStatus().running).toBe(true);
+
+    await sendAndRespond(mock1, 1, '{"success": false, "error": "fail 2"}');
+    expect(getDispatcherStatus().consecutiveScriptFailures).toBe(2);
+    expect(getDispatcherStatus().running).toBe(true);
+
+    await sendAndRespond(mock1, 1, '{"success": false, "error": "fail 3"}');
+    mock1.emitEvent("close", null, "SIGTERM");
+
+    const statusAfterRecycle = getDispatcherStatus();
+    expect(statusAfterRecycle.running).toBe(false);
+    expect(statusAfterRecycle.ready).toBe(false);
+    expect(statusAfterRecycle.failed).toBe(false);
+    expect(statusAfterRecycle.consecutiveCrashes).toBe(0);
+    expect(statusAfterRecycle.consecutiveScriptFailures).toBe(3);
+    expect(statusAfterRecycle.lastRecycleReason).toBe("consecutive_failures");
+    expect(mock1.process.kill).toHaveBeenCalledWith("SIGTERM");
+  });
+
+  it("records lastRecycleReason as max_requests when dispatcher shuts down at request limit", async () => {
+    const { getDispatcherStatus, initDispatcher, shutdownDispatcher } = await import(
+      "../../../packages/ai/src/bridge.js"
+    );
+    onTestFinished(() => shutdownDispatcher());
+
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+    const ready = initDispatcher();
+    mock.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+    await ready;
+
+    mock.stderr.emit(
+      "data",
+      Buffer.from("[dispatcher] Reached max requests (50), shutting down for restart\n"),
+    );
+    mock.emitEvent("close", 0, null);
+
+    const status = getDispatcherStatus();
+    expect(status.running).toBe(false);
+    expect(status.consecutiveCrashes).toBe(0);
+    expect(status.lastRecycleReason).toBe("max_requests");
+  });
+
+  it("respects DISPATCHER_MAX_CONSECUTIVE_FAILURES env override and retries concurrent requests on recycle", async () => {
+    process.env.DISPATCHER_MAX_CONSECUTIVE_FAILURES = "2";
+    const {
+      buildMinimalEnv,
+      getDispatcherStatus,
+      initDispatcher,
+      runPythonWithProgress,
+      shutdownDispatcher,
+    } = await import("../../../packages/ai/src/bridge.js");
+    onTestFinished(() => shutdownDispatcher());
+
+    expect(buildMinimalEnv().DISPATCHER_MAX_CONSECUTIVE_FAILURES).toBe("2");
+
+    const mockDisp = createMockProcess();
+    const mockPerReq = createMockProcess();
+    let spawnCalls = 0;
+    vi.mocked(spawn).mockImplementation(() => {
+      spawnCalls++;
+      return spawnCalls === 1 ? mockDisp.process : mockPerReq.process;
+    });
+
+    const ready = initDispatcher();
+    mockDisp.stderr.emit("data", Buffer.from('{"ready": true, "gpu": true}\n'));
+    await ready;
+
+    // Failure 1 (non-CUDA, non-JSON traceback) -> consecutiveScriptFailures = 1
+    const p1 = runPythonWithProgress("test.py", []);
+    const s1 = p1.catch((e: unknown) => e);
+    await new Promise((r) => setTimeout(r, 10));
+    const id1 = JSON.parse(mockDisp.stdinWrites[0].trim()).id;
+    mockDisp.stderr.emit("data", Buffer.from("ValueError: bad frame\n"));
+    mockDisp.stdout.emit(
+      "data",
+      Buffer.from(`${JSON.stringify({ id: id1, exitCode: 1, stdout: "" })}\n`),
+    );
+    await s1;
+    expect(getDispatcherStatus().consecutiveScriptFailures).toBe(1);
+    expect(getDispatcherStatus().running).toBe(true);
+
+    // Pre-exec gate refusal ("feature_not_installed") is ignored and preserves consecutiveScriptFailures = 1
+    const pGate = runPythonWithProgress("test.py", []);
+    const sGate = pGate.catch((e: unknown) => e);
+    await new Promise((r) => setTimeout(r, 10));
+    const idGate = JSON.parse(mockDisp.stdinWrites[1].trim()).id;
+    mockDisp.stdout.emit(
+      "data",
+      Buffer.from(
+        `${JSON.stringify({
+          id: idGate,
+          exitCode: 1,
+          stdout: '{"success": false, "error": "feature_not_installed"}',
+        })}\n`,
+      ),
+    );
+    await sGate;
+    expect(getDispatcherStatus().consecutiveScriptFailures).toBe(1);
+    expect(getDispatcherStatus().running).toBe(true);
+
+    // Enqueue 2 concurrent requests; the first hits failure #2 (reaching threshold=2),
+    // which recycles the dispatcher and causes the second pending request to retry per-request.
+    const pFail2 = runPythonWithProgress("test.py", []);
+    const pConcurrent = runPythonWithProgress("other.py", []);
+    const sFail2 = pFail2.catch((e: unknown) => e);
+    await new Promise((r) => setTimeout(r, 10));
+
+    const lines = mockDisp.stdinWrites.join("").split("\n").filter(Boolean);
+    const idFail2 = JSON.parse(lines[2]).id;
+    mockDisp.stdout.emit(
+      "data",
+      Buffer.from(
+        `${JSON.stringify({ id: idFail2, exitCode: 1, stdout: '{"error": "second failure"}' })}\n`,
+      ),
+    );
+    mockDisp.emitEvent("close", null, "SIGTERM");
+
+    const err2 = (await sFail2) as Error;
+    expect(err2.message).toBe("second failure");
+    expect(getDispatcherStatus().lastRecycleReason).toBe("consecutive_failures");
+    expect(getDispatcherStatus().consecutiveScriptFailures).toBe(2);
+
+    await new Promise((r) => setTimeout(r, 10));
+    mockPerReq.stdout.emit("data", Buffer.from('{"ok": true}\n'));
+    mockPerReq.emitEvent("close", 0, null);
+
+    const concurrentRes = await pConcurrent;
+    expect(concurrentRes.stdout).toBe('{"ok": true}');
+    expect(concurrentRes.stderr).toContain("[bridge] retried after dispatcher crash");
+  });
+
+  it("tracks per-child failure threshold independently of cumulative consecutiveScriptFailures and ignores late close from recycled child", async () => {
+    const { getDispatcherStatus, initDispatcher, runPythonWithProgress, shutdownDispatcher } =
+      await import("../../../packages/ai/src/bridge.js");
+    onTestFinished(() => shutdownDispatcher());
+
+    const mockChild1 = createMockProcess();
+    const mockChild2 = createMockProcess();
+    let spawnCount = 0;
+    vi.mocked(spawn).mockImplementation(() => {
+      spawnCount++;
+      return spawnCount === 1 ? mockChild1.process : mockChild2.process;
+    });
+
+    const ready1 = initDispatcher();
+    mockChild1.stderr.emit("data", Buffer.from('{"ready": true, "gpu": true}\n'));
+    await ready1;
+
+    // 3 non-CUDA failures on Child 1 -> recycles Child 1 (consecutiveScriptFailures = 3)
+    for (let i = 0; i < 3; i++) {
+      const p = runPythonWithProgress("test.py", []);
+      const s = p.catch((e: unknown) => e);
+      await new Promise((r) => setTimeout(r, 10));
+      const lines = mockChild1.stdinWrites.join("").split("\n").filter(Boolean);
+      const { id } = JSON.parse(lines[lines.length - 1]);
+      mockChild1.stdout.emit(
+        "data",
+        Buffer.from(`${JSON.stringify({ id, exitCode: 1, stdout: '{"error": "bad input"}' })}\n`),
+      );
+      await s;
+    }
+
+    expect(getDispatcherStatus().consecutiveScriptFailures).toBe(3);
+    expect(getDispatcherStatus().lastRecycleReason).toBe("consecutive_failures");
+    expect(getDispatcherStatus().running).toBe(false);
+
+    // Spawn Child 2 BEFORE Child 1's SIGTERM close event arrives
+    const ready2 = initDispatcher();
+    mockChild2.stderr.emit("data", Buffer.from('{"ready": true, "gpu": true}\n'));
+    await ready2;
+
+    // Now Child 1's late close event arrives: must not null Child 2 or increment consecutiveCrashes
+    mockChild1.emitEvent("close", null, "SIGTERM");
+    expect(getDispatcherStatus().running).toBe(true);
+    expect(getDispatcherStatus().ready).toBe(true);
+    expect(getDispatcherStatus().consecutiveCrashes).toBe(0);
+
+    // 1st non-CUDA failure on Child 2 increments cumulative consecutiveScriptFailures to 4,
+    // but Child 2's own childScriptFailures is only 1 (< 3), so Child 2 stays running!
+    const pChild2Fail1 = runPythonWithProgress("test.py", []);
+    const sChild2Fail1 = pChild2Fail1.catch((e: unknown) => e);
+    await new Promise((r) => setTimeout(r, 10));
+    const idChild2Fail1 = JSON.parse(mockChild2.stdinWrites[0].trim()).id;
+    mockChild2.stdout.emit(
+      "data",
+      Buffer.from(
+        `${JSON.stringify({ id: idChild2Fail1, exitCode: 1, stdout: '{"error": "bad input 4"}' })}\n`,
+      ),
+    );
+    await sChild2Fail1;
+
+    expect(getDispatcherStatus().consecutiveScriptFailures).toBe(4);
+    expect(getDispatcherStatus().running).toBe(true);
+    expect(mockChild2.process.kill).not.toHaveBeenCalled();
+
+    // CUDA poison on stderr with empty stdout on Child 2 immediately recycles Child 2
+    const pChild2Cuda = runPythonWithProgress("test.py", []);
+    const sChild2Cuda = pChild2Cuda.catch((e: unknown) => e);
+    await new Promise((r) => setTimeout(r, 10));
+    const idChild2Cuda = JSON.parse(mockChild2.stdinWrites[1].trim()).id;
+    mockChild2.stderr.emit(
+      "data",
+      Buffer.from("RuntimeError: CUDA error: an illegal memory access was encountered\n"),
+    );
+    mockChild2.stdout.emit(
+      "data",
+      Buffer.from(`${JSON.stringify({ id: idChild2Cuda, exitCode: 1, stdout: "" })}\n`),
+    );
+    await sChild2Cuda;
+
+    expect(getDispatcherStatus().consecutiveScriptFailures).toBe(5);
+    expect(getDispatcherStatus().lastRecycleReason).toBe("cuda_error");
+    expect(getDispatcherStatus().running).toBe(false);
+    expect(mockChild2.process.kill).toHaveBeenCalledWith("SIGTERM");
   });
 });

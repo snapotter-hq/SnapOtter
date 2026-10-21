@@ -60,6 +60,7 @@ export function buildMinimalEnv(): Record<string, string> {
     "U2NET_HOME",
     "PROCESSING_TIMEOUT_S",
     "DISPATCHER_MAX_REQUESTS",
+    "DISPATCHER_MAX_CONSECUTIVE_FAILURES",
     "PYTHON_VENV_PATH",
     "SNAPOTTER_GPU",
     "OTEL_EXPORTER_OTLP_ENDPOINT",
@@ -296,6 +297,73 @@ interface PendingRequest {
 const CRASH_WINDOW_MS = 60_000;
 const MAX_CONSECUTIVE_CRASHES = 5;
 const BASE_BACKOFF_MS = 1_000;
+const DEFAULT_MAX_CONSECUTIVE_SCRIPT_FAILURES = 3;
+
+const CUDA_POISON_RE =
+  /cuda\s+(?:failure|error|driver)|cudaerror|cudnn_status|cublas_status_(?:not_initialized|internal_error|execution_failed)|ort_runtime_exception|onnxruntimeerror|device-side\s+assert|illegal\s+memory\s+access|unspecified\s+launch\s+failure/i;
+
+const PRE_EXEC_GATE_ERRORS = new Set([
+  "invalid_script_name",
+  "script_not_allowed",
+  "feature_not_installed",
+]);
+
+function resolveMaxConsecutiveScriptFailures(): number {
+  const configured = process.env.DISPATCHER_MAX_CONSECUTIVE_FAILURES?.trim();
+  if (configured !== undefined && configured !== "") {
+    const parsed = Number(configured);
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      return Math.floor(parsed);
+    }
+  }
+  return DEFAULT_MAX_CONSECUTIVE_SCRIPT_FAILURES;
+}
+
+function classifyDispatcherResponseFailure(
+  exitCode: unknown,
+  stdout: string,
+  stderr: string,
+  extracted: string,
+  infoType?: string,
+): { status: "succeeded" | "failed" | "ignored"; cudaPoison: boolean } {
+  const trimmed = stdout.trim();
+  if (trimmed) {
+    const lines = trimmed.split("\n");
+    const candidates = [trimmed, lines[lines.length - 1]?.trim() ?? ""];
+    for (const candidate of candidates) {
+      if (!candidate.startsWith("{")) continue;
+      try {
+        const parsed = JSON.parse(candidate) as {
+          success?: unknown;
+          error?: unknown;
+          errorInfo?: { type?: unknown };
+        };
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          const errVal = typeof parsed.error === "string" ? parsed.error.trim() : "";
+          if (errVal === "canceled" || PRE_EXEC_GATE_ERRORS.has(errVal)) {
+            return { status: "ignored", cudaPoison: false };
+          }
+          const failed =
+            exitCode !== 0 ||
+            parsed.success === false ||
+            (errVal.length > 0 && parsed.success !== true);
+          if (!failed) return { status: "succeeded", cudaPoison: false };
+          const combined = `${infoType ?? ""}\n${extracted}\n${errVal}\n${stdout}\n${stderr}`;
+          return { status: "failed", cudaPoison: CUDA_POISON_RE.test(combined) };
+        }
+      } catch {
+        // Not JSON; fall through to exitCode check below.
+      }
+    }
+  }
+  if (exitCode !== 0) {
+    const combined = `${infoType ?? ""}\n${extracted}\n${stdout}\n${stderr}`;
+    return { status: "failed", cudaPoison: CUDA_POISON_RE.test(combined) };
+  }
+  return { status: "succeeded", cudaPoison: false };
+}
+
+export type DispatcherRecycleReason = "cuda_error" | "consecutive_failures" | "max_requests";
 
 export interface DispatcherStatus {
   running: boolean;
@@ -304,6 +372,8 @@ export interface DispatcherStatus {
   gpu: boolean;
   pid: number | null;
   consecutiveCrashes: number;
+  consecutiveScriptFailures: number;
+  lastRecycleReason: DispatcherRecycleReason | null;
 }
 
 /**
@@ -323,6 +393,9 @@ export class PythonDispatcher {
   private crashes = 0;
   private lastCrashTs = 0;
   private backoffEnd = 0;
+  private consecutiveScriptFailures = 0;
+  private childScriptFailures = 0;
+  private lastRecycleReason: DispatcherRecycleReason | null = null;
   /**
    * Monotonic child counter. Each spawned child and every request written to
    * it carry the generation current at spawn time, so a stale child's late
@@ -386,10 +459,67 @@ export class PythonDispatcher {
     }
   }
 
+  /**
+   * Cleanly retire the current dispatcher child without counting it as a crash
+   * against MAX_CONSECUTIVE_CRASHES. Used when a script failure indicates a
+   * poisoned CUDA/ORT context or reaches the consecutive script failure limit.
+   */
+  private recycleChild(
+    proc: ChildProcess,
+    generation: number,
+    reason: DispatcherRecycleReason,
+  ): void {
+    this.lastRecycleReason = reason;
+    this.childScriptFailures = 0;
+    this.stoppedChildren.add(proc);
+    aiLog.warn(`[bridge] Recycling Python dispatcher (${reason})`);
+    if (this.child === proc) {
+      this.child = null;
+      this.childReady = false;
+    }
+    this.rejectPendingForGeneration(
+      generation,
+      new SafeError("Python dispatcher exited unexpectedly", {
+        kind: "operational",
+        code: "dispatcher-exit",
+      }),
+    );
+    proc.stdin?.end();
+    if (!proc.killed) {
+      proc.kill("SIGTERM");
+    }
+  }
+
+  private recordScriptOutcome(
+    proc: ChildProcess,
+    generation: number,
+    outcome: { status: "succeeded" | "failed" | "ignored"; cudaPoison: boolean },
+  ): void {
+    if (outcome.status === "ignored") {
+      return;
+    }
+    if (outcome.status === "succeeded") {
+      this.consecutiveScriptFailures = 0;
+      this.childScriptFailures = 0;
+      return;
+    }
+    this.consecutiveScriptFailures++;
+    this.childScriptFailures++;
+    if (outcome.cudaPoison) {
+      this.recycleChild(proc, generation, "cuda_error");
+      return;
+    }
+    const maxFailures = resolveMaxConsecutiveScriptFailures();
+    if (maxFailures > 0 && this.childScriptFailures >= maxFailures) {
+      this.recycleChild(proc, generation, "consecutive_failures");
+    }
+  }
+
   private startChild(): ChildProcess | null {
     if (this.childFailed) return null;
     this.generation++;
     const gen = this.generation;
+    this.childScriptFailures = 0;
 
     try {
       // Under the root context: the child outlives whichever job started
@@ -479,6 +609,13 @@ export class PythonDispatcher {
             // Malformed JSON object - collect as regular stderr.
           }
         } else if (trimmed.startsWith("[")) {
+          if (trimmed.includes("[dispatcher] Reached max requests")) {
+            this.lastRecycleReason = "max_requests";
+          } else if (trimmed.includes("[dispatcher] CUDA/ORT runtime failure detected")) {
+            this.lastRecycleReason = "cuda_error";
+          } else if (trimmed.includes("[dispatcher] Reached consecutive script failure limit")) {
+            this.lastRecycleReason = "consecutive_failures";
+          }
           // Forward diagnostic messages to Node.js logger and collect as regular stderr.
           aiLog.info(`[python] ${trimmed}`);
         }
@@ -512,16 +649,25 @@ export class PythonDispatcher {
             const req = this.pending.get(reqId);
             if (req) {
               this.pending.delete(reqId);
+              const stdoutStr = typeof response.stdout === "string" ? response.stdout : "";
+              const stderrStr = req.stderrLines.join("\n");
+              const raw = { stdout: stdoutStr, stderr: stderrStr };
+              const extracted = response.exitCode !== 0 ? extractPythonError(raw) : "";
+              const info = response.exitCode !== 0 ? extractPythonErrorInfo(raw) : null;
+              const outcome = classifyDispatcherResponseFailure(
+                response.exitCode,
+                stdoutStr,
+                stderrStr,
+                extracted,
+                info?.type,
+              );
+              this.recordScriptOutcome(proc, gen, outcome);
               if (response.exitCode !== 0) {
-                const raw = { stdout: response.stdout, stderr: req.stderrLines.join("\n") };
-                const extracted = extractPythonError(raw);
-                req.reject(
-                  pythonExitError(response.exitCode, null, extracted, extractPythonErrorInfo(raw)),
-                );
+                req.reject(pythonExitError(response.exitCode, null, extracted, info));
               } else {
                 req.resolve({
-                  stdout: response.stdout || "",
-                  stderr: req.stderrLines.join("\n"),
+                  stdout: stdoutStr,
+                  stderr: stderrStr,
                 });
               }
             }
@@ -896,6 +1042,8 @@ export class PythonDispatcher {
       gpu: this.gpuAvail,
       pid: this.child?.pid ?? null,
       consecutiveCrashes: this.crashes,
+      consecutiveScriptFailures: this.consecutiveScriptFailures,
+      lastRecycleReason: this.lastRecycleReason,
     };
   }
 
@@ -908,6 +1056,7 @@ export class PythonDispatcher {
     // newly installed GPU frameworks against pre-install state.
     this.gpuProbed = false;
     this.gpuFrameworks = undefined;
+    this.childScriptFailures = 0;
     if (this.child && !this.child.killed) {
       this.stoppedChildren.add(this.child);
       this.child.stdin?.end();

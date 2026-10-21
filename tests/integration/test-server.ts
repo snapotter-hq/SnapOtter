@@ -20,6 +20,7 @@ mkdirSync(process.env.WORKSPACE_PATH!, { recursive: true });
 
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
+import { getDispatcherStatus, isGpuAvailable } from "@snapotter/ai";
 import { APP_VERSION } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 // ---------------------------------------------------------------------------
@@ -321,7 +322,7 @@ export async function buildTestApp(): Promise<TestApp> {
       storage: { mode: env.STORAGE_MODE, available: "N/A" },
       database: dbOk ? "ok" : "error",
       queue: { active: 0, pending: 0 },
-      ai: {},
+      ai: { gpu: isGpuAvailable(), dispatcher: getDispatcherStatus() },
     };
   });
 
