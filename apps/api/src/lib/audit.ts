@@ -40,6 +40,14 @@ export function sanitizeAuditInput(raw: string): string {
   return raw.replace(AUDIT_STRIP_RE, "").slice(0, MAX_AUDIT_INPUT_LENGTH) || "(empty)";
 }
 
+export function extractActorId(details: Record<string, unknown>): string | null {
+  return (details.userId as string) ?? (details.adminId as string) ?? null;
+}
+
+export function extractActorUsername(details: Record<string, unknown>): string {
+  return (details.username as string) ?? (details.newUsername as string) ?? "system";
+}
+
 /**
  * Emit a structured audit log entry for security-relevant events.
  *
@@ -54,8 +62,8 @@ export async function auditLog(
 ): Promise<void> {
   logger.info({ audit: true, event, ip, requestId, ...details }, `[AUDIT] ${event}`);
 
-  const actorId = (details.userId as string) ?? (details.adminId as string) ?? null;
-  const actorUsername = (details.username as string) ?? (details.newUsername as string) ?? "system";
+  const actorId = extractActorId(details);
+  const actorUsername = extractActorUsername(details);
   const targetId = (details.targetUserId as string) ?? (details.keyId as string) ?? null;
   const targetType = deriveTargetType(event);
 
@@ -127,7 +135,7 @@ export function auditFromRequest(request: FastifyRequest) {
     auditLog(request.log, event, details, request.ip, request.id);
 }
 
-function deriveTargetType(event: string): string | null {
+export function deriveTargetType(event: string): string | null {
   if (
     event.startsWith("USER_") ||
     event.startsWith("LOGIN") ||

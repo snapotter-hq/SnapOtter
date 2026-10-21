@@ -1,73 +1,23 @@
 /**
- * Unit tests for pure utility functions extracted from fetch-urls route:
- * - filenameFromUrl: extract filename from URL path
- * - getUniqueName: deduplicate filenames
- * - hasPathTraversal: detect path traversal in filenames (from meme-templates)
- * - getContentType: extension to MIME mapping (from meme-templates)
- *
- * These are tested by importing the route module and exercising the exported/inline logic.
- * Since these are private functions, we replicate their logic here for isolated testing.
+ * Unit tests for pure utility functions exported from fetch-urls and meme-templates routes:
+ * - filenameFromUrl: extract filename from URL path (apps/api/src/routes/fetch-urls.ts)
+ * - getUniqueName: deduplicate filenames (apps/api/src/routes/fetch-urls.ts)
+ * - hasPathTraversal: detect path traversal in filenames (apps/api/src/routes/meme-templates.ts)
+ * - getContentType: extension to MIME mapping (apps/api/src/routes/meme-templates.ts)
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-// Replicate filenameFromUrl logic for isolated testing
-function filenameFromUrl(url: string): string {
-  try {
-    const pathname = new URL(url).pathname;
-    const base = pathname.split("/").pop() ?? "";
-    const decoded = decodeURIComponent(base);
-    if (decoded?.includes(".") && decoded.length <= 255) {
-      return decoded;
-    }
-  } catch {
-    // ignore parse errors
-  }
-  return "image-fallback";
-}
+vi.mock("../../../apps/api/src/db/index.js", () => ({
+  db: {},
+  pool: {},
+  closeDb: async () => {},
+  schema: {},
+}));
 
-// Replicate getUniqueName logic
-function getUniqueName(name: string, used: Set<string>): string {
-  if (!used.has(name)) {
-    used.add(name);
-    return name;
-  }
-  const dotIdx = name.lastIndexOf(".");
-  const base = dotIdx > 0 ? name.slice(0, dotIdx) : name;
-  const ext = dotIdx > 0 ? name.slice(dotIdx) : "";
-  let counter = 1;
-  let candidate = `${base}_${counter}${ext}`;
-  while (used.has(candidate)) {
-    counter++;
-    candidate = `${base}_${counter}${ext}`;
-  }
-  used.add(candidate);
-  return candidate;
-}
+import { filenameFromUrl, getUniqueName } from "../../../apps/api/src/routes/fetch-urls.js";
+import { getContentType, hasPathTraversal } from "../../../apps/api/src/routes/meme-templates.js";
 
-// Replicate hasPathTraversal logic
-function hasPathTraversal(filename: string): boolean {
-  return (
-    filename.includes("..") ||
-    filename.includes("/") ||
-    filename.includes("\\") ||
-    filename.includes("\0")
-  );
-}
-
-// Replicate getContentType logic
-const CONTENT_TYPES: Record<string, string> = {
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".png": "image/png",
-  ".webp": "image/webp",
-  ".ttf": "font/ttf",
-};
-
-function getContentType(filename: string): string | undefined {
-  const dot = filename.lastIndexOf(".");
-  if (dot === -1) return undefined;
-  return CONTENT_TYPES[filename.slice(dot).toLowerCase()];
-}
+const FALLBACK_FILENAME_RE = /^file-[0-9a-f]{8}$/;
 
 // ---------------------------------------------------------------------------
 // filenameFromUrl
@@ -85,20 +35,20 @@ describe("filenameFromUrl", () => {
     expect(filenameFromUrl("https://example.com/my%20photo.jpg")).toBe("my photo.jpg");
   });
 
-  it("returns fallback for URL without extension", () => {
-    expect(filenameFromUrl("https://example.com/images/12345")).toBe("image-fallback");
+  it("returns file-<uuid8> fallback for URL without extension", () => {
+    expect(filenameFromUrl("https://example.com/images/12345")).toMatch(FALLBACK_FILENAME_RE);
   });
 
-  it("returns fallback for empty path", () => {
-    expect(filenameFromUrl("https://example.com/")).toBe("image-fallback");
+  it("returns file-<uuid8> fallback for empty path", () => {
+    expect(filenameFromUrl("https://example.com/")).toMatch(FALLBACK_FILENAME_RE);
   });
 
-  it("returns fallback for root URL", () => {
-    expect(filenameFromUrl("https://example.com")).toBe("image-fallback");
+  it("returns file-<uuid8> fallback for root URL", () => {
+    expect(filenameFromUrl("https://example.com")).toMatch(FALLBACK_FILENAME_RE);
   });
 
-  it("returns fallback for invalid URL", () => {
-    expect(filenameFromUrl("not a url")).toBe("image-fallback");
+  it("returns file-<uuid8> fallback for invalid URL", () => {
+    expect(filenameFromUrl("not a url")).toMatch(FALLBACK_FILENAME_RE);
   });
 
   it("handles deeply nested path", () => {
@@ -109,10 +59,10 @@ describe("filenameFromUrl", () => {
     expect(filenameFromUrl("https://example.com/my.photo.2024.png")).toBe("my.photo.2024.png");
   });
 
-  it("returns fallback for filename over 255 characters", () => {
+  it("returns file-<uuid8> fallback for filename over 255 characters", () => {
     const longName = `${"a".repeat(256)}.jpg`;
     const url = `https://example.com/${longName}`;
-    expect(filenameFromUrl(url)).toBe("image-fallback");
+    expect(filenameFromUrl(url)).toMatch(FALLBACK_FILENAME_RE);
   });
 
   it("handles filename at exactly 255 characters", () => {

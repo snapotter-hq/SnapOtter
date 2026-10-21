@@ -1,181 +1,198 @@
 /**
  * Unit tests for roles route validation and role management logic.
  *
- * Tests the role name validation, builtin role protection,
- * permission validation, and user reassignment on role deletion.
+ * Tests the role name validation, create/update schemas (including toolPermissions),
+ * builtin role protection, permission validation, and user reassignment on role deletion
+ * from apps/api/src/routes/roles.ts.
  */
-import { describe, expect, it } from "vitest";
-import { updateRoleSchema } from "../../../apps/api/src/routes/roles.js";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-// ── Reproduce validation logic from roles.ts ────────────────────────────
+const mocks = vi.hoisted(() => ({
+  selectRows: [] as unknown[],
+  insertedValues: undefined as Record<string, unknown> | undefined,
+  insertRowCount: 1,
+  updateCalls: [] as Array<{ table: unknown; values: unknown; where: unknown }>,
+  deleteCalls: [] as Array<{ table: unknown; where: unknown }>,
+  requirePermission: vi.fn(() => () => Promise.resolve({ id: "admin-1", role: "admin" })),
+  hasEffectivePermission: vi.fn(() => Promise.resolve(true)),
+  canAssignRole: vi.fn(() => Promise.resolve(true)),
+  canGrantRoleDefinition: vi.fn(() => Promise.resolve(true)),
+  canManageRoleDefinition: vi.fn(() => Promise.resolve(true)),
+  auditFn: vi.fn(() => Promise.resolve()),
+}));
 
-type Permission =
-  | "tools:use"
-  | "files:own"
-  | "files:all"
-  | "apikeys:own"
-  | "apikeys:all"
-  | "pipelines:own"
-  | "pipelines:all"
-  | "settings:read"
-  | "settings:write"
-  | "users:manage"
-  | "teams:manage"
-  | "features:manage"
-  | "system:health"
-  | "audit:read"
-  | "compliance:manage"
-  | "webhooks:manage"
-  | "security:manage";
+vi.mock("drizzle-orm", () => ({
+  eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+  sql: (strings: TemplateStringsArray, ...vals: unknown[]) => ({
+    sql: strings.join("?"),
+    vals,
+  }),
+}));
 
-const ALL_PERMISSIONS: Permission[] = [
-  "tools:use",
-  "files:own",
-  "files:all",
-  "apikeys:own",
-  "apikeys:all",
-  "pipelines:own",
-  "pipelines:all",
-  "settings:read",
-  "settings:write",
-  "users:manage",
-  "teams:manage",
-  "features:manage",
-  "system:health",
-  "audit:read",
-  "compliance:manage",
-  "webhooks:manage",
-  "security:manage",
-];
+vi.mock("../../../apps/api/src/db/index.js", () => {
+  const makeSelectChain = () => ({
+    from: () => ({
+      where: () => {
+        const res = Promise.resolve(mocks.selectRows);
+        return Object.assign(res, {
+          for: () => Promise.resolve(mocks.selectRows),
+        });
+      },
+      groupBy: () => Promise.resolve([]),
+      // biome-ignore lint/suspicious/noThenProperty: mock Drizzle query builder promise chain
+      then: (resolve: (v: unknown) => unknown) => Promise.resolve(mocks.selectRows).then(resolve),
+    }),
+  });
+  const dbObj = {
+    select: makeSelectChain,
+    insert: () => ({
+      values: (vals: Record<string, unknown>) => {
+        mocks.insertedValues = vals;
+        return {
+          onConflictDoNothing: () => Promise.resolve({ rowCount: mocks.insertRowCount }),
+        };
+      },
+    }),
+    update: (table: unknown) => ({
+      set: (values: unknown) => ({
+        where: (where: unknown) => {
+          mocks.updateCalls.push({ table, values, where });
+          return Promise.resolve({ rowCount: 1 });
+        },
+      }),
+    }),
+    delete: (table: unknown) => ({
+      where: (where: unknown) => {
+        mocks.deleteCalls.push({ table, where });
+        return Promise.resolve();
+      },
+    }),
+    transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(dbObj),
+  };
+  return {
+    db: dbObj,
+    pool: {},
+    closeDb: async () => {},
+    schema: {
+      roles: { id: "roles.id", name: "roles.name" },
+      users: { id: "users.id", role: "users.role" },
+    },
+  };
+});
 
-const ROLE_NAME_PATTERN = /^[a-z0-9_-]+$/;
+vi.mock("../../../apps/api/src/permissions.js", () => ({
+  requirePermission: mocks.requirePermission,
+  hasEffectivePermission: mocks.hasEffectivePermission,
+  canAssignRole: mocks.canAssignRole,
+  canGrantRoleDefinition: mocks.canGrantRoleDefinition,
+  canManageRoleDefinition: mocks.canManageRoleDefinition,
+}));
 
-function validateRoleName(raw: string): { success: boolean; name?: string; error?: string } {
-  const trimmed = raw.trim().toLowerCase();
-  if (trimmed.length < 2 || trimmed.length > 30) {
-    return { success: false, error: "Role name must be 2-30 characters" };
-  }
-  if (!ROLE_NAME_PATTERN.test(trimmed)) {
-    return {
-      success: false,
-      error: "Role name can only contain lowercase letters, numbers, hyphens, and underscores",
-    };
-  }
-  return { success: true, name: trimmed };
-}
+vi.mock("../../../apps/api/src/lib/audit.js", () => ({
+  auditFromRequest: () => mocks.auditFn,
+}));
 
-function validateCreateRole(body: {
-  name?: string;
-  description?: string;
-  permissions?: string[];
-}): { success: boolean; error?: string } {
-  if (!body.name) return { success: false, error: "name is required" };
-  const nameResult = validateRoleName(body.name);
-  if (!nameResult.success) return nameResult;
-  if (!body.permissions || body.permissions.length === 0) {
-    return { success: false, error: "At least one permission is required" };
-  }
-  if (body.description !== undefined && body.description.length > 500) {
-    return { success: false, error: "Description too long" };
-  }
-  return { success: true };
-}
-
-function validateUpdateRole(body: {
-  name?: string;
-  description?: string;
-  permissions?: string[];
-}): { success: boolean; error?: string } {
-  const parsed = updateRoleSchema.safeParse(body);
-  if (!parsed.success) {
-    return {
-      success: false,
-      error: parsed.error.issues.map((i) => i.message).join("; "),
-    };
-  }
-  return { success: true };
-}
-
-function validatePermissions(permissions: string[]): string[] {
-  return permissions.filter((p) => !ALL_PERMISSIONS.includes(p as Permission));
-}
+import {
+  ALL_PERMISSIONS,
+  createRoleSchema,
+  roleNameField,
+  rolesRoutes,
+  updateRoleSchema,
+  validatePermissions,
+} from "../../../apps/api/src/routes/roles.js";
 
 // ── Tests ───────────────────────────────────────────────────────────────
 
 describe("roles route logic", () => {
-  describe("role name validation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.selectRows = [];
+    mocks.insertedValues = undefined;
+    mocks.insertRowCount = 1;
+    mocks.updateCalls = [];
+    mocks.deleteCalls = [];
+    mocks.requirePermission.mockImplementation(
+      () => () => Promise.resolve({ id: "admin-1", role: "admin" }),
+    );
+    mocks.hasEffectivePermission.mockResolvedValue(true);
+    mocks.canAssignRole.mockResolvedValue(true);
+    mocks.canGrantRoleDefinition.mockResolvedValue(true);
+    mocks.canManageRoleDefinition.mockResolvedValue(true);
+  });
+
+  describe("role name validation (roleNameField)", () => {
     it("accepts valid lowercase name", () => {
-      const result = validateRoleName("viewer");
+      const result = roleNameField.safeParse("viewer");
       expect(result.success).toBe(true);
-      expect(result.name).toBe("viewer");
+      if (result.success) expect(result.data).toBe("viewer");
     });
 
     it("converts to lowercase", () => {
-      const result = validateRoleName("Viewer");
+      const result = roleNameField.safeParse("Viewer");
       expect(result.success).toBe(true);
-      expect(result.name).toBe("viewer");
+      if (result.success) expect(result.data).toBe("viewer");
     });
 
     it("trims whitespace and lowercases", () => {
-      const result = validateRoleName("  Manager  ");
+      const result = roleNameField.safeParse("  Manager  ");
       expect(result.success).toBe(true);
-      expect(result.name).toBe("manager");
+      if (result.success) expect(result.data).toBe("manager");
     });
 
     it("allows hyphens", () => {
-      const result = validateRoleName("team-lead");
+      const result = roleNameField.safeParse("team-lead");
       expect(result.success).toBe(true);
     });
 
     it("allows underscores", () => {
-      const result = validateRoleName("team_lead");
+      const result = roleNameField.safeParse("team_lead");
       expect(result.success).toBe(true);
     });
 
     it("allows numbers", () => {
-      const result = validateRoleName("admin2");
+      const result = roleNameField.safeParse("admin2");
       expect(result.success).toBe(true);
     });
 
     it("rejects single character", () => {
-      const result = validateRoleName("a");
+      const result = roleNameField.safeParse("a");
       expect(result.success).toBe(false);
     });
 
     it("rejects names longer than 30 characters", () => {
-      const result = validateRoleName("a".repeat(31));
+      const result = roleNameField.safeParse("a".repeat(31));
       expect(result.success).toBe(false);
     });
 
     it("accepts name exactly 30 characters", () => {
-      const result = validateRoleName("a".repeat(30));
+      const result = roleNameField.safeParse("a".repeat(30));
       expect(result.success).toBe(true);
     });
 
     it("accepts name exactly 2 characters", () => {
-      const result = validateRoleName("ab");
+      const result = roleNameField.safeParse("ab");
       expect(result.success).toBe(true);
     });
 
     it("rejects spaces in name", () => {
-      const result = validateRoleName("team lead");
+      const result = roleNameField.safeParse("team lead");
       expect(result.success).toBe(false);
     });
 
     it("rejects special characters", () => {
-      const result = validateRoleName("admin@role");
+      const result = roleNameField.safeParse("admin@role");
       expect(result.success).toBe(false);
     });
 
     it("rejects dots in name", () => {
-      const result = validateRoleName("admin.role");
+      const result = roleNameField.safeParse("admin.role");
       expect(result.success).toBe(false);
     });
   });
 
-  describe("create role validation", () => {
+  describe("create role validation (createRoleSchema)", () => {
     it("accepts valid create payload", () => {
-      const result = validateCreateRole({
+      const result = createRoleSchema.safeParse({
         name: "reviewer",
         description: "Can review files",
         permissions: ["tools:use", "files:own"],
@@ -184,15 +201,38 @@ describe("roles route logic", () => {
     });
 
     it("description is optional", () => {
-      const result = validateCreateRole({
+      const result = createRoleSchema.safeParse({
         name: "reviewer",
         permissions: ["tools:use"],
       });
       expect(result.success).toBe(true);
     });
 
+    it("accepts optional or nullable toolPermissions", () => {
+      const withCategory = createRoleSchema.safeParse({
+        name: "reviewer",
+        permissions: ["tools:use"],
+        toolPermissions: { mode: "category", allowed: ["image"] },
+      });
+      expect(withCategory.success).toBe(true);
+
+      const withNull = createRoleSchema.safeParse({
+        name: "reviewer",
+        permissions: ["tools:use"],
+        toolPermissions: null,
+      });
+      expect(withNull.success).toBe(true);
+
+      const withInvalidMode = createRoleSchema.safeParse({
+        name: "reviewer",
+        permissions: ["tools:use"],
+        toolPermissions: { mode: "invalid", allowed: [] },
+      });
+      expect(withInvalidMode.success).toBe(false);
+    });
+
     it("requires at least one permission", () => {
-      const result = validateCreateRole({
+      const result = createRoleSchema.safeParse({
         name: "reviewer",
         permissions: [],
       });
@@ -200,14 +240,14 @@ describe("roles route logic", () => {
     });
 
     it("rejects missing permissions", () => {
-      const result = validateCreateRole({
+      const result = createRoleSchema.safeParse({
         name: "reviewer",
       });
       expect(result.success).toBe(false);
     });
 
     it("rejects description longer than 500 characters", () => {
-      const result = validateCreateRole({
+      const result = createRoleSchema.safeParse({
         name: "reviewer",
         permissions: ["tools:use"],
         description: "x".repeat(501),
@@ -216,44 +256,56 @@ describe("roles route logic", () => {
     });
   });
 
-  describe("update role validation", () => {
+  describe("update role validation (updateRoleSchema)", () => {
     it("accepts partial update with just name", () => {
-      const result = validateUpdateRole({ name: "new-name" });
+      const result = updateRoleSchema.safeParse({ name: "new-name" });
       expect(result.success).toBe(true);
     });
 
     it("accepts partial update with just description", () => {
-      const result = validateUpdateRole({ description: "Updated description" });
+      const result = updateRoleSchema.safeParse({ description: "Updated description" });
       expect(result.success).toBe(true);
     });
 
     it("accepts partial update with just permissions", () => {
-      const result = validateUpdateRole({ permissions: ["tools:use", "files:own"] });
+      const result = updateRoleSchema.safeParse({ permissions: ["tools:use", "files:own"] });
+      expect(result.success).toBe(true);
+    });
+
+    it("accepts partial update with toolPermissions", () => {
+      const result = updateRoleSchema.safeParse({
+        toolPermissions: { mode: "tool", allowed: ["resize"] },
+      });
       expect(result.success).toBe(true);
     });
 
     it("accepts empty update body", () => {
-      const result = validateUpdateRole({});
+      const result = updateRoleSchema.safeParse({});
       expect(result.success).toBe(true);
     });
 
     it("accepts all fields together", () => {
-      const result = validateUpdateRole({
+      const result = updateRoleSchema.safeParse({
         name: "updated-role",
         description: "New desc",
         permissions: ["tools:use"],
+        toolPermissions: null,
       });
       expect(result.success).toBe(true);
     });
 
     it("rejects empty permissions array (#2887)", () => {
-      const result = validateUpdateRole({ permissions: [] });
+      const result = updateRoleSchema.safeParse({ permissions: [] });
       expect(result.success).toBe(false);
-      expect(result.error).toBe("At least one permission is required");
+      if (!result.success) {
+        expect(result.error.issues.map((i) => i.message).join("; ")).toBe(
+          "At least one permission is required",
+        );
+      }
     });
   });
 
-  describe("permission validation", () => {
+  describe("permission validation (validatePermissions)", () => {
     it("returns empty array for valid permissions", () => {
       const invalid = validatePermissions(["tools:use", "files:own"]);
       expect(invalid).toHaveLength(0);
@@ -286,6 +338,8 @@ describe("roles route logic", () => {
       expect(ALL_PERMISSIONS).toContain("files:all");
       expect(ALL_PERMISSIONS).toContain("apikeys:own");
       expect(ALL_PERMISSIONS).toContain("apikeys:all");
+      expect(ALL_PERMISSIONS).toContain("pipelines:own");
+      expect(ALL_PERMISSIONS).toContain("pipelines:all");
       expect(ALL_PERMISSIONS).toContain("settings:read");
       expect(ALL_PERMISSIONS).toContain("settings:write");
       expect(ALL_PERMISSIONS).toContain("users:manage");
@@ -299,43 +353,115 @@ describe("roles route logic", () => {
     });
   });
 
-  describe("builtin role protection", () => {
-    it("blocks modification of builtin roles", () => {
-      const role = { isBuiltin: true, name: "admin" };
-      expect(role.isBuiltin).toBe(true);
+  describe("route handler behavior (rolesRoutes)", () => {
+    type RouteHandler = (request: unknown, reply: unknown) => Promise<unknown>;
+    let putHandler: RouteHandler;
+    let deleteHandler: RouteHandler;
+
+    beforeAll(async () => {
+      const fakeApp = {
+        get: vi.fn(),
+        post: vi.fn(),
+        put: vi.fn((path: string, handler: RouteHandler) => {
+          if (path === "/api/v1/roles/:id") putHandler = handler;
+        }),
+        delete: vi.fn((path: string, handler: RouteHandler) => {
+          if (path === "/api/v1/roles/:id") deleteHandler = handler;
+        }),
+        log: { info: vi.fn() },
+      };
+      await rolesRoutes(fakeApp as never);
     });
 
-    it("allows modification of custom roles", () => {
-      const role = { isBuiltin: false, name: "reviewer" };
-      expect(role.isBuiltin).toBe(false);
-    });
+    function makeReply() {
+      const reply = {
+        statusCode: 200,
+        payload: undefined as unknown,
+        status: vi.fn((code: number) => {
+          reply.statusCode = code;
+          return reply;
+        }),
+        send: vi.fn((body: unknown) => {
+          reply.payload = body;
+          return reply;
+        }),
+      };
+      return reply;
+    }
 
-    it("blocks deletion of builtin roles", () => {
-      const role = { isBuiltin: true, name: "user" };
-      expect(role.isBuiltin).toBe(true);
-    });
-  });
-
-  describe("user reassignment on role deletion", () => {
-    it("reassigns users to 'user' role when custom role is deleted", () => {
-      const usersOnRole = [
-        { id: "u1", role: "reviewer" },
-        { id: "u2", role: "reviewer" },
+    it("blocks modification and deletion of built-in roles with 400", async () => {
+      mocks.selectRows = [
+        {
+          id: "builtin-admin",
+          name: "admin",
+          isBuiltin: true,
+          permissions: ["tools:use"],
+          toolPermissions: null,
+        },
       ];
-      const updatedUsers = usersOnRole.map((u) => ({ ...u, role: "user" }));
-      expect(updatedUsers.every((u) => u.role === "user")).toBe(true);
-    });
-  });
 
-  describe("role name rename cascading", () => {
-    it("updates all users when role name changes", () => {
-      const users = [
-        { id: "u1", role: "old-name" },
-        { id: "u2", role: "old-name" },
+      const putReply = makeReply();
+      await putHandler(
+        {
+          params: { id: "builtin-admin" },
+          body: { description: "edited" },
+          log: { info: vi.fn() },
+        },
+        putReply,
+      );
+      expect(putReply.statusCode).toBe(400);
+      expect(putReply.payload).toEqual({
+        error: "Cannot modify built-in roles",
+        code: "VALIDATION_ERROR",
+      });
+
+      const deleteReply = makeReply();
+      await deleteHandler({ params: { id: "builtin-admin" }, log: { info: vi.fn() } }, deleteReply);
+      expect(deleteReply.statusCode).toBe(400);
+      expect(deleteReply.payload).toEqual({
+        error: "Cannot delete built-in roles",
+        code: "VALIDATION_ERROR",
+      });
+    });
+
+    it("cascades role rename to users and updates role row", async () => {
+      mocks.selectRows = [
+        {
+          id: "role-1",
+          name: "old-name",
+          isBuiltin: false,
+          permissions: ["tools:use"],
+          toolPermissions: null,
+        },
       ];
-      const newName = "new-name";
-      const updated = users.map((u) => ({ ...u, role: newName }));
-      expect(updated.every((u) => u.role === "new-name")).toBe(true);
+
+      const reply = makeReply();
+      await putHandler(
+        { params: { id: "role-1" }, body: { name: "new-name" }, log: { info: vi.fn() } },
+        reply,
+      );
+      expect(reply.statusCode).toBe(200);
+      expect(reply.payload).toEqual({ ok: true });
+      expect(mocks.updateCalls).toHaveLength(2);
+    });
+
+    it("reassigns users on deleted custom role to 'user' before deleting the role", async () => {
+      mocks.selectRows = [
+        {
+          id: "role-1",
+          name: "reviewer",
+          isBuiltin: false,
+          permissions: ["tools:use"],
+          toolPermissions: null,
+        },
+      ];
+
+      const reply = makeReply();
+      await deleteHandler({ params: { id: "role-1" }, log: { info: vi.fn() } }, reply);
+      expect(reply.statusCode).toBe(200);
+      expect(reply.payload).toEqual({ ok: true });
+      expect(mocks.updateCalls).toHaveLength(1);
+      expect(mocks.deleteCalls).toHaveLength(1);
     });
   });
 });

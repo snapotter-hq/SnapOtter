@@ -106,7 +106,7 @@ type FetchResult = SuccessResult | FailureResult;
 /**
  * Extract a usable filename from a URL path, falling back to a UUID-based name.
  */
-function filenameFromUrl(url: string): string {
+export function filenameFromUrl(url: string): string {
   try {
     const pathname = new URL(url).pathname;
     const base = basename(pathname);
@@ -127,7 +127,7 @@ function filenameFromUrl(url: string): string {
  * Appends `_1`, `_2`, etc. before the extension when a collision is found.
  * Mirrors the deduplication logic in batch.ts.
  */
-function getUniqueName(name: string, used: Set<string>): string {
+export function getUniqueName(name: string, used: Set<string>): string {
   if (!used.has(name)) {
     used.add(name);
     return name;

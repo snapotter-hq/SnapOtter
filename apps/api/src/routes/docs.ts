@@ -31,7 +31,7 @@ function localizedDocsRateLimit() {
   };
 }
 
-interface PathOperation {
+export interface PathOperation {
   tags?: string[];
   summary?: string;
   description?: string;
@@ -42,30 +42,30 @@ interface PathOperation {
 }
 
 /** Either a response or a `$ref` to one under components.responses. */
-interface ResponseObject {
+export interface ResponseObject {
   description?: string;
   $ref?: string;
 }
 
-interface SchemaObject {
+export interface SchemaObject {
   type?: string;
   properties?: Record<string, SchemaObject>;
   required?: string[];
   description?: string;
 }
 
-interface OpenAPISpec {
+export interface OpenAPISpec {
   info: { title: string; version: string; description?: string };
   tags?: Array<{ name: string; description?: string }>;
   paths: Record<string, Record<string, PathOperation>>;
   components?: { responses?: Record<string, ResponseObject> };
 }
 
-function isPublic(op: PathOperation): boolean {
+export function isPublic(op: PathOperation): boolean {
   return Array.isArray(op.security) && op.security.length === 0;
 }
 
-function generateLlmsTxt(spec: OpenAPISpec): string {
+export function generateLlmsTxt(spec: OpenAPISpec): string {
   const lines: string[] = [];
   const customModes: Record<string, string> = {
     "content-aware-resize": "sync",
@@ -151,7 +151,7 @@ function generateLlmsTxt(spec: OpenAPISpec): string {
   return lines.join("\n");
 }
 
-function generateLlmsFullTxt(spec: OpenAPISpec): string {
+export function generateLlmsFullTxt(spec: OpenAPISpec): string {
   const lines: string[] = [];
   lines.push(`# ${spec.info.title} v${spec.info.version}`);
   lines.push("");

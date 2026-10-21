@@ -702,31 +702,52 @@ interface ToolBundleInstallResult {
   skipped?: boolean;
 }
 
-interface ManifestModel {
+export interface ManifestModel {
   id: string;
   path?: string;
   downloadFn?: string;
   args?: string[];
 }
 
-interface ManifestBundle {
+export interface ManifestBundle {
   models: ManifestModel[];
   targets?: Record<string, { minimumMemoryBytes?: number }>;
 }
 
-interface Manifest {
+export interface Manifest {
   bundleRepo?: string;
   bundles: Record<string, ManifestBundle>;
 }
 
-function readManifest(): Manifest | null {
-  const manifestPath = getManifestPath();
+export function readManifest(manifestPath = getManifestPath()): Manifest | null {
   if (!existsSync(manifestPath)) return null;
   try {
     return JSON.parse(readFileSync(manifestPath, "utf-8")) as Manifest;
   } catch {
     return null;
   }
+}
+
+export function collectProtectedBundleTargets(
+  manifest: Manifest,
+  bundleIdToUninstall: string,
+  isInstalled: (bundleId: string) => boolean = isFeatureInstalled,
+): { protectedFiles: Set<string>; protectedDirs: Set<string> } {
+  const protectedFiles = new Set<string>();
+  const protectedDirs = new Set<string>();
+  for (const [otherId, otherBundle] of Object.entries(manifest.bundles)) {
+    if (otherId === bundleIdToUninstall || !isInstalled(otherId)) continue;
+    for (const m of otherBundle.models ?? []) {
+      if (m.path) protectedFiles.add(m.path);
+      if (m.downloadFn === "rembg_session" && m.args?.[0]) {
+        protectedFiles.add(`rembg/${m.args[0]}.onnx`);
+      }
+      if (m.downloadFn === "hf_snapshot" && m.args?.[1]) {
+        protectedDirs.add(m.args[1]);
+      }
+    }
+  }
+  return { protectedFiles, protectedDirs };
 }
 
 type SupportedOcrRuntimeTarget = Exclude<ReturnType<typeof selectOcrRuntimeTarget>, null>;
@@ -824,7 +845,7 @@ async function queueBundleInstallIfNeeded(
 }
 
 /** Recursively calculate total size of a directory in bytes. */
-function getDirSize(dirPath: string): number {
+export function getDirSize(dirPath: string): number {
   if (!existsSync(dirPath)) return 0;
 
   let total = 0;
@@ -1112,20 +1133,10 @@ export async function registerFeatureRoutes(app: FastifyInstance): Promise<void>
         if (manifest) {
           const manifestBundle = manifest.bundles[bundleId];
           if (manifestBundle) {
-            const protectedFiles = new Set<string>();
-            const protectedDirs = new Set<string>();
-            for (const [otherId, otherBundle] of Object.entries(manifest.bundles)) {
-              if (otherId === bundleId || !isFeatureInstalled(otherId)) continue;
-              for (const m of otherBundle.models ?? []) {
-                if (m.path) protectedFiles.add(m.path);
-                if (m.downloadFn === "rembg_session" && m.args?.[0]) {
-                  protectedFiles.add(`rembg/${m.args[0]}.onnx`);
-                }
-                if (m.downloadFn === "hf_snapshot" && m.args?.[1]) {
-                  protectedDirs.add(m.args[1]);
-                }
-              }
-            }
+            const { protectedFiles, protectedDirs } = collectProtectedBundleTargets(
+              manifest,
+              bundleId,
+            );
 
             const modelsDir = getModelsDir();
             for (const model of manifestBundle.models) {

@@ -1,66 +1,24 @@
 /**
- * Unit tests for pure utility functions in the features route.
- *
- * The route file contains `readManifest()` and `getDirSize()` as private
- * functions. We reproduce their logic here for unit testing since the route
- * registration requires the full Fastify + DB stack.
+ * Unit tests for utility functions in the features route (apps/api/src/routes/features.ts).
  */
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-// ── Reproduced utility functions from features.ts ────────────────────────
+vi.mock("../../../apps/api/src/db/index.js", () => ({
+  db: {},
+  pool: {},
+  closeDb: async () => {},
+  schema: {},
+}));
 
-interface ManifestModel {
-  id: string;
-  path?: string;
-}
-
-interface ManifestBundle {
-  models: ManifestModel[];
-}
-
-interface Manifest {
-  bundles: Record<string, ManifestBundle>;
-}
-
-function readManifest(manifestPath: string): Manifest | null {
-  if (!existsSync(manifestPath)) return null;
-  try {
-    return JSON.parse(readFileSync(manifestPath, "utf-8")) as Manifest;
-  } catch {
-    return null;
-  }
-}
-
-function getDirSize(dirPath: string): number {
-  if (!existsSync(dirPath)) return 0;
-
-  let total = 0;
-  const entries = readdirSync(dirPath, { withFileTypes: true });
-  for (const entry of entries) {
-    const fullPath = join(dirPath, entry.name);
-    if (entry.isDirectory()) {
-      total += getDirSize(fullPath);
-    } else if (entry.isFile()) {
-      try {
-        total += statSync(fullPath).size;
-      } catch {
-        // File may have been deleted between readdir and stat
-      }
-    }
-  }
-  return total;
-}
+import {
+  collectProtectedBundleTargets,
+  getDirSize,
+  type Manifest,
+  readManifest,
+} from "../../../apps/api/src/routes/features.js";
 
 // ── Test fixtures ────────────────────────────────────────────────────────
 
@@ -118,7 +76,7 @@ describe("readManifest", () => {
 
     const result = readManifest(filePath);
     expect(result).not.toBeNull();
-    expect(Object.keys(result?.bundles)).toHaveLength(0);
+    expect(Object.keys(result?.bundles ?? {})).toHaveLength(0);
   });
 
   it("handles manifest with models without paths", () => {
@@ -151,7 +109,7 @@ describe("readManifest", () => {
     );
 
     const result = readManifest(filePath);
-    expect(Object.keys(result?.bundles)).toHaveLength(2);
+    expect(Object.keys(result?.bundles ?? {})).toHaveLength(2);
   });
 });
 
@@ -206,8 +164,8 @@ describe("getDirSize", () => {
 
 // ── Shared model path logic ─────────────────────────────────────────────
 
-describe("shared model path deduplication", () => {
-  it("identifies models shared between bundles", () => {
+describe("shared model path deduplication (collectProtectedBundleTargets)", () => {
+  it("identifies models, rembg sessions, and hf_snapshot dirs shared with installed bundles", () => {
     const manifest: Manifest = {
       bundles: {
         "ai-rembg": {
@@ -220,35 +178,36 @@ describe("shared model path deduplication", () => {
           models: [
             { id: "common", path: "shared/common-model.onnx" },
             { id: "esrgan-specific", path: "esrgan/only.pth" },
+            { id: "isnet", downloadFn: "rembg_session", args: ["isnet-general-use"] },
+            { id: "whisper", downloadFn: "hf_snapshot", args: ["repo/id", "whisper-tiny"] },
           ],
+        },
+        "ai-uninstalled": {
+          models: [{ id: "unused", path: "uninstalled/model.onnx" }],
         },
       },
     };
 
-    // Simulate the uninstall logic: collect paths still needed by other bundles
-    const bundleToUninstall = "ai-rembg";
-    const sharedPaths = new Set<string>();
-    for (const [otherId, otherBundle] of Object.entries(manifest.bundles)) {
-      if (otherId === bundleToUninstall) continue;
-      for (const m of otherBundle.models ?? []) {
-        if (m.path) sharedPaths.add(m.path);
-      }
-    }
+    const { protectedFiles, protectedDirs } = collectProtectedBundleTargets(
+      manifest,
+      "ai-rembg",
+      (id) => id === "ai-esrgan",
+    );
 
-    // The shared model path should be protected
-    expect(sharedPaths.has("shared/common-model.onnx")).toBe(true);
-    expect(sharedPaths.has("esrgan/only.pth")).toBe(true);
-    // rembg-specific should NOT be in the shared set (it belongs to the bundle being uninstalled)
-    expect(sharedPaths.has("rembg/only.onnx")).toBe(false);
+    expect(protectedFiles.has("shared/common-model.onnx")).toBe(true);
+    expect(protectedFiles.has("esrgan/only.pth")).toBe(true);
+    expect(protectedFiles.has("rembg/isnet-general-use.onnx")).toBe(true);
+    expect(protectedFiles.has("rembg/only.onnx")).toBe(false);
+    expect(protectedFiles.has("uninstalled/model.onnx")).toBe(false);
+    expect(protectedDirs.has("whisper-tiny")).toBe(true);
 
-    // Models from the bundle to uninstall that are NOT shared can be deleted
-    const bundleModels = manifest.bundles[bundleToUninstall].models;
-    const deletable = bundleModels.filter((m) => m.path && !sharedPaths.has(m.path));
+    const bundleModels = manifest.bundles["ai-rembg"].models;
+    const deletable = bundleModels.filter((m) => m.path && !protectedFiles.has(m.path));
     expect(deletable).toHaveLength(1);
     expect(deletable[0].path).toBe("rembg/only.onnx");
   });
 
-  it("handles bundle with no models property", () => {
+  it("handles bundle with empty models array", () => {
     const manifest: Manifest = {
       bundles: {
         "ai-rembg": { models: [{ id: "m1", path: "a.onnx" }] },
@@ -256,14 +215,13 @@ describe("shared model path deduplication", () => {
       },
     };
 
-    const sharedPaths = new Set<string>();
-    for (const [otherId, otherBundle] of Object.entries(manifest.bundles)) {
-      if (otherId === "ai-rembg") continue;
-      for (const m of otherBundle.models ?? []) {
-        if (m.path) sharedPaths.add(m.path);
-      }
-    }
+    const { protectedFiles, protectedDirs } = collectProtectedBundleTargets(
+      manifest,
+      "ai-rembg",
+      () => true,
+    );
 
-    expect(sharedPaths.size).toBe(0);
+    expect(protectedFiles.size).toBe(0);
+    expect(protectedDirs.size).toBe(0);
   });
 });

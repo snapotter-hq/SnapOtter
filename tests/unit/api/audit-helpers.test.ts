@@ -1,94 +1,57 @@
 /**
- * Unit tests for audit event mapping and actor extraction logic.
- *
- * Since deriveTargetType is not exported from audit.ts, we reproduce the
- * mapping logic here so we can verify every event type maps correctly.
- * Actor ID and username extraction logic is tested via the same rules
- * used in auditLog().
+ * Unit tests for audit event mapping and actor extraction logic in apps/api/src/lib/audit.ts.
  */
+import { describe, expect, it, vi } from "vitest";
 
-import { describe, expect, it } from "vitest";
+vi.mock("../../../apps/api/src/db/index.js", () => ({
+  db: {},
+  pool: {},
+  closeDb: async () => {},
+  schema: { auditLog: {} },
+}));
 
-// ---------------------------------------------------------------------------
-// Reproduce the private deriveTargetType logic so we can test its mapping
-// ---------------------------------------------------------------------------
-type AuditEvent =
-  | "LOGIN_SUCCESS"
-  | "LOGIN_FAILED"
-  | "LOGOUT"
-  | "PASSWORD_CHANGED"
-  | "PASSWORD_RESET"
-  | "USER_CREATED"
-  | "USER_DELETED"
-  | "USER_UPDATED"
-  | "FILE_UPLOADED"
-  | "FILE_DELETED"
-  | "API_KEY_CREATED"
-  | "API_KEY_DELETED"
-  | "ROLE_CREATED"
-  | "ROLE_UPDATED"
-  | "ROLE_DELETED"
-  | "SETTINGS_UPDATED";
+import {
+  deriveTargetType,
+  extractActorId,
+  extractActorUsername,
+} from "../../../apps/api/src/lib/audit.js";
 
-function deriveTargetType(event: AuditEvent): string | null {
-  if (
-    event.startsWith("USER_") ||
-    event.startsWith("LOGIN") ||
-    event.startsWith("PASSWORD") ||
-    event === "LOGOUT"
-  )
-    return "user";
-  if (event.startsWith("API_KEY")) return "api_key";
-  if (event.startsWith("FILE")) return "file";
-  if (event.startsWith("ROLE")) return "role";
-  if (event === "SETTINGS_UPDATED") return "setting";
-  return null;
-}
-
-// ---------------------------------------------------------------------------
-// Reproduce the actor extraction logic from auditLog()
-// ---------------------------------------------------------------------------
-function extractActorId(details: Record<string, unknown>): string | null {
-  return (details.userId as string) ?? (details.adminId as string) ?? null;
-}
-
-function extractActorUsername(details: Record<string, unknown>): string {
-  return (details.username as string) ?? (details.newUsername as string) ?? "system";
-}
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 describe("audit helpers", () => {
   describe("deriveTargetType", () => {
-    it.each<[AuditEvent, string]>([
+    it.each([
       ["LOGIN_SUCCESS", "user"],
       ["LOGIN_FAILED", "user"],
+      ["LOGIN_THROTTLED", "user"],
       ["LOGOUT", "user"],
       ["PASSWORD_CHANGED", "user"],
       ["PASSWORD_RESET", "user"],
       ["USER_CREATED", "user"],
       ["USER_DELETED", "user"],
       ["USER_UPDATED", "user"],
+      ["OIDC_LOGIN_SUCCESS", "user"],
+      ["SAML_LOGIN_SUCCESS", "user"],
+      ["SCIM_USER_CREATED", "user"],
+      ["MFA_ENABLED", "user"],
     ])("%s -> %s", (event, expected) => {
       expect(deriveTargetType(event)).toBe(expected);
     });
 
-    it.each<[AuditEvent, string]>([
+    it.each([
       ["FILE_UPLOADED", "file"],
       ["FILE_DELETED", "file"],
     ])("%s -> %s", (event, expected) => {
       expect(deriveTargetType(event)).toBe(expected);
     });
 
-    it.each<[AuditEvent, string]>([
+    it.each([
       ["API_KEY_CREATED", "api_key"],
       ["API_KEY_DELETED", "api_key"],
+      ["API_KEY_AUTH_FAILED", "api_key"],
     ])("%s -> %s", (event, expected) => {
       expect(deriveTargetType(event)).toBe(expected);
     });
 
-    it.each<[AuditEvent, string]>([
+    it.each([
       ["ROLE_CREATED", "role"],
       ["ROLE_UPDATED", "role"],
       ["ROLE_DELETED", "role"],
@@ -96,8 +59,34 @@ describe("audit helpers", () => {
       expect(deriveTargetType(event)).toBe(expected);
     });
 
-    it("SETTINGS_UPDATED -> setting", () => {
-      expect(deriveTargetType("SETTINGS_UPDATED")).toBe("setting");
+    it.each([
+      ["SETTINGS_UPDATED", "setting"],
+      ["IP_ALLOWLIST_UPDATED", "setting"],
+    ])("%s -> %s", (event, expected) => {
+      expect(deriveTargetType(event)).toBe(expected);
+    });
+
+    it.each([
+      ["TOOL_EXECUTED", "tool"],
+      ["BATCH_STARTED", "tool"],
+      ["PIPELINE_EXECUTED", "tool"],
+    ])("%s -> %s", (event, expected) => {
+      expect(deriveTargetType(event)).toBe(expected);
+    });
+
+    it("LEGAL_HOLD_CREATED -> compliance", () => {
+      expect(deriveTargetType("LEGAL_HOLD_CREATED")).toBe("compliance");
+    });
+
+    it.each([
+      ["SIEM_FORWARD_FAILED", "integration"],
+      ["WEBHOOK_DELIVERED", "integration"],
+    ])("%s -> %s", (event, expected) => {
+      expect(deriveTargetType(event)).toBe(expected);
+    });
+
+    it("returns null for unmapped event prefixes", () => {
+      expect(deriveTargetType("UNKNOWN_EVENT")).toBeNull();
     });
   });
 
@@ -117,10 +106,6 @@ describe("audit helpers", () => {
     it("returns null when neither userId nor adminId is present", () => {
       expect(extractActorId({})).toBeNull();
     });
-
-    it("returns null for an empty details object", () => {
-      expect(extractActorId({})).toBeNull();
-    });
   });
 
   describe("extractActorUsername", () => {
@@ -137,10 +122,6 @@ describe("audit helpers", () => {
     });
 
     it('returns "system" when neither username nor newUsername is present', () => {
-      expect(extractActorUsername({})).toBe("system");
-    });
-
-    it('returns "system" for an empty details object', () => {
       expect(extractActorUsername({})).toBe("system");
     });
   });

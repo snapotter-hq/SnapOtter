@@ -28,7 +28,7 @@ const teamNameField = z
 
 const POSTGRES_INTEGER_MAX = 2_147_483_647;
 
-const createTeamSchema = z
+export const createTeamSchema = z
   .object({
     name: teamNameField,
     storageQuota: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable().optional(),
@@ -36,7 +36,7 @@ const createTeamSchema = z
   })
   .strict();
 
-const updateTeamSchema = z
+export const updateTeamSchema = z
   .object({
     name: teamNameField.optional(),
     storageQuota: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).nullable().optional(),

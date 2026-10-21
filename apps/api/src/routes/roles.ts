@@ -39,7 +39,7 @@ async function resolveTransactionActor(tx: Tx, user: AuthUser): Promise<AuthUser
   return currentActor;
 }
 
-const ALL_PERMISSIONS: Permission[] = [
+export const ALL_PERMISSIONS: Permission[] = [
   "tools:use",
   "files:own",
   "files:all",
@@ -59,7 +59,11 @@ const ALL_PERMISSIONS: Permission[] = [
   "security:manage",
 ];
 
-const roleNameField = z
+export function validatePermissions(permissions: string[]): string[] {
+  return permissions.filter((p) => !ALL_PERMISSIONS.includes(p as Permission));
+}
+
+export const roleNameField = z
   .string()
   .transform(normalizeRoleName)
   .pipe(
@@ -81,7 +85,7 @@ const toolPermissionsSchema = z
   .nullable()
   .optional();
 
-const createRoleSchema = z.object({
+export const createRoleSchema = z.object({
   name: roleNameField,
   description: z.string().max(500).optional(),
   permissions: z.array(z.string()).min(1, "At least one permission is required"),
@@ -140,7 +144,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
     }
     const { name, description, permissions, toolPermissions } = parsed.data;
 
-    const invalid = permissions.filter((p) => !ALL_PERMISSIONS.includes(p as Permission));
+    const invalid = validatePermissions(permissions);
     if (invalid.length > 0) {
       return reply
         .status(400)
@@ -241,7 +245,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
         updates.description = body.description.trim();
       }
       if (body.permissions) {
-        const invalid = body.permissions.filter((p) => !ALL_PERMISSIONS.includes(p as Permission));
+        const invalid = validatePermissions(body.permissions);
         if (invalid.length > 0) {
           return reply.status(400).send({
             error: `Invalid permissions: ${invalid.join(", ")}`,

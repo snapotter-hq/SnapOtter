@@ -1,157 +1,289 @@
 /**
- * Unit tests for teams route validation and helper logic.
+ * Unit tests for teams route validation and route handler logic.
  *
- * Tests the team name validation schema, duplicate detection logic,
- * and Default team protection constraints.
+ * Tests createTeamSchema and updateTeamSchema (including .strict() and
+ * storageQuota/retentionHours), duplicate detection, Default team protection,
+ * and member count checks from apps/api/src/routes/teams.ts.
  */
-import { describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-// ── Reproduce the validation logic from teams.ts ───────────────────────
+const mocks = vi.hoisted(() => ({
+  selectQueue: [] as unknown[][],
+  insertedValues: undefined as Record<string, unknown> | undefined,
+  insertRowCount: 1,
+  updatedValues: undefined as Record<string, unknown> | undefined,
+  updateRowCount: 1,
+  deleteWhere: vi.fn(() => Promise.resolve()),
+  requirePermission: vi.fn(() => () => Promise.resolve({ id: "admin-1", role: "admin" })),
+}));
 
-function validateTeamName(body: unknown): {
-  success: boolean;
-  name?: string;
-  error?: string;
-} {
-  if (typeof body !== "object" || body === null) {
-    return { success: false, error: "Team name is required" };
-  }
-  const raw = (body as Record<string, unknown>).name;
-  if (typeof raw !== "string") {
-    return { success: false, error: "Team name is required" };
-  }
-  const trimmed = raw.trim();
-  if (trimmed.length === 0) {
-    return { success: false, error: "Team name is required" };
-  }
-  if (trimmed.length > 50) {
-    return { success: false, error: "Team name must be 50 characters or fewer" };
-  }
-  return { success: true, name: trimmed };
-}
+vi.mock("drizzle-orm", () => ({
+  eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+  sql: (strings: TemplateStringsArray, ...vals: unknown[]) => ({
+    sql: strings.join("?"),
+    vals,
+  }),
+}));
+
+vi.mock("../../../apps/api/src/db/index.js", () => {
+  const nextRows = () => mocks.selectQueue.shift() ?? [];
+  const dbObj = {
+    select: () => ({
+      from: () => ({
+        where: () => {
+          const rows = nextRows();
+          const p = Promise.resolve(rows);
+          return Object.assign(p, {
+            for: () => Promise.resolve(rows),
+          });
+        },
+      }),
+    }),
+    insert: () => ({
+      values: (vals: Record<string, unknown>) => {
+        mocks.insertedValues = vals;
+        return {
+          onConflictDoNothing: () => Promise.resolve({ rowCount: mocks.insertRowCount }),
+        };
+      },
+    }),
+    update: () => ({
+      set: (vals: Record<string, unknown>) => {
+        mocks.updatedValues = vals;
+        return {
+          where: () => Promise.resolve({ rowCount: mocks.updateRowCount }),
+        };
+      },
+    }),
+    delete: () => ({
+      where: mocks.deleteWhere,
+    }),
+    transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(dbObj),
+  };
+  return {
+    db: dbObj,
+    pool: {},
+    closeDb: async () => {},
+    schema: {
+      teams: {
+        id: "teams.id",
+        name: "teams.name",
+        storageQuota: "teams.storage_quota",
+        retentionHours: "teams.retention_hours",
+        createdAt: "teams.created_at",
+      },
+      users: {
+        team: "users.team",
+      },
+    },
+  };
+});
+
+vi.mock("../../../apps/api/src/permissions.js", () => ({
+  requirePermission: mocks.requirePermission,
+}));
+
+import {
+  createTeamSchema,
+  teamsRoutes,
+  updateTeamSchema,
+} from "../../../apps/api/src/routes/teams.js";
 
 // ── Tests ───────────────────────────────────────────────────────────────
 
 describe("teams route logic", () => {
-  describe("team name validation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.selectQueue = [];
+    mocks.insertedValues = undefined;
+    mocks.insertRowCount = 1;
+    mocks.updatedValues = undefined;
+    mocks.updateRowCount = 1;
+    mocks.requirePermission.mockImplementation(
+      () => () => Promise.resolve({ id: "admin-1", role: "admin" }),
+    );
+  });
+
+  describe("createTeamSchema validation", () => {
     it("accepts valid team name", () => {
-      const result = validateTeamName({ name: "Engineering" });
+      const result = createTeamSchema.safeParse({ name: "Engineering" });
       expect(result.success).toBe(true);
-      expect(result.name).toBe("Engineering");
+      if (result.success) expect(result.data.name).toBe("Engineering");
     });
 
     it("trims whitespace from team name", () => {
-      const result = validateTeamName({ name: "  Design  " });
+      const result = createTeamSchema.safeParse({ name: "  Design  " });
       expect(result.success).toBe(true);
-      expect(result.name).toBe("Design");
+      if (result.success) expect(result.data.name).toBe("Design");
     });
 
     it("rejects empty string after trimming", () => {
-      const result = validateTeamName({ name: "   " });
+      const result = createTeamSchema.safeParse({ name: "   " });
       expect(result.success).toBe(false);
     });
 
     it("rejects missing name field", () => {
-      const result = validateTeamName({});
+      const result = createTeamSchema.safeParse({});
       expect(result.success).toBe(false);
     });
 
     it("rejects name longer than 50 characters", () => {
-      const result = validateTeamName({ name: "A".repeat(51) });
+      const result = createTeamSchema.safeParse({ name: "A".repeat(51) });
       expect(result.success).toBe(false);
     });
 
     it("accepts name exactly 50 characters", () => {
-      const result = validateTeamName({ name: "A".repeat(50) });
+      const result = createTeamSchema.safeParse({ name: "A".repeat(50) });
       expect(result.success).toBe(true);
     });
 
     it("accepts single character name", () => {
-      const result = validateTeamName({ name: "X" });
+      const result = createTeamSchema.safeParse({ name: "X" });
       expect(result.success).toBe(true);
     });
 
     it("rejects non-string name", () => {
-      const result = validateTeamName({ name: 123 });
+      const result = createTeamSchema.safeParse({ name: 123 });
+      expect(result.success).toBe(false);
+    });
+
+    it("accepts optional storageQuota and retentionHours and rejects unknown keys (.strict())", () => {
+      const valid = createTeamSchema.safeParse({
+        name: "Ops",
+        storageQuota: 1024 * 1024,
+        retentionHours: 24,
+      });
+      expect(valid.success).toBe(true);
+
+      const nullable = createTeamSchema.safeParse({
+        name: "Ops",
+        storageQuota: null,
+        retentionHours: null,
+      });
+      expect(nullable.success).toBe(true);
+
+      const unknownKey = createTeamSchema.safeParse({
+        name: "Ops",
+        storagequota: 1024,
+      });
+      expect(unknownKey.success).toBe(false);
+
+      expect(createTeamSchema.safeParse({ name: "Ops", storageQuota: 0 }).success).toBe(false);
+      expect(createTeamSchema.safeParse({ name: "Ops", storageQuota: -1 }).success).toBe(false);
+      expect(createTeamSchema.safeParse({ name: "Ops", storageQuota: 1.5 }).success).toBe(false);
+      expect(createTeamSchema.safeParse({ name: "Ops", retentionHours: 0 }).success).toBe(false);
+      expect(
+        createTeamSchema.safeParse({ name: "Ops", retentionHours: 2_147_483_648 }).success,
+      ).toBe(false);
+    });
+  });
+
+  describe("updateTeamSchema validation", () => {
+    it("accepts name, storageQuota, or retentionHours individually", () => {
+      expect(updateTeamSchema.safeParse({ name: "NewName" }).success).toBe(true);
+      expect(updateTeamSchema.safeParse({ storageQuota: 5000 }).success).toBe(true);
+      expect(updateTeamSchema.safeParse({ retentionHours: 48 }).success).toBe(true);
+    });
+
+    it("rejects empty object when none of name, storageQuota, or retentionHours is provided", () => {
+      const result = updateTeamSchema.safeParse({});
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects unknown keys via .strict()", () => {
+      const result = updateTeamSchema.safeParse({ name: "NewName", extraField: true });
       expect(result.success).toBe(false);
     });
   });
 
-  describe("Default team protection", () => {
-    it("identifies the Default team by name", () => {
-      const team = { name: "Default", id: "some-id" };
-      expect(team.name === "Default").toBe(true);
+  describe("route handler behavior (teamsRoutes)", () => {
+    type RouteHandler = (request: unknown, reply: unknown) => Promise<unknown>;
+    let postHandler: RouteHandler;
+    let putHandler: RouteHandler;
+    let deleteHandler: RouteHandler;
+
+    beforeAll(async () => {
+      const fakeApp = {
+        get: vi.fn(),
+        post: vi.fn((path: string, handler: RouteHandler) => {
+          if (path === "/api/v1/teams") postHandler = handler;
+        }),
+        put: vi.fn((path: string, handler: RouteHandler) => {
+          if (path === "/api/v1/teams/:id") putHandler = handler;
+        }),
+        delete: vi.fn((path: string, handler: RouteHandler) => {
+          if (path === "/api/v1/teams/:id") deleteHandler = handler;
+        }),
+        log: { info: vi.fn() },
+      };
+      await teamsRoutes(fakeApp as never);
     });
 
-    it("non-Default teams can be deleted", () => {
-      const team = { name: "Engineering", id: "eng-id" };
-      expect(team.name === "Default").toBe(false);
-    });
-  });
+    function makeReply() {
+      const reply = {
+        statusCode: 200,
+        payload: undefined as unknown,
+        status: vi.fn((code: number) => {
+          reply.statusCode = code;
+          return reply;
+        }),
+        send: vi.fn((body: unknown) => {
+          reply.payload = body;
+          return reply;
+        }),
+      };
+      return reply;
+    }
 
-  describe("member count check", () => {
-    it("blocks deletion when team has members", () => {
-      const memberCount = { count: 3 };
-      expect(memberCount.count > 0).toBe(true);
-    });
-
-    it("allows deletion when team has no members", () => {
-      const memberCount = { count: 0 };
-      expect(memberCount.count > 0).toBe(false);
-    });
-
-    it("handles null member count as zero", () => {
-      const memberCount: { count: number } | undefined = undefined;
-      const count = memberCount?.count ?? 0;
-      expect(count > 0).toBe(false);
-    });
-  });
-
-  describe("case-insensitive duplicate detection", () => {
-    it("detects duplicates case-insensitively", () => {
-      const existingNames = ["engineering", "design", "marketing"];
-      const newName = "Engineering";
-      const isDuplicate = existingNames.some(
-        (name) => name.toLowerCase() === newName.toLowerCase(),
-      );
-      expect(isDuplicate).toBe(true);
+    it("blocks deletion of the Default team with 400", async () => {
+      mocks.selectQueue = [[{ id: "default-id", name: "Default" }]];
+      const reply = makeReply();
+      await deleteHandler({ params: { id: "default-id" } }, reply);
+      expect(reply.statusCode).toBe(400);
+      expect(reply.payload).toEqual({
+        error: "Cannot delete the Default team",
+        code: "VALIDATION_ERROR",
+      });
+      expect(mocks.deleteWhere).not.toHaveBeenCalled();
     });
 
-    it("allows unique names", () => {
-      const existingNames = ["engineering", "design"];
-      const newName = "Marketing";
-      const isDuplicate = existingNames.some(
-        (name) => name.toLowerCase() === newName.toLowerCase(),
-      );
-      expect(isDuplicate).toBe(false);
+    it("blocks deletion when team has members and allows deletion when member count is zero", async () => {
+      mocks.selectQueue = [[{ id: "eng-id", name: "Engineering" }], [{ count: 3 }]];
+      const blockedReply = makeReply();
+      await deleteHandler({ params: { id: "eng-id" } }, blockedReply);
+      expect(blockedReply.statusCode).toBe(400);
+      expect(blockedReply.payload).toEqual({
+        error: "Cannot delete a team that has members",
+        code: "VALIDATION_ERROR",
+      });
+      expect(mocks.deleteWhere).not.toHaveBeenCalled();
+
+      mocks.selectQueue = [[{ id: "eng-id", name: "Engineering" }], [{ count: 0 }]];
+      const okReply = makeReply();
+      await deleteHandler({ params: { id: "eng-id" } }, okReply);
+      expect(okReply.statusCode).toBe(200);
+      expect(okReply.payload).toEqual({ ok: true });
+      expect(mocks.deleteWhere).toHaveBeenCalledTimes(1);
     });
 
-    it("excludes current team when renaming", () => {
-      const existingTeams = [
-        { id: "t1", name: "engineering" },
-        { id: "t2", name: "design" },
-      ];
-      const currentId = "t1";
-      const newName = "Engineering";
+    it("rejects duplicate team names on create and rename with 409", async () => {
+      mocks.selectQueue = [[{ id: "t1", name: "engineering" }]];
+      const createReply = makeReply();
+      await postHandler({ body: { name: "Engineering" } }, createReply);
+      expect(createReply.statusCode).toBe(409);
+      expect(createReply.payload).toEqual({
+        error: "Team name already exists",
+        code: "CONFLICT",
+      });
 
-      const isDuplicate = existingTeams.some(
-        (t) => t.id !== currentId && t.name.toLowerCase() === newName.toLowerCase(),
-      );
-      expect(isDuplicate).toBe(false);
-    });
-
-    it("detects duplicate when renaming to another team name", () => {
-      const existingTeams = [
-        { id: "t1", name: "engineering" },
-        { id: "t2", name: "design" },
-      ];
-      const currentId = "t1";
-      const newName = "Design";
-
-      const isDuplicate = existingTeams.some(
-        (t) => t.id !== currentId && t.name.toLowerCase() === newName.toLowerCase(),
-      );
-      expect(isDuplicate).toBe(true);
+      mocks.selectQueue = [[{ id: "t1", name: "engineering" }], [{ id: "t2", name: "design" }]];
+      const renameReply = makeReply();
+      await putHandler({ params: { id: "t1" }, body: { name: "Design" } }, renameReply);
+      expect(renameReply.statusCode).toBe(409);
+      expect(renameReply.payload).toEqual({
+        error: "Team name already exists",
+        code: "CONFLICT",
+      });
     });
   });
 });
