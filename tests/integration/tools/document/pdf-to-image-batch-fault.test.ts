@@ -33,18 +33,26 @@ const faults = vi.hoisted(() => ({
   settleFails: false,
   /** Job id whose row is marked terminal right before a fault, so failBatchJob returns false. */
   retireRowBeforeFault: null as string | null,
+  /** Object keys (or prefixes) where reply.raw emits an error mid-stream (#2764). */
+  replyErrorOnStream: new Set<string>(),
+  /** When set, reply.raw emits an error while failBatchJob is awaiting (#2764). */
+  replyErrorDuringSettle: false,
+  /** When set, reply.raw also emits an error while deletePrefix is awaiting (#2764). */
+  replyErrorDuringCleanup: false,
 }));
 
 const warnLogs: Array<{ bindings: unknown; msg: string }> = [];
+let currentReplyRaw: (NodeJS.EventEmitter & { destroy: (err?: Error) => void }) | null = null;
 
 preReadyHooks.push((app) => {
   app.addHook(
     "onRequest",
     (
       request: { log: { warn: (...args: unknown[]) => unknown } },
-      _reply: unknown,
+      reply: { raw: NodeJS.EventEmitter & { destroy: (err?: Error) => void } },
       done: () => void,
     ) => {
+      currentReplyRaw = reply.raw;
       const origWarn = request.log.warn.bind(request.log);
       request.log.warn = (objOrMsg: unknown, msg?: unknown) => {
         if (typeof objOrMsg === "string") {
@@ -88,6 +96,17 @@ vi.mock("../../../../apps/api/src/lib/object-storage.js", async (importOriginal)
       return actual.putObject(key, data);
     },
     getObjectStream: async (key: string) => {
+      for (const prefix of faults.replyErrorOnStream) {
+        if (key.startsWith(prefix)) {
+          return new Readable({
+            read() {
+              queueMicrotask(() => {
+                currentReplyRaw?.emit("error", new Error(`test poison: reply error for ${key}`));
+              });
+            },
+          });
+        }
+      }
       for (const prefix of faults.streamPoison) {
         if (key.startsWith(prefix)) {
           if (faults.retireRowBeforeFault) {
@@ -105,6 +124,18 @@ vi.mock("../../../../apps/api/src/lib/object-storage.js", async (importOriginal)
       }
       return actual.getObjectStream(key);
     },
+    deletePrefix: async (prefix: string) => {
+      if (faults.replyErrorDuringCleanup) {
+        faults.replyErrorDuringCleanup = false;
+        await new Promise<void>((resolve) => {
+          queueMicrotask(() => {
+            currentReplyRaw?.emit("error", new Error("test poison: reply error during cleanup"));
+            resolve();
+          });
+        });
+      }
+      return actual.deletePrefix(prefix);
+    },
   };
 });
 
@@ -114,6 +145,15 @@ vi.mock("../../../../apps/api/src/routes/progress.js", async (importOriginal) =>
   return {
     ...actual,
     failBatchJob: async (...args: Parameters<typeof actual.failBatchJob>) => {
+      if (faults.replyErrorDuringSettle) {
+        faults.replyErrorDuringSettle = false;
+        await new Promise<void>((resolve) => {
+          queueMicrotask(() => {
+            currentReplyRaw?.emit("error", new Error("test poison: reply error during settle"));
+            resolve();
+          });
+        });
+      }
       if (faults.settleFails) throw new Error("settle write failed");
       return actual.failBatchJob(...args);
     },
@@ -137,6 +177,10 @@ afterEach(() => {
   faults.streamPoison.clear();
   faults.settleFails = false;
   faults.retireRowBeforeFault = null;
+  faults.replyErrorOnStream.clear();
+  faults.replyErrorDuringSettle = false;
+  faults.replyErrorDuringCleanup = false;
+  currentReplyRaw = null;
   warnLogs.length = 0;
 });
 
@@ -167,6 +211,14 @@ async function readRow(id: string) {
 async function objectsUnder(prefix: string) {
   const { listObjects } = await import("../../../../apps/api/src/lib/object-storage.js");
   return listObjects(prefix);
+}
+
+async function waitForReplyDestroy() {
+  for (let i = 0; i < 100 && !(currentReplyRaw as { destroyed?: boolean } | null)?.destroyed; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setTimeout(resolve, 20));
 }
 
 describe("pdf-to-image batch storage fault (#1443)", () => {
@@ -427,5 +479,88 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
       errors: [{ filename: "", error: "Internal server error" }],
     });
     expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
+  });
+
+  it("absorbs reply.raw errors during mid-stream failure and socket destroy without an uncaught error (#2764)", async () => {
+    const clientJobId = "batch-2764-reply-error-destroy";
+    faults.replyErrorOnStream.add(`outputs/${clientJobId}-f0/`);
+    const uncaught = vi.fn();
+    process.on("uncaughtException", uncaught);
+
+    try {
+      await postBatch(clientJobId).then(
+        (res: unknown) => res,
+        () => null,
+      );
+      await waitForReplyDestroy();
+
+      expect(uncaught).not.toHaveBeenCalled();
+      const row = await readRow(clientJobId);
+      expect(row?.status).toBe("failed");
+      expect(row?.completedAt).not.toBeNull();
+      expect(row?.error).toMatchObject({
+        message: "Failed to package batch results",
+        details: [{ filename: "", error: "Failed to package batch results" }],
+      });
+      expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
+      expect(await objectsUnder(`outputs/${clientJobId}-f1/`)).toEqual([]);
+    } finally {
+      process.off("uncaughtException", uncaught);
+    }
+  });
+
+  it("keeps reply.raw error listener attached while settlement and prefix cleanup await (#2764)", async () => {
+    const clientJobId = "batch-2764-reply-error-during-cleanup";
+    faults.replyErrorOnStream.add(`outputs/${clientJobId}-f0/`);
+    faults.replyErrorDuringSettle = true;
+    faults.replyErrorDuringCleanup = true;
+    const uncaught = vi.fn();
+    process.on("uncaughtException", uncaught);
+
+    try {
+      await postBatch(clientJobId).then(
+        (res: unknown) => res,
+        () => null,
+      );
+      await waitForReplyDestroy();
+
+      expect(uncaught).not.toHaveBeenCalled();
+      expect(faults.replyErrorDuringSettle).toBe(false);
+      expect(faults.replyErrorDuringCleanup).toBe(false);
+      const row = await readRow(clientJobId);
+      expect(row?.status).toBe("failed");
+      expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
+      expect(await objectsUnder(`outputs/${clientJobId}-f1/`)).toEqual([]);
+    } finally {
+      process.off("uncaughtException", uncaught);
+    }
+  });
+
+  it("settles the batch as failed when reply.raw emits an error during prefix cleanup after the archive finishes (#2764)", async () => {
+    const clientJobId = "batch-2764-reply-error-post-archive-cleanup";
+    faults.replyErrorDuringCleanup = true;
+    const uncaught = vi.fn();
+    process.on("uncaughtException", uncaught);
+
+    try {
+      await postBatch(clientJobId).then(
+        (res: unknown) => res,
+        () => null,
+      );
+      await waitForReplyDestroy();
+
+      expect(uncaught).not.toHaveBeenCalled();
+      expect(faults.replyErrorDuringCleanup).toBe(false);
+      const row = await readRow(clientJobId);
+      expect(row?.status).toBe("failed");
+      expect(row?.error).toMatchObject({
+        message: "Failed to package batch results",
+        details: [{ filename: "", error: "Failed to package batch results" }],
+      });
+      expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
+      expect(await objectsUnder(`outputs/${clientJobId}-f1/`)).toEqual([]);
+    } finally {
+      process.off("uncaughtException", uncaught);
+    }
   });
 });

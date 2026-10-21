@@ -753,77 +753,84 @@ export function registerPdfToImageRoute(
       }
 
       try {
-        for (const entry of results) {
-          if (!entry) continue;
-          if (streamError) break;
-          const stream = await getObjectStream(entry.key);
-          // The local backend resolves the stream and only then emits ENOENT,
-          // so the catch below never sees it. Without this listener the error
-          // is unhandled and the request hangs instead of terminating.
-          stream.on("error", (err: Error) =>
-            failStream(err, "Object stream error during PDF batch processing"),
-          );
-          if (streamError) {
-            (stream as { destroy?: () => void }).destroy?.();
-            break;
+        try {
+          for (const entry of results) {
+            if (!entry) continue;
+            if (streamError) break;
+            const stream = await getObjectStream(entry.key);
+            // The local backend resolves the stream and only then emits ENOENT,
+            // so the catch below never sees it. Without this listener the error
+            // is unhandled and the request hangs instead of terminating.
+            stream.on("error", (err: Error) =>
+              failStream(err, "Object stream error during PDF batch processing"),
+            );
+            if (streamError) {
+              (stream as { destroy?: () => void }).destroy?.();
+              break;
+            }
+            openedStreams.push(stream as { destroy?: (err?: Error) => void });
+            archive.append(stream, { name: entry.filename });
           }
-          openedStreams.push(stream as { destroy?: (err?: Error) => void });
-          archive.append(stream, { name: entry.filename });
+          if (!streamError) {
+            void archive
+              .finalize()
+              .catch((err) =>
+                failStream(err, "Failed to finalize ZIP during PDF batch processing"),
+              );
+          }
+          await streamDone;
+        } catch (err) {
+          failStream(err, "Failed to stream ZIP entries during PDF batch processing");
         }
-        if (!streamError) {
-          void archive
-            .finalize()
-            .catch((err) => failStream(err, "Failed to finalize ZIP during PDF batch processing"));
+
+        // The per-page images and per-document ZIPs exist only to build the
+        // response, which is now buffered into the archive stream. Delete them
+        // before settling terminal progress so any reply.raw error during
+        // cleanup still routes through settleFaultedBatch.
+        await Promise.all(
+          results.map((entry) =>
+            entry
+              ? deletePrefix(entry.prefix).catch((cleanupErr) =>
+                  request.log.warn(
+                    { err: cleanupErr, jobId, prefix: entry.prefix },
+                    "failed to clean up temporary batch PDF prefix",
+                  ),
+                )
+              : null,
+          ),
+        );
+
+        if (streamError) {
+          const message = isSafeMessageError(streamError)
+            ? friendlyError(streamError.message)
+            : "Failed to package batch results";
+          await settleFaultedBatch(
+            errors.length,
+            [...errors, { filename: "", error: message }],
+            message,
+            isSafeMessageError(streamError) ? streamError.code : undefined,
+          );
+        } else {
+          await updateJobProgress({
+            jobId,
+            status: "completed",
+            totalFiles: files.length,
+            completedFiles: files.length,
+            failedFiles: errors.length,
+            errors,
+          }).catch((err) =>
+            request.log.error({ err, jobId }, "failed to persist a PDF batch's terminal progress"),
+          );
         }
-        await streamDone;
-      } catch (err) {
-        failStream(err, "Failed to stream ZIP entries during PDF batch processing");
       } finally {
         reply.raw.removeListener("close", onReplyClose);
         reply.raw.removeListener("error", onReplyError);
       }
 
       if (streamError) {
-        const message = isSafeMessageError(streamError)
-          ? friendlyError(streamError.message)
-          : "Failed to package batch results";
-        await settleFaultedBatch(
-          errors.length,
-          [...errors, { filename: "", error: message }],
-          message,
-          isSafeMessageError(streamError) ? streamError.code : undefined,
-        );
-      } else {
-        await updateJobProgress({
-          jobId,
-          status: "completed",
-          totalFiles: files.length,
-          completedFiles: files.length,
-          failedFiles: errors.length,
-          errors,
-        }).catch((err) =>
-          request.log.error({ err, jobId }, "failed to persist a PDF batch's terminal progress"),
-        );
-      }
-
-      // The per-page images and per-document ZIPs exist only to build the
-      // response, which is now sent. Leaving them would strand every rendered
-      // page on the volume until the storage sweep, and they carry no jobs row
-      // for retention or GDPR deletion to find.
-      await Promise.all(
-        results.map((entry) =>
-          entry
-            ? deletePrefix(entry.prefix).catch((cleanupErr) =>
-                request.log.warn(
-                  { err: cleanupErr, jobId, prefix: entry.prefix },
-                  "failed to clean up temporary batch PDF prefix",
-                ),
-              )
-            : null,
-        ),
-      );
-
-      if (streamError) {
+        if (!reply.raw.destroyed) {
+          reply.raw.once("error", () => {});
+        }
         reply.raw.destroy(streamError);
       } else {
         reply.raw.end();
