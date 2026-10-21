@@ -9,6 +9,7 @@
  * the tests gracefully handle the 422 response.
  */
 
+import AdmZip from "adm-zip";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
@@ -292,6 +293,7 @@ describe("Different input formats", () => {
     ["tga", "image/x-tga"],
     ["ico", "image/x-icon"],
     ["ppm", "image/x-portable-pixmap"],
+    ["hdr", "image/vnd.radiance"],
   ])(
     "generates a working preview.webp for CLI-decoded %s output (#2704)",
     { timeout: 60_000 },
@@ -316,6 +318,32 @@ describe("Different input formats", () => {
       expect(meta.format).toBe("webp");
     },
   );
+
+  it("preserves non-Sharp container extensions in edit-metadata batch runs (#3180)", async () => {
+    const bmpBuf = readFixture(fixtures.image.formats("bmp"));
+    const qoiBuf = readFixture(fixtures.image.formats("qoi"));
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "sample.bmp", contentType: "image/bmp", content: bmpBuf },
+      { name: "file", filename: "sample.qoi", contentType: "image/qoi", content: qoiBuf },
+      { name: "settings", content: "{}" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/edit-metadata/batch",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const zipEntries = new AdmZip(res.rawPayload)
+      .getEntries()
+      .map((e) => e.entryName)
+      .sort();
+    expect(zipEntries).toEqual(["sample_edit-metadata.bmp", "sample_edit-metadata.qoi"]);
+  });
 });
 
 // ── Inspect endpoint ────────────────────────────────────────────

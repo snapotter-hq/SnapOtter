@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { hasServerErrorStatus } from "@snapotter/shared";
+import { hasServerErrorStatus, IMAGE_EXT_TO_MIME } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -78,6 +78,7 @@ const MIME_BY_FORMAT: Record<string, string> = {
   qoi: "image/qoi",
   dds: "image/vnd.ms-dds",
   exr: "image/x-exr",
+  hdr: "image/vnd.radiance",
   dpx: "image/x-dpx",
   fits: "image/fits",
   eps: "application/postscript",
@@ -307,23 +308,11 @@ export function registerEditMetadata(app: FastifyInstance) {
 
       // Determine content type from extension
       const ext = filename.split(".").pop()?.toLowerCase() ?? "";
-      const extToMime: Record<string, string> = {
-        jpg: "image/jpeg",
-        jpeg: "image/jpeg",
-        png: "image/png",
-        webp: "image/webp",
-        avif: "image/avif",
-        tiff: "image/tiff",
-        tif: "image/tiff",
-        gif: "image/gif",
-        heic: "image/heif",
-        heif: "image/heif",
-      };
 
       return {
         buffer,
         filename,
-        contentType: extToMime[ext] ?? "image/jpeg",
+        contentType: IMAGE_EXT_TO_MIME[ext] ?? "image/jpeg",
       };
     },
   });

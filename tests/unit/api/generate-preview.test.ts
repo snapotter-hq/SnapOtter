@@ -46,11 +46,13 @@ vi.mock("../../../apps/api/src/lib/engine-unavailable.js", async (importOriginal
   };
 });
 
-import { generatePreview } from "../../../apps/api/src/jobs/postprocess.js";
+import { IMAGE_EXT_TO_MIME } from "@snapotter/shared";
+import { buildOutputName, generatePreview } from "../../../apps/api/src/jobs/postprocess.js";
 import * as formatDecoders from "../../../apps/api/src/lib/format-decoders.js";
 import { DecoderUnavailableError } from "../../../apps/api/src/lib/format-decoders.js";
 import * as formatEncoders from "../../../apps/api/src/lib/format-encoders.js";
 import { encodeQoi } from "../../../apps/api/src/lib/format-encoders.js";
+import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerEditMetadata } from "../../../apps/api/src/routes/tools/edit-metadata.js";
 import { registerSvgToRaster } from "../../../apps/api/src/routes/tools/svg-to-raster.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
@@ -367,6 +369,71 @@ describe("registerEditMetadata CLI-decoded preview generation (#2704)", () => {
     } finally {
       decodeSpy.mockRestore();
     }
+  });
+
+  it("maps Radiance HDR inputs to image/vnd.radiance and generates preview.webp (#3180)", async () => {
+    const handler = getEditMetadataHandler();
+    const hdrBuffer = readFixture(fixtures.image.formats("hdr"));
+    const decodedPng = await sharp({
+      create: { width: 10, height: 10, channels: 3, background: { r: 200, g: 120, b: 40 } },
+    })
+      .png()
+      .toBuffer();
+    const decodeSpy = vi
+      .spyOn(formatDecoders, "decodeToSharpCompat")
+      .mockResolvedValueOnce(decodedPng);
+    const reply = makeReply();
+
+    try {
+      await handler(makeMultipartRequest(hdrBuffer, "sample.hdr"), reply);
+
+      expect(reply.statusCode).toBe(200);
+      expect(decodeSpy).toHaveBeenCalledWith(hdrBuffer, "hdr", "hdr");
+      const body = reply.payload as { jobId: string; previewUrl?: string };
+      expect(body.previewUrl).toBe(`/api/v1/download/${body.jobId}/preview.webp`);
+      expect(putObjectMock).toHaveBeenCalledTimes(2);
+      const [previewKey, previewBytes] = putObjectMock.mock.calls[1] as [string, Buffer];
+      expect(previewKey).toBe(`outputs/${body.jobId}/preview.webp`);
+      const meta = await sharp(previewBytes).metadata();
+      expect(meta.format).toBe("webp");
+      expect(meta.width).toBe(10);
+      expect(meta.height).toBe(10);
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+    } finally {
+      decodeSpy.mockRestore();
+    }
+  });
+
+  it("returns IMAGE_EXT_TO_MIME content types from the registered process function so batch and pipeline runs preserve extensions and generate previews (#3180)", async () => {
+    getEditMetadataHandler();
+    const config = getToolConfig("edit-metadata");
+    if (!config) throw new Error("edit-metadata process config not registered");
+
+    for (const [ext, expectedMime] of Object.entries(IMAGE_EXT_TO_MIME)) {
+      const result = await config.process(Buffer.from("bytes"), {}, `Photo.${ext.toUpperCase()}`);
+      expect(result.contentType, `extension .${ext}`).toBe(expectedMime);
+    }
+
+    for (const [ext, expectedMime] of [
+      ["psd", "image/vnd.adobe.photoshop"],
+      ["bmp", "image/bmp"],
+      ["jxl", "image/jxl"],
+      ["jp2", "image/jp2"],
+      ["qoi", "image/qoi"],
+      ["tga", "image/x-tga"],
+      ["ico", "image/x-icon"],
+      ["ppm", "image/x-portable-pixmap"],
+      ["hdr", "image/vnd.radiance"],
+    ] as const) {
+      const result = await config.process(Buffer.from("bytes"), {}, `sample.${ext}`);
+      expect(result.contentType).toBe(expectedMime);
+      expect(
+        buildOutputName(result.filename, `sample.${ext}`, "edit-metadata", result.contentType),
+      ).toBe(`sample_edit-metadata.${ext}`);
+    }
+
+    const fallback = await config.process(Buffer.from("bytes"), {}, "sample.unknown");
+    expect(fallback.contentType).toBe("image/jpeg");
   });
 });
 
