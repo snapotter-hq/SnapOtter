@@ -11,16 +11,24 @@ import { runEndWrites } from "@/lib/run-teardown";
 import { useFileStore } from "@/stores/file-store";
 
 type Position = "center" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
+
+interface WatermarkImageEntryResult {
+  downloadUrl: string;
+  originalSize: number | null;
+  processedSize: number | null;
+}
+
 export function WatermarkImageSettings() {
   const { t } = useTranslation();
-  const { files, processing, error, setProcessing, setError, setJobId } = useFileStore();
+  const { files, currentEntry, processing, error, setProcessing, setError, setJobId } =
+    useFileStore();
   const [position, setPosition] = useState<Position>("bottom-right");
   const [opacity, setOpacity] = useState(50);
   const [scale, setScale] = useState(25);
   const [watermarkFile, setWatermarkFile] = useState<File | null>(null);
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
-  const [originalSize, setOriginalSize] = useState<number | null>(null);
-  const [processedSize, setProcessedSize] = useState<number | null>(null);
+  const [resultsByEntry, setResultsByEntry] = useState<Record<string, WatermarkImageEntryResult>>(
+    {},
+  );
   const watermarkInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -57,7 +65,6 @@ export function WatermarkImageSettings() {
 
     setProcessing(true);
     setError(null);
-    setDownloadUrl(null);
 
     let storeReset = false;
     const unsubscribe = useFileStore.subscribe((state) => {
@@ -79,6 +86,32 @@ export function WatermarkImageSettings() {
         if (abortRef.current === controller) abortRef.current = null;
         setProcessing(false);
         return;
+      }
+      const entryId = capturedEntry.id;
+      setResultsByEntry((prev) => {
+        if (!(entryId in prev)) return prev;
+        const next = { ...prev };
+        delete next[entryId];
+        return next;
+      });
+      if (
+        capturedEntry.processedUrl !== null ||
+        capturedEntry.processedPreviewUrl !== null ||
+        capturedEntry.processedSize !== null ||
+        capturedEntry.status !== "pending" ||
+        capturedEntry.error !== null
+      ) {
+        if (capturedEntry.processedUrl?.startsWith("blob:")) {
+          URL.revokeObjectURL(capturedEntry.processedUrl);
+        }
+        useFileStore.getState().updateEntryById(entryId, {
+          processedUrl: null,
+          processedPreviewUrl: null,
+          processedFilename: null,
+          processedSize: null,
+          status: "pending",
+          error: null,
+        });
       }
       try {
         const formData = new FormData();
@@ -108,7 +141,7 @@ export function WatermarkImageSettings() {
         const result = resolveServerUrls(await res.json());
         if (controller.signal.aborted || storeReset) return;
         setJobId(result.jobId);
-        useFileStore.getState().updateEntryById(capturedEntry.id, {
+        useFileStore.getState().updateEntryById(entryId, {
           processedUrl: result.downloadUrl,
           processedPreviewUrl: result.previewUrl ?? null,
           processedFilename: null,
@@ -116,9 +149,14 @@ export function WatermarkImageSettings() {
           originalSize: result.originalSize,
           processedSize: result.processedSize,
         });
-        setDownloadUrl(result.downloadUrl);
-        setOriginalSize(result.originalSize);
-        setProcessedSize(result.processedSize);
+        setResultsByEntry((prev) => ({
+          ...prev,
+          [entryId]: {
+            downloadUrl: result.downloadUrl,
+            originalSize: result.originalSize ?? null,
+            processedSize: result.processedSize ?? null,
+          },
+        }));
       } catch (err) {
         if (
           controller.signal.aborted ||
@@ -138,9 +176,31 @@ export function WatermarkImageSettings() {
       }
     } else {
       // Multiple files: process each one individually, writing results to each entry
+      setResultsByEntry({});
       try {
         const store = useFileStore.getState();
         const entryIds = store.entries.map((e) => e.id);
+        for (const entry of store.entries) {
+          if (
+            entry.processedUrl !== null ||
+            entry.processedPreviewUrl !== null ||
+            entry.processedSize !== null ||
+            entry.status !== "pending" ||
+            entry.error !== null
+          ) {
+            if (entry.processedUrl?.startsWith("blob:")) {
+              URL.revokeObjectURL(entry.processedUrl);
+            }
+            store.updateEntryById(entry.id, {
+              processedUrl: null,
+              processedPreviewUrl: null,
+              processedFilename: null,
+              processedSize: null,
+              status: "pending",
+              error: null,
+            });
+          }
+        }
         for (let i = 0; i < files.length; i++) {
           if (controller.signal.aborted || storeReset) break;
           const entryId = entryIds[i];
@@ -186,6 +246,14 @@ export function WatermarkImageSettings() {
                 originalSize: result.originalSize,
                 processedSize: result.processedSize,
               });
+              setResultsByEntry((prev) => ({
+                ...prev,
+                [entryId]: {
+                  downloadUrl: result.downloadUrl,
+                  originalSize: result.originalSize ?? null,
+                  processedSize: result.processedSize ?? null,
+                },
+              }));
             }
           } catch (err) {
             if (
@@ -214,6 +282,13 @@ export function WatermarkImageSettings() {
   };
 
   const hasFile = files.length > 0;
+  const activeEntryResult =
+    currentEntry && currentEntry.processedUrl !== null
+      ? resultsByEntry[currentEntry.id]
+      : undefined;
+  const downloadUrl = activeEntryResult?.downloadUrl ?? null;
+  const originalSize = activeEntryResult?.originalSize ?? null;
+  const processedSize = activeEntryResult?.processedSize ?? null;
 
   return (
     <div className="space-y-4">
@@ -326,7 +401,13 @@ export function WatermarkImageSettings() {
             : t.toolSettings["watermark-image"].submit}
       </button>
 
-      {downloadUrl && <ResultDownloadLink href={downloadUrl} testId="watermark-image-download" />}
+      {downloadUrl && (
+        <ResultDownloadLink
+          href={downloadUrl}
+          testId="watermark-image-download"
+          claimEntryId={currentEntry?.id}
+        />
+      )}
     </div>
   );
 }

@@ -7,12 +7,17 @@ import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
+
+interface CompareEntryResult {
+  similarity: number;
+  downloadUrl: string;
+}
+
 export function CompareSettings() {
   const { t } = useTranslation();
-  const { files, processing, error, setProcessing, setError } = useFileStore();
+  const { files, currentEntry, processing, error, setProcessing, setError } = useFileStore();
   const [secondFile, setSecondFile] = useState<File | null>(null);
-  const [similarity, setSimilarity] = useState<number | null>(null);
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [resultsByEntry, setResultsByEntry] = useState<Record<string, CompareEntryResult>>({});
   const secondInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -26,6 +31,7 @@ export function CompareSettings() {
     const { entries, selectedIndex } = useFileStore.getState();
     const capturedEntry = entries[selectedIndex] ?? entries[0];
     if (!capturedEntry) return;
+    const entryId = capturedEntry.id;
 
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -33,8 +39,31 @@ export function CompareSettings() {
 
     setProcessing(true);
     setError(null);
-    setDownloadUrl(null);
-    setSimilarity(null);
+    setResultsByEntry((prev) => {
+      if (!(entryId in prev)) return prev;
+      const next = { ...prev };
+      delete next[entryId];
+      return next;
+    });
+    if (
+      capturedEntry.processedUrl !== null ||
+      capturedEntry.processedPreviewUrl !== null ||
+      capturedEntry.processedSize !== null ||
+      capturedEntry.status !== "pending" ||
+      capturedEntry.error !== null
+    ) {
+      if (capturedEntry.processedUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(capturedEntry.processedUrl);
+      }
+      useFileStore.getState().updateEntryById(entryId, {
+        processedUrl: null,
+        processedPreviewUrl: null,
+        processedFilename: null,
+        processedSize: null,
+        status: "pending",
+        error: null,
+      });
+    }
 
     let storeReset = false;
     const unsubscribe = useFileStore.subscribe((state) => {
@@ -72,23 +101,34 @@ export function CompareSettings() {
 
       const result = resolveServerUrls(await res.json());
       if (controller.signal.aborted || storeReset) return;
-      setSimilarity(result.similarity);
-      setDownloadUrl(result.downloadUrl);
       // Show the second image in the slider (not the diff) so the user can
       // visually compare their two originals. The diff is still downloadable.
-      const currentTarget = useFileStore
-        .getState()
-        .entries.find((entry) => entry.id === capturedEntry.id);
+      const currentTarget = useFileStore.getState().entries.find((entry) => entry.id === entryId);
       if (currentTarget) {
         if (currentTarget.processedUrl?.startsWith("blob:")) {
           URL.revokeObjectURL(currentTarget.processedUrl);
         }
-        useFileStore.getState().updateEntryById(capturedEntry.id, {
-          processedUrl: URL.createObjectURL(secondFile),
-          processedPreviewUrl: null,
-          processedFilename: null,
-          status: "completed",
-        });
+        const nextUrl = URL.createObjectURL(secondFile);
+        try {
+          useFileStore.getState().updateEntryById(entryId, {
+            processedUrl: nextUrl,
+            processedPreviewUrl: null,
+            processedFilename: null,
+            status: "completed",
+          });
+        } catch (err) {
+          if (!useFileStore.getState().entries.some((e) => e.processedUrl === nextUrl)) {
+            URL.revokeObjectURL(nextUrl);
+          }
+          throw err;
+        }
+        setResultsByEntry((prev) => ({
+          ...prev,
+          [entryId]: {
+            similarity: result.similarity,
+            downloadUrl: result.downloadUrl,
+          },
+        }));
       }
     } catch (err) {
       if (
@@ -110,6 +150,12 @@ export function CompareSettings() {
   };
 
   const hasFile = files.length > 0;
+  const activeEntryResult =
+    currentEntry && currentEntry.processedUrl !== null
+      ? resultsByEntry[currentEntry.id]
+      : undefined;
+  const similarity = activeEntryResult?.similarity ?? null;
+  const downloadUrl = activeEntryResult?.downloadUrl ?? null;
 
   return (
     <div className="space-y-4">
@@ -164,6 +210,7 @@ export function CompareSettings() {
           href={downloadUrl}
           testId="compare-download"
           label={t.toolSettings.compare.downloadDiffImage}
+          claimEntryId={currentEntry?.id}
         />
       )}
     </div>

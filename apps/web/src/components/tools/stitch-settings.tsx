@@ -26,7 +26,8 @@ interface StitchResult {
 
 export function StitchSettings() {
   const { t } = useTranslation();
-  const { files, processing, error, setProcessing, setError, setJobId } = useFileStore();
+  const { files, currentEntry, processing, error, setProcessing, setError, setJobId } =
+    useFileStore();
 
   const [direction, setDirection] = useState<Direction>("horizontal");
   const [gridColumns, setGridColumns] = useState(3);
@@ -38,7 +39,7 @@ export function StitchSettings() {
   const [backgroundColor, setBackgroundColor] = useState("#FFFFFF");
   const [format, setFormat] = useState<OutputFormat>("png");
   const [quality, setQuality] = useState(90);
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [downloadByEntry, setDownloadByEntry] = useState<Record<string, string>>({});
   const [uploadProgress, setUploadProgress] = useState(0);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
@@ -59,6 +60,7 @@ export function StitchSettings() {
     const { entries, selectedIndex } = useFileStore.getState();
     const capturedEntry = entries[selectedIndex] ?? entries[0];
     if (!capturedEntry) return;
+    const entryId = capturedEntry.id;
 
     unsubscribeRef.current?.();
     xhrRef.current?.abort();
@@ -67,7 +69,28 @@ export function StitchSettings() {
 
     setError(null);
     setProcessing(true);
-    setDownloadUrl(null);
+    setDownloadByEntry({});
+    for (const entry of useFileStore.getState().entries) {
+      if (
+        entry.processedUrl !== null ||
+        entry.processedPreviewUrl !== null ||
+        entry.processedSize !== null ||
+        entry.status !== "pending" ||
+        entry.error !== null
+      ) {
+        if (entry.processedUrl?.startsWith("blob:")) {
+          URL.revokeObjectURL(entry.processedUrl);
+        }
+        useFileStore.getState().updateEntryById(entry.id, {
+          processedUrl: null,
+          processedPreviewUrl: null,
+          processedFilename: null,
+          processedSize: null,
+          status: "pending",
+          error: null,
+        });
+      }
+    }
     setUploadProgress(0);
 
     let storeReset = false;
@@ -144,7 +167,7 @@ export function StitchSettings() {
           }
           try {
             setJobId(result.jobId);
-            useFileStore.getState().updateEntryById(capturedEntry.id, {
+            useFileStore.getState().updateEntryById(entryId, {
               processedUrl: result.downloadUrl,
               processedPreviewUrl: null,
               processedFilename: null,
@@ -152,7 +175,10 @@ export function StitchSettings() {
               originalSize: result.originalSize,
               processedSize: result.processedSize,
             });
-            setDownloadUrl(result.downloadUrl);
+            setDownloadByEntry((prev) => ({
+              ...prev,
+              [entryId]: result.downloadUrl,
+            }));
             setProcessing(false);
           } catch (err) {
             setError(jobFailureMessage({ reason: "trackingFailed" }, t.errors));
@@ -204,6 +230,10 @@ export function StitchSettings() {
   };
 
   const hasEnoughFiles = files.length >= 2;
+  const downloadUrl =
+    currentEntry && currentEntry.processedUrl !== null
+      ? (downloadByEntry[currentEntry.id] ?? null)
+      : null;
 
   return (
     <div className="space-y-4">
@@ -433,6 +463,7 @@ export function StitchSettings() {
           href={downloadUrl}
           testId="stitch-download"
           label={t.toolSettings.stitch.downloadStitchedImage}
+          claimEntryId={currentEntry?.id}
         />
       )}
     </div>

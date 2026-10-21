@@ -7,17 +7,23 @@ import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
+
+interface ComposeEntryResult {
+  downloadUrl: string;
+  originalSize: number | null;
+  processedSize: number | null;
+}
+
 export function ComposeSettings() {
   const { t } = useTranslation();
-  const { files, processing, error, setProcessing, setError, setJobId } = useFileStore();
+  const { files, currentEntry, processing, error, setProcessing, setError, setJobId } =
+    useFileStore();
   const [overlayFile, setOverlayFile] = useState<File | null>(null);
   const [x, setX] = useState(0);
   const [y, setY] = useState(0);
   const [opacity, setOpacity] = useState(100);
   const [blendMode, setBlendMode] = useState("over");
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
-  const [originalSize, setOriginalSize] = useState<number | null>(null);
-  const [processedSize, setProcessedSize] = useState<number | null>(null);
+  const [resultsByEntry, setResultsByEntry] = useState<Record<string, ComposeEntryResult>>({});
   const overlayInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -31,6 +37,7 @@ export function ComposeSettings() {
     const { entries, selectedIndex } = useFileStore.getState();
     const capturedEntry = entries[selectedIndex] ?? entries[0];
     if (!capturedEntry) return;
+    const entryId = capturedEntry.id;
 
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -38,7 +45,31 @@ export function ComposeSettings() {
 
     setProcessing(true);
     setError(null);
-    setDownloadUrl(null);
+    setResultsByEntry((prev) => {
+      if (!(entryId in prev)) return prev;
+      const next = { ...prev };
+      delete next[entryId];
+      return next;
+    });
+    if (
+      capturedEntry.processedUrl !== null ||
+      capturedEntry.processedPreviewUrl !== null ||
+      capturedEntry.processedSize !== null ||
+      capturedEntry.status !== "pending" ||
+      capturedEntry.error !== null
+    ) {
+      if (capturedEntry.processedUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(capturedEntry.processedUrl);
+      }
+      useFileStore.getState().updateEntryById(entryId, {
+        processedUrl: null,
+        processedPreviewUrl: null,
+        processedFilename: null,
+        processedSize: null,
+        status: "pending",
+        error: null,
+      });
+    }
 
     let storeReset = false;
     const unsubscribe = useFileStore.subscribe((state) => {
@@ -78,7 +109,7 @@ export function ComposeSettings() {
       const result = resolveServerUrls(await res.json());
       if (controller.signal.aborted || storeReset) return;
       setJobId(result.jobId);
-      useFileStore.getState().updateEntryById(capturedEntry.id, {
+      useFileStore.getState().updateEntryById(entryId, {
         processedUrl: result.downloadUrl,
         processedPreviewUrl: result.previewUrl ?? null,
         processedFilename: null,
@@ -86,9 +117,14 @@ export function ComposeSettings() {
         originalSize: result.originalSize,
         processedSize: result.processedSize,
       });
-      setDownloadUrl(result.downloadUrl);
-      setOriginalSize(result.originalSize);
-      setProcessedSize(result.processedSize);
+      setResultsByEntry((prev) => ({
+        ...prev,
+        [entryId]: {
+          downloadUrl: result.downloadUrl,
+          originalSize: result.originalSize ?? null,
+          processedSize: result.processedSize ?? null,
+        },
+      }));
     } catch (err) {
       if (
         controller.signal.aborted ||
@@ -109,6 +145,13 @@ export function ComposeSettings() {
   };
 
   const hasFile = files.length > 0;
+  const activeEntryResult =
+    currentEntry && currentEntry.processedUrl !== null
+      ? resultsByEntry[currentEntry.id]
+      : undefined;
+  const downloadUrl = activeEntryResult?.downloadUrl ?? null;
+  const originalSize = activeEntryResult?.originalSize ?? null;
+  const processedSize = activeEntryResult?.processedSize ?? null;
 
   return (
     <div className="space-y-4">
@@ -232,7 +275,13 @@ export function ComposeSettings() {
         {processing ? t.toolSettings.compose.processing : t.toolSettings.compose.submit}
       </button>
 
-      {downloadUrl && <ResultDownloadLink href={downloadUrl} testId="compose-download" />}
+      {downloadUrl && (
+        <ResultDownloadLink
+          href={downloadUrl}
+          testId="compose-download"
+          claimEntryId={currentEntry?.id}
+        />
+      )}
     </div>
   );
 }

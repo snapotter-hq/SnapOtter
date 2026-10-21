@@ -1355,13 +1355,13 @@ export function BeautifySettings({
   onImageOverlay?: (children: React.ReactNode) => void;
 }) {
   const { t } = useTranslation();
-  const { files, setProcessing, setError, setJobId } = useFileStore();
+  const { files, currentEntry, setProcessing, setError, setJobId } = useFileStore();
   const { processFiles, processAllFiles, processing, error, downloadUrl, progress } =
     useToolProcessor("beautify");
 
   const [settings, setSettings] = useState<Record<string, unknown>>({});
   const [bgImageFile, setBgImageFile] = useState<File | null>(null);
-  const [manualDownloadUrl, setManualDownloadUrl] = useState<string | null>(null);
+  const [manualDownloadByEntry, setManualDownloadByEntry] = useState<Record<string, string>>({});
   const [manualProcessing, setManualProcessing] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -1382,6 +1382,10 @@ export function BeautifySettings({
   const isImageBg = settings.backgroundType === "image";
   const isProcessing = processing || manualProcessing;
   const displayError = error;
+  const manualDownloadUrl =
+    currentEntry && currentEntry.processedUrl !== null
+      ? (manualDownloadByEntry[currentEntry.id] ?? null)
+      : null;
   const displayDownloadUrl = manualDownloadUrl || downloadUrl;
 
   const handleProcess = async () => {
@@ -1392,6 +1396,7 @@ export function BeautifySettings({
       const { entries, selectedIndex } = useFileStore.getState();
       const capturedEntry = entries[selectedIndex] ?? entries[0];
       if (!capturedEntry) return;
+      const entryId = capturedEntry.id;
 
       abortRef.current?.abort();
       const controller = new AbortController();
@@ -1400,7 +1405,31 @@ export function BeautifySettings({
       setManualProcessing(true);
       setProcessing(true);
       setError(null);
-      setManualDownloadUrl(null);
+      setManualDownloadByEntry((prev) => {
+        if (!(entryId in prev)) return prev;
+        const next = { ...prev };
+        delete next[entryId];
+        return next;
+      });
+      if (
+        capturedEntry.processedUrl !== null ||
+        capturedEntry.processedPreviewUrl !== null ||
+        capturedEntry.processedSize !== null ||
+        capturedEntry.status !== "pending" ||
+        capturedEntry.error !== null
+      ) {
+        if (capturedEntry.processedUrl?.startsWith("blob:")) {
+          URL.revokeObjectURL(capturedEntry.processedUrl);
+        }
+        useFileStore.getState().updateEntryById(entryId, {
+          processedUrl: null,
+          processedPreviewUrl: null,
+          processedFilename: null,
+          processedSize: null,
+          status: "pending",
+          error: null,
+        });
+      }
 
       let storeReset = false;
       const unsubscribe = useFileStore.subscribe((state) => {
@@ -1450,7 +1479,7 @@ export function BeautifySettings({
         const result = resolveServerUrls(await res.json());
         if (controller.signal.aborted || storeReset) return;
         setJobId(result.jobId);
-        useFileStore.getState().updateEntryById(capturedEntry.id, {
+        useFileStore.getState().updateEntryById(entryId, {
           processedUrl: result.downloadUrl,
           processedPreviewUrl: result.previewUrl ?? null,
           processedFilename: null,
@@ -1458,7 +1487,10 @@ export function BeautifySettings({
           originalSize: result.originalSize,
           processedSize: result.processedSize,
         });
-        setManualDownloadUrl(result.downloadUrl);
+        setManualDownloadByEntry((prev) => ({
+          ...prev,
+          [entryId]: result.downloadUrl,
+        }));
       } catch (err) {
         if (
           controller.signal.aborted ||
@@ -1486,7 +1518,7 @@ export function BeautifySettings({
     abortRef.current?.abort();
     abortRef.current = null;
     setManualProcessing(false);
-    setManualDownloadUrl(null);
+    setManualDownloadByEntry({});
     if (files.length > 1) {
       processAllFiles(files, settings);
     } else {
@@ -1535,7 +1567,11 @@ export function BeautifySettings({
       )}
 
       {displayDownloadUrl && (
-        <ResultDownloadLink href={displayDownloadUrl} testId="beautify-download" />
+        <ResultDownloadLink
+          href={displayDownloadUrl}
+          testId="beautify-download"
+          claimEntryId={currentEntry?.id}
+        />
       )}
     </form>
   );

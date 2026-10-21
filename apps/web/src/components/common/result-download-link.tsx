@@ -23,6 +23,8 @@ interface ResultDownloadLinkProps {
   children?: ReactNode;
   /** Filename to force on the saved file; omit to let the response name it. */
   downloadName?: string;
+  /** Entry id to claim on click; defaults to the currently selected entry. */
+  claimEntryId?: string;
 }
 
 /**
@@ -37,6 +39,7 @@ export function ResultDownloadLink({
   label,
   children,
   downloadName,
+  claimEntryId,
 }: ResultDownloadLinkProps) {
   const { t } = useTranslation();
 
@@ -48,7 +51,14 @@ export function ResultDownloadLink({
       className={className ?? DEFAULT_CLASS_NAME}
       // The result is being taken, so the navigation guard has nothing left to
       // warn about for this entry.
-      onClick={() => useFileStore.getState().claimSelected()}
+      onClick={() => {
+        const store = useFileStore.getState();
+        if (claimEntryId !== undefined) {
+          store.markClaimedById(claimEntryId);
+        } else {
+          store.claimSelected();
+        }
+      }}
     >
       {children ?? (
         <>
