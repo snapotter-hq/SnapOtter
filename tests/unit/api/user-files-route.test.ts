@@ -6,6 +6,7 @@
  * and POST /api/v1/files/save-result handlers from user-files.ts.
  */
 import { Readable } from "node:stream";
+import { IMAGE_EXT_TO_MIME } from "@snapotter/shared";
 import sharp from "sharp";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -296,28 +297,77 @@ describe("user files route logic", () => {
       expect(extToMime(".avif")).toBe("image/avif");
     });
 
-    it("maps video extensions (.mp4, .webm, .mov)", () => {
+    it("maps video extensions (.mp4, .webm, .mov, .mkv, .avi, .m4v, .ogv, .ts, ...)", () => {
       expect(extToMime(".mp4")).toBe("video/mp4");
+      expect(extToMime(".m4v")).toBe("video/mp4");
       expect(extToMime(".webm")).toBe("video/webm");
       expect(extToMime(".mov")).toBe("video/quicktime");
+      expect(extToMime(".mkv")).toBe("video/x-matroska");
+      expect(extToMime(".avi")).toBe("video/x-msvideo");
+      expect(extToMime(".3gp")).toBe("video/3gpp");
+      expect(extToMime(".flv")).toBe("video/x-flv");
+      expect(extToMime(".wmv")).toBe("video/x-ms-wmv");
+      expect(extToMime(".mpg")).toBe("video/mpeg");
+      expect(extToMime(".mpeg")).toBe("video/mpeg");
+      expect(extToMime(".ts")).toBe("video/mp2t");
+      expect(extToMime(".mts")).toBe("video/mp2t");
+      expect(extToMime(".m2ts")).toBe("video/mp2t");
+      expect(extToMime(".ogv")).toBe("video/ogg");
     });
 
-    it("maps audio extensions (.mp3, .wav, .flac, .ogg, .aac)", () => {
+    it("maps audio extensions (.mp3, .wav, .flac, .ogg, .aac, .m4a, .opus, .aiff, .wma, ...)", () => {
       expect(extToMime(".mp3")).toBe("audio/mpeg");
       expect(extToMime(".wav")).toBe("audio/wav");
       expect(extToMime(".flac")).toBe("audio/flac");
       expect(extToMime(".ogg")).toBe("audio/ogg");
       expect(extToMime(".aac")).toBe("audio/aac");
+      expect(extToMime(".m4a")).toBe("audio/mp4");
+      expect(extToMime(".opus")).toBe("audio/opus");
+      expect(extToMime(".wma")).toBe("audio/x-ms-wma");
+      expect(extToMime(".aiff")).toBe("audio/aiff");
+      expect(extToMime(".amr")).toBe("audio/amr");
+      expect(extToMime(".ac3")).toBe("audio/ac3");
     });
 
-    it("maps document, text, and archive extensions (.pdf, .txt, .csv, .json, .xml, .zip)", () => {
+    it("maps document, text, data, archive, and subtitle extensions (#3215)", () => {
       expect(extToMime(".pdf")).toBe("application/pdf");
+      expect(extToMime(".epub")).toBe("application/epub+zip");
+      expect(extToMime(".docx")).toBe(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      );
+      expect(extToMime(".odt")).toBe("application/vnd.oasis.opendocument.text");
+      expect(extToMime(".rtf")).toBe("application/rtf");
+      expect(extToMime(".pptx")).toBe(
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      );
+      expect(extToMime(".odp")).toBe("application/vnd.oasis.opendocument.presentation");
+      expect(extToMime(".xlsx")).toBe(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+      expect(extToMime(".ods")).toBe("application/vnd.oasis.opendocument.spreadsheet");
+      expect(extToMime(".html")).toBe("text/html");
+      expect(extToMime(".htm")).toBe("text/html");
+      expect(extToMime(".md")).toBe("text/markdown");
+      expect(extToMime(".markdown")).toBe("text/markdown");
       expect(extToMime(".txt")).toBe("text/plain");
       expect(extToMime(".csv")).toBe("text/csv");
+      expect(extToMime(".tsv")).toBe("text/tab-separated-values");
       expect(extToMime(".json")).toBe("application/json");
       expect(extToMime(".xml")).toBe("application/xml");
+      expect(extToMime(".yaml")).toBe("application/yaml");
+      expect(extToMime(".yml")).toBe("application/yaml");
       expect(extToMime(".zip")).toBe("application/zip");
+      expect(extToMime(".srt")).toBe("application/x-subrip");
+      expect(extToMime(".vtt")).toBe("text/vtt");
     });
+
+    it.each(Object.entries(IMAGE_EXT_TO_MIME))(
+      "maps IMAGE_EXT_TO_MIME entry .%s to %s (#3215)",
+      (ext, mime) => {
+        expect(extToMime(`.${ext}`)).toBe(mime);
+        expect(extToMime(ext)).toBe(mime);
+      },
+    );
 
     it("handles uppercase extensions", () => {
       expect(extToMime(".JPG")).toBe("image/jpeg");
@@ -763,6 +813,77 @@ describe("user files route logic", () => {
         );
         expect(mocks.insertedValues?.originalName).toBe("vacation-photo.jpg");
       });
+
+      it.each([
+        ["result.mkv", "video/x-matroska"],
+        ["result.avi", "video/x-msvideo"],
+        ["result.m4a", "audio/mp4"],
+        ["result.opus", "audio/opus"],
+        ["result.epub", "application/epub+zip"],
+        ["result.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+        ["result.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+        [
+          "result.pptx",
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ],
+        ["result.odt", "application/vnd.oasis.opendocument.text"],
+        ["result.ods", "application/vnd.oasis.opendocument.spreadsheet"],
+        ["result.odp", "application/vnd.oasis.opendocument.presentation"],
+        ["result.rtf", "application/rtf"],
+        ["result.html", "text/html"],
+        ["result.md", "text/markdown"],
+        ["result.yaml", "application/yaml"],
+        ["result.srt", "application/x-subrip"],
+        ["result.vtt", "text/vtt"],
+        ["result.MKV", "video/x-matroska"],
+        ["result", "video/x-matroska"],
+      ])(
+        "stores the output MIME type for non-image save-result %s -> %s (#3215)",
+        async (filename, expectedMime) => {
+          mocks.parentRows = [
+            makeParent({ originalName: "source.mkv", mimeType: "video/x-matroska" }),
+          ];
+          mocks.validateImageBuffer.mockResolvedValueOnce({
+            valid: false,
+            reason: "Not a valid image",
+          } as never);
+          const reply = makeReply();
+          await saveResultHandler(
+            makeSaveResultRequest({
+              filename,
+              parentId: "parent-1",
+              toolId: "video-convert",
+              buffer: Buffer.from("non-image-output-bytes"),
+            }),
+            reply,
+          );
+          expect(reply.statusCode).toBe(201);
+          expect(mocks.insertedValues?.mimeType).toBe(expectedMime);
+        },
+      );
+
+      it.each(["result.qoi", "result.cr3"])(
+        "downgrades unverified IMAGE_EXT_TO_MIME image/* claims on save-result (%s) to application/octet-stream (#3215)",
+        async (filename) => {
+          mocks.parentRows = [makeParent({ originalName: "source.png", mimeType: "image/png" })];
+          mocks.validateImageBuffer.mockResolvedValueOnce({
+            valid: false,
+            reason: "Not a valid image",
+          } as never);
+          const reply = makeReply();
+          await saveResultHandler(
+            makeSaveResultRequest({
+              filename,
+              parentId: "parent-1",
+              toolId: "convert",
+              buffer: Buffer.from("not-an-image"),
+            }),
+            reply,
+          );
+          expect(reply.statusCode).toBe(201);
+          expect(mocks.insertedValues?.mimeType).toBe("application/octet-stream");
+        },
+      );
     });
 
     describe("GET /api/v1/files/:id/thumbnail cache write failure logging (#1633)", () => {

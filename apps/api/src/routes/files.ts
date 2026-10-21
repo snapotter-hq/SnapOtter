@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { extname } from "node:path";
 import { pipeline, type Readable, Transform } from "node:stream";
+import { IMAGE_EXT_TO_MIME } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { sendInputValidationError } from "../lib/engine-unavailable.js";
@@ -447,19 +448,8 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
 
 export function getContentType(ext: string): string {
   const map: Record<string, string> = {
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    png: "image/png",
-    webp: "image/webp",
-    gif: "image/gif",
-    bmp: "image/bmp",
-    tiff: "image/tiff",
-    tif: "image/tiff",
-    avif: "image/avif",
-    svg: "image/svg+xml",
     pdf: "application/pdf",
     zip: "application/zip",
-    ico: "image/x-icon",
     json: "application/json",
     csv: "text/csv",
     tsv: "text/tab-separated-values",
@@ -507,21 +497,8 @@ export function getContentType(ext: string): string {
     epub: "application/epub+zip",
     srt: "application/x-subrip",
     vtt: "text/vtt",
-    jxl: "image/jxl",
-    dng: "image/x-adobe-dng",
-    cr2: "image/x-canon-cr2",
-    nef: "image/x-nikon-nef",
-    arw: "image/x-sony-arw",
-    orf: "image/x-olympus-orf",
-    rw2: "image/x-panasonic-rw2",
-    tga: "image/x-tga",
-    psd: "image/vnd.adobe.photoshop",
-    exr: "image/x-exr",
-    hdr: "image/vnd.radiance",
-    heic: "image/heic",
-    heif: "image/heif",
   };
-  const type = map[ext] ?? "application/octet-stream";
+  const type = map[ext] ?? IMAGE_EXT_TO_MIME[ext] ?? "application/octet-stream";
   // Text payloads (extracted text, markdown, CSV, subtitles) are written UTF-8.
   // Without an explicit charset a browser can sniff a legacy encoding and
   // mojibake non-Latin scripts like Arabic when the file is viewed inline (#589).

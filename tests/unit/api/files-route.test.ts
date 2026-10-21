@@ -6,6 +6,7 @@
  */
 import { Readable } from "node:stream";
 import { gzipSync } from "node:zlib";
+import { IMAGE_EXT_TO_MIME } from "@snapotter/shared";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── Mocks ───────────────────────────────────────────────────────────────
@@ -203,6 +204,13 @@ describe("files route logic", () => {
       expect(getContentType("heic")).toBe("image/heic");
       expect(getContentType("heif")).toBe("image/heif");
     });
+
+    it.each(Object.entries(IMAGE_EXT_TO_MIME))(
+      "maps IMAGE_EXT_TO_MIME entry %s to %s (#3215)",
+      (ext, mime) => {
+        expect(getContentType(ext)).toBe(mime);
+      },
+    );
 
     it("appends charset=utf-8 to text/* formats", () => {
       expect(getContentType("csv")).toBe("text/csv; charset=utf-8");
@@ -585,6 +593,39 @@ describe("files route logic", () => {
       expect(warnOnVanishedBucket).not.toHaveBeenCalled();
       expect(vanishedReply.send).not.toHaveBeenCalled();
     });
+
+    it.each([
+      ["result.jp2", "image/jp2"],
+      ["result.qoi", "image/qoi"],
+      ["result.ppm", "image/x-portable-pixmap"],
+      ["result.pgm", "image/x-portable-graymap"],
+      ["result.pbm", "image/x-portable-bitmap"],
+      ["result.dds", "image/vnd.ms-dds"],
+      ["result.cur", "image/x-icon"],
+      ["result.apng", "image/apng"],
+      ["result.dpx", "image/x-dpx"],
+      ["result.fits", "image/fits"],
+      ["result.eps", "application/postscript"],
+      ["result.svgz", "image/svg+xml"],
+      ["result.cr3", "image/x-canon-cr3"],
+      ["result.raf", "image/x-fuji-raf"],
+      ["result.pef", "image/x-pentax-pef"],
+    ])(
+      "serves Content-Type from IMAGE_EXT_TO_MIME for %s -> %s (#3215)",
+      async (filename, expectedContentType) => {
+        const reply = makeDownloadReply();
+        await downloadHandler(
+          {
+            params: { jobId: "job-1", filename },
+            headers: {},
+            log: { warn: vi.fn(), error: vi.fn() },
+          },
+          reply,
+        );
+        expect(reply.statusCode).toBe(200);
+        expect(reply.headers["Content-Type"]).toBe(expectedContentType);
+      },
+    );
   });
 
   describe("POST /api/v1/upload orphan cleanup on failure (#1210)", () => {

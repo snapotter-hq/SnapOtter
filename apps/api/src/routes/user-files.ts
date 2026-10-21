@@ -11,7 +11,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { extname } from "node:path";
-import { SafeError } from "@snapotter/shared";
+import { IMAGE_EXT_TO_MIME, SafeError } from "@snapotter/shared";
 import { and, desc, eq, inArray, like, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
@@ -65,31 +65,57 @@ export const deleteFilesSchema = z.object({
 export function extToMime(ext: string): string {
   const clean = ext.toLowerCase().replace(/^\./, "");
   const map: Record<string, string> = {
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    png: "image/png",
-    webp: "image/webp",
-    gif: "image/gif",
-    bmp: "image/bmp",
-    tiff: "image/tiff",
-    tif: "image/tiff",
-    avif: "image/avif",
-    mp4: "video/mp4",
-    webm: "video/webm",
-    mov: "video/quicktime",
-    mp3: "audio/mpeg",
-    wav: "audio/wav",
-    flac: "audio/flac",
-    ogg: "audio/ogg",
-    aac: "audio/aac",
     pdf: "application/pdf",
+    epub: "application/epub+zip",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    odt: "application/vnd.oasis.opendocument.text",
+    rtf: "application/rtf",
+    pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    odp: "application/vnd.oasis.opendocument.presentation",
+    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ods: "application/vnd.oasis.opendocument.spreadsheet",
+    html: "text/html",
+    htm: "text/html",
+    md: "text/markdown",
+    markdown: "text/markdown",
     txt: "text/plain",
     csv: "text/csv",
+    tsv: "text/tab-separated-values",
     json: "application/json",
     xml: "application/xml",
+    yaml: "application/yaml",
+    yml: "application/yaml",
     zip: "application/zip",
+    srt: "application/x-subrip",
+    vtt: "text/vtt",
+    mp4: "video/mp4",
+    m4v: "video/mp4",
+    webm: "video/webm",
+    mov: "video/quicktime",
+    mkv: "video/x-matroska",
+    avi: "video/x-msvideo",
+    "3gp": "video/3gpp",
+    flv: "video/x-flv",
+    wmv: "video/x-ms-wmv",
+    mpg: "video/mpeg",
+    mpeg: "video/mpeg",
+    ts: "video/mp2t",
+    mts: "video/mp2t",
+    m2ts: "video/mp2t",
+    ogv: "video/ogg",
+    mp3: "audio/mpeg",
+    wav: "audio/wav",
+    ogg: "audio/ogg",
+    flac: "audio/flac",
+    m4a: "audio/mp4",
+    aac: "audio/aac",
+    opus: "audio/opus",
+    wma: "audio/x-ms-wma",
+    aiff: "audio/aiff",
+    amr: "audio/amr",
+    ac3: "audio/ac3",
   };
-  return map[clean] ?? "application/octet-stream";
+  return map[clean] ?? IMAGE_EXT_TO_MIME[clean] ?? "application/octet-stream";
 }
 
 /**
