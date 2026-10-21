@@ -135,7 +135,7 @@ const SETTINGS: Record<string, Record<string, unknown>> = {
   },
   "optimize-for-web": {},
   pixelate: { blockSize: 9 },
-  "replace-color": { targetColor: "#c82828", replacementColor: "#008000", tolerance: 20 },
+  "replace-color": { sourceColor: "#c82828", targetColor: "#008000", tolerance: 20 },
   resize: { width: 45 },
   rotate: { angle: 33 },
   "rounded-crop": { borderWidth: 6, borderColor: "#008000" },
@@ -940,5 +940,62 @@ describe("the container guard covers the image catalogue (#1190)", () => {
   it("every covered tool is a real catalogue entry", () => {
     const known = new Set(candidates);
     expect(COVERED.filter((id) => !known.has(id))).toEqual([]);
+  });
+
+  it("every SETTINGS entry uses keys recognised by its tool's settingsSchema (#3068)", () => {
+    const findStrippedKeys = (raw: unknown, parsed: unknown, prefix = ""): string[] => {
+      if (Array.isArray(raw) && Array.isArray(parsed)) {
+        return raw.flatMap((item, idx) => findStrippedKeys(item, parsed[idx], `${prefix}[${idx}]`));
+      }
+      if (
+        raw !== null &&
+        typeof raw === "object" &&
+        parsed !== null &&
+        typeof parsed === "object"
+      ) {
+        const parsedObj = parsed as Record<string, unknown>;
+        return Object.entries(raw as Record<string, unknown>).flatMap(([key, value]) => {
+          const path = prefix ? `${prefix}.${key}` : key;
+          if (!(key in parsedObj)) return [path];
+          return findStrippedKeys(value, parsedObj[key], path);
+        });
+      }
+      return [];
+    };
+
+    const stripped: Array<{ toolId: string; unknownKeys: string[] }> = [];
+    for (const [toolId, raw] of Object.entries(SETTINGS)) {
+      const config = getToolConfig(toolId);
+      if (!config) throw new Error(`${toolId} must be registered`);
+      const parsed = config.settingsSchema.parse(raw);
+      const unknownKeys = findStrippedKeys(raw, parsed);
+      if (unknownKeys.length > 0) {
+        stripped.push({ toolId, unknownKeys });
+      }
+    }
+    expect(stripped).toEqual([]);
+  });
+
+  it("replace-color replaces the fixture's red pixels with green in both GIF and PNG (#3068)", async () => {
+    const { gif, png } = await sources();
+    const [fromGif, fromPng] = await Promise.all([
+      run("replace-color", gif, "source.gif"),
+      run("replace-color", png, "source.png"),
+    ]);
+    const [a, b] = await Promise.all([decode(fromGif.buffer), decode(fromPng.buffer)]);
+    // Pixel (0, 0) in sourceGif() is flat RED (200, 40, 40) and should become
+    // green (0, 128, 0) under SETTINGS["replace-color"], while pixel (64, 0)
+    // is flat BLUE (60, 60, 200) and should remain untouched.
+    expect([a.data[0], a.data[1], a.data[2]], "GIF pixel (0, 0)").toEqual([0, 128, 0]);
+    expect([b.data[0], b.data[1], b.data[2]], "PNG pixel (0, 0)").toEqual([0, 128, 0]);
+    const blueOffset = 64 * 4;
+    expect(
+      [a.data[blueOffset], a.data[blueOffset + 1], a.data[blueOffset + 2]],
+      "GIF pixel (64, 0)",
+    ).toEqual([BLUE.r, BLUE.g, BLUE.b]);
+    expect(
+      [b.data[blueOffset], b.data[blueOffset + 1], b.data[blueOffset + 2]],
+      "PNG pixel (64, 0)",
+    ).toEqual([BLUE.r, BLUE.g, BLUE.b]);
   });
 });
