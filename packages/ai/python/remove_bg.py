@@ -4,8 +4,29 @@ import json
 import os
 
 
+_OOM_MARKERS = (
+    "out of memory",
+    "not enough memory",
+    "can't allocate memory",
+    "cannot allocate memory",
+    "unable to allocate",
+    "failed to allocate",
+    "cudaerrormemoryallocation",
+    "cublas_status_alloc_failed",
+    "bad_alloc",
+    "memoryerror",
+)
+
+
 def emit_progress(percent, stage):
     print(json.dumps({"progress": percent, "stage": stage}), file=sys.stderr, flush=True)
+
+
+def _is_oom(err):
+    if isinstance(err, MemoryError):
+        return True
+    m = str(err).lower()
+    return any(s in m for s in _OOM_MARKERS)
 
 
 def _refine_edges(image_bytes, level):
@@ -248,12 +269,29 @@ def main():
                     alpha_matting_foreground_threshold=240,
                     alpha_matting_background_threshold=10,
                 )
-            except MemoryError:
-                raise
             except Exception as e:
-                if use_alpha_matting:
-                    return remove(input_data, session=session, alpha_matting=False)
+                if _is_oom(e):
+                    raise
                 detail = str(e).strip() or type(e).__name__
+                if use_alpha_matting:
+                    sys.stderr.write(
+                        json.dumps(
+                            {
+                                "warning": f"[remove-bg] Alpha matting failed ({detail}); retrying without alpha matting"
+                            }
+                        )
+                        + "\n"
+                    )
+                    sys.stderr.flush()
+                    try:
+                        return remove(input_data, session=session, alpha_matting=False)
+                    except Exception as retry_err:
+                        if _is_oom(retry_err):
+                            raise
+                        retry_detail = str(retry_err).strip() or type(retry_err).__name__
+                        raise RuntimeError(
+                            f"Background removal failed: {retry_detail}"
+                        ) from retry_err
                 raise RuntimeError(f"Background removal failed: {detail}") from e
 
         output_data = run_with_heartbeat(_remove, emit_progress, 30, 80, "Analyzing image")
