@@ -75,10 +75,48 @@ interface Template {
 
 const TEMPLATES_KEY = "metadata-templates";
 
+function isTemplateValues(value: unknown): value is Partial<FormFields> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  for (const [key, fieldValue] of Object.entries(value as Record<string, unknown>)) {
+    if (key === "__proto__" || !Object.hasOwn(EMPTY_FORM, key)) return false;
+    if (fieldValue === undefined) continue;
+    if (key === "clearGps") {
+      if (typeof fieldValue !== "boolean") return false;
+    } else if (key === "keywords") {
+      if (
+        !Array.isArray(fieldValue) ||
+        !fieldValue.every((item): item is string => typeof item === "string")
+      ) {
+        return false;
+      }
+    } else if (key === "dateMode") {
+      if (fieldValue !== "edit" && fieldValue !== "shift") return false;
+    } else if (key === "dateShiftDirection") {
+      if (fieldValue !== "+" && fieldValue !== "-") return false;
+    } else if (key === "keywordsMode") {
+      if (fieldValue !== "add" && fieldValue !== "set") return false;
+    } else if (typeof fieldValue !== "string") {
+      return false;
+    }
+  }
+  return true;
+}
+
+function isTemplate(value: unknown): value is Template {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.name === "string" && isTemplateValues(record.values);
+}
+
 function loadTemplates(): Template[] {
   try {
     const raw = localStorage.getItem(TEMPLATES_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed) || !parsed.every(isTemplate)) {
+      return [];
+    }
+    return parsed;
   } catch {
     return [];
   }

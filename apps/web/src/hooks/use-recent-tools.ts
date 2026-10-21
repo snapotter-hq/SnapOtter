@@ -1,22 +1,27 @@
 import { useSyncExternalStore } from "react";
+import { parseStringArray } from "@/lib/settings-payload";
 
 const STORAGE_KEY = "snapotter-recent-tools";
 const MAX_RECENT = 5;
 const EMPTY: string[] = [];
 
 let listeners: Array<() => void> = [];
-let cachedRaw: string | null = null;
+let cachedRaw: string | null | undefined;
 let cachedParsed: string[] = EMPTY;
 
 function getSnapshot(): string[] {
-  const raw = localStorage.getItem(STORAGE_KEY);
+  let raw: string | null = null;
+  try {
+    raw = localStorage.getItem(STORAGE_KEY);
+  } catch {
+    cachedRaw = undefined;
+    cachedParsed = EMPTY;
+    return EMPTY;
+  }
   if (raw !== cachedRaw) {
     cachedRaw = raw;
-    try {
-      cachedParsed = raw ? JSON.parse(raw) : EMPTY;
-    } catch {
-      cachedParsed = EMPTY;
-    }
+    const parsed = parseStringArray(raw ?? undefined);
+    cachedParsed = parsed.length > 0 ? parsed : EMPTY;
   }
   return cachedParsed;
 }
@@ -35,8 +40,12 @@ function subscribe(listener: () => void) {
 export function recordRecentTool(toolId: string) {
   const current = getSnapshot();
   const updated = [toolId, ...current.filter((id) => id !== toolId)].slice(0, MAX_RECENT);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  cachedRaw = null;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  } catch {
+    // Storage blocked or full
+  }
+  cachedRaw = undefined;
   for (const l of listeners) l();
 }
 

@@ -17,6 +17,7 @@ import type { FeedbackPromptVariant } from "@/lib/feedback.js";
 import { trackFeedbackPromptDismissed, trackFeedbackPromptShown } from "@/lib/feedback.js";
 import { format } from "@/lib/format.js";
 import { ICON_MAP } from "@/lib/icon-map.js";
+import { parseStringArray } from "@/lib/settings-payload.js";
 import { getCategoryName, getToolName } from "@/lib/tool-i18n.js";
 import { buildToolRequestDiscussionUrl } from "@/lib/tool-request.js";
 import { cn } from "@/lib/utils.js";
@@ -34,7 +35,7 @@ const COLLAPSE_STORAGE_KEY = "snapotter-collapsed-sections";
 function getCollapsedSections(): Set<string> {
   try {
     const raw = localStorage.getItem(COLLAPSE_STORAGE_KEY);
-    return raw ? new Set(JSON.parse(raw)) : new Set();
+    return new Set(parseStringArray(raw ?? undefined));
   } catch {
     return new Set();
   }
