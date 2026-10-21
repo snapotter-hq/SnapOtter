@@ -314,6 +314,19 @@ describe("capture path", () => {
     expect(h.scope.setFingerprint).toHaveBeenLastCalledWith(["connectivity", "net-unavailable"]);
   });
 
+  it("reports a Smithy S3 socket or connection TimeoutError with $metadata and no code as a connectivity warning (#2774)", async () => {
+    const err = Object.assign(
+      new Error(
+        "@smithy/node-http-handler - the request socket timed out after 30000 ms of inactivity",
+      ),
+      { name: "TimeoutError", $metadata: { attempts: 3 } },
+    );
+    await reportError(err, { source: "cron", subsystem: "storage-ttl" });
+    expect(h.scope.setLevel).toHaveBeenCalledWith("warning");
+    expect(h.scope.setTag).toHaveBeenCalledWith("error_class", "operational");
+    expect(h.scope.setFingerprint).toHaveBeenLastCalledWith(["connectivity", "net-unavailable"]);
+  });
+
   it("prefers the connectivity fingerprint for infra-connectivity operational errors", async () => {
     const pg = Object.assign(new Error("Failed query: select 1"), {
       cause: Object.assign(new Error("57P01"), { code: "57P01" }),

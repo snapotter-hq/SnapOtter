@@ -192,7 +192,9 @@ export function connectivityClass(err: unknown): ConnectivityClass | null {
     );
     const hasNetCode = links.some((l) => typeof l.code === "string" && NET_CODES.has(l.code));
     if (hasPgState || (hasNetCode && looksLikePg(links))) return "pg-unavailable";
-    if (hasNetCode) return "net-unavailable";
+    if (hasNetCode || links.some((l) => l.name === "TimeoutError" && "$metadata" in l)) {
+      return "net-unavailable";
+    }
     return null;
   } catch {
     return null;

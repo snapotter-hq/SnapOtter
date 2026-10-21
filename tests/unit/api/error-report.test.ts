@@ -68,6 +68,31 @@ describe("classifyError", () => {
     });
     expect(classifyError(err, "worker")).toBe("operational");
   });
+  it("operational: S3 socket and connection TimeoutError rejections with $metadata and no code (#2774)", () => {
+    const socketTimeout = Object.assign(
+      new Error(
+        "@smithy/node-http-handler - the request socket timed out after 30000 ms of inactivity",
+      ),
+      { name: "TimeoutError", $metadata: { attempts: 3 } },
+    );
+    const connTimeout = Object.assign(
+      new Error(
+        "@smithy/node-http-handler - the request socket did not establish a connection with the server within the configured timeout of 10000 ms.",
+      ),
+      { name: "TimeoutError", $metadata: { attempts: 3 } },
+    );
+    for (const err of [socketTimeout, connTimeout]) {
+      expect(classifyError(err, "cron")).toBe("operational");
+      expect(classifyError(err, "worker")).toBe("operational");
+      expect(classifyError(err, "http")).toBe("operational");
+      expect(classifyError(err)).toBe("operational");
+    }
+    const noSuchKey = Object.assign(new Error("The specified key does not exist."), {
+      name: "NoSuchKey",
+      $metadata: { httpStatusCode: 404 },
+    });
+    expect(classifyError(noSuchKey, "cron")).toBe("bug");
+  });
   it("operational: environmental database errors (auth, permission, resources), not query bugs", () => {
     // The deployment's DB is misconfigured or starved -- the operator's
     // environment, not our code. These flooded the bug view as pg auth /

@@ -290,6 +290,43 @@ describe("connectivityClass", () => {
       expect(connectivityClass(err)).toBeNull();
     }
   });
+  it("classifies Smithy S3 connection and socket TimeoutError rejections with $metadata and no code as net-unavailable (#2774)", () => {
+    const socketTimeout = Object.assign(
+      new Error(
+        "@smithy/node-http-handler - the request socket timed out after 30000 ms of inactivity",
+      ),
+      { name: "TimeoutError", $metadata: { attempts: 3 } },
+    );
+    const connTimeout = Object.assign(
+      new Error(
+        "@smithy/node-http-handler - the request socket did not establish a connection with the server within the configured timeout of 10000 ms.",
+      ),
+      { name: "TimeoutError", $metadata: { attempts: 3 } },
+    );
+    expect(connectivityClass(socketTimeout)).toBe("net-unavailable");
+    expect(connectivityClass(connTimeout)).toBe("net-unavailable");
+    expect(connectivityClass(new Error("S3 read failed", { cause: socketTimeout }))).toBe(
+      "net-unavailable",
+    );
+  });
+  it("leaves a bare TimeoutError without $metadata or a non-TimeoutError with $metadata unclassified (#2774)", () => {
+    expect(
+      connectivityClass(
+        new DOMException("The operation was aborted due to timeout", "TimeoutError"),
+      ),
+    ).toBeNull();
+    expect(
+      connectivityClass(Object.assign(new Error("Request timed out"), { name: "TimeoutError" })),
+    ).toBeNull();
+    expect(
+      connectivityClass(
+        Object.assign(new Error("The specified key does not exist."), {
+          name: "NoSuchKey",
+          $metadata: { httpStatusCode: 404 },
+        }),
+      ),
+    ).toBeNull();
+  });
   it("classifies ioredis connection loss as redis-unavailable", () => {
     const err = Object.assign(new Error("Connection is closed."), {
       name: "MaxRetriesPerRequestError",
