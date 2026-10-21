@@ -347,6 +347,61 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
     expect(await objectsUnder(`outputs/${clientJobId}-f1/`)).toEqual([]);
   });
 
+  it("preserves earlier per-file errors on the failed row and terminal frame when a mid-batch storage fault hits (#2815)", async () => {
+    const clientJobId = "batch-2815-partial-storage-fault";
+    faults.poison.add(`outputs/${clientJobId}-f1/`);
+
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "bad.pdf",
+        contentType: "application/pdf",
+        content: Buffer.from("not a pdf"),
+      },
+      { name: "file", filename: "b.pdf", contentType: "application/pdf", content: PDF_2PAGE },
+      { name: "settings", content: JSON.stringify({ dpi: 72 }) },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/pdf/pdf-to-jpg/batch",
+      body,
+      headers: { "content-type": contentType, authorization: `Bearer ${token}` },
+    });
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(503);
+    expect(res.json()).toMatchObject({ code: "workspace-cap" });
+
+    const row = await readRow(clientJobId);
+    expect(row?.status).toBe("failed");
+    expect(row?.completedAt).not.toBeNull();
+    expect(row?.error).toEqual({
+      message: "Workspace storage limit reached",
+      code: "workspace-cap",
+      details: [
+        { filename: "bad.pdf", error: "Invalid or corrupt PDF file" },
+        { filename: "", error: "Workspace storage limit reached" },
+      ],
+    });
+
+    const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`);
+    expect(cached).not.toBeNull();
+    expect(JSON.parse(cached as string)).toMatchObject({
+      jobId: clientJobId,
+      type: "batch",
+      status: "failed",
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 2,
+      code: "workspace-cap",
+      errors: [
+        { filename: "bad.pdf", error: "Invalid or corrupt PDF file" },
+        { filename: "", error: "Workspace storage limit reached" },
+      ],
+    });
+    expect(await objectsUnder(`outputs/${clientJobId}-f1/`)).toEqual([]);
+  });
+
   it("logs a warning when failBatchJob matches no live row on a storage fault (#1555)", async () => {
     const clientJobId = "batch-1555-unapplied-storage-settle";
     faults.poison.add(`outputs/${clientJobId}-f1/`);

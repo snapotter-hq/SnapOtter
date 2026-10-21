@@ -495,4 +495,43 @@ describe("pdf-to-image batch route (#1552)", () => {
     });
     await app.close();
   });
+
+  it("preserves earlier per-file errors in failBatchJob when a mid-batch storage fault hits (#2815)", async () => {
+    putObject.mockImplementation(async (key: string) => {
+      if (key.includes("-f1/")) {
+        throw workspaceCap();
+      }
+    });
+    const app = await buildApp(registerPdfToImage);
+    const res = await app.inject({
+      method: "POST",
+      url: `${apiToolPath("pdf-to-image")}/batch`,
+      ...multipartBody(
+        [
+          { name: "bad.pdf", type: "application/pdf", data: Buffer.from("not a pdf") },
+          { name: "b.pdf", type: "application/pdf", data: PDF },
+        ],
+        { dpi: 36 },
+      ),
+    });
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toMatchObject({
+      error: "Workspace is full.",
+      code: "workspace-cap",
+    });
+    expect(failBatchJob).toHaveBeenCalledWith({
+      jobId: expect.any(String),
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 2,
+      errors: [
+        { filename: "bad.pdf", error: "Invalid or corrupt PDF file" },
+        { filename: "", error: "Workspace is full." },
+      ],
+      message: "Workspace is full.",
+      code: "workspace-cap",
+    });
+    await app.close();
+  });
 });

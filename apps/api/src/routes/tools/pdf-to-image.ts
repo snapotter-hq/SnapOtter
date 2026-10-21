@@ -613,7 +613,7 @@ export function registerPdfToImageRoute(
                 : friendlyError(err instanceof Error ? err.message : String(err));
             await settleFaultedBatch(
               files.length,
-              [{ filename: "", error: message }],
+              [...errors, { filename: "", error: message }],
               message,
               safe ? err.code : undefined,
             );
