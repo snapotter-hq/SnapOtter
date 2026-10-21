@@ -13,15 +13,14 @@ import { describe, expect, it, vi } from "vitest";
 const onConflictDoUpdateMock = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<{ rowCount: number }>>(async () => ({ rowCount: 1 })),
 );
-const insertValuesMock = vi.hoisted(() =>
-  vi.fn((..._args: unknown[]) => {
-    const p = Promise.resolve({ rowCount: 1 }) as Promise<{ rowCount: number }> & {
-      onConflictDoUpdate: typeof onConflictDoUpdateMock;
-    };
-    p.onConflictDoUpdate = onConflictDoUpdateMock;
-    return p;
-  }),
-);
+const defaultInsertValuesImpl = vi.hoisted(() => (..._args: unknown[]) => {
+  const p = Promise.resolve({ rowCount: 1 }) as Promise<{ rowCount: number }> & {
+    onConflictDoUpdate: typeof onConflictDoUpdateMock;
+  };
+  p.onConflictDoUpdate = onConflictDoUpdateMock;
+  return p;
+});
+const insertValuesMock = vi.hoisted(() => vi.fn(defaultInsertValuesImpl));
 const updateSetMock = vi.hoisted(() => vi.fn());
 const reportErrorMock = vi.hoisted(() => vi.fn());
 const readFileSpy = vi.hoisted(() => vi.fn());
@@ -35,6 +34,9 @@ const clearTerminalReplayKeyMock = vi.hoisted(() => vi.fn(async () => {}));
 const updateJobProgressMock = vi.hoisted(() => vi.fn());
 const updateSingleFileProgressMock = vi.hoisted(() => vi.fn(async () => {}));
 const flowAddMock = vi.hoisted(() => vi.fn(async () => {}));
+const waitForJobMock = vi.hoisted(() =>
+  vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => null),
+);
 const putObjectMock = vi.hoisted(() => vi.fn(async () => {}));
 const deleteObjectMock = vi.hoisted(() => vi.fn(async () => {}));
 
@@ -208,7 +210,7 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
 vi.mock("../../../apps/api/src/jobs/enqueue.js", () => ({
   getFlowProducer: () => ({ add: flowAddMock }),
   injectTraceContext: vi.fn(),
-  waitForJob: vi.fn(async () => null),
+  waitForJob: waitForJobMock,
 }));
 
 vi.mock("../../../apps/api/src/jobs/batch-progress.js", () => ({
@@ -1803,6 +1805,136 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
       storeValidatedOcrPdfSpy.mockReset();
       deleteObjectMock.mockReset();
       flowAddMock.mockReset();
+    }
+  });
+
+  it("deletes the uploaded object in finally when pre-enqueue setup or flow add fails on a non-ocr-pdf pipeline, and keeps it once enqueued (#2910)", async () => {
+    const parts = [
+      { type: "file" as const, filename: "first.png", content: Buffer.from("first-ok") },
+      {
+        type: "field" as const,
+        fieldname: "pipeline",
+        value: JSON.stringify({
+          steps: [{ toolId: executeTestToolId, settings: {} }],
+        }),
+      },
+      { type: "field" as const, fieldname: "clientJobId", value: "pipeline-execute-2910" },
+    ];
+
+    try {
+      // 1. clientJobId alias upsert rejects
+      vi.clearAllMocks();
+      const aliasErr = new Error("alias upsert failed");
+      onConflictDoUpdateMock.mockRejectedValueOnce(aliasErr);
+
+      await expect(invokePipelineExecuteRoute(parts)).rejects.toBe(aliasErr);
+      expect(putObjectMock).toHaveBeenCalledTimes(1);
+      const aliasUploadKey = String((putObjectMock.mock.calls[0] as unknown[] | undefined)?.[0]);
+      expect(aliasUploadKey).toMatch(/^uploads\/.*\/first\.png$/);
+      expect(deleteObjectMock).toHaveBeenCalledTimes(1);
+      expect(deleteObjectMock).toHaveBeenCalledWith(aliasUploadKey);
+
+      // 2. updateSingleFileProgress rejects
+      vi.clearAllMocks();
+      const progressErr = new Error("progress write failed");
+      updateSingleFileProgressMock.mockRejectedValueOnce(progressErr);
+
+      await expect(invokePipelineExecuteRoute(parts)).rejects.toBe(progressErr);
+      expect(putObjectMock).toHaveBeenCalledTimes(1);
+      const progressUploadKey = String((putObjectMock.mock.calls[0] as unknown[] | undefined)?.[0]);
+      expect(progressUploadKey).toMatch(/^uploads\/.*\/first\.png$/);
+      expect(deleteObjectMock).toHaveBeenCalledTimes(1);
+      expect(deleteObjectMock).toHaveBeenCalledWith(progressUploadKey);
+
+      // 3. schema.jobs step row insert rejects
+      vi.clearAllMocks();
+      const insertErr = new Error("step insert failed");
+      insertValuesMock.mockImplementation((row: unknown) => {
+        if ((row as { type?: string })?.type === "pipeline-step") {
+          return Promise.reject(insertErr) as ReturnType<typeof insertValuesMock>;
+        }
+        return defaultInsertValuesImpl(row);
+      });
+
+      await expect(invokePipelineExecuteRoute(parts)).rejects.toBe(insertErr);
+      expect(putObjectMock).toHaveBeenCalledTimes(1);
+      const insertUploadKey = String((putObjectMock.mock.calls[0] as unknown[] | undefined)?.[0]);
+      expect(insertUploadKey).toMatch(/^uploads\/.*\/first\.png$/);
+      expect(deleteObjectMock).toHaveBeenCalledTimes(1);
+      expect(deleteObjectMock).toHaveBeenCalledWith(insertUploadKey);
+
+      // 4. schema.jobs parent pipeline row insert rejects
+      vi.clearAllMocks();
+      const parentInsertErr = new Error("parent insert failed");
+      insertValuesMock.mockImplementation((row: unknown) => {
+        if ((row as { type?: string })?.type === "pipeline") {
+          return Promise.reject(parentInsertErr) as ReturnType<typeof insertValuesMock>;
+        }
+        return defaultInsertValuesImpl(row);
+      });
+
+      await expect(invokePipelineExecuteRoute(parts)).rejects.toBe(parentInsertErr);
+      expect(putObjectMock).toHaveBeenCalledTimes(1);
+      const parentInsertUploadKey = String(
+        (putObjectMock.mock.calls[0] as unknown[] | undefined)?.[0],
+      );
+      expect(parentInsertUploadKey).toMatch(/^uploads\/.*\/first\.png$/);
+      expect(deleteObjectMock).toHaveBeenCalledTimes(1);
+      expect(deleteObjectMock).toHaveBeenCalledWith(parentInsertUploadKey);
+      insertValuesMock.mockImplementation(defaultInsertValuesImpl);
+
+      // 5. getFlowProducer().add rejects and deleteObject warning is logged when cleanup also rejects
+      vi.clearAllMocks();
+      const flowErr = new Error("Redis flow add failed");
+      const cleanupErr = Object.assign(new Error("Access Denied"), { name: "AccessDenied" });
+      flowAddMock.mockRejectedValueOnce(flowErr);
+      deleteObjectMock.mockRejectedValueOnce(cleanupErr);
+      const log = { error: vi.fn(), warn: vi.fn() };
+
+      await expect(invokePipelineExecuteRoute(parts, log)).rejects.toBe(flowErr);
+      expect(putObjectMock).toHaveBeenCalledTimes(1);
+      const flowUploadKey = String((putObjectMock.mock.calls[0] as unknown[] | undefined)?.[0]);
+      expect(flowUploadKey).toMatch(/^uploads\/.*\/first\.png$/);
+      expect(deleteObjectMock).toHaveBeenCalledTimes(1);
+      expect(deleteObjectMock).toHaveBeenCalledWith(flowUploadKey);
+      expect(log.warn).toHaveBeenCalledWith(
+        { err: cleanupErr, key: flowUploadKey },
+        "pipeline ingress cleanup failed",
+      );
+
+      // 6. When putObject itself rejects, deleteObject is not called
+      vi.clearAllMocks();
+      const putErr = new Error("storage put failed");
+      putObjectMock.mockRejectedValueOnce(putErr);
+
+      await expect(invokePipelineExecuteRoute(parts)).rejects.toBe(putErr);
+      expect(putObjectMock).toHaveBeenCalledTimes(1);
+      expect(deleteObjectMock).not.toHaveBeenCalled();
+
+      // 7. Once getFlowProducer().add succeeds, a waitForJob rejection does not delete the upload
+      vi.clearAllMocks();
+      const waitErr = new Error("worker failed after enqueue");
+      waitForJobMock.mockRejectedValueOnce(waitErr);
+
+      await expect(invokePipelineExecuteRoute(parts)).rejects.toBe(waitErr);
+      expect(putObjectMock).toHaveBeenCalledTimes(1);
+      expect(flowAddMock).toHaveBeenCalledTimes(1);
+      expect(deleteObjectMock).not.toHaveBeenCalled();
+    } finally {
+      insertValuesMock.mockReset();
+      insertValuesMock.mockImplementation(defaultInsertValuesImpl);
+      putObjectMock.mockReset();
+      putObjectMock.mockResolvedValue(undefined);
+      onConflictDoUpdateMock.mockReset();
+      onConflictDoUpdateMock.mockResolvedValue({ rowCount: 1 });
+      updateSingleFileProgressMock.mockReset();
+      updateSingleFileProgressMock.mockResolvedValue(undefined);
+      flowAddMock.mockReset();
+      flowAddMock.mockResolvedValue(undefined);
+      deleteObjectMock.mockReset();
+      deleteObjectMock.mockResolvedValue(undefined);
+      waitForJobMock.mockReset();
+      waitForJobMock.mockResolvedValue(null);
     }
   });
 

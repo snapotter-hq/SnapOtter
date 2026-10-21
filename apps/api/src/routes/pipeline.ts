@@ -337,7 +337,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       return withRouteScratch("pipeline", async (scratchDir) => {
         const ingressAbort = new AbortController();
         const abortIngress = () => ingressAbort.abort();
-        let uncommittedOcrKey: string | undefined;
+        let uncommittedUploadKey: string | undefined;
         request.raw.once("aborted", abortIngress);
         if (request.raw.aborted) ingressAbort.abort();
         try {
@@ -661,7 +661,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                 maxBytes: resolveOcrEncodedInputLimit(env.MAX_UPLOAD_SIZE_MB),
                 signal: ingressAbort.signal,
               });
-              uncommittedOcrKey = uploadKey;
+              uncommittedUploadKey = uploadKey;
             } catch (err) {
               if (err instanceof InputValidationError) {
                 reportEngineUnavailable(err, firstToolId ?? "pipeline", request.log);
@@ -681,6 +681,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           } else {
             if (!processBuffer) throw new Error("Pipeline input buffer is unavailable");
             await putObject(uploadKey, processBuffer);
+            uncommittedUploadKey = uploadKey;
           }
 
           // Derive the pipeline's pool from the first step's modality so the
@@ -823,7 +824,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
           // Add the flow to BullMQ
           await getFlowProducer().add(tree);
-          uncommittedOcrKey = undefined;
+          uncommittedUploadKey = undefined;
 
           // Wait for the finalize job (pipelines block to completion). A
           // rejection here is a server fault (Redis down, a crashed finalize)
@@ -882,8 +883,8 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           });
         } finally {
           request.raw.removeListener("aborted", abortIngress);
-          if (uncommittedOcrKey) {
-            const key = uncommittedOcrKey;
+          if (uncommittedUploadKey) {
+            const key = uncommittedUploadKey;
             await deleteObject(key).catch((cleanupErr) => {
               request.log.warn({ err: cleanupErr, key }, "pipeline ingress cleanup failed");
             });
