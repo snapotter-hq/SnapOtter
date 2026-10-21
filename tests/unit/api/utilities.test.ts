@@ -1,5 +1,5 @@
-import { basename } from "node:path";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { sanitizeFilename } from "../../../apps/api/src/lib/filename.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 
 // ---------------------------------------------------------------------------
@@ -1184,60 +1184,6 @@ describe("verifyPassword", () => {
 // 5. sanitizeFilename
 // ---------------------------------------------------------------------------
 
-// The function is duplicated across multiple route files. Since it is not exported,
-// we replicate the exact logic here and test it directly. This tests the BEHAVIOR
-// so if any of the copies drift, these tests document the expected contract.
-
-function sanitizeFilename(raw: string): string {
-  let name = basename(raw);
-  name = name.replace(/\.\./g, "");
-  name = name.replace(/\0/g, "");
-  if (!name || name === "." || name === "..") {
-    name = "upload";
-  }
-
-  // Guard against double-extension attacks (e.g. "image.png.php").
-  const dotIndex = name.indexOf(".");
-  if (dotIndex !== -1) {
-    const parts = name.split(".");
-    const SAFE_IMAGE_EXTENSIONS = new Set([
-      ".jpg",
-      ".jpeg",
-      ".png",
-      ".webp",
-      ".gif",
-      ".bmp",
-      ".tiff",
-      ".tif",
-      ".avif",
-      ".svg",
-      ".pdf",
-    ]);
-    for (let i = 1; i < parts.length; i++) {
-      const ext = `.${parts[i].toLowerCase()}`;
-      if (SAFE_IMAGE_EXTENSIONS.has(ext)) {
-        name = parts.slice(0, i + 1).join(".");
-        break;
-      }
-    }
-  }
-
-  // Truncate to filesystem-safe length (255 byte NAME_MAX minus margin for _toolId suffix)
-  const MAX_NAME_BYTES = 200;
-  const enc = new TextEncoder();
-  if (enc.encode(name).length > MAX_NAME_BYTES) {
-    const dotIdx = name.lastIndexOf(".");
-    const ext = dotIdx > 0 ? name.slice(dotIdx) : "";
-    let base = dotIdx > 0 ? name.slice(0, dotIdx) : name;
-    while (enc.encode(base + ext).length > MAX_NAME_BYTES) {
-      base = base.slice(0, -1);
-    }
-    name = base + ext;
-  }
-
-  return name;
-}
-
 describe("sanitizeFilename", () => {
   // -- Path traversal attacks -----------------------------------------------
 
@@ -1338,6 +1284,17 @@ describe("sanitizeFilename", () => {
 
   it("preserves filename with multiple extensions", () => {
     expect(sanitizeFilename("archive.tar.gz")).toBe("archive.tar.gz");
+  });
+
+  it("truncates double-extension attacks across image, video, audio, document, and data modalities", () => {
+    expect(sanitizeFilename("image.png.php")).toBe("image.png");
+    expect(sanitizeFilename("report.csv.php")).toBe("report.csv");
+    expect(sanitizeFilename("clip.mp4.exe")).toBe("clip.mp4");
+    expect(sanitizeFilename("track.mp3.sh")).toBe("track.mp3");
+    expect(sanitizeFilename("contract.docx.js")).toBe("contract.docx");
+    expect(sanitizeFilename("photo.heic.php")).toBe("photo.heic");
+    expect(sanitizeFilename("render.jxl.html")).toBe("render.jxl");
+    expect(sanitizeFilename("Report.CSV.php")).toBe("Report.CSV");
   });
 
   // -- Unicode filenames ----------------------------------------------------

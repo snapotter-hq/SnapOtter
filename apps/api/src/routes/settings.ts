@@ -27,9 +27,9 @@ import {
   requirePermission,
 } from "../permissions.js";
 
-const settingsBodySchema = z.record(z.string().min(1), z.unknown());
+export const settingsBodySchema = z.record(z.string().min(1), z.unknown());
 
-const HTML_TAG_PATTERN = /<[a-z/!?][^>]*>/i;
+export const HTML_TAG_PATTERN = /<[a-z/!?][^>]*>/i;
 
 async function encryptIfSensitive(key: string, value: string): Promise<string> {
   if (!env.DATA_ENCRYPTION_KEY || !getSettingPolicy(key)?.encrypted) return value;

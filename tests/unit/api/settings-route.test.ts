@@ -5,196 +5,248 @@
  * logic including HTML tag validation, auth requirements, and error handling.
  */
 import Fastify from "fastify";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
-// ── Mocks ───────────────────────────────────────────────────────────────
-
-const mockDbRows: Array<{ key: string; value: string; updatedAt: Date }> = [];
-const mockInsertRun = vi.fn();
-const mockUpdateRun = vi.fn();
-
-vi.mock("../../../apps/api/src/db/index.js", () => ({
-  db: {
-    select: () => ({
-      from: () => ({
-        where: () => ({
-          get: vi.fn(() => {
-            // Dynamically check mockDbRows
-            return null;
-          }),
-        }),
-        all: () => mockDbRows,
-      }),
-    }),
-    insert: () => ({
-      values: () => ({ run: mockInsertRun }),
-    }),
-    update: () => ({
-      set: () => ({ where: () => ({ run: mockUpdateRun }) }),
-    }),
-  },
-  pool: {},
-  closeDb: async () => {},
-  schema: {
-    settings: { key: {} },
-  },
-}));
-
-vi.mock("../../../apps/api/src/config.js", () => ({
-  env: {
-    AUTH_ENABLED: true,
-  },
-}));
-
-// ── Test the validation and helper logic ────────────────────────────────
-
-const HTML_TAG_PATTERN = /<[a-z/!?][^>]*>/i;
-
-const settingsBodySchemaLogic = {
-  validate(body: unknown): { valid: boolean; error?: string } {
-    if (typeof body !== "object" || body === null || Array.isArray(body)) {
-      return { valid: false, error: "Request body must be a JSON object with key-value pairs" };
-    }
-    return { valid: true };
-  },
-};
-
-function validateEntries(body: Record<string, unknown>): {
-  entries: Array<{ key: string; strValue: string }>;
-  error?: string;
-} {
-  const entries: Array<{ key: string; strValue: string }> = [];
-
-  for (const [key, value] of Object.entries(body)) {
-    if (typeof key !== "string" || key.length === 0) continue;
-
-    const strValue = typeof value === "string" ? value : JSON.stringify(value);
-
-    if (HTML_TAG_PATTERN.test(key) || HTML_TAG_PATTERN.test(strValue)) {
-      return { entries: [], error: "Settings keys and values must not contain HTML tags" };
-    }
-
-    entries.push({ key, strValue });
-  }
-
-  return { entries };
-}
+import { describe, expect, it, vi } from "vitest";
 
 describe("settings route logic", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockDbRows.length = 0;
+  async function loadSettingsModule() {
+    vi.resetModules();
+    const upsertedEntries: Array<{ key: string; value: string }> = [];
+
+    vi.doMock("drizzle-orm", () => ({
+      and: (...args: unknown[]) => ({ op: "and", args }),
+      eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+    }));
+    vi.doMock("../../../apps/api/src/config.js", () => ({
+      env: {
+        DATA_ENCRYPTION_KEY: "",
+        DATA_ENCRYPTION_KEY_PREVIOUS: "",
+        OIDC_ENABLED: false,
+        SAML_ENABLED: false,
+      },
+    }));
+
+    const txHandle = {
+      insert: () => ({
+        values: (vals: { key: string; value: string }) => ({
+          onConflictDoUpdate: () => {
+            upsertedEntries.push({ key: vals.key, value: vals.value });
+            return Promise.resolve();
+          },
+        }),
+      }),
+      delete: () => ({
+        where: () => Promise.resolve(),
+      }),
+    };
+
+    vi.doMock("../../../apps/api/src/db/index.js", () => ({
+      db: {
+        select: () => ({
+          from: () => ({
+            where: () => Promise.resolve([]),
+          }),
+        }),
+        transaction: async (cb: (tx: typeof txHandle) => Promise<unknown>) => cb(txHandle),
+      },
+      schema: { settings: { key: "settings.key", value: "settings.value" } },
+    }));
+    vi.doMock("../../../apps/api/src/permissions.js", () => ({
+      requirePermission: () => async () => ({ id: "admin-1", username: "admin", role: "admin" }),
+      getEffectivePermissions: async () => ["settings:read", "settings:write", "security:manage"],
+      isFullEffectiveAdmin: async () => true,
+    }));
+    vi.doMock("../../../apps/api/src/lib/audit.js", () => ({
+      auditFromRequest: () => async () => {},
+    }));
+
+    const mod = await import("../../../apps/api/src/routes/settings.js");
+    return { ...mod, upsertedEntries };
+  }
+
+  describe("settingsBodySchema validation", () => {
+    it("rejects null and array bodies", async () => {
+      const { settingsBodySchema } = await loadSettingsModule();
+      expect(settingsBodySchema.safeParse(null).success).toBe(false);
+      expect(settingsBodySchema.safeParse([]).success).toBe(false);
+    });
+
+    it("rejects empty-string keys via z.string().min(1)", async () => {
+      const { settingsBodySchema } = await loadSettingsModule();
+      expect(settingsBodySchema.safeParse({ "": "dark" }).success).toBe(false);
+    });
+
+    it("accepts non-empty key-value objects and empty objects", async () => {
+      const { settingsBodySchema } = await loadSettingsModule();
+      expect(settingsBodySchema.safeParse({ defaultTheme: "dark" }).success).toBe(true);
+      expect(settingsBodySchema.safeParse({}).success).toBe(true);
+    });
   });
 
-  describe("body validation", () => {
-    it("rejects null body", () => {
-      expect(settingsBodySchemaLogic.validate(null).valid).toBe(false);
-    });
-
-    it("rejects array body", () => {
-      expect(settingsBodySchemaLogic.validate([]).valid).toBe(false);
-    });
-
-    it("accepts object body", () => {
-      expect(settingsBodySchemaLogic.validate({ theme: "dark" }).valid).toBe(true);
-    });
-
-    it("accepts empty object body", () => {
-      expect(settingsBodySchemaLogic.validate({}).valid).toBe(true);
-    });
-  });
-
-  describe("HTML tag validation", () => {
-    it("rejects HTML tags in keys", () => {
-      const result = validateEntries({ "<script>alert(1)</script>": "value" });
-      expect(result.error).toBe("Settings keys and values must not contain HTML tags");
-    });
-
-    it("rejects HTML tags in values", () => {
-      const result = validateEntries({ key: "<img src=x onerror=alert(1)>" });
-      expect(result.error).toBe("Settings keys and values must not contain HTML tags");
-    });
-
-    it("accepts clean keys and values", () => {
-      const result = validateEntries({ theme: "dark", locale: "en" });
-      expect(result.error).toBeUndefined();
-      expect(result.entries).toHaveLength(2);
-    });
-
-    it("stringifies non-string values", () => {
-      const result = validateEntries({ count: 42 as unknown as string });
-      expect(result.entries[0].strValue).toBe("42");
-    });
-
-    it("stringifies boolean values", () => {
-      const result = validateEntries({ enabled: true as unknown as string });
-      expect(result.entries[0].strValue).toBe("true");
-    });
-
-    it("stringifies object values", () => {
-      const result = validateEntries({ config: { a: 1 } as unknown as string });
-      expect(result.entries[0].strValue).toBe('{"a":1}');
-    });
-
-    it("rejects HTML tag in the middle of a value", () => {
-      const result = validateEntries({ key: "before <div>inside</div> after" });
-      expect(result.error).toBe("Settings keys and values must not contain HTML tags");
-    });
-
-    it("accepts values with angle brackets that are not HTML tags", () => {
-      const result = validateEntries({ math: "a > b && c < d" });
-      // "<" followed by space is not an HTML tag, but "< d" fails pattern if "d" is a letter
-      // The regex /<[a-z/!?][^>]*>/i would match "< d..." -- let's verify
-      const hasTag = HTML_TAG_PATTERN.test("a > b && c < d");
-      if (hasTag) {
-        expect(result.error).toBeDefined();
-      } else {
-        expect(result.error).toBeUndefined();
+  describe("PUT /api/v1/settings validation and HTML tag rejection", () => {
+    it("rejects array bodies with 400 VALIDATION_ERROR", async () => {
+      const { settingsRoutes } = await loadSettingsModule();
+      const app = Fastify();
+      await settingsRoutes(app);
+      await app.ready();
+      try {
+        const res = await app.inject({
+          method: "PUT",
+          url: "/api/v1/settings",
+          payload: ["not", "an", "object"],
+        });
+        expect(res.statusCode).toBe(400);
+        expect(res.json()).toEqual({
+          error: "Request body must be a JSON object with key-value pairs",
+          code: "VALIDATION_ERROR",
+        });
+      } finally {
+        await app.close();
+        vi.restoreAllMocks();
       }
     });
 
-    it("allows multiple settings entries", () => {
-      const result = validateEntries({
-        theme: "dark",
-        locale: "en",
-        fontSize: "14",
-      });
-      expect(result.entries).toHaveLength(3);
-      expect(result.entries.map((e) => e.key)).toEqual(["theme", "locale", "fontSize"]);
+    it("rejects HTML tags in keys and values with 400 VALIDATION_ERROR", async () => {
+      const { settingsRoutes } = await loadSettingsModule();
+      const app = Fastify();
+      await settingsRoutes(app);
+      await app.ready();
+      try {
+        const keyTagRes = await app.inject({
+          method: "PUT",
+          url: "/api/v1/settings",
+          payload: { "<script>alert(1)</script>": "dark" },
+        });
+        expect(keyTagRes.statusCode).toBe(400);
+        expect(keyTagRes.json()).toEqual({
+          error: "Settings keys and values must not contain HTML tags",
+          code: "VALIDATION_ERROR",
+        });
+
+        const valTagRes = await app.inject({
+          method: "PUT",
+          url: "/api/v1/settings",
+          payload: { defaultTheme: "<img src=x onerror=alert(1)>" },
+        });
+        expect(valTagRes.statusCode).toBe(400);
+        expect(valTagRes.json()).toEqual({
+          error: "Settings keys and values must not contain HTML tags",
+          code: "VALIDATION_ERROR",
+        });
+
+        const midTagRes = await app.inject({
+          method: "PUT",
+          url: "/api/v1/settings",
+          payload: { oidc_issuer_url: "before <div>inside</div> after" },
+        });
+        expect(midTagRes.statusCode).toBe(400);
+        expect(midTagRes.json()).toEqual({
+          error: "Settings keys and values must not contain HTML tags",
+          code: "VALIDATION_ERROR",
+        });
+
+        const objTagRes = await app.inject({
+          method: "PUT",
+          url: "/api/v1/settings",
+          payload: { disabledTools: ["<script>alert(1)</script>"] },
+        });
+        expect(objTagRes.statusCode).toBe(400);
+        expect(objTagRes.json()).toEqual({
+          error: "Settings keys and values must not contain HTML tags",
+          code: "VALIDATION_ERROR",
+        });
+      } finally {
+        await app.close();
+        vi.restoreAllMocks();
+      }
+    });
+
+    it("accepts valid policy keys, coerces boolean/number values via prepareSetting, and rejects unknown or readonly keys", async () => {
+      const { settingsRoutes, upsertedEntries } = await loadSettingsModule();
+      const app = Fastify();
+      await settingsRoutes(app);
+      await app.ready();
+      try {
+        const okRes = await app.inject({
+          method: "PUT",
+          url: "/api/v1/settings",
+          payload: {
+            defaultTheme: "dark",
+            defaultLocale: "en",
+            passwordMinLength: 14,
+            passwordRequireUppercase: true,
+          },
+        });
+        expect(okRes.statusCode).toBe(200);
+        expect(okRes.json()).toEqual({ ok: true, updatedCount: 4 });
+        expect(upsertedEntries).toEqual([
+          { key: "defaultLocale", value: "en" },
+          { key: "defaultTheme", value: "dark" },
+          { key: "passwordMinLength", value: "14" },
+          { key: "passwordRequireUppercase", value: "true" },
+        ]);
+
+        upsertedEntries.length = 0;
+
+        const unknownRes = await app.inject({
+          method: "PUT",
+          url: "/api/v1/settings",
+          payload: { defaultTheme: "light", theme: "dark" },
+        });
+        expect(unknownRes.statusCode).toBe(400);
+        expect(unknownRes.json()).toMatchObject({
+          code: "UNKNOWN_SETTING",
+          setting: "theme",
+        });
+
+        const readonlyRes = await app.inject({
+          method: "PUT",
+          url: "/api/v1/settings",
+          payload: { defaultTheme: "light", instance_id: "custom-instance" },
+        });
+        expect(readonlyRes.statusCode).toBe(400);
+        expect(readonlyRes.json()).toEqual({
+          error: 'Setting "instance_id" cannot be modified via the API',
+          code: "READONLY_SETTING",
+        });
+
+        const duplicateAliasRes = await app.inject({
+          method: "PUT",
+          url: "/api/v1/settings",
+          payload: {
+            passwordRequireDigit: "true",
+            passwordRequireNumber: "false",
+          },
+        });
+        expect(duplicateAliasRes.statusCode).toBe(400);
+        expect(duplicateAliasRes.json()).toEqual({
+          error:
+            'Setting "passwordRequireNumber" duplicates "passwordRequireDigit" in the same request',
+          code: "VALIDATION_ERROR",
+        });
+        expect(upsertedEntries).toEqual([]);
+      } finally {
+        await app.close();
+        vi.restoreAllMocks();
+      }
     });
   });
 
   describe("HTML_TAG_PATTERN regex", () => {
-    it("matches <script> tags", () => {
+    it("matches <script>, <img>, closing tags, HTML comments, and <?xml?> processing instructions", async () => {
+      const { HTML_TAG_PATTERN } = await loadSettingsModule();
       expect(HTML_TAG_PATTERN.test("<script>")).toBe(true);
-    });
-
-    it("matches <img> tags", () => {
       expect(HTML_TAG_PATTERN.test("<img src=x>")).toBe(true);
-    });
-
-    it("matches </div> closing tags", () => {
       expect(HTML_TAG_PATTERN.test("</div>")).toBe(true);
-    });
-
-    it("matches <!-- comments -->", () => {
       expect(HTML_TAG_PATTERN.test("<!-- comment -->")).toBe(true);
-    });
-
-    it("matches <?xml?> processing instructions", () => {
       expect(HTML_TAG_PATTERN.test("<?xml version='1.0'?>")).toBe(true);
     });
 
-    it("does not match plain text", () => {
+    it("does not match plain text, empty strings, or angle brackets with spaces", async () => {
+      const { HTML_TAG_PATTERN } = await loadSettingsModule();
       expect(HTML_TAG_PATTERN.test("hello world")).toBe(false);
-    });
-
-    it("does not match empty string", () => {
       expect(HTML_TAG_PATTERN.test("")).toBe(false);
-    });
-
-    it("does not match numeric comparisons", () => {
       expect(HTML_TAG_PATTERN.test("5 > 3")).toBe(false);
+      expect(HTML_TAG_PATTERN.test("a > b && c < d")).toBe(false);
     });
   });
 });

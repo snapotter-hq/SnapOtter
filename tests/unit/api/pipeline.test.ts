@@ -102,9 +102,13 @@ vi.mock("../../../apps/api/src/lib/file-validation.js", () => ({
   ),
 }));
 
-vi.mock("../../../apps/api/src/lib/filename.js", () => ({
-  sanitizeFilename: (n: string) => n,
-}));
+vi.mock("../../../apps/api/src/lib/filename.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/filename.js")>();
+  return {
+    ...actual,
+    sanitizeFilename: (n: string) => n,
+  };
+});
 
 vi.mock("../../../apps/api/src/lib/format-decoders.js", () => ({
   decodeToSharpCompat: vi.fn(),
@@ -232,33 +236,98 @@ vi.mock("../../../apps/api/src/permissions.js", () => ({
 
 import { autoOrient } from "../../../apps/api/src/lib/auto-orient.js";
 import { validateImageBuffer } from "../../../apps/api/src/lib/file-validation.js";
+import { createUniqueNamer } from "../../../apps/api/src/lib/filename.js";
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
-import { registerPipelineRoutes } from "../../../apps/api/src/routes/pipeline.js";
+import {
+  pipelineDefinitionSchema,
+  pipelineStepSchema,
+  registerPipelineRoutes,
+  resolvePipelineStepToolId,
+  savePipelineSchema,
+} from "../../../apps/api/src/routes/pipeline.js";
 import {
   getRegisteredToolIds,
   getToolConfig,
   registerToolProcessFn,
 } from "../../../apps/api/src/routes/tool-factory.js";
 
-// ── Pipeline step schema tests (reproduced logic) ──────────────────────
+// ── Pipeline step schema tests ─────────────────────────────────────────
 
 describe("pipeline step schema validation", () => {
-  it("requires at least one step", () => {
-    const steps: unknown[] = [];
-    expect(steps.length).toBe(0);
-    // Pipeline definition schema requires min 1 step
+  it("requires at least one step and enforces MAX_PIPELINE_STEPS", () => {
+    const empty = pipelineDefinitionSchema.safeParse({ steps: [] });
+    expect(empty.success).toBe(false);
+    if (!empty.success) {
+      expect(empty.error.issues[0]?.message).toBe("Pipeline must have at least one step");
+    }
+
+    const atMax = pipelineDefinitionSchema.safeParse({
+      steps: Array.from({ length: 20 }, () => ({ toolId: "resize", settings: {} })),
+    });
+    expect(atMax.success).toBe(true);
+
+    const overMax = pipelineDefinitionSchema.safeParse({
+      steps: Array.from({ length: 21 }, () => ({ toolId: "resize", settings: {} })),
+    });
+    expect(overMax.success).toBe(false);
+    if (!overMax.success) {
+      expect(overMax.error.issues[0]?.message).toBe("Pipeline exceeds maximum steps");
+    }
   });
 
   it("validates step has toolId field", () => {
-    const step = { toolId: "resize", settings: {} };
-    expect(step.toolId).toBe("resize");
-    expect(step.settings).toEqual({});
+    const parsed = pipelineStepSchema.safeParse({ toolId: "resize", settings: { width: 100 } });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data).toEqual({ toolId: "resize", settings: { width: 100 } });
+    }
+    expect(pipelineStepSchema.safeParse({ settings: {} }).success).toBe(false);
   });
 
   it("defaults settings to empty object when omitted", () => {
-    const step = { toolId: "compress" };
-    const settings = (step as { settings?: Record<string, unknown> }).settings ?? {};
-    expect(settings).toEqual({});
+    const parsed = pipelineStepSchema.parse({ toolId: "compress" });
+    expect(parsed).toEqual({ toolId: "compress", settings: {} });
+  });
+
+  it("validates savePipelineSchema name, optional description, and steps constraints", () => {
+    expect(
+      savePipelineSchema.safeParse({
+        name: "Resize and Compress",
+        description: "Web ready",
+        steps: [{ toolId: "resize" }],
+      }).success,
+    ).toBe(true);
+    expect(
+      savePipelineSchema.safeParse({
+        name: "Resize only",
+        steps: [{ toolId: "resize" }],
+      }).success,
+    ).toBe(true);
+    expect(
+      savePipelineSchema.safeParse({
+        name: "",
+        steps: [{ toolId: "resize" }],
+      }).success,
+    ).toBe(false);
+    expect(
+      savePipelineSchema.safeParse({
+        name: "a".repeat(101),
+        steps: [{ toolId: "resize" }],
+      }).success,
+    ).toBe(false);
+    expect(
+      savePipelineSchema.safeParse({
+        name: "Valid",
+        description: "d".repeat(501),
+        steps: [{ toolId: "resize" }],
+      }).success,
+    ).toBe(false);
+    expect(
+      savePipelineSchema.safeParse({
+        name: "Empty steps",
+        steps: [],
+      }).success,
+    ).toBe(false);
   });
 });
 
@@ -266,91 +335,89 @@ describe("pipeline step schema validation", () => {
 
 describe("content-aware resize routing", () => {
   it("resolves resize with contentAware to content-aware-resize", () => {
-    const step = { toolId: "resize", settings: { contentAware: true, width: 200 } };
-
-    const resolvedToolId =
-      step.toolId === "resize" && step.settings?.contentAware
-        ? "content-aware-resize"
-        : step.toolId;
-
-    expect(resolvedToolId).toBe("content-aware-resize");
+    expect(
+      resolvePipelineStepToolId({
+        toolId: "resize",
+        settings: { contentAware: true, width: 200 },
+      }),
+    ).toBe("content-aware-resize");
   });
 
   it("keeps resize as-is without contentAware", () => {
-    const step = { toolId: "resize", settings: { width: 200 } };
-
-    const resolvedToolId =
-      step.toolId === "resize" && (step.settings as Record<string, unknown>)?.contentAware
-        ? "content-aware-resize"
-        : step.toolId;
-
-    expect(resolvedToolId).toBe("resize");
+    expect(
+      resolvePipelineStepToolId({
+        toolId: "resize",
+        settings: { width: 200 },
+      }),
+    ).toBe("resize");
+    expect(
+      resolvePipelineStepToolId({
+        toolId: "resize",
+        settings: { contentAware: false, width: 200 },
+      }),
+    ).toBe("resize");
+    expect(resolvePipelineStepToolId({ toolId: "resize" })).toBe("resize");
   });
 
   it("keeps non-resize tools unchanged", () => {
-    const step = { toolId: "compress", settings: { quality: 80 } };
-
-    const resolvedToolId =
-      step.toolId === "resize" && (step.settings as Record<string, unknown>)?.contentAware
-        ? "content-aware-resize"
-        : step.toolId;
-
-    expect(resolvedToolId).toBe("compress");
+    expect(
+      resolvePipelineStepToolId({
+        toolId: "compress",
+        settings: { quality: 80, contentAware: true },
+      }),
+    ).toBe("compress");
   });
 });
 
 // ── Unique filename deduplication ──────────────────────────────────────
 
-describe("filename deduplication (getUniqueName logic)", () => {
-  function getUniqueName(name: string, usedNames: Set<string>): string {
-    if (!usedNames.has(name)) {
-      usedNames.add(name);
-      return name;
-    }
-    const dotIdx = name.lastIndexOf(".");
-    const base = dotIdx > 0 ? name.slice(0, dotIdx) : name;
-    const ext = dotIdx > 0 ? name.slice(dotIdx) : "";
-    let counter = 1;
-    let candidate = `${base}_${counter}${ext}`;
-    while (usedNames.has(candidate)) {
-      counter++;
-      candidate = `${base}_${counter}${ext}`;
-    }
-    usedNames.add(candidate);
-    return candidate;
-  }
-
+describe("filename deduplication (createUniqueNamer)", () => {
   it("returns the original name when no conflicts", () => {
-    const used = new Set<string>();
-    expect(getUniqueName("photo.png", used)).toBe("photo.png");
+    const uniqueName = createUniqueNamer();
+    expect(uniqueName("photo.png")).toBe("photo.png");
   });
 
   it("adds _1 suffix on first conflict", () => {
-    const used = new Set<string>(["photo.png"]);
-    expect(getUniqueName("photo.png", used)).toBe("photo_1.png");
+    const uniqueName = createUniqueNamer();
+    expect(uniqueName("photo.png")).toBe("photo.png");
+    expect(uniqueName("photo.png")).toBe("photo_1.png");
   });
 
   it("increments counter on repeated conflicts", () => {
-    const used = new Set<string>(["photo.png", "photo_1.png"]);
-    expect(getUniqueName("photo.png", used)).toBe("photo_2.png");
+    const uniqueName = createUniqueNamer();
+    expect(uniqueName("photo.png")).toBe("photo.png");
+    expect(uniqueName("photo_1.png")).toBe("photo_1.png");
+    expect(uniqueName("photo.png")).toBe("photo_2.png");
   });
 
   it("handles filenames without extension", () => {
-    const used = new Set<string>(["README"]);
-    expect(getUniqueName("README", used)).toBe("README_1");
+    const uniqueName = createUniqueNamer();
+    expect(uniqueName("README")).toBe("README");
+    expect(uniqueName("README")).toBe("README_1");
   });
 
   it("handles multiple dots in filename", () => {
-    const used = new Set<string>(["my.photo.final.png"]);
-    expect(getUniqueName("my.photo.final.png", used)).toBe("my.photo.final_1.png");
+    const uniqueName = createUniqueNamer();
+    expect(uniqueName("my.photo.final.png")).toBe("my.photo.final.png");
+    expect(uniqueName("my.photo.final.png")).toBe("my.photo.final_1.png");
   });
 
   it("tracks all used names across multiple calls", () => {
-    const used = new Set<string>();
-    expect(getUniqueName("a.jpg", used)).toBe("a.jpg");
-    expect(getUniqueName("a.jpg", used)).toBe("a_1.jpg");
-    expect(getUniqueName("a.jpg", used)).toBe("a_2.jpg");
-    expect(getUniqueName("b.jpg", used)).toBe("b.jpg");
+    const uniqueName = createUniqueNamer();
+    expect(uniqueName("a.jpg")).toBe("a.jpg");
+    expect(uniqueName("a.jpg")).toBe("a_1.jpg");
+    expect(uniqueName("a.jpg")).toBe("a_2.jpg");
+    expect(uniqueName("b.jpg")).toBe("b.jpg");
+  });
+
+  it("compares filenames case-insensitively and normalizes Unicode to NFC", () => {
+    const uniqueName = createUniqueNamer();
+    expect(uniqueName("Report.PDF")).toBe("Report.PDF");
+    expect(uniqueName("report.pdf")).toBe("report_1.pdf");
+    const composed = `caf${String.fromCharCode(0xe9)}.png`;
+    const decomposed = `cafe${String.fromCharCode(0x301)}.png`;
+    expect(uniqueName(composed)).toBe(composed);
+    expect(uniqueName(decomposed)).toBe(`cafe${String.fromCharCode(0x301)}_1.png`);
   });
 });
 

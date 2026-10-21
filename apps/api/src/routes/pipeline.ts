@@ -120,7 +120,7 @@ async function requirePipelineAccess(
 }
 
 /** Schema for a single pipeline step. */
-const pipelineStepSchema = z.object({
+export const pipelineStepSchema = z.object({
   toolId: z.string(),
   settings: z.record(z.unknown()).default({}),
 });
@@ -134,16 +134,26 @@ const stepsSchema =
         .max(env.MAX_PIPELINE_STEPS, "Pipeline exceeds maximum steps")
     : z.array(pipelineStepSchema).min(1, "Pipeline must have at least one step");
 
-const pipelineDefinitionSchema = z.object({
+export const pipelineDefinitionSchema = z.object({
   steps: stepsSchema,
 });
 
 /** Schema for saving a pipeline. */
-const savePipelineSchema = z.object({
+export const savePipelineSchema = z.object({
   name: z.string().min(1, "Pipeline name is required").max(100),
   description: z.string().max(500).optional(),
   steps: stepsSchema,
 });
+
+/** Resolve a pipeline step's toolId (routing resize with contentAware to content-aware-resize). */
+export function resolvePipelineStepToolId(step: {
+  toolId: string;
+  settings?: Record<string, unknown>;
+}): string {
+  return step.toolId === "resize" && step.settings?.contentAware
+    ? "content-aware-resize"
+    : step.toolId;
+}
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -553,10 +563,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             const step = pipeline.steps[i];
 
             // Route content-aware resize to its dedicated tool
-            const resolvedToolId =
-              step.toolId === "resize" && step.settings?.contentAware
-                ? "content-aware-resize"
-                : step.toolId;
+            const resolvedToolId = resolvePipelineStepToolId(step);
 
             const toolConfig = getToolConfig(resolvedToolId);
             if (!toolConfig) {
@@ -1206,10 +1213,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           for (let i = 0; i < pipeline.steps.length; i++) {
             const step = pipeline.steps[i];
 
-            const resolvedToolId =
-              step.toolId === "resize" && step.settings?.contentAware
-                ? "content-aware-resize"
-                : step.toolId;
+            const resolvedToolId = resolvePipelineStepToolId(step);
 
             const toolConfig = getToolConfig(resolvedToolId);
             if (!toolConfig) {
