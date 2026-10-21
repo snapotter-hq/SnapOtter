@@ -748,7 +748,7 @@ describe("validateImageBuffer - megapixel limit boundary", () => {
     const result = await validateImageBuffer(png);
     expect(result.valid).toBe(false);
     if (!result.valid) {
-      expect(result.reason).toMatch(/^Image exceeds maximum size: 1\.0MP \(limit: 1MP\)$/);
+      expect(result.reason).toMatch(/^Image exceeds maximum size: 1\.01MP \(limit: 1MP\)$/);
     }
   });
 

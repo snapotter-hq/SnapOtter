@@ -46,6 +46,47 @@ describe("file-validation megapixel limit (L277/L279/L282)", () => {
     const res = await validateImageBuffer(buf, "unlimited.png");
     expect(res).toMatchObject({ valid: true, width: 2000, height: 2000 });
   });
+
+  it("formats near-boundary exceeded megapixels with 2 decimal places (#3062)", async () => {
+    const svg = (w: number, h: number) =>
+      Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"/>`);
+
+    // 10001x10000 = 100.01 MP against MAX_MEGAPIXELS = 100 (where toFixed(1) rounds down to "100.0")
+    env.MAX_MEGAPIXELS = 100;
+    await expect(validateImageBuffer(svg(10_001, 10_000), "near.svg")).resolves.toEqual({
+      valid: false,
+      reason: "Image exceeds maximum size: 100.01MP (limit: 100MP)",
+    });
+
+    // 1,000,001 x 100 = 100.0001 MP (< 0.005 MP excess) floors at limit + 0.01 instead of rounding down to 100.00 MP
+    await expect(validateImageBuffer(svg(1_000_001, 100), "tiny-excess.svg")).resolves.toEqual({
+      valid: false,
+      reason: "Image exceeds maximum size: 100.01MP (limit: 100MP)",
+    });
+
+    // 4024x1000 = 4.024 MP rounds down to 4.02 MP (kills Math.ceil mutant)
+    env.MAX_MEGAPIXELS = 4;
+    await expect(validateImageBuffer(await png(4024, 1000), "round-down.png")).resolves.toEqual({
+      valid: false,
+      reason: "Image exceeds maximum size: 4.02MP (limit: 4MP)",
+    });
+
+    // 4045x1000 = 4.045 MP: IEEE-754 (4.045).toFixed(2) === "4.04", must round to 4.05 MP via Math.round
+    await expect(validateImageBuffer(await png(4045, 1000), "ieee.png")).resolves.toEqual({
+      valid: false,
+      reason: "Image exceeds maximum size: 4.05MP (limit: 4MP)",
+    });
+
+    // 4050x1000 = 4.05 MP ((4.05).toFixed(1) === "4.0" in IEEE-754 -> 4.05 MP) vs 4051x1000 = 4.051 MP -> 4.1 MP
+    await expect(validateImageBuffer(await png(4050, 1000), "upper-two-dec.png")).resolves.toEqual({
+      valid: false,
+      reason: "Image exceeds maximum size: 4.05MP (limit: 4MP)",
+    });
+    await expect(validateImageBuffer(await png(4051, 1000), "one-dec.png")).resolves.toEqual({
+      valid: false,
+      reason: "Image exceeds maximum size: 4.1MP (limit: 4MP)",
+    });
+  });
 });
 
 describe("file-validation null-byte spot positions (L304-L309)", () => {

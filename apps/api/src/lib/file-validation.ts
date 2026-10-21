@@ -331,7 +331,7 @@ export async function validateImageBuffer(
     if (env.MAX_MEGAPIXELS > 0 && megapixels > env.MAX_MEGAPIXELS) {
       return {
         valid: false,
-        reason: `Image exceeds maximum size: ${megapixels.toFixed(1)}MP (limit: ${env.MAX_MEGAPIXELS}MP)`,
+        reason: `Image exceeds maximum size: ${formatExceededMp(megapixels, env.MAX_MEGAPIXELS)}MP (limit: ${env.MAX_MEGAPIXELS}MP)`,
       };
     }
 
@@ -339,6 +339,12 @@ export async function validateImageBuffer(
   } catch {
     return { valid: false, reason: "Failed to read image metadata" };
   }
+}
+
+function formatExceededMp(actual: number, limit: number): string {
+  const oneDec = actual.toFixed(1);
+  if (Number(oneDec) > limit) return oneDec;
+  return Math.max(limit + 0.01, Math.round(actual * 100) / 100).toFixed(2);
 }
 
 /**
