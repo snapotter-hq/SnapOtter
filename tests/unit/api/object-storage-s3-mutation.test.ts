@@ -80,6 +80,7 @@ import {
   isMissingObjectError,
   listJobDirs,
   listObjects,
+  normalizeOperationalWriteError,
   normalizeS3ReadFault,
   objectExists,
   putObject,
@@ -148,6 +149,14 @@ describe("object-storage S3 dispatch (STORAGE_MODE=s3)", () => {
         "an unmodeled S3 404 on write",
         Object.assign(new Error("NotFound"), {
           name: "NotFound",
+          $metadata: { httpStatusCode: 404 },
+        }),
+      ],
+      [
+        "a 404 XML response whose body timed out during deserialization (#3256)",
+        Object.assign(new Error("S3 response body stream timed out"), {
+          name: "TimeoutError",
+          code: "ETIMEDOUT",
           $metadata: { httpStatusCode: 404 },
         }),
       ],
@@ -1035,6 +1044,21 @@ describe("normalizeS3ReadFault (#2808)", () => {
       }),
     ],
     [
+      "TimeoutError on a 404 XML error body (#3256)",
+      Object.assign(new Error("S3 response body stream timed out"), {
+        name: "TimeoutError",
+        $metadata: { httpStatusCode: 404 },
+      }),
+    ],
+    [
+      "ETIMEDOUT on a 404 XML error body (#3256)",
+      Object.assign(new Error("read ETIMEDOUT"), {
+        name: "Error",
+        code: "ETIMEDOUT",
+        $metadata: { httpStatusCode: 404 },
+      }),
+    ],
+    [
       "network connectivity error (ECONNREFUSED)",
       Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), {
         code: "ECONNREFUSED",
@@ -1055,6 +1079,21 @@ describe("normalizeS3ReadFault (#2808)", () => {
       code: "storage-unavailable",
       statusCode: 503,
       cause,
+    });
+  });
+
+  it("normalizes a TimeoutError with httpStatusCode 404 in normalizeOperationalWriteError (#3256)", () => {
+    const timeoutOn404 = Object.assign(new Error("S3 response body stream timed out"), {
+      name: "TimeoutError",
+      $metadata: { httpStatusCode: 404 },
+    });
+    expect(normalizeOperationalWriteError(timeoutOn404)).toMatchObject({
+      message: STORAGE_UNAVAILABLE_MESSAGE,
+      isSafeMessage: true,
+      kind: "operational",
+      code: "storage-unavailable",
+      statusCode: 503,
+      cause: timeoutOn404,
     });
   });
 

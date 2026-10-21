@@ -593,8 +593,14 @@ function serverFault(error: unknown): Error {
 
 function isS3MissingShape(error: unknown): boolean {
   if (typeof error !== "object" || error === null || !("$metadata" in error)) return false;
-  const e = error as { name?: string; $metadata?: { httpStatusCode?: number } };
-  if (e.name === "NoSuchBucket") return false;
+  const e = error as {
+    name?: string;
+    code?: string;
+    $metadata?: { httpStatusCode?: number };
+  };
+  if (e.name === "NoSuchBucket" || e.name === "TimeoutError" || e.code === "ETIMEDOUT") {
+    return false;
+  }
   return e.name === "NoSuchKey" || e.$metadata?.httpStatusCode === 404;
 }
 

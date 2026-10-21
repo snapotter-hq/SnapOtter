@@ -59,6 +59,19 @@ describe("isMissingObjectError", () => {
     expect(s3.isMissingObjectError(sdkError("TimeoutError", undefined))).toBe(false);
   });
 
+  it("rejects TimeoutError and ETIMEDOUT even when deserializerMiddleware stamped httpStatusCode 404 (#3256)", () => {
+    expect(s3.isMissingObjectError(sdkError("TimeoutError", 404))).toBe(false);
+    expect(
+      s3.isMissingObjectError(
+        Object.assign(new Error("read ETIMEDOUT"), {
+          name: "Error",
+          code: "ETIMEDOUT",
+          $metadata: { httpStatusCode: 404 },
+        }),
+      ),
+    ).toBe(false);
+  });
+
   it("rejects non-SDK errors", () => {
     expect(s3.isMissingObjectError(new Error("boom"))).toBe(false);
     expect(s3.isMissingObjectError({ code: "ENOENT", syscall: "open" })).toBe(false);
@@ -236,6 +249,135 @@ describe("S3Client stalled endpoint timeout (#2755)", () => {
       expect(streamErr).toMatchObject({ name: "TimeoutError", code: "ETIMEDOUT" });
       expect(s3.isMissingObjectError(streamErr)).toBe(false);
     } finally {
+      for (const socket of sockets) socket.destroy();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  it("arms the idle socket timeout on XML response bodies inside deserializerMiddleware when headers arrive under 3s and socketTimeout >= 6000 (#3256)", async () => {
+    const sockets = new Set<net.Socket>();
+    let observedClientTimeout: number | undefined;
+    let statusCode = 200;
+    let xmlMode: "fast-list" | "stalled-list" | "list-then-stalled-delete" | "stalled-404" =
+      "fast-list";
+    let requestCount = 0;
+
+    const server = http.createServer((req, res) => {
+      requestCount += 1;
+      if (
+        xmlMode === "fast-list" ||
+        (xmlMode === "list-then-stalled-delete" && req.method === "GET")
+      ) {
+        const listXml =
+          '<?xml version="1.0" encoding="UTF-8"?><ListBucketResult><IsTruncated>false</IsTruncated><Contents><Key>uploads/job-1/a.png</Key><Size>1</Size></Contents></ListBucketResult>';
+        res.writeHead(200, {
+          "Content-Length": String(Buffer.byteLength(listXml)),
+          "Content-Type": "application/xml",
+        });
+        res.end(listXml);
+        return;
+      }
+      res.writeHead(statusCode, {
+        "Content-Length": "1000",
+        "Content-Type": "application/xml",
+      });
+      res.write(
+        statusCode === 404
+          ? '<?xml version="1.0"?><Error><Code>NoSuchBucket'
+          : '<?xml version="1.0"?>',
+      );
+    });
+    server.on("connection", (socket) => sockets.add(socket));
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as net.AddressInfo;
+
+    const origSetTimeout = http.IncomingMessage.prototype.setTimeout;
+    http.IncomingMessage.prototype.setTimeout = function (msecs: number, cb?: () => void) {
+      observedClientTimeout = msecs;
+      return origSetTimeout.call(this, msecs, cb);
+    };
+
+    try {
+      // 1. socketTimeout >= 6000 (default 30_000 ms): verify the deserialize middleware
+      // arms IncomingMessage.setTimeout(30_000) before deserializerMiddleware reads the XML body.
+      s3.configureS3({
+        bucket: "stalled-xml-bucket",
+        region: "us-east-1",
+        endpoint: `http://127.0.0.1:${port}`,
+        accessKeyId: "k",
+        secretAccessKey: "s",
+        forcePathStyle: true,
+        prefix: "",
+      });
+
+      await expect(s3.listGenericObjects("uploads/job-1/")).resolves.toEqual([
+        { key: "uploads/job-1/a.png", size: 1, mtimeMs: 0 },
+      ]);
+      expect(observedClientTimeout).toBe(s3.S3_SOCKET_TIMEOUT_MS);
+
+      // 2. Short socketTimeout: verify listGenericObjects, listGenericJobDirs,
+      // deleteGenericPrefix (DeleteObjectsCommand), and stalled 404 XML error responses
+      // time out with TimeoutError (ETIMEDOUT) and are not misclassified as missing objects.
+      xmlMode = "stalled-list";
+      s3.configureS3({
+        bucket: "stalled-xml-bucket",
+        region: "us-east-1",
+        endpoint: `http://127.0.0.1:${port}`,
+        accessKeyId: "k",
+        secretAccessKey: "s",
+        forcePathStyle: true,
+        prefix: "",
+        socketTimeout: 80,
+      });
+
+      const listObjectsErr = await s3.listGenericObjects("uploads/job-1/").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(listObjectsErr).toMatchObject({ name: "TimeoutError", code: "ETIMEDOUT" });
+      expect(s3.isMissingObjectError(listObjectsErr)).toBe(false);
+
+      const listDirsErr = await s3.listGenericJobDirs("outputs").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(listDirsErr).toMatchObject({ name: "TimeoutError", code: "ETIMEDOUT" });
+      expect(s3.isMissingObjectError(listDirsErr)).toBe(false);
+
+      xmlMode = "list-then-stalled-delete";
+      const deletePrefixErr = await s3.deleteGenericPrefix("uploads/job-1/").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(deletePrefixErr).toMatchObject({ name: "TimeoutError", code: "ETIMEDOUT" });
+      expect(s3.isMissingObjectError(deletePrefixErr)).toBe(false);
+
+      xmlMode = "stalled-404";
+      statusCode = 404;
+      requestCount = 0;
+      const stalled404ThumbErr = await s3.getThumbnail("photo.png").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(requestCount).toBeGreaterThan(0);
+      expect(stalled404ThumbErr).toMatchObject({
+        name: "TimeoutError",
+        code: "ETIMEDOUT",
+        $metadata: { httpStatusCode: 404 },
+      });
+      expect(s3.isMissingObjectError(stalled404ThumbErr)).toBe(false);
+
+      const stalled404DeleteErr = await s3.deleteObject("photo.png").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(stalled404DeleteErr).toMatchObject({
+        name: "TimeoutError",
+        code: "ETIMEDOUT",
+        $metadata: { httpStatusCode: 404 },
+      });
+    } finally {
+      http.IncomingMessage.prototype.setTimeout = origSetTimeout;
       for (const socket of sockets) socket.destroy();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }

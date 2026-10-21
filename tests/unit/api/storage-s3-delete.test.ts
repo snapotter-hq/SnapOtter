@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  */
 const send = vi.hoisted(() => vi.fn());
 const s3ClientConfigs = vi.hoisted(() => [] as Record<string, unknown>[]);
+const middlewareStackAdd = vi.hoisted(() => vi.fn());
 
 vi.mock("@aws-sdk/client-s3", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@aws-sdk/client-s3")>();
@@ -16,6 +17,7 @@ vi.mock("@aws-sdk/client-s3", async (importOriginal) => {
     ...actual,
     S3Client: class {
       send = send;
+      middlewareStack = { add: middlewareStackAdd };
       constructor(opts: Record<string, unknown>) {
         s3ClientConfigs.push(opts);
       }
@@ -587,5 +589,47 @@ describe("S3Client requestHandler timeouts (#2755)", () => {
     send.mockResolvedValueOnce({ Body: nullSocketStream });
     await getGenericObjectStream("outputs/job-1/result.png");
     expect(nullSocketStream.setTimeout).not.toHaveBeenCalled();
+  });
+
+  it("registers a low-priority deserialize middleware that arms response.body once and deduplicates across requireObjectBody (#3256)", async () => {
+    middlewareStackAdd.mockClear();
+    configureS3({
+      bucket: "b",
+      region: "us-east-1",
+      endpoint: "",
+      accessKeyId: "k",
+      secretAccessKey: "s",
+      forcePathStyle: true,
+      prefix: "",
+    });
+    const sharedStream = Object.assign(new PassThrough(), {
+      setTimeout: vi.fn(),
+    });
+    send.mockImplementationOnce(async () => {
+      const [middleware] = middlewareStackAdd.mock.calls[0] ?? [];
+      if (typeof middleware === "function") {
+        const noResponseHandler = middleware(async () => ({ output: {} }));
+        await noResponseHandler({});
+        const handler = middleware(async () => ({
+          response: { body: sharedStream },
+          output: { Body: sharedStream },
+        }));
+        await handler({});
+      }
+      return { Body: sharedStream };
+    });
+
+    const returned = await getObjectStream("photo.png");
+    expect(returned).toBe(sharedStream);
+    expect(middlewareStackAdd).toHaveBeenCalledWith(expect.any(Function), {
+      step: "deserialize",
+      priority: "low",
+      name: "armResponseBodyTimeoutMiddleware",
+    });
+    expect(sharedStream.setTimeout).toHaveBeenCalledTimes(1);
+    expect(sharedStream.setTimeout).toHaveBeenCalledWith(
+      S3_SOCKET_TIMEOUT_MS,
+      expect.any(Function),
+    );
   });
 });

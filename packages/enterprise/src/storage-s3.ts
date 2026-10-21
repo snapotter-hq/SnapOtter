@@ -63,6 +63,14 @@ function getClient(): S3Client {
         ...(requestTimeout > 0 ? { requestTimeout, throwOnRequestTimeout: true } : {}),
       },
     });
+    client.middlewareStack?.add(
+      (next) => async (args) => {
+        const result = await next(args);
+        armResponseBodyTimeout((result.response as { body?: unknown } | undefined)?.body);
+        return result;
+      },
+      { step: "deserialize", priority: "low", name: "armResponseBodyTimeoutMiddleware" },
+    );
   }
   return client;
 }
@@ -77,8 +85,10 @@ function thumbKey(storedName: string): string {
   return `${prefix}thumbs/${storedName}.thumb.jpg`;
 }
 
+const armedResponseBodies = new WeakSet<object>();
+
 function armResponseBodyTimeout<T>(body: T): T {
-  if (typeof body !== "object" || body === null) {
+  if (typeof body !== "object" || body === null || armedResponseBodies.has(body)) {
     return body;
   }
   const socketTimeout = cfg().socketTimeout ?? S3_SOCKET_TIMEOUT_MS;
@@ -94,6 +104,7 @@ function armResponseBodyTimeout<T>(body: T): T {
     typeof readable.setTimeout === "function" &&
     (!("socket" in readable) || Boolean(readable.socket))
   ) {
+    armedResponseBodies.add(body);
     readable.setTimeout(socketTimeout, () => {
       const timeoutError = Object.assign(
         new Error(`S3 response body stream timed out after ${socketTimeout} ms of inactivity`),
@@ -148,8 +159,14 @@ export async function checkConnection(): Promise<void> {
  */
 export function isMissingObjectError(error: unknown): boolean {
   if (typeof error !== "object" || error === null || !("$metadata" in error)) return false;
-  const e = error as { name?: string; $metadata?: { httpStatusCode?: number } };
-  if (e.name === "NoSuchBucket") return false;
+  const e = error as {
+    name?: string;
+    code?: string;
+    $metadata?: { httpStatusCode?: number };
+  };
+  if (e.name === "NoSuchBucket" || e.name === "TimeoutError" || e.code === "ETIMEDOUT") {
+    return false;
+  }
   return e.name === "NoSuchKey" || e.$metadata?.httpStatusCode === 404;
 }
 
