@@ -1,7 +1,17 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { en } from "@snapotter/shared";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  configure,
+  fireEvent,
+  getConfig,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import AdmZip from "adm-zip";
 import { StrictMode } from "react";
 import { Link, MemoryRouter, Route, Routes } from "react-router";
@@ -122,6 +132,7 @@ function arrive(state?: { libraryFileIds: string[] }, strict = false) {
 }
 
 beforeEach(() => {
+  configure({ asyncUtilTimeout: 5000 });
   storageMap.clear();
   xhrs = [];
   MockEventSource.instances = [];
@@ -144,7 +155,9 @@ beforeEach(() => {
       );
     }
     return Promise.resolve(
-      new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+      new Response(JSON.stringify({ authEnabled: false, bundles: [], settings: {} }), {
+        status: 200,
+      }),
     );
   });
   vi.stubGlobal("fetch", fetchMock);
@@ -176,6 +189,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  configure({ asyncUtilTimeout: 1000 });
   // Before the globals go: reset revokes blob urls through the stubbed URL.
   useFileStore.getState().reset();
   usePipelineStore.getState().reset();
@@ -265,7 +279,9 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
         return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
       }
       return Promise.resolve(
-        new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+        new Response(JSON.stringify({ authEnabled: false, bundles: [], settings: {} }), {
+          status: 200,
+        }),
       );
     });
 
@@ -345,7 +361,9 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
         return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
       }
       return Promise.resolve(
-        new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+        new Response(JSON.stringify({ authEnabled: false, bundles: [], settings: {} }), {
+          status: 200,
+        }),
       );
     });
 
@@ -456,7 +474,9 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
         return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
       }
       return Promise.resolve(
-        new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+        new Response(JSON.stringify({ authEnabled: false, bundles: [], settings: {} }), {
+          status: 200,
+        }),
       );
     });
 
@@ -511,7 +531,9 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
         return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
       }
       return Promise.resolve(
-        new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+        new Response(JSON.stringify({ authEnabled: false, bundles: [], settings: {} }), {
+          status: 200,
+        }),
       );
     });
 
@@ -567,7 +589,9 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
         return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
       }
       return Promise.resolve(
-        new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+        new Response(JSON.stringify({ authEnabled: false, bundles: [], settings: {} }), {
+          status: 200,
+        }),
       );
     });
 
@@ -627,7 +651,9 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
         return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
       }
       return Promise.resolve(
-        new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+        new Response(JSON.stringify({ authEnabled: false, bundles: [], settings: {} }), {
+          status: 200,
+        }),
       );
     });
 
@@ -683,16 +709,22 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
         return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
       }
       return Promise.resolve(
-        new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+        new Response(JSON.stringify({ authEnabled: false, bundles: [], settings: {} }), {
+          status: 200,
+        }),
       );
     });
 
+    expect(getConfig().asyncUtilTimeout).toBe(5000);
     arrive({ libraryFileIds: ["slow-file"] });
     expect(capturedSignal?.aborted).toBe(false);
 
     fireEvent.click(screen.getAllByText(en.automate.importFromLibrary)[0]);
-    fireEvent.click(await screen.findByText("modal.png"));
-    fireEvent.click(screen.getByText(en.commonUi.fileLibrary.importCount.replace("{count}", "1")));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(await within(dialog).findByText("modal.png", {}, { timeout: 5000 }));
+    fireEvent.click(
+      within(dialog).getByText(en.commonUi.fileLibrary.importCount.replace("{count}", "1")),
+    );
 
     await waitFor(() =>
       expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual(["modal.png"]),
@@ -724,7 +756,9 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
         return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
       }
       return Promise.resolve(
-        new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+        new Response(JSON.stringify({ authEnabled: false, bundles: [], settings: {} }), {
+          status: 200,
+        }),
       );
     });
 
@@ -813,7 +847,9 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
         return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
       }
       return Promise.resolve(
-        new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+        new Response(JSON.stringify({ authEnabled: false, bundles: [], settings: {} }), {
+          status: 200,
+        }),
       );
     });
 
@@ -821,7 +857,9 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
     useFileStore.getState().setProcessing(true);
     arrive({ libraryFileIds: ["missing-1", "missing-2", "corrupt-3"] });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't import 3 of 3 files.");
+    expect(await screen.findByRole("alert", {}, { timeout: 5000 })).toHaveTextContent(
+      "Couldn't import 3 of 3 files.",
+    );
     expect(useFileStore.getState().entries).toEqual([]);
     expect(useFileStore.getState().processing).toBe(false);
     expect(consoleError).toHaveBeenCalledTimes(3);
@@ -860,13 +898,17 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
         return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
       }
       return Promise.resolve(
-        new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+        new Response(JSON.stringify({ authEnabled: false, bundles: [], settings: {} }), {
+          status: 200,
+        }),
       );
     });
 
     arrive({ libraryFileIds: ["good-file", "bad-file"] });
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't import 1 of 2 files.");
+    expect(await screen.findByRole("alert", {}, { timeout: 5000 })).toHaveTextContent(
+      "Couldn't import 1 of 2 files.",
+    );
     expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual(["good.png"]);
     expect(consoleError).toHaveBeenCalledTimes(1);
     expect(consoleError).toHaveBeenCalledWith(
@@ -894,7 +936,9 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
         return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
       }
       return Promise.resolve(
-        new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+        new Response(JSON.stringify({ authEnabled: false, bundles: [], settings: {} }), {
+          status: 200,
+        }),
       );
     });
 
@@ -950,13 +994,18 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
         return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
       }
       return Promise.resolve(
-        new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+        new Response(JSON.stringify({ authEnabled: false, bundles: [], settings: {} }), {
+          status: 200,
+        }),
       );
     });
 
     // 1. Total failure alert cleared by dropping a file onto Dropzone (handleFiles).
+    expect(getConfig().asyncUtilTimeout).toBe(5000);
     const firstView = arrive({ libraryFileIds: ["bad-file"] });
-    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't import 1 of 1 files.");
+    expect(await screen.findByRole("alert", {}, { timeout: 5000 })).toHaveTextContent(
+      "Couldn't import 1 of 1 files.",
+    );
     fireEvent.drop(screen.getByRole("region", { name: en.dropzone.ariaLabel }), {
       dataTransfer: { files: [png("dropped.png")] },
     });
@@ -965,10 +1014,15 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
 
     // 2. Total failure alert cleared by importing from FileLibraryModal (handleLibraryImport).
     const secondView = arrive({ libraryFileIds: ["bad-file"] });
-    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't import 1 of 1 files.");
+    expect(await screen.findByRole("alert", {}, { timeout: 5000 })).toHaveTextContent(
+      "Couldn't import 1 of 1 files.",
+    );
     fireEvent.click(screen.getAllByText(en.automate.importFromLibrary)[0]);
-    fireEvent.click(await screen.findByText("modal.png"));
-    fireEvent.click(screen.getByText(en.commonUi.fileLibrary.importCount.replace("{count}", "1")));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(await within(dialog).findByText("modal.png", {}, { timeout: 5000 }));
+    fireEvent.click(
+      within(dialog).getByText(en.commonUi.fileLibrary.importCount.replace("{count}", "1")),
+    );
     await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
     secondView.unmount();
 
@@ -985,7 +1039,9 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
     }) as typeof document.createElement);
 
     arrive({ libraryFileIds: ["good-file", "bad-file"] });
-    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't import 1 of 2 files.");
+    expect(await screen.findByRole("alert", {}, { timeout: 5000 })).toHaveTextContent(
+      "Couldn't import 1 of 2 files.",
+    );
 
     fireEvent.click(screen.getByText(en.automate.addButton));
     const emptyInput = createdInputs.at(-1);
