@@ -54,7 +54,7 @@ afterEach(() => {
   useFileStore.getState().reset();
   useSplitStore.setState({ processing: false });
   usePdfToImageStore.setState({ processing: false });
-  usePassportPhotoStore.setState({ analyzing: false, generating: false });
+  usePassportPhotoStore.getState().reset();
   vi.unstubAllGlobals();
 });
 
@@ -206,12 +206,25 @@ describe("ToolPage Clear all intake guard (#2622)", () => {
       "/image/passport-photo",
       () => usePassportPhotoStore.setState({ analyzing: true }),
     ],
+    [
+      "passport-photo (generating)",
+      "/image/passport-photo",
+      () => usePassportPhotoStore.setState({ generating: true }),
+    ],
   ])("refuses Clear all while %s is busy in its own store", async (_name, path, start) => {
     renderToolPage(path);
     await act(async () => {
+      if (path === "/image/passport-photo") {
+        await import("@/components/tools/passport-photo-settings");
+      }
       useFileStore.getState().setFiles([new File(["img"], "scan.png", { type: "image/png" })]);
       start();
     });
+
+    if (path === "/image/passport-photo") {
+      expect(usePassportPhotoStore.getState().analyzedFileKey).not.toBeNull();
+      expect(usePassportPhotoStore.getState().analyzeError).toBeNull();
+    }
 
     fireEvent.click(screen.getByRole("button", { name: en.toolPage.clearAll }));
 

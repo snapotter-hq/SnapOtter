@@ -176,8 +176,28 @@ export const usePassportPhotoStore = create<PassportPhotoStore>((set) => ({
   setZoom: (zoom) => set({ zoom }),
   setGenerateResult: (generateResult) => set({ generateResult }),
   setGenerateError: (generateError) => set({ generateError }),
-  setAnalyzing: (analyzing) => set({ analyzing }),
-  setGenerating: (generating) => set({ generating }),
+  setAnalyzing: (analyzing) =>
+    set((state) => {
+      if (!analyzing) return { analyzing: false };
+      const { files, entries } = useFileStore.getState();
+      const currentKey =
+        files[0] !== undefined ? passportFileKey(files[0], entries[0]?.id) : state.analyzedFileKey;
+      return {
+        analyzing: true,
+        analyzedFileKey: currentKey ?? state.analyzedFileKey,
+      };
+    }),
+  setGenerating: (generating) =>
+    set((state) => {
+      if (!generating) return { generating: false };
+      const { files, entries } = useFileStore.getState();
+      const currentKey =
+        files[0] !== undefined ? passportFileKey(files[0], entries[0]?.id) : state.analyzedFileKey;
+      return {
+        generating: true,
+        analyzedFileKey: currentKey ?? state.analyzedFileKey,
+      };
+    }),
   reset: () => {
     cancelPassportRuns();
     set({ ...INITIAL_STATE });

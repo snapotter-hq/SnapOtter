@@ -318,6 +318,24 @@ describe("usePassportPhotoStore.reset (#2635)", () => {
     expect(after.adjustY).toBe(0);
     expect(after.zoom).toBe(1);
   });
+
+  it("stamps analyzedFileKey when setAnalyzing(true) or setGenerating(true) runs with a loaded file (#3187)", () => {
+    const fileForKey = new File(["k"], "key.jpg", { type: "image/jpeg", lastModified: 42 });
+    useFileStore.getState().setFiles([fileForKey]);
+    const entryId = useFileStore.getState().entries[0]?.id;
+    const expectedKey = passportFileKey(fileForKey, entryId);
+
+    usePassportPhotoStore.getState().setAnalyzing(true);
+    expect(usePassportPhotoStore.getState().analyzedFileKey).toBe(expectedKey);
+    usePassportPhotoStore.getState().setAnalyzing(false);
+    expect(usePassportPhotoStore.getState().analyzedFileKey).toBe(expectedKey);
+
+    usePassportPhotoStore.getState().setAnalyzedFileKey(null);
+    usePassportPhotoStore.getState().setGenerating(true);
+    expect(usePassportPhotoStore.getState().analyzedFileKey).toBe(expectedKey);
+    usePassportPhotoStore.getState().setGenerating(false);
+    expect(usePassportPhotoStore.getState().analyzedFileKey).toBe(expectedKey);
+  });
 });
 
 describe("ToolPage resets usePassportPhotoStore and useMemeStore across tool changes and unmounts (#2635)", () => {

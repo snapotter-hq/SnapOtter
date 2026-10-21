@@ -478,6 +478,7 @@ export function PassportPhotoSettings() {
     const fileKey = passportFileKey(file, currentEntryId);
     if (store.analyzedFileKey === fileKey) return;
     store.setAnalyzedFileKey(fileKey);
+    if (store.analyzing || store.generating) return;
     setGenerateError(null);
     runAnalyze(file);
   }, [hasFile, files, currentEntryId, runAnalyze, setGenerateError]);
