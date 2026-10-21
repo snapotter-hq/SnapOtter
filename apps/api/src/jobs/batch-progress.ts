@@ -79,6 +79,11 @@ export async function markBatchCanceled(parentId: string): Promise<void> {
   await sharedRedis().setex(canceledKey(parentId), 3600, "1");
 }
 
+/** Clear a stale cooperative cancel flag when a pipeline alias channel is re-pointed (#2739). */
+export async function clearBatchCanceled(parentId: string): Promise<void> {
+  await sharedRedis().del(canceledKey(parentId));
+}
+
 /** Whether a cooperative batch cancel was requested. A Redis read fault
  * reports false: keep-working is the safe direction, and a Redis outage has
  * already stopped the queues themselves. The swallowed error is still

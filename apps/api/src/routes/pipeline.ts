@@ -18,7 +18,7 @@ import sharp from "sharp";
 import { z } from "zod";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
-import { recordChildOutcome } from "../jobs/batch-progress.js";
+import { clearBatchCanceled, recordChildOutcome } from "../jobs/batch-progress.js";
 import { getFlowProducer, injectTraceContext, waitForJob } from "../jobs/enqueue.js";
 import {
   INVALID_CLIENT_JOB_ID_ERROR,
@@ -744,6 +744,12 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           }
 
           if (clientJobId) {
+            await clearBatchCanceled(clientJobId).catch((err) => {
+              request.log.warn(
+                { err, clientJobId, pipelineFlowId: jobId },
+                "failed to clear batch cancel flag for pipeline alias",
+              );
+            });
             await clearTerminalReplayKey(clientJobId).catch((err) => {
               request.log.warn(
                 { err, clientJobId, pipelineFlowId: jobId },

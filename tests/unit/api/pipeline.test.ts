@@ -29,6 +29,7 @@ const rmSpy = vi.hoisted(() => vi.fn());
 const spoolMultipartFileSpy = vi.hoisted(() => vi.fn());
 const storeValidatedOcrPdfSpy = vi.hoisted(() => vi.fn());
 const recordChildOutcomeMock = vi.hoisted(() => vi.fn(async () => {}));
+const clearBatchCanceledMock = vi.hoisted(() => vi.fn(async () => {}));
 const failBatchJobMock = vi.hoisted(() => vi.fn(async () => true));
 const clearTerminalReplayKeyMock = vi.hoisted(() => vi.fn(async () => {}));
 const updateJobProgressMock = vi.hoisted(() => vi.fn());
@@ -207,6 +208,7 @@ vi.mock("../../../apps/api/src/jobs/enqueue.js", () => ({
 }));
 
 vi.mock("../../../apps/api/src/jobs/batch-progress.js", () => ({
+  clearBatchCanceled: clearBatchCanceledMock,
   recordChildOutcome: recordChildOutcomeMock,
 }));
 
@@ -1640,7 +1642,7 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
     );
   });
 
-  it("clears the Redis terminal replay key when claiming a clientJobId alias row and skips it when refused (#2740)", async () => {
+  it("clears the Redis terminal replay key and batch cancel flag when claiming a clientJobId alias row and skips both when refused (#2739, #2740)", async () => {
     vi.clearAllMocks();
     onConflictDoUpdateMock.mockResolvedValueOnce({ rowCount: 1 });
 
@@ -1658,10 +1660,18 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
 
     expect(claimedReply.statusCode).toBe(202);
     expect(claimedReply.payload).toEqual({ jobId: "reused-pipeline-alias", async: true });
+    expect(clearBatchCanceledMock).toHaveBeenCalledTimes(1);
+    expect(clearBatchCanceledMock).toHaveBeenCalledWith("reused-pipeline-alias");
     expect(clearTerminalReplayKeyMock).toHaveBeenCalledTimes(1);
     expect(clearTerminalReplayKeyMock).toHaveBeenCalledWith("reused-pipeline-alias");
     expect(updateSingleFileProgressMock).toHaveBeenCalledWith(
       expect.objectContaining({ jobId: "reused-pipeline-alias", phase: "processing" }),
+    );
+    expect(onConflictDoUpdateMock.mock.invocationCallOrder[0]).toBeLessThan(
+      clearBatchCanceledMock.mock.invocationCallOrder[0],
+    );
+    expect(clearBatchCanceledMock.mock.invocationCallOrder[0]).toBeLessThan(
+      updateSingleFileProgressMock.mock.invocationCallOrder[0],
     );
     expect(onConflictDoUpdateMock.mock.invocationCallOrder[0]).toBeLessThan(
       clearTerminalReplayKeyMock.mock.invocationCallOrder[0],
@@ -1675,25 +1685,48 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
 
     vi.clearAllMocks();
     onConflictDoUpdateMock.mockResolvedValueOnce({ rowCount: 1 });
-    clearTerminalReplayKeyMock.mockRejectedValueOnce(new Error("redis del fault"));
+    const cancelDelErr = new Error("redis del cancel fault");
+    const terminalDelErr = new Error("redis del fault");
+    clearBatchCanceledMock.mockRejectedValueOnce(cancelDelErr);
+    clearTerminalReplayKeyMock.mockRejectedValueOnce(terminalDelErr);
+    const faultLog = { error: vi.fn(), warn: vi.fn() };
 
-    const faultTolerantReply = await invokePipelineExecuteRoute([
-      { type: "file", filename: "photo.png", content: Buffer.from("photo-png-bytes") },
-      {
-        type: "field",
-        fieldname: "pipeline",
-        value: JSON.stringify({
-          steps: [{ toolId: executeTestToolId, settings: {} }],
-        }),
-      },
-      { type: "field", fieldname: "clientJobId", value: "reused-pipeline-alias-fault" },
-    ]);
+    const faultTolerantReply = await invokePipelineExecuteRoute(
+      [
+        { type: "file", filename: "photo.png", content: Buffer.from("photo-png-bytes") },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: executeTestToolId, settings: {} }],
+          }),
+        },
+        { type: "field", fieldname: "clientJobId", value: "reused-pipeline-alias-fault" },
+      ],
+      faultLog,
+    );
 
     expect(faultTolerantReply.statusCode).toBe(202);
     expect(faultTolerantReply.payload).toEqual({
       jobId: "reused-pipeline-alias-fault",
       async: true,
     });
+    expect(faultLog.warn).toHaveBeenCalledWith(
+      {
+        err: cancelDelErr,
+        clientJobId: "reused-pipeline-alias-fault",
+        pipelineFlowId: expect.any(String),
+      },
+      "failed to clear batch cancel flag for pipeline alias",
+    );
+    expect(faultLog.warn).toHaveBeenCalledWith(
+      {
+        err: terminalDelErr,
+        clientJobId: "reused-pipeline-alias-fault",
+        pipelineFlowId: expect.any(String),
+      },
+      "failed to clear terminal replay key for pipeline alias",
+    );
     expect(updateSingleFileProgressMock).toHaveBeenCalledWith(
       expect.objectContaining({ jobId: "reused-pipeline-alias-fault", phase: "processing" }),
     );
@@ -1715,6 +1748,7 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
 
     expect(refusedReply.statusCode).toBe(202);
     expect((refusedReply.payload as { jobId?: string })?.jobId).not.toBe("refused-pipeline-alias");
+    expect(clearBatchCanceledMock).not.toHaveBeenCalled();
     expect(clearTerminalReplayKeyMock).not.toHaveBeenCalled();
     expect(updateSingleFileProgressMock).not.toHaveBeenCalled();
   });

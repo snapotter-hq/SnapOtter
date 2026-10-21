@@ -59,7 +59,9 @@ vi.mock("../../../apps/api/src/jobs/enqueue.js", async (importOriginal) => {
 
 const { eq } = await import("drizzle-orm");
 const { db, schema } = await import("../../../apps/api/src/db/index.js");
-const { isBatchCanceled } = await import("../../../apps/api/src/jobs/batch-progress.js");
+const { isBatchCanceled, markBatchCanceled } = await import(
+  "../../../apps/api/src/jobs/batch-progress.js"
+);
 const { sharedRedis } = await import("../../../apps/api/src/jobs/connection.js");
 const { getFlowProducer } = await import("../../../apps/api/src/jobs/enqueue.js");
 const { runSystemJob, SYSTEM_JOBS } = await import("../../../apps/api/src/jobs/system-jobs.js");
@@ -468,6 +470,34 @@ describe("HTTP cancel on route-created pipeline rows", () => {
       enqueueMock.timeoutOnce = false;
       enqueueMock.capturedFlow = null;
     }
+
+    // Run 3 reuses the canceled clientJobId within the 1h Redis cancel-flag
+    // TTL (#2739): re-pointing the alias must clear the stale
+    // batch:<clientJobId>:canceled key so run 3 completes instead of being
+    // skipped by processPipelineStep as canceled.
+    expect(await isBatchCanceled(clientJobId)).toBe(true);
+    const { body: body3, contentType: contentType3 } = createMultipartPayload([
+      { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+      {
+        name: "pipeline",
+        content: JSON.stringify({ steps: [{ toolId: "resize", settings: { width: 50 } }] }),
+      },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+    const execRes3 = await app.inject({
+      method: "POST",
+      url: "/api/v1/pipeline/execute",
+      headers: { "content-type": contentType3, authorization: `Bearer ${adminToken}` },
+      body: body3,
+    });
+    expect(execRes3.statusCode).toBe(200);
+    expect(await isBatchCanceled(clientJobId)).toBe(false);
+    const thirdAlias = await jobRow(clientJobId);
+    const thirdFlow = ((thirdAlias?.settings ?? {}) as { pipelineFlowId?: string }).pipelineFlowId;
+    expect(thirdFlow).toBeDefined();
+    expect(thirdFlow).not.toBe(firstFlow);
+    expect((await jobRow(thirdFlow as string))?.status).toBe("completed");
+    expect(thirdAlias?.status).toBe("completed");
   });
 
   it("blocks a non-owner from canceling a pipeline via its alias (404)", async () => {
@@ -494,10 +524,12 @@ describe("HTTP cancel on route-created pipeline rows", () => {
 
     // A second user submits their own pipeline under the first user's id.
     // The claim is refused, so the second run falls back to its own flow id
-    // and never publishes, persists, or clears the terminal key on the first
-    // user's channel (#895, #2740).
+    // and never publishes, persists, or clears the terminal key or cancel
+    // flag on the first user's channel (#895, #2739, #2740).
     const terminalBefore = await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`);
     expect(terminalBefore).not.toBeNull();
+    await markBatchCanceled(clientJobId);
+    expect(await isBatchCanceled(clientJobId)).toBe(true);
     const attacker = await createUserAndLogin(app, `alias-reuse-${Date.now()}`);
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
@@ -518,6 +550,7 @@ describe("HTTP cancel on route-created pipeline rows", () => {
     expect(attackerFlowId).not.toBe(clientJobId);
     await waitForTerminalFrame(attackerFlowId);
     expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBe(terminalBefore);
+    expect(await isBatchCanceled(clientJobId)).toBe(true);
 
     const after = await jobRow(clientJobId);
     expect(after?.userId).toBe(ownerBefore);
