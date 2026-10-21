@@ -1678,5 +1678,68 @@ describe("EditorPage Open Image server decode (#2530)", () => {
       expect(loadImageSpy).toHaveBeenCalledWith("data:image/png;base64,REBAKED", 1920, 1080);
       expect(toastError).not.toHaveBeenCalled();
     });
+
+    it("delegates WelcomeScreen New Document to EditorPage's single NewDocumentDialog so paste is blocked, File > New does not stack a second dialog, and store replacement closes it (#3270)", () => {
+      FakeImage.manual = true;
+      renderEditor();
+
+      fireEvent.click(screen.getByRole("button", { name: en.editor.welcome.newDocumentButton }));
+      expect(
+        screen.getAllByRole("heading", { name: en.editor.ui.newDocument.heading }),
+      ).toHaveLength(1);
+      expect(document.querySelectorAll("#new-doc-preset")).toHaveLength(1);
+
+      // Pasting an image while the welcome-opened New Document dialog is open is ignored.
+      const pasteEvent = new Event("paste", { bubbles: true, cancelable: true });
+      Object.defineProperty(pasteEvent, "clipboardData", {
+        value: {
+          items: [
+            {
+              type: "image/png",
+              getAsFile: () => new File(["pasted-png"], "paste.png", { type: "image/png" }),
+            },
+          ],
+        },
+      });
+      document.dispatchEvent(pasteEvent);
+      expect(pasteEvent.defaultPrevented).toBe(false);
+      expect(FakeImage.instances).toHaveLength(0);
+      expect(URL.createObjectURL).not.toHaveBeenCalled();
+      expect(loadImageSpy).not.toHaveBeenCalled();
+
+      // Clicking File > New while the dialog is already open does not mount a second NewDocumentDialog.
+      fireEvent.click(screen.getByTestId("menu-file"));
+      fireEvent.click(screen.getByTestId("menu-item-new"));
+      expect(
+        screen.getAllByRole("heading", { name: en.editor.ui.newDocument.heading }),
+      ).toHaveLength(1);
+      expect(document.querySelectorAll("#new-doc-preset")).toHaveLength(1);
+      expect(document.querySelectorAll("#new-doc-width")).toHaveLength(1);
+      expect(document.querySelectorAll("#new-doc-height")).toHaveLength(1);
+
+      // Replacing the document via the store closes the dialog via closeDocumentModals().
+      act(() => {
+        useEditorStore.setState({
+          sourceImageUrl: "blob:project",
+          sourceImageSize: { width: 500, height: 400 },
+          canvasSize: { width: 500, height: 400 },
+          lastAction: { id: "loadProject" },
+          _historyVersion: useEditorStore.getState()._historyVersion + 1,
+        });
+      });
+      expect(screen.queryByRole("heading", { name: en.editor.ui.newDocument.heading })).toBeNull();
+    });
+
+    it("opens and closes its fallback NewDocumentDialog when WelcomeScreen is rendered standalone without onNewDocument (#3270)", () => {
+      render(<WelcomeScreen />);
+
+      fireEvent.click(screen.getByRole("button", { name: en.editor.welcome.newDocumentButton }));
+      expect(
+        screen.getByRole("heading", { name: en.editor.ui.newDocument.heading }),
+      ).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: en.common.cancel }));
+      expect(screen.queryByRole("heading", { name: en.editor.ui.newDocument.heading })).toBeNull();
+    });
   });
 });

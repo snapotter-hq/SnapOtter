@@ -543,7 +543,12 @@ export function EditorPage() {
             onCanvasResize={() => setShowCanvasResize(true)}
             onImageResize={() => setShowImageResize(true)}
           />
-          {!sourceImageUrl && <WelcomeScreen onOpenFile={handleOpenFile} />}
+          {!sourceImageUrl && (
+            <WelcomeScreen
+              onOpenFile={handleOpenFile}
+              onNewDocument={() => setShowNewDocument(true)}
+            />
+          )}
         </div>
         <EditorRightPanel />
       </div>

@@ -13,9 +13,10 @@ const ACCEPTED_TYPES = ".png,.jpg,.jpeg,.webp,.gif,.bmp,.tiff,.svg,.avif,.svgz,.
 
 interface WelcomeScreenProps {
   onOpenFile?: (file: File) => void | Promise<void>;
+  onNewDocument?: () => void;
 }
 
-export function WelcomeScreen({ onOpenFile }: WelcomeScreenProps = {}) {
+export function WelcomeScreen({ onOpenFile, onNewDocument }: WelcomeScreenProps = {}) {
   const { t } = useTranslation();
   const sourceImageFailed = useRef(t.editor.ui.captureFailure.sourceImageFailed);
   sourceImageFailed.current = t.editor.ui.captureFailure.sourceImageFailed;
@@ -121,7 +122,7 @@ export function WelcomeScreen({ onOpenFile }: WelcomeScreenProps = {}) {
 
             <button
               type="button"
-              onClick={() => setShowNewDoc(true)}
+              onClick={() => (onNewDocument ? onNewDocument() : setShowNewDoc(true))}
               className="flex items-center gap-3 w-full px-4 py-3 bg-muted text-foreground rounded-lg hover:bg-muted/80 transition-colors"
             >
               <FilePlus size={20} />
@@ -137,7 +138,9 @@ export function WelcomeScreen({ onOpenFile }: WelcomeScreenProps = {}) {
         </div>
       </section>
 
-      <NewDocumentDialog open={showNewDoc} onClose={() => setShowNewDoc(false)} />
+      {!onNewDocument && (
+        <NewDocumentDialog open={showNewDoc} onClose={() => setShowNewDoc(false)} />
+      )}
     </>
   );
 }
