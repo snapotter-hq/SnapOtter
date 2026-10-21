@@ -122,7 +122,7 @@ for oom_mod in (gif_remove_bg, remove_bg):
     )
 
 # Verify _remove_one does not retry with alpha_matting=False when a CPU allocator OOM occurs,
-# and verify main()'s frame-0 probe falls back from birefnet* to u2net on CPU allocator OOM.
+# and verify main()'s frame-0 probe falls back from non-u2net models to u2net on CPU allocator OOM.
 import io  # noqa: E402
 import tempfile  # noqa: E402
 import types  # noqa: E402
@@ -180,10 +180,10 @@ def _verify_gif_cpu_oom_handling():
         gif_remove_bg._remove_one(_FakeFrame(), "sess", True, {}, None, (16, 16))
         assert rembg_calls == [("sess", True), ("sess", False)], rembg_calls
 
-        # Now exercise main()'s frame-0 probe fallback from birefnet-general to u2net on CPU OOM,
+        # Now exercise main()'s frame-0 probe fallback from non-u2net models to u2net on CPU OOM,
         # and confirm non-OOM errors or OOMs when already on u2net are not retried.
         with tempfile.TemporaryDirectory() as tmpdir:
-            for m_name in ("birefnet-general", "u2net"):
+            for m_name in ("birefnet-general", "isnet-general-use", "bria-rmbg", "u2net"):
                 open(os.path.join(tmpdir, f"{m_name}.onnx"), "wb").close()
 
             fake_gpu = types.ModuleType("gpu")
@@ -191,7 +191,12 @@ def _verify_gif_cpu_oom_handling():
             fake_model_paths = types.ModuleType("model_paths")
             fake_model_paths.ensure_rembg_model_home = lambda: None
             fake_remove_bg = types.ModuleType("remove_bg")
-            fake_remove_bg.ALLOWED_MODELS = {"birefnet-general", "u2net"}
+            fake_remove_bg.ALLOWED_MODELS = {
+                "birefnet-general",
+                "isnet-general-use",
+                "bria-rmbg",
+                "u2net",
+            }
 
             prev_mods = {
                 k: sys.modules.get(k) for k in ("gpu", "model_paths", "remove_bg")
@@ -367,6 +372,74 @@ def _verify_gif_cpu_oom_handling():
                 assert "[gif-remove-bg] session device=cpu model=u2net" in stderr_captured, (
                     f"expected u2net session log line after _create_session OOM, got {stderr_captured!r}"
                 )
+
+                # Non-birefnet models (isnet-general-use, bria-rmbg) also fall back to u2net on
+                # both frame-0 probe OOM and _create_session OOM (#3385).
+                for non_birefnet_model in ("isnet-general-use", "bria-rmbg"):
+                    create_err[0] = None
+                    probe_err[0] = (
+                        {f"session:{non_birefnet_model}"},
+                        RuntimeError("DefaultCPUAllocator: not enough memory"),
+                    )
+                    nb_probe_payload = _run_main(
+                        {"model": non_birefnet_model, "outputFormat": "webp"}
+                    )
+                    assert nb_probe_payload == {
+                        "success": True,
+                        "model": "u2net",
+                        "device": "cpu",
+                        "frames": 2,
+                        "format": "webp",
+                    }, (non_birefnet_model, nb_probe_payload)
+                    assert created_models == [non_birefnet_model, "u2net"], created_models
+                    assert removed_sessions == [
+                        f"session:{non_birefnet_model}",
+                        "session:u2net",
+                        "session:u2net",
+                    ], removed_sessions
+                    assert sessions_alive_on_u2net_alloc == [[]], (
+                        f"failed {non_birefnet_model} session must be released before allocating u2net: {sessions_alive_on_u2net_alloc!r}"
+                    )
+                    nb_warnings = [
+                        json.loads(line)["warning"]
+                        for line in stderr_captured
+                        if line.startswith("{") and "warning" in json.loads(line)
+                    ]
+                    assert any(
+                        "[gif-remove-bg]" in w and non_birefnet_model in w and "u2net" in w
+                        for w in nb_warnings
+                    ), f"expected OOM fallback warning for {non_birefnet_model}, got {stderr_captured!r}"
+
+                    probe_err[0] = None
+                    create_err[0] = (
+                        {non_birefnet_model},
+                        RuntimeError("DefaultCPUAllocator: not enough memory"),
+                    )
+                    nb_create_payload = _run_main(
+                        {"model": non_birefnet_model, "outputFormat": "webp"}
+                    )
+                    assert nb_create_payload == {
+                        "success": True,
+                        "model": "u2net",
+                        "device": "cpu",
+                        "frames": 2,
+                        "format": "webp",
+                    }, (non_birefnet_model, nb_create_payload)
+                    assert created_models == [non_birefnet_model, "u2net"], created_models
+                    assert removed_sessions == ["session:u2net", "session:u2net"], removed_sessions
+
+                    create_err[0] = (
+                        {non_birefnet_model},
+                        RuntimeError("Invalid ONNX model graph"),
+                    )
+                    nb_non_oom_payload = _run_main(
+                        {"model": non_birefnet_model, "outputFormat": "webp"}
+                    )
+                    assert nb_non_oom_payload == {
+                        "success": False,
+                        "error": "Invalid ONNX model graph",
+                    }, (non_birefnet_model, nb_non_oom_payload)
+                    assert created_models == [non_birefnet_model], created_models
 
                 # Bare MemoryError() in _create_session formats type(e).__name__ ("MemoryError") in warning.
                 create_err[0] = ({"birefnet-general"}, MemoryError())

@@ -349,7 +349,7 @@ def main():
         # Probe frame 0 to settle the model once (OOM -> lighter model for the
         # WHOLE animation, never per-frame; switching mid-animation would
         # flicker). Wrap both session creation and the frame-0 probe so an OOM
-        # while loading birefnet* weights or running frame 0 falls back to u2net.
+        # while loading non-u2net weights or running frame 0 falls back to u2net.
         try:
             session, device = _create_session(model, providers, initial_device)
             print(
@@ -359,7 +359,7 @@ def main():
             )
             _remove_one(frames[0], session, use_alpha, settings, target, orig_size)
         except Exception as e:
-            if _is_oom(e) and model.startswith("birefnet"):
+            if _is_oom(e) and model != "u2net":
                 prev_model = model
                 detail = str(e).strip() or type(e).__name__
                 session = None
