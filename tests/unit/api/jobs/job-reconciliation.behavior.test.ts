@@ -10,7 +10,9 @@ const loggerErrorMock = vi.hoisted(() => vi.fn());
 const loggerWarnMock = vi.hoisted(() => vi.fn());
 const clearTerminalReplayKeyMock = vi.hoisted(() => vi.fn());
 const dbSelectRows = vi.hoisted(() => ({ rows: [] as unknown[] }));
-const dbUpdateSetCalls = vi.hoisted(() => [] as Array<{ values: Record<string, unknown> }>);
+const dbUpdateSetCalls = vi.hoisted(
+  () => [] as Array<{ values: Record<string, unknown>; where?: unknown }>,
+);
 const dbUpdateReturningQueue = vi.hoisted(() => [] as Array<Array<{ id: string }>>);
 
 async function loadJobReconciliation() {
@@ -35,11 +37,15 @@ async function loadJobReconciliation() {
   const makeUpdateBuilder = () => {
     const builder = {
       set: vi.fn((values: Record<string, unknown>) => {
-        dbUpdateSetCalls.push({ values });
+        const call: { values: Record<string, unknown>; where?: unknown } = { values };
+        dbUpdateSetCalls.push(call);
         return {
-          where: vi.fn(() => ({
-            returning: vi.fn(async () => dbUpdateReturningQueue.shift() ?? [{ id: "settled" }]),
-          })),
+          where: vi.fn((cond: unknown) => {
+            call.where = cond;
+            return {
+              returning: vi.fn(async () => dbUpdateReturningQueue.shift() ?? [{ id: "settled" }]),
+            };
+          }),
         };
       }),
     };
@@ -475,5 +481,80 @@ describe("reconcileStrandedJobs per-row fault isolation (#1498)", () => {
       { err: redisDelErr, jobId: "job-failed", settledIds: ["job-failed"] },
       "Failed to clear terminal replay cache after job reconciliation",
     );
+  });
+
+  it("matches both artifactJobId and pipelineFlowId in the alias update WHERE clause (#2701)", async () => {
+    const { reconcileStrandedJobs } = await loadJobReconciliation();
+
+    dbSelectRows.rows = [
+      {
+        id: "flow-recovered",
+        toolId: "pipeline",
+        pool: "image",
+        type: "pipeline",
+        status: "processing",
+        bytesIn: 120,
+        inputRefs: [],
+        progress: null,
+      },
+      {
+        id: "flow-failed",
+        toolId: "pipeline",
+        pool: "image",
+        type: "pipeline",
+        status: "queued",
+        bytesIn: null,
+        inputRefs: [],
+        progress: null,
+      },
+    ];
+
+    listObjectsMock.mockImplementation(async (prefix: string) => {
+      if (prefix === "outputs/flow-recovered/") {
+        return [{ key: "outputs/flow-recovered/out.png", size: 512, mtimeMs: 1_000 }];
+      }
+      return [];
+    });
+
+    const summary = await reconcileStrandedJobs({ graceMs: 0 });
+    expect(summary.recovered).toBe(1);
+    expect(summary.failed).toBe(1);
+
+    const recoveredAliasWhere = dbUpdateSetCalls[1]?.where as {
+      op: string;
+      conds: Array<{
+        op: string;
+        col?: unknown;
+        val?: unknown;
+        vals?: unknown;
+        strings?: string[];
+      }>;
+    };
+    expect(recoveredAliasWhere).toEqual({
+      op: "and",
+      conds: [
+        { op: "eq", col: "jobs.type", val: "single" },
+        { op: "inArray", col: "jobs.status", vals: ["queued", "processing"] },
+        {
+          op: "sql",
+          strings: ["(", "->>'artifactJobId' = ", " OR ", "->>'pipelineFlowId' = ", ")"],
+          vals: ["jobs.settings", "flow-recovered", "jobs.settings", "flow-recovered"],
+        },
+      ],
+    });
+
+    const failedAliasWhere = dbUpdateSetCalls[3]?.where as typeof recoveredAliasWhere;
+    expect(failedAliasWhere).toEqual({
+      op: "and",
+      conds: [
+        { op: "eq", col: "jobs.type", val: "single" },
+        { op: "inArray", col: "jobs.status", vals: ["queued", "processing"] },
+        {
+          op: "sql",
+          strings: ["(", "->>'artifactJobId' = ", " OR ", "->>'pipelineFlowId' = ", ")"],
+          vals: ["jobs.settings", "flow-failed", "jobs.settings", "flow-failed"],
+        },
+      ],
+    });
   });
 });

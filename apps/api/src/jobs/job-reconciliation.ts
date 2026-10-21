@@ -254,16 +254,17 @@ function isBatchCount(value: unknown): value is number {
 }
 
 /**
- * Non-terminal clientJobId alias rows still pointing at this artifact job
- * (#2682). Guarded on `settings->>'artifactJobId'` and `NON_TERMINAL` so a
- * channel that a newer run has already re-pointed (#886) or that a cancel
- * already settled is left untouched.
+ * Non-terminal clientJobId alias rows still pointing at this artifact or
+ * pipeline flow job (#2682, #2701). Guarded on `settings->>'artifactJobId'`
+ * or `settings->>'pipelineFlowId'` and `NON_TERMINAL` so a channel that a
+ * newer run has already re-pointed (#886, #2650) or that a cancel already
+ * settled is left untouched.
  */
-function reconcilableAliasRows(artifactJobId: string): SQL | undefined {
+function reconcilableAliasRows(targetJobId: string): SQL | undefined {
   return and(
     eq(schema.jobs.type, "single"),
     inArray(schema.jobs.status, NON_TERMINAL),
-    sql`${schema.jobs.settings}->>'artifactJobId' = ${artifactJobId}`,
+    sql`(${schema.jobs.settings}->>'artifactJobId' = ${targetJobId} OR ${schema.jobs.settings}->>'pipelineFlowId' = ${targetJobId})`,
   );
 }
 

@@ -1042,6 +1042,147 @@ describe("stranded-job reconciliation", () => {
       expect(canceledRow.status).toBe("canceled");
       expect(canceledRow.error?.message).toBe("Canceled");
     });
+
+    it("settles pipelineFlowId clientJobId alias rows on recovery and failure while leaving re-pointed, non-single, or terminal rows untouched (#2701)", async () => {
+      const recoveredFlowId = await seedJob({
+        status: "processing",
+        toolId: "pipeline",
+        pool: "image",
+        type: "pipeline",
+      });
+      await seedOutput(recoveredFlowId, "out.png", Buffer.from("png-bytes"));
+      await seedOutput(
+        recoveredFlowId,
+        ".result-payload.json",
+        Buffer.from(
+          JSON.stringify({
+            stepsCompleted: 1,
+            steps: [{ step: 1, toolId: "resize", size: 9 }],
+          }),
+          "utf8",
+        ),
+      );
+
+      const failedFlowId = await seedJob({
+        status: "processing",
+        toolId: "pipeline",
+        pool: "image",
+        type: "pipeline",
+      });
+
+      const recoveredPipelineAlias = randomUUID();
+      const failedPipelineAlias = randomUUID();
+      const repointedPipelineAlias = randomUUID();
+      const newerFlowId = randomUUID();
+      const nonSinglePipelineCollision = randomUUID();
+      const canceledPipelineAlias = randomUUID();
+
+      await db.insert(schema.jobs).values([
+        {
+          id: recoveredPipelineAlias,
+          type: "single",
+          pool: "image",
+          status: "processing",
+          inputRefs: [],
+          settings: { pipelineFlowId: recoveredFlowId },
+        },
+        {
+          id: failedPipelineAlias,
+          type: "single",
+          pool: "image",
+          status: "processing",
+          progress: { percent: 50, stage: "Step 1 of 2" },
+          inputRefs: [],
+          settings: { pipelineFlowId: failedFlowId },
+        },
+        {
+          id: repointedPipelineAlias,
+          type: "single",
+          pool: "image",
+          status: "queued",
+          inputRefs: [],
+          settings: { pipelineFlowId: newerFlowId },
+        },
+        {
+          id: nonSinglePipelineCollision,
+          type: "batch",
+          status: "queued",
+          inputRefs: [],
+          settings: { pipelineFlowId: recoveredFlowId },
+        },
+        {
+          id: canceledPipelineAlias,
+          type: "single",
+          pool: "image",
+          status: "canceled",
+          completedAt: new Date(),
+          error: { message: "Canceled" },
+          inputRefs: [],
+          settings: { pipelineFlowId: failedFlowId },
+        },
+      ]);
+
+      for (const targetId of [recoveredPipelineAlias, failedPipelineAlias]) {
+        publishEphemeral({
+          jobId: targetId,
+          type: "single",
+          phase: "failed",
+          percent: 0,
+          error: "Stale pre-reconciliation pipeline frame",
+        });
+      }
+      await vi.waitFor(async () => {
+        expect(
+          await sharedRedis().get(`${bullPrefix()}:terminal:${recoveredPipelineAlias}`),
+        ).not.toBeNull();
+        expect(
+          await sharedRedis().get(`${bullPrefix()}:terminal:${failedPipelineAlias}`),
+        ).not.toBeNull();
+      });
+
+      const summary = await reconcileStrandedJobs({ graceMs: 0 });
+      expect(summary.outcomes.find((o) => o.jobId === recoveredFlowId)?.resolution).toBe(
+        "recovered",
+      );
+      expect(summary.outcomes.find((o) => o.jobId === failedFlowId)?.resolution).toBe("failed");
+
+      const recoveredFlowRow = await readJob(recoveredFlowId);
+      const recoveredAliasRow = await readJob(recoveredPipelineAlias);
+      expect(recoveredAliasRow.status).toBe("completed");
+      expect(recoveredAliasRow.completedAt).not.toBeNull();
+      expect(recoveredAliasRow.error).toBeNull();
+      expect(recoveredAliasRow.progress).toEqual(recoveredFlowRow.progress);
+      expect(resultOf(recoveredAliasRow)).toMatchObject({
+        jobId: recoveredFlowId,
+        downloadUrl: `/api/v1/download/${recoveredFlowId}/out.png`,
+        reconciled: true,
+        stepsCompleted: 1,
+      });
+
+      const failedAliasRow = await readJob(failedPipelineAlias);
+      expect(failedAliasRow.status).toBe("failed");
+      expect(failedAliasRow.completedAt).not.toBeNull();
+      expect(failedAliasRow.progress).toEqual({ percent: 0 });
+      expect(failedAliasRow.error?.message).toBe(UNRECOVERABLE_STRANDED_JOB_ERROR);
+
+      expect(
+        await sharedRedis().get(`${bullPrefix()}:terminal:${recoveredPipelineAlias}`),
+      ).toBeNull();
+      expect(await sharedRedis().get(`${bullPrefix()}:terminal:${failedPipelineAlias}`)).toBeNull();
+
+      const repointedRow = await readJob(repointedPipelineAlias);
+      expect(repointedRow.status).toBe("queued");
+      expect(repointedRow.progress).toBeNull();
+      expect(repointedRow.settings).toEqual({ pipelineFlowId: newerFlowId });
+
+      const nonSingleRow = await readJob(nonSinglePipelineCollision);
+      expect(nonSingleRow.status).toBe("queued");
+      expect(nonSingleRow.progress).toBeNull();
+
+      const canceledRow = await readJob(canceledPipelineAlias);
+      expect(canceledRow.status).toBe("canceled");
+      expect(canceledRow.error?.message).toBe("Canceled");
+    });
   });
 
   describe("pipeline and batch finalize resultPayload preservation (#2683)", () => {
