@@ -56,6 +56,7 @@ import {
   ToolsSection,
 } from "@/components/settings/settings-dialog";
 import { TwoFactorSettings } from "@/components/settings/two-factor-settings";
+import { ToolPalette } from "@/components/tools/tool-palette";
 import { I18nProvider } from "@/contexts/i18n-context";
 import { ApiError } from "@/lib/api";
 import { format } from "@/lib/format";
@@ -1020,5 +1021,75 @@ describe("Tools: save disabled tools (#2713)", () => {
     await save(err);
     await expectShown(de.common.somethingWentWrong);
     expect(console.warn).toHaveBeenCalledWith(expect.any(String), err);
+  });
+
+  it.each(["{corrupt", "{}", "null", "[42]"])(
+    "ToolsSection falls back disabledTools to [] when /v1/settings returns %s (#3084)",
+    async (rawDisabledTools) => {
+      apiGet.mockResolvedValueOnce({
+        settings: { disabledTools: rawDisabledTools },
+      });
+      renderDe(<ToolsSection />);
+      expect(await screen.findByRole("button", { name: s.tools.saveButton })).toBeEnabled();
+      expect(
+        screen.getByText(format(s.tools.disabledCountOther, { count: 0 })),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(s.tools.loadFailedError)).toBeNull();
+    },
+  );
+
+  it.each(["{corrupt", "{}", "null", "[42]"])(
+    "ToolPalette falls back disabledTools to [] when /v1/settings returns %s (#3084)",
+    async (rawDisabledTools) => {
+      // Marking resize experimental ensures it only renders once /v1/settings
+      // resolves and setExperimentalEnabled(true) runs after setDisabledTools.
+      const { TOOLS } = await import("@snapotter/shared");
+      const resizeTool = TOOLS.find((t) => t.id === "resize");
+      const prevExperimental = resizeTool?.experimental;
+      if (resizeTool) resizeTool.experimental = true;
+
+      try {
+        apiGet.mockImplementation(async (url: string) => {
+          if (url === "/v1/settings") {
+            return {
+              settings: {
+                disabledTools: rawDisabledTools,
+                enableExperimentalTools: "true",
+              },
+            };
+          }
+          if (url === "/v1/pipeline/tools") {
+            return { toolIds: ["resize"] };
+          }
+          return {};
+        });
+        renderDe(<ToolPalette onAddStep={() => {}} />);
+        await act(async () => {});
+        expect(await screen.findByText(de.tools.resize.name)).toBeInTheDocument();
+      } finally {
+        if (resizeTool) resizeTool.experimental = prevExperimental;
+      }
+    },
+  );
+
+  it("ToolPalette hides tools listed in a valid disabledTools JSON array (#3084)", async () => {
+    apiGet.mockImplementation(async (url: string) => {
+      if (url === "/v1/settings") {
+        return {
+          settings: {
+            disabledTools: JSON.stringify(["resize"]),
+            enableExperimentalTools: "false",
+          },
+        };
+      }
+      if (url === "/v1/pipeline/tools") {
+        return { toolIds: ["resize", "crop"] };
+      }
+      return {};
+    });
+    renderDe(<ToolPalette onAddStep={() => {}} />);
+    await act(async () => {});
+    expect(await screen.findByText(de.tools.crop.name)).toBeInTheDocument();
+    expect(screen.queryByText(de.tools.resize.name)).toBeNull();
   });
 });

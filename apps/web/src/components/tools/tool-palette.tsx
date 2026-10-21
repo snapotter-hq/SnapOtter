@@ -6,6 +6,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useFuseSearch } from "@/hooks/use-fuse-search";
 import { apiGet } from "@/lib/api";
 import { ICON_MAP } from "@/lib/icon-map";
+import { parseStringArray } from "@/lib/settings-payload";
 import { getCategoryName, getToolDescription, getToolName } from "@/lib/tool-i18n";
 import { cn } from "@/lib/utils";
 
@@ -26,9 +27,7 @@ export function ToolPalette({ onAddStep, className }: ToolPaletteProps) {
   useEffect(() => {
     apiGet<{ settings: Record<string, string> }>("/v1/settings")
       .then((data) => {
-        setDisabledTools(
-          data.settings.disabledTools ? JSON.parse(data.settings.disabledTools) : [],
-        );
+        setDisabledTools(parseStringArray(data.settings.disabledTools));
         setExperimentalEnabled(data.settings.enableExperimentalTools === "true");
       })
       .catch(() => {});

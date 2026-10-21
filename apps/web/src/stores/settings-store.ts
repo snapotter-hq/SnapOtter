@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { apiGet } from "@/lib/api";
+import { parseStringArray } from "@/lib/settings-payload";
 import { useThemeStore } from "./theme-store";
 
 type Theme = "light" | "dark" | "system";
@@ -45,7 +46,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           : "light";
 
         set({
-          disabledTools: data.settings.disabledTools ? JSON.parse(data.settings.disabledTools) : [],
+          disabledTools: parseStringArray(data.settings.disabledTools),
           experimentalEnabled: data.settings.enableExperimentalTools === "true",
           defaultToolView:
             data.settings.defaultToolView === "fullscreen" ? "fullscreen" : "sidebar",

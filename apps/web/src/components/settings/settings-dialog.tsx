@@ -60,7 +60,7 @@ import { format, plural } from "@/lib/format";
 import { generatePassword, passwordLengthFor } from "@/lib/generate-password";
 import { logout } from "@/lib/logout";
 import { passwordErrorMessages } from "@/lib/password-errors";
-import { changedSettings, writableSettings } from "@/lib/settings-payload";
+import { changedSettings, parseStringArray, writableSettings } from "@/lib/settings-payload";
 import { getCategoryName, getToolDescription, getToolName } from "@/lib/tool-i18n";
 import { cn, copyToClipboard } from "@/lib/utils";
 import { useAnalyticsStore } from "@/stores/analytics-store";
@@ -3828,9 +3828,7 @@ export function ToolsSection() {
   useEffect(() => {
     apiGet<{ settings: Record<string, string> }>("/v1/settings")
       .then((data) => {
-        setDisabledTools(
-          data.settings.disabledTools ? JSON.parse(data.settings.disabledTools) : [],
-        );
+        setDisabledTools(parseStringArray(data.settings.disabledTools));
         setLoadFailed(false);
       })
       .catch(() => setLoadFailed(true))

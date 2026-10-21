@@ -2164,6 +2164,31 @@ describe("useSettingsStore", () => {
     expect(useSettingsStore.getState().loadError).toBe(false);
     expect(useSettingsStore.getState().disabledTools).toEqual(["resize"]);
   });
+
+  it.each(["{corrupt", "{}", "null", "42", '"resize"', "[null]", "[42]"])(
+    "fetch falls back disabledTools to [] when API returns %s (#3084)",
+    async (rawDisabledTools) => {
+      mockApiGet.mockResolvedValueOnce({
+        settings: {
+          disabledTools: rawDisabledTools,
+          enableExperimentalTools: "true",
+          defaultToolView: "fullscreen",
+          defaultTheme: "dark",
+        },
+      });
+
+      await useSettingsStore.getState().fetch();
+
+      const s = useSettingsStore.getState();
+      expect(s.disabledTools).toEqual([]);
+      expect(s.disabledTools.includes("resize")).toBe(false);
+      expect(s.experimentalEnabled).toBe(true);
+      expect(s.defaultToolView).toBe("fullscreen");
+      expect(s.defaultTheme).toBe("dark");
+      expect(s.loaded).toBe(true);
+      expect(s.loadError).toBe(false);
+    },
+  );
 });
 
 // ==========================================================================

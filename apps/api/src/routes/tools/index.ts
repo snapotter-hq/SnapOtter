@@ -2,6 +2,7 @@ import { TOOLS } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { db, schema } from "../../db/index.js";
+import { logger } from "../../lib/logger.js";
 import { registerColorAdjustments } from "./adjust-colors.js";
 import { registerAiCanvasExpand } from "./ai-canvas-expand.js";
 import { registerAspectPad } from "./aspect-pad.js";
@@ -166,6 +167,31 @@ import { registerWordToPdf } from "./word-to-pdf.js";
 import { registerXmlToCsv } from "./xml-to-csv.js";
 import { registerYamlJson } from "./yaml-json.js";
 
+const DISABLED_TOOLS_KEY = "disabledTools";
+
+function parseDisabledTools(raw: string): string[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    logger.warn(
+      { err, key: DISABLED_TOOLS_KEY },
+      "tools: failed to parse stored disabledTools JSON",
+    );
+    return [];
+  }
+
+  if (!Array.isArray(parsed) || !parsed.every((item): item is string => typeof item === "string")) {
+    logger.warn(
+      { key: DISABLED_TOOLS_KEY },
+      "tools: stored disabledTools is not a JSON array of strings",
+    );
+    return [];
+  }
+
+  return parsed;
+}
+
 /**
  * Registry that imports and registers all tool routes.
  * Each tool uses the createToolRoute factory from tool-factory.ts.
@@ -181,8 +207,9 @@ export async function registerToolRoutes(app: FastifyInstance): Promise<void> {
   const [disabledRow] = await db
     .select()
     .from(schema.settings)
-    .where(eq(schema.settings.key, "disabledTools"));
-  const disabledTools: string[] = disabledRow ? JSON.parse(disabledRow.value) : [];
+    .where(eq(schema.settings.key, DISABLED_TOOLS_KEY));
+  const disabledTools: string[] =
+    disabledRow && disabledRow.value !== "" ? parseDisabledTools(disabledRow.value) : [];
 
   // Read experimental flag
   const [expRow] = await db
