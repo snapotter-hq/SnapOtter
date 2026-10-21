@@ -50,7 +50,8 @@ interface FieldBounds {
   minInclusive?: boolean;
   max?: number;
   maxInclusive?: boolean;
-  kind: "number" | "enum" | "boolean" | "other";
+  values?: unknown[];
+  kind: "number" | "enum" | "boolean" | "literal-union" | "other";
 }
 
 /**
@@ -66,6 +67,8 @@ interface ZodDefLike {
   in?: ZodNodeLike;
   shape?: () => Record<string, ZodNodeLike>;
   checks?: Array<{ kind: string; value?: number; inclusive?: boolean }>;
+  options?: ZodNodeLike[];
+  value?: unknown;
 }
 
 interface ZodNodeLike {
@@ -90,6 +93,27 @@ function unwrapNode(node: ZodNodeLike): ZodNodeLike {
     else return current;
   }
   return current;
+}
+
+function collectLiteralUnionValues(node: ZodNodeLike): unknown[] | null {
+  const inner = unwrapNode(node);
+  const def = inner._def;
+  if (!def) return null;
+  if (def.typeName === "ZodLiteral") {
+    return [def.value];
+  }
+  if (def.typeName === "ZodUnion") {
+    const options = def.options ?? [];
+    if (options.length === 0) return null;
+    const collected: unknown[] = [];
+    for (const option of options) {
+      const sub = collectLiteralUnionValues(option);
+      if (!sub) return null;
+      collected.push(...sub);
+    }
+    return [...new Set(collected)];
+  }
+  return null;
 }
 
 /**
@@ -141,6 +165,13 @@ export function readFieldBounds(schema: unknown): Map<string, FieldBounds> {
       bounds.set(key, { kind: "enum" });
     } else if (typeName === "ZodBoolean") {
       bounds.set(key, { kind: "boolean" });
+    } else if (typeName === "ZodUnion" || typeName === "ZodLiteral") {
+      const values = collectLiteralUnionValues(inner);
+      if (values && values.length > 0) {
+        bounds.set(key, { kind: "literal-union", values });
+      } else {
+        bounds.set(key, { kind: "other" });
+      }
     } else {
       bounds.set(key, { kind: "other" });
     }
@@ -173,6 +204,56 @@ export function invalidProbesFor(
         });
       }
       probes.push({ key: axis.key, value: "not-a-number", why: "wrong type" });
+      continue;
+    }
+    if (field.kind === "literal-union") {
+      const values = field.values ?? [];
+      if (
+        values.length > 0 &&
+        values.every((v): v is number => typeof v === "number" && Number.isFinite(v))
+      ) {
+        const nums = [...new Set(values)].sort((a, b) => a - b);
+        const memberSet = new Set(nums);
+        const min = nums[0];
+        const max = nums[nums.length - 1];
+        const allInt = nums.every(Number.isInteger);
+        const midpoint = (a: number, b: number) => (allInt ? Math.round((a + b) / 2) : (a + b) / 2);
+
+        probes.push({ key: axis.key, value: min - 1, why: "below declared min" });
+        probes.push({ key: axis.key, value: max + 1, why: "above declared max" });
+
+        let excludedMid: number | undefined;
+        const overallMid = midpoint(min, max);
+        if (!memberSet.has(overallMid)) {
+          excludedMid = overallMid;
+        } else {
+          for (let i = 0; i < nums.length - 1; i++) {
+            const gapMid = midpoint(nums[i], nums[i + 1]);
+            if (!memberSet.has(gapMid)) {
+              excludedMid = gapMid;
+              break;
+            }
+          }
+        }
+        if (excludedMid !== undefined) {
+          probes.push({ key: axis.key, value: excludedMid, why: "excluded midpoint" });
+        }
+        probes.push({ key: axis.key, value: "not-a-number", why: "wrong type" });
+      } else {
+        const memberSet = new Set(values);
+        let outsider = "__snapotter_qa_not_a_member__";
+        while (memberSet.has(outsider)) {
+          outsider = `${outsider}_`;
+        }
+        const hasNumber = values.some((v) => typeof v === "number");
+        const wrongType = !hasNumber ? 12345 : { invalid: true };
+        probes.push({
+          key: axis.key,
+          value: outsider,
+          why: "enum outsider",
+        });
+        probes.push({ key: axis.key, value: wrongType, why: "wrong type" });
+      }
       continue;
     }
     if (field.kind === "enum") {
