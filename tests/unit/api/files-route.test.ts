@@ -672,7 +672,7 @@ describe("files route logic", () => {
       return reply;
     }
 
-    function filePart(filename: string, content: Buffer | Error) {
+    function filePart(filename: string | undefined, content: Buffer | Error) {
       return {
         type: "file" as const,
         fieldname: "file",
@@ -940,6 +940,41 @@ describe("files route logic", () => {
       const prefix = writtenKey.replace(/first\.txt$/, "");
       expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
       expect(mocks.deletePrefix).toHaveBeenCalledWith(prefix);
+    });
+
+    it("returns an empty format string for extensionless non-image files (#2745)", async () => {
+      const req = makeRequest([
+        filePart("README", Buffer.from("hello")),
+        filePart("README.", Buffer.from("trailing-dot")),
+        filePart(undefined, Buffer.from("world")),
+        filePart(".gitignore", Buffer.from("node_modules\n")),
+        filePart("Archive.ZIP", Buffer.from("not-an-image")),
+        filePart(
+          "logo",
+          Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>'),
+        ),
+      ]);
+      const reply = makeReply();
+
+      await uploadHandler(req, reply);
+
+      expect(reply.statusCode).toBe(200);
+      expect(reply.payload).toEqual({
+        jobId: expect.any(String),
+        files: [
+          { name: "README", size: 5, format: "" },
+          { name: "README.", size: 12, format: "" },
+          { name: "upload", size: 5, format: "" },
+          { name: ".gitignore", size: 13, format: "" },
+          { name: "Archive.ZIP", size: 12, format: "zip" },
+          {
+            name: "logo",
+            size: '<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>'
+              .length,
+            format: "svg",
+          },
+        ],
+      });
     });
   });
 });

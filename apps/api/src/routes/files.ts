@@ -208,7 +208,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
           wroteUpload = true;
           await putObject(`uploads/${jobId}/${safeName}`, safeBuffer);
 
-          const fileExt = safeName.split(".").pop()?.toLowerCase() ?? "";
+          const fileExt = extname(safeName).toLowerCase().replace(/^\./, "");
           uploadedFiles.push({
             name: safeName,
             size: safeBuffer.length,
