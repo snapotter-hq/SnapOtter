@@ -146,6 +146,7 @@ describe("getDominantBackground", () => {
 describe("beautify route and processBeautify validation & backgroundImage preparation (#3104)", () => {
   type RouteHandler = (request: unknown, reply: unknown) => Promise<unknown>;
   let handler: RouteHandler;
+  let memeHandler: RouteHandler;
   const PNG_200 = readFixture(fixtures.image.base.png200);
   const storedObjects = new Map<string, Buffer>();
 
@@ -154,8 +155,12 @@ describe("beautify route and processBeautify validation & backgroundImage prepar
       storedObjects.set(key, buf);
     });
     const fakeApp = {
-      post: vi.fn((_path: string, fn: RouteHandler) => {
-        handler = fn;
+      post: vi.fn((path: string, fn: RouteHandler) => {
+        if (path.endsWith("/meme-generator")) {
+          memeHandler = fn;
+        } else {
+          handler = fn;
+        }
       }),
     } as unknown as Parameters<typeof registerBeautify>[0];
     registerMemeGenerator(fakeApp);
@@ -583,5 +588,162 @@ describe("beautify route and processBeautify validation & backgroundImage prepar
     } finally {
       heicSpy.mockRestore();
     }
+  });
+
+  it("preserves extensionless and dotfile stems when resolving output filenames in beautify and meme-generator (#3406)", async () => {
+    const JPG_100 = readFixture(fixtures.image.base.jpg100);
+    const beautifyConfig = getToolConfig("beautify");
+    if (!beautifyConfig) throw new Error("beautify missing from toolRegistry");
+    const memeConfig = getToolConfig("meme-generator");
+    if (!memeConfig) throw new Error("meme-generator missing from toolRegistry");
+
+    // 1. beautify registry process: extensionless and dotfile inputs
+    const beautifyExtlessPng = await beautifyConfig.process(
+      JPG_100,
+      beautifyConfig.settingsSchema.parse({ outputFormat: "png", shadowPreset: "none" }),
+      "image",
+    );
+    expect(beautifyExtlessPng.filename).toBe("image.png");
+    expect(beautifyExtlessPng.contentType).toBe("image/png");
+
+    const beautifyExtlessForcedPng = await beautifyConfig.process(
+      JPG_100,
+      beautifyConfig.settingsSchema.parse({ outputFormat: "jpeg", shadowPreset: "medium" }),
+      "image",
+    );
+    expect(beautifyExtlessForcedPng.filename).toBe("image.png");
+    expect(beautifyExtlessForcedPng.contentType).toBe("image/png");
+
+    const beautifyDotfilePng = await beautifyConfig.process(
+      PNG_200,
+      beautifyConfig.settingsSchema.parse({ outputFormat: "png", shadowPreset: "none" }),
+      ".hidden",
+    );
+    expect(beautifyDotfilePng.filename).toBe(".hidden.png");
+    expect(beautifyDotfilePng.contentType).toBe("image/png");
+
+    const beautifyDotfileJpeg = await beautifyConfig.process(
+      JPG_100,
+      beautifyConfig.settingsSchema.parse({
+        outputFormat: "jpeg",
+        shadowPreset: "none",
+        borderRadius: 0,
+        frame: "none",
+        backgroundType: "solid",
+      }),
+      ".hidden",
+    );
+    expect(beautifyDotfileJpeg.filename).toBe(".hidden.jpeg");
+    expect(beautifyDotfileJpeg.contentType).toBe("image/jpeg");
+
+    const beautifyDotfileWithExt = await beautifyConfig.process(
+      JPG_100,
+      beautifyConfig.settingsSchema.parse({ outputFormat: "png", shadowPreset: "none" }),
+      ".hidden.jpg",
+    );
+    expect(beautifyDotfileWithExt.filename).toBe(".hidden.png");
+    expect(beautifyDotfileWithExt.contentType).toBe("image/png");
+
+    // 2. beautify HTTP route: extensionless and dotfile uploads
+    const resBeautifyExtless = await invokeBeautify({
+      file: { filename: "image", content: JPG_100 },
+      settings: { shadowPreset: "medium", outputFormat: "jpeg" },
+    });
+    expect(resBeautifyExtless.statusCode).toBe(200);
+    expect(resBeautifyExtless.json.downloadUrl).toBe(
+      `/api/v1/download/${resBeautifyExtless.json.jobId}/image.png`,
+    );
+
+    const resBeautifyDotfile = await invokeBeautify({
+      file: { filename: ".hidden", content: PNG_200 },
+      settings: { shadowPreset: "none", outputFormat: "webp" },
+    });
+    expect(resBeautifyDotfile.statusCode).toBe(200);
+    expect(resBeautifyDotfile.json.downloadUrl).toBe(
+      `/api/v1/download/${resBeautifyDotfile.json.jobId}/.hidden.webp`,
+    );
+
+    // 3. meme-generator registry process: extensionless, dotfile, and normal inputs
+    const memeExtlessJpg = await memeConfig.process(JPG_100, {}, "image");
+    expect(memeExtlessJpg.filename).toBe("image.jpg");
+    expect(memeExtlessJpg.contentType).toBe("image/jpeg");
+
+    const memeExtlessPng = await memeConfig.process(PNG_200, {}, "image");
+    expect(memeExtlessPng.filename).toBe("image.png");
+    expect(memeExtlessPng.contentType).toBe("image/png");
+
+    const memeDotfileJpg = await memeConfig.process(JPG_100, {}, ".hidden");
+    expect(memeDotfileJpg.filename).toBe(".hidden.jpg");
+    expect(memeDotfileJpg.contentType).toBe("image/jpeg");
+
+    const memeDotfilePng = await memeConfig.process(PNG_200, {}, ".hidden");
+    expect(memeDotfilePng.filename).toBe(".hidden.png");
+    expect(memeDotfilePng.contentType).toBe("image/png");
+
+    const memeNormalSvg = await memeConfig.process(
+      Buffer.from(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="blue"/></svg>',
+      ),
+      {},
+      "vector.svg",
+    );
+    expect(memeNormalSvg.filename).toBe("vector.png");
+    expect(memeNormalSvg.contentType).toBe("image/png");
+
+    const memeDotfileSvg = await memeConfig.process(
+      Buffer.from(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="blue"/></svg>',
+      ),
+      {},
+      ".hidden.svg",
+    );
+    expect(memeDotfileSvg.filename).toBe(".hidden.png");
+    expect(memeDotfileSvg.contentType).toBe("image/png");
+
+    // 4. meme-generator HTTP route: extensionless and dotfile uploads
+    async function invokeMemeMultipart(filename: string, content: Buffer) {
+      let statusCode = 200;
+      let body: unknown;
+      const reply = {
+        status(code: number) {
+          statusCode = code;
+          return reply;
+        },
+        send(payload: unknown) {
+          body = payload;
+          return reply;
+        },
+      };
+      const request = {
+        headers: { "content-type": "multipart/form-data; boundary=test" },
+        async *parts() {
+          yield {
+            type: "file" as const,
+            fieldname: "file",
+            filename,
+            file: Readable.from([content]),
+          };
+          yield {
+            type: "field" as const,
+            fieldname: "settings",
+            value: JSON.stringify({ textBoxes: [] }),
+          };
+        },
+      };
+      await memeHandler(request, reply);
+      return { statusCode, json: body as Record<string, unknown> };
+    }
+
+    const resMemeExtless = await invokeMemeMultipart("image", JPG_100);
+    expect(resMemeExtless.statusCode).toBe(200);
+    expect(resMemeExtless.json.downloadUrl).toBe(
+      `/api/v1/download/${resMemeExtless.json.jobId}/image.jpg`,
+    );
+
+    const resMemeDotfile = await invokeMemeMultipart(".hidden", PNG_200);
+    expect(resMemeDotfile.statusCode).toBe(200);
+    expect(resMemeDotfile.json.downloadUrl).toBe(
+      `/api/v1/download/${resMemeDotfile.json.jobId}/.hidden.png`,
+    );
   });
 });

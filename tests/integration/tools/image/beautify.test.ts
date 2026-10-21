@@ -1428,4 +1428,33 @@ describe("Beautify", () => {
       "Invalid background image: Unrecognized image format",
     );
   });
+
+  it("appends output extension for extensionless and dotfile filenames (#3406)", async () => {
+    const extlessPayload = createMultipartPayload([
+      { name: "file", filename: "image", contentType: "image/jpeg", content: JPG },
+      {
+        name: "settings",
+        content: JSON.stringify({ shadowPreset: "medium", outputFormat: "jpeg" }),
+      },
+    ]);
+    const extlessRes = await post("/api/v1/tools/image/beautify", extlessPayload);
+    expect(extlessRes.statusCode).toBe(200);
+    expect(JSON.parse(extlessRes.body).downloadUrl).toMatch(/\/image\.png$/);
+
+    const dotfilePayload = createMultipartPayload([
+      { name: "file", filename: ".hidden", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ shadowPreset: "none", outputFormat: "webp" }) },
+    ]);
+    const dotfileRes = await post("/api/v1/tools/image/beautify", dotfilePayload);
+    expect(dotfileRes.statusCode).toBe(200);
+    const dotfileDownloadUrl = JSON.parse(dotfileRes.body).downloadUrl as string;
+    expect(dotfileDownloadUrl).toMatch(/\/\.hidden\.webp$/);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: dotfileDownloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dlRes.statusCode).toBe(200);
+  });
 });

@@ -672,4 +672,52 @@ describe("Meme Generator", () => {
 
     expect(res.statusCode).toBe(400);
   });
+
+  it("appends output extension for extensionless and dotfile filenames (#3406)", async () => {
+    const JPG = readFixture(fixtures.image.base.jpg100);
+    const settings = {
+      textLayout: "top-bottom",
+      textBoxes: [{ id: "top", text: "EXTLESS" }],
+    };
+
+    const extlessPayload = createMultipartPayload([
+      { name: "file", filename: "image", contentType: "image/jpeg", content: JPG },
+      { name: "settings", content: JSON.stringify(settings) },
+    ]);
+    const extlessRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/meme-generator",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": extlessPayload.contentType,
+      },
+      body: extlessPayload.body,
+    });
+    expect(extlessRes.statusCode).toBe(200);
+    expect(JSON.parse(extlessRes.body).downloadUrl).toMatch(/\/image\.jpg$/);
+
+    const dotfilePayload = createMultipartPayload([
+      { name: "file", filename: ".hidden", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify(settings) },
+    ]);
+    const dotfileRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/meme-generator",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": dotfilePayload.contentType,
+      },
+      body: dotfilePayload.body,
+    });
+    expect(dotfileRes.statusCode).toBe(200);
+    const dotfileDownloadUrl = JSON.parse(dotfileRes.body).downloadUrl as string;
+    expect(dotfileDownloadUrl).toMatch(/\/\.hidden\.png$/);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: dotfileDownloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dlRes.statusCode).toBe(200);
+  });
 });

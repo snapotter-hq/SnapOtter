@@ -196,7 +196,9 @@ async function processMeme(
     gif: ".gif",
   };
   const correctExt = extMap[detectedFormat] ?? ".png";
-  const outFilename = filename.replace(/\.[^.]+$/, correctExt);
+  const currentExt = extname(filename);
+  const baseName = currentExt ? filename.slice(0, -currentExt.length) : filename;
+  const outFilename = `${baseName}${correctExt}`;
 
   return {
     buffer: result,

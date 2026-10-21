@@ -74,8 +74,10 @@ function needsAlphaOutput(settings: BeautifySettings): boolean {
 /** Compute the output filename with the correct extension. */
 function resolveOutputFilename(filename: string, settings: BeautifySettings): string {
   const forcedPng = needsAlphaOutput(settings) && !ALPHA_FORMATS.has(settings.outputFormat);
-  const ext = forcedPng ? ".png" : `.${settings.outputFormat}`;
-  return filename.replace(/\.[^.]+$/, ext);
+  const targetExt = forcedPng ? ".png" : `.${settings.outputFormat}`;
+  const currentExt = extname(filename);
+  const baseName = currentExt ? filename.slice(0, -currentExt.length) : filename;
+  return `${baseName}${targetExt}`;
 }
 
 function sanitizeSvgInput(buf: Buffer): Buffer {
