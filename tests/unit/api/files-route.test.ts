@@ -545,6 +545,159 @@ describe("files route logic", () => {
       expect(classifyError(bugErr, "http")).toBe("bug");
     });
 
+    it("rethrows non-syscall local faults from getObjectSize and getObjectStream while keeping 404 for ENOENT and ENAMETOOLONG (#2851)", async () => {
+      const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+      mocks.isStorageServiceFault.mockReturnValue(false);
+
+      const nonMissingLocalErrors: Array<{
+        err: Error;
+        expectedKind: "bug" | "expected";
+      }> = [
+        {
+          err: Object.assign(new RangeError("File size is greater than 2 GiB"), {
+            code: "ERR_FS_FILE_TOO_LARGE",
+          }),
+          expectedKind: "bug",
+        },
+        {
+          err: Object.assign(new Error("The operation was aborted"), {
+            name: "AbortError",
+            code: "ABORT_ERR",
+          }),
+          expectedKind: "expected",
+        },
+        {
+          err: Object.assign(new RangeError("Invalid byte range"), {
+            code: "ERR_OUT_OF_RANGE",
+          }),
+          expectedKind: "bug",
+        },
+        {
+          err: new TypeError("unexpected local failure"),
+          expectedKind: "bug",
+        },
+      ];
+
+      // 1. outputs/ size probe fails with non-syscall local error -> rethrows without probing uploads/
+      for (const { err: localFault, expectedKind } of nonMissingLocalErrors) {
+        mocks.getObjectSize.mockClear();
+        mocks.verifyS3Bucket.mockClear();
+        mocks.getObjectSize.mockRejectedValueOnce(localFault);
+        const warn = vi.fn();
+        const reply = makeDownloadReply();
+        const caught = await downloadHandler(
+          {
+            params: { jobId: "job-1", filename: "result.png" },
+            headers: {},
+            log: { warn, error: vi.fn() },
+          },
+          reply,
+        ).then(
+          () => null,
+          (e: unknown) => e,
+        );
+        expect(caught).toBe(localFault);
+        expect(classifyError(caught, "http")).toBe(expectedKind);
+        expect(mocks.getObjectSize).toHaveBeenCalledTimes(1);
+        expect(mocks.verifyS3Bucket).not.toHaveBeenCalled();
+        expect(warn).not.toHaveBeenCalled();
+        expect(reply.send).not.toHaveBeenCalled();
+      }
+
+      // 2. outputs/ misses with ENOENT, uploads/ size probe fails with non-syscall local error -> rethrows
+      const enoent = Object.assign(new Error("ENOENT: no such file or directory, stat"), {
+        code: "ENOENT",
+        syscall: "stat",
+      });
+      for (const { err: localFault, expectedKind } of nonMissingLocalErrors) {
+        mocks.getObjectSize.mockClear();
+        mocks.verifyS3Bucket.mockClear();
+        mocks.getObjectSize.mockRejectedValueOnce(enoent).mockRejectedValueOnce(localFault);
+        const warn = vi.fn();
+        const reply = makeDownloadReply();
+        const caught = await downloadHandler(
+          {
+            params: { jobId: "job-1", filename: "result.png" },
+            headers: {},
+            log: { warn, error: vi.fn() },
+          },
+          reply,
+        ).then(
+          () => null,
+          (e: unknown) => e,
+        );
+        expect(caught).toBe(localFault);
+        expect(classifyError(caught, "http")).toBe(expectedKind);
+        expect(mocks.getObjectSize).toHaveBeenCalledTimes(2);
+        expect(mocks.verifyS3Bucket).not.toHaveBeenCalled();
+        expect(warn).not.toHaveBeenCalled();
+        expect(reply.send).not.toHaveBeenCalled();
+      }
+
+      // 3. getObjectStream fails with non-syscall local error -> rethrows instead of 404
+      for (const { err: localFault, expectedKind } of nonMissingLocalErrors) {
+        mocks.getObjectSize.mockResolvedValueOnce(128);
+        mocks.getObjectStream.mockRejectedValueOnce(localFault);
+        const warn = vi.fn();
+        const reply = makeDownloadReply();
+        const caught = await downloadHandler(
+          {
+            params: { jobId: "job-1", filename: "result.png" },
+            headers: {},
+            log: { warn, error: vi.fn() },
+          },
+          reply,
+        ).then(
+          () => null,
+          (e: unknown) => e,
+        );
+        expect(caught).toBe(localFault);
+        expect(classifyError(caught, "http")).toBe(expectedKind);
+        expect(warn).not.toHaveBeenCalled();
+        expect(reply.send).not.toHaveBeenCalled();
+      }
+
+      // 4. ENOENT, ENAMETOOLONG, and S3 NoSuchKey at getObjectStream still map to 404
+      const enametoolong = Object.assign(new Error("ENAMETOOLONG: name too long, stat"), {
+        code: "ENAMETOOLONG",
+        syscall: "stat",
+      });
+      mocks.getObjectSize.mockRejectedValueOnce(enoent).mockRejectedValueOnce(enametoolong);
+      const warnMiss = vi.fn();
+      const missReply = makeDownloadReply();
+      await downloadHandler(
+        {
+          params: { jobId: "job-1", filename: "missing.png" },
+          headers: {},
+          log: { warn: warnMiss, error: vi.fn() },
+        },
+        missReply,
+      );
+      expect(missReply.statusCode).toBe(404);
+      expect(missReply.payload).toEqual({ error: "File not found" });
+      expect(warnMiss).toHaveBeenCalledTimes(1);
+
+      const s3StreamNoSuchKey = Object.assign(new Error("NoSuchKey"), {
+        name: "NoSuchKey",
+        $metadata: { httpStatusCode: 404 },
+      });
+      mocks.getObjectSize.mockResolvedValueOnce(128);
+      mocks.getObjectStream.mockRejectedValueOnce(s3StreamNoSuchKey);
+      const warnS3StreamMiss = vi.fn();
+      const s3StreamMissReply = makeDownloadReply();
+      await downloadHandler(
+        {
+          params: { jobId: "job-1", filename: "vanished-on-stream.png" },
+          headers: {},
+          log: { warn: warnS3StreamMiss, error: vi.fn() },
+        },
+        s3StreamMissReply,
+      );
+      expect(s3StreamMissReply.statusCode).toBe(404);
+      expect(s3StreamMissReply.payload).toEqual({ error: "File not found" });
+      expect(warnS3StreamMiss).toHaveBeenCalledTimes(1);
+    });
+
     it("verifies S3 bucket existence only when both outputs/ and uploads/ size probes miss (#996)", async () => {
       const notFound = Object.assign(new Error("NotFound"), {
         name: "NotFound",

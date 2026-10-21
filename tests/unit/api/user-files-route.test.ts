@@ -1292,7 +1292,81 @@ describe("user files route logic", () => {
         expect(reply.send).not.toHaveBeenCalled();
       });
 
+      it("rethrows non-syscall local faults (ERR_FS_FILE_TOO_LARGE, AbortError, TypeError) from readStoredFile instead of swallowing them as 422 (#2851)", async () => {
+        const { SafeError } = await import("@snapotter/shared");
+        const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+        const row = makeFileRow({
+          id: "file-local-nosyscall",
+          storedName: "stored-local-nosyscall.png",
+          mimeType: "image/png",
+        });
+        mocks.parentRows = [row];
+        mocks.isStorageServiceFault.mockReturnValue(false);
+
+        const nonMissingLocalErrors: Array<{
+          err: Error;
+          expectedKind: "bug" | "operational" | "expected";
+        }> = [
+          {
+            err: Object.assign(new RangeError("File size is greater than 2 GiB"), {
+              code: "ERR_FS_FILE_TOO_LARGE",
+            }),
+            expectedKind: "bug",
+          },
+          {
+            err: Object.assign(new Error("The operation was aborted"), {
+              name: "AbortError",
+              code: "ABORT_ERR",
+            }),
+            expectedKind: "expected",
+          },
+          {
+            err: new TypeError("unexpected failure"),
+            expectedKind: "bug",
+          },
+          {
+            err: new SafeError("The server's storage is full.", {
+              kind: "operational",
+              code: "storage-full",
+              statusCode: 503,
+            }),
+            expectedKind: "operational",
+          },
+          {
+            err: Object.assign(new Error("ENAMETOOLONG: name too long, open"), {
+              code: "ENAMETOOLONG",
+              syscall: "open",
+            }),
+            expectedKind: "bug",
+          },
+          {
+            err: Object.assign(new Error("non-SafeError invalid stored name"), {
+              code: "INVALID_STORED_NAME",
+            }),
+            expectedKind: "bug",
+          },
+        ];
+
+        for (const { err: localFault, expectedKind } of nonMissingLocalErrors) {
+          mocks.readStoredFile.mockRejectedValueOnce(localFault);
+          const warn = vi.fn();
+          const reply = makeReply();
+          const caught = await thumbnailHandler(
+            { params: { id: row.id }, log: { warn, error: vi.fn() } },
+            reply,
+          ).then(
+            () => null,
+            (e: unknown) => e,
+          );
+          expect(caught).toBe(localFault);
+          expect(classifyError(caught, "http")).toBe(expectedKind);
+          expect(warn).not.toHaveBeenCalled();
+          expect(reply.send).not.toHaveBeenCalled();
+        }
+      });
+
       it("logs a warning and returns 422 when readStoredFile rejects with a missing blob (ENOENT or NoSuchKey)", async () => {
+        const { SafeError } = await import("@snapotter/shared");
         const row = makeFileRow({
           id: "file-missing-blob",
           storedName: "stored-missing-blob.png",
@@ -1334,6 +1408,26 @@ describe("user files route logic", () => {
         expect(reply2.statusCode).toBe(422);
         expect(reply2.payload).toEqual({ error: "Could not generate thumbnail" });
         expect(warn2).toHaveBeenCalledWith(
+          { fileId: row.id, storedName: row.storedName },
+          "library thumbnail: stored blob missing",
+        );
+
+        const invalidStoredName = new SafeError("Invalid stored file name", {
+          kind: "operational",
+          code: "INVALID_STORED_NAME",
+          statusCode: 400,
+        });
+        mocks.readStoredFile.mockRejectedValueOnce(invalidStoredName);
+
+        const warn3 = vi.fn();
+        const reply3 = makeReply();
+        await thumbnailHandler(
+          { params: { id: row.id }, log: { warn: warn3, error: vi.fn() } },
+          reply3,
+        );
+        expect(reply3.statusCode).toBe(422);
+        expect(reply3.payload).toEqual({ error: "Could not generate thumbnail" });
+        expect(warn3).toHaveBeenCalledWith(
           { fileId: row.id, storedName: row.storedName },
           "library thumbnail: stored blob missing",
         );
@@ -1750,6 +1844,121 @@ describe("user files route logic", () => {
         );
         expect(bugErr).toBe(unexpectedBug);
         expect(classifyError(bugErr, "http")).toBe("bug");
+      });
+
+      it("rethrows non-syscall local faults from streamStoredFile while keeping 404 for ENOENT, S3 404, and INVALID_STORED_NAME (#2851)", async () => {
+        const { SafeError } = await import("@snapotter/shared");
+        const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+        mocks.parentRows = [
+          {
+            id: "file-dl-local",
+            userId: "user-1",
+            originalName: "photo.png",
+            storedName: "stored-dl-local.png",
+            mimeType: "image/png",
+            size: 128,
+            width: 10,
+            height: 10,
+            version: 1,
+            parentId: null,
+            toolChain: null,
+            createdAt: new Date("2025-06-01T12:00:00Z"),
+          },
+        ];
+        mocks.isStorageServiceFault.mockReturnValue(false);
+
+        const nonMissingLocalErrors: Array<{
+          err: Error;
+          expectedKind: "bug" | "operational" | "expected";
+        }> = [
+          {
+            err: Object.assign(new RangeError("File size is greater than 2 GiB"), {
+              code: "ERR_FS_FILE_TOO_LARGE",
+            }),
+            expectedKind: "bug",
+          },
+          {
+            err: Object.assign(new Error("The operation was aborted"), {
+              name: "AbortError",
+              code: "ABORT_ERR",
+            }),
+            expectedKind: "expected",
+          },
+          {
+            err: new TypeError("unexpected failure"),
+            expectedKind: "bug",
+          },
+          {
+            err: new SafeError("The server's storage is full.", {
+              kind: "operational",
+              code: "storage-full",
+              statusCode: 503,
+            }),
+            expectedKind: "operational",
+          },
+          {
+            err: Object.assign(new Error("ENAMETOOLONG: name too long, open"), {
+              code: "ENAMETOOLONG",
+              syscall: "open",
+            }),
+            expectedKind: "bug",
+          },
+          {
+            err: Object.assign(new Error("non-SafeError invalid stored name"), {
+              code: "INVALID_STORED_NAME",
+            }),
+            expectedKind: "bug",
+          },
+        ];
+
+        for (const { err: localFault, expectedKind } of nonMissingLocalErrors) {
+          mocks.streamStoredFile.mockRejectedValueOnce(localFault);
+          const warn = vi.fn();
+          const reply = makeReply();
+          const caught = await downloadHandler(
+            { params: { id: "file-dl-local" }, log: { warn, error: vi.fn() } },
+            reply,
+          ).then(
+            () => null,
+            (e: unknown) => e,
+          );
+          expect(caught).toBe(localFault);
+          expect(classifyError(caught, "http")).toBe(expectedKind);
+          expect(warn).not.toHaveBeenCalled();
+          expect(reply.send).not.toHaveBeenCalled();
+        }
+
+        const missingErrors = [
+          Object.assign(new Error("ENOENT: no such file or directory, open"), {
+            code: "ENOENT",
+            syscall: "open",
+          }),
+          Object.assign(new Error("NoSuchKey"), {
+            name: "NoSuchKey",
+            $metadata: { httpStatusCode: 404 },
+          }),
+          new SafeError("Invalid stored file name", {
+            kind: "operational",
+            code: "INVALID_STORED_NAME",
+            statusCode: 400,
+          }),
+        ];
+
+        for (const miss of missingErrors) {
+          mocks.streamStoredFile.mockRejectedValueOnce(miss);
+          const warn = vi.fn();
+          const reply = makeReply();
+          await downloadHandler(
+            { params: { id: "file-dl-local" }, log: { warn, error: vi.fn() } },
+            reply,
+          );
+          expect(reply.statusCode).toBe(404);
+          expect(reply.payload).toEqual({ error: "File not found in storage" });
+          expect(warn).toHaveBeenCalledWith(
+            { fileId: "file-dl-local", storedName: "stored-dl-local.png" },
+            "library download: stored blob missing",
+          );
+        }
       });
     });
   });

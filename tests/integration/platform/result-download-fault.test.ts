@@ -303,4 +303,36 @@ describe("tool-result download fault classification (local mode)", () => {
       await new Promise<void>((resolve) => s3Server.close(() => resolve()));
     }
   });
+
+  // #2851: non-syscall local errors (ERR_FS_FILE_TOO_LARGE, TypeError) must
+  // reach the error handler as 500 instead of falling through to 404.
+  it("returns 500, not 404, when getObjectSize or getObjectStream rejects with a non-syscall local error (#2851)", async () => {
+    const jobId = "resfault-nosyscall";
+    await putObject(`outputs/${jobId}/result.png`, PNG);
+
+    const tooLarge = Object.assign(new RangeError("File size is greater than 2 GiB"), {
+      code: "ERR_FS_FILE_TOO_LARGE",
+    });
+    const sizeSpy = vi.spyOn(objectStorage, "getObjectSize").mockRejectedValueOnce(tooLarge);
+    try {
+      const res = await download(jobId, "result.png");
+      expect(res.statusCode).toBe(500);
+      expect(JSON.parse(res.body).error).not.toMatch(/not found/i);
+    } finally {
+      sizeSpy.mockRestore();
+    }
+
+    const unexpectedBug = new TypeError("unexpected stream failure");
+    const streamSpy = vi
+      .spyOn(objectStorage, "getObjectStream")
+      .mockRejectedValueOnce(unexpectedBug);
+    try {
+      const res = await download(jobId, "result.png");
+      expect(res.statusCode).toBe(500);
+      expect(JSON.parse(res.body).error).not.toMatch(/not found/i);
+    } finally {
+      streamSpy.mockRestore();
+      await deletePrefix(`outputs/${jobId}`);
+    }
+  });
 });

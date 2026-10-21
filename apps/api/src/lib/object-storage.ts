@@ -658,7 +658,7 @@ function serverFault(error: unknown): Error {
   return Object.assign(err, { statusCode: 500 });
 }
 
-function isS3MissingShape(error: unknown): boolean {
+export function isS3MissingShape(error: unknown): boolean {
   if (typeof error !== "object" || error === null || !("$metadata" in error)) return false;
   const e = error as {
     name?: string;

@@ -45,7 +45,7 @@ import {
 import { decodeHeic } from "../lib/heic-converter.js";
 import { deleteLibraryFileStorage } from "../lib/library-cleanup.js";
 import { readFilePart } from "../lib/multipart-parts.js";
-import { normalizeS3ReadFault } from "../lib/object-storage.js";
+import { isS3MissingShape, normalizeS3ReadFault } from "../lib/object-storage.js";
 import { quotaRefusal } from "../lib/quota.js";
 import {
   decompressSvgz,
@@ -216,8 +216,11 @@ function discardStagedBlob(request: FastifyRequest, route: string, storedName: s
 
 function rethrowIfLibraryStorageFault(e: unknown): void {
   if (isStorageServiceFault(e)) throw normalizeS3ReadFault(e);
-  const { code, syscall } = (e ?? {}) as NodeJS.ErrnoException;
-  if (syscall && code !== "ENOENT") throw e;
+  if (isS3MissingShape(e)) return;
+  if (e instanceof SafeError && e.code === "INVALID_STORED_NAME") return;
+  const { code } = (e ?? {}) as NodeJS.ErrnoException;
+  if (code === "ENOENT") return;
+  throw e;
 }
 
 // ── Route registration ─────────────────────────────────────────────
@@ -629,11 +632,10 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
         stream = await streamStoredFile(file.storedName);
       } catch (e) {
         // streamStoredFile rejects for every open-time fault, not only a
-        // missing blob. A syscall failure other than ENOENT (EACCES, ENOTDIR)
-        // and an S3 service fault other than a missing object (AccessDenied,
-        // rotated credentials, S3 5xx) are storage faults that must keep
-        // reaching the global handler and Sentry (#937, #2808). A missing blob
-        // and a poisoned stored_name keep their long-standing 404 mapping.
+        // missing blob. Only proven missing-object rejections (ENOENT, S3
+        // NoSuchKey/404) and a poisoned stored_name (INVALID_STORED_NAME)
+        // keep their 404 mapping; every other local or S3 fault rethrows to
+        // the global handler and Sentry (#937, #2808, #2851).
         rethrowIfLibraryStorageFault(e);
         request.log.warn(
           { fileId: id, storedName: file.storedName },

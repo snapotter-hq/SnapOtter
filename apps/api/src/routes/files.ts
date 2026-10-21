@@ -20,6 +20,7 @@ import {
   deletePrefix,
   getObjectSize,
   getObjectStream,
+  isS3MissingShape,
   isStorageServiceFault,
   isValidObjectKey,
   normalizeS3ReadFault,
@@ -254,19 +255,20 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(404).send({ error: "File not found" });
       }
 
-      // A size-probe rejection is only a miss when storage says the object
-      // is not there. A syscall fault other than ENOENT (EACCES, ENOTDIR)
-      // or an S3 service fault (AccessDenied, rotated credentials, S3 5xx)
-      // is a storage outage that must keep reaching the global handler and
-      // Sentry, not fold into "File not found" (#974, sibling of #937).
-      // ENAMETOOLONG counts as a miss: no object can exist at such a key,
-      // and this route takes unauthenticated client-supplied names (params
-      // up to maxParamLength: 500 exceed the 255-byte filename limit), so
-      // long garbage must stay 404 instead of paging Sentry.
+      // A size-probe or stream-open rejection is only a miss when storage
+      // says the object is not there (ENOENT, S3 NoSuchKey/404) or when the
+      // client supplied a filename exceeding the filesystem limit
+      // (ENAMETOOLONG, since maxParamLength: 500 exceeds 255 bytes). Every
+      // other local or S3 fault (EACCES, ENOTDIR, ERR_FS_FILE_TOO_LARGE,
+      // AccessDenied, rotated credentials, S3 5xx) must reach the global
+      // handler and Sentry rather than fold into "File not found" (#974,
+      // #2808, #2851).
       const rethrowIfStorageFault = (e: unknown): void => {
         if (isStorageServiceFault(e)) throw normalizeS3ReadFault(e);
-        const { code, syscall } = (e ?? {}) as NodeJS.ErrnoException;
-        if (syscall && code !== "ENOENT" && code !== "ENAMETOOLONG") throw e;
+        if (isS3MissingShape(e)) return;
+        const { code } = (e ?? {}) as NodeJS.ErrnoException;
+        if (code === "ENOENT" || code === "ENAMETOOLONG") return;
+        throw e;
       };
 
       // Resolve from object storage: outputs/ first, then uploads/

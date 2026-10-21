@@ -16,6 +16,8 @@ const hooks = vi.hoisted(() => ({
   reportError: vi.fn(),
   svgUnexpectedError: false,
   afterSaveFile: null as ((storedName: string) => Promise<void>) | null,
+  streamStoredFileError: null as Error | null,
+  readStoredFileError: null as Error | null,
 }));
 
 vi.mock("../../../apps/api/src/lib/file-storage.js", async (importOriginal) => {
@@ -28,6 +30,22 @@ vi.mock("../../../apps/api/src/lib/file-storage.js", async (importOriginal) => {
         await hooks.afterSaveFile(storedName);
       }
       return storedName;
+    },
+    streamStoredFile: async (...args: Parameters<typeof actual.streamStoredFile>) => {
+      if (hooks.streamStoredFileError) {
+        const err = hooks.streamStoredFileError;
+        hooks.streamStoredFileError = null;
+        throw err;
+      }
+      return actual.streamStoredFile(...args);
+    },
+    readStoredFile: async (...args: Parameters<typeof actual.readStoredFile>) => {
+      if (hooks.readStoredFileError) {
+        const err = hooks.readStoredFileError;
+        hooks.readStoredFileError = null;
+        throw err;
+      }
+      return actual.readStoredFile(...args);
     },
   };
 });
@@ -440,6 +458,78 @@ describe("File download", () => {
     } finally {
       await chmod(blobPath, 0o644);
     }
+  });
+
+  it("keeps 404 for a poisoned stored_name (INVALID_STORED_NAME SafeError) on download (#2851)", async () => {
+    const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+      { name: "file", filename: "poisoned-dl.png", contentType: "image/png", content: PNG },
+    ]);
+
+    const uploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+      body: uploadBody,
+    });
+    expect(uploadRes.statusCode).toBe(201);
+    const fileId = (JSON.parse(uploadRes.body).files[0] as { id: string }).id;
+
+    const [row] = await db
+      .select({ storedName: schema.userFiles.storedName })
+      .from(schema.userFiles)
+      .where(eq(schema.userFiles.id, fileId));
+    await unlink(getStoredFilePath(row.storedName));
+    await db
+      .update(schema.userFiles)
+      .set({ storedName: "../escape.png" })
+      .where(eq(schema.userFiles.id, fileId));
+
+    hooks.reportError.mockClear();
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/v1/files/${fileId}/download`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(res.statusCode).toBe(404);
+    expect(JSON.parse(res.body)).toEqual({ error: "File not found in storage" });
+    expect(hooks.reportError).not.toHaveBeenCalled();
+  });
+
+  it("returns 500, not 404 or 422, when streamStoredFile or readStoredFile rejects with a non-syscall local error (#2851)", async () => {
+    const { body: uploadBody, contentType: uploadCt } = createMultipartPayload([
+      { name: "file", filename: "nosyscall-fault.png", contentType: "image/png", content: PNG },
+    ]);
+
+    const uploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": uploadCt, authorization: `Bearer ${adminToken}` },
+      body: uploadBody,
+    });
+    expect(uploadRes.statusCode).toBe(201);
+    const fileId = (JSON.parse(uploadRes.body).files[0] as { id: string }).id;
+
+    const tooLarge = Object.assign(new RangeError("File size is greater than 2 GiB"), {
+      code: "ERR_FS_FILE_TOO_LARGE",
+    });
+    hooks.streamStoredFileError = tooLarge;
+    const dlRes = await app.inject({
+      method: "GET",
+      url: `/api/v1/files/${fileId}/download`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dlRes.statusCode).toBe(500);
+    expect(JSON.parse(dlRes.body).error).not.toMatch(/not found/i);
+
+    const unexpectedBug = new TypeError("unexpected readStoredFile failure");
+    hooks.readStoredFileError = unexpectedBug;
+    const thumbRes = await app.inject({
+      method: "GET",
+      url: `/api/v1/files/${fileId}/thumbnail`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(thumbRes.statusCode).toBe(500);
+    expect(JSON.parse(thumbRes.body).error).not.toMatch(/could not generate thumbnail/i);
   });
 });
 
