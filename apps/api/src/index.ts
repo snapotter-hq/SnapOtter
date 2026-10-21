@@ -5,9 +5,11 @@ import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import { trace } from "@opentelemetry/api";
 import { getDispatcherStatus, initDispatcher, isGpuAvailable } from "@snapotter/ai";
+import { configureSharpConcurrency } from "@snapotter/image-engine";
 import { ANALYTICS_EVENTS, APP_VERSION, SafeError } from "@snapotter/shared";
 import { eq, sql } from "drizzle-orm";
 import Fastify from "fastify";
+import sharp from "sharp";
 import { env } from "./config.js";
 import { closeDb, db, schema } from "./db/index.js";
 import {
@@ -32,7 +34,7 @@ import { stripBasePath } from "./lib/base-path.js";
 import { shouldRunStartupCleanup } from "./lib/cleanup.js";
 import { buildCsp } from "./lib/csp.js";
 import { isEnterpriseFeatureEnabled } from "./lib/enterprise-feature.js";
-import { warnIfExternalUrlCanonicalized } from "./lib/env.js";
+import { resolveWorkerThreads, warnIfExternalUrlCanonicalized } from "./lib/env.js";
 import { setSentryInstanceTag } from "./lib/error-report.js";
 import {
   acquireInstallLock,
@@ -100,6 +102,10 @@ import { shutdownTracing } from "./tracing.js";
 
 // Before anything can log from packages/ai, so its lines reach LOG_DIR (#1500).
 routeAiLogsToPino();
+
+const bootWorkerThreads = resolveWorkerThreads(env);
+sharp.concurrency(bootWorkerThreads);
+configureSharpConcurrency(bootWorkerThreads);
 
 // Run before anything else, and before the retry loop below: a rejected
 // DATABASE_URL / DATABASE_MIGRATION_URL pair fails the same way on every attempt,

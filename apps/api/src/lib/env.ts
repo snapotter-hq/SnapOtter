@@ -444,6 +444,8 @@ export function resolveConcurrency(env: Env): number {
 }
 
 export function resolveWorkerThreads(env: Env): number {
-  if (env.MAX_WORKER_THREADS > 0) return env.MAX_WORKER_THREADS;
+  if (Number.isFinite(env.MAX_WORKER_THREADS) && env.MAX_WORKER_THREADS >= 1) {
+    return Math.floor(env.MAX_WORKER_THREADS);
+  }
   return Math.max(2, availableParallelism() - 1);
 }

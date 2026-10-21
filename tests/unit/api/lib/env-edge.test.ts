@@ -268,13 +268,22 @@ describe("worker sizing helpers", () => {
 
     expect(resolveConcurrency({ ...env, CONCURRENT_JOBS: 7 })).toBe(7);
     expect(resolveWorkerThreads({ ...env, MAX_WORKER_THREADS: 9 })).toBe(9);
+    expect(resolveWorkerThreads({ ...env, MAX_WORKER_THREADS: 1 })).toBe(1);
+    expect(resolveWorkerThreads({ ...env, MAX_WORKER_THREADS: 2.7 })).toBe(2);
   });
 
-  it("falls back to at least two workers when overrides are zero", () => {
+  it("falls back to at least two workers when overrides are zero, below 1, or non-finite", () => {
     const env = loadEnv();
+    const autoThreads = resolveWorkerThreads({ ...env, MAX_WORKER_THREADS: 0 });
 
     expect(resolveConcurrency({ ...env, CONCURRENT_JOBS: 0 })).toBeGreaterThanOrEqual(2);
-    expect(resolveWorkerThreads({ ...env, MAX_WORKER_THREADS: 0 })).toBeGreaterThanOrEqual(2);
+    expect(autoThreads).toBeGreaterThanOrEqual(2);
+    expect(resolveWorkerThreads({ ...env, MAX_WORKER_THREADS: -3 })).toBe(autoThreads);
+    expect(resolveWorkerThreads({ ...env, MAX_WORKER_THREADS: 0.5 })).toBe(autoThreads);
+    expect(resolveWorkerThreads({ ...env, MAX_WORKER_THREADS: Number.POSITIVE_INFINITY })).toBe(
+      autoThreads,
+    );
+    expect(resolveWorkerThreads({ ...env, MAX_WORKER_THREADS: Number.NaN })).toBe(autoThreads);
   });
 });
 

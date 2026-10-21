@@ -32,6 +32,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
 import { context, propagation, ROOT_CONTEXT, SpanStatusCode, trace } from "@opentelemetry/api";
+import { configureSharpConcurrency } from "@snapotter/image-engine";
 import { HW_ACCEL_FAMILIES, hwAccelStatus, softwareEncoderStatus } from "@snapotter/media-engine";
 import {
   ANALYTICS_EVENTS,
@@ -50,6 +51,7 @@ import {
 import archiver from "archiver";
 import { type Job, UnrecoverableError, Worker } from "bullmq";
 import { and, eq, notInArray } from "drizzle-orm";
+import sharp from "sharp";
 import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { trackEvent } from "../lib/analytics.js";
@@ -61,7 +63,7 @@ import {
   probeFailureLevel,
 } from "../lib/binary-overrides.js";
 import { allFailedFault, type BatchFault } from "../lib/engine-unavailable.js";
-import { resolveConcurrency } from "../lib/env.js";
+import { resolveConcurrency, resolveWorkerThreads } from "../lib/env.js";
 import { classifyError, reportError, safeFormatTag } from "../lib/error-report.js";
 import { friendlyError, sharedFailureReason, stripInternalPaths } from "../lib/errors.js";
 import { createUniqueNamer } from "../lib/filename.js";
@@ -2369,6 +2371,9 @@ async function isCanceledPipelineFlow(jobId: string, totalSteps: number): Promis
 }
 
 export function startWorkers(): void {
+  const workerThreads = resolveWorkerThreads(env);
+  sharp.concurrency(workerThreads);
+  configureSharpConcurrency(workerThreads);
   const concurrency = Math.max(1, Math.floor(resolveConcurrency(env) / 2));
 
   for (const pool of POOLS) {

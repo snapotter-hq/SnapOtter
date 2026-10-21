@@ -44,6 +44,10 @@ export interface Operation {
   options: Record<string, unknown>;
 }
 
+export function configureSharpConcurrency(threads: number): number {
+  return sharp.concurrency(threads);
+}
+
 const OPERATION_MAP: Record<
   string,
   (image: Sharp, options: Record<string, unknown>) => Promise<Sharp>

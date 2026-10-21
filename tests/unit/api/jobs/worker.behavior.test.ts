@@ -1,4 +1,15 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import sharp from "sharp";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
+const initialSharpConcurrency = sharp.concurrency();
+
+afterEach(() => {
+  sharp.concurrency(initialSharpConcurrency);
+});
 
 const objectStorageMocks = vi.hoisted(() => ({
   copyObjectToFile: vi.fn(),
@@ -95,6 +106,7 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
 
   vi.doMock("../../../../apps/api/src/lib/env.js", () => ({
     resolveConcurrency: vi.fn(() => 2),
+    resolveWorkerThreads: vi.fn(() => 2),
   }));
 
   vi.doMock("../../../../apps/api/src/lib/errors.js", () => ({
@@ -2692,5 +2704,71 @@ describe("contentTypeForFilename (#2703)", () => {
     ["pdf", "application/octet-stream"],
   ])("maps %s to %s", (filename, expected) => {
     expect(contentTypeForFilename(filename)).toBe(expected);
+  });
+});
+
+describe("startWorkers sharp.concurrency wiring (#2708)", () => {
+  it("configures sharp.concurrency from resolveWorkerThreads(env) when workers start", async () => {
+    const { resolveWorkerThreads } = await vi.importActual<
+      typeof import("../../../../apps/api/src/lib/env.js")
+    >("../../../../apps/api/src/lib/env.js");
+    const resolveWorkerThreadsSpy = vi.fn(resolveWorkerThreads);
+    const imageEngineActual =
+      await vi.importActual<typeof import("@snapotter/image-engine")>("@snapotter/image-engine");
+    const configureSharpConcurrencySpy = vi.fn(() => 2);
+
+    const workerMod = await loadWorker("", () => {
+      vi.doMock("../../../../apps/api/src/config.js", () => ({
+        env: {
+          BASE_PATH: "",
+          SCRATCH_PATH: "",
+          JOB_TIMEOUT_LONG_S: 60,
+          JOB_TIMEOUT_FAST_S: 15,
+          CONCURRENT_JOBS: 1,
+          MAX_WORKER_THREADS: 2,
+        },
+      }));
+      vi.doMock("../../../../apps/api/src/lib/env.js", () => ({
+        resolveConcurrency: vi.fn(() => 1),
+        resolveWorkerThreads: resolveWorkerThreadsSpy,
+      }));
+      vi.doMock("@snapotter/image-engine", () => ({
+        ...imageEngineActual,
+        configureSharpConcurrency: configureSharpConcurrencySpy,
+      }));
+      vi.doMock("@snapotter/media-engine", () => ({
+        HW_ACCEL_FAMILIES: [],
+        hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+        softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+        binaryOverrideWarning: vi.fn(),
+        checkBinaryOverrides: vi.fn(() => []),
+        probeFailureLevel: vi.fn(() => "warn"),
+      }));
+    });
+
+    sharp.concurrency(7);
+    workerMod.startWorkers();
+
+    expect(resolveWorkerThreadsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ MAX_WORKER_THREADS: 2 }),
+    );
+    expect(configureSharpConcurrencySpy).toHaveBeenCalledWith(2);
+    expect(sharp.concurrency()).toBe(2);
+  });
+
+  it("configures sharp.concurrency at API boot before Fastify routes are registered", () => {
+    const source = readFileSync(resolve(repoRoot, "apps/api/src/index.ts"), "utf8");
+    const fastifyStart = source.indexOf("const app = Fastify(");
+    const resolveCall = source.indexOf("const bootWorkerThreads = resolveWorkerThreads(env);");
+    const sharpCall = source.indexOf("sharp.concurrency(bootWorkerThreads);");
+    const engineCall = source.indexOf("configureSharpConcurrency(bootWorkerThreads);");
+
+    expect(resolveCall).toBeGreaterThan(-1);
+    expect(sharpCall).toBeGreaterThan(resolveCall);
+    expect(engineCall).toBeGreaterThan(resolveCall);
+    expect(sharpCall).toBeLessThan(fastifyStart);
+    expect(engineCall).toBeLessThan(fastifyStart);
   });
 });
