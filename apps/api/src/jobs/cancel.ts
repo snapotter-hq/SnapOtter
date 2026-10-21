@@ -264,7 +264,10 @@ export async function requestCancel(jobId: string): Promise<boolean> {
       // since healing it as canceled would lie about a finished run.
       if (flowRow && isTerminal(flowRow.status)) {
         if (flowRow.status === "canceled") {
-          await cancelSingleJobGuarded({ jobId });
+          await cancelSingleJobGuarded({
+            jobId,
+            expectedPipelineFlowId: settings.pipelineFlowId,
+          });
           return true;
         }
         return false;

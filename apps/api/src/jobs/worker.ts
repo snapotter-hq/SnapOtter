@@ -1507,27 +1507,38 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
     // write is the one failure a client may never recover from);
     // requestCancel's pipeline-alias heal converges the row on a later
     // cancel, off the canceled flow row this finalize still commits.
-    const settleGuarded = async (rowId: string) => {
+    const settleGuarded = async (
+      rowId: string,
+      expectedPipelineFlowId?: string,
+    ): Promise<boolean> => {
       try {
-        await cancelSingleJobGuarded({ jobId: rowId });
+        await cancelSingleJobGuarded({
+          jobId: rowId,
+          ...(expectedPipelineFlowId && { expectedPipelineFlowId }),
+        });
+        return false;
       } catch (err) {
         logger.error(
           { err, jobId: data.jobId, target: rowId },
           "canceled pipeline terminal write failed",
         );
         void reportError(err, { source: "worker", pool: data.pool, jobId: rowId });
+        return true;
       }
     };
-    await settleGuarded(data.jobId);
-    if (progressJobId !== data.jobId) {
-      await settleGuarded(progressJobId);
-    }
-    // Ephemeral terminal event for live SSE clients, published
-    // unconditionally for single-run pipelines: liveness must not depend
-    // on the durable write (which the guard also skips when a reused
-    // alias id is still terminal from an earlier run). Pipeline-batch
-    // per-file finalizes report through the parent batch channel instead.
-    if (!data.parentId) {
+    const flowWriteFaulted = await settleGuarded(data.jobId);
+    const progressWriteFaulted =
+      progressJobId !== data.jobId
+        ? await settleGuarded(progressJobId, data.jobId)
+        : flowWriteFaulted;
+    // Ephemeral terminal event for live SSE clients, published when the run has
+    // no separate alias row or when the alias row's durable write faulted
+    // (#888). When a separate alias row settled cleanly via
+    // cancelSingleJobGuarded, that call already announced the frame if the
+    // pointer still matched and skipped announcement if a newer run re-pointed
+    // the channel (#2741). Pipeline-batch per-file finalizes report through
+    // the parent batch channel instead.
+    if (!data.parentId && (progressJobId === data.jobId || progressWriteFaulted)) {
       publishEphemeral({
         jobId: progressJobId,
         type: "single",
@@ -1596,6 +1607,7 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
           percent: 0,
           error: errorMsg,
           ...failFault,
+          ...(progressJobId !== data.jobId && { expectedPipelineFlowId: data.jobId }),
         },
         async (tx) => {
           await tx
@@ -1710,6 +1722,7 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
       percent: 100,
       stage: "complete",
       result: legacyResult,
+      ...(progressJobId !== data.jobId && { expectedPipelineFlowId: data.jobId }),
     },
     async (tx) => {
       await tx
@@ -2548,16 +2561,23 @@ export function startWorkers(): void {
             return false;
           })
           .then((canceled) => {
-            const netSettle = (jobId: string) =>
+            const netSettle = (jobId: string, expectedPipelineFlowId?: string) =>
               (canceled
-                ? cancelSingleJobGuarded({ jobId })
-                : failSingleJobGuarded({ jobId, message: "Pipeline processing failed" })
+                ? cancelSingleJobGuarded({
+                    jobId,
+                    ...(expectedPipelineFlowId && { expectedPipelineFlowId }),
+                  })
+                : failSingleJobGuarded({
+                    jobId,
+                    message: "Pipeline processing failed",
+                    ...(expectedPipelineFlowId && { expectedPipelineFlowId }),
+                  })
               ).catch((netErr) => {
                 logger.error({ err: netErr, jobId }, "pipeline-finalize safety net failed");
                 void reportError(netErr, { source: "worker", pool, jobId });
               });
             const frameId = data.clientJobId ?? data.jobId;
-            void netSettle(frameId);
+            void netSettle(frameId, frameId !== data.jobId ? data.jobId : undefined);
             if (frameId !== data.jobId) void netSettle(data.jobId);
           });
       }

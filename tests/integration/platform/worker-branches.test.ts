@@ -1134,26 +1134,38 @@ describe("pipeline finalize", () => {
   it("hard-fails the finalize job when the last step has no output ref", async () => {
     const jobId = `pf-${randomUUID()}`;
     const clientJobId = `pfc-${randomUUID()}`;
-    await db.insert(schema.jobs).values({
-      id: `${jobId}-s0`,
-      type: "pipeline-step",
-      status: "completed",
-      toolId: "noop",
-      pool: "image",
-      inputRefs: [],
-      outputRefs: [],
-    });
-    // The client-facing row the SSE replays, as the route's first progress
-    // publish would have created it.
-    await db.insert(schema.jobs).values({
-      id: clientJobId,
-      type: "single",
-      status: "processing",
-      inputRefs: [],
-      progress: { percent: 0, stage: "Preparing pipeline..." },
-    });
+    await db.insert(schema.jobs).values([
+      {
+        id: `${jobId}-s0`,
+        type: "pipeline-step",
+        status: "completed",
+        toolId: "noop",
+        pool: "image",
+        inputRefs: [],
+        outputRefs: [],
+      },
+      {
+        id: jobId,
+        type: "pipeline",
+        status: "processing",
+        toolId: "pipeline",
+        pool: "image",
+        inputRefs: [],
+      },
+      // The client-facing row the SSE replays, stamped with the flow pointer as
+      // routes/pipeline.ts creates it (#771, #2741).
+      {
+        id: clientJobId,
+        type: "single",
+        status: "processing",
+        inputRefs: [],
+        progress: { percent: 0, stage: "Preparing pipeline..." },
+        settings: { pipelineFlowId: jobId },
+      },
+    ]);
 
-    await enqueueToolJob(
+    await getQueue("image").add(
+      "pipeline-finalize",
       toolJob({
         jobId,
         toolId: "pipeline",
@@ -1162,6 +1174,7 @@ describe("pipeline finalize", () => {
         filename: "chain.png",
         clientJobId,
       }),
+      { jobId, attempts: 1 },
     );
 
     // This branch throws instead of writing a failure row, so the BullMQ job
@@ -1224,6 +1237,7 @@ describe("pipeline finalize", () => {
         status: "processing",
         inputRefs: [],
         progress: { percent: 0, stage: "Preparing pipeline..." },
+        settings: { pipelineFlowId: jobId },
       },
     ]);
     await markBatchCanceled(clientJobId);
@@ -1303,6 +1317,7 @@ describe("pipeline finalize", () => {
         status: "processing",
         inputRefs: [],
         progress: { percent: 0, stage: "Preparing pipeline..." },
+        settings: { pipelineFlowId: jobId },
       },
     ]);
 
@@ -1369,6 +1384,7 @@ describe("pipeline finalize", () => {
         status: "processing",
         inputRefs: [],
         progress: { percent: 0, stage: "Preparing pipeline..." },
+        settings: { pipelineFlowId: singleJobId },
       },
     ]);
 

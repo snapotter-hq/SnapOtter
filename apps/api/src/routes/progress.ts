@@ -335,10 +335,20 @@ function singleFileErrorRow(progress: Omit<SingleFileProgress, "type">): {
   };
 }
 
+export type SingleFileProgressInput = Omit<SingleFileProgress, "type"> & {
+  /**
+   * When set, the durable write requires the row's settings.pipelineFlowId to
+   * still equal this flow id (#2741). If a newer pipeline run re-pointed the
+   * clientJobId alias row in the meantime, the stale run's write and
+   * announcement are skipped so the live run's channel is left untouched.
+   */
+  expectedPipelineFlowId?: string;
+};
+
 async function persistSingleFileProgress(
-  progress: Omit<SingleFileProgress, "type">,
+  progress: SingleFileProgressInput,
   executor: Pick<typeof db, "select" | "insert" | "update"> = db,
-): Promise<void> {
+): Promise<boolean> {
   const status =
     progress.phase === "complete"
       ? "completed"
@@ -353,7 +363,7 @@ async function persistSingleFileProgress(
 
   if (existing) {
     const isTerminalFrame = status === "completed" || status === "failed";
-    await executor
+    const res = await executor
       .update(schema.jobs)
       .set({
         status,
@@ -369,34 +379,45 @@ async function persistSingleFileProgress(
       // per-job persist queue, so they cannot rely on ordering the way the
       // completion path does.
       .where(
-        isTerminalFrame
-          ? eq(schema.jobs.id, progress.jobId)
-          : and(
-              eq(schema.jobs.id, progress.jobId),
-              notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
-            ),
+        and(
+          eq(schema.jobs.id, progress.jobId),
+          isTerminalFrame
+            ? undefined
+            : notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
+          progress.expectedPipelineFlowId
+            ? sql`${schema.jobs.settings}->>'pipelineFlowId' = ${progress.expectedPipelineFlowId}`
+            : undefined,
+        ),
       );
-  } else {
-    await executor.insert(schema.jobs).values({
-      id: progress.jobId,
-      type: "single",
-      status,
-      progress: progressJsonb,
-      inputRefs: [],
-      error: progress.error ? singleFileErrorRow(progress) : null,
-    });
+    return progress.expectedPipelineFlowId
+      ? ((res as { rowCount?: number | null } | undefined)?.rowCount ?? 0) > 0
+      : true;
   }
+  if (progress.expectedPipelineFlowId) {
+    return false;
+  }
+  await executor.insert(schema.jobs).values({
+    id: progress.jobId,
+    type: "single",
+    status,
+    progress: progressJsonb,
+    inputRefs: [],
+    error: progress.error ? singleFileErrorRow(progress) : null,
+  });
+  return true;
 }
 
 async function persistDurable(
-  payload: (JobProgress & { type: "batch" }) | SingleFileProgress,
-): Promise<void> {
+  payload:
+    | (JobProgress & { type: "batch" })
+    | (SingleFileProgress & { expectedPipelineFlowId?: string }),
+): Promise<boolean> {
   if (payload.type === "single") {
     const { type: _, ...rest } = payload;
-    await persistSingleFileProgress(rest);
-  } else {
-    await persistJobProgress(payload);
+    return persistSingleFileProgress(rest);
   }
+  await persistJobProgress(payload);
+  return true;
 }
 
 // ── Publish (Redis pub/sub + terminal cache + durable persist) ──
@@ -437,16 +458,29 @@ function announce(payload: (JobProgress & { type: "batch" }) | SingleFileProgres
   });
 }
 
-function publish(payload: (JobProgress & { type: "batch" }) | SingleFileProgress): Promise<void> {
+function publish(
+  payload:
+    | (JobProgress & { type: "batch" })
+    | (SingleFileProgress & { expectedPipelineFlowId?: string }),
+): Promise<void> {
   const isTerminal = isTerminalPayload(payload);
-  if (!isTerminal) {
-    announce(payload);
+  const wirePayload: (JobProgress & { type: "batch" }) | SingleFileProgress =
+    payload.type === "single"
+      ? (({ expectedPipelineFlowId: _, ...rest }) => rest)(payload)
+      : payload;
+  const guardBeforeAnnounce =
+    isTerminal || Boolean(payload.type === "single" && payload.expectedPipelineFlowId);
+  if (!guardBeforeAnnounce) {
+    announce(wirePayload);
   }
 
-  const persisted = enqueuePersist(payload.jobId, () => persistDurable(payload));
-  const durable = isTerminal
+  let applied = false;
+  const persisted = enqueuePersist(payload.jobId, async () => {
+    applied = await persistDurable(payload);
+  });
+  const durable = guardBeforeAnnounce
     ? persisted.then(() => {
-        announce(payload);
+        if (applied) announce(wirePayload);
       })
     : persisted;
   // Nonterminal producers intentionally ignore best-effort persistence. Attach
@@ -469,10 +503,8 @@ export function updateJobProgress(progress: JobProgress): Promise<void> {
 }
 
 /** Publish progress and resolve after its best-effort durable DB write settles. */
-export function updateSingleFileProgress(
-  progress: Omit<SingleFileProgress, "type">,
-): Promise<void> {
-  const event: SingleFileProgress = { ...progress, type: "single" };
+export function updateSingleFileProgress(progress: SingleFileProgressInput): Promise<void> {
+  const event = { ...progress, type: "single" as const };
   return publish(event);
 }
 
@@ -484,19 +516,23 @@ type ProgressTransaction = Pick<typeof db, "select" | "insert" | "update">;
  * earlier nonterminal writes, so late progress cannot overwrite completion.
  */
 export async function updateSingleFileProgressAtomically(
-  progress: Omit<SingleFileProgress, "type">,
+  progress: SingleFileProgressInput,
   mutateAuthoritative: (tx: ProgressTransaction) => Promise<void>,
 ): Promise<void> {
-  const event: SingleFileProgress = { ...progress, type: "single" };
-  const { type: _, ...persisted } = event;
+  const { expectedPipelineFlowId, ...frameFields } = progress;
+  const event: SingleFileProgress = { ...frameFields, type: "single" };
+  let applied = false;
   await enqueuePersist(progress.jobId, () =>
     db.transaction(async (tx) => {
       const executor = tx as unknown as ProgressTransaction;
       await mutateAuthoritative(executor);
-      await persistSingleFileProgress(persisted, executor);
+      applied = await persistSingleFileProgress(
+        { ...frameFields, ...(expectedPipelineFlowId && { expectedPipelineFlowId }) },
+        executor,
+      );
     }),
   );
-  announce(event);
+  if (applied) announce(event);
 }
 
 export interface CompleteBatchJobArgs {
@@ -680,6 +716,8 @@ export async function failBatchJob(args: FailBatchJobArgs): Promise<boolean> {
 export interface FailSingleJobArgs {
   jobId: string;
   message: string;
+  expectedArtifactJobId?: string;
+  expectedPipelineFlowId?: string;
 }
 
 /**
@@ -711,6 +749,12 @@ export async function failSingleJobGuarded(args: FailSingleJobArgs): Promise<voi
         and(
           eq(schema.jobs.id, args.jobId),
           notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
+          args.expectedArtifactJobId
+            ? sql`${schema.jobs.settings}->>'artifactJobId' = ${args.expectedArtifactJobId}`
+            : undefined,
+          args.expectedPipelineFlowId
+            ? sql`${schema.jobs.settings}->>'pipelineFlowId' = ${args.expectedPipelineFlowId}`
+            : undefined,
         ),
       );
     applied = ((res as { rowCount?: number | null } | undefined)?.rowCount ?? 0) > 0;
@@ -725,10 +769,14 @@ export interface CancelSingleJobArgs {
    * settings.artifactJobId to still equal this id. A single-tool cancel
    * resolves the pointer before it settles; if a new run re-pointed the
    * channel in between, the row belongs to a run the user never canceled
-   * and must be left alone (#886). Alias-less callers (pipeline finalize)
-   * omit it.
+   * and must be left alone (#886).
    */
   expectedArtifactJobId?: string;
+  /**
+   * When set, the guarded write additionally requires the row's
+   * settings.pipelineFlowId to still equal this id (#2741).
+   */
+  expectedPipelineFlowId?: string;
 }
 
 /**
@@ -763,6 +811,9 @@ export async function cancelSingleJobGuarded(args: CancelSingleJobArgs): Promise
           notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
           args.expectedArtifactJobId
             ? sql`${schema.jobs.settings}->>'artifactJobId' = ${args.expectedArtifactJobId}`
+            : undefined,
+          args.expectedPipelineFlowId
+            ? sql`${schema.jobs.settings}->>'pipelineFlowId' = ${args.expectedPipelineFlowId}`
             : undefined,
         ),
       );

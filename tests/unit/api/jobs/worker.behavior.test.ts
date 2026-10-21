@@ -2354,6 +2354,9 @@ describe("processPipelineFinalize (#3167, #2703)", () => {
     }));
     const updateSingleFileProgressMock = vi.fn().mockResolvedValue(undefined);
     const updateSingleFileProgressAtomicallyMock = vi.fn();
+    const cancelSingleJobGuardedMock = vi.fn().mockResolvedValue(undefined);
+    const failSingleJobGuardedMock = vi.fn().mockResolvedValue(undefined);
+    const publishEphemeralMock = vi.fn();
     const recordChildOutcomeMock = vi.fn().mockResolvedValue(undefined);
     const reportErrorMock = vi.fn();
     const trackEventMock = vi.fn();
@@ -2401,11 +2404,11 @@ describe("processPipelineFinalize (#3167, #2703)", () => {
       }));
       vi.doMock("../../../../apps/api/src/routes/progress.js", () => ({
         cancelBatchJob: vi.fn(),
-        cancelSingleJobGuarded: vi.fn(),
+        cancelSingleJobGuarded: cancelSingleJobGuardedMock,
         completeBatchJob: vi.fn(),
         failBatchJob: vi.fn(),
-        failSingleJobGuarded: vi.fn(),
-        publishEphemeral: vi.fn(),
+        failSingleJobGuarded: failSingleJobGuardedMock,
+        publishEphemeral: publishEphemeralMock,
         updateSingleFileProgress: updateSingleFileProgressMock,
         updateSingleFileProgressAtomically: updateSingleFileProgressAtomicallyMock,
       }));
@@ -2426,13 +2429,24 @@ describe("processPipelineFinalize (#3167, #2703)", () => {
     const { logger } = await import("../../../../apps/api/src/lib/logger.js");
     workerMod.startWorkers();
     const workerCalls = (Worker as unknown as { mock: { calls: unknown[][] } }).mock.calls;
-    const imageCall = workerCalls.find(([queue]) => String(queue).endsWith("image"));
-    if (!imageCall) throw new Error("image pool worker not registered");
-    const processor = imageCall[1] as (job: unknown) => Promise<unknown>;
+    const imageIdx = workerCalls.findIndex(([queue]) => String(queue).endsWith("image"));
+    if (imageIdx === -1) throw new Error("image pool worker not registered");
+    const processor = workerCalls[imageIdx][1] as (job: unknown) => Promise<unknown>;
+    const workerInstance = (Worker as unknown as { mock: { results: Array<{ value: unknown }> } })
+      .mock.results[imageIdx]?.value as {
+      on: ReturnType<typeof vi.fn>;
+    };
+    const failedListener = workerInstance?.on.mock.calls.find(
+      ([event]: unknown[]) => event === "failed",
+    )?.[1] as ((job: unknown, err: Error) => void) | undefined;
 
     return {
       processor,
+      failedListener,
       dbUpdateMock,
+      cancelSingleJobGuardedMock,
+      failSingleJobGuardedMock,
+      publishEphemeralMock,
       updateSingleFileProgressMock,
       updateSingleFileProgressAtomicallyMock,
       recordChildOutcomeMock,
@@ -2500,6 +2514,7 @@ describe("processPipelineFinalize (#3167, #2703)", () => {
         code: "ENGINE_UNAVAILABLE",
         details: "Check QPDF_PATH",
         httpStatus: 503,
+        expectedPipelineFlowId: "pf-1",
       },
       expect.any(Function),
     );
@@ -2706,6 +2721,168 @@ describe("processPipelineFinalize (#3167, #2703)", () => {
       });
     },
   );
+
+  it("passes expectedPipelineFlowId on alias writes across completion, cancel, and the failed-handler safety net (#2741)", async () => {
+    const {
+      processor,
+      failedListener,
+      cancelSingleJobGuardedMock,
+      failSingleJobGuardedMock,
+      publishEphemeralMock,
+      updateSingleFileProgressAtomicallyMock,
+    } = await setupPipelineFinalizeProcessor({
+      "pf-done-s0": {
+        id: "pf-done-s0",
+        status: "completed",
+        toolId: "resize",
+        bytesIn: 100,
+        bytesOut: 80,
+        outputRefs: ["outputs/pf-done-s0/out.png"],
+        progress: { percent: 100, stage: "complete" },
+      },
+      "pf-cancel-s0": {
+        id: "pf-cancel-s0",
+        status: "canceled",
+        toolId: "resize",
+        error: { message: "Canceled" },
+      },
+      "pf-fail-s0": {
+        id: "pf-fail-s0",
+        status: "failed",
+        toolId: "resize",
+        error: { message: "boom" },
+      },
+    });
+    objectStorageMocks.getObjectBuffer.mockResolvedValueOnce(Buffer.from("png"));
+    objectStorageMocks.putObject.mockResolvedValue(undefined);
+    updateSingleFileProgressAtomicallyMock.mockResolvedValueOnce(undefined);
+
+    await processor({
+      id: "pf-done",
+      name: "pipeline-finalize",
+      data: {
+        kind: "pipeline-finalize",
+        jobId: "pf-done",
+        clientJobId: "pfc-done",
+        toolId: "pipeline",
+        userId: null,
+        pool: "image",
+        totalSteps: 1,
+        inputRefs: [],
+        filename: "out.png",
+        settings: {},
+      },
+    });
+    expect(updateSingleFileProgressAtomicallyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobId: "pfc-done",
+        phase: "complete",
+        expectedPipelineFlowId: "pf-done",
+      }),
+      expect.any(Function),
+    );
+
+    await processor({
+      id: "pf-cancel",
+      name: "pipeline-finalize",
+      data: {
+        kind: "pipeline-finalize",
+        jobId: "pf-cancel",
+        clientJobId: "pfc-cancel",
+        toolId: "pipeline",
+        userId: null,
+        pool: "image",
+        totalSteps: 1,
+        inputRefs: [],
+        filename: "out.png",
+        settings: {},
+      },
+    });
+    expect(cancelSingleJobGuardedMock).toHaveBeenNthCalledWith(1, { jobId: "pf-cancel" });
+    expect(cancelSingleJobGuardedMock).toHaveBeenNthCalledWith(2, {
+      jobId: "pfc-cancel",
+      expectedPipelineFlowId: "pf-cancel",
+    });
+    expect(publishEphemeralMock).not.toHaveBeenCalled();
+
+    cancelSingleJobGuardedMock.mockClear();
+    cancelSingleJobGuardedMock
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("alias write fault"));
+    await processor({
+      id: "pf-cancel",
+      name: "pipeline-finalize",
+      data: {
+        kind: "pipeline-finalize",
+        jobId: "pf-cancel",
+        clientJobId: "pfc-cancel",
+        toolId: "pipeline",
+        userId: null,
+        pool: "image",
+        totalSteps: 1,
+        inputRefs: [],
+        filename: "out.png",
+        settings: {},
+      },
+    });
+    expect(publishEphemeralMock).toHaveBeenCalledWith({
+      jobId: "pfc-cancel",
+      type: "single",
+      phase: "failed",
+      percent: 0,
+      error: "Canceled",
+    });
+
+    cancelSingleJobGuardedMock.mockClear();
+    failSingleJobGuardedMock.mockClear();
+    failedListener?.(
+      {
+        id: "pf-cancel",
+        data: {
+          kind: "pipeline-finalize",
+          jobId: "pf-cancel",
+          clientJobId: "pfc-cancel",
+          toolId: "pipeline",
+          pool: "image",
+          totalSteps: 1,
+        },
+      },
+      new Error("stalled"),
+    );
+    await vi.waitFor(() => {
+      expect(cancelSingleJobGuardedMock).toHaveBeenCalledWith({
+        jobId: "pfc-cancel",
+        expectedPipelineFlowId: "pf-cancel",
+      });
+      expect(cancelSingleJobGuardedMock).toHaveBeenCalledWith({ jobId: "pf-cancel" });
+    });
+
+    failedListener?.(
+      {
+        id: "pf-fail",
+        data: {
+          kind: "pipeline-finalize",
+          jobId: "pf-fail",
+          clientJobId: "pfc-fail",
+          toolId: "pipeline",
+          pool: "image",
+          totalSteps: 1,
+        },
+      },
+      new Error("stalled"),
+    );
+    await vi.waitFor(() => {
+      expect(failSingleJobGuardedMock).toHaveBeenCalledWith({
+        jobId: "pfc-fail",
+        message: "Pipeline processing failed",
+        expectedPipelineFlowId: "pf-fail",
+      });
+      expect(failSingleJobGuardedMock).toHaveBeenCalledWith({
+        jobId: "pf-fail",
+        message: "Pipeline processing failed",
+      });
+    });
+  });
 });
 
 describe("contentTypeForFilename (#2703)", () => {

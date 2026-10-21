@@ -14,6 +14,7 @@ const stubs = vi.hoisted(() => ({
   publishes: [] as string[],
   removeError: null as Error | null,
   rowUpdates: 0,
+  selectRows: [] as Array<Record<string, unknown>>,
   state: "waiting" as "waiting" | "active",
   finalizeKeys: new Map<string, string>(),
 }));
@@ -23,7 +24,14 @@ vi.mock("../../../../apps/api/src/db/index.js", async (importOriginal) => {
   return {
     ...actual,
     db: {
-      select: () => ({ from: () => ({ where: async () => [] }) }),
+      select: () => ({
+        from: () => ({
+          where: async () => {
+            const next = stubs.selectRows.shift();
+            return next ? [next] : [];
+          },
+        }),
+      }),
       update: () => ({
         set: () => ({
           where: async () => {
@@ -36,8 +44,10 @@ vi.mock("../../../../apps/api/src/db/index.js", async (importOriginal) => {
   };
 });
 
+const cancelSingleJobGuardedMock = vi.hoisted(() => vi.fn());
+
 vi.mock("../../../../apps/api/src/routes/progress.js", () => ({
-  cancelSingleJobGuarded: vi.fn(),
+  cancelSingleJobGuarded: cancelSingleJobGuardedMock,
 }));
 
 vi.mock("../../../../apps/api/src/jobs/batch-progress.js", () => ({
@@ -144,5 +154,27 @@ describe("requestCancel when remove() races the worker lock (#889)", () => {
     await expect(requestCancel("j-repeat")).resolves.toBe(true);
     await expect(requestCancel("j-repeat")).resolves.toBe(true);
     expect(stubs.publishes).toEqual(["j-repeat", "j-repeat"]);
+  });
+
+  it("passes expectedPipelineFlowId when healing a nonterminal pipeline alias over a canceled flow (#2741)", async () => {
+    cancelSingleJobGuardedMock.mockClear();
+    stubs.selectRows = [
+      {
+        type: "single",
+        toolId: null,
+        status: "processing",
+        settings: { pipelineFlowId: "flow-1" },
+      },
+      {
+        status: "canceled",
+        settings: { stepCount: 1, clientJobId: "alias-1" },
+      },
+    ];
+
+    await expect(requestCancel("alias-1")).resolves.toBe(true);
+    expect(cancelSingleJobGuardedMock).toHaveBeenCalledWith({
+      jobId: "alias-1",
+      expectedPipelineFlowId: "flow-1",
+    });
   });
 });

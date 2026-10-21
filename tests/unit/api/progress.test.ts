@@ -8,8 +8,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const dbMocks = vi.hoisted(() => ({
   failure: null as Error | null,
+  existing: [] as Array<Record<string, unknown>>,
+  rowCount: 1 as number | null,
   inserted: [] as Array<Record<string, unknown>>,
   updated: [] as Array<Record<string, unknown>>,
+  whereClauses: [] as unknown[],
 }));
 
 const redisMocks = vi.hoisted(() => ({
@@ -31,7 +34,7 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
         from: () => ({
           where: async () => {
             if (dbMocks.failure) throw dbMocks.failure;
-            return [];
+            return dbMocks.existing;
           },
         }),
       }),
@@ -43,9 +46,11 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
       }),
       update: () => ({
         set: (values: Record<string, unknown>) => ({
-          where: async () => {
+          where: async (clause: unknown) => {
             if (dbMocks.failure) throw dbMocks.failure;
             dbMocks.updated.push(values);
+            dbMocks.whereClauses.push(clause);
+            return { rowCount: dbMocks.rowCount };
           },
         }),
       }),
@@ -58,7 +63,7 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
   pool: {},
   closeDb: async () => {},
   schema: {
-    jobs: { id: {}, status: {} },
+    jobs: { id: {}, status: {}, settings: {} },
   },
 }));
 
@@ -70,7 +75,9 @@ import type { JobProgress } from "../../../apps/api/src/routes/progress.js";
 import {
   buildPersistedSingleFileProgress,
   buildSingleFileReplayEvent,
+  cancelSingleJobGuarded,
   clearTerminalReplayKey,
+  failSingleJobGuarded,
   refreshFeatureInstallStream,
   updateJobProgress,
   updateSingleFileProgress,
@@ -557,5 +564,136 @@ describe("refreshFeatureInstallStream (#2819)", () => {
     } finally {
       process.off("unhandledRejection", unhandled);
     }
+  });
+});
+
+describe("expectedPipelineFlowId pointer guard (#2741)", () => {
+  beforeEach(() => {
+    dbMocks.failure = null;
+    dbMocks.existing = [{ id: "alias-1" }];
+    dbMocks.rowCount = 1;
+    dbMocks.inserted = [];
+    dbMocks.updated = [];
+    dbMocks.whereClauses = [];
+    redisMocks.setex.mockClear();
+    redisMocks.publish.mockClear();
+  });
+
+  afterEach(() => {
+    dbMocks.existing = [];
+    dbMocks.rowCount = 1;
+  });
+
+  it("guards failSingleJobGuarded and cancelSingleJobGuarded on expectedPipelineFlowId and skips announcement when re-pointed", async () => {
+    dbMocks.rowCount = 0;
+    await failSingleJobGuarded({
+      jobId: "alias-1",
+      message: "Pipeline processing failed",
+      expectedPipelineFlowId: "flow-1",
+    });
+    expect(JSON.stringify(dbMocks.whereClauses.at(-1))).toContain("pipelineFlowId");
+    expect(JSON.stringify(dbMocks.whereClauses.at(-1))).toContain("flow-1");
+    expect(redisMocks.setex).not.toHaveBeenCalled();
+    expect(redisMocks.publish).not.toHaveBeenCalled();
+
+    await cancelSingleJobGuarded({
+      jobId: "alias-1",
+      expectedPipelineFlowId: "flow-1",
+    });
+    expect(JSON.stringify(dbMocks.whereClauses.at(-1))).toContain("pipelineFlowId");
+    expect(JSON.stringify(dbMocks.whereClauses.at(-1))).toContain("flow-1");
+    expect(redisMocks.setex).not.toHaveBeenCalled();
+    expect(redisMocks.publish).not.toHaveBeenCalled();
+
+    dbMocks.rowCount = 1;
+    await failSingleJobGuarded({
+      jobId: "alias-1",
+      message: "Pipeline processing failed",
+      expectedPipelineFlowId: "flow-1",
+    });
+    expect(redisMocks.setex).toHaveBeenCalledTimes(1);
+    await Promise.resolve();
+    expect(redisMocks.publish).toHaveBeenCalledTimes(1);
+  });
+
+  it("guards updateSingleFileProgressAtomically and updateSingleFileProgress on expectedPipelineFlowId, strips it from the wire frame, and skips insert or announcement when unmatched", async () => {
+    const mutateAuthoritative = vi.fn().mockResolvedValue(undefined);
+    dbMocks.rowCount = 0;
+
+    await updateSingleFileProgressAtomically(
+      {
+        jobId: "alias-1",
+        phase: "complete",
+        percent: 100,
+        stage: "complete",
+        result: { downloadUrl: "/api/v1/download/flow-1/out.png" },
+        expectedPipelineFlowId: "flow-1",
+      },
+      mutateAuthoritative,
+    );
+    expect(mutateAuthoritative).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(dbMocks.whereClauses.at(-1))).toContain("pipelineFlowId");
+    expect(JSON.stringify(dbMocks.whereClauses.at(-1))).toContain("flow-1");
+    expect(redisMocks.setex).not.toHaveBeenCalled();
+    expect(redisMocks.publish).not.toHaveBeenCalled();
+
+    // Missing alias row with expectedPipelineFlowId must not insert a pointerless row.
+    dbMocks.existing = [];
+    dbMocks.rowCount = 1;
+    await updateSingleFileProgress({
+      jobId: "alias-missing",
+      phase: "failed",
+      percent: 0,
+      error: "Step 1: boom",
+      expectedPipelineFlowId: "flow-1",
+    });
+    expect(dbMocks.inserted).toHaveLength(0);
+    expect(redisMocks.setex).not.toHaveBeenCalled();
+    expect(redisMocks.publish).not.toHaveBeenCalled();
+
+    // Matching alias row persists and announces without leaking expectedPipelineFlowId onto the wire.
+    dbMocks.existing = [{ id: "alias-1" }];
+    dbMocks.rowCount = 1;
+    await updateSingleFileProgressAtomically(
+      {
+        jobId: "alias-1",
+        phase: "complete",
+        percent: 100,
+        stage: "complete",
+        result: { downloadUrl: "/api/v1/download/flow-1/out.png" },
+        expectedPipelineFlowId: "flow-1",
+      },
+      mutateAuthoritative,
+    );
+    expect(redisMocks.setex).toHaveBeenCalledTimes(1);
+    const cachedJson = (redisMocks.setex.mock.calls[0] as unknown[])[2] as string;
+    expect(JSON.parse(cachedJson)).not.toHaveProperty("expectedPipelineFlowId");
+    await Promise.resolve();
+    expect(redisMocks.publish).toHaveBeenCalledTimes(1);
+
+    // Nonterminal updateSingleFileProgress with expectedPipelineFlowId waits for the guarded DB update and strips expectedPipelineFlowId from the wire payload.
+    redisMocks.setex.mockClear();
+    redisMocks.publish.mockClear();
+    dbMocks.rowCount = 0;
+    await updateSingleFileProgress({
+      jobId: "alias-1",
+      phase: "processing",
+      percent: 45,
+      stage: "Step 1/2: resize",
+      expectedPipelineFlowId: "flow-1",
+    });
+    expect(redisMocks.publish).not.toHaveBeenCalled();
+
+    dbMocks.rowCount = 1;
+    await updateSingleFileProgress({
+      jobId: "alias-1",
+      phase: "processing",
+      percent: 45,
+      stage: "Step 1/2: resize",
+      expectedPipelineFlowId: "flow-1",
+    });
+    expect(redisMocks.publish).toHaveBeenCalledTimes(1);
+    const publishedJson = (redisMocks.publish.mock.calls[0] as unknown[])[1] as string;
+    expect(JSON.parse(publishedJson)).not.toHaveProperty("expectedPipelineFlowId");
   });
 });
