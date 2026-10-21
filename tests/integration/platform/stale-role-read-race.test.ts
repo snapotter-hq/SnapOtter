@@ -1,8 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { existsSync } from "node:fs";
+import { mkdir, rm, writeFile } from "node:fs/promises";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
-import { hashPassword } from "../../../apps/api/src/plugins/auth.js";
+import { getStoredFilePath } from "../../../apps/api/src/lib/file-storage.js";
+import { ensureAnonymousUser, hashPassword } from "../../../apps/api/src/plugins/auth.js";
 
 const originalLastAdmin = await vi.importActual("../../../apps/api/src/lib/last-admin.js");
 
@@ -1080,5 +1084,681 @@ describe("Stale role reads during concurrent operations", () => {
       error: "User not found",
       code: "NOT_FOUND",
     });
+  });
+
+  it("PUT /api/auth/users/:id checks in-transaction authority before returning 400 LAST_ADMIN (#2743)", async () => {
+    const suffix = randomUUID().slice(0, 8);
+    const [team] = await db.select().from(schema.teams).limit(1);
+
+    const priorAdmins = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(and(eq(schema.users.role, "admin"), ne(schema.users.id, "anonymous")));
+    const priorAdminIds = priorAdmins.map((u) => u.id);
+
+    if (priorAdminIds.length > 0) {
+      await db
+        .update(schema.users)
+        .set({ role: "user" })
+        .where(inArray(schema.users.id, priorAdminIds));
+    }
+
+    const createdUserIds: string[] = [];
+    try {
+      // 1. Acting admin2 is demoted to user (or deleted) right before assertNotLastAdmin
+      // runs, leaving admin1 as the sole admin while admin2 has lost authority.
+      const admin1Id = randomUUID();
+      const admin2Id = randomUUID();
+      const admin3Id = randomUUID();
+      createdUserIds.push(admin1Id, admin2Id, admin3Id);
+      await db.insert(schema.users).values([
+        {
+          id: admin1Id,
+          username: `sole-put-admin1-${suffix}`,
+          passwordHash: await hashPassword("Password123!"),
+          role: "admin",
+          team: team.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          mustChangePassword: false,
+        },
+        {
+          id: admin2Id,
+          username: `acting-put-admin2-${suffix}`,
+          passwordHash: await hashPassword("Password123!"),
+          role: "admin",
+          team: team.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          mustChangePassword: false,
+        },
+        {
+          id: admin3Id,
+          username: `deleted-put-admin3-${suffix}`,
+          passwordHash: await hashPassword("Password123!"),
+          role: "admin",
+          team: team.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          mustChangePassword: false,
+        },
+      ]);
+
+      const admin2Login = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username: `acting-put-admin2-${suffix}`, password: "Password123!" },
+      });
+      const admin2Token = admin2Login.cookies?.find(
+        (c: { name: string; value: string }) => c.name === "snapotter-session",
+      )?.value;
+
+      const admin3Login = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username: `deleted-put-admin3-${suffix}`, password: "Password123!" },
+      });
+      const admin3Token = admin3Login.cookies?.find(
+        (c: { name: string; value: string }) => c.name === "snapotter-session",
+      )?.value;
+
+      interceptFn = async (_tx, id) => {
+        if (id === admin1Id) {
+          await db
+            .update(schema.users)
+            .set({ role: "user" })
+            .where(inArray(schema.users.id, [admin2Id, admin3Id]));
+        }
+      };
+
+      const demotedActorRes = await testApp.app.inject({
+        method: "PUT",
+        url: `/api/auth/users/${admin1Id}`,
+        headers: { cookie: `snapotter-session=${admin2Token}` },
+        payload: { role: "user" },
+      });
+      expect(demotedActorRes.statusCode).toBe(403);
+      expect(JSON.parse(demotedActorRes.body)).toEqual({
+        error: "Cannot manage a user beyond your role authority",
+        code: "ESCALATION_DENIED",
+      });
+
+      await db.update(schema.users).set({ role: "admin" }).where(eq(schema.users.id, admin3Id));
+      interceptFn = async (_tx, id) => {
+        if (id === admin1Id) {
+          await db.delete(schema.users).where(eq(schema.users.id, admin3Id));
+        }
+      };
+
+      const deletedActorRes = await testApp.app.inject({
+        method: "PUT",
+        url: `/api/auth/users/${admin1Id}`,
+        headers: { cookie: `snapotter-session=${admin3Token}` },
+        payload: { role: "user" },
+      });
+      expect(deletedActorRes.statusCode).toBe(403);
+      expect(JSON.parse(deletedActorRes.body)).toEqual({
+        error: "Cannot manage a user beyond your role authority",
+        code: "ESCALATION_DENIED",
+      });
+
+      const [admin1After] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.id, admin1Id));
+      expect(admin1After.role).toBe("admin");
+
+      // 2. Custom user-manager updates subordinate bob, who is promoted to the sole
+      // remaining admin right before assertNotLastAdmin runs.
+      const leadRoleName = `lead-put-last-${suffix}`;
+      const subRoleName = `sub-put-last-${suffix}`;
+      const nextSubRoleName = `next-sub-put-last-${suffix}`;
+      await db.insert(schema.roles).values([
+        {
+          id: randomUUID(),
+          name: leadRoleName,
+          description: "Scoped user manager",
+          permissions: ["tools:use", "users:manage"],
+          isBuiltin: false,
+        },
+        {
+          id: randomUUID(),
+          name: subRoleName,
+          description: "Subordinate role",
+          permissions: ["tools:use"],
+          isBuiltin: false,
+        },
+        {
+          id: randomUUID(),
+          name: nextSubRoleName,
+          description: "Second subordinate role",
+          permissions: ["tools:use"],
+          isBuiltin: false,
+        },
+      ]);
+
+      const leadId = randomUUID();
+      const bobId = randomUUID();
+      createdUserIds.push(leadId, bobId);
+      await db.insert(schema.users).values([
+        {
+          id: leadId,
+          username: `lead-put-${suffix}`,
+          passwordHash: await hashPassword("Password123!"),
+          role: leadRoleName,
+          team: team.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          mustChangePassword: false,
+        },
+        {
+          id: bobId,
+          username: `bob-put-${suffix}`,
+          passwordHash: await hashPassword("Password123!"),
+          role: subRoleName,
+          team: team.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          mustChangePassword: false,
+        },
+      ]);
+
+      const leadLogin = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username: `lead-put-${suffix}`, password: "Password123!" },
+      });
+      const leadToken = leadLogin.cookies?.find(
+        (c: { name: string; value: string }) => c.name === "snapotter-session",
+      )?.value;
+
+      interceptFn = async (_tx, id) => {
+        if (id === bobId) {
+          await db.update(schema.users).set({ role: "user" }).where(eq(schema.users.id, admin1Id));
+          await db.update(schema.users).set({ role: "admin" }).where(eq(schema.users.id, bobId));
+        }
+      };
+
+      const promotedTargetRes = await testApp.app.inject({
+        method: "PUT",
+        url: `/api/auth/users/${bobId}`,
+        headers: { cookie: `snapotter-session=${leadToken}` },
+        payload: { role: nextSubRoleName },
+      });
+      expect(promotedTargetRes.statusCode).toBe(403);
+      expect(JSON.parse(promotedTargetRes.body)).toEqual({
+        error: "Cannot manage a user beyond your role authority",
+        code: "ESCALATION_DENIED",
+      });
+
+      const [bobAfter] = await db.select().from(schema.users).where(eq(schema.users.id, bobId));
+      expect(bobAfter.role).toBe("admin");
+
+      // 3. When the actor retains admin authority (e.g. the synthetic anonymous admin)
+      // and the target is the sole real admin, UNKNOWN_ROLE and UNKNOWN_TEAM still
+      // precede 400 LAST_ADMIN, and 400 LAST_ADMIN is returned when role/team are valid.
+      interceptFn = null;
+      await ensureAnonymousUser();
+      const anonSessionId = randomUUID();
+      await db.insert(schema.sessions).values({
+        id: anonSessionId,
+        userId: "anonymous",
+        expiresAt: new Date(Date.now() + 3600_000),
+      });
+
+      beforeTransactionFn = async () => {
+        await db.delete(schema.roles).where(eq(schema.roles.name, nextSubRoleName));
+      };
+      const unknownRoleRes = await testApp.app.inject({
+        method: "PUT",
+        url: `/api/auth/users/${bobId}`,
+        headers: { cookie: `snapotter-session=${anonSessionId}` },
+        payload: { role: nextSubRoleName },
+      });
+      expect(unknownRoleRes.statusCode).toBe(400);
+      expect(JSON.parse(unknownRoleRes.body)).toEqual({
+        error: "Role not found",
+        code: "UNKNOWN_ROLE",
+      });
+
+      const ephemeralTeamId = randomUUID();
+      await db.insert(schema.teams).values({
+        id: ephemeralTeamId,
+        name: `ephemeral-team-${suffix}`,
+        createdAt: new Date(),
+      });
+      beforeTransactionFn = async () => {
+        await db.delete(schema.teams).where(eq(schema.teams.id, ephemeralTeamId));
+      };
+      const unknownTeamRes = await testApp.app.inject({
+        method: "PUT",
+        url: `/api/auth/users/${bobId}`,
+        headers: { cookie: `snapotter-session=${anonSessionId}` },
+        payload: { role: "user", team: ephemeralTeamId },
+      });
+      expect(unknownTeamRes.statusCode).toBe(400);
+      expect(JSON.parse(unknownTeamRes.body)).toEqual({
+        error: "Team not found",
+        code: "UNKNOWN_TEAM",
+      });
+
+      const lastAdminRes = await testApp.app.inject({
+        method: "PUT",
+        url: `/api/auth/users/${bobId}`,
+        headers: { cookie: `snapotter-session=${anonSessionId}` },
+        payload: { role: "user" },
+      });
+      expect(lastAdminRes.statusCode).toBe(400);
+      expect(JSON.parse(lastAdminRes.body)).toEqual({
+        error: "Cannot demote the last admin",
+        code: "LAST_ADMIN",
+      });
+    } finally {
+      interceptFn = null;
+      beforeTransactionFn = null;
+      await db.delete(schema.users).where(eq(schema.users.id, "anonymous"));
+      if (createdUserIds.length > 0) {
+        await db.delete(schema.users).where(inArray(schema.users.id, createdUserIds));
+      }
+      if (priorAdminIds.length > 0) {
+        await db
+          .update(schema.users)
+          .set({ role: "admin" })
+          .where(inArray(schema.users.id, priorAdminIds));
+      }
+    }
+  });
+
+  it("DELETE /api/auth/users/:id checks in-transaction authority before returning 400 LAST_ADMIN in both transactions (#2743)", async () => {
+    const suffix = randomUUID().slice(0, 8);
+    const [team] = await db.select().from(schema.teams).limit(1);
+
+    const priorAdmins = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(and(eq(schema.users.role, "admin"), ne(schema.users.id, "anonymous")));
+    const priorAdminIds = priorAdmins.map((u) => u.id);
+
+    if (priorAdminIds.length > 0) {
+      await db
+        .update(schema.users)
+        .set({ role: "user" })
+        .where(inArray(schema.users.id, priorAdminIds));
+    }
+
+    const createdUserIds: string[] = [];
+    let storedPathToClean: string | null = null;
+    try {
+      const leadRoleName = `lead-del-last-${suffix}`;
+      const subRoleName = `sub-del-last-${suffix}`;
+      await db.insert(schema.roles).values([
+        {
+          id: randomUUID(),
+          name: leadRoleName,
+          description: "Scoped user manager for delete",
+          permissions: ["tools:use", "users:manage"],
+          isBuiltin: false,
+        },
+        {
+          id: randomUUID(),
+          name: subRoleName,
+          description: "Subordinate role for delete",
+          permissions: ["tools:use"],
+          isBuiltin: false,
+        },
+      ]);
+
+      // 1. Pre-storage transaction (txCount === 1): acting admin2 is demoted to user
+      // (or admin3 is deleted) leaving admin1 as the sole admin, and admin1's stored
+      // library file on disk is preserved because tx 1 aborts before deleteLibraryFileStorage.
+      const admin1Id = randomUUID();
+      const admin2Id = randomUUID();
+      const admin3Id = randomUUID();
+      createdUserIds.push(admin1Id, admin2Id, admin3Id);
+      await db.insert(schema.users).values([
+        {
+          id: admin1Id,
+          username: `sole-del-admin1-${suffix}`,
+          passwordHash: await hashPassword("Password123!"),
+          role: "admin",
+          team: team.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          mustChangePassword: false,
+        },
+        {
+          id: admin2Id,
+          username: `acting-del-admin2-${suffix}`,
+          passwordHash: await hashPassword("Password123!"),
+          role: "admin",
+          team: team.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          mustChangePassword: false,
+        },
+        {
+          id: admin3Id,
+          username: `deleted-del-admin3-${suffix}`,
+          passwordHash: await hashPassword("Password123!"),
+          role: "admin",
+          team: team.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          mustChangePassword: false,
+        },
+      ]);
+
+      const storedName = `keep-on-pretx-abort-${suffix}.png`;
+      storedPathToClean = getStoredFilePath(storedName);
+      await mkdir(env.FILES_STORAGE_PATH, { recursive: true });
+      await writeFile(storedPathToClean, "library-file-bytes");
+      await db.insert(schema.userFiles).values({
+        id: randomUUID(),
+        userId: admin1Id,
+        originalName: "keep.png",
+        storedName,
+        mimeType: "image/png",
+        size: 18,
+        createdAt: new Date(),
+      });
+
+      const admin2Login = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username: `acting-del-admin2-${suffix}`, password: "Password123!" },
+      });
+      const admin2Token = admin2Login.cookies?.find(
+        (c: { name: string; value: string }) => c.name === "snapotter-session",
+      )?.value;
+
+      const admin3Login = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username: `deleted-del-admin3-${suffix}`, password: "Password123!" },
+      });
+      const admin3Token = admin3Login.cookies?.find(
+        (c: { name: string; value: string }) => c.name === "snapotter-session",
+      )?.value;
+
+      let txCount1 = 0;
+      interceptFn = async (_tx, id) => {
+        if (id === admin1Id) {
+          txCount1 += 1;
+          if (txCount1 === 1) {
+            await db
+              .update(schema.users)
+              .set({ role: "user" })
+              .where(inArray(schema.users.id, [admin2Id, admin3Id]));
+          }
+        }
+      };
+
+      const preTxActorDemotedRes = await testApp.app.inject({
+        method: "DELETE",
+        url: `/api/auth/users/${admin1Id}`,
+        headers: { cookie: `snapotter-session=${admin2Token}` },
+      });
+      expect(preTxActorDemotedRes.statusCode).toBe(403);
+      expect(JSON.parse(preTxActorDemotedRes.body)).toEqual({
+        error: "Cannot manage a user beyond your role authority",
+        code: "ESCALATION_DENIED",
+      });
+      expect(txCount1).toBe(1);
+      expect(existsSync(storedPathToClean)).toBe(true);
+
+      await db.update(schema.users).set({ role: "admin" }).where(eq(schema.users.id, admin3Id));
+      let txCount1b = 0;
+      interceptFn = async (_tx, id) => {
+        if (id === admin1Id) {
+          txCount1b += 1;
+          if (txCount1b === 1) {
+            await db.delete(schema.users).where(eq(schema.users.id, admin3Id));
+          }
+        }
+      };
+
+      const preTxActorDeletedRes = await testApp.app.inject({
+        method: "DELETE",
+        url: `/api/auth/users/${admin1Id}`,
+        headers: { cookie: `snapotter-session=${admin3Token}` },
+      });
+      expect(preTxActorDeletedRes.statusCode).toBe(403);
+      expect(JSON.parse(preTxActorDeletedRes.body)).toEqual({
+        error: "Cannot manage a user beyond your role authority",
+        code: "ESCALATION_DENIED",
+      });
+      expect(txCount1b).toBe(1);
+      expect(existsSync(storedPathToClean)).toBe(true);
+
+      // 2. Pre-storage transaction (txCount === 1): custom manager deletes subordinate bob,
+      // who is promoted to the sole admin before the first transaction runs.
+      const leadId = randomUUID();
+      const bobId = randomUUID();
+      createdUserIds.push(leadId, bobId);
+      await db.insert(schema.users).values([
+        {
+          id: leadId,
+          username: `lead-del-${suffix}`,
+          passwordHash: await hashPassword("Password123!"),
+          role: leadRoleName,
+          team: team.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          mustChangePassword: false,
+        },
+        {
+          id: bobId,
+          username: `bob-del-${suffix}`,
+          passwordHash: await hashPassword("Password123!"),
+          role: subRoleName,
+          team: team.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          mustChangePassword: false,
+        },
+      ]);
+
+      const leadLogin = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username: `lead-del-${suffix}`, password: "Password123!" },
+      });
+      const leadToken = leadLogin.cookies?.find(
+        (c: { name: string; value: string }) => c.name === "snapotter-session",
+      )?.value;
+
+      let txCount2 = 0;
+      interceptFn = async (_tx, id) => {
+        if (id === bobId) {
+          txCount2 += 1;
+          if (txCount2 === 1) {
+            await db
+              .update(schema.users)
+              .set({ role: "user" })
+              .where(eq(schema.users.id, admin1Id));
+            await db.update(schema.users).set({ role: "admin" }).where(eq(schema.users.id, bobId));
+          }
+        }
+      };
+
+      const preTxTargetPromotedRes = await testApp.app.inject({
+        method: "DELETE",
+        url: `/api/auth/users/${bobId}`,
+        headers: { cookie: `snapotter-session=${leadToken}` },
+      });
+      expect(preTxTargetPromotedRes.statusCode).toBe(403);
+      expect(JSON.parse(preTxTargetPromotedRes.body)).toEqual({
+        error: "Cannot manage a user beyond your role authority",
+        code: "ESCALATION_DENIED",
+      });
+      expect(txCount2).toBe(1);
+
+      // 3. Final transaction (txCount === 2): restore admin1 and admin2 as admins (plus bob
+      // is currently admin, so 3 admins exist during txCount === 1). On txCount === 2,
+      // demote admin2 and bob to user so admin1 is the sole admin and admin2 lost authority.
+      await db
+        .update(schema.users)
+        .set({ role: "admin" })
+        .where(inArray(schema.users.id, [admin1Id, admin2Id, bobId]));
+
+      let txCount3 = 0;
+      interceptFn = async (_tx, id) => {
+        if (id === admin1Id) {
+          txCount3 += 1;
+          if (txCount3 === 2) {
+            await db
+              .update(schema.users)
+              .set({ role: "user" })
+              .where(inArray(schema.users.id, [admin2Id, bobId]));
+          }
+        }
+      };
+
+      const finalTxActorDemotedRes = await testApp.app.inject({
+        method: "DELETE",
+        url: `/api/auth/users/${admin1Id}`,
+        headers: { cookie: `snapotter-session=${admin2Token}` },
+      });
+      expect(finalTxActorDemotedRes.statusCode).toBe(403);
+      expect(JSON.parse(finalTxActorDemotedRes.body)).toEqual({
+        error: "Cannot manage a user beyond your role authority",
+        code: "ESCALATION_DENIED",
+      });
+      expect(txCount3).toBe(2);
+
+      // 4. Final transaction (txCount === 2): bob is subRoleName during txCount === 1 while
+      // admin1 is admin. On txCount === 2, promote bob to admin and demote admin1 to user so
+      // bob becomes the sole admin and beyond lead's authority.
+      await db.update(schema.users).set({ role: subRoleName }).where(eq(schema.users.id, bobId));
+      let txCount4 = 0;
+      interceptFn = async (_tx, id) => {
+        if (id === bobId) {
+          txCount4 += 1;
+          if (txCount4 === 2) {
+            await db
+              .update(schema.users)
+              .set({ role: "user" })
+              .where(eq(schema.users.id, admin1Id));
+            await db.update(schema.users).set({ role: "admin" }).where(eq(schema.users.id, bobId));
+          }
+        }
+      };
+
+      const finalTxTargetPromotedRes = await testApp.app.inject({
+        method: "DELETE",
+        url: `/api/auth/users/${bobId}`,
+        headers: { cookie: `snapotter-session=${leadToken}` },
+      });
+      expect(finalTxTargetPromotedRes.statusCode).toBe(403);
+      expect(JSON.parse(finalTxTargetPromotedRes.body)).toEqual({
+        error: "Cannot manage a user beyond your role authority",
+        code: "ESCALATION_DENIED",
+      });
+      expect(txCount4).toBe(2);
+
+      const [bobAfter] = await db.select().from(schema.users).where(eq(schema.users.id, bobId));
+      expect(bobAfter).toBeDefined();
+      expect(bobAfter.role).toBe("admin");
+
+      // 5. When the actor retains admin authority (e.g. the synthetic anonymous admin)
+      // and the target is the sole real admin (both in tx 1 and when becoming the sole
+      // admin in tx 2), 400 LAST_ADMIN is returned.
+      interceptFn = null;
+      await ensureAnonymousUser();
+      const anonSessionId = randomUUID();
+      await db.insert(schema.sessions).values({
+        id: anonSessionId,
+        userId: "anonymous",
+        expiresAt: new Date(Date.now() + 3600_000),
+      });
+
+      const preTxLastAdminRes = await testApp.app.inject({
+        method: "DELETE",
+        url: `/api/auth/users/${bobId}`,
+        headers: { cookie: `snapotter-session=${anonSessionId}` },
+      });
+      expect(preTxLastAdminRes.statusCode).toBe(400);
+      expect(JSON.parse(preTxLastAdminRes.body)).toEqual({
+        error: "Cannot delete the last admin",
+        code: "LAST_ADMIN",
+      });
+
+      await db.update(schema.users).set({ role: "admin" }).where(eq(schema.users.id, admin1Id));
+      let txCount5 = 0;
+      interceptFn = async (_tx, id) => {
+        if (id === bobId) {
+          txCount5 += 1;
+          if (txCount5 === 2) {
+            await db
+              .update(schema.users)
+              .set({ role: "user" })
+              .where(eq(schema.users.id, admin1Id));
+          }
+        }
+      };
+
+      const finalTxLastAdminRes = await testApp.app.inject({
+        method: "DELETE",
+        url: `/api/auth/users/${bobId}`,
+        headers: { cookie: `snapotter-session=${anonSessionId}` },
+      });
+      expect(finalTxLastAdminRes.statusCode).toBe(400);
+      expect(JSON.parse(finalTxLastAdminRes.body)).toEqual({
+        error: "Cannot delete the last admin",
+        code: "LAST_ADMIN",
+      });
+      expect(txCount5).toBe(2);
+
+      // 6. When the target user is deleted before the pre-storage transaction (txCount === 1)
+      // while the actor retains authority, 404 NOT_FOUND is returned from tx 1.
+      const doomedId = randomUUID();
+      await db.insert(schema.users).values({
+        id: doomedId,
+        username: `doomed-pretx-${suffix}`,
+        passwordHash: await hashPassword("Password123!"),
+        role: "user",
+        team: team.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        mustChangePassword: false,
+      });
+
+      let txCount6 = 0;
+      interceptFn = async (_tx, id) => {
+        if (id === doomedId) {
+          txCount6 += 1;
+          if (txCount6 === 1) {
+            await db.delete(schema.users).where(eq(schema.users.id, doomedId));
+          }
+        }
+      };
+
+      const preTxNotFoundRes = await testApp.app.inject({
+        method: "DELETE",
+        url: `/api/auth/users/${doomedId}`,
+        headers: { cookie: `snapotter-session=${anonSessionId}` },
+      });
+      expect(preTxNotFoundRes.statusCode).toBe(404);
+      expect(JSON.parse(preTxNotFoundRes.body)).toEqual({
+        error: "User not found",
+        code: "NOT_FOUND",
+      });
+      expect(txCount6).toBe(1);
+    } finally {
+      interceptFn = null;
+      if (storedPathToClean) {
+        await rm(storedPathToClean, { force: true });
+      }
+      await db.delete(schema.users).where(eq(schema.users.id, "anonymous"));
+      if (createdUserIds.length > 0) {
+        await db.delete(schema.users).where(inArray(schema.users.id, createdUserIds));
+      }
+      if (priorAdminIds.length > 0) {
+        await db
+          .update(schema.users)
+          .set({ role: "admin" })
+          .where(inArray(schema.users.id, priorAdminIds));
+      }
+    }
   });
 });

@@ -124,9 +124,9 @@ describe("the last admin can't be removed by two requests at once (#2231)", () =
       ]),
     );
 
-    expect(results.map((r) => r.statusCode).sort()).toEqual([200, 400]);
-    const refused = results.find((r) => r.statusCode === 400);
-    expect(JSON.parse(refused?.body ?? "{}").code).toBe("LAST_ADMIN");
+    expect(results.map((r) => r.statusCode).sort()).toEqual([200, 403]);
+    const refused = results.find((r) => r.statusCode === 403);
+    expect(JSON.parse(refused?.body ?? "{}").code).toBe("ESCALATION_DENIED");
     expect(await adminCount()).toBe(1);
   });
 
@@ -148,13 +148,13 @@ describe("the last admin can't be removed by two requests at once (#2231)", () =
       ]),
     );
 
-    expect(results.map((r) => r.statusCode).sort()).toEqual([200, 400]);
-    const refused = results.find((r) => r.statusCode === 400);
-    expect(JSON.parse(refused?.body ?? "{}").code).toBe("LAST_ADMIN");
+    expect(results.map((r) => r.statusCode).sort()).toEqual([200, 403]);
+    const refused = results.find((r) => r.statusCode === 403);
+    expect(JSON.parse(refused?.body ?? "{}").code).toBe("ESCALATION_DENIED");
     expect(await adminCount()).toBe(1);
 
     // The admin whose deletion was refused is still there, sessions and all.
-    const survivorId = results[0].statusCode === 400 ? y.id : x.id;
+    const survivorId = results[0].statusCode === 403 ? y.id : x.id;
     const [survivor] = await db
       .select({ id: schema.users.id })
       .from(schema.users)
@@ -267,5 +267,29 @@ describe("the last admin can't be removed by two requests at once (#2231)", () =
       headers: { authorization: `Bearer ${SCIM_TOKEN}` },
     });
     expect(scimRes.statusCode).toBe(409);
+
+    const anonSessionId = randomUUID();
+    await db.insert(schema.sessions).values({
+      id: anonSessionId,
+      userId: "anonymous",
+      expiresAt: new Date(Date.now() + 3600_000),
+    });
+
+    const putRes = await testApp.app.inject({
+      method: "PUT",
+      url: `/api/auth/users/${survivorId}`,
+      headers: { cookie: `snapotter-session=${anonSessionId}` },
+      payload: { role: "user" },
+    });
+    expect(putRes.statusCode).toBe(400);
+    expect(JSON.parse(putRes.body).code).toBe("LAST_ADMIN");
+
+    const delRes = await testApp.app.inject({
+      method: "DELETE",
+      url: `/api/auth/users/${survivorId}`,
+      headers: { cookie: `snapotter-session=${anonSessionId}` },
+    });
+    expect(delRes.statusCode).toBe(400);
+    expect(JSON.parse(delRes.body).code).toBe("LAST_ADMIN");
   });
 });

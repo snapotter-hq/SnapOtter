@@ -1630,8 +1630,17 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
             teamExists = Boolean(lockedTeam);
           }
           // Last admin protection, under the lock every admin removal shares (#2231).
+          let lastAdminBlocked = false;
           if (id !== admin.id && updates.role && updates.role !== "admin") {
-            await assertNotLastAdmin(tx, id);
+            try {
+              await assertNotLastAdmin(tx, id);
+            } catch (err) {
+              if (err instanceof LastAdminError) {
+                lastAdminBlocked = true;
+              } else {
+                throw err;
+              }
+            }
           }
 
           const [currentUser] = await tx
@@ -1679,6 +1688,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
           if (!teamExists) {
             throw new Error("UNKNOWN_TEAM");
+          }
+
+          if (lastAdminBlocked) {
+            throw new LastAdminError();
           }
 
           previousRole = currentUser.role;
@@ -1888,11 +1901,57 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       // Loaded here rather than at the top: it reaches the preview route and the
       // logger, which the auth plugin otherwise has no need to pull in.
       const { deleteLibraryFileStorage } = await import("../lib/library-cleanup.js");
+      const assertDeleteAllowed = async (
+        tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+      ) => {
+        let lastAdminBlocked = false;
+        try {
+          await assertNotLastAdmin(tx, id);
+        } catch (err) {
+          if (err instanceof LastAdminError) {
+            lastAdminBlocked = true;
+          } else {
+            throw err;
+          }
+        }
+
+        const [currentAdmin] = await tx
+          .select({ role: schema.users.role })
+          .from(schema.users)
+          .where(eq(schema.users.id, admin.id));
+        const [currentUser] = await tx
+          .select({ role: schema.users.role })
+          .from(schema.users)
+          .where(eq(schema.users.id, id));
+
+        if (!currentAdmin) {
+          throw new EscalationDeniedError();
+        }
+
+        const currentActor = { ...admin, role: currentAdmin.role };
+
+        if (!(await hasEffectivePermission(currentActor, "users:manage", tx))) {
+          throw new EscalationDeniedError();
+        }
+
+        if (!currentUser) {
+          throw new Error("NOT_FOUND");
+        }
+
+        if (!(await canManageTargetRole(currentActor, currentUser.role, tx))) {
+          throw new EscalationDeniedError();
+        }
+
+        if (lastAdminBlocked) {
+          throw new LastAdminError();
+        }
+      };
+
       // Refuse the last admin before anything is removed. The row deletes below
       // check again under the lock every admin removal shares, which is what
       // holds against two admins deleting each other at once (#2231).
       try {
-        await db.transaction((tx) => assertNotLastAdmin(tx, id));
+        await db.transaction((tx) => assertDeleteAllowed(tx));
       } catch (err) {
         if (err instanceof EscalationDeniedError) {
           return reply.status(403).send({
@@ -1926,34 +1985,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       try {
         await db.transaction(async (tx) => {
-          await assertNotLastAdmin(tx, id);
-
-          const [currentAdmin] = await tx
-            .select({ role: schema.users.role })
-            .from(schema.users)
-            .where(eq(schema.users.id, admin.id));
-          const [currentUser] = await tx
-            .select({ role: schema.users.role })
-            .from(schema.users)
-            .where(eq(schema.users.id, id));
-
-          if (!currentAdmin) {
-            throw new EscalationDeniedError();
-          }
-
-          const currentActor = { ...admin, role: currentAdmin.role };
-
-          if (!(await hasEffectivePermission(currentActor, "users:manage", tx))) {
-            throw new EscalationDeniedError();
-          }
-
-          if (!currentUser) {
-            throw new Error("NOT_FOUND");
-          }
-
-          if (!(await canManageTargetRole(currentActor, currentUser.role, tx))) {
-            throw new EscalationDeniedError();
-          }
+          await assertDeleteAllowed(tx);
 
           // Delete associated sessions
           await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
