@@ -1,3 +1,4 @@
+import { extname } from "node:path";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -216,7 +217,7 @@ export function registerColorPalette(app: FastifyInstance) {
       }
       if (needsCliDecode(validation.format)) {
         try {
-          const fileExt = filename.split(".").pop()?.toLowerCase();
+          const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
           fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt);
         } catch (decodeErr) {
           if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;

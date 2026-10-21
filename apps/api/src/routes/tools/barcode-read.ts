@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { extname } from "node:path";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -233,7 +234,7 @@ export function registerBarcodeRead(app: FastifyInstance) {
         }
         if (needsCliDecode(validation.format)) {
           try {
-            const fileExt = filename.split(".").pop()?.toLowerCase();
+            const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
             fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt);
           } catch (decodeErr) {
             if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;

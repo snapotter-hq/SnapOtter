@@ -743,7 +743,8 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           decoded = Buffer.from(await decodeHeic(rawBuffer));
         } else if (validation.valid && needsCliDecode(validation.format)) {
           try {
-            const fileExt = file.originalName.split(".").pop()?.toLowerCase();
+            const fileExt =
+              extname(file.originalName).toLowerCase().replace(/^\./, "") || undefined;
             decoded = Buffer.from(await decodeToSharpCompat(rawBuffer, validation.format, fileExt));
           } catch (decodeErr) {
             if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;

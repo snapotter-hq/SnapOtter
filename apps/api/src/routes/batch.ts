@@ -10,6 +10,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
+import { extname } from "node:path";
 import { FEATURE_BUNDLES, isSafeMessageError, TOOLS, toolSection } from "@snapotter/shared";
 import type { FlowJob } from "bullmq";
 import { eq, inArray } from "drizzle-orm";
@@ -532,7 +533,8 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
 
                 if (!skipPreprocess && needsCliDecode(validation.format)) {
                   try {
-                    const fileExt = processFilename.split(".").pop()?.toLowerCase();
+                    const fileExt =
+                      extname(processFilename).toLowerCase().replace(/^\./, "") || undefined;
                     processBuffer = await decodeToSharpCompat(
                       processBuffer,
                       validation.format,

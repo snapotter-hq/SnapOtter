@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { extname } from "node:path";
 import { apiToolPath, hasServerErrorStatus, kbToBytes } from "@snapotter/shared";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
@@ -243,7 +244,7 @@ export function registerImageToPdfRoute(
           }
         } else if (needsCliDecode(validation.format)) {
           try {
-            const fileExt = file.filename.split(".").pop()?.toLowerCase();
+            const fileExt = extname(file.filename).toLowerCase().replace(/^\./, "") || undefined;
             buf = await decodeToSharpCompat(buf, validation.format, fileExt);
           } catch (rawDecodeErr) {
             const decodeErr = normalizeOperationalWriteError(rawDecodeErr);

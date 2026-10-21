@@ -181,7 +181,8 @@ export async function readImageDimensions(
 ): Promise<{ width: number; height: number } | null> {
   try {
     const bin = await findExiftool();
-    const suffix = ext ? `.${ext.replace(/^\./, "")}` : ".jpg";
+    const safeExt = ext?.replace(/[^a-z0-9]/gi, "");
+    const suffix = safeExt ? `.${safeExt}` : ".jpg";
     const id = randomUUID();
     const tempPath = join(tmpdir(), `exif-dim-${id}${suffix}`);
 

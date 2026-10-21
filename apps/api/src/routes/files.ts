@@ -360,7 +360,9 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
     }
     const originalBuffer = await data.toBuffer();
     let buffer = originalBuffer;
-    const ext = data.filename?.split(".").pop()?.toLowerCase();
+    const ext = data.filename
+      ? extname(data.filename).toLowerCase().replace(/^\./, "") || undefined
+      : undefined;
 
     const validation = await validateImageBuffer(buffer, data.filename);
     if (!validation.valid) {
@@ -387,7 +389,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
     // Decode CLI-decoded formats (RAW, PSD, TGA, EXR, HDR) via external tools
     if (needsCliDecode(validation.format)) {
       try {
-        buffer = await decodeToSharpCompat(buffer, validation.format);
+        buffer = await decodeToSharpCompat(buffer, validation.format, ext);
       } catch (decodeErr) {
         if (decodeErr instanceof DecoderOutOfMemoryError) {
           return sendInputValidationError(

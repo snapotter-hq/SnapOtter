@@ -1,3 +1,4 @@
+import { extname } from "node:path";
 import type { FastifyBaseLogger } from "fastify";
 import sharp from "sharp";
 import { autoOrient } from "../lib/auto-orient.js";
@@ -79,7 +80,7 @@ export class ImageInputHandler implements InputHandler {
     if (needsCliDecode(validation.format)) {
       try {
         opts.signal?.throwIfAborted();
-        const fileExt = name.split(".").pop()?.toLowerCase();
+        const fileExt = extname(name).toLowerCase().replace(/^\./, "") || undefined;
         fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt, {
           maxDimension: opts.maxDimension,
           maxPixels: opts.maxPixels,

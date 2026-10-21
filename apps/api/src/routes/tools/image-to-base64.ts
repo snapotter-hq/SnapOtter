@@ -1,4 +1,4 @@
-import { basename } from "node:path";
+import { basename, extname } from "node:path";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -127,7 +127,7 @@ export function registerImageToBase64(app: FastifyInstance) {
           }
           if (needsCliDecode(validation.format)) {
             try {
-              const fileExt = filename.split(".").pop()?.toLowerCase();
+              const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
               decoded = await decodeToSharpCompat(decoded, validation.format, fileExt);
             } catch (decodeErr) {
               if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;

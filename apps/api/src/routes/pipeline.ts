@@ -9,6 +9,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
+import { extname } from "node:path";
 import { FEATURE_BUNDLES, isSafeMessageError, MODALITY_POOL, TOOLS } from "@snapotter/shared";
 import type { FlowJob } from "bullmq";
 import { and, eq, inArray, sql } from "drizzle-orm";
@@ -465,7 +466,8 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                     // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
                     if (needsCliDecode(validation.format)) {
                       try {
-                        const fileExt = filename.split(".").pop()?.toLowerCase();
+                        const fileExt =
+                          extname(filename).toLowerCase().replace(/^\./, "") || undefined;
                         processBuffer = await decodeToSharpCompat(
                           processBuffer,
                           validation.format,
@@ -1524,7 +1526,8 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
                 if (needsCliDecode(fileValidation.format)) {
                   try {
-                    const fileExt = processFilename.split(".").pop()?.toLowerCase();
+                    const fileExt =
+                      extname(processFilename).toLowerCase().replace(/^\./, "") || undefined;
                     processBuffer = await decodeToSharpCompat(
                       processBuffer,
                       fileValidation.format,

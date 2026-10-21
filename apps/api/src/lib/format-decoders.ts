@@ -9,6 +9,7 @@ import { resolveFfmpeg } from "@snapotter/media-engine";
 import { isSafeMessageError, SafeError } from "@snapotter/shared";
 import sharp from "sharp";
 import { isBinarySpawnFailure } from "./binary-overrides.js";
+import { isRawExtension } from "./file-validation.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -416,7 +417,14 @@ async function preflightEncodedDimensions(
   // the hard-to-parse formats here (camera RAW, EXR, JXL and JPEG 2000). It is
   // part of every supported container image alongside these decoders.
   const id = randomUUID();
-  const safeExt = (ext || format || "img").replace(/[^a-z0-9]/gi, "") || "img";
+  const cleanExt = ext?.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const candidateExt =
+    format === "raw"
+      ? cleanExt && isRawExtension(cleanExt)
+        ? cleanExt
+        : format
+      : cleanExt || format;
+  const safeExt = (candidateExt || "img").replace(/[^a-z0-9]/gi, "") || "img";
   const inputPath = join(tmpdir(), `dimensions-${id}.${safeExt}`);
   let exiftoolFailure: unknown;
   try {
@@ -760,9 +768,11 @@ async function decodeRaw(
   // Use the original extension so LibRaw / ExifTool / ImageMagick can identify
   // the RAW variant.
   // The extension comes from the upload's filename; keep it alphanumeric so it
-  // can't smuggle text into the decoders' command lines and stderr (#1429).
-  const safeExt = ext?.replace(/[^a-z0-9]/gi, "");
-  const suffix = safeExt ? `.${safeExt}` : ".dng";
+  // can't smuggle text into the decoders' command lines and stderr (#1429), and
+  // only accept recognised RAW extensions so a bare filename token never steers
+  // ImageMagick into a missing-delegate 503 (#3246).
+  const safeExt = ext?.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const suffix = safeExt && isRawExtension(safeExt) ? `.${safeExt}` : ".dng";
   const inputPath = join(tmpdir(), `raw-in-${id}${suffix}`);
   const outputPath = join(tmpdir(), `raw-out-${id}.png`);
   // dcraw_emu APPENDS the output extension to the full input path

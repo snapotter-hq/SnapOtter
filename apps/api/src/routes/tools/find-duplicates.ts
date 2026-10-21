@@ -1,3 +1,4 @@
+import { extname } from "node:path";
 import { isToolInputError } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
@@ -193,7 +194,7 @@ export function registerFindDuplicates(app: FastifyInstance) {
         }
         if (needsCliDecode(validation.format)) {
           try {
-            const fileExt = file.filename.split(".").pop()?.toLowerCase();
+            const fileExt = extname(file.filename).toLowerCase().replace(/^\./, "") || undefined;
             file.buffer = await decodeToSharpCompat(file.buffer, validation.format, fileExt);
           } catch (decodeErr) {
             if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;

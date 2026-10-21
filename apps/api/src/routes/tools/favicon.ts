@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { extname, join } from "node:path";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
@@ -132,7 +132,7 @@ export function registerFavicon(app: FastifyInstance) {
       }
 
       let buf = file.buffer;
-      const fileExt = file.filename.split(".").pop()?.toLowerCase();
+      const fileExt = extname(file.filename).toLowerCase().replace(/^\./, "") || undefined;
 
       try {
         // Decode HEIC/HEIF via system decoder

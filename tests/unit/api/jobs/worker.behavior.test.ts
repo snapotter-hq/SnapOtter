@@ -61,8 +61,10 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
     IMAGE_EXT_TO_MIME,
     ANALYTICS_EVENTS: {},
     TOOLS: [],
-    // pdf-producer.ts builds its scrub set from COMPRESS_PRESETS at load.
+    // pdf-producer.ts builds its scrub set from COMPRESS_PRESETS at load, and
+    // file-validation.ts builds RAW_EXTENSIONS from CAMERA_RAW_INPUTS at load.
     COMPRESS_PRESETS: [],
+    CAMERA_RAW_INPUTS: [],
     getBundleForTool: vi.fn(() => null),
     getOptionalBundleForTool: vi.fn(() => null),
   }));
@@ -506,6 +508,7 @@ describe("worker result payload behavior", () => {
           ANALYTICS_EVENTS: {},
           TOOLS: [],
           COMPRESS_PRESETS: [],
+          CAMERA_RAW_INPUTS: [],
           getBundleForTool: vi.fn(() => null),
           getOptionalBundleForTool: vi.fn(() => null),
         }));

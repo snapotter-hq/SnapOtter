@@ -461,6 +461,106 @@ exit 1`,
     expect(isDecoderUnavailable(err)).toBe(false);
     expect(String(err.message)).toMatch(/Unsupported file format/);
   });
+
+  it("falls back to .dng when decodeToSharpCompat('raw', ext) receives a non-RAW extension token (#3246)", async () => {
+    useShims({
+      dcraw_emu: ': > "$5.tiff"\nexit 0',
+      exiftool: "exit 0",
+      magick: `${MAGICK_VERSION}
+has_dng=0
+for a; do
+  case "$a" in
+    *.dng) has_dng=1 ;;
+  esac
+done
+if [ "$has_dng" = 1 ]; then
+  echo "magick: corrupt DNG image" >&2
+  exit 1
+fi
+echo "magick: no decode delegate for this image format @ error/constitute.c/ReadImage/752." >&2
+exit 1`,
+    });
+
+    const err = await decodeToSharpCompat(
+      readFixture(fixtures.image.formats("dng")),
+      "raw",
+      "myphoto",
+    ).catch((e) => e);
+
+    expect(isDecoderUnavailable(err)).toBe(false);
+    expect(String(err.message)).toMatch(/corrupt DNG image/);
+  });
+
+  it("keeps a recognised RAW extension on the temp file in decodeRaw (#3246)", async () => {
+    useShims({
+      dcraw_emu: 'echo "Cannot open $5: corrupt RAF" >&2\nexit 2',
+      exiftool: "exit 0",
+      magick: magickNoDelegate,
+    });
+
+    const err = await decodeToSharpCompat(
+      readFixture(fixtures.image.formats("dng")),
+      "raw",
+      ".RAF",
+    ).catch((e) => e);
+
+    expect(isDecoderUnavailable(err)).toBe(false);
+    expect(String(err.message)).toMatch(/raw-in-[0-9a-f-]+\.raf: corrupt RAF/);
+  });
+
+  it("uses .raw instead of a non-RAW extension token during preflightEncodedDimensions (#3246)", async () => {
+    useShims({
+      exiftool: `case "$5" in
+  *.raw)
+    echo "10 10"
+    exit 0
+    ;;
+  *)
+    echo "File not found: $5" >&2
+    exit 1
+    ;;
+esac`,
+      dcraw_emu: 'echo "Cannot open $5: corrupt RAW" >&2\nexit 2',
+      magick: magickNoDelegate,
+    });
+
+    const err = await decodeToSharpCompat(
+      readFixture(fixtures.image.formats("dng")),
+      "raw",
+      "myphoto",
+      { maxPixels: 1000 },
+    ).catch((e) => e);
+
+    expect(isDecoderUnavailable(err)).toBe(false);
+    expect(String(err.message)).toMatch(/raw-in-[0-9a-f-]+\.dng: corrupt RAW/);
+  });
+
+  it("preserves a lowercase recognised RAW extension during preflightEncodedDimensions (#3246)", async () => {
+    useShims({
+      exiftool: `case "$5" in
+  *.raf)
+    echo "10 10"
+    exit 0
+    ;;
+  *)
+    echo "Unexpected suffix: $5" >&2
+    exit 1
+    ;;
+esac`,
+      dcraw_emu: 'echo "Cannot open $5: corrupt RAF" >&2\nexit 2',
+      magick: magickNoDelegate,
+    });
+
+    const err = await decodeToSharpCompat(
+      readFixture(fixtures.image.formats("dng")),
+      "raw",
+      ".RAF",
+      { maxPixels: 1000 },
+    ).catch((e) => e);
+
+    expect(isDecoderUnavailable(err)).toBe(false);
+    expect(String(err.message)).toMatch(/raw-in-[0-9a-f-]+\.raf: corrupt RAF/);
+  });
 });
 
 describe("asDecoderUnavailable classification (#1429)", () => {

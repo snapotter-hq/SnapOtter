@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { extname } from "node:path";
 import { hasServerErrorStatus, IMAGE_EXT_TO_MIME } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
@@ -249,7 +250,7 @@ export function registerEditMetadata(app: FastifyInstance) {
             if (contentType === "image/heif" || contentType === "image/heic") {
               previewInput = await decodeHeic(outputBuffer);
             } else if (cliFormat) {
-              const fileExt = filename.split(".").pop()?.toLowerCase();
+              const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
               try {
                 previewInput = await decodeToSharpCompat(outputBuffer, cliFormat, fileExt);
               } catch (decodeErr) {

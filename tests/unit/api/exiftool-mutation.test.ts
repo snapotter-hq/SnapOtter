@@ -504,6 +504,26 @@ describe("readImageDimensions", () => {
     expect(operationArgs()[3].endsWith(".jpg")).toBe(true);
   });
 
+  it("strips non-alphanumeric characters from ext so path separators cannot break tempPath (#3246)", async () => {
+    withExiftool(() => ({
+      stdout: JSON.stringify([{ ImageWidth: 4000, ImageHeight: 3000 }]),
+      stderr: "",
+    }));
+    const dims = await readImageDimensions(Buffer.from("img"), "sub/dscf0001");
+    expect(dims).toEqual({ width: 4000, height: 3000 });
+    const tempPath = operationArgs()[3];
+    expect(tempPath).toMatch(/exif-dim-[0-9a-f-]+\.subdscf0001$/);
+  });
+
+  it("falls back to .jpg when ext contains only non-alphanumeric characters (#3246)", async () => {
+    withExiftool(() => ({
+      stdout: JSON.stringify([{ ImageWidth: 10, ImageHeight: 10 }]),
+      stderr: "",
+    }));
+    await readImageDimensions(Buffer.from("img"), "./..");
+    expect(operationArgs()[3].endsWith(".jpg")).toBe(true);
+  });
+
   it("returns null when ImageWidth is missing", async () => {
     withExiftool(() => ({ stdout: JSON.stringify([{ ImageHeight: 600 }]), stderr: "" }));
     const dims = await readImageDimensions(Buffer.from("img"), "jpg");

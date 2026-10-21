@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { extname } from "node:path";
 import { hasServerErrorStatus, isToolInputError } from "@snapotter/shared";
 import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 import sharp from "sharp";
@@ -118,7 +119,7 @@ async function prepareBeautifyImage(
   let fallbackFormat: string | undefined;
   if (needsCliDecode(validation.format)) {
     try {
-      const fileExt = filename.split(".").pop()?.toLowerCase();
+      const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
       buf = await decodeToSharpCompat(buf, validation.format, fileExt);
     } catch (decodeErr) {
       if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;

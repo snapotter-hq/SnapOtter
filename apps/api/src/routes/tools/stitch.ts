@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { extname } from "node:path";
 import { hasServerErrorStatus } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp, { type OverlayOptions } from "sharp";
@@ -104,7 +105,7 @@ export function registerStitch(app: FastifyInstance) {
       }
 
       if (needsCliDecode(validation.format)) {
-        const fileExt = file.filename.split(".").pop()?.toLowerCase();
+        const fileExt = extname(file.filename).toLowerCase().replace(/^\./, "") || undefined;
         try {
           file.buffer = await decodeToSharpCompat(file.buffer, validation.format, fileExt);
         } catch (decodeErr) {

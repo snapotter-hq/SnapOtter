@@ -4,6 +4,8 @@
  * Tests the path traversal guard, content type mapping, and download/upload
  * logic helpers from the files route.
  */
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { Readable } from "node:stream";
 import { gzipSync } from "node:zlib";
 import { IMAGE_EXT_TO_MIME } from "@snapotter/shared";
@@ -23,6 +25,11 @@ const mocks = vi.hoisted(() => ({
   requireFileAccess: vi.fn(() => Promise.resolve({ id: "user-1", role: "admin" })),
   requirePermission: vi.fn(() => () => Promise.resolve(true)),
   sanitizeSvg: vi.fn((buf: Buffer) => buf),
+  readImageDimensions: vi.fn<
+    (_buf: Buffer, _ext?: string) => Promise<{ width: number; height: number } | null>
+  >(() => Promise.resolve(null)),
+  decodeToSharpCompat:
+    vi.fn<(_buf: Buffer, _format: string, _ext?: string, _options?: unknown) => Promise<Buffer>>(),
 }));
 
 vi.mock("../../../apps/api/src/db/index.js", () => ({
@@ -65,6 +72,25 @@ vi.mock("../../../apps/api/src/lib/svg-sanitize.js", async (importOriginal) => {
   return {
     ...actual,
     sanitizeSvg: (...args: Parameters<typeof actual.sanitizeSvg>) => mocks.sanitizeSvg(...args),
+  };
+});
+
+vi.mock("../../../apps/api/src/lib/exiftool.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/exiftool.js")>();
+  return {
+    ...actual,
+    readImageDimensions: (...args: Parameters<typeof actual.readImageDimensions>) =>
+      mocks.readImageDimensions(...args),
+  };
+});
+
+vi.mock("../../../apps/api/src/lib/format-decoders.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/format-decoders.js")>();
+  return {
+    ...actual,
+    decodeToSharpCompat: (...args: Parameters<typeof actual.decodeToSharpCompat>) =>
+      mocks.decodeToSharpCompat(...args),
   };
 });
 
@@ -988,6 +1014,160 @@ describe("files route logic", () => {
           },
         ],
       });
+    });
+  });
+
+  describe("POST /api/v1/preview RAW extension extraction (#3246)", () => {
+    type RouteHandler = (request: unknown, reply: unknown) => Promise<unknown>;
+    let previewHandler: RouteHandler;
+
+    beforeAll(async () => {
+      const fakeApp = {
+        post: vi.fn((path: string, arg2: unknown, arg3?: unknown) => {
+          const handler = (typeof arg2 === "function" ? arg2 : arg3) as RouteHandler;
+          if (path === "/api/v1/preview") previewHandler = handler;
+        }),
+        get: vi.fn(),
+      };
+      await fileRoutes(fakeApp as never);
+    });
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      mocks.requirePermission.mockImplementation(() => () => Promise.resolve(true));
+    });
+
+    function makePreviewReply() {
+      const headers: Record<string, string> = {};
+      const reply = {
+        statusCode: 200,
+        headers,
+        payload: undefined as unknown,
+        status: vi.fn((code: number) => {
+          reply.statusCode = code;
+          return reply;
+        }),
+        header: vi.fn((name: string, val: string) => {
+          headers[name] = val;
+          return reply;
+        }),
+        send: vi.fn((body: unknown) => {
+          reply.payload = body;
+          return reply;
+        }),
+      };
+      return reply;
+    }
+
+    const PNG_1X1 = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      "base64",
+    );
+
+    it("passes undefined ext for extensionless RAW filenames instead of the bare filename (#3246)", async () => {
+      const rafMagic = Buffer.from("FUJIFILMCCD-RAW 0201", "ascii");
+      mocks.decodeToSharpCompat.mockResolvedValueOnce(PNG_1X1);
+      mocks.readImageDimensions.mockResolvedValueOnce({ width: 6000, height: 4000 });
+
+      const req = {
+        log: { warn: vi.fn(), error: vi.fn() },
+        file: async () => ({
+          filename: "sub/DSCF0001",
+          toBuffer: async () => rafMagic,
+        }),
+      };
+      const reply = makePreviewReply();
+
+      await previewHandler(req, reply);
+
+      expect(reply.statusCode).toBe(200);
+      expect(mocks.decodeToSharpCompat).toHaveBeenCalledWith(rafMagic, "raw", undefined);
+      expect(mocks.readImageDimensions).toHaveBeenCalledWith(rafMagic, undefined);
+      expect(reply.headers["X-Original-Width"]).toBe("6000");
+      expect(reply.headers["X-Original-Height"]).toBe("4000");
+    });
+
+    it.each([
+      [".raf", undefined],
+      ["DSCF0001.", undefined],
+      [undefined, undefined],
+      ["photo.jpg.cr2", "cr2"],
+    ] as const)(
+      "extracts ext=%s -> %s consistently with validateImageBuffer (#3246)",
+      async (filename, expectedExt) => {
+        const rafMagic = Buffer.from("FUJIFILMCCD-RAW 0201", "ascii");
+        mocks.decodeToSharpCompat.mockResolvedValueOnce(PNG_1X1);
+        mocks.readImageDimensions.mockResolvedValueOnce({ width: 4000, height: 3000 });
+
+        const req = {
+          log: { warn: vi.fn(), error: vi.fn() },
+          file: async () => ({
+            filename,
+            toBuffer: async () => rafMagic,
+          }),
+        };
+        const reply = makePreviewReply();
+
+        await previewHandler(req, reply);
+
+        expect(reply.statusCode).toBe(200);
+        expect(mocks.decodeToSharpCompat).toHaveBeenCalledWith(rafMagic, "raw", expectedExt);
+        expect(mocks.readImageDimensions).toHaveBeenCalledWith(rafMagic, expectedExt);
+      },
+    );
+
+    it("extracts lowercase extension via extname for dotted RAW filenames (#3246)", async () => {
+      const rafMagic = Buffer.from("FUJIFILMCCD-RAW 0201", "ascii");
+      mocks.decodeToSharpCompat.mockResolvedValueOnce(PNG_1X1);
+      mocks.readImageDimensions.mockResolvedValueOnce({ width: 6000, height: 4000 });
+
+      const req = {
+        log: { warn: vi.fn(), error: vi.fn() },
+        file: async () => ({
+          filename: "sub/DSCF0001.RAF",
+          toBuffer: async () => rafMagic,
+        }),
+      };
+      const reply = makePreviewReply();
+
+      await previewHandler(req, reply);
+
+      expect(reply.statusCode).toBe(200);
+      expect(mocks.decodeToSharpCompat).toHaveBeenCalledWith(rafMagic, "raw", "raf");
+      expect(mocks.readImageDimensions).toHaveBeenCalledWith(rafMagic, "raf");
+    });
+
+    it("uses extname instead of split('.').pop() at POST /api/v1/preview and every decodeToSharpCompat call site (#3246)", () => {
+      const filesRouteSrc = readFileSync(
+        resolve(process.cwd(), "apps/api/src/routes/files.ts"),
+        "utf8",
+      );
+      expect(filesRouteSrc).not.toContain('.split(".").pop()');
+
+      const callerFiles = [
+        "apps/api/src/modality/image-input.ts",
+        "apps/api/src/routes/user-files.ts",
+        "apps/api/src/routes/batch.ts",
+        "apps/api/src/routes/pipeline.ts",
+        "apps/api/src/routes/tools/barcode-read.ts",
+        "apps/api/src/routes/tools/beautify.ts",
+        "apps/api/src/routes/tools/collage.ts",
+        "apps/api/src/routes/tools/color-palette.ts",
+        "apps/api/src/routes/tools/edit-metadata.ts",
+        "apps/api/src/routes/tools/favicon.ts",
+        "apps/api/src/routes/tools/find-duplicates.ts",
+        "apps/api/src/routes/tools/image-to-base64.ts",
+        "apps/api/src/routes/tools/image-to-pdf.ts",
+        "apps/api/src/routes/tools/meme-generator.ts",
+        "apps/api/src/routes/tools/split.ts",
+        "apps/api/src/routes/tools/stitch.ts",
+      ];
+      for (const relPath of callerFiles) {
+        const src = readFileSync(resolve(process.cwd(), relPath), "utf8");
+        expect(src, `${relPath} should not compute fileExt with split('.').pop()`).not.toMatch(
+          /const\s+fileExt\s*=\s*[^;]*\.split\(["']\.["']\)\.pop\(\)/,
+        );
+      }
     });
   });
 });
