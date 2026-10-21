@@ -148,7 +148,12 @@ async function loadGdprExport() {
     wasUserCanceled: wasUserCanceledMock,
   }));
 
+  const actualErrorReport = await vi.importActual<
+    typeof import("../../../../apps/api/src/lib/error-report.js")
+  >("../../../../apps/api/src/lib/error-report.js");
+
   vi.doMock("../../../../apps/api/src/lib/error-report.js", () => ({
+    ...actualErrorReport,
     reportError: reportErrorMock,
   }));
 
@@ -166,13 +171,21 @@ async function loadGdprExport() {
     },
   }));
 
+  const actualObjectStorage = await vi.importActual<
+    typeof import("../../../../apps/api/src/lib/object-storage.js")
+  >("../../../../apps/api/src/lib/object-storage.js");
+
   vi.doMock("../../../../apps/api/src/lib/object-storage.js", () => ({
+    ...actualObjectStorage,
     deletePrefix: deletePrefixMock,
     putObject: putObjectMock,
     putObjectStream: putObjectStreamMock,
   }));
 
-  return import("../../../../apps/api/src/jobs/gdpr-export.js");
+  return {
+    ...(await import("../../../../apps/api/src/jobs/gdpr-export.js")),
+    classifyError: actualErrorReport.classifyError,
+  };
 }
 
 describe("GDPR export job behavior", () => {
@@ -361,8 +374,8 @@ describe("GDPR export job behavior", () => {
     );
   });
 
-  it("rethrows S3 storage service faults mid-archive without writing a partial ZIP", async () => {
-    const { gdprExportJob } = await loadGdprExport();
+  it("normalizes S3 storage service faults mid-archive into a 503 storage-unavailable SafeError without writing a partial ZIP (#3306)", async () => {
+    const { gdprExportJob, classifyError } = await loadGdprExport();
     selectMock
       .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
       .mockReturnValueOnce(
@@ -398,13 +411,24 @@ describe("GDPR export job behavior", () => {
     const unhandled: unknown[] = [];
     const onUnhandled = (reason: unknown) => unhandled.push(reason);
     process.on("unhandledRejection", onUnhandled);
+    let caught: unknown;
     try {
-      await expect(gdprExportJob("user-1", "export-s3-fault")).rejects.toBe(s3Fault);
+      caught = await gdprExportJob("user-1", "export-s3-fault").catch((err: unknown) => err);
       await new Promise((resolve) => setImmediate(resolve));
     } finally {
       process.off("unhandledRejection", onUnhandled);
     }
 
+    expect(caught).toMatchObject({
+      name: "SafeError",
+      isSafeMessage: true,
+      kind: "operational",
+      code: "storage-unavailable",
+      statusCode: 503,
+      message: "The server's storage service is unavailable.",
+      cause: s3Fault,
+    });
+    expect(classifyError(caught, "worker")).toBe("operational");
     expect(unhandled).toEqual([]);
     expect(putObjectStreamMock).not.toHaveBeenCalled();
     expect(written).toHaveLength(0);
@@ -1260,11 +1284,24 @@ describe("GDPR export job behavior", () => {
         },
       }));
 
+      const actualObjectStorage = await vi.importActual<
+        typeof import("../../../../apps/api/src/lib/object-storage.js")
+      >("../../../../apps/api/src/lib/object-storage.js");
+
       vi.doMock("../../../../apps/api/src/lib/object-storage.js", () => ({
+        ...actualObjectStorage,
         deletePrefix: deletePrefixMock,
         putObject: putObjectMock,
         putObjectStream: putObjectStreamMock,
       }));
+
+      const { classifyError } = await vi.importActual<
+        typeof import("../../../../apps/api/src/lib/error-report.js")
+      >("../../../../apps/api/src/lib/error-report.js");
+
+      const { friendlyError } = await vi.importActual<
+        typeof import("../../../../apps/api/src/lib/errors.js")
+      >("../../../../apps/api/src/lib/errors.js");
 
       const { env } = await import("../../../../apps/api/src/config.js");
       (env as Record<string, unknown>).STORAGE_MODE = "s3";
@@ -1274,7 +1311,7 @@ describe("GDPR export job behavior", () => {
       const getObjectSpy = vi.spyOn(s3, "getObject");
 
       const { gdprExportJob } = await import("../../../../apps/api/src/jobs/gdpr-export.js");
-      return { env, getObjectSpy, gdprExportJob };
+      return { env, getObjectSpy, gdprExportJob, classifyError, friendlyError };
     }
 
     it("skips S3 NoSuchKey and poisoned stored_name while exporting valid blobs", async () => {
@@ -1349,13 +1386,16 @@ describe("GDPR export job behavior", () => {
 
     it.each([
       ["AccessDenied", 403],
+      ["SlowDown", 503],
       ["NoSuchBucket", 404],
       ["InternalError", 500],
       ["TimeoutError", undefined],
+      ["TimeoutError", 404],
     ])(
-      "fails the export when S3 rejects getObject with %s (HTTP %s)",
+      "fails the export with a normalized 503 storage-unavailable SafeError when S3 rejects getObject with %s (HTTP %s) (#3306)",
       async (name, httpStatusCode) => {
-        const { env, getObjectSpy, gdprExportJob } = await loadGdprExportWithRealFileStorage();
+        const { env, getObjectSpy, gdprExportJob, classifyError, friendlyError } =
+          await loadGdprExportWithRealFileStorage();
         try {
           selectMock
             .mockReturnValueOnce(queryChain([{ id: "user-s3", email: "s3@example.test" }]))
@@ -1379,7 +1419,110 @@ describe("GDPR export job behavior", () => {
           });
           getObjectSpy.mockRejectedValueOnce(sdkFault);
 
-          await expect(gdprExportJob("user-s3", `export-s3-${name}`)).rejects.toBe(sdkFault);
+          const caught = await gdprExportJob("user-s3", `export-s3-${name}`).catch(
+            (err: unknown) => err,
+          );
+          expect(caught).toMatchObject({
+            name: "SafeError",
+            isSafeMessage: true,
+            kind: "operational",
+            code: "storage-unavailable",
+            statusCode: 503,
+            message: "The server's storage service is unavailable.",
+            cause: sdkFault,
+          });
+          expect(classifyError(caught, "worker")).toBe("operational");
+          expect(friendlyError((caught as Error).message)).toBe(
+            "The server's storage service is unavailable.",
+          );
+          expect(putObjectStreamMock).not.toHaveBeenCalled();
+          expect(written).toHaveLength(0);
+          expect(loggerWarnMock).not.toHaveBeenCalled();
+        } finally {
+          (env as Record<string, unknown>).STORAGE_MODE = "local";
+        }
+      },
+    );
+
+    it("passes unexpected non-S3 code defects through unwrapped so classifyError reports them as bug (#3306)", async () => {
+      const { env, getObjectSpy, gdprExportJob, classifyError } =
+        await loadGdprExportWithRealFileStorage();
+      try {
+        selectMock
+          .mockReturnValueOnce(queryChain([{ id: "user-s3", email: "s3@example.test" }]))
+          .mockReturnValueOnce(
+            queryChain([
+              {
+                id: "file-1",
+                userId: "user-s3",
+                storedName: "11111111-1111-1111-1111-111111111111.png",
+                originalName: "one.png",
+                createdAt: new Date("2026-06-02T00:00:00.000Z"),
+              },
+            ]),
+          )
+          .mockReturnValueOnce(queryChain([]))
+          .mockReturnValueOnce(queryChain([]));
+
+        const unexpectedBug = new TypeError("unexpected S3 client defect");
+        getObjectSpy.mockRejectedValueOnce(unexpectedBug);
+
+        const caught = await gdprExportJob("user-s3", "export-s3-bug").catch((err: unknown) => err);
+        expect(caught).toBe(unexpectedBug);
+        expect(classifyError(caught, "worker")).toBe("bug");
+        expect(putObjectStreamMock).not.toHaveBeenCalled();
+        expect(written).toHaveLength(0);
+        expect(loggerWarnMock).not.toHaveBeenCalled();
+      } finally {
+        (env as Record<string, unknown>).STORAGE_MODE = "local";
+      }
+    });
+
+    it.each([
+      ["EIO", "read"],
+      ["ERR_STREAM_PREMATURE_CLOSE", undefined],
+      ["ECONNRESET", "read"],
+    ])(
+      "normalizes mid-stream S3 getObject fault %s (syscall=%s) into a 503 storage-unavailable SafeError (#3306)",
+      async (code, syscall) => {
+        const { env, getObjectSpy, gdprExportJob, classifyError } =
+          await loadGdprExportWithRealFileStorage();
+        try {
+          selectMock
+            .mockReturnValueOnce(queryChain([{ id: "user-s3", email: "s3@example.test" }]))
+            .mockReturnValueOnce(
+              queryChain([
+                {
+                  id: "file-1",
+                  userId: "user-s3",
+                  storedName: "11111111-1111-1111-1111-111111111111.png",
+                  originalName: "one.png",
+                  createdAt: new Date("2026-06-02T00:00:00.000Z"),
+                },
+              ]),
+            )
+            .mockReturnValueOnce(queryChain([]))
+            .mockReturnValueOnce(queryChain([]));
+
+          const streamFault = Object.assign(new Error(`S3 stream ${code}`), {
+            code,
+            ...(syscall ? { syscall } : {}),
+          });
+          getObjectSpy.mockRejectedValueOnce(streamFault);
+
+          const caught = await gdprExportJob("user-s3", `export-s3-stream-${code}`).catch(
+            (err: unknown) => err,
+          );
+          expect(caught).toMatchObject({
+            name: "SafeError",
+            isSafeMessage: true,
+            kind: "operational",
+            code: "storage-unavailable",
+            statusCode: 503,
+            message: "The server's storage service is unavailable.",
+            cause: streamFault,
+          });
+          expect(classifyError(caught, "worker")).toBe("operational");
           expect(putObjectStreamMock).not.toHaveBeenCalled();
           expect(written).toHaveLength(0);
           expect(loggerWarnMock).not.toHaveBeenCalled();

@@ -14,7 +14,7 @@ import { db, schema } from "../db/index.js";
 import { reportError } from "../lib/error-report.js";
 import { isStorageServiceFault, readStoredFile } from "../lib/file-storage.js";
 import { logger } from "../lib/logger.js";
-import { deletePrefix, putObjectStream } from "../lib/object-storage.js";
+import { deletePrefix, normalizeS3ReadFault, putObjectStream } from "../lib/object-storage.js";
 import * as cancelMod from "./cancel.js";
 import { registerCancelable, unregisterCancelable } from "./cancel.js";
 
@@ -265,9 +265,9 @@ export async function gdprExportJob(
           // missing blob or a poisoned stored_name from a 1.x SQLite import logs a
           // warning and goes into missing-files.json so the archive declares its
           // own gaps.
+          if (isStorageServiceFault(e)) throw normalizeS3ReadFault(e);
           const { code, syscall } = (e ?? {}) as NodeJS.ErrnoException;
           if ((syscall && code !== "ENOENT") || code === "ERR_FS_FILE_TOO_LARGE") throw e;
-          if (isStorageServiceFault(e)) throw e;
           if (!(await isExportJobLive())) {
             archive.abort();
             passthrough.destroy();
