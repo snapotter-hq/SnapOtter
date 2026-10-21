@@ -170,6 +170,18 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
     }
   }, [info, initialSettings]);
 
+  // Reset animation-only modes when standalone metadata resolves as a static image
+  useEffect(() => {
+    if (
+      initialSettings === undefined &&
+      info != null &&
+      info.pages <= 1 &&
+      MODES.find((m) => m.id === mode)?.requiresAnimation
+    ) {
+      setMode("resize");
+    }
+  }, [info, initialSettings, mode]);
+
   // Emit settings
   const onChangeRef = useRef(onChange);
   useEffect(() => {

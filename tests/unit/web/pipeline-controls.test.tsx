@@ -737,4 +737,167 @@ describe("GifToolsControls (#1223)", async () => {
       useFileStore.setState({ files: [], selectedIndex: 0 });
     }
   });
+
+  it("resets speed, reverse, and extract to resize when standalone metadata resolves as a static image (#3311)", async () => {
+    const { useFileStore } = await import("@/stores/file-store");
+    try {
+      for (const animMode of [
+        { label: "Speed", expectedPending: { mode: "speed", speedFactor: 1, loop: 0 } },
+        { label: "Reverse", expectedPending: { mode: "reverse", loop: 0 } },
+        {
+          label: "Extract",
+          expectedPending: {
+            mode: "extract",
+            extractMode: "single",
+            frameNumber: 0,
+            extractFormat: "png",
+            loop: 0,
+          },
+        },
+      ] as const) {
+        let resolveDeferredFetch!: (res: Response) => void;
+        useFileStore.setState({
+          files: [
+            new File(["gif"], `pending-${animMode.label}.gif`, {
+              type: "image/gif",
+            }),
+          ],
+          selectedIndex: 0,
+        });
+        vi.spyOn(globalThis, "fetch").mockImplementation(
+          () =>
+            new Promise<Response>((resolve) => {
+              resolveDeferredFetch = resolve;
+            }),
+        );
+
+        const onPendingToStatic = vi.fn();
+        const { container } = render(<GifToolsControls onChange={onPendingToStatic} />);
+        await userEvent.click(screen.getByRole("button", { name: animMode.label }));
+        expect(onPendingToStatic).toHaveBeenLastCalledWith(animMode.expectedPending);
+
+        await act(async () => {
+          resolveDeferredFetch(
+            new Response(
+              JSON.stringify({
+                width: 32,
+                height: 32,
+                pages: 1,
+                delay: [],
+                loop: 0,
+                fileSize: 256,
+                duration: 0,
+              }),
+              { status: 200, headers: { "Content-Type": "application/json" } },
+            ),
+          );
+        });
+
+        expect(screen.getByText("Static image")).toBeDefined();
+        expect(
+          (screen.getByRole("button", { name: animMode.label }) as HTMLButtonElement).disabled,
+        ).toBe(true);
+        expect(container.querySelector("#gif-width")).not.toBeNull();
+        expect(onPendingToStatic).toHaveBeenLastCalledWith({
+          mode: "resize",
+          loop: 0,
+        });
+        cleanup();
+      }
+
+      const animFile = new File(["gif-anim"], "anim-switch.gif", { type: "image/gif" });
+      const staticFile = new File(["gif-static"], "static-switch.gif", { type: "image/gif" });
+      vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
+        const body = init?.body as FormData | undefined;
+        const uploaded = body?.get("file") as File | null;
+        const isStatic = uploaded?.name === "static-switch.gif";
+        return new Response(
+          JSON.stringify({
+            width: 64,
+            height: 64,
+            pages: isStatic ? 1 : 4,
+            delay: isStatic ? [] : [100, 100, 100, 100],
+            loop: 0,
+            fileSize: isStatic ? 512 : 1024,
+            duration: isStatic ? 0 : 400,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      });
+
+      useFileStore.setState({
+        files: [animFile, staticFile],
+        selectedIndex: 0,
+      });
+
+      const onSwitch = vi.fn();
+      const { container: switchContainer } = await act(async () =>
+        render(<GifToolsControls onChange={onSwitch} />),
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Speed" }));
+      expect(switchContainer.querySelector("#gif-speed")).not.toBeNull();
+      expect(onSwitch).toHaveBeenLastCalledWith({
+        mode: "speed",
+        speedFactor: 1,
+        loop: 0,
+      });
+
+      await act(async () => {
+        useFileStore.setState({ selectedIndex: 1 });
+      });
+
+      expect(screen.getByText("Static image")).toBeDefined();
+      expect((screen.getByRole("button", { name: "Speed" }) as HTMLButtonElement).disabled).toBe(
+        true,
+      );
+      expect(switchContainer.querySelector("#gif-speed")).toBeNull();
+      expect(switchContainer.querySelector("#gif-width")).not.toBeNull();
+      expect(onSwitch).toHaveBeenLastCalledWith({
+        mode: "resize",
+        loop: 0,
+      });
+
+      await userEvent.click(screen.getByRole("button", { name: "Optimize" }));
+      expect(onSwitch).toHaveBeenLastCalledWith({
+        mode: "optimize",
+        colors: 256,
+        dither: 1,
+        effort: 7,
+        loop: 0,
+      });
+      await act(async () => {
+        useFileStore.setState({ selectedIndex: 0 });
+      });
+      await act(async () => {
+        useFileStore.setState({ selectedIndex: 1 });
+      });
+      expect(onSwitch).toHaveBeenLastCalledWith({
+        mode: "optimize",
+        colors: 256,
+        dither: 1,
+        effort: 7,
+        loop: 0,
+      });
+      cleanup();
+
+      const onHydratedPipelineStatic = vi.fn();
+      await act(async () =>
+        render(
+          <GifToolsControls
+            settings={{ mode: "speed", speedFactor: 2, loop: 0 }}
+            onChange={onHydratedPipelineStatic}
+          />,
+        ),
+      );
+      expect(screen.getByText("Static image")).toBeDefined();
+      expect(onHydratedPipelineStatic).toHaveBeenLastCalledWith({
+        mode: "speed",
+        speedFactor: 2,
+        loop: 0,
+      });
+    } finally {
+      cleanup();
+      useFileStore.setState({ files: [], selectedIndex: 0 });
+    }
+  });
 });
