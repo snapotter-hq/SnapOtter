@@ -77,6 +77,50 @@ describe("chart-maker numbers written the way a spreadsheet shows them (#1198)",
     expect(skippedFirstRow.unreadable).toBe(1);
   });
 
+  it("splits a headerless semicolon CSV with comma decimals on the semicolon (#2981)", () => {
+    expect(parse("Apples;1,5\nBananas;2,5\nCherries;3,5\n")).toEqual([
+      { label: "Apples", value: 1.5 },
+      { label: "Bananas", value: 2.5 },
+      { label: "Cherries", value: 3.5 },
+    ]);
+    expect(parse("Apples;1,5;4,25\nBananas;2,5;5,75\n")).toEqual([
+      { label: "Apples", value: 4.25 },
+      { label: "Bananas", value: 5.75 },
+    ]);
+    expect(parse("Apples;100,5;-2,1\nBananas;200,5;1,4\n")).toEqual([
+      { label: "Apples", value: 100.5 },
+      { label: "Bananas", value: 200.5 },
+    ]);
+    expect(parse("Apples;1,250\nBananas;2,500\n")).toEqual([
+      { label: "Apples", value: 1250 },
+      { label: "Bananas", value: 2500 },
+    ]);
+    expect(parse("item (EUR, gross);value\nApples;1,5\nBananas;2,5\n")).toEqual([
+      { label: "Apples", value: 1.5 },
+      { label: "Bananas", value: 2.5 },
+    ]);
+    expect(parse('"Item, name";value\nApples;1,5\nBananas;2,5\n')).toEqual([
+      { label: "Apples", value: 1.5 },
+      { label: "Bananas", value: 2.5 },
+    ]);
+    expect(parse('"A;B",10\n"C;D",20\n')).toEqual([
+      { label: "A;B", value: 10 },
+      { label: "C;D", value: 20 },
+    ]);
+    expect(parse('"A;B","1,5"\n"C;D","2,5"\n')).toEqual([
+      { label: "A;B", value: 1.5 },
+      { label: "C;D", value: 2.5 },
+    ]);
+    expect(parse("region,code,sales\nEMEA,A;1,50\nAPAC,B;2,75\n")).toEqual([
+      { label: "EMEA", value: 50 },
+      { label: "APAC", value: 75 },
+    ]);
+    expect(parse("EMEA,A;1,50\nAPAC,B;2,75\n")).toEqual([
+      { label: "EMEA", value: 50 },
+      { label: "APAC", value: 75 },
+    ]);
+  });
+
   it("reads a column of three-digit groups as thousands", () => {
     expect(values('k,v\na,"1,200"\nb,"2,400"\n')).toEqual([1200, 2400]);
     expect(values("k,v\na,1 200\nb,2 400\nc,1'000'000\n")).toEqual([1200, 2400, 1000000]);

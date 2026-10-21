@@ -365,11 +365,49 @@ function isHeaderRow(rows: string[][]): boolean {
   return years >= 2;
 }
 
+function prefersSemicolon(
+  text: string,
+  parsed: Papa.ParseResult<string[]>,
+): Papa.ParseResult<string[]> | null {
+  if (parsed.meta.delimiter !== ",") return null;
+  if (!parsed.data.some((row) => row.some((cell) => cell.includes(";")))) return null;
+  const initialHasHeader = isHeaderRow(parsed.data);
+  const initialDataRows = initialHasHeader ? parsed.data.slice(1) : parsed.data;
+  const initialLayout = detectColumns(
+    initialDataRows,
+    initialHasHeader ? parsed.data[0].length : 0,
+  );
+  const initialLabelHasSemicolon =
+    initialLayout.labelCol >= 0 &&
+    initialDataRows.some((row) => toCell(row[initialLayout.labelCol]).includes(";"));
+  if (initialLayout.valueCol >= 0 && !initialLabelHasSemicolon) return null;
+
+  const semi = Papa.parse<string[]>(text, {
+    delimiter: ";",
+    header: false,
+    skipEmptyLines: "greedy",
+  });
+  if (semi.errors.length > 0) return null;
+  const hasHeader = isHeaderRow(semi.data);
+  const dataRows = hasHeader ? semi.data.slice(1) : semi.data;
+  const { decimals, labelCol, valueCol, width } = detectColumns(
+    dataRows,
+    hasHeader ? semi.data[0].length : 0,
+  );
+  if (width <= 1 || valueCol < 0 || !semi.data.every((row) => row.length === width)) return null;
+  if (decimals[valueCol] !== "," && !dataRows.some((row) => toCell(row[valueCol]).includes(","))) {
+    return null;
+  }
+  if (labelCol >= 0 && dataRows.some((row) => toCell(row[labelCol]).includes(";"))) return null;
+  return semi;
+}
+
 function parseCsv(text: string): Table {
   // "greedy" also drops rows of bare commas, which every spreadsheet export
   // trails. Plain `true` keeps them as [""] cells that drag the numeric vote
   // below the majority and rejected the file.
-  const parsed = Papa.parse<string[]>(text, { header: false, skipEmptyLines: "greedy" });
+  const initial = Papa.parse<string[]>(text, { header: false, skipEmptyLines: "greedy" });
+  const parsed = prefersSemicolon(text, initial) ?? initial;
   const rows = parsed.data;
 
   // A one-column CSV always reports UndetectableDelimiter and Papa hands back

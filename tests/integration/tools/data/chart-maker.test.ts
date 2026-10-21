@@ -406,6 +406,14 @@ describe("Chart Maker column detection", () => {
     ).toBe(true);
   });
 
+  it("splits a headerless semicolon CSV with comma decimals on the semicolon (#2981)", async () => {
+    const png = await renderChart("Apples;1,5\nBananas;2,5\nCherries;3,5\n");
+
+    expect(
+      png.equals(await renderChart("label,value\nApples,1.5\nBananas,2.5\nCherries,3.5\n")),
+    ).toBe(true);
+  });
+
   it("charts a $-prefixed revenue column rather than the id column", async () => {
     const png = await renderChart("id,region,revenue\n1,EMEA,$4400\n2,APAC,$3610\n");
 
