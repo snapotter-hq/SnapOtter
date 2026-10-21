@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { en } from "@snapotter/shared";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -618,6 +618,66 @@ describe("automate pipeline delete (#1987)", () => {
 
     await waitFor(() => expect(screen.getByText(en.automate.noSavedPipelines)).toBeInTheDocument());
     expect(usePipelineStore.getState().savedPipelines).toEqual([]);
+  });
+
+  it("keeps the list expanded when deleting from 5 to 4, then hides Show less and resets expansion when deleting down to 3 (#2973)", async () => {
+    const five = [1, 2, 3, 4, 5].map((n) => ({
+      ...SAVED,
+      id: `p${n}`,
+      name: `Pipeline ${n}`,
+    }));
+    usePipelineStore.setState({ savedPipelines: five });
+    let listReplies = 0;
+    server = {
+      save: savedOk,
+      list: () => {
+        listReplies += 1;
+        return new Response(
+          JSON.stringify({ pipelines: listReplies === 1 ? five.slice(1) : five.slice(2) }),
+        );
+      },
+      delete: () => new Response(JSON.stringify({ ok: true })),
+    };
+
+    renderAutomate();
+
+    fireEvent.click(await screen.findByText(format(en.automate.moreCount, { count: 2 })));
+    expect(screen.getByText(en.common.showLess)).toBeInTheDocument();
+
+    // Deleting from 5 down to 4 keeps the list expanded and Show less visible.
+    fireEvent.click((await screen.findAllByTitle(en.automate.deletePipeline))[0]);
+    await waitFor(() =>
+      expect(usePipelineStore.getState().savedPipelines.map((p) => p.id)).toEqual([
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+      ]),
+    );
+    expect(screen.getByText(en.common.showLess)).toBeInTheDocument();
+    expect(screen.getByText("Pipeline 5")).toBeInTheDocument();
+
+    // Deleting from 4 down to 3 hides Show less and resets showAllSaved.
+    fireEvent.click((await screen.findAllByTitle(en.automate.deletePipeline))[0]);
+    await waitFor(() =>
+      expect(usePipelineStore.getState().savedPipelines.map((p) => p.id)).toEqual([
+        "p3",
+        "p4",
+        "p5",
+      ]),
+    );
+    expect(screen.queryByText(en.common.showLess)).not.toBeInTheDocument();
+    expect(screen.queryByText(format(en.automate.moreCount, { count: 1 }))).not.toBeInTheDocument();
+
+    // If a fourth pipeline is added later, the list should stay collapsed (+1 more)
+    // rather than auto-expanding from a stale showAllSaved flag.
+    act(() => {
+      usePipelineStore.setState({ savedPipelines: five.slice(1) });
+    });
+    await waitFor(() =>
+      expect(screen.getByText(format(en.automate.moreCount, { count: 1 }))).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(en.common.showLess)).not.toBeInTheDocument();
   });
 });
 

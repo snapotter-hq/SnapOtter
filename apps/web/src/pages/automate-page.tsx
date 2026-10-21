@@ -329,6 +329,12 @@ function AutomatePageContent({
     }
   }, [steps.length]);
 
+  useEffect(() => {
+    if (savedPipelines.length <= 3) {
+      setShowAllSaved(false);
+    }
+  }, [savedPipelines.length]);
+
   const handleOpenLibrary = useCallback(() => {
     if (!allowIntake()) return;
     setLibraryModalOpen(true);
@@ -1115,7 +1121,7 @@ function AutomatePageContent({
                   {t.automate.noSavedPipelines}
                 </p>
               )
-            ) : showAllSaved ? (
+            ) : showAllSaved && savedPipelines.length > 3 ? (
               <div className="space-y-1 max-h-36 overflow-y-auto">
                 {savedPipelines.map((p) => (
                   <div key={p.id} className="flex items-center gap-1 group">
