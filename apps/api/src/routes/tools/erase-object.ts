@@ -3,6 +3,7 @@ import { inpaint, isGpuAvailable } from "@snapotter/ai";
 import {
   FEATURE_BUNDLES,
   getBundleForTool,
+  hasServerErrorStatus,
   isToolInputError,
   TOOL_BUNDLE_MAP,
 } from "@snapotter/shared";
@@ -17,23 +18,23 @@ import {
   parseSaveModeField,
   type ToolJobData,
 } from "../../jobs/types.js";
-import { autoOrient } from "../../lib/auto-orient.js";
 import { stripInternalPaths } from "../../lib/errors.js";
 import { isFeatureInstalled, isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { createUniqueNamer } from "../../lib/filename.js";
-import {
-  decodeToSharpCompat,
-  isDecoderUnavailable,
-  needsCliDecode,
-} from "../../lib/format-decoders.js";
+import { isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
-import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
+import { encodeHeic } from "../../lib/heic-converter.js";
 import { containerMemoryLimitBytes, hqCpuMemoryRefusal } from "../../lib/hq-memory-gate.js";
 import { asInputErrorIfUndecodable, withAiImageEncodeContext } from "../../lib/image-error.js";
+import { prepareRouteImage } from "../../lib/image-input-prep.js";
 import { trackClientDisconnect } from "../../lib/ingress-disconnect.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
-import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
+import {
+  getObjectBuffer,
+  normalizeOperationalWriteError,
+  putObject,
+} from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import {
   discardUnenqueuedUploads,
@@ -41,6 +42,7 @@ import {
   settleUnenqueuedAlias,
 } from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
 
@@ -84,6 +86,7 @@ export function registerEraseObject(app: FastifyInstance) {
       let imageBuffer: Buffer | null = null;
       let maskBuffer: Buffer | null = null;
       let filename = "image";
+      let maskFilename = "mask.png";
       let clientJobId: string | null = null;
       let clientJobIdRaw: string | null = null;
       let fileId: string | null = null;
@@ -108,6 +111,7 @@ export function registerEraseObject(app: FastifyInstance) {
               if (part.fieldname === "mask") {
                 const upload = await receiveUpload(part, jobId, { uniqueName });
                 maskKey = upload.key;
+                maskFilename = upload.filename;
               } else {
                 const upload = await receiveUpload(part, jobId, { uniqueName });
                 imageKey = upload.key;
@@ -181,7 +185,7 @@ export function registerEraseObject(app: FastifyInstance) {
         if (!imageValidation.valid) {
           return reply.status(400).send({ error: `Invalid image: ${imageValidation.reason}` });
         }
-        const maskValidation = await validateImageBuffer(maskBuffer, "mask.png");
+        const maskValidation = await validateImageBuffer(maskBuffer, maskFilename);
         if (!maskValidation.valid) {
           return reply.status(400).send({ error: `Invalid mask: ${maskValidation.reason}` });
         }
@@ -235,27 +239,42 @@ export function registerEraseObject(app: FastifyInstance) {
         }
 
         try {
-          if (imageValidation.format === "heif") {
-            imageBuffer = await decodeHeic(imageBuffer);
-          }
-          if (needsCliDecode(imageValidation.format)) {
-            imageBuffer = await decodeToSharpCompat(imageBuffer, imageValidation.format);
-          }
-          imageBuffer = await autoOrient(imageBuffer);
+          const preparedImage = await prepareRouteImage(
+            imageBuffer,
+            filename,
+            imageValidation.format,
+            {
+              log: request.log,
+              rewriteFilenameToPng: true,
+              rasterizeSvg: true,
+            },
+          );
+          imageBuffer = preparedImage.buffer;
+          filename = preparedImage.filename;
 
-          // The mask goes through the same CLI-decoded formats the main image
-          // does. Without this, a HEIC/RAW/etc. mask reaches the unguarded
-          // sharp() calls inside inpaint() and fails with a generic, misclassified
-          // error instead of the clear message the image gets right above.
-          if (maskValidation.format === "heif") {
-            maskBuffer = await decodeHeic(maskBuffer);
+          // The mask goes through the same CLI-decoded and SVG formats the main
+          // image does. Without this, a HEIC/RAW/SVG/etc. mask reaches the
+          // unguarded sharp() calls inside inpaint() and fails with a generic,
+          // misclassified error instead of the clear message the image gets.
+          const preparedMask = await prepareRouteImage(
+            maskBuffer,
+            maskFilename,
+            maskValidation.format,
+            {
+              log: request.log,
+              rasterizeSvg: true,
+            },
+          );
+          maskBuffer = preparedMask.buffer;
+        } catch (rawErr) {
+          const err = normalizeOperationalWriteError(rawErr);
+          if (err instanceof InputValidationError) {
+            return reply.status(400).send({ error: err.message });
           }
-          if (needsCliDecode(maskValidation.format)) {
-            maskBuffer = await decodeToSharpCompat(maskBuffer, maskValidation.format);
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+          if (!isToolInputError(err)) {
+            request.log.error({ err, toolId: "erase-object" }, "Input decoding failed");
           }
-        } catch (err) {
-          if (isDecoderUnavailable(err)) throw err;
-          request.log.error({ err, toolId: "erase-object" }, "Input decoding failed");
           return reply.status(422).send({
             error: "Object erasing failed",
             details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),

@@ -3,7 +3,13 @@ import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { restorePhoto } from "@snapotter/ai";
-import { getBundleForTool } from "@snapotter/shared";
+import {
+  getBundleForTool,
+  hasServerErrorStatus,
+  isToolInputError,
+  markToolInputError,
+  ToolInputError,
+} from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -20,20 +26,19 @@ import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
-import {
-  decodeAnyFormat,
-  decodeToSharpCompat,
-  isDecoderUnavailable,
-  needsCliDecode,
-} from "../../lib/format-decoders.js";
-import { decodeHeic } from "../../lib/heic-converter.js";
+import { decodeAnyFormat, isDecoderUnavailable } from "../../lib/format-decoders.js";
 import {
   asInputErrorIfUndecodable,
   withAiImageEncodeContext,
   withImageEncodeContext,
 } from "../../lib/image-error.js";
+import { prepareRouteImage } from "../../lib/image-input-prep.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
-import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
+import {
+  getObjectBuffer,
+  normalizeOperationalWriteError,
+  putObject,
+} from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import {
   discardUnenqueuedUploads,
@@ -41,6 +46,7 @@ import {
   settleUnenqueuedAlias,
 } from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
 import { registerToolProcessFn } from "../tool-factory.js";
@@ -215,23 +221,43 @@ export function registerRestorePhoto(app: FastifyInstance) {
         }
 
         try {
-          if (validation.format === "heif") {
-            fileBuffer = await decodeHeic(fileBuffer);
-          }
-          if (needsCliDecode(validation.format)) {
-            fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
-          }
-          fileBuffer = await autoOrient(fileBuffer);
+          const prepared = await prepareRouteImage(fileBuffer, filename, validation.format, {
+            log: request.log,
+            rewriteFilenameToPng: true,
+            rasterizeSvg: true,
+          });
+          fileBuffer = prepared.buffer;
+          filename = prepared.filename;
           if (validation.format === "avif") {
             try {
               fileBuffer = await sharp(fileBuffer).png().toBuffer();
-            } catch {
-              fileBuffer = await decodeAnyFormat(fileBuffer, "avif");
+            } catch (probeErr) {
+              request.log.info(
+                { err: probeErr, format: "avif" },
+                "restore-photo: native AVIF decode failed, trying the CLI decoder",
+              );
+              try {
+                fileBuffer = await decodeAnyFormat(fileBuffer, "avif");
+              } catch (rawAvifErr) {
+                const avifErr = normalizeOperationalWriteError(rawAvifErr);
+                if (isDecoderUnavailable(avifErr) || hasServerErrorStatus(avifErr)) throw avifErr;
+                const combined = new ToolInputError(
+                  `AVIF decode failed (native: ${probeErr instanceof Error ? probeErr.message : String(probeErr)}; cli: ${avifErr instanceof Error ? avifErr.message : String(avifErr)})`,
+                );
+                combined.cause = avifErr;
+                throw markToolInputError(combined);
+              }
             }
           }
-        } catch (err) {
-          if (isDecoderUnavailable(err)) throw err;
-          request.log.error({ err, toolId: "restore-photo" }, "Input decoding failed");
+        } catch (rawErr) {
+          const err = normalizeOperationalWriteError(rawErr);
+          if (err instanceof InputValidationError) {
+            return reply.status(400).send({ error: err.message });
+          }
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+          if (!isToolInputError(err)) {
+            request.log.error({ err, toolId: "restore-photo" }, "Input decoding failed");
+          }
           return reply.status(422).send({
             error: "Photo restoration failed",
             details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),

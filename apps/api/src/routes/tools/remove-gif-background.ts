@@ -8,6 +8,7 @@ import {
   BG_REMOVAL_MODELS,
   getBundleForTool,
   HEX_COLOR_PATTERN,
+  hasServerErrorStatus,
   isSafeMessageError,
   isToolInputError,
   TOOL_BUNDLE_MAP,
@@ -29,19 +30,26 @@ import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
+import { isDecoderUnavailable } from "../../lib/format-decoders.js";
 import {
   asInputErrorIfUndecodable,
   withAiImageEncodeContext,
   withImageEncodeContext,
 } from "../../lib/image-error.js";
+import { prepareRouteImage } from "../../lib/image-input-prep.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
-import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
+import {
+  getObjectBuffer,
+  normalizeOperationalWriteError,
+  putObject,
+} from "../../lib/object-storage.js";
 import {
   discardUnenqueuedUploads,
   hasPersistedJobRow,
   settleUnenqueuedAlias,
 } from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
 import { registerToolProcessFn } from "../tool-factory.js";
@@ -360,6 +368,29 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
             return reply
               .status(400)
               .send({ error: `Invalid background image: ${bgValidation.reason}` });
+          }
+          try {
+            const preparedBg = await prepareRouteImage(bgBuffer, bgName, bgValidation.format, {
+              log: request.log,
+              rewriteFilenameToPng: true,
+              rasterizeSvg: true,
+              rasterizeToPng: true,
+            });
+            bgBuffer = preparedBg.buffer;
+            bgName = preparedBg.filename;
+          } catch (rawErr) {
+            const err = normalizeOperationalWriteError(rawErr);
+            if (err instanceof InputValidationError) {
+              return reply.status(400).send({ error: err.message });
+            }
+            if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+            if (!isToolInputError(err)) {
+              request.log.error({ err, toolId }, "Background image decoding failed");
+            }
+            return reply.status(422).send({
+              error: "Animated background removal failed",
+              details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
+            });
           }
           bgImageKey = `uploads/${jobId}/bg-${bgName}`;
           await putObject(bgImageKey, bgBuffer);

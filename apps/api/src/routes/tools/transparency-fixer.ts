@@ -3,7 +3,12 @@ import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { isMemoryAllocError, removeBackground } from "@snapotter/ai";
-import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
+import {
+  getBundleForTool,
+  hasServerErrorStatus,
+  isToolInputError,
+  TOOL_BUNDLE_MAP,
+} from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -20,19 +25,19 @@ import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
-import {
-  decodeToSharpCompat,
-  isDecoderUnavailable,
-  needsCliDecode,
-} from "../../lib/format-decoders.js";
-import { decodeHeic } from "../../lib/heic-converter.js";
+import { isDecoderUnavailable } from "../../lib/format-decoders.js";
 import {
   asInputErrorIfUndecodable,
   withAiImageEncodeContext,
   withImageEncodeContext,
 } from "../../lib/image-error.js";
+import { prepareRouteImage } from "../../lib/image-input-prep.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
-import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
+import {
+  getObjectBuffer,
+  normalizeOperationalWriteError,
+  putObject,
+} from "../../lib/object-storage.js";
 import {
   discardUnenqueuedUploads,
   hasPersistedJobRow,
@@ -40,6 +45,7 @@ import {
 } from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { windowMax } from "../../lib/window-max.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
 import { registerToolProcessFn } from "../tool-factory.js";
@@ -333,20 +339,22 @@ export function registerTransparencyFixer(app: FastifyInstance) {
         }
 
         try {
-          if (validation.format === "heif") {
-            fileBuffer = await decodeHeic(fileBuffer);
-            const ext = filename.match(/\.[^.]+$/)?.[0];
-            if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
+          const prepared = await prepareRouteImage(fileBuffer, filename, validation.format, {
+            log: request.log,
+            rewriteFilenameToPng: true,
+            rasterizeSvg: true,
+          });
+          fileBuffer = prepared.buffer;
+          filename = prepared.filename;
+        } catch (rawErr) {
+          const err = normalizeOperationalWriteError(rawErr);
+          if (err instanceof InputValidationError) {
+            return reply.status(400).send({ error: err.message });
           }
-          if (needsCliDecode(validation.format)) {
-            fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
-            const ext = filename.match(/\.[^.]+$/)?.[0];
-            if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+          if (!isToolInputError(err)) {
+            request.log.error({ err, toolId: TOOL_ID }, "Input decoding failed");
           }
-          fileBuffer = await autoOrient(fileBuffer);
-        } catch (err) {
-          if (isDecoderUnavailable(err)) throw err;
-          request.log.error({ err, toolId: TOOL_ID }, "Input decoding failed");
           return reply.status(422).send({
             error: "Transparency fix failed",
             details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),

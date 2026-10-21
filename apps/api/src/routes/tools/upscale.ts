@@ -3,7 +3,12 @@ import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { upscale } from "@snapotter/ai";
-import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
+import {
+  getBundleForTool,
+  hasServerErrorStatus,
+  isToolInputError,
+  TOOL_BUNDLE_MAP,
+} from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -20,21 +25,22 @@ import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
-import {
-  decodeToSharpCompat,
-  isDecoderUnavailable,
-  needsCliDecode,
-} from "../../lib/format-decoders.js";
+import { isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
-import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
+import { encodeHeic } from "../../lib/heic-converter.js";
 import {
   asInputErrorIfUndecodable,
   withAiImageEncodeContext,
   withImageEncodeContext,
 } from "../../lib/image-error.js";
+import { prepareRouteImage } from "../../lib/image-input-prep.js";
 import { logger } from "../../lib/logger.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
-import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
+import {
+  getObjectBuffer,
+  normalizeOperationalWriteError,
+  putObject,
+} from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import {
   discardUnenqueuedUploads,
@@ -42,6 +48,7 @@ import {
   settleUnenqueuedAlias,
 } from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
 import { registerToolProcessFn, type ToolProcessCtx } from "../tool-factory.js";
@@ -266,16 +273,22 @@ export function registerUpscale(app: FastifyInstance) {
       }
 
       try {
-        if (validation.format === "heif") {
-          fileBuffer = await decodeHeic(fileBuffer);
+        const prepared = await prepareRouteImage(fileBuffer, filename, validation.format, {
+          log: request.log,
+          rewriteFilenameToPng: true,
+          rasterizeSvg: true,
+        });
+        fileBuffer = prepared.buffer;
+        filename = prepared.filename;
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(rawErr);
+        if (err instanceof InputValidationError) {
+          return reply.status(400).send({ error: err.message });
         }
-        if (needsCliDecode(validation.format)) {
-          fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+        if (!isToolInputError(err)) {
+          request.log.error({ err, toolId: "upscale" }, "Input decoding failed");
         }
-        fileBuffer = await autoOrient(fileBuffer);
-      } catch (err) {
-        if (isDecoderUnavailable(err)) throw err;
-        request.log.error({ err, toolId: "upscale" }, "Input decoding failed");
         return reply.status(422).send({
           error: "Upscaling failed",
           details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),

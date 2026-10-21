@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { extname, join } from "node:path";
+import { join } from "node:path";
 import { removeBackground } from "@snapotter/ai";
 import {
   BG_REMOVAL_MODELS,
@@ -9,12 +9,9 @@ import {
   HEX_COLOR_PATTERN,
   hasServerErrorStatus,
   isToolInputError,
-  markToolInputError,
   TOOL_BUNDLE_MAP,
-  ToolInputError,
 } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import sharp from "sharp";
 import { z } from "zod";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob, insertToolJobAlias } from "../../jobs/enqueue.js";
@@ -36,18 +33,13 @@ import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import {
-  DecoderOutOfMemoryError,
-  decodeToSharpCompat,
-  isDecoderUnavailable,
-  needsCliDecode,
-} from "../../lib/format-decoders.js";
-import { decodeHeic } from "../../lib/heic-converter.js";
+import { isDecoderUnavailable } from "../../lib/format-decoders.js";
 import {
   asInputErrorIfUndecodable,
   withAiImageEncodeContext,
   withImageEncodeContext,
 } from "../../lib/image-error.js";
+import { prepareRouteImage } from "../../lib/image-input-prep.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import {
   getObjectBuffer,
@@ -56,13 +48,13 @@ import {
   normalizeOperationalWriteError,
   putObject,
 } from "../../lib/object-storage.js";
-import { decompressSvgz, isSvgzClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
 import {
   discardUnenqueuedUploads,
   hasPersistedJobRow,
   settleUnenqueuedAlias,
 } from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
 import { registerToolProcessFn } from "../tool-factory.js";
@@ -392,25 +384,22 @@ export function registerRemoveBackground(app: FastifyInstance) {
         }
 
         try {
-          // Decode HEIC/HEIF before processing
-          if (validation.format === "heif") {
-            fileBuffer = await decodeHeic(fileBuffer);
-            const ext = filename.match(/\.[^.]+$/)?.[0];
-            if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
+          const prepared = await prepareRouteImage(fileBuffer, filename, validation.format, {
+            log: request.log,
+            rewriteFilenameToPng: true,
+            rasterizeSvg: true,
+          });
+          fileBuffer = prepared.buffer;
+          filename = prepared.filename;
+        } catch (rawErr) {
+          const err = normalizeOperationalWriteError(rawErr);
+          if (err instanceof InputValidationError) {
+            return reply.status(400).send({ error: err.message });
           }
-
-          // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
-          if (needsCliDecode(validation.format)) {
-            fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
-            const ext = filename.match(/\.[^.]+$/)?.[0];
-            if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+          if (!isToolInputError(err)) {
+            request.log.error({ err, toolId: "remove-background" }, "Input decoding failed");
           }
-
-          // Auto-orient to fix EXIF rotation
-          fileBuffer = await autoOrient(fileBuffer);
-        } catch (err) {
-          if (isDecoderUnavailable(err)) throw err;
-          request.log.error({ err, toolId: "remove-background" }, "Input decoding failed");
           return reply.status(422).send({
             error: "Background removal failed",
             details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
@@ -585,74 +574,13 @@ export function registerRemoveBackground(app: FastifyInstance) {
               .status(400)
               .send({ error: `Invalid background image: ${bgValidation.reason}` });
           }
-          if (bgValidation.format === "heif") {
-            try {
-              bgImageBuffer = await decodeHeic(bgImageBuffer);
-            } catch (rawErr) {
-              const err = normalizeOperationalWriteError(rawErr);
-              if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
-              throw err instanceof Error
-                ? markToolInputError(err)
-                : new ToolInputError(String(err));
-            }
-          }
-          let fallbackFormat: string | undefined;
-          if (needsCliDecode(bgValidation.format)) {
-            const fileExt = extname(bgFilename).toLowerCase().replace(/^\./, "") || undefined;
-            try {
-              bgImageBuffer = await decodeToSharpCompat(
-                bgImageBuffer,
-                bgValidation.format,
-                fileExt,
-              );
-            } catch (rawDecodeErr) {
-              const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
-              if (
-                decodeErr instanceof DecoderOutOfMemoryError ||
-                (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
-              ) {
-                throw decodeErr;
-              }
-              try {
-                const meta = await sharp(bgImageBuffer).metadata();
-                fallbackFormat = meta.format;
-              } catch (err) {
-                if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
-                  throw decodeErr;
-                }
-                throw await asInputErrorIfUndecodable(bgImageBuffer, err);
-              }
-            }
-          }
-          let isSvg = bgValidation.format === "svg" || fallbackFormat === "svg";
-          if (
-            !isSvg &&
-            bgValidation.format === "png" &&
-            bgFilename.toLowerCase().endsWith(".apng")
-          ) {
-            const meta = await sharp(bgImageBuffer)
-              .metadata()
-              .catch(() => null);
-            if (meta?.format === "svg") isSvg = true;
-          }
-          if (isSvg) {
-            try {
-              bgImageBuffer = decompressSvgz(bgImageBuffer);
-              bgImageBuffer = sanitizeSvg(bgImageBuffer);
-            } catch (err) {
-              if (
-                isSvgzClientError(err) ||
-                (err instanceof Error && err.message.includes("SVGZ file does not contain"))
-              ) {
-                return reply.status(400).send({
-                  error: err instanceof Error ? err.message : "Invalid SVG",
-                });
-              }
-              throw err;
-            }
-          } else {
-            bgImageBuffer = await autoOrient(bgImageBuffer, request.log);
-          }
+          const preparedBg = await prepareRouteImage(
+            bgImageBuffer,
+            bgFilename,
+            bgValidation.format,
+            { log: request.log },
+          );
+          bgImageBuffer = preparedBg.buffer;
         }
 
         // Apply effects using cached mask + original
@@ -707,6 +635,9 @@ export function registerRemoveBackground(app: FastifyInstance) {
         });
       } catch (rawErr) {
         const err = normalizeOperationalWriteError(rawErr);
+        if (err instanceof InputValidationError) {
+          return reply.status(400).send({ error: err.message });
+        }
         if (isDecoderUnavailable(err)) throw err;
         if (hasServerErrorStatus(err)) throw err;
         if (!isToolInputError(err)) {

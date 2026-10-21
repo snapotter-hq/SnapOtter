@@ -130,8 +130,9 @@ function post(route: (typeof ROUTES)[number], sample: Sample) {
   });
 }
 
-// These routes retry a failed CLI decode with Sharp and report Sharp's error,
-// which never carries a path; their ICO row only pins that behaviour.
+// These routes retry a failed CLI decode with Sharp and report Sharp's error
+// (or the undecodable-image message), which never carries a path; their ICO
+// row only pins that behaviour.
 const ICO_DETAIL_FROM_SHARP = new Set([
   "collage",
   "stitch",
@@ -139,6 +140,8 @@ const ICO_DETAIL_FROM_SHARP = new Set([
   "color-palette",
   "barcode-read",
   "meme-generator upload",
+  "image-enhancement analyze",
+  "optimize-for-web preview",
 ]);
 
 describe("decode failures don't expose server temp paths (#1430)", () => {
@@ -152,7 +155,7 @@ describe("decode failures don't expose server temp paths (#1430)", () => {
         expect(res.body).not.toMatch(/(heic|ico|jxl|raw|jp2|exr)-(in|out)-/);
         const { details } = res.json();
         if (format === "ico" && ICO_DETAIL_FROM_SHARP.has(route.name)) {
-          expect(details).toMatch(/unsupported image format/);
+          expect(details).toMatch(/unsupported image format|can't be decoded/);
         } else {
           // The decoder's own error named its temp files; they're now masked.
           expect(details).toContain("[internal]");

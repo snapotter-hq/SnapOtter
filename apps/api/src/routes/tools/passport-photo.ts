@@ -20,26 +20,24 @@ import { z } from "zod";
 import { db, schema } from "../../db/index.js";
 import { INVALID_CLIENT_JOB_ID_ERROR, parseClientJobIdField } from "../../jobs/types.js";
 import { autoOrient } from "../../lib/auto-orient.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { getFirstMissingBundleForTool } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import {
-  decodeToSharpCompat,
-  isDecoderUnavailable,
-  needsCliDecode,
-} from "../../lib/format-decoders.js";
-import { decodeHeic } from "../../lib/heic-converter.js";
+import { isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
+import { prepareRouteImage } from "../../lib/image-input-prep.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import {
   getObjectBuffer,
   isMissingObjectError,
   isValidObjectKey,
+  normalizeOperationalWriteError,
   putObject,
 } from "../../lib/object-storage.js";
 import { isUniqueViolation } from "../../lib/pg-errors.js";
 import { withRouteScratch } from "../../lib/route-scratch.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { updateSingleFileProgress } from "../progress.js";
 import { registerToolProcessFn } from "../tool-factory.js";
@@ -230,22 +228,14 @@ export function registerPassportPhoto(app: FastifyInstance) {
       }
 
       try {
-        // Decode HEIC/HEIF before processing
-        if (validation.format === "heif") {
-          fileBuffer = await decodeHeic(fileBuffer);
-          const ext = filename.match(/\.[^.]+$/)?.[0];
-          if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
-        }
-
-        // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
-        if (needsCliDecode(validation.format)) {
-          fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
-          const ext = filename.match(/\.[^.]+$/)?.[0];
-          if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
-        }
-
-        // Auto-orient to fix EXIF rotation
-        const orientedBuffer = await autoOrient(fileBuffer);
+        const prepared = await prepareRouteImage(fileBuffer, filename, validation.format, {
+          log: request.log,
+          rewriteFilenameToPng: true,
+          rasterizeSvg: true,
+        });
+        fileBuffer = prepared.buffer;
+        filename = prepared.filename;
+        const orientedBuffer = fileBuffer;
 
         request.log.info(
           { toolId: "passport-photo", imageSize: orientedBuffer.length },
@@ -362,8 +352,9 @@ export function registerPassportPhoto(app: FastifyInstance) {
           imageWidth: landmarksResult.imageWidth,
           imageHeight: landmarksResult.imageHeight,
         });
-      } catch (err) {
-        const details = err instanceof Error ? err.message : "Unknown error";
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(rawErr);
+        const details = stripInternalPaths(err instanceof Error ? err.message : "Unknown error");
         const progressError =
           hasServerErrorStatus(err) && !isSafeMessageError(err)
             ? "Passport photo analysis failed"
@@ -380,6 +371,9 @@ export function registerPassportPhoto(app: FastifyInstance) {
               "Failed to persist passport photo analysis progress",
             );
           });
+        }
+        if (err instanceof InputValidationError) {
+          return reply.status(400).send({ error: err.message });
         }
         if (isDecoderUnavailable(err)) throw err;
         if (hasServerErrorStatus(err)) throw err;

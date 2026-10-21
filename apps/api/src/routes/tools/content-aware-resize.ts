@@ -10,14 +10,12 @@ import {
 } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { autoOrient } from "../../lib/auto-orient.js";
 import { sendInputValidationError } from "../../lib/engine-unavailable.js";
 import { formatZodErrors, friendlyError } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, needsCliDecode } from "../../lib/format-decoders.js";
-import { decodeHeic } from "../../lib/heic-converter.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
+import { prepareRouteImage } from "../../lib/image-input-prep.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { putObject } from "../../lib/object-storage.js";
 import { InputValidationError } from "../../modality/contract.js";
@@ -203,18 +201,19 @@ export function registerContentAwareResize(app: FastifyInstance) {
       (s) => ((s as Settings)?.square ? "square" : "custom"),
       async (inputBuffer, settings, filename, ctx) => {
         const s = settings as Settings;
-        // Decode HEIC/HEIF for pipeline/batch mode
-        const ext = filename.split(".").pop()?.toLowerCase() ?? "";
-        let buf = inputBuffer;
-        if (["heic", "heif", "hif"].includes(ext)) {
-          buf = await decodeHeic(buf);
-        }
-        // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR) for pipeline/batch mode
         const cliCheck = await validateImageBuffer(inputBuffer, filename);
-        if (cliCheck.valid && needsCliDecode(cliCheck.format)) {
-          buf = await decodeToSharpCompat(inputBuffer, cliCheck.format);
-        }
-        const orientedBuffer = await autoOrient(buf);
+        const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+        const format = cliCheck.valid
+          ? cliCheck.format
+          : ["heic", "heif", "hif"].includes(ext)
+            ? "heif"
+            : ext === "svg" || ext === "svgz"
+              ? "svg"
+              : "png";
+        const prepared = await prepareRouteImage(inputBuffer, filename, format, {
+          rasterizeSvg: true,
+        });
+        const orientedBuffer = prepared.buffer;
         const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
         const needsCleanup = !ctx?.scratchDir;
         if (needsCleanup) await mkdir(scratchDir, { recursive: true });

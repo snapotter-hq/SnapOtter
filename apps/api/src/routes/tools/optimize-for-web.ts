@@ -1,24 +1,20 @@
 import { extname } from "node:path";
 import { MAX_RESIZE_OUTPUT_DIMENSION, optimizeForWeb } from "@snapotter/image-engine";
-import { isToolInputError } from "@snapotter/shared";
+import { hasServerErrorStatus, isToolInputError } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
-import { autoOrient } from "../../lib/auto-orient.js";
 import { sendInputValidationError } from "../../lib/engine-unavailable.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import {
-  decodeToSharpCompat,
-  isDecoderUnavailable,
-  needsCliDecode,
-} from "../../lib/format-decoders.js";
+import { isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
-import { decodeHeic } from "../../lib/heic-converter.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
+import { prepareRouteImage } from "../../lib/image-input-prep.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
-import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { engineUnavailable } from "../../modality/image-input.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -116,56 +112,35 @@ export function registerOptimizeForWeb(app: FastifyInstance) {
         return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
       }
 
-      // Decode HEIC/HEIF
-      if (validation.format === "heif") {
-        try {
-          fileBuffer = await decodeHeic(fileBuffer);
-        } catch (err) {
-          if (isDecoderUnavailable(err)) {
-            return sendInputValidationError(
-              reply,
-              engineUnavailable(err),
-              "optimize-for-web",
-              request.log,
-            );
-          }
-          return reply.status(422).send({
-            error: "Failed to decode HEIC file",
-            details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-          });
+      try {
+        const prepared = await prepareRouteImage(fileBuffer, filename, validation.format, {
+          log: request.log,
+        });
+        fileBuffer = prepared.buffer;
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(rawErr);
+        if (err instanceof InputValidationError) {
+          return reply.status(400).send({ error: err.message });
         }
-      }
-
-      // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
-      if (needsCliDecode(validation.format)) {
-        try {
-          fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
-        } catch (err) {
-          if (isDecoderUnavailable(err)) {
-            return sendInputValidationError(
-              reply,
-              engineUnavailable(err),
-              "optimize-for-web",
-              request.log,
-            );
-          }
-          return reply.status(422).send({
-            error: `Failed to decode ${validation.format} file`,
-            details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-          });
+        if (isDecoderUnavailable(err)) {
+          return sendInputValidationError(
+            reply,
+            engineUnavailable(err),
+            "optimize-for-web",
+            request.log,
+          );
         }
-      }
-
-      // Sanitize SVG
-      if (validation.format === "svg") {
-        try {
-          fileBuffer = decompressSvgz(fileBuffer);
-          fileBuffer = sanitizeSvg(fileBuffer);
-        } catch (err) {
-          return reply.status(400).send({
-            error: err instanceof Error ? err.message : "Invalid SVG",
-          });
+        if (hasServerErrorStatus(err)) throw err;
+        if (!isToolInputError(err)) {
+          request.log.error({ err, toolId: "optimize-for-web" }, "Input decoding failed");
         }
+        return reply.status(422).send({
+          error:
+            validation.format === "heif"
+              ? "Failed to decode HEIC file"
+              : `Failed to decode ${validation.format} file`,
+          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+        });
       }
 
       let settings: Settings;
@@ -184,9 +159,7 @@ export function registerOptimizeForWeb(app: FastifyInstance) {
       }
 
       try {
-        const processBuffer =
-          validation.format === "svg" ? fileBuffer : await autoOrient(fileBuffer);
-        const result = await processImage(processBuffer, settings, filename);
+        const result = await processImage(fileBuffer, settings, filename);
 
         // Return the optimized image directly as binary with size headers.
         // This avoids workspace creation for ephemeral previews.
@@ -195,7 +168,8 @@ export function registerOptimizeForWeb(app: FastifyInstance) {
         reply.header("X-Processed-Size", String(result.buffer.length));
         reply.header("X-Output-Filename", encodeURIComponent(result.filename));
         return reply.send(result.buffer);
-      } catch (err) {
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(rawErr);
         if (isDecoderUnavailable(err)) {
           return sendInputValidationError(
             reply,
@@ -204,6 +178,7 @@ export function registerOptimizeForWeb(app: FastifyInstance) {
             request.log,
           );
         }
+        if (hasServerErrorStatus(err)) throw err;
         const message = stripInternalPaths(
           err instanceof Error ? err.message : "Preview processing failed",
         );

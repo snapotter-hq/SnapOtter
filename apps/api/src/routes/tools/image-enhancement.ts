@@ -4,27 +4,26 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { noiseRemoval } from "@snapotter/ai";
 import { analyzeImage, applyCorrections } from "@snapotter/image-engine";
+import { hasServerErrorStatus, isToolInputError } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { runPerFrame } from "../../lib/animated-image.js";
-import { autoOrient } from "../../lib/auto-orient.js";
 import type { DeepEnhanceSkipReason } from "../../lib/batch-file-notes.js";
 import { sendInputValidationError } from "../../lib/engine-unavailable.js";
 import { reportError } from "../../lib/error-report.js";
 import { stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
-import {
-  decodeToSharpCompat,
-  isDecoderUnavailable,
-  needsCliDecode,
-} from "../../lib/format-decoders.js";
-import { decodeHeic } from "../../lib/heic-converter.js";
+import { sanitizeFilename } from "../../lib/filename.js";
+import { isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
+import { prepareRouteImage } from "../../lib/image-input-prep.js";
 import { logger } from "../../lib/logger.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
+import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
 import { outputFormatFor, resolveOutputFormat } from "../../lib/output-format.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { engineUnavailable } from "../../modality/image-input.js";
 import { createToolRoute } from "../tool-factory.js";
 
@@ -232,7 +231,7 @@ export function registerImageEnhancement(app: FastifyInstance) {
               chunks.push(chunk);
             }
             fileBuffer = Buffer.concat(chunks);
-            filename = part.filename ?? "image";
+            filename = sanitizeFilename(part.filename ?? "image");
             break;
           }
         }
@@ -250,53 +249,50 @@ export function registerImageEnhancement(app: FastifyInstance) {
         return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
       }
 
-      if (validation.format === "heif") {
-        try {
-          fileBuffer = await decodeHeic(fileBuffer);
-        } catch (err) {
-          if (isDecoderUnavailable(err)) {
-            return sendInputValidationError(
-              reply,
-              engineUnavailable(err),
-              "image-enhancement",
-              request.log,
-            );
-          }
-          return reply.status(422).send({
-            error: "Failed to decode HEIC file",
-            details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-          });
+      try {
+        const prepared = await prepareRouteImage(fileBuffer, filename, validation.format, {
+          log: request.log,
+        });
+        fileBuffer = prepared.buffer;
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(rawErr);
+        if (err instanceof InputValidationError) {
+          return reply.status(400).send({ error: err.message });
         }
-      }
-
-      // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
-      if (needsCliDecode(validation.format)) {
-        try {
-          fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
-        } catch (err) {
-          if (isDecoderUnavailable(err)) {
-            return sendInputValidationError(
-              reply,
-              engineUnavailable(err),
-              "image-enhancement",
-              request.log,
-            );
-          }
-          return reply.status(422).send({
-            error: `Failed to decode ${validation.format} file`,
-            details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-          });
+        if (isDecoderUnavailable(err)) {
+          return sendInputValidationError(
+            reply,
+            engineUnavailable(err),
+            "image-enhancement",
+            request.log,
+          );
         }
+        if (hasServerErrorStatus(err)) throw err;
+        if (!isToolInputError(err)) {
+          request.log.error({ err, toolId: "image-enhancement" }, "Input decoding failed");
+        }
+        return reply.status(422).send({
+          error:
+            validation.format === "heif"
+              ? "Failed to decode HEIC file"
+              : `Failed to decode ${validation.format} file`,
+          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+        });
       }
 
       try {
-        fileBuffer = await autoOrient(fileBuffer);
         const analysis = await analyzeImage(fileBuffer);
         return reply.send(analysis);
-      } catch (err) {
+      } catch (rawErr) {
+        const classified = await asInputErrorIfUndecodable(fileBuffer, rawErr);
+        const err = normalizeOperationalWriteError(classified);
+        if (hasServerErrorStatus(err)) throw err;
+        if (!isToolInputError(err)) {
+          request.log.error({ err, toolId: "image-enhancement" }, "Image analysis failed");
+        }
         return reply.status(422).send({
           error: "Analysis failed",
-          details: err instanceof Error ? err.message : String(err),
+          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
         });
       }
     },

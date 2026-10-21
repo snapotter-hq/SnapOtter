@@ -3,7 +3,12 @@ import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { blurFaces } from "@snapotter/ai";
-import { getBundleForTool, TOOL_BUNDLE_MAP } from "@snapotter/shared";
+import {
+  getBundleForTool,
+  hasServerErrorStatus,
+  isToolInputError,
+  TOOL_BUNDLE_MAP,
+} from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -16,24 +21,22 @@ import {
   parseSaveModeField,
   type ToolJobData,
 } from "../../jobs/types.js";
-import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
-import {
-  DecoderOutOfMemoryError,
-  decodeToSharpCompat,
-  isDecoderUnavailable,
-  needsCliDecode,
-} from "../../lib/format-decoders.js";
-import { decodeHeic } from "../../lib/heic-converter.js";
+import { isDecoderUnavailable } from "../../lib/format-decoders.js";
 import {
   asInputErrorIfUndecodable,
   withAiImageEncodeContext,
   withImageEncodeContext,
 } from "../../lib/image-error.js";
+import { prepareRouteImage } from "../../lib/image-input-prep.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
-import { getObjectBuffer, putObject } from "../../lib/object-storage.js";
+import {
+  getObjectBuffer,
+  normalizeOperationalWriteError,
+  putObject,
+} from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import {
   discardUnenqueuedUploads,
@@ -41,6 +44,7 @@ import {
   settleUnenqueuedAlias,
 } from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
 import { registerToolProcessFn } from "../tool-factory.js";
@@ -198,16 +202,22 @@ export function registerBlurFaces(app: FastifyInstance) {
         }
 
         try {
-          if (validation.format === "heif") {
-            fileBuffer = await decodeHeic(fileBuffer);
+          const prepared = await prepareRouteImage(fileBuffer, filename, validation.format, {
+            log: request.log,
+            rewriteFilenameToPng: true,
+            rasterizeSvg: true,
+          });
+          fileBuffer = prepared.buffer;
+          filename = prepared.filename;
+        } catch (rawErr) {
+          const err = normalizeOperationalWriteError(rawErr);
+          if (err instanceof InputValidationError) {
+            return reply.status(400).send({ error: err.message });
           }
-          if (needsCliDecode(validation.format)) {
-            fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format);
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+          if (!isToolInputError(err)) {
+            request.log.error({ err, toolId: "blur-faces" }, "Input decoding failed");
           }
-          fileBuffer = await autoOrient(fileBuffer);
-        } catch (err) {
-          if (isDecoderUnavailable(err)) throw err;
-          request.log.error({ err, toolId: "blur-faces" }, "Input decoding failed");
           return reply.status(422).send({
             error: "Face blur failed",
             details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
@@ -268,25 +278,19 @@ export function registerBlurFaces(app: FastifyInstance) {
       () => "blur-faces",
       async (inputBuffer, settings, filename, ctx) => {
         const s = settings as { blurRadius?: number; sensitivity?: number };
-        let decoded = inputBuffer;
-        const validation = await validateImageBuffer(decoded, filename);
-        if (validation.valid && validation.format === "heif") {
-          decoded = await decodeHeic(decoded);
-        }
-        if (validation.valid && needsCliDecode(validation.format)) {
-          try {
-            decoded = await decodeToSharpCompat(decoded, validation.format);
-          } catch (decodeErr) {
-            if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
-            try {
-              await sharp(decoded).metadata();
-            } catch (err) {
-              if (isDecoderUnavailable(decodeErr)) throw decodeErr;
-              throw err;
-            }
-          }
-        }
-        const orientedBuffer = await autoOrient(decoded);
+        const validation = await validateImageBuffer(inputBuffer, filename);
+        const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+        const format = validation.valid
+          ? validation.format
+          : ["heic", "heif", "hif"].includes(ext)
+            ? "heif"
+            : ext === "svg" || ext === "svgz"
+              ? "svg"
+              : "png";
+        const prepared = await prepareRouteImage(inputBuffer, filename, format, {
+          rasterizeSvg: true,
+        });
+        const orientedBuffer = prepared.buffer;
         const scratchDir = ctx?.scratchDir ?? join(tmpdir(), "snapotter-scratch", randomUUID());
         const needsCleanup = !ctx?.scratchDir;
         if (needsCleanup) await mkdir(scratchDir, { recursive: true });
