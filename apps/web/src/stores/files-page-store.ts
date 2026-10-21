@@ -3,6 +3,7 @@ import { apiDeleteUserFiles, apiListFiles, apiUploadUserFiles, type UserFile } f
 
 interface FilesPageState {
   files: UserFile[];
+  knownFiles: Map<string, UserFile>;
   total: number;
   selectedFileId: string | null;
   checkedIds: Set<string>;
@@ -24,6 +25,7 @@ interface FilesPageState {
 
 export const useFilesPageStore = create<FilesPageState>((set, get) => ({
   files: [],
+  knownFiles: new Map(),
   total: 0,
   selectedFileId: null,
   checkedIds: new Set(),
@@ -36,12 +38,25 @@ export const useFilesPageStore = create<FilesPageState>((set, get) => ({
   fetchFiles: async () => {
     set({ loading: true, error: null });
     try {
-      const { searchQuery } = get();
+      const { searchQuery, files: prevFiles, knownFiles: prevKnownFiles } = get();
       const result = await apiListFiles({ search: searchQuery || undefined, limit: 200 });
-      set({ files: result.files, total: result.total, loading: false });
+      const nextKnownFiles = new Map(prevKnownFiles);
+      for (const f of prevFiles) {
+        nextKnownFiles.set(f.id, f);
+      }
+      for (const f of result.files) {
+        nextKnownFiles.set(f.id, f);
+      }
+      set({
+        files: result.files,
+        knownFiles: nextKnownFiles,
+        total: result.total,
+        loading: false,
+      });
     } catch (err) {
       set({
         files: [],
+        knownFiles: new Map(),
         total: 0,
         selectedFileId: null,
         checkedIds: new Set(),
@@ -85,8 +100,19 @@ export const useFilesPageStore = create<FilesPageState>((set, get) => ({
     if (checkedIds.size === 0) return;
     set({ loading: true, error: null });
     try {
-      await apiDeleteUserFiles(Array.from(checkedIds));
-      set({ checkedIds: new Set(), selectedFileId: null });
+      const idsToDelete = Array.from(checkedIds);
+      await apiDeleteUserFiles(idsToDelete);
+      const nextKnownFiles = new Map(get().knownFiles);
+      for (const id of idsToDelete) {
+        nextKnownFiles.delete(id);
+      }
+      const nextFiles = get().files.filter((f) => !checkedIds.has(f.id));
+      set({
+        files: nextFiles,
+        knownFiles: nextKnownFiles,
+        checkedIds: new Set(),
+        selectedFileId: null,
+      });
       await get().fetchFiles();
     } catch (err) {
       set({ error: err instanceof Error ? err.message : "Delete failed", loading: false });

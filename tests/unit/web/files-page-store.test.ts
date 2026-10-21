@@ -64,6 +64,7 @@ describe("useFilesPageStore", () => {
     mockApiDeleteUserFiles.mockReset();
     useFilesPageStore.setState({
       files: [],
+      knownFiles: new Map(),
       total: 0,
       selectedFileId: null,
       checkedIds: new Set(),
@@ -79,6 +80,7 @@ describe("useFilesPageStore", () => {
   it("has correct initial state", () => {
     const s = useFilesPageStore.getState();
     expect(s.files).toEqual([]);
+    expect(s.knownFiles.size).toBe(0);
     expect(s.total).toBe(0);
     expect(s.selectedFileId).toBeNull();
     expect(s.checkedIds.size).toBe(0);
@@ -371,6 +373,7 @@ describe("useFilesPageStore", () => {
     };
     useFilesPageStore.setState({
       files: [staleFile],
+      knownFiles: new Map([["f1", staleFile]]),
       total: 1,
       selectedFileId: "f1",
       checkedIds: new Set(["f1"]),
@@ -383,9 +386,68 @@ describe("useFilesPageStore", () => {
     expect(s.error).toBe("Network error");
     expect(s.loading).toBe(false);
     expect(s.files).toEqual([]);
+    expect(s.knownFiles.size).toBe(0);
     expect(s.total).toBe(0);
     expect(s.selectedFileId).toBeNull();
     expect(s.checkedIds.size).toBe(0);
+  });
+
+  it("fetchFiles retains seen files in knownFiles across searches and deleteChecked prunes them (#2904)", async () => {
+    const beaver = {
+      id: "beaver",
+      originalName: "beaver.png",
+      mimeType: "image/png",
+      size: 100,
+      width: 10,
+      height: 10,
+      version: 1,
+      toolChain: [],
+      createdAt: "",
+    };
+    const otter = {
+      id: "otter",
+      originalName: "otter.png",
+      mimeType: "image/png",
+      size: 200,
+      width: 20,
+      height: 20,
+      version: 1,
+      toolChain: [],
+      createdAt: "",
+    };
+
+    mockApiListFiles.mockResolvedValueOnce({ files: [beaver, otter], total: 2 });
+    await useFilesPageStore.getState().fetchFiles();
+    expect(useFilesPageStore.getState().knownFiles).toEqual(
+      new Map([
+        ["beaver", beaver],
+        ["otter", otter],
+      ]),
+    );
+
+    useFilesPageStore.getState().setSearchQuery("otter");
+    mockApiListFiles.mockResolvedValueOnce({ files: [otter], total: 1 });
+    await useFilesPageStore.getState().fetchFiles();
+    expect(useFilesPageStore.getState().files).toEqual([otter]);
+    expect(useFilesPageStore.getState().knownFiles).toEqual(
+      new Map([
+        ["beaver", beaver],
+        ["otter", otter],
+      ]),
+    );
+
+    useFilesPageStore.setState({ checkedIds: new Set(["beaver"]) });
+    mockApiDeleteUserFiles.mockResolvedValueOnce({ deleted: 1 });
+    mockApiListFiles.mockResolvedValueOnce({ files: [otter], total: 1 });
+    await useFilesPageStore.getState().deleteChecked();
+    expect(useFilesPageStore.getState().knownFiles).toEqual(new Map([["otter", otter]]));
+
+    // Deleting a currently visible file also prunes it from knownFiles without fetchFiles re-adding it from prevFiles.
+    useFilesPageStore.setState({ checkedIds: new Set(["otter"]) });
+    mockApiDeleteUserFiles.mockResolvedValueOnce({ deleted: 1 });
+    mockApiListFiles.mockResolvedValueOnce({ files: [], total: 0 });
+    await useFilesPageStore.getState().deleteChecked();
+    expect(useFilesPageStore.getState().knownFiles.size).toBe(0);
   });
 
   it("fetchFiles sets generic error for non-Error throws", async () => {

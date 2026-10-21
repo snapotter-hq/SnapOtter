@@ -466,11 +466,13 @@ function formatSize(bytes: number): string {
 export function getFilesToOpen({
   details,
   files,
+  knownFiles,
   checkedIds,
   filterMimePrefix,
 }: {
   details: UserFileDetail;
   files: UserFile[];
+  knownFiles?: ReadonlyMap<string, UserFile>;
   checkedIds: Set<string>;
   filterMimePrefix?: string;
 }): UserFile[] {
@@ -478,7 +480,17 @@ export function getFilesToOpen({
     !filterMimePrefix || file.mimeType.startsWith(filterMimePrefix);
 
   if (!isCompatible(details)) return [];
-  const compatibleChecked = files.filter((file) => checkedIds.has(file.id) && isCompatible(file));
+  const byId = new Map<string, UserFile>(knownFiles);
+  for (const file of files) {
+    byId.set(file.id, file);
+  }
+  const compatibleChecked: UserFile[] = [];
+  for (const id of checkedIds) {
+    const file = byId.get(id);
+    if (file && isCompatible(file)) {
+      compatibleChecked.push(file);
+    }
+  }
   if (compatibleChecked.length > 1) return compatibleChecked;
   return [details];
 }
@@ -490,78 +502,193 @@ interface FileDetailsProps {
 
 export function FileDetails({ filterMimePrefix, mobile = false }: FileDetailsProps) {
   const { t } = useTranslation();
-  const { files, selectedFileId } = useFilesPageStore();
+  const { files, knownFiles, selectedFileId, checkedIds } = useFilesPageStore();
   const setFiles = useFileStore((s) => s.setFiles);
+  const addFiles = useFileStore((s) => s.addFiles);
   const navigate = useNavigate();
   const location = useLocation();
   const selectForTool = (location.state as { selectForTool?: string } | null)?.selectForTool;
 
   const [details, setDetails] = useState<UserFileDetail | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
-  const selectedFile = files.find((file) => file.id === selectedFileId);
+  const [detailError, setDetailError] = useState(false);
+  const [detailRetry, setDetailRetry] = useState(0);
+  const [opening, setOpening] = useState(false);
+  const [openFailed, setOpenFailed] = useState<{ failed: number; total: number } | null>(null);
+  const latestOpenRef = useRef(0);
+  const partialFailedIdsRef = useRef<Set<string> | null>(null);
+
+  const selectedFile =
+    files.find((file) => file.id === selectedFileId) ??
+    (selectedFileId ? knownFiles.get(selectedFileId) : undefined);
   const selectedFileIsCompatible =
     !filterMimePrefix || selectedFile?.mimeType.startsWith(filterMimePrefix) === true;
 
   useEffect(() => {
-    if (!selectedFileId || !selectedFileIsCompatible) {
-      setDetails(null);
+    if (partialFailedIdsRef.current && checkedIds === partialFailedIdsRef.current) {
       return;
     }
+    partialFailedIdsRef.current = null;
+    setOpenFailed(null);
+  }, [checkedIds]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: detailRetry triggers a fresh detail fetch attempt
+  useEffect(() => {
+    latestOpenRef.current += 1;
+    partialFailedIdsRef.current = null;
+    setOpening(false);
+    setOpenFailed(null);
+
+    if (!selectedFileId || !selectedFileIsCompatible) {
+      setDetails(null);
+      setDetailError(false);
+      setLoadingDetails(false);
+      return;
+    }
+    let cancelled = false;
+    setDetails(null);
+    setDetailError(false);
     setLoadingDetails(true);
     apiGetFileDetails(selectedFileId)
-      .then(setDetails)
-      .catch(() => setDetails(null))
-      .finally(() => setLoadingDetails(false));
-  }, [selectedFileId, selectedFileIsCompatible]);
+      .then((res) => {
+        if (!cancelled) setDetails(res);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error(`[file-details] failed to load details for file ${selectedFileId}`, err);
+        setDetails(null);
+        setDetailError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingDetails(false);
+      });
+    return () => {
+      cancelled = true;
+      latestOpenRef.current += 1;
+    };
+  }, [selectedFileId, selectedFileIsCompatible, detailRetry]);
 
   async function handleOpenFile() {
-    if (!details) return;
+    if (!details || opening) return;
 
-    const { checkedIds, files: allFiles } = useFilesPageStore.getState();
-
-    // If multiple files are checked, open all of them; otherwise just the selected one
-    const filesToOpen = getFilesToOpen({
-      details,
+    const {
+      checkedIds: currentCheckedIds,
       files: allFiles,
-      checkedIds,
-      filterMimePrefix,
-    });
+      knownFiles: allKnownFiles,
+    } = useFilesPageStore.getState();
 
-    const downloaded = await Promise.all(
-      filesToOpen.map(async (f) => {
-        const res = await fetch(getFileDownloadUrl(f.id), {
-          headers: formatHeaders(),
-        });
-        if (!res.ok) return null;
-        const blob = await res.blob();
-        return { file: new File([blob], f.originalName, { type: f.mimeType }), serverId: f.id };
-      }),
-    );
+    const isCompatible = (file: Pick<UserFile, "mimeType">) =>
+      !filterMimePrefix || file.mimeType.startsWith(filterMimePrefix);
+    const isPartialRetry =
+      partialFailedIdsRef.current !== null && currentCheckedIds === partialFailedIdsRef.current;
 
-    const valid = downloaded.filter((d): d is NonNullable<typeof d> => d !== null);
-    if (valid.length === 0) return;
-
-    setFiles(valid.map((d) => d.file));
-    const entryIds = useFileStore.getState().entries.map((e) => e.id);
-
-    if (selectForTool) {
-      const tool = TOOLS.find((t) => t.id === selectForTool);
-      navigate(tool?.route ?? "/", { state: { fromLibrary: true } });
-    } else {
-      navigate("/", { state: { fromLibrary: true } });
-    }
-
-    // Set serverFileId on each entry so tool processing auto-saves the result
-    // to the library: an independent new file by default, or a superseding
-    // version when the user picks overwrite (#495)
-    setTimeout(() => {
-      const store = useFileStore.getState();
-      for (let i = 0; i < valid.length; i++) {
-        if (entryIds[i]) {
-          store.updateEntryById(entryIds[i], { serverFileId: valid[i].serverId });
+    let filesToOpen: UserFile[];
+    if (isPartialRetry) {
+      const byId = new Map<string, UserFile>(allKnownFiles);
+      for (const file of allFiles) {
+        byId.set(file.id, file);
+      }
+      filesToOpen = [];
+      for (const id of currentCheckedIds) {
+        const file = byId.get(id) ?? (id === details.id ? details : undefined);
+        if (file && isCompatible(file)) {
+          filesToOpen.push(file);
         }
       }
-    }, 0);
+    } else {
+      // If multiple files are checked, open all of them; otherwise just the selected one
+      filesToOpen = getFilesToOpen({
+        details,
+        files: allFiles,
+        knownFiles: allKnownFiles,
+        checkedIds: currentCheckedIds,
+        filterMimePrefix,
+      });
+    }
+
+    if (filesToOpen.length === 0) return;
+
+    const openRun = ++latestOpenRef.current;
+    const isLatestOpen = () => openRun === latestOpenRef.current;
+    setOpening(true);
+    setOpenFailed(null);
+
+    try {
+      const outcomes = await Promise.allSettled(
+        filesToOpen.map(async (f) => {
+          const res = await fetch(getFileDownloadUrl(f.id), {
+            headers: formatHeaders(),
+          });
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+          }
+          const blob = await res.blob();
+          return { file: new File([blob], f.originalName, { type: f.mimeType }), serverId: f.id };
+        }),
+      );
+
+      if (!isLatestOpen()) return;
+
+      const valid: { file: File; serverId: string }[] = [];
+      const failedIds = new Set<string>();
+      for (let i = 0; i < outcomes.length; i++) {
+        const outcome = outcomes[i];
+        const source = filesToOpen[i];
+        if (outcome.status === "fulfilled") {
+          valid.push(outcome.value);
+        } else {
+          console.error(`[file-details] failed to download file ${source.id}`, outcome.reason);
+          failedIds.add(source.id);
+        }
+      }
+
+      if (valid.length > 0) {
+        let entryIds: string[];
+        if (isPartialRetry) {
+          const prevCount = useFileStore.getState().entries.length;
+          addFiles(valid.map((d) => d.file));
+          entryIds = useFileStore
+            .getState()
+            .entries.slice(prevCount)
+            .map((e) => e.id);
+        } else {
+          setFiles(valid.map((d) => d.file));
+          entryIds = useFileStore.getState().entries.map((e) => e.id);
+        }
+
+        // Set serverFileId on each entry so tool processing auto-saves the result
+        // to the library: an independent new file by default, or a superseding
+        // version when the user picks overwrite (#495)
+        setTimeout(() => {
+          const store = useFileStore.getState();
+          for (let i = 0; i < valid.length; i++) {
+            if (entryIds[i]) {
+              store.updateEntryById(entryIds[i], { serverFileId: valid[i].serverId });
+            }
+          }
+        }, 0);
+      }
+
+      if (failedIds.size === 0) {
+        partialFailedIdsRef.current = null;
+        if (valid.length > 0) {
+          if (selectForTool) {
+            const tool = TOOLS.find((t) => t.id === selectForTool);
+            navigate(tool?.route ?? "/", { state: { fromLibrary: true } });
+          } else {
+            navigate("/", { state: { fromLibrary: true } });
+          }
+        }
+      } else {
+        if ((valid.length > 0 || isPartialRetry) && currentCheckedIds.size > 0) {
+          partialFailedIdsRef.current = failedIds;
+          useFilesPageStore.setState({ checkedIds: failedIds });
+        }
+        setOpenFailed({ failed: failedIds.size, total: filesToOpen.length });
+      }
+    } finally {
+      if (isLatestOpen()) setOpening(false);
+    }
   }
 
   if (!selectedFileId || !selectedFileIsCompatible) {
@@ -591,6 +718,31 @@ export function FileDetails({ filterMimePrefix, mobile = false }: FileDetailsPro
         )}
       >
         <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (detailError) {
+    return (
+      <div
+        className={cn(
+          "flex flex-col items-center justify-center gap-2 text-muted-foreground",
+          mobile
+            ? "flex flex-col gap-4"
+            : "w-60 border-s border-border p-4 shrink-0 hidden lg:flex flex-col",
+        )}
+      >
+        <p role="alert" className="text-sm text-muted-foreground text-center">
+          {t.files.details.loadFailed}
+        </p>
+        <button
+          type="button"
+          onClick={() => setDetailRetry((n) => n + 1)}
+          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          {t.common.retry}
+        </button>
       </div>
     );
   }
@@ -643,10 +795,16 @@ export function FileDetails({ filterMimePrefix, mobile = false }: FileDetailsPro
 
       {/* Action buttons */}
       <div className={cn("border-t border-border flex flex-col gap-2", mobile ? "pt-3" : "pt-4")}>
+        {openFailed && (
+          <p role="alert" className="text-xs text-destructive">
+            {format(t.commonUi.fileLibrary.importFailed, openFailed)}
+          </p>
+        )}
         <button
           type="button"
           onClick={handleOpenFile}
-          className="w-full px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors"
+          disabled={opening}
+          className="w-full px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {selectForTool ? t.files.selectFile : t.files.openFile}
         </button>
