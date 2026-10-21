@@ -1047,44 +1047,21 @@ test.describe("Editor Options Bar", () => {
 test.describe("Editor Autosave", () => {
   test("autosave data persists in localStorage", async ({ page }) => {
     test.slow();
-    await gotoEditor(page);
+    const issues = await gotoEditor(page);
     await createNewDocument(page);
 
     await selectTool(page, "brush");
     await drawOnCanvas(page, 100, 100, 300, 300);
     await page.waitForTimeout(300);
 
-    // Write autosave data (production-compatible approach)
-    await page.evaluate(() => {
-      const key = "snapotter-editor-autosave";
-      const storeState = {
-        canvasSize: { width: 1920, height: 1080 },
-        layers: [
-          {
-            id: "test",
-            name: "Layer 1",
-            visible: true,
-            locked: false,
-            opacity: 1,
-            blendMode: "normal",
-            thumbnail: null,
-          },
-        ],
-        objects: [],
-        adjustments: {},
-        filters: [],
-        guides: [],
-        sourceImageUrl: null,
-        sourceImageSize: null,
-        foregroundColor: "#000000",
-        backgroundColor: "#ffffff",
-      };
-      localStorage.setItem(
-        key,
-        JSON.stringify({ version: 1, timestamp: Date.now(), state: storeState }),
-      );
-    });
-    await page.waitForTimeout(500);
+    await page.getByTestId("menu-file").click();
+    await page.getByTestId("menu-item-save").click();
+
+    await expect
+      .poll(async () => {
+        return await page.evaluate(() => localStorage.getItem("snapotter-editor-autosave"));
+      })
+      .not.toBeNull();
 
     const autosaveData = await page.evaluate(() =>
       localStorage.getItem("snapotter-editor-autosave"),
@@ -1092,7 +1069,19 @@ test.describe("Editor Autosave", () => {
     expect(autosaveData).not.toBeNull();
     const parsed = JSON.parse(autosaveData!);
     expect(parsed.version).toBe(1);
+    expect(parsed.timestamp).toBeGreaterThan(0);
     expect(parsed.state.canvasSize.width).toBeGreaterThan(0);
+    expect(parsed.state.canvasSize.height).toBeGreaterThan(0);
+    expect(Array.isArray(parsed.state.layers)).toBe(true);
+    expect(Array.isArray(parsed.state.objects)).toBe(true);
+    expect(parsed.state.objects.length).toBeGreaterThan(0);
     expect(Array.isArray(parsed.state.filters)).toBe(true);
+    expect(parsed.state.sourceImageUrl).toBe("idb://snapotter-editor-autosave/source");
+
+    await page.reload();
+    await expect(page.getByRole("button", { name: "Restore", exact: true })).toBeVisible({
+      timeout: 10000,
+    });
+    expect(isClean(issues), `Console errors:\n${issuesSummary(issues)}`).toBe(true);
   });
 });
