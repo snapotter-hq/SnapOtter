@@ -7,6 +7,7 @@
  */
 import { PassThrough, Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import { isSafeMessageError } from "@snapotter/shared";
 import archiver from "archiver";
 import { eq } from "drizzle-orm";
 import { env } from "../config.js";
@@ -14,7 +15,12 @@ import { db, schema } from "../db/index.js";
 import { reportError } from "../lib/error-report.js";
 import { isStorageServiceFault, readStoredFile } from "../lib/file-storage.js";
 import { logger } from "../lib/logger.js";
-import { deletePrefix, normalizeS3ReadFault, putObjectStream } from "../lib/object-storage.js";
+import {
+  deletePrefix,
+  isS3MissingShape,
+  normalizeS3ReadFault,
+  putObjectStream,
+} from "../lib/object-storage.js";
 import * as cancelMod from "./cancel.js";
 import { registerCancelable, unregisterCancelable } from "./cancel.js";
 
@@ -86,6 +92,15 @@ async function cleanupOutputsBestEffort(jobId: string, userId: string): Promise<
       jobId,
     });
   }
+}
+
+function rethrowIfLibraryStorageFault(e: unknown): void {
+  if (isStorageServiceFault(e)) throw normalizeS3ReadFault(e);
+  if (isS3MissingShape(e)) return;
+  if (isSafeMessageError(e) && e.code === "INVALID_STORED_NAME") return;
+  const { code } = (e ?? {}) as NodeJS.ErrnoException;
+  if (code === "ENOENT") return;
+  throw e;
 }
 
 export async function gdprExportJob(
@@ -258,16 +273,15 @@ export async function gdprExportJob(
             await pipelineDone.catch(() => {});
             return { outputRef: null };
           }
-          // A storage service fault (rotated S3 credentials, bucket policy change,
-          // S3 5xx, vanished bucket) or a local filesystem fault other than ENOENT
-          // (EACCES, EIO, ERR_FS_FILE_TOO_LARGE) must fail the export rather than
-          // ship an archive with library files silently missing (#975). A genuinely
-          // missing blob or a poisoned stored_name from a 1.x SQLite import logs a
-          // warning and goes into missing-files.json so the archive declares its
-          // own gaps.
-          if (isStorageServiceFault(e)) throw normalizeS3ReadFault(e);
-          const { code, syscall } = (e ?? {}) as NodeJS.ErrnoException;
-          if ((syscall && code !== "ENOENT") || code === "ERR_FS_FILE_TOO_LARGE") throw e;
+          // Only proven missing-object rejections (ENOENT, S3 NoSuchKey/404)
+          // and a poisoned stored_name from a 1.x SQLite import
+          // (INVALID_STORED_NAME) log a warning and go into missing-files.json
+          // so the archive declares its own gaps. Every storage fault (rotated
+          // S3 credentials, bucket policy change, S3 5xx, vanished bucket,
+          // EACCES, EIO, ERR_FS_FILE_TOO_LARGE) or unexpected runtime error
+          // must fail the export rather than ship an archive with library
+          // files silently missing (#975, #3397).
+          rethrowIfLibraryStorageFault(e);
           if (!(await isExportJobLive())) {
             archive.abort();
             passthrough.destroy();

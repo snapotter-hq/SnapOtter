@@ -471,6 +471,61 @@ describe("GDPR export job behavior", () => {
     },
   );
 
+  it.each([
+    ["TypeError", () => new TypeError("unexpected read failure"), "bug"],
+    ["unannotated Error", () => new Error("unexpected read failure without errno"), "bug"],
+    [
+      "SafeError with non-INVALID_STORED_NAME code",
+      () =>
+        new SafeError("The server's storage is full.", {
+          kind: "operational",
+          code: "storage-full",
+          statusCode: 503,
+        }),
+      "operational",
+    ],
+    [
+      "non-SafeError carrying INVALID_STORED_NAME code",
+      () =>
+        Object.assign(new Error("non-SafeError invalid stored name"), {
+          code: "INVALID_STORED_NAME",
+        }),
+      "bug",
+    ],
+  ] as const)(
+    "rethrows non-syscall local readStoredFile error (%s) instead of listing the file in missing-files.json (#3397)",
+    async (_label, makeError, expectedKind) => {
+      const { gdprExportJob, classifyError } = await loadGdprExport();
+      selectMock
+        .mockReturnValueOnce(queryChain([{ id: "user-1", email: "ada@example.test" }]))
+        .mockReturnValueOnce(
+          queryChain([
+            {
+              id: "file-1",
+              userId: "user-1",
+              storedName: "a.png",
+              originalName: "a.png",
+              createdAt: new Date("2026-06-02T00:00:00.000Z"),
+            },
+          ]),
+        )
+        .mockReturnValueOnce(queryChain([]))
+        .mockReturnValueOnce(queryChain([]));
+
+      const fault = makeError();
+      readStoredFileMock.mockRejectedValueOnce(fault);
+
+      const caught = await gdprExportJob("user-1", "export-local-nosyscall").catch(
+        (err: unknown) => err,
+      );
+      expect(caught).toBe(fault);
+      expect(classifyError(caught, "worker")).toBe(expectedKind);
+      expect(putObjectStreamMock).not.toHaveBeenCalled();
+      expect(written).toHaveLength(0);
+      expect(loggerWarnMock).not.toHaveBeenCalled();
+    },
+  );
+
   it("skips a poisoned stored_name (INVALID_STORED_NAME SafeError) with a warning and manifest entry", async () => {
     const { gdprExportJob } = await loadGdprExport();
     selectMock
@@ -1470,6 +1525,47 @@ describe("GDPR export job behavior", () => {
         const caught = await gdprExportJob("user-s3", "export-s3-bug").catch((err: unknown) => err);
         expect(caught).toBe(unexpectedBug);
         expect(classifyError(caught, "worker")).toBe("bug");
+        expect(putObjectStreamMock).not.toHaveBeenCalled();
+        expect(written).toHaveLength(0);
+        expect(loggerWarnMock).not.toHaveBeenCalled();
+      } finally {
+        (env as Record<string, unknown>).STORAGE_MODE = "local";
+      }
+    });
+
+    it("rethrows a non-INVALID_STORED_NAME SafeError in S3 mode even though isStorageServiceFault returns false (#3397)", async () => {
+      const { env, getObjectSpy, gdprExportJob, classifyError } =
+        await loadGdprExportWithRealFileStorage();
+      const { SafeError: FreshSafeError } = await import("@snapotter/shared");
+      try {
+        selectMock
+          .mockReturnValueOnce(queryChain([{ id: "user-s3", email: "s3@example.test" }]))
+          .mockReturnValueOnce(
+            queryChain([
+              {
+                id: "file-1",
+                userId: "user-s3",
+                storedName: "11111111-1111-1111-1111-111111111111.png",
+                originalName: "one.png",
+                createdAt: new Date("2026-06-02T00:00:00.000Z"),
+              },
+            ]),
+          )
+          .mockReturnValueOnce(queryChain([]))
+          .mockReturnValueOnce(queryChain([]));
+
+        const safeFault = new FreshSafeError("The server's storage service is unavailable.", {
+          kind: "operational",
+          code: "storage-unavailable",
+          statusCode: 503,
+        });
+        getObjectSpy.mockRejectedValueOnce(safeFault);
+
+        const caught = await gdprExportJob("user-s3", "export-s3-safeerror").catch(
+          (err: unknown) => err,
+        );
+        expect(caught).toBe(safeFault);
+        expect(classifyError(caught, "worker")).toBe("operational");
         expect(putObjectStreamMock).not.toHaveBeenCalled();
         expect(written).toHaveLength(0);
         expect(loggerWarnMock).not.toHaveBeenCalled();
