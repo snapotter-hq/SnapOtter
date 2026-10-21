@@ -584,4 +584,104 @@ describe("FilePreview direct-download error handling (#1346)", () => {
     });
     expect(URL.createObjectURL).not.toHaveBeenCalled();
   });
+
+  it("aborts an in-flight on-demand preview fetch when switching files or unmounting and ignores AbortError (#3342)", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const signals: (AbortSignal | null | undefined)[] = [];
+    let rejectFirst: (err: Error) => void = () => {};
+    let rejectSecond: (err: Error) => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string, init?: RequestInit) => {
+        signals.push(init?.signal);
+        if (String(input).includes("/f1/")) {
+          return new Promise((_resolve, reject) => {
+            rejectFirst = reject;
+          });
+        }
+        return new Promise((_resolve, reject) => {
+          rejectSecond = reject;
+        });
+      }),
+    );
+
+    const view = render(<FilePreview fileId="f1" mimeType="video/x-matroska" name="clip.mkv" />);
+    fireEvent.click(screen.getByRole("button", { name: en.toolPage.generatePreview }));
+    expect(signals).toHaveLength(1);
+    expect(signals[0]).toBeInstanceOf(AbortSignal);
+    expect(signals[0]?.aborted).toBe(false);
+
+    view.rerender(
+      <FilePreview
+        fileId="f2"
+        mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        name="report.docx"
+      />,
+    );
+    expect(signals[0]?.aborted).toBe(true);
+
+    await act(async () => {
+      rejectFirst(new DOMException("The operation was aborted.", "AbortError"));
+    });
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(screen.queryByText(en.files.details.previewFailedRetry)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: en.toolPage.generatePreview }));
+    expect(signals).toHaveLength(2);
+    expect(signals[1]).toBeInstanceOf(AbortSignal);
+    expect(signals[1]?.aborted).toBe(false);
+
+    view.unmount();
+    expect(signals[1]?.aborted).toBe(true);
+
+    await act(async () => {
+      rejectSecond(new DOMException("The operation was aborted.", "AbortError"));
+    });
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it("aborts an in-flight preview while reading the response body and when switching to a PDF file (#3342)", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const signals: (AbortSignal | null | undefined)[] = [];
+    let rejectBlob: (err: Error) => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string, init?: RequestInit) => {
+        signals.push(init?.signal);
+        if (String(input).includes("/f1/")) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            blob: () =>
+              new Promise<Blob>((_resolve, reject) => {
+                rejectBlob = reject;
+              }),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          blob: async () => new Blob(["%PDF-1.4"], { type: "application/pdf" }),
+        });
+      }),
+    );
+
+    const view = render(<FilePreview fileId="f1" mimeType="video/x-matroska" name="clip.mkv" />);
+    fireEvent.click(screen.getByRole("button", { name: en.toolPage.generatePreview }));
+    await waitFor(() => {
+      expect(signals).toHaveLength(1);
+    });
+    expect(signals[0]?.aborted).toBe(false);
+
+    view.rerender(<FilePreview fileId="f2" mimeType="application/pdf" name="report.pdf" />);
+    expect(signals[0]?.aborted).toBe(true);
+    expect(await screen.findByTitle("report.pdf")).toHaveAttribute("src", "blob:loaded");
+
+    vi.mocked(URL.createObjectURL).mockClear();
+    await act(async () => {
+      rejectBlob(new DOMException("The operation was aborted.", "AbortError"));
+    });
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+  });
 });

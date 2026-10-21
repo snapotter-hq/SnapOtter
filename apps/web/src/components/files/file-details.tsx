@@ -116,8 +116,11 @@ export function FilePreview({
   // longer shown is dropped instead of landing on the current one.
   const previewRequest = useRef(0);
   const previewSrcRef = useRef<string | null>(null);
+  const previewAbortRef = useRef<AbortController | null>(null);
 
   const revokePreviewSrc = useCallback(() => {
+    previewAbortRef.current?.abort();
+    previewAbortRef.current = null;
     if (previewSrcRef.current) {
       URL.revokeObjectURL(previewSrcRef.current);
       previewSrcRef.current = null;
@@ -185,12 +188,15 @@ export function FilePreview({
   }, [nativePlayable, isPdf, fileId, mediaRetry, revokePreviewSrc]);
 
   const handleGeneratePreview = useCallback(() => {
+    previewAbortRef.current?.abort();
+    const controller = new AbortController();
+    previewAbortRef.current = controller;
     const request = ++previewRequest.current;
     const current = () => previewRequest.current === request;
     setPreviewLoading(true);
     setPreviewError(null);
     let encoder: string | null = null;
-    fetch(getFilePreviewUrl(fileId), { headers: formatHeaders() })
+    fetch(getFilePreviewUrl(fileId), { headers: formatHeaders(), signal: controller.signal })
       .then(async (res) => {
         if (!res.ok) {
           encoder = await previewFailureEncoder(res);
@@ -199,7 +205,7 @@ export function FilePreview({
         return res.blob();
       })
       .then((blob) => {
-        if (!current()) return;
+        if (!current() || controller.signal.aborted) return;
         if (previewSrcRef.current) {
           URL.revokeObjectURL(previewSrcRef.current);
         }
@@ -208,11 +214,14 @@ export function FilePreview({
         setPreviewSrc(nextUrl);
       })
       .catch((err) => {
-        if (!current()) return;
+        if (!current() || controller.signal.aborted) return;
         console.error(`[file-preview] failed to generate preview for file ${fileId}`, err);
         setPreviewError({ encoder });
       })
       .finally(() => {
+        if (previewAbortRef.current === controller) {
+          previewAbortRef.current = null;
+        }
         if (current()) setPreviewLoading(false);
       });
   }, [fileId]);
