@@ -46,10 +46,14 @@ vi.mock("qr-code-styling", () => ({
 
 import {
   AdminSecuritySettings,
+  ApiKeysSection,
+  GeneralSection,
   PeopleSection,
   RolesSection,
   SecuritySection,
+  SystemSection,
   TeamsSection,
+  ToolsSection,
 } from "@/components/settings/settings-dialog";
 import { TwoFactorSettings } from "@/components/settings/two-factor-settings";
 import { I18nProvider } from "@/contexts/i18n-context";
@@ -128,6 +132,14 @@ const role = {
   isBuiltin: false,
   userCount: 0,
 };
+const apiKey = {
+  id: 1,
+  name: "ci key",
+  prefix: "si_abc",
+  createdAt: "2026-01-01T00:00:00Z",
+  permissions: null,
+  expiresAt: null,
+};
 
 beforeEach(() => {
   storage.clear();
@@ -142,10 +154,14 @@ beforeEach(() => {
     totpEnabled: false,
   });
   apiGet.mockImplementation(async (path: string) => {
+    if (path.startsWith("/auth/session"))
+      return { user: { id: 1, username: "ada", role: "admin" } };
+    if (path.startsWith("/v1/preferences")) return { preferences: {} };
     if (path.startsWith("/auth/users")) return { users: [user], maxUsers: 5 };
     if (path.startsWith("/v1/teams")) return { teams: [team] };
     if (path.startsWith("/v1/roles")) return { roles: [role] };
     if (path.startsWith("/v1/settings")) return { settings: {} };
+    if (path.startsWith("/v1/api-keys")) return { apiKeys: [apiKey] };
     throw new Error(`unexpected GET ${path}`);
   });
   vi.stubGlobal("confirm", () => true);
@@ -805,5 +821,153 @@ describe("Two-factor authentication", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: s.security.disableTwoFactorButton }));
     await expectShown(expected);
+  });
+});
+
+describe("General: save preferences (#2713)", () => {
+  async function save(err: ApiError) {
+    apiPut.mockRejectedValueOnce(err);
+    renderDe(<GeneralSection />);
+    fireEvent.click(await screen.findByRole("button", { name: s.general.saveButton }));
+  }
+
+  it.each([
+    reject(401, "AUTH_REQUIRED", de.errors.sessionEnded),
+    reject(403, "FORBIDDEN", de.errors.forbidden),
+    reject(403, "IP_NOT_ALLOWED", de.auth.ipNotAllowed),
+    reject(429, undefined, de.errors.tooManyRequests),
+    reject(500, undefined, s.general.saveFailed),
+  ])("%s", async (_name, err, expected) => {
+    await save(err);
+    const msg = await screen.findByText(expected);
+    expect(msg).toHaveClass("text-destructive");
+    expect(screen.queryByText(SERVER_TEXT)).toBeNull();
+  });
+
+  it("shows the success message in success-ink when saving succeeds", async () => {
+    apiPut.mockResolvedValueOnce({});
+    renderDe(<GeneralSection />);
+    fireEvent.click(await screen.findByRole("button", { name: s.general.saveButton }));
+    const msg = await screen.findByText(s.general.saveSuccess);
+    expect(msg).toHaveClass("text-success-ink");
+  });
+
+  it("logs the server's reason when it falls back", async () => {
+    const err = apiError(500);
+    await save(err);
+    await expectShown(s.general.saveFailed);
+    expect(console.warn).toHaveBeenCalledWith(expect.any(String), err);
+  });
+});
+
+describe("System: support bundle download (#2713)", () => {
+  async function download(status: number, code?: string, contentType = "application/json") {
+    const body =
+      contentType === "application/json"
+        ? JSON.stringify({ error: SERVER_TEXT, ...(code ? { code } : {}) })
+        : "<html>Bad Gateway</html>";
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(body, { status, headers: { "content-type": contentType } }),
+    );
+    renderDe(<SystemSection />);
+    fireEvent.click(await screen.findByRole("button", { name: s.system.supportBundleButton }));
+  }
+
+  it.each([
+    ["401 AUTH_REQUIRED", 401, "AUTH_REQUIRED", de.errors.sessionEnded],
+    ["403 FORBIDDEN", 403, "FORBIDDEN", de.errors.forbidden],
+    ["403 IP_NOT_ALLOWED", 403, "IP_NOT_ALLOWED", de.auth.ipNotAllowed],
+    ["429 (no code)", 429, undefined, de.errors.tooManyRequests],
+    ["500 (no code)", 500, undefined, s.system.supportBundleFailed],
+  ] as const)("%s", async (_name, status, code, expected) => {
+    await download(status, code);
+    await expectShown(expected);
+  });
+
+  it("falls back and logs the ApiError when the response is not JSON", async () => {
+    await download(502, undefined, "text/html");
+    await expectShown(s.system.supportBundleFailed);
+    expect(console.warn).toHaveBeenCalledWith(expect.any(String), expect.any(ApiError));
+  });
+});
+
+describe("API keys (#2713)", () => {
+  it.each([
+    reject(401, "AUTH_REQUIRED", de.errors.sessionEnded),
+    reject(403, "FORBIDDEN", de.errors.forbidden),
+    reject(403, "IP_NOT_ALLOWED", de.auth.ipNotAllowed),
+    reject(429, undefined, de.errors.tooManyRequests),
+    reject(500, undefined, de.common.somethingWentWrong),
+  ])("generating a key: %s", async (_name, err, expected) => {
+    apiPost.mockRejectedValueOnce(err);
+    renderDe(<ApiKeysSection />);
+    fireEvent.click(await screen.findByRole("button", { name: s.apiKeys.generateButton }));
+    await expectShown(expected);
+  });
+
+  it.each([
+    reject(401, "AUTH_REQUIRED", de.errors.sessionEnded),
+    reject(403, "FORBIDDEN", de.errors.forbidden),
+    reject(403, "IP_NOT_ALLOWED", de.auth.ipNotAllowed),
+    reject(429, undefined, de.errors.tooManyRequests),
+    reject(500, undefined, de.common.somethingWentWrong),
+  ])("deleting a key: %s", async (_name, err, expected) => {
+    apiDelete.mockRejectedValueOnce(err);
+    renderDe(<ApiKeysSection />);
+    fireEvent.click(await screen.findByRole("button", { name: de.a11y.deleteKey }));
+    await expectShown(expected);
+  });
+
+  it("logs the server's reason when generating or deleting falls back", async () => {
+    const genErr = apiError(500);
+    const delErr = apiError(500);
+    apiPost.mockRejectedValueOnce(genErr);
+    apiDelete.mockRejectedValueOnce(delErr);
+    renderDe(<ApiKeysSection />);
+    fireEvent.click(await screen.findByRole("button", { name: s.apiKeys.generateButton }));
+    await expectShown(de.common.somethingWentWrong);
+    expect(console.warn).toHaveBeenCalledWith(expect.any(String), genErr);
+
+    fireEvent.click(screen.getByRole("button", { name: de.a11y.deleteKey }));
+    await expectShown(de.common.somethingWentWrong);
+    expect(console.warn).toHaveBeenCalledWith(expect.any(String), delErr);
+  });
+});
+
+describe("Tools: save disabled tools (#2713)", () => {
+  async function save(err: ApiError) {
+    apiPut.mockRejectedValueOnce(err);
+    renderDe(<ToolsSection />);
+    fireEvent.click(await screen.findByRole("button", { name: s.tools.saveButton }));
+  }
+
+  it.each([
+    reject(401, "AUTH_REQUIRED", de.errors.sessionEnded),
+    reject(403, "FORBIDDEN", de.errors.forbidden),
+    reject(403, "IP_NOT_ALLOWED", de.auth.ipNotAllowed),
+    reject(429, undefined, de.errors.tooManyRequests),
+    reject(500, undefined, de.common.somethingWentWrong),
+  ])("%s", async (_name, err, expected) => {
+    await save(err);
+    await expectShown(expected);
+  });
+
+  it("clears the error banner and shows the restart banner when the next save succeeds", async () => {
+    apiPut.mockRejectedValueOnce(apiError(401, "AUTH_REQUIRED")).mockResolvedValueOnce({});
+    renderDe(<ToolsSection />);
+    const button = await screen.findByRole("button", { name: s.tools.saveButton });
+    fireEvent.click(button);
+    await expectShown(de.errors.sessionEnded);
+
+    fireEvent.click(button);
+    await expectShown(s.tools.restartBanner);
+    expect(screen.queryByText(de.errors.sessionEnded)).toBeNull();
+  });
+
+  it("logs the server's reason when saving tools falls back", async () => {
+    const err = apiError(500);
+    await save(err);
+    await expectShown(de.common.somethingWentWrong);
+    expect(console.warn).toHaveBeenCalledWith(expect.any(String), err);
   });
 });

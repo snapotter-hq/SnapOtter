@@ -163,6 +163,16 @@ describe("Add user: a failed policy read", () => {
     expect(warn).not.toHaveBeenCalledWith(policyWarning, expect.anything());
   });
 
+  it("is logged for a 403 that is not FORBIDDEN, such as IP_NOT_ALLOWED (#2713)", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const failure = new ApiError("ip blocked", 403, "IP_NOT_ALLOWED", { code: "IP_NOT_ALLOWED" });
+    settingsRead = async () => {
+      throw failure;
+    };
+    await openAddForm();
+    expect(warn).toHaveBeenCalledWith(policyWarning, failure);
+  });
+
   it("is logged for anything else", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const failure = new ApiError("down", 500, undefined, { error: "down" });

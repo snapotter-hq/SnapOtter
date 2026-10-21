@@ -163,7 +163,7 @@ export function apiErrorMessage(
   return fallback;
 }
 
-async function throwWithMessage(res: Response): Promise<never> {
+export async function throwWithMessage(res: Response): Promise<never> {
   let msg = `API error: ${res.status}`;
   let body: Record<string, unknown> = {};
   try {

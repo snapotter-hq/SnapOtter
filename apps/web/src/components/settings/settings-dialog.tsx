@@ -52,6 +52,7 @@ import {
   apiPost,
   apiPut,
   formatHeaders,
+  throwWithMessage,
 } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { canRecordFeedback, shouldShowInstallFeedbackCard } from "@/lib/feedback";
@@ -378,7 +379,7 @@ interface TeamEntry {
 
 /* ────────────────────── General ────────────────────── */
 
-function GeneralSection() {
+export function GeneralSection() {
   const { t, locale, setLocale, supportedLocales } = useTranslation();
   const later = useTimeouts();
   const { authEnabled } = useAuth();
@@ -386,7 +387,7 @@ function GeneralSection() {
   const [loading, setLoading] = useState(true);
   const [defaultToolView, setDefaultToolView] = useState("sidebar");
   const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [saveMsg, setSaveMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [logoutFailed, setLogoutFailed] = useState(false);
 
   useEffect(() => {
@@ -431,17 +432,20 @@ function GeneralSection() {
       // it saves to /v1/preferences (writable by any authenticated user) rather
       // than the admin-only /v1/settings.
       await apiPut("/v1/preferences", { defaultToolView });
-      setSaveMsg(t.settings.general.saveSuccess);
+      setSaveMsg({ type: "success", text: t.settings.general.saveSuccess });
       useSettingsStore.setState({
         defaultToolView: defaultToolView as "sidebar" | "fullscreen",
       });
-    } catch {
-      setSaveMsg(t.settings.general.saveFailed);
+    } catch (err) {
+      setSaveMsg({
+        type: "error",
+        text: apiErrorMessage(t, err, {}, t.settings.general.saveFailed),
+      });
     } finally {
       setSaving(false);
       later(() => setSaveMsg(null), 3000, "saveMsg");
     }
-  }, [defaultToolView, t.settings.general.saveSuccess, t.settings.general.saveFailed, later]);
+  }, [defaultToolView, t, later]);
 
   const username = user?.username || "admin";
   const role = user?.role || t.settings.general.roleUnknown;
@@ -544,10 +548,10 @@ function GeneralSection() {
           <span
             className={cn(
               "text-sm",
-              saveMsg === t.settings.general.saveFailed ? "text-destructive" : "text-success-ink",
+              saveMsg.type === "error" ? "text-destructive" : "text-success-ink",
             )}
           >
-            {saveMsg}
+            {saveMsg.text}
           </span>
         )}
       </div>
@@ -894,7 +898,7 @@ export function SystemSection() {
                 const res = await fetch(appUrl("/api/v1/admin/support-bundle"), {
                   headers: formatHeaders(),
                 });
-                if (!res.ok) throw new Error(`${res.status}`);
+                if (!res.ok) await throwWithMessage(res);
                 const blob = await res.blob();
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement("a");
@@ -904,8 +908,8 @@ export function SystemSection() {
                 a.download = filenameMatch ? filenameMatch[1] : "snapotter-support.zip";
                 a.click();
                 URL.revokeObjectURL(url);
-              } catch {
-                setBundleError(t.settings.system.supportBundleFailed);
+              } catch (err) {
+                setBundleError(apiErrorMessage(t, err, {}, t.settings.system.supportBundleFailed));
               } finally {
                 setBundleLoading(false);
               }
@@ -1558,8 +1562,8 @@ export function PeopleSection() {
     apiGet<{ settings: Record<string, string> }>("/v1/settings")
       .then((data) => setPolicyMinLength(data.settings?.passwordMinLength))
       .catch((err) => {
-        // A 403 is the expected answer for an admin without access.
-        if (err instanceof ApiError && err.status === 403) return;
+        // A 403 FORBIDDEN is the expected answer for an admin without access.
+        if (err instanceof ApiError && err.code === "FORBIDDEN") return;
         console.warn("Password policy read failed; Generate uses the default length", err);
       });
   }, []);
@@ -2394,8 +2398,8 @@ export function ApiKeysSection() {
       setShowScoping(false);
       setExpiresAt("");
       await loadKeys();
-    } catch {
-      setError(t.common.somethingWentWrong);
+    } catch (err) {
+      setError(apiErrorMessage(t, err, {}, t.common.somethingWentWrong));
     } finally {
       setGenerating(false);
     }
@@ -2417,8 +2421,8 @@ export function ApiKeysSection() {
       try {
         await apiDelete(`/v1/api-keys/${id}`);
         await loadKeys();
-      } catch {
-        setError(t.common.somethingWentWrong);
+      } catch (err) {
+        setError(apiErrorMessage(t, err, {}, t.common.somethingWentWrong));
       }
     },
     [loadKeys, t],
@@ -3800,7 +3804,7 @@ export function AuditLogSection() {
 
 /* ────────────────────── Tools ────────────────────── */
 
-function ToolsSection() {
+export function ToolsSection() {
   const { t } = useTranslation();
   const [disabledTools, setDisabledTools] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -3808,7 +3812,7 @@ function ToolsSection() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [showRestartBanner, setShowRestartBanner] = useState(false);
-  const [saveFailed, setSaveFailed] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     apiGet<{ settings: Record<string, string> }>("/v1/settings")
@@ -3848,16 +3852,16 @@ function ToolsSection() {
 
   const handleSave = useCallback(async () => {
     setSaving(true);
-    setSaveFailed(false);
+    setSaveError(null);
     try {
       await apiPut("/v1/settings", { disabledTools: JSON.stringify(disabledTools) });
       setShowRestartBanner(true);
-    } catch {
-      setSaveFailed(true);
+    } catch (err) {
+      setSaveError(apiErrorMessage(t, err, {}, t.common.somethingWentWrong));
     } finally {
       setSaving(false);
     }
-  }, [disabledTools]);
+  }, [disabledTools, t]);
 
   if (loading) {
     return (
@@ -3951,9 +3955,9 @@ function ToolsSection() {
         </div>
       )}
 
-      {saveFailed && (
+      {saveError && (
         <div className="px-4 py-3 rounded-lg border border-red-500/30 bg-red-500/10 text-sm text-red-700 dark:text-red-400">
-          {t.common.somethingWentWrong}
+          {saveError}
         </div>
       )}
 
