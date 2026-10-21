@@ -900,4 +900,187 @@ describe("GifToolsControls (#1223)", async () => {
       useFileStore.setState({ files: [], selectedIndex: 0 });
     }
   });
+
+  it("omits extract frame max and range hint when metadata is absent or in pipeline steps, and applies them when standalone metadata resolves (#3312)", async () => {
+    const { useFileStore } = await import("@/stores/file-store");
+    try {
+      const onPipelineExtract = vi.fn();
+      const { container: pipelineContainer } = render(
+        <GifToolsControls
+          settings={{ mode: "extract", extractMode: "single", frameNumber: 5 }}
+          onChange={onPipelineExtract}
+        />,
+      );
+      const singleFrameInput = pipelineContainer.querySelector<HTMLInputElement>("#gif-frame");
+      expect(singleFrameInput).not.toBeNull();
+      expect(singleFrameInput?.getAttribute("max")).toBeNull();
+      expect(singleFrameInput?.checkValidity()).toBe(true);
+      expect(screen.queryByText(/0 is first frame/i)).toBeNull();
+
+      await userEvent.click(screen.getByRole("button", { name: "Range" }));
+      const startInput = pipelineContainer.querySelector<HTMLInputElement>("#gif-frame-start");
+      const endInput = pipelineContainer.querySelector<HTMLInputElement>("#gif-frame-end");
+      expect(startInput?.getAttribute("max")).toBeNull();
+      expect(endInput?.getAttribute("max")).toBeNull();
+      expect(endInput?.getAttribute("placeholder")).toBeNull();
+      cleanup();
+
+      let resolveDeferredFetch!: (res: Response) => void;
+      useFileStore.setState({
+        files: [new File(["gif"], "deferred-extract.gif", { type: "image/gif" })],
+        selectedIndex: 0,
+      });
+      vi.spyOn(globalThis, "fetch").mockImplementation(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveDeferredFetch = resolve;
+          }),
+      );
+
+      const onPipelineWithLoadedGif = vi.fn();
+      const { container: pipelineLoadedContainer } = render(
+        <GifToolsControls
+          settings={{ mode: "extract", extractMode: "range", frameStart: 0, frameEnd: 12 }}
+          onChange={onPipelineWithLoadedGif}
+        />,
+      );
+      await act(async () => {
+        resolveDeferredFetch(
+          new Response(
+            JSON.stringify({
+              width: 64,
+              height: 64,
+              pages: 5,
+              delay: [100, 100, 100, 100, 100],
+              loop: 0,
+              fileSize: 1024,
+              duration: 500,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      });
+      expect(
+        pipelineLoadedContainer
+          .querySelector<HTMLInputElement>("#gif-frame-start")
+          ?.getAttribute("max"),
+      ).toBeNull();
+      expect(
+        pipelineLoadedContainer
+          .querySelector<HTMLInputElement>("#gif-frame-end")
+          ?.getAttribute("max"),
+      ).toBeNull();
+      expect(
+        pipelineLoadedContainer
+          .querySelector<HTMLInputElement>("#gif-frame-end")
+          ?.getAttribute("placeholder"),
+      ).toBeNull();
+      await userEvent.click(screen.getByRole("button", { name: "Single" }));
+      expect(
+        pipelineLoadedContainer.querySelector<HTMLInputElement>("#gif-frame")?.getAttribute("max"),
+      ).toBeNull();
+      expect(screen.queryByText(/0 is first frame/i)).toBeNull();
+      cleanup();
+
+      let resolveStandaloneFetch!: (res: Response) => void;
+      useFileStore.setState({
+        files: [new File(["gif"], "standalone-extract.gif", { type: "image/gif" })],
+        selectedIndex: 0,
+      });
+      vi.spyOn(globalThis, "fetch").mockImplementation(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveStandaloneFetch = resolve;
+          }),
+      );
+
+      const onStandaloneExtract = vi.fn();
+      const { container: standaloneContainer } = render(
+        <GifToolsControls onChange={onStandaloneExtract} />,
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Extract" }));
+      expect(
+        standaloneContainer.querySelector<HTMLInputElement>("#gif-frame")?.getAttribute("max"),
+      ).toBeNull();
+      expect(screen.queryByText(/0 is first frame/i)).toBeNull();
+
+      await userEvent.click(screen.getByRole("button", { name: "Range" }));
+      expect(
+        standaloneContainer
+          .querySelector<HTMLInputElement>("#gif-frame-start")
+          ?.getAttribute("max"),
+      ).toBeNull();
+      expect(
+        standaloneContainer.querySelector<HTMLInputElement>("#gif-frame-end")?.getAttribute("max"),
+      ).toBeNull();
+      expect(
+        standaloneContainer
+          .querySelector<HTMLInputElement>("#gif-frame-end")
+          ?.getAttribute("placeholder"),
+      ).toBeNull();
+
+      await act(async () => {
+        resolveStandaloneFetch(
+          new Response(
+            JSON.stringify({
+              width: 64,
+              height: 64,
+              pages: 6,
+              delay: [100, 100, 100, 100, 100, 100],
+              loop: 0,
+              fileSize: 1024,
+              duration: 600,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      });
+
+      expect(
+        standaloneContainer
+          .querySelector<HTMLInputElement>("#gif-frame-start")
+          ?.getAttribute("max"),
+      ).toBe("5");
+      expect(
+        standaloneContainer.querySelector<HTMLInputElement>("#gif-frame-end")?.getAttribute("max"),
+      ).toBe("5");
+      expect(
+        standaloneContainer
+          .querySelector<HTMLInputElement>("#gif-frame-end")
+          ?.getAttribute("placeholder"),
+      ).toBe("5");
+
+      await userEvent.click(screen.getByRole("button", { name: "Single" }));
+      expect(
+        standaloneContainer.querySelector<HTMLInputElement>("#gif-frame")?.getAttribute("max"),
+      ).toBe("5");
+      expect(screen.getByText("0 to 5 (0 is first frame)")).toBeDefined();
+
+      await act(async () => {
+        useFileStore.setState({ files: [], selectedIndex: 0 });
+      });
+      expect(
+        standaloneContainer.querySelector<HTMLInputElement>("#gif-frame")?.getAttribute("max"),
+      ).toBeNull();
+      expect(screen.queryByText(/0 is first frame/i)).toBeNull();
+
+      await userEvent.click(screen.getByRole("button", { name: "Range" }));
+      expect(
+        standaloneContainer
+          .querySelector<HTMLInputElement>("#gif-frame-start")
+          ?.getAttribute("max"),
+      ).toBeNull();
+      expect(
+        standaloneContainer.querySelector<HTMLInputElement>("#gif-frame-end")?.getAttribute("max"),
+      ).toBeNull();
+      expect(
+        standaloneContainer
+          .querySelector<HTMLInputElement>("#gif-frame-end")
+          ?.getAttribute("placeholder"),
+      ).toBeNull();
+    } finally {
+      cleanup();
+      useFileStore.setState({ files: [], selectedIndex: 0 });
+    }
+  });
 });

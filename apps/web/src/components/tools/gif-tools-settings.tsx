@@ -270,7 +270,8 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
     rotate: t.toolSettings["gif-tools"].rotateMode,
   };
 
-  const maxFrame = Math.max(0, (info?.pages ?? 1) - 1);
+  const maxFrame =
+    initialSettings === undefined && info != null ? Math.max(0, info.pages - 1) : undefined;
 
   return (
     <div className="space-y-4">
@@ -623,9 +624,11 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
                 max={maxFrame}
                 className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
               />
-              <p className="text-[10px] text-muted-foreground mt-0.5">
-                {format(t.toolSettings["gif-tools"].frameRangeHint, { max: maxFrame })}
-              </p>
+              {maxFrame !== undefined && (
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {format(t.toolSettings["gif-tools"].frameRangeHint, { max: maxFrame })}
+                </p>
+              )}
             </div>
           )}
 
@@ -656,7 +659,7 @@ export function GifToolsControls({ settings: initialSettings, onChange }: GifToo
                   onChange={(e) => setFrameEnd(e.target.value)}
                   min={0}
                   max={maxFrame}
-                  placeholder={String(maxFrame)}
+                  placeholder={maxFrame !== undefined ? String(maxFrame) : undefined}
                   className="w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground"
                 />
               </div>
