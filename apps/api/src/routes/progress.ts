@@ -905,6 +905,29 @@ export async function releaseFeatureInstallStream(jobId: string): Promise<void> 
     );
 }
 
+/**
+ * Reset `created_at` on a reserved install row when the queue starts executing
+ * it after waiting behind earlier installs (#2819). Routed through the per-job
+ * persist queue so it stays ordered ahead of the installer's progress and
+ * terminal writes.
+ */
+export function refreshFeatureInstallStream(jobId: string): Promise<void> {
+  const refreshed = enqueuePersist(jobId, async () => {
+    await db
+      .update(schema.jobs)
+      .set({ createdAt: sql`now()` })
+      .where(
+        and(
+          eq(schema.jobs.id, jobId),
+          notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
+          sql`${schema.jobs.settings}->>'featureInstall' IS NOT NULL`,
+        ),
+      );
+  });
+  void refreshed.catch(() => {});
+  return refreshed;
+}
+
 /** Frames held for a stream whose job row hasn't appeared yet. */
 const MAX_HELD_FRAMES = 200;
 /**

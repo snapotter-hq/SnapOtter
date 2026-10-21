@@ -113,10 +113,12 @@ const hoisted = vi.hoisted(() => {
   const logErrorWithCausesMock = vi.fn();
   // The progress phase whose update should throw, or null for none.
   const failProgressPhase = { value: null as string | null };
+  const failRefreshStream = { value: false };
 
   return {
     logErrorWithCausesMock,
     failProgressPhase,
+    failRefreshStream,
     spawnCalls,
     spawnMock,
     acquireVenvLockMock,
@@ -186,6 +188,12 @@ vi.mock("../../../apps/api/src/routes/progress.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../apps/api/src/routes/progress.js")>();
   return {
     ...actual,
+    refreshFeatureInstallStream: async (jobId: string) => {
+      if (hoisted.failRefreshStream.value) {
+        throw new Error("refresh timestamp failed");
+      }
+      return actual.refreshFeatureInstallStream(jobId);
+    },
     updateSingleFileProgress: async (
       update: Parameters<typeof actual.updateSingleFileProgress>[0],
     ) => {
@@ -299,6 +307,7 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
     hoisted.spawnMock.mockClear();
     hoisted.logErrorWithCausesMock.mockClear();
     hoisted.failProgressPhase.value = null;
+    hoisted.failRefreshStream.value = false;
     hoisted.acquireVenvLockMock.mockClear();
     hoisted.getOcrRuntimeEffectiveMemoryBytesMock.mockReset();
     hoisted.getOcrRuntimeEffectiveMemoryBytesMock.mockReturnValue(8 * 1024 ** 3);
@@ -1110,6 +1119,105 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
       vi.unstubAllGlobals();
       env.INSTALL_STALL_MS = originalStall;
       env.INSTALL_MAX_MS = originalMax;
+    }
+  });
+
+  it("refreshes created_at on the reserved jobs row when a queued bundle starts installing (#2819)", async () => {
+    const { db, schema } = await import("../../../apps/api/src/db/index.js");
+    const { eq } = await import("drizzle-orm");
+    const { runSystemJob, SYSTEM_JOBS } = await import("../../../apps/api/src/jobs/system-jobs.js");
+
+    const r1 = await postInstall("transcription");
+    expect(JSON.parse(r1.body).queued).toBe(false);
+    await waitFor(() => hoisted.spawnCalls.length === 1);
+
+    const r2 = await postInstall("face-detection");
+    const { jobId: queuedJobId, queued } = JSON.parse(r2.body) as {
+      jobId: string;
+      queued: boolean;
+    };
+    expect(queued).toBe(true);
+
+    const r3 = await postInstall("ocr");
+    const { jobId: queuedOcrJobId, queued: ocrQueued } = JSON.parse(r3.body) as {
+      jobId: string;
+      queued: boolean;
+    };
+    expect(ocrQueued).toBe(true);
+
+    // Backdate both queued rows to 65 minutes ago to simulate waiting >1h behind an earlier install.
+    const staleCreatedAt = new Date(Date.now() - 65 * 60_000);
+    await db
+      .update(schema.jobs)
+      .set({ createdAt: staleCreatedAt })
+      .where(eq(schema.jobs.id, queuedJobId));
+    await db
+      .update(schema.jobs)
+      .set({ createdAt: staleCreatedAt })
+      .where(eq(schema.jobs.id, queuedOcrJobId));
+
+    // Periodic orphan reconciliation must not fail the queued install rows while they are queued.
+    await runSystemJob({ name: SYSTEM_JOBS.jobReconciliation } as never);
+    const [queuedBeforeStart] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, queuedJobId));
+    expect(queuedBeforeStart?.status).toBe("queued");
+    expect(queuedBeforeStart?.createdAt.getTime()).toBe(staleCreatedAt.getTime());
+    const [queuedOcrBeforeStart] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, queuedOcrJobId));
+    expect(queuedOcrBeforeStart?.status).toBe("queued");
+    expect(queuedOcrBeforeStart?.createdAt.getTime()).toBe(staleCreatedAt.getTime());
+
+    // Finish the first install so pump() starts face-detection.
+    const beforeFaceStartMs = Date.now() - 5_000;
+    hoisted.spawnCalls[0].emit("close", 0);
+    await waitFor(() => hoisted.spawnCalls.length === 2);
+
+    await vi.waitFor(async () => {
+      const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, queuedJobId));
+      expect(row?.createdAt.getTime()).toBeGreaterThanOrEqual(beforeFaceStartMs);
+    });
+
+    // Finish face-detection so pump() starts ocr (startOcrInstall path).
+    const beforeOcrStartMs = Date.now() - 5_000;
+    hoisted.spawnCalls[1].emit("close", 0);
+    await waitFor(() => queue.getActiveBundleId() === null);
+
+    await vi.waitFor(async () => {
+      const [ocrRowAfterComplete] = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, queuedOcrJobId));
+      expect(ocrRowAfterComplete?.status).toBe("completed");
+      expect(ocrRowAfterComplete?.createdAt.getTime()).toBeGreaterThanOrEqual(beforeOcrStartMs);
+    });
+  });
+
+  it("logs a warning and still starts the installer when refreshing created_at fails (#2819)", async () => {
+    const { logger } = await import("../../../apps/api/src/lib/logger.js");
+    const warnSpy = vi.spyOn(logger, "warn");
+    hoisted.failRefreshStream.value = true;
+
+    try {
+      const res = await postInstall("transcription");
+      expect(res.statusCode).toBe(202);
+      const { jobId } = JSON.parse(res.body) as { jobId: string };
+
+      await waitFor(() => hoisted.spawnCalls.length === 1);
+      await vi.waitFor(() => {
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ jobId, err: expect.any(Error) }),
+          "could not refresh feature install reservation timestamp",
+        );
+      });
+
+      hoisted.spawnCalls[0].emit("close", 0);
+      await waitFor(() => queue.getActiveBundleId() === null);
+    } finally {
+      warnSpy.mockRestore();
     }
   });
 });

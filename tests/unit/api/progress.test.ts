@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const dbMocks = vi.hoisted(() => ({
   failure: null as Error | null,
   inserted: [] as Array<Record<string, unknown>>,
+  updated: [] as Array<Record<string, unknown>>,
 }));
 
 const redisMocks = vi.hoisted(() => ({
@@ -41,9 +42,10 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
         },
       }),
       update: () => ({
-        set: () => ({
+        set: (values: Record<string, unknown>) => ({
           where: async () => {
             if (dbMocks.failure) throw dbMocks.failure;
+            dbMocks.updated.push(values);
           },
         }),
       }),
@@ -69,6 +71,7 @@ import {
   buildPersistedSingleFileProgress,
   buildSingleFileReplayEvent,
   clearTerminalReplayKey,
+  refreshFeatureInstallStream,
   updateJobProgress,
   updateSingleFileProgress,
   updateSingleFileProgressAtomically,
@@ -516,5 +519,43 @@ describe("JobProgress type shape", () => {
     };
     expect(p.type).toBe("batch");
     expect(p.currentFile).toBe("last.png");
+  });
+});
+
+describe("refreshFeatureInstallStream (#2819)", () => {
+  afterEach(() => {
+    dbMocks.failure = null;
+  });
+
+  it("updates createdAt via the per-job persist queue, suppresses unhandled rejections on DB failure, and does not block subsequent progress writes", async () => {
+    dbMocks.updated = [];
+    await expect(refreshFeatureInstallStream("install-job-1")).resolves.toBeUndefined();
+    expect(dbMocks.updated).toHaveLength(1);
+    expect(dbMocks.updated[0]).toHaveProperty("createdAt");
+
+    dbMocks.failure = new Error("database unavailable");
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    try {
+      const rejectedRefresh = refreshFeatureInstallStream("install-job-2");
+      await expect(rejectedRefresh).rejects.toThrow("database unavailable");
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(unhandled).not.toHaveBeenCalled();
+
+      // A failed refresh on install-job-2 must not wedge its per-job persist queue.
+      dbMocks.failure = null;
+      dbMocks.inserted = [];
+      await expect(
+        updateSingleFileProgress({
+          jobId: "install-job-2",
+          phase: "complete",
+          percent: 100,
+          result: { bundleId: "ocr" },
+        }),
+      ).resolves.toBeUndefined();
+      expect(dbMocks.inserted).toHaveLength(1);
+    } finally {
+      process.off("unhandledRejection", unhandled);
+    }
   });
 });

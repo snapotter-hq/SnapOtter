@@ -15,6 +15,7 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { analyticsEnabled } from "../lib/analytics-gate.js";
 import { getMaxAgeMs } from "../lib/cleanup.js";
+import { getActiveAndQueuedInstalls } from "../lib/feature-install-queue.js";
 import { logger } from "../lib/logger.js";
 import { deletePrefix, listJobDirs, type ObjectInfo } from "../lib/object-storage.js";
 import { getSettingStrict, parseNumericSettingValue } from "../lib/settings-helpers.js";
@@ -181,7 +182,9 @@ async function dispatchSystemJob(job: Job): Promise<unknown> {
       // so a lost terminal write cannot hold a user's concurrency slot until
       // the next restart (#1726), while skipping single-file clientJobId alias
       // rows whose target artifact or pipeline flow row is still non-terminal
-      // (#2807).
+      // (#2807) and featureInstall stream rows that are still active or queued
+      // in feature-install-queue.ts (#2819).
+      const liveFeatureInstalls = JSON.stringify(getActiveAndQueuedInstalls());
       const orphanResult = await db.execute(
         sql`UPDATE jobs
           SET status = 'failed',
@@ -192,16 +195,25 @@ async function dispatchSystemJob(job: Job): Promise<unknown> {
             AND created_at < now() - interval '1 hour'
             AND NOT (
               type = 'single'
-              AND EXISTS (
-                SELECT 1
-                FROM jobs AS target
-                WHERE target.id IN (
-                  jobs.settings->>'artifactJobId',
-                  jobs.settings->>'pipelineFlowId'
+              AND (
+                EXISTS (
+                  SELECT 1
+                  FROM jobs AS target
+                  WHERE target.id IN (
+                    jobs.settings->>'artifactJobId',
+                    jobs.settings->>'pipelineFlowId'
+                  )
+                    AND target.status IN ('processing', 'queued')
+                    AND target.tool_id IS NOT NULL
+                    AND target.tool_id <> ''
                 )
-                  AND target.status IN ('processing', 'queued')
-                  AND target.tool_id IS NOT NULL
-                  AND target.tool_id <> ''
+                OR EXISTS (
+                  SELECT 1
+                  FROM jsonb_to_recordset(${liveFeatureInstalls}::jsonb)
+                    AS active_install("jobId" text, "bundleId" text)
+                  WHERE active_install."jobId" = jobs.id
+                    AND active_install."bundleId" = jobs.settings->>'featureInstall'
+                )
               )
             )`,
       );

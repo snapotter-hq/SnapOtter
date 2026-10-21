@@ -525,6 +525,11 @@ describe("dispatchSystemJob jobReconciliation (#1726)", () => {
     expect(text).toContain("target.status IN ('processing', 'queued')");
     expect(text).toContain("AND target.tool_id IS NOT NULL");
     expect(text).toContain("AND target.tool_id <> ''");
+    expect(text).toContain("jsonb_to_recordset(");
+    expect(text).toContain('active_install("jobId" text, "bundleId" text)');
+    expect(text).toContain('active_install."jobId" = jobs.id');
+    expect(text).toContain("active_install.\"bundleId\" = jobs.settings->>'featureInstall'");
+    expect(sqlCalls.flatMap((c) => c.values)).toContain("[]");
     expect(logSpy).toHaveBeenCalledWith({ count: 2 }, "Reconciled orphaned job rows");
     expect(result).toEqual({
       scanned: 1,
@@ -534,6 +539,40 @@ describe("dispatchSystemJob jobReconciliation (#1726)", () => {
       raced: 0,
       orphaned: 2,
     });
+  });
+
+  it("interpolates active and queued featureInstall jobId/bundleId entries into the orphan UPDATE (#2819)", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    const { enqueue, resetQueueState, setActive } = await import(
+      "../../../../apps/api/src/lib/feature-install-queue.js"
+    );
+    resetQueueState();
+    try {
+      setActive({ bundleId: "ocr", jobId: "install-active", mutationEpoch: "epoch-1" });
+      enqueue({ bundleId: "face-detection", jobId: "install-queued", mutationEpoch: "epoch-1" });
+      reconcileStrandedJobsMock.mockResolvedValue({
+        scanned: 0,
+        recovered: 0,
+        failed: 0,
+        live: 0,
+        raced: 0,
+        outcomes: [],
+      });
+      dbExecuteMock.mockResolvedValue({ rowCount: 0 });
+
+      await runSystemJob({ name: SYSTEM_JOBS.jobReconciliation } as never);
+
+      const interpolated = sqlCalls.flatMap((c) => c.values);
+      expect(interpolated).toContain(
+        JSON.stringify([
+          { bundleId: "ocr", jobId: "install-active", mutationEpoch: "epoch-1" },
+          { bundleId: "face-detection", jobId: "install-queued", mutationEpoch: "epoch-1" },
+        ]),
+      );
+    } finally {
+      resetQueueState();
+    }
   });
 
   it("does NOT log when zero orphaned rows were reconciled and defaults missing rowCount to 0", async () => {

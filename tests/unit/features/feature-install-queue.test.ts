@@ -3,8 +3,11 @@ import {
   clearActive,
   dequeue,
   enqueue,
+  getActiveAndQueuedInstalls,
   getActiveBundleId,
+  getActiveInstallJobId,
   getQueuedBundleIds,
+  getQueuedInstallJobIds,
   isQueuedOrActive,
   peekQueue,
   resetQueueState,
@@ -17,7 +20,10 @@ describe("feature-install-queue", () => {
 
   it("starts empty", () => {
     expect(getActiveBundleId()).toBeNull();
+    expect(getActiveInstallJobId()).toBeNull();
     expect(getQueuedBundleIds()).toEqual([]);
+    expect(getQueuedInstallJobIds()).toEqual([]);
+    expect(getActiveAndQueuedInstalls()).toEqual([]);
     expect(peekQueue()).toBeNull();
   });
 
@@ -99,5 +105,31 @@ describe("feature-install-queue", () => {
     const jobId = enqueue({ bundleId: "ocr", jobId: "j2", mutationEpoch: "epoch-1" });
     expect(jobId).toBe("j2");
     expect(getQueuedBundleIds()).toEqual(["ocr"]);
+  });
+
+  it("exposes active and queued install jobIds and a snapshot of active+queued entries (#2819)", () => {
+    setActive({ bundleId: "ocr", jobId: "job-active", mutationEpoch: "epoch-1" });
+    enqueue({ bundleId: "face-detection", jobId: "job-q1", mutationEpoch: "epoch-1" });
+    enqueue({ bundleId: "transcription", jobId: "job-q2", mutationEpoch: "epoch-2" });
+
+    expect(getActiveInstallJobId()).toBe("job-active");
+    expect(getQueuedInstallJobIds()).toEqual(["job-q1", "job-q2"]);
+    const snapshot = getActiveAndQueuedInstalls();
+    expect(snapshot).toEqual([
+      { bundleId: "ocr", jobId: "job-active", mutationEpoch: "epoch-1" },
+      { bundleId: "face-detection", jobId: "job-q1", mutationEpoch: "epoch-1" },
+      { bundleId: "transcription", jobId: "job-q2", mutationEpoch: "epoch-2" },
+    ]);
+
+    // Mutating the returned array must not corrupt internal queue state.
+    snapshot.pop();
+    expect(getQueuedInstallJobIds()).toEqual(["job-q1", "job-q2"]);
+
+    clearActive();
+    expect(getActiveInstallJobId()).toBeNull();
+    expect(getActiveAndQueuedInstalls()).toEqual([
+      { bundleId: "face-detection", jobId: "job-q1", mutationEpoch: "epoch-1" },
+      { bundleId: "transcription", jobId: "job-q2", mutationEpoch: "epoch-2" },
+    ]);
   });
 });

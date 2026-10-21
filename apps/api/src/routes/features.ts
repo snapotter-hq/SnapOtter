@@ -101,6 +101,7 @@ import {
 import { requirePermission } from "../permissions.js";
 import { requireAuth } from "../plugins/auth.js";
 import {
+  refreshFeatureInstallStream,
   releaseFeatureInstallStream,
   reserveFeatureInstallStream,
   updateSingleFileProgress,
@@ -314,6 +315,7 @@ function startOcrInstall(bundleId: string, jobId: string, installLockFd: number)
  * queue's active slot is already set to it (pump() does both before calling).
  */
 function startInstall(bundleId: string, jobId: string, installLockFd: number): void {
+  void refreshReservedInstall(jobId);
   if (bundleId === "ocr") {
     startOcrInstall(bundleId, jobId, installLockFd);
     return;
@@ -796,6 +798,19 @@ async function releaseReservedInstall(jobId: string): Promise<void> {
     await releaseFeatureInstallStream(jobId);
   } catch (err) {
     logger.warn({ err, jobId }, "could not release an unused feature install reservation");
+  }
+}
+
+/**
+ * Reset `created_at` on the reserved install row when a queued install begins
+ * executing (#2819). Best-effort so a transient DB error never aborts spawning
+ * the installer child, while still logging the failure.
+ */
+async function refreshReservedInstall(jobId: string): Promise<void> {
+  try {
+    await refreshFeatureInstallStream(jobId);
+  } catch (err) {
+    logger.warn({ err, jobId }, "could not refresh feature install reservation timestamp");
   }
 }
 

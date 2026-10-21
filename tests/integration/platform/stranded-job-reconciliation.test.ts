@@ -38,13 +38,22 @@ import {
 import { getQueue } from "../../../apps/api/src/jobs/queues.js";
 import { runSystemJob, SYSTEM_JOBS } from "../../../apps/api/src/jobs/system-jobs.js";
 import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
+import {
+  enqueue as enqueueFeatureInstall,
+  resetQueueState as resetFeatureInstallQueue,
+  setActive as setActiveFeatureInstall,
+} from "../../../apps/api/src/lib/feature-install-queue.js";
 import { logger } from "../../../apps/api/src/lib/logger.js";
 import * as objectStorage from "../../../apps/api/src/lib/object-storage.js";
 import { deletePrefix, listObjects, putObject } from "../../../apps/api/src/lib/object-storage.js";
 import {
   buildBatchReplayEvent,
   buildSingleFileReplayEvent,
+  clearTerminalReplayKey,
   publishEphemeral,
+  refreshFeatureInstallStream,
+  reserveFeatureInstallStream,
+  updateSingleFileProgress,
 } from "../../../apps/api/src/routes/progress.js";
 import {
   buildTestApp,
@@ -2541,6 +2550,219 @@ describe("stranded-job reconciliation", () => {
       } finally {
         await queue.remove(liveToolJobId).catch(() => {});
         await queue.remove(livePipelineId).catch(() => {});
+      }
+    });
+  });
+
+  describe("featureInstall stream orphan reconciliation (#2819)", () => {
+    it("keeps active and queued featureInstall stream rows alive past 1 hour while reconciling unused reservations, abandoned installs, and collisions", async () => {
+      const user = await createUserAndLogin(testApp.app, `feature-install-orphan-${Date.now()}`);
+      const backdatedCreatedAt = new Date(Date.now() - 65 * 60_000);
+
+      const activeInstallJobId = randomUUID();
+      const queuedInstallJobId = randomUUID();
+      const unusedDupJobId = randomUUID();
+      const abandonedInstallJobId = randomUUID();
+      const nonSingleCollisionId = randomUUID();
+      const mismatchedBundleId = randomUUID();
+
+      resetFeatureInstallQueue();
+      try {
+        // 1. Active feature install stream row (>1h old, in processing with progress).
+        await reserveFeatureInstallStream({
+          jobId: activeInstallJobId,
+          bundleId: "ocr",
+          userId: user.userId,
+        });
+        await updateSingleFileProgress({
+          jobId: activeInstallJobId,
+          phase: "processing",
+          percent: 45,
+          stage: "Downloading OCR runtime",
+        });
+        await db
+          .update(schema.jobs)
+          .set({ createdAt: backdatedCreatedAt })
+          .where(eq(schema.jobs.id, activeInstallJobId));
+        setActiveFeatureInstall({
+          bundleId: "ocr",
+          jobId: activeInstallJobId,
+          mutationEpoch: "epoch-1",
+        });
+
+        // 2. Queued feature install stream row (>1h old, waiting in FIFO queue).
+        await reserveFeatureInstallStream({
+          jobId: queuedInstallJobId,
+          bundleId: "face-detection",
+          userId: user.userId,
+        });
+        await db
+          .update(schema.jobs)
+          .set({ createdAt: backdatedCreatedAt })
+          .where(eq(schema.jobs.id, queuedInstallJobId));
+        enqueueFeatureInstall({
+          bundleId: "face-detection",
+          jobId: queuedInstallJobId,
+          mutationEpoch: "epoch-1",
+        });
+
+        // 3. Unused duplicate reservation for an active bundle ("ocr") whose releaseReservedInstall failed.
+        await reserveFeatureInstallStream({
+          jobId: unusedDupJobId,
+          bundleId: "ocr",
+          userId: user.userId,
+        });
+        await db
+          .update(schema.jobs)
+          .set({ createdAt: backdatedCreatedAt })
+          .where(eq(schema.jobs.id, unusedDupJobId));
+
+        // 4. Abandoned feature install row no longer in feature-install-queue.ts (lost terminal write).
+        await reserveFeatureInstallStream({
+          jobId: abandonedInstallJobId,
+          bundleId: "transcription",
+          userId: user.userId,
+        });
+        await db
+          .update(schema.jobs)
+          .set({ status: "processing", createdAt: backdatedCreatedAt })
+          .where(eq(schema.jobs.id, abandonedInstallJobId));
+
+        // 5. Non-single batch collision and mismatched bundle row whose jobIds ARE in feature-install-queue.ts
+        // so the type = 'single' and active_install."bundleId" = jobs.settings->>'featureInstall' guards are exercised.
+        await db.insert(schema.jobs).values([
+          {
+            id: nonSingleCollisionId,
+            userId: user.userId,
+            type: "batch",
+            status: "processing",
+            inputRefs: [],
+            settings: { featureInstall: "batch-collision-bundle" },
+            createdAt: backdatedCreatedAt,
+          },
+          {
+            id: mismatchedBundleId,
+            userId: user.userId,
+            type: "single",
+            status: "queued",
+            inputRefs: [],
+            settings: { featureInstall: "different-bundle" },
+            createdAt: backdatedCreatedAt,
+          },
+        ]);
+        enqueueFeatureInstall({
+          bundleId: "batch-collision-bundle",
+          jobId: nonSingleCollisionId,
+          mutationEpoch: "epoch-1",
+        });
+        enqueueFeatureInstall({
+          bundleId: "queued-bundle",
+          jobId: mismatchedBundleId,
+          mutationEpoch: "epoch-1",
+        });
+
+        await runSystemJob({ name: SYSTEM_JOBS.jobReconciliation } as unknown as Job);
+
+        // Active and queued featureInstall rows remain non-terminal.
+        const activeRow = await readJob(activeInstallJobId);
+        expect(activeRow.status).toBe("processing");
+        expect(activeRow.error).toBeNull();
+        expect(activeRow.progress).toEqual({
+          percent: 45,
+          stage: "Downloading OCR runtime",
+        });
+
+        // Subsequent progress frames continue to persist and SSE reconnect replays processing, not failed.
+        await updateSingleFileProgress({
+          jobId: activeInstallJobId,
+          phase: "processing",
+          percent: 80,
+          stage: "Extracting OCR runtime",
+        });
+        expect((await readJob(activeInstallJobId)).progress).toEqual({
+          percent: 80,
+          stage: "Extracting OCR runtime",
+        });
+
+        const ssePromise = testApp.app.inject({
+          method: "GET",
+          url: `/api/v1/jobs/${activeInstallJobId}/progress`,
+          headers: { authorization: `Bearer ${adminToken}` },
+        });
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        publishEphemeral({
+          jobId: activeInstallJobId,
+          type: "single",
+          phase: "complete",
+          percent: 100,
+          result: { bundleId: "ocr" },
+        });
+        const sseRes = await ssePromise;
+        await clearTerminalReplayKey(activeInstallJobId);
+        expect(sseRes.statusCode).toBe(200);
+        const sseFrames = sseRes.body
+          .split(/\r?\n/)
+          .filter((line: string) => line.startsWith("data: "))
+          .map((line: string) => JSON.parse(line.slice(6)) as Record<string, unknown>);
+        expect(sseFrames[0]).toEqual({
+          jobId: activeInstallJobId,
+          type: "single",
+          phase: "processing",
+          percent: 80,
+          stage: "Extracting OCR runtime",
+        });
+
+        const queuedRow = await readJob(queuedInstallJobId);
+        expect(queuedRow.status).toBe("queued");
+        expect(queuedRow.error).toBeNull();
+
+        // Unused duplicate reservation, abandoned install, and non-matching rows are reconciled as failed.
+        for (const orphanId of [
+          unusedDupJobId,
+          abandonedInstallJobId,
+          nonSingleCollisionId,
+          mismatchedBundleId,
+        ]) {
+          const orphanRow = await readJob(orphanId);
+          expect(orphanRow.status, `expected ${orphanId} to be reconciled as failed`).toBe(
+            "failed",
+          );
+          expect(orphanRow.error).toEqual({ message: "Orphaned job reconciled" });
+          expect(orphanRow.completedAt).not.toBeNull();
+        }
+
+        // refreshFeatureInstallStream must not modify created_at on a terminal install row or a non-featureInstall row.
+        const ordinaryJobId = await seedJob({
+          userId: user.userId,
+          toolId: "convert",
+          pool: "image",
+          type: "tool",
+          status: "queued",
+          ageMs: 65 * 60_000,
+        });
+        const ordinaryBefore = (await readJob(ordinaryJobId)).createdAt.getTime();
+        await refreshFeatureInstallStream(ordinaryJobId);
+        expect((await readJob(ordinaryJobId)).createdAt.getTime()).toBe(ordinaryBefore);
+
+        await refreshFeatureInstallStream(abandonedInstallJobId);
+        expect((await readJob(abandonedInstallJobId)).createdAt.getTime()).toBe(
+          backdatedCreatedAt.getTime(),
+        );
+
+        // Once the queue clears and the rows are no longer active or queued, the next sweep reconciles them.
+        resetFeatureInstallQueue();
+        await runSystemJob({ name: SYSTEM_JOBS.jobReconciliation } as unknown as Job);
+
+        expect((await readJob(activeInstallJobId)).status).toBe("failed");
+        expect((await readJob(activeInstallJobId)).error).toEqual({
+          message: "Orphaned job reconciled",
+        });
+        expect((await readJob(queuedInstallJobId)).status).toBe("failed");
+        expect((await readJob(queuedInstallJobId)).error).toEqual({
+          message: "Orphaned job reconciled",
+        });
+      } finally {
+        resetFeatureInstallQueue();
       }
     });
   });
