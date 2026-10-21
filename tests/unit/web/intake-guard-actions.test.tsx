@@ -6,9 +6,10 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const showIgnored = vi.hoisted(() => vi.fn());
+const showUnsupported = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/intake-notice", () => ({
   showIntakeIgnored: showIgnored,
-  showUnsupportedFileType: vi.fn(),
+  showUnsupportedFileType: showUnsupported,
 }));
 
 vi.mock("@/lib/analytics", async () => {
@@ -72,6 +73,7 @@ function renderAutomatePage(state?: { libraryFileIds?: string[] }) {
 beforeEach(() => {
   storageMap.clear();
   showIgnored.mockClear();
+  showUnsupported.mockClear();
   vi.stubGlobal("localStorage", localStorageMock);
   let blobCounter = 0;
   vi.stubGlobal("URL", {
@@ -278,6 +280,217 @@ describe("ToolPage handleUndo and startOver intake guard (#2652)", () => {
     fireEvent.click(screen.getByRole("button", { name: en.toolPage.tryDifferentFile }));
     expect(showIgnored).not.toHaveBeenCalled();
     expect(useFileStore.getState().entries).toHaveLength(0);
+  });
+});
+
+describe("ToolPage handleAddMore, handleFiles, and handleUrlImport intake guard (#3196)", () => {
+  it("refuses handleAddMore click while a run is in flight and refuses onchange if a run starts while the file picker is open", async () => {
+    renderToolPage("/image/resize");
+    await act(async () => {
+      useFileStore.getState().setFiles([png("a.png")]);
+    });
+
+    const createdInputs: HTMLInputElement[] = [];
+    const realCreate = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation(((tag: string) => {
+      const el = realCreate(tag);
+      if (tag === "input") {
+        createdInputs.push(el as HTMLInputElement);
+        (el as HTMLInputElement).click = () => {};
+      }
+      return el;
+    }) as typeof document.createElement);
+
+    // Open the native file picker while idle.
+    fireEvent.click(screen.getByRole("button", { name: en.toolPage.addMore }));
+    expect(createdInputs).toHaveLength(1);
+    const fileInput = createdInputs[0];
+
+    // Start a run while the file dialog is still open.
+    act(() => {
+      useFileStore.getState().setProcessing(true);
+      useFileStore.getState().setActiveJob("resize-job-1", null);
+    });
+
+    // Clicking "Add more" while already busy is refused before creating an input.
+    fireEvent.click(screen.getByRole("button", { name: en.toolPage.addMore }));
+    expect(showIgnored).toHaveBeenCalledTimes(1);
+    expect(showIgnored).toHaveBeenCalledWith(en.dropzone.ignoredWhileRunning);
+    expect(createdInputs).toHaveLength(1);
+
+    // Empty picker cancellation while busy stays silent.
+    Object.defineProperty(fileInput, "files", { value: [], configurable: true });
+    act(() => {
+      fileInput.onchange?.({ target: fileInput } as unknown as Event);
+    });
+    expect(showIgnored).toHaveBeenCalledTimes(1);
+
+    // Unsupported file selection reports unsupported file type without mutating useFileStore.
+    Object.defineProperty(fileInput, "files", {
+      value: [new File(["txt"], "notes.txt", { type: "text/plain" })],
+      configurable: true,
+    });
+    act(() => {
+      fileInput.onchange?.({ target: fileInput } as unknown as Event);
+    });
+    expect(showUnsupported).toHaveBeenCalledTimes(1);
+    expect(showUnsupported).toHaveBeenCalledWith(en.dropzone.unsupportedFileType);
+    expect(showIgnored).toHaveBeenCalledTimes(1);
+    expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual(["a.png"]);
+
+    // Completing the file selection from the earlier dialog while busy is refused.
+    Object.defineProperty(fileInput, "files", {
+      value: [png("b.png")],
+      configurable: true,
+    });
+    act(() => {
+      fileInput.onchange?.({ target: fileInput } as unknown as Event);
+    });
+    expect(showIgnored).toHaveBeenCalledTimes(2);
+    expect(showIgnored).toHaveBeenLastCalledWith(en.dropzone.ignoredWhileRunning);
+    expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual(["a.png"]);
+    expect(useFileStore.getState().processing).toBe(true);
+
+    // Once the run finishes, picking a valid file appends it.
+    act(() => {
+      useFileStore.getState().setProcessing(false);
+    });
+    act(() => {
+      fileInput.onchange?.({ target: fileInput } as unknown as Event);
+    });
+    expect(showIgnored).toHaveBeenCalledTimes(2);
+    expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual(["a.png", "b.png"]);
+  });
+
+  it("refuses ToolPage Dropzone handleFiles and handleUrlImport when a run starts before picker onchange or URL fetch completes", async () => {
+    let resolveUrlFetch: ((res: Response) => void) | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/api/v1/fetch-urls/download")) {
+          return Promise.resolve(
+            new Response("img", {
+              status: 200,
+              headers: { "Content-Type": "image/png" },
+            }),
+          );
+        }
+        if (url.includes("/api/v1/fetch-urls")) {
+          return new Promise<Response>((resolve) => {
+            resolveUrlFetch = resolve;
+          });
+        }
+        return Promise.resolve(
+          new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+        );
+      }),
+    );
+
+    renderToolPage("/image/resize");
+
+    const createdInputs: HTMLInputElement[] = [];
+    const realCreate = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation(((tag: string) => {
+      const el = realCreate(tag);
+      if (tag === "input") {
+        createdInputs.push(el as HTMLInputElement);
+        (el as HTMLInputElement).click = () => {};
+      }
+      return el;
+    }) as typeof document.createElement);
+
+    // Open Dropzone's Upload picker while idle.
+    fireEvent.click(screen.getByRole("button", { name: en.common.upload }));
+    expect(createdInputs).toHaveLength(1);
+    const dropzoneFileInput = createdInputs[0];
+
+    // Start a URL import in Dropzone while idle.
+    const urlInput = screen.getByPlaceholderText(en.dropzone.urlPlaceholder);
+    fireEvent.change(urlInput, { target: { value: "https://example.com/photo.png" } });
+    fireEvent.click(screen.getByRole("button", { name: en.dropzone.addUrlButton }));
+    expect(resolveUrlFetch).toBeTypeOf("function");
+
+    // Start a run before either async intake finishes.
+    act(() => {
+      useFileStore.getState().setProcessing(true);
+    });
+
+    // Dropzone drop while busy is refused by handleFiles.
+    fireEvent.drop(screen.getByRole("region", { name: en.a11y.fileDropZone }), {
+      dataTransfer: { files: [png("dropped.png")] },
+    });
+    expect(showIgnored).toHaveBeenCalledTimes(1);
+    expect(showIgnored).toHaveBeenLastCalledWith(en.dropzone.ignoredWhileRunning);
+    expect(useFileStore.getState().entries).toHaveLength(0);
+
+    // Dropzone picker onchange opened while idle is refused by handleFiles once busy.
+    Object.defineProperty(dropzoneFileInput, "files", {
+      value: [png("picked.png")],
+      configurable: true,
+    });
+    act(() => {
+      dropzoneFileInput.onchange?.({ target: dropzoneFileInput } as unknown as Event);
+    });
+    expect(showIgnored).toHaveBeenCalledTimes(2);
+    expect(useFileStore.getState().entries).toHaveLength(0);
+
+    // In-flight URL import started while idle is refused by handleUrlImport once busy.
+    await act(async () => {
+      resolveUrlFetch?.(
+        new Response(
+          JSON.stringify({
+            results: [
+              {
+                success: true,
+                url: "https://example.com/photo.png",
+                filename: "photo.png",
+                downloadUrl: "/api/v1/fetch-urls/download/photo.png",
+              },
+            ],
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+    await waitFor(() => expect(showIgnored).toHaveBeenCalledTimes(3));
+    expect(useFileStore.getState().entries).toHaveLength(0);
+
+    // Once idle again, URL import and Dropzone drop are accepted by handleUrlImport and handleFiles.
+    act(() => {
+      useFileStore.getState().setProcessing(false);
+    });
+    fireEvent.change(urlInput, { target: { value: "https://example.com/accepted-url.png" } });
+    fireEvent.click(screen.getByRole("button", { name: en.dropzone.addUrlButton }));
+    await act(async () => {
+      resolveUrlFetch?.(
+        new Response(
+          JSON.stringify({
+            results: [
+              {
+                success: true,
+                url: "https://example.com/accepted-url.png",
+                filename: "accepted-url.png",
+                downloadUrl: "/api/v1/fetch-urls/download/accepted-url.png",
+              },
+            ],
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+    await waitFor(() =>
+      expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual(["accepted-url.png"]),
+    );
+
+    act(() => {
+      useFileStore.getState().reset();
+    });
+    fireEvent.drop(screen.getByRole("region", { name: en.a11y.fileDropZone }), {
+      dataTransfer: { files: [png("accepted.png")] },
+    });
+    expect(showIgnored).toHaveBeenCalledTimes(3);
+    expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual(["accepted.png"]);
   });
 });
 

@@ -656,9 +656,12 @@ function ToolPageContent({
 
   // Drops and pastes are turned away, with a message, while a run is in flight (#2108).
   const { running: runInFlight, allowIntake } = useIntakeGuard();
+  const allowIntakeRef = useRef(allowIntake);
+  allowIntakeRef.current = allowIntake;
 
   const handleFiles = useCallback(
     (newFiles: File[]) => {
+      if (!allowIntakeRef.current()) return;
       setEraserSliderInitPos(null);
       reset();
       setFiles(newFiles);
@@ -668,6 +671,7 @@ function ToolPageContent({
 
   const handleUrlImport = useCallback(
     (file: File) => {
+      if (!allowIntakeRef.current()) return;
       addFiles([file]);
     },
     [addFiles],
@@ -707,6 +711,7 @@ function ToolPageContent({
       if (selected.length === 0) return;
       const newFiles = toolFileFilter ? selected.filter(toolFileFilter) : selected;
       if (newFiles.length > 0) {
+        if (!allowIntakeRef.current()) return;
         addFiles(newFiles);
       } else {
         showUnsupportedFileType(t.dropzone.unsupportedFileType);
