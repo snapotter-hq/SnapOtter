@@ -380,6 +380,150 @@ describe("runSystemJob", () => {
     }
   });
 
+  it("retention fails closed on corrupt or unreadable tamperResistantAudit and isolates jobs delete errors (#2736)", async () => {
+    const oldJobId = `iso-j-${randomUUID().slice(0, 8)}`;
+    const oldAuditId = `iso-a-${randomUUID().slice(0, 8)}`;
+
+    await db.execute(
+      sql`INSERT INTO jobs (id, type, status, created_at) VALUES (${oldJobId}, 'tool', 'completed', now() - interval '60 days')`,
+    );
+    await db.execute(
+      sql`INSERT INTO audit_log (id, actor_username, action, created_at) VALUES (${oldAuditId}, 'test', 'test', now() - interval '60 days')`,
+    );
+
+    await db
+      .insert(schema.settings)
+      .values([
+        { key: "jobsRetentionDays", value: "30" },
+        { key: "auditRetentionDays", value: "30" },
+        { key: "tamperResistantAudit", value: "TRUE" },
+      ])
+      .onConflictDoUpdate({
+        target: schema.settings.key,
+        set: { value: sql`excluded.value`, updatedAt: new Date() },
+      });
+
+    const errSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    let selectSpy: { mockRestore(): void } | undefined;
+    let executeSpy: { mockRestore(): void } | undefined;
+
+    try {
+      // 1. Corrupt non-"false" tamperResistantAudit ("TRUE") fails closed:
+      //    old jobs row is pruned, old audit_log row is preserved with a warning.
+      await runSystemJob({ name: SYSTEM_JOBS.retention } as unknown as Job);
+
+      const [jobAfterCorruptTamper] = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, oldJobId));
+      expect(jobAfterCorruptTamper).toBeUndefined();
+
+      const [auditAfterCorruptTamper] = await db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.id, oldAuditId));
+      expect(auditAfterCorruptTamper).toBeDefined();
+      expect(warnSpy).toHaveBeenCalledWith(
+        { key: "tamperResistantAudit", value: "TRUE" },
+        "invalid boolean setting, treating tamperResistantAudit as enabled",
+      );
+
+      // 2. Unreadable tamperResistantAudit also fails closed:
+      await db
+        .update(schema.settings)
+        .set({ value: "false", updatedAt: new Date() })
+        .where(eq(schema.settings.key, "tamperResistantAudit"));
+
+      const tamperReadErr = new Error("tamperResistantAudit query failed");
+      const originalSelect = db.select.bind(db);
+      let settingsSelectCount = 0;
+      selectSpy = vi.spyOn(db, "select").mockImplementation((...args: unknown[]) => {
+        // biome-ignore lint/suspicious/noExplicitAny: passthrough to the real overloaded implementation
+        const builder = (originalSelect as any)(...args);
+        const originalFrom = builder.from.bind(builder);
+        builder.from = (table: unknown) => {
+          if (table === schema.settings) {
+            settingsSelectCount++;
+            if (settingsSelectCount === 3) {
+              throw tamperReadErr;
+            }
+          }
+          return originalFrom(table);
+        };
+        return builder;
+      });
+
+      await runSystemJob({ name: SYSTEM_JOBS.retention } as unknown as Job);
+      selectSpy.mockRestore();
+
+      const [auditAfterReadErr] = await db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.id, oldAuditId));
+      expect(auditAfterReadErr).toBeDefined();
+      expect(errSpy).toHaveBeenCalledWith(
+        { err: tamperReadErr },
+        "Retention: tamperResistantAudit read failed; skipping audit_log sweep",
+      );
+
+      // 3. When DELETE FROM jobs fails, retentionSweep logs the error and still
+      //    prunes audit_log when tamperResistantAudit is "false":
+      await db.execute(
+        sql`INSERT INTO jobs (id, type, status, created_at) VALUES (${oldJobId}, 'tool', 'completed', now() - interval '60 days')`,
+      );
+      const jobsDeleteErr = new Error("canceling statement due to lock timeout");
+      const originalExecute = db.execute.bind(db);
+      let executeCount = 0;
+      executeSpy = vi.spyOn(db, "execute").mockImplementation(((query: unknown) => {
+        executeCount++;
+        if (executeCount === 1) {
+          return Promise.reject(jobsDeleteErr);
+        }
+        return originalExecute(query as Parameters<typeof db.execute>[0]);
+      }) as typeof db.execute);
+
+      await runSystemJob({ name: SYSTEM_JOBS.retention } as unknown as Job);
+      executeSpy.mockRestore();
+
+      expect(errSpy).toHaveBeenCalledWith({ err: jobsDeleteErr }, "Retention: jobs sweep failed");
+      const [jobStillPresent] = await db
+        .select()
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, oldJobId));
+      expect(jobStillPresent).toBeDefined();
+
+      const [auditNowPruned] = await db
+        .select()
+        .from(schema.auditLog)
+        .where(eq(schema.auditLog.id, oldAuditId));
+      expect(auditNowPruned).toBeUndefined();
+    } finally {
+      selectSpy?.mockRestore();
+      executeSpy?.mockRestore();
+      errSpy.mockRestore();
+      warnSpy.mockRestore();
+      await db
+        .delete(schema.jobs)
+        .where(eq(schema.jobs.id, oldJobId))
+        .catch(() => {});
+      await db
+        .delete(schema.auditLog)
+        .where(eq(schema.auditLog.id, oldAuditId))
+        .catch(() => {});
+      await db
+        .delete(schema.settings)
+        .where(
+          inArray(schema.settings.key, [
+            "jobsRetentionDays",
+            "auditRetentionDays",
+            "tamperResistantAudit",
+          ]),
+        )
+        .catch(() => {});
+    }
+  });
+
   it("throws on unknown system job name", async () => {
     await expect(runSystemJob({ name: "system:bogus" } as unknown as Job)).rejects.toThrow(
       "Unknown system job: system:bogus",

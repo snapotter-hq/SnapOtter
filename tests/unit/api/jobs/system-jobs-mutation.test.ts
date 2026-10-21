@@ -64,18 +64,15 @@ interface SqlCall {
   values: unknown[];
 }
 const sqlCalls = vi.hoisted(() => [] as SqlCall[]);
-// Captured eq(col, value) argument pairs.
-const eqCalls = vi.hoisted(() => [] as unknown[][]);
 
 // -- Fluent, queued db.select() builder ---------------------------------------
 
-type TableName = "users" | "teams" | "jobs" | "settings";
+type TableName = "users" | "teams" | "jobs";
 
 const selectQueues = vi.hoisted(() => ({
   users: [] as unknown[][],
   teams: [] as unknown[][],
   jobs: [] as unknown[][],
-  settings: [] as unknown[][],
 }));
 
 const schemaMock = vi.hoisted(() => ({
@@ -88,14 +85,12 @@ const schemaMock = vi.hoisted(() => ({
     completedAt: "jobs.completedAt",
     deleteAfter: "jobs.deleteAfter",
   },
-  settings: { key: "settings.key", value: "settings.value" },
 }));
 
 function tableNameOf(table: unknown): TableName {
   if (table === schemaMock.users) return "users";
   if (table === schemaMock.teams) return "teams";
   if (table === schemaMock.jobs) return "jobs";
-  if (table === schemaMock.settings) return "settings";
   throw new Error("Unexpected table passed to db.select().from()");
 }
 
@@ -130,7 +125,6 @@ function resetSelectQueues(): void {
   selectQueues.users = [];
   selectQueues.teams = [];
   selectQueues.jobs = [];
-  selectQueues.settings = [];
 }
 
 /** Flatten a captured sql`` template back into a single comparable string. */
@@ -149,7 +143,6 @@ async function loadSystemJobs(
   vi.resetModules();
   resetSelectQueues();
   sqlCalls.length = 0;
-  eqCalls.length = 0;
   getQueueMock.mockReset();
   runSiemForwardMock.mockReset();
   runAuditArchiveMock.mockReset();
@@ -174,10 +167,7 @@ async function loadSystemJobs(
 
   vi.doMock("drizzle-orm", () => ({
     and: vi.fn(() => "and"),
-    eq: vi.fn((...args: unknown[]) => {
-      eqCalls.push(args);
-      return "eq";
-    }),
+    eq: vi.fn(() => "eq"),
     inArray: vi.fn(() => "inArray"),
     isNotNull: vi.fn(() => "isNotNull"),
     lt: vi.fn(() => "lt"),
@@ -815,13 +805,17 @@ describe("storageTtlSweep legal-hold select gating", () => {
 describe("retentionSweep SQL pinning", () => {
   it("issues jobs + audit deletes with the exact SQL text and window day counts", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
+    const warnSpy = loggerCalls("warn");
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
-    getSettingStrictMock.mockResolvedValueOnce("60").mockResolvedValueOnce("180");
-    queueSelect("settings", []); // tamperResistantAudit unset -> not tamper-resistant
+    getSettingStrictMock
+      .mockResolvedValueOnce("60")
+      .mockResolvedValueOnce("180")
+      .mockResolvedValueOnce(undefined); // tamperResistantAudit unset -> not tamper-resistant
 
     await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
 
     expect(dbExecuteMock).toHaveBeenCalledTimes(2);
+    expect(warnSpy).not.toHaveBeenCalled();
     const text = allSqlText();
     // Kills StringLiteral `` on the heldUsersSubquery + both DELETE templates.
     expect(text).toContain("DELETE FROM jobs");
@@ -833,35 +827,42 @@ describe("retentionSweep SQL pinning", () => {
     const interpolated = sqlCalls.flatMap((c) => c.values);
     expect(interpolated).toContain(60);
     expect(interpolated).toContain(180);
+    warnSpy.mockRestore();
   });
 
   it("reads the exact settings key when checking tamper-resistant mode", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
-    getSettingStrictMock.mockResolvedValueOnce("30").mockResolvedValueOnce("90");
-    queueSelect("settings", []);
+    getSettingStrictMock
+      .mockResolvedValueOnce("30")
+      .mockResolvedValueOnce("90")
+      .mockResolvedValueOnce(undefined);
 
     await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
 
-    // Kills StringLiteral "" on "tamperResistantAudit" (line 373): eq must have
-    // been called with the settings.key column and that literal.
-    expect(eqCalls).toContainEqual(["settings.key", "tamperResistantAudit"]);
+    // Kills StringLiteral "" on "tamperResistantAudit": getSettingStrict must
+    // have been called with that literal on the third read.
+    expect(getSettingStrictMock).toHaveBeenNthCalledWith(3, "tamperResistantAudit");
   });
 
-  it("deletes audit rows when the tamper setting exists but is 'false'", async () => {
-    // Row present, value "false" -> `length>0 && value==="true"` is false ->
-    // NOT tamper-resistant -> audit delete runs.
+  it("deletes audit rows without warning when the tamper setting exists and is 'false'", async () => {
+    // Row present, value "false" -> not tamper-resistant -> audit delete runs.
     delete process.env.SENTRY_CRON_MONITORS;
+    const warnSpy = loggerCalls("warn");
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
-    getSettingStrictMock.mockResolvedValueOnce("30").mockResolvedValueOnce("90");
-    queueSelect("settings", [{ value: "false" }]);
+    getSettingStrictMock
+      .mockResolvedValueOnce("30")
+      .mockResolvedValueOnce("90")
+      .mockResolvedValueOnce("false");
 
     await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
 
-    // Kills the ConditionalExpression `true` on the tamper guard (line 376):
+    // Kills the ConditionalExpression `true` on the tamper guard:
     // a `true` mutant would treat this as tamper-resistant and skip the audit
     // delete, leaving only 1 execute call.
     expect(dbExecuteMock).toHaveBeenCalledTimes(2);
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
   it("uses the env retention days when the settings rows are absent", async () => {
@@ -870,13 +871,16 @@ describe("retentionSweep SQL pinning", () => {
       JOBS_RETENTION_DAYS: 45,
       AUDIT_RETENTION_DAYS: 120,
     });
-    getSettingStrictMock.mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined);
-    queueSelect("settings", []);
+    getSettingStrictMock
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined);
 
     await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
 
     expect(getSettingStrictMock).toHaveBeenNthCalledWith(1, "jobsRetentionDays");
     expect(getSettingStrictMock).toHaveBeenNthCalledWith(2, "auditRetentionDays");
+    expect(getSettingStrictMock).toHaveBeenNthCalledWith(3, "tamperResistantAudit");
     expect(parseNumericSettingValueMock).not.toHaveBeenCalled();
     const interpolated = sqlCalls.flatMap((c) => c.values);
     expect(interpolated).toContain(45);
@@ -886,8 +890,10 @@ describe("retentionSweep SQL pinning", () => {
   it("omits DELETE FROM jobs when jobsRetentionDays read fails and omits DELETE FROM audit_log when auditRetentionDays read fails (#2718)", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
-    getSettingStrictMock.mockRejectedValueOnce(new Error("db error")).mockResolvedValueOnce("180");
-    queueSelect("settings", []);
+    getSettingStrictMock
+      .mockRejectedValueOnce(new Error("db error"))
+      .mockResolvedValueOnce("180")
+      .mockResolvedValueOnce(undefined);
 
     await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
 
@@ -896,6 +902,45 @@ describe("retentionSweep SQL pinning", () => {
 
     sqlCalls.length = 0;
     getSettingStrictMock.mockResolvedValueOnce("60").mockRejectedValueOnce(new Error("db error"));
+
+    await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
+
+    expect(allSqlText()).toContain("DELETE FROM jobs");
+    expect(allSqlText()).not.toContain("DELETE FROM audit_log");
+  });
+
+  it("still issues DELETE FROM audit_log when DELETE FROM jobs fails, and omits DELETE FROM audit_log when tamperResistantAudit is corrupt or its read fails (#2736)", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    getSettingStrictMock
+      .mockResolvedValueOnce("60")
+      .mockResolvedValueOnce("180")
+      .mockResolvedValueOnce(undefined);
+    dbExecuteMock
+      .mockRejectedValueOnce(new Error("jobs lock timeout"))
+      .mockResolvedValueOnce(undefined);
+
+    await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
+
+    expect(allSqlText()).toContain("DELETE FROM jobs");
+    expect(allSqlText()).toContain("DELETE FROM audit_log");
+
+    sqlCalls.length = 0;
+    getSettingStrictMock
+      .mockResolvedValueOnce("60")
+      .mockResolvedValueOnce("180")
+      .mockResolvedValueOnce("1");
+
+    await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
+
+    expect(allSqlText()).toContain("DELETE FROM jobs");
+    expect(allSqlText()).not.toContain("DELETE FROM audit_log");
+
+    sqlCalls.length = 0;
+    getSettingStrictMock
+      .mockResolvedValueOnce("60")
+      .mockResolvedValueOnce("180")
+      .mockRejectedValueOnce(new Error("tamper read failed"));
 
     await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
 

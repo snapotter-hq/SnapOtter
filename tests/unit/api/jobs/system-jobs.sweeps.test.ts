@@ -48,13 +48,12 @@ const dbUpdateMock = vi.hoisted(() => vi.fn());
 // Each call to db.select(cols).from(table) pulls the next queued result for
 // that table. .where() and .limit() are chainable and the builder is thenable
 // so `await db.select()...where()` resolves to the queued rows.
-type TableName = "users" | "teams" | "jobs" | "settings";
+type TableName = "users" | "teams" | "jobs";
 
 const selectQueues = vi.hoisted(() => ({
   users: [] as unknown[][],
   teams: [] as unknown[][],
   jobs: [] as unknown[][],
-  settings: [] as unknown[][],
 }));
 
 const schemaMock = vi.hoisted(() => ({
@@ -70,14 +69,12 @@ const schemaMock = vi.hoisted(() => ({
     toolId: "jobs.toolId",
     type: "jobs.type",
   },
-  settings: { key: "settings.key", value: "settings.value" },
 }));
 
 function tableNameOf(table: unknown): TableName {
   if (table === schemaMock.users) return "users";
   if (table === schemaMock.teams) return "teams";
   if (table === schemaMock.jobs) return "jobs";
-  if (table === schemaMock.settings) return "settings";
   throw new Error("Unexpected table passed to db.select().from()");
 }
 
@@ -125,7 +122,6 @@ function resetSelectQueues(): void {
   selectQueues.users = [];
   selectQueues.teams = [];
   selectQueues.jobs = [];
-  selectQueues.settings = [];
 }
 
 async function loadSystemJobs(
@@ -326,10 +322,12 @@ describe("withCronMonitor", () => {
 describe("dispatchSystemJob retention", () => {
   it("deletes old jobs and old audit rows when both retentions are positive and tamper mode is off", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
+    const warnSpy = loggerCalls("warn");
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
-    getSettingStrictMock.mockResolvedValueOnce("60").mockResolvedValueOnce("180");
-    // tamperResistantAudit setting lookup returns no rows -> not tamper resistant.
-    queueSelect("settings", []);
+    getSettingStrictMock
+      .mockResolvedValueOnce("60")
+      .mockResolvedValueOnce("180")
+      .mockResolvedValueOnce(undefined);
 
     await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
 
@@ -337,15 +335,20 @@ describe("dispatchSystemJob retention", () => {
     expect(dbExecuteMock).toHaveBeenCalledTimes(2);
     expect(getSettingStrictMock).toHaveBeenCalledWith("jobsRetentionDays");
     expect(getSettingStrictMock).toHaveBeenCalledWith("auditRetentionDays");
+    expect(getSettingStrictMock).toHaveBeenCalledWith("tamperResistantAudit");
     expect(parseNumericSettingValueMock).toHaveBeenCalledWith("jobsRetentionDays", "60", 0);
     expect(parseNumericSettingValueMock).toHaveBeenCalledWith("auditRetentionDays", "180", 0);
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
   it("skips the jobs delete when jobsRetentionDays is 0", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
-    getSettingStrictMock.mockResolvedValueOnce("0").mockResolvedValueOnce("90");
-    queueSelect("settings", []);
+    getSettingStrictMock
+      .mockResolvedValueOnce("0")
+      .mockResolvedValueOnce("90")
+      .mockResolvedValueOnce(undefined);
 
     await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
 
@@ -362,18 +365,24 @@ describe("dispatchSystemJob retention", () => {
 
     // Only the jobs delete runs; the settings lookup for tamper mode is skipped.
     expect(dbExecuteMock).toHaveBeenCalledTimes(1);
+    expect(getSettingStrictMock).not.toHaveBeenCalledWith("tamperResistantAudit");
   });
 
   it("preserves audit rows when tamper-resistant mode is on", async () => {
     delete process.env.SENTRY_CRON_MONITORS;
+    const warnSpy = loggerCalls("warn");
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
-    getSettingStrictMock.mockResolvedValueOnce("30").mockResolvedValueOnce("90");
-    queueSelect("settings", [{ value: "true" }]);
+    getSettingStrictMock
+      .mockResolvedValueOnce("30")
+      .mockResolvedValueOnce("90")
+      .mockResolvedValueOnce("true");
 
     await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
 
-    // Jobs delete runs, but the audit_log delete is suppressed.
+    // Jobs delete runs, but the audit_log delete is suppressed without warning.
     expect(dbExecuteMock).toHaveBeenCalledTimes(1);
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
   it("logs the error and skips the jobs sweep when reading jobsRetentionDays fails (#2718)", async () => {
@@ -381,8 +390,10 @@ describe("dispatchSystemJob retention", () => {
     const errSpy = loggerCalls("error");
     const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
     const readErr = new Error("connection terminated unexpectedly");
-    getSettingStrictMock.mockRejectedValueOnce(readErr).mockResolvedValueOnce("90");
-    queueSelect("settings", []);
+    getSettingStrictMock
+      .mockRejectedValueOnce(readErr)
+      .mockResolvedValueOnce("90")
+      .mockResolvedValueOnce(undefined);
 
     await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
 
@@ -433,6 +444,97 @@ describe("dispatchSystemJob retention", () => {
     expect(warnSpy).toHaveBeenCalledWith(
       { key: "auditRetentionDays", value: "-5" },
       "invalid numeric setting, using default",
+    );
+    warnSpy.mockRestore();
+  });
+
+  it("logs the error and still runs the audit_log sweep when DELETE FROM jobs fails (#2736)", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const errSpy = loggerCalls("error");
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    const deleteErr = new Error("canceling statement due to lock timeout");
+    getSettingStrictMock
+      .mockResolvedValueOnce("30")
+      .mockResolvedValueOnce("90")
+      .mockResolvedValueOnce(undefined);
+    dbExecuteMock.mockRejectedValueOnce(deleteErr).mockResolvedValueOnce(undefined);
+
+    await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
+
+    expect(dbExecuteMock).toHaveBeenCalledTimes(2);
+    expect(errSpy).toHaveBeenCalledWith({ err: deleteErr }, "Retention: jobs sweep failed");
+    errSpy.mockRestore();
+  });
+
+  it("logs the error when DELETE FROM audit_log fails (#2736)", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const errSpy = loggerCalls("error");
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    const deleteErr = new Error("canceling statement due to lock timeout");
+    getSettingStrictMock
+      .mockResolvedValueOnce("30")
+      .mockResolvedValueOnce("90")
+      .mockResolvedValueOnce(undefined);
+    dbExecuteMock.mockResolvedValueOnce(undefined).mockRejectedValueOnce(deleteErr);
+
+    await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
+
+    expect(dbExecuteMock).toHaveBeenCalledTimes(2);
+    expect(errSpy).toHaveBeenCalledWith({ err: deleteErr }, "Retention: audit_log sweep failed");
+    errSpy.mockRestore();
+  });
+
+  it("logs the error and skips the audit_log sweep when reading tamperResistantAudit fails (#2736)", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const errSpy = loggerCalls("error");
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    const readErr = new Error("connection terminated unexpectedly");
+    getSettingStrictMock
+      .mockResolvedValueOnce("30")
+      .mockResolvedValueOnce("90")
+      .mockRejectedValueOnce(readErr);
+
+    await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
+
+    expect(dbExecuteMock).toHaveBeenCalledTimes(1);
+    expect(errSpy).toHaveBeenCalledWith(
+      { err: readErr },
+      "Retention: tamperResistantAudit read failed; skipping audit_log sweep",
+    );
+    errSpy.mockRestore();
+  });
+
+  it("logs a warning and skips the audit_log sweep when tamperResistantAudit holds a corrupt non-'false' value (#2736)", async () => {
+    delete process.env.SENTRY_CRON_MONITORS;
+    const warnSpy = loggerCalls("warn");
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+    getSettingStrictMock
+      .mockResolvedValueOnce("30")
+      .mockResolvedValueOnce("90")
+      .mockResolvedValueOnce("TRUE");
+
+    await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
+
+    expect(dbExecuteMock).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      { key: "tamperResistantAudit", value: "TRUE" },
+      "invalid boolean setting, treating tamperResistantAudit as enabled",
+    );
+
+    // An empty string stored in settings.value is also corrupt (not unset) and must fail closed.
+    dbExecuteMock.mockClear();
+    warnSpy.mockClear();
+    getSettingStrictMock
+      .mockResolvedValueOnce("30")
+      .mockResolvedValueOnce("90")
+      .mockResolvedValueOnce("");
+
+    await runSystemJob({ name: SYSTEM_JOBS.retention } as never);
+
+    expect(dbExecuteMock).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      { key: "tamperResistantAudit", value: "" },
+      "invalid boolean setting, treating tamperResistantAudit as enabled",
     );
     warnSpy.mockRestore();
   });

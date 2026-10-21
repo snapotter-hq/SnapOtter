@@ -554,12 +554,16 @@ async function retentionSweep(): Promise<void> {
     logger.error({ err }, "Retention: jobsRetentionDays read failed; skipping jobs sweep");
   }
   if (jobsRetentionDays > 0) {
-    await db.execute(
-      sql`DELETE FROM jobs
-        WHERE created_at < now() - ${jobsRetentionDays} * interval '1 day'
-        AND status IN ('completed', 'failed', 'canceled')
-        AND (user_id IS NULL OR user_id NOT IN ${heldUsersSubquery})`,
-    );
+    try {
+      await db.execute(
+        sql`DELETE FROM jobs
+          WHERE created_at < now() - ${jobsRetentionDays} * interval '1 day'
+          AND status IN ('completed', 'failed', 'canceled')
+          AND (user_id IS NULL OR user_id NOT IN ${heldUsersSubquery})`,
+      );
+    } catch (err) {
+      logger.error({ err }, "Retention: jobs sweep failed");
+    }
   }
   let auditRetentionDays = 0;
   try {
@@ -572,21 +576,34 @@ async function retentionSweep(): Promise<void> {
     logger.error({ err }, "Retention: auditRetentionDays read failed; skipping audit_log sweep");
   }
   if (auditRetentionDays > 0) {
-    const tamperResult = await db
-      .select({ value: schema.settings.value })
-      .from(schema.settings)
-      .where(eq(schema.settings.key, "tamperResistantAudit"))
-      .limit(1);
-
-    const isTamperResistant = tamperResult.length > 0 && tamperResult[0].value === "true";
+    let isTamperResistant = true;
+    try {
+      const rawTamper = await getSettingStrict("tamperResistantAudit");
+      if (rawTamper !== undefined && rawTamper !== "false" && rawTamper !== "true") {
+        logger.warn(
+          { key: "tamperResistantAudit", value: rawTamper },
+          "invalid boolean setting, treating tamperResistantAudit as enabled",
+        );
+      }
+      isTamperResistant = rawTamper !== undefined && rawTamper !== "false";
+    } catch (err) {
+      logger.error(
+        { err },
+        "Retention: tamperResistantAudit read failed; skipping audit_log sweep",
+      );
+    }
 
     // Only delete audit logs if tamper-resistant mode is OFF
     if (!isTamperResistant) {
-      await db.execute(
-        sql`DELETE FROM audit_log
-          WHERE created_at < now() - ${auditRetentionDays} * interval '1 day'
-          AND (actor_id IS NULL OR actor_id NOT IN ${heldUsersSubquery})`,
-      );
+      try {
+        await db.execute(
+          sql`DELETE FROM audit_log
+            WHERE created_at < now() - ${auditRetentionDays} * interval '1 day'
+            AND (actor_id IS NULL OR actor_id NOT IN ${heldUsersSubquery})`,
+        );
+      } catch (err) {
+        logger.error({ err }, "Retention: audit_log sweep failed");
+      }
     }
   }
 }
