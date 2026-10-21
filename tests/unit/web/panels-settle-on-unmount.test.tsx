@@ -10,6 +10,7 @@ vi.mock("@/lib/analytics", async () => {
   return analyticsModuleMock();
 });
 
+import { BeautifySettings } from "@/components/tools/beautify-settings";
 import { BulkRenameSettings } from "@/components/tools/bulk-rename-settings";
 import { CollageSettings } from "@/components/tools/collage-settings";
 import { ColorPaletteSettings } from "@/components/tools/color-palette-settings";
@@ -566,10 +567,30 @@ interface FetchFileStorePanelCase {
   Panel: ComponentType;
   submitId: string;
   needsSecondaryFile: boolean;
+  prepare?: (container: HTMLElement) => void;
   goodResponse: () => Response;
 }
 
 const fetchFileStorePanels: FetchFileStorePanelCase[] = [
+  {
+    name: "beautify (image background)",
+    Panel: BeautifySettings,
+    submitId: "beautify-submit",
+    needsSecondaryFile: true,
+    prepare: () => {
+      fireEvent.click(screen.getByRole("button", { name: en.toolSettings.beautify.bgImage }));
+    },
+    goodResponse: () =>
+      new Response(
+        JSON.stringify({
+          jobId: "j-beautify",
+          downloadUrl: "/api/v1/download/j-beautify/out.png",
+          originalSize: 100,
+          processedSize: 90,
+        }),
+        { status: 200 },
+      ),
+  },
   {
     name: "compare",
     Panel: CompareSettings,
@@ -632,9 +653,10 @@ const fetchFileStorePanels: FetchFileStorePanelCase[] = [
 
 describe.each(fetchFileStorePanels)(
   "$name panel (#2636)",
-  ({ Panel, submitId, needsSecondaryFile, goodResponse }) => {
+  ({ Panel, submitId, needsSecondaryFile, prepare, goodResponse }) => {
     it("aborts in-flight fetch, clears processing, and sets runInterrupted on unmount", async () => {
       const { container, unmount } = render(<Panel />);
+      prepare?.(container);
       if (needsSecondaryFile) chooseSecondaryFile(container);
       fireEvent.click(screen.getByTestId(submitId));
       expect(useFileStore.getState().processing).toBe(true);
@@ -667,6 +689,7 @@ describe.each(fetchFileStorePanels)(
         .spyOn(HTMLAnchorElement.prototype, "click")
         .mockImplementation(() => {});
       const { container, unmount } = render(<Panel />);
+      prepare?.(container);
       if (needsSecondaryFile) chooseSecondaryFile(container);
       fireEvent.click(screen.getByTestId(submitId));
       await act(async () => {});
@@ -695,6 +718,7 @@ describe.each(fetchFileStorePanels)(
         .mockImplementation(() => {});
 
       const { container, unmount } = render(<Panel />);
+      prepare?.(container);
       if (needsSecondaryFile) chooseSecondaryFile(container);
       fireEvent.click(screen.getByTestId(submitId));
       expect(useFileStore.getState().processing).toBe(true);
@@ -738,6 +762,7 @@ describe.each(fetchFileStorePanels)(
         useFileStore.getState().reset();
         useFileStore.getState().setFiles([image()]);
         const { container, unmount } = render(<Panel />);
+        prepare?.(container);
         if (needsSecondaryFile) chooseSecondaryFile(container);
         fireEvent.click(screen.getByTestId(submitId));
 
@@ -758,10 +783,57 @@ describe.each(fetchFileStorePanels)(
 
         expect(useFileStore.getState().processing).toBe(true);
         expect(useFileStore.getState().error).toBeNull();
+        expect(screen.queryByText("Server failed")).toBeNull();
+        expect(screen.queryByText("Failed to fetch")).toBeNull();
       }
     });
   },
 );
+
+describe("beautify image-background reset or removeFile while mounted (#2711)", () => {
+  it("aborts in-flight fetch, clears manualProcessing, and re-enables beautify-submit when useFileStore resets or removes the file mid-run", async () => {
+    const { container, unmount } = render(<BeautifySettings />);
+    fireEvent.click(screen.getByRole("button", { name: en.toolSettings.beautify.bgImage }));
+    chooseSecondaryFile(container, image("bg.png"));
+    fireEvent.click(screen.getByTestId("beautify-submit"));
+
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(screen.getByTestId("beautify-submit")).toBeDisabled();
+    expect(screen.getByTestId("beautify-submit")).toHaveTextContent(
+      en.toolSettings.beautify.processing,
+    );
+    expect(fetchSignals[0]?.aborted).toBe(false);
+
+    // Resetting the store and loading a new file while mounted clears manualProcessing.
+    act(() => {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("fresh.png")]);
+    });
+
+    expect(fetchSignals[0]?.aborted).toBe(true);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(screen.getByTestId("beautify-submit")).toBeEnabled();
+    expect(screen.getByTestId("beautify-submit")).toHaveTextContent(
+      en.toolSettings.beautify.submit,
+    );
+
+    // Starting another run and removing the file via removeFile(0) aborts and clears processing.
+    fireEvent.click(screen.getByTestId("beautify-submit"));
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(fetchSignals[1]?.aborted).toBe(false);
+
+    act(() => {
+      useFileStore.getState().removeFile(0);
+    });
+
+    expect(fetchSignals[1]?.aborted).toBe(true);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(screen.getByTestId("beautify-submit")).toHaveTextContent(
+      en.toolSettings.beautify.submit,
+    );
+    unmount();
+  });
+});
 
 describe("watermark-image multi-file loop (#2636)", () => {
   it("aborts the active file request on unmount, stops the loop, and resets the processing entry", async () => {

@@ -1021,7 +1021,15 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   const runFileRef = useRef<File | null>(null);
   const expiredRerunInFlightRef = useRef(false);
   const effectsRunIdRef = useRef(0);
+  const effectsAbortRef = useRef<AbortController | null>(null);
   const [applyingEffects, setApplyingEffects] = useState(false);
+
+  useEffect(
+    () => () => {
+      effectsAbortRef.current?.abort();
+    },
+    [],
+  );
 
   const initialParsedDownload = !processing ? parseMaskDownloadUrl(downloadUrl) : null;
 
@@ -1237,6 +1245,8 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   // Phase 1: Run AI background removal
   const handleRemoveBg = () => {
     // Reset Phase 2 state
+    effectsAbortRef.current?.abort();
+    effectsAbortRef.current = null;
     effectsRunIdRef.current += 1;
     expiredRerunInFlightRef.current = false;
     setApplyingEffects(false);
@@ -1324,6 +1334,10 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   // whose automatic re-run is still in flight (#2490).
   useEffect(() => {
     if (bgRemoved) return;
+    if (files.length <= 1) {
+      effectsAbortRef.current?.abort();
+      effectsAbortRef.current = null;
+    }
     setApplyingEffects(false);
     if (
       expiredRerunInFlightRef.current &&
@@ -1350,7 +1364,12 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     const settingsAtStart = { ...removeBgSession.settings };
     const runId = ++effectsRunIdRef.current;
 
+    effectsAbortRef.current?.abort();
+    const controller = new AbortController();
+    effectsAbortRef.current = controller;
+
     const isStaleEffectsRun = () => {
+      if (controller.signal.aborted) return true;
       const store = useFileStore.getState();
       const liveEntry = store.entries[store.selectedIndex];
       return (
@@ -1364,6 +1383,25 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
         (store.entries.length === 1 && !bgRemovedRef.current)
       );
     };
+
+    const unsubscribe = useFileStore.subscribe((state) => {
+      const liveEntry = state.entries[state.selectedIndex];
+      if (
+        !capturedEntry ||
+        !capturedFile ||
+        liveEntry?.id !== capturedEntry.id ||
+        liveEntry?.file !== capturedFile ||
+        (expectedProcessedUrl !== undefined && liveEntry.processedUrl !== expectedProcessedUrl)
+      ) {
+        if (effectsAbortRef.current === controller) effectsAbortRef.current = null;
+        if (effectsRunIdRef.current === runId) {
+          setApplyingEffects(false);
+        }
+        unsubscribe();
+        controller.abort();
+      }
+    });
+    controller.signal.addEventListener("abort", unsubscribe, { once: true });
 
     setApplyingEffects(true);
     setEffectsError(null);
@@ -1401,6 +1439,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
         method: "POST",
         headers,
         body: formData,
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -1456,6 +1495,9 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
         useFileStore.getState().markClaimedById(capturedEntry.id, expectedProcessedUrl);
       }
     } catch (err) {
+      if (controller.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) {
+        return;
+      }
       if (!isStaleEffectsRun() && bgRemovedRef.current) {
         setEffectsError(
           err instanceof Error
@@ -1464,6 +1506,10 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
         );
       }
     } finally {
+      unsubscribe();
+      if (effectsAbortRef.current === controller) {
+        effectsAbortRef.current = null;
+      }
       if (effectsRunIdRef.current === runId) {
         setApplyingEffects(false);
       }

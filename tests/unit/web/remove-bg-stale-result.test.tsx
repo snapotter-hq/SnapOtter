@@ -8,13 +8,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // removal) has finished for the loaded file and exposes the mask's URL; a test
 // can start from a run still in flight and finish it later.
 const processor = vi.hoisted(() => ({
+  processFiles: vi.fn(),
   processing: false,
   downloadUrl: "/api/v1/download/JOBA/a_mask.png" as string | null,
 }));
 
 vi.mock("@/hooks/use-tool-processor", () => ({
   useToolProcessor: () => ({
-    processFiles: vi.fn(),
+    processFiles: processor.processFiles,
     processAllFiles: vi.fn(),
     processing: processor.processing,
     error: null,
@@ -34,6 +35,7 @@ const download = () => screen.queryByTestId("remove-background-download");
 beforeEach(() => {
   URL.createObjectURL = vi.fn(() => "blob:mock");
   URL.revokeObjectURL = vi.fn();
+  processor.processFiles.mockClear();
   processor.processing = false;
   processor.downloadUrl = "/api/v1/download/JOBA/a_mask.png";
 });
@@ -306,5 +308,131 @@ describe("remove-background result after the files change (#2107)", () => {
     expect(state.lastSavedLibraryFileId).toBeNull();
     expect(state.entries[0].claimed).toBe(false);
     expect(clickSpy).not.toHaveBeenCalled();
+  });
+
+  it("aborts the in-flight Phase 2 effects fetch on unmount and does not write or download if it resolves late (#2711)", async () => {
+    const a = png("a.png");
+    useFileStore.getState().setFiles([a]);
+    useFileStore.getState().updateEntry(0, { serverFileId: "lib-a-v1" });
+    useFileStore.getState().setLibrarySaveMode("overwrite");
+
+    const signals: Array<AbortSignal | undefined> = [];
+    let resolveEffects: ((res: Response) => void) | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init?: RequestInit) => {
+        signals.push(init?.signal ?? undefined);
+        return new Promise<Response>((resolve) => {
+          resolveEffects = resolve;
+        });
+      }),
+    );
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    const { unmount } = render(<RemoveBgSettings />);
+    fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+    await waitFor(() => expect(resolveEffects).toBeDefined());
+    expect(signals[0]).toBeInstanceOf(AbortSignal);
+    expect(signals[0]?.aborted).toBe(false);
+
+    unmount();
+
+    expect(signals[0]?.aborted).toBe(true);
+
+    await act(async () => {
+      resolveEffects?.(
+        new Response(
+          JSON.stringify({
+            downloadUrl: "/api/v1/download/JOBA/a_effects.png",
+            savedFileId: "lib-a-v2",
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+
+    const state = useFileStore.getState();
+    expect(state.entries[0].serverFileId).toBe("lib-a-v1");
+    expect(state.lastSavedLibraryFileId).toBeNull();
+    expect(state.entries[0].claimed).toBe(false);
+    expect(clickSpy).not.toHaveBeenCalled();
+
+    // A remount after an unmounted in-flight 500 or 410 response must not show a stale error or restart Phase 1.
+    for (const badStatus of [500, 410] as const) {
+      processor.processFiles.mockClear();
+      resolveEffects = undefined;
+      const view = render(<RemoveBgSettings />);
+      fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+      await waitFor(() => expect(resolveEffects).toBeDefined());
+      view.unmount();
+      expect(signals.at(-1)?.aborted).toBe(true);
+
+      await act(async () => {
+        resolveEffects?.(
+          new Response(
+            JSON.stringify(
+              badStatus === 410 ? { code: "BACKGROUND_REMOVAL_EXPIRED" } : { error: "Boom" },
+            ),
+            { status: badStatus },
+          ),
+        );
+      });
+
+      expect(processor.processFiles).not.toHaveBeenCalled();
+      const remounted = render(<RemoveBgSettings />);
+      expect(await screen.findByTestId("remove-background-download-effects")).toBeInTheDocument();
+      expect(screen.queryByText("Boom")).toBeNull();
+      remounted.unmount();
+    }
+  });
+
+  it("aborts the in-flight Phase 2 effects fetch immediately when the active file changes or Undo clears the cutout in useFileStore (#2711)", async () => {
+    const a = png("a.png");
+    const b = png("b.png");
+    useFileStore.getState().setFiles([a]);
+    useFileStore.getState().updateEntry(0, {
+      serverFileId: "lib-a-v1",
+      processedUrl: "/api/v1/download/JOBA/a_mask.png",
+    });
+    useFileStore.getState().setLibrarySaveMode("overwrite");
+
+    const signals: Array<AbortSignal | undefined> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init?: RequestInit) => {
+        signals.push(init?.signal ?? undefined);
+        return new Promise<Response>(() => {});
+      }),
+    );
+
+    const { rerender } = render(<RemoveBgSettings />);
+    fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+    await waitFor(() => expect(signals[0]).toBeInstanceOf(AbortSignal));
+    expect(signals[0]?.aborted).toBe(false);
+
+    act(() => {
+      useFileStore.getState().setFiles([b]);
+    });
+
+    expect(signals[0]?.aborted).toBe(true);
+
+    // Undo clearing the cutout on a single file also aborts an in-flight Phase 2 request.
+    act(() => {
+      useFileStore.getState().setFiles([a]);
+      useFileStore.getState().updateEntry(0, {
+        serverFileId: "lib-a-v1",
+        processedUrl: "/api/v1/download/JOBA/a_mask.png",
+      });
+    });
+    rerender(<RemoveBgSettings />);
+    fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+    await waitFor(() => expect(signals[1]).toBeInstanceOf(AbortSignal));
+    expect(signals[1]?.aborted).toBe(false);
+
+    act(() => {
+      useFileStore.getState().undoProcessing();
+    });
+
+    expect(signals[1]?.aborted).toBe(true);
   });
 });

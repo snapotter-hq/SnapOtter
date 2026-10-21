@@ -5,6 +5,7 @@ import { CollapsibleSection } from "@/components/common/collapsible-section";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
+import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
@@ -1354,7 +1355,7 @@ export function BeautifySettings({
   onImageOverlay?: (children: React.ReactNode) => void;
 }) {
   const { t } = useTranslation();
-  const { files, setJobId } = useFileStore();
+  const { files, setProcessing, setError, setJobId } = useFileStore();
   const { processFiles, processAllFiles, processing, error, downloadUrl, progress } =
     useToolProcessor("beautify");
 
@@ -1362,7 +1363,12 @@ export function BeautifySettings({
   const [bgImageFile, setBgImageFile] = useState<File | null>(null);
   const [manualDownloadUrl, setManualDownloadUrl] = useState<string | null>(null);
   const [manualProcessing, setManualProcessing] = useState(false);
-  const [manualError, setManualError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useSettleOnUnmount(
+    () => abortRef.current !== null,
+    () => abortRef.current?.abort(),
+  );
 
   const handleSettingsChange = useCallback((s: Record<string, unknown>) => {
     setSettings(s);
@@ -1375,7 +1381,7 @@ export function BeautifySettings({
   const hasFile = files.length > 0;
   const isImageBg = settings.backgroundType === "image";
   const isProcessing = processing || manualProcessing;
-  const displayError = error || manualError;
+  const displayError = error;
   const displayDownloadUrl = manualDownloadUrl || downloadUrl;
 
   const handleProcess = async () => {
@@ -1386,9 +1392,35 @@ export function BeautifySettings({
       const { entries, selectedIndex } = useFileStore.getState();
       const capturedEntry = entries[selectedIndex] ?? entries[0];
       if (!capturedEntry) return;
+
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
       setManualProcessing(true);
-      setManualError(null);
+      setProcessing(true);
+      setError(null);
       setManualDownloadUrl(null);
+
+      let storeReset = false;
+      const unsubscribe = useFileStore.subscribe((state) => {
+        if (
+          !state.processing ||
+          !state.entries.some((e) => e.id === capturedEntry.id && e.file === capturedEntry.file)
+        ) {
+          storeReset = true;
+          if (abortRef.current === controller) {
+            abortRef.current = null;
+            setManualProcessing(false);
+          }
+          unsubscribe();
+          if (state.processing) {
+            setProcessing(false);
+          }
+          controller.abort();
+        }
+      });
+      controller.signal.addEventListener("abort", unsubscribe, { once: true });
 
       try {
         const formData = new FormData();
@@ -1400,6 +1432,7 @@ export function BeautifySettings({
           method: "POST",
           headers: formatHeaders(),
           body: formData,
+          signal: controller.signal,
         });
 
         if (!res.ok) {
@@ -1415,6 +1448,7 @@ export function BeautifySettings({
         }
 
         const result = resolveServerUrls(await res.json());
+        if (controller.signal.aborted || storeReset) return;
         setJobId(result.jobId);
         useFileStore.getState().updateEntryById(capturedEntry.id, {
           processedUrl: result.downloadUrl,
@@ -1426,17 +1460,32 @@ export function BeautifySettings({
         });
         setManualDownloadUrl(result.downloadUrl);
       } catch (err) {
-        setManualError(
-          err instanceof Error ? err.message : t.toolSettings.beautify.processingFailed,
-        );
+        if (
+          controller.signal.aborted ||
+          storeReset ||
+          (err instanceof DOMException && err.name === "AbortError")
+        ) {
+          return;
+        }
+        unsubscribe();
+        setError(err instanceof Error ? err.message : t.toolSettings.beautify.processingFailed);
       } finally {
-        setManualProcessing(false);
+        unsubscribe();
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+          setManualProcessing(false);
+        }
+        if (!controller.signal.aborted && !storeReset) {
+          setProcessing(false);
+        }
       }
       return;
     }
 
     // Standard processing via useToolProcessor
-    setManualError(null);
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setManualProcessing(false);
     setManualDownloadUrl(null);
     if (files.length > 1) {
       processAllFiles(files, settings);
@@ -1461,7 +1510,7 @@ export function BeautifySettings({
 
       {displayError && <p className="text-xs text-destructive-ink">{displayError}</p>}
 
-      {processing ? (
+      {processing && !manualProcessing ? (
         <ProgressCard
           active={processing}
           phase={progress.phase === "idle" ? "uploading" : progress.phase}
