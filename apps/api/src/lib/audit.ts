@@ -6,6 +6,7 @@ import { db, schema } from "../db/index.js";
 import { computeHmac } from "./audit-integrity.js";
 import { deriveAuditHmacKey } from "./encryption.js";
 import { isEnterpriseFeatureEnabled } from "./enterprise-feature.js";
+import { getSettingStrict } from "./settings-helpers.js";
 
 const MAX_AUDIT_INPUT_LENGTH = 200;
 
@@ -78,14 +79,25 @@ export async function auditLog(
 
   // Compute HMAC for tamper-resistant mode
   if (env.DATA_ENCRYPTION_KEY) {
+    let isTamperResistant = true;
     try {
-      const tamperResult = await db
-        .select({ value: schema.settings.value })
-        .from(schema.settings)
-        .where(eq(schema.settings.key, "tamperResistantAudit"))
-        .limit(1);
+      const rawTamper = await getSettingStrict("tamperResistantAudit");
+      if (rawTamper !== undefined && rawTamper !== "false" && rawTamper !== "true") {
+        logger.warn(
+          { key: "tamperResistantAudit", value: rawTamper },
+          "invalid boolean setting, treating tamperResistantAudit as enabled",
+        );
+      }
+      isTamperResistant = rawTamper !== undefined && rawTamper !== "false";
+    } catch (err) {
+      logger.warn(
+        { err, event },
+        "Failed to read tamperResistantAudit setting, treating as enabled",
+      );
+    }
 
-      if (tamperResult.length > 0 && tamperResult[0].value === "true") {
+    if (isTamperResistant) {
+      try {
         const hmacKey = await deriveAuditHmacKey(env.DATA_ENCRYPTION_KEY);
         const rowData = {
           actorId,
@@ -99,9 +111,9 @@ export async function auditLog(
         };
         const integrity = computeHmac(rowData, hmacKey);
         await db.update(schema.auditLog).set({ integrity }).where(eq(schema.auditLog.id, id));
+      } catch (err) {
+        logger.warn({ err, event }, "Failed to compute audit HMAC");
       }
-    } catch (err) {
-      logger.warn({ err, event }, "Failed to compute audit HMAC");
     }
   }
 }

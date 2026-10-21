@@ -9,7 +9,7 @@
  *     "audit_export" fallback, and the fail-closed catch paths.
  *   - auditLog: the EXACT values written to the DB (actorId / actorUsername /
  *     targetType / targetId coalescing chains) and the tamper-resistant HMAC
- *     branch (the DATA_ENCRYPTION_KEY gate, the tamperResistantAudit === "true"
+ *     branch (the DATA_ENCRYPTION_KEY gate, the tamperResistantAudit fail-closed
  *     gate, and the integrity UPDATE it issues).
  *   - deriveTargetType: driven through the REAL auditLog insert (the existing
  *     audit-helpers test only exercises a hand-copied reproduction, so the real
@@ -88,6 +88,15 @@ vi.mock("@snapotter/enterprise", () => ({
   },
 }));
 
+vi.mock("../../../apps/api/src/lib/settings-helpers.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/settings-helpers.js")>();
+  return {
+    ...actual,
+    getSettingStrict: vi.fn((key: string) => actual.getSettingStrict(key)),
+  };
+});
+
 // deriveAuditHmacKey / computeHmac are real: we assert a real hex string lands in
 // the integrity UPDATE, which pins the HMAC branch end-to-end.
 
@@ -97,6 +106,7 @@ import {
   isToolAuditEnabled,
   sanitizeAuditInput,
 } from "../../../apps/api/src/lib/audit.js";
+import { getSettingStrict } from "../../../apps/api/src/lib/settings-helpers.js";
 
 function makeLogger() {
   return {
@@ -386,15 +396,18 @@ describe("auditLog failure handling", () => {
 
 describe("auditLog tamper-resistant integrity", () => {
   it("computes and stores an integrity HMAC when encryption + tamperResistant are on", async () => {
+    const logger = makeLogger();
     state.encryptionKey = "a".repeat(64);
     state.selectRows = [[{ value: "true" }]]; // tamperResistantAudit === "true"
-    await auditLog(makeLogger() as never, "USER_CREATED", { userId: "u1" });
+    await auditLog(logger as never, "USER_CREATED", { userId: "u1" });
 
+    expect(getSettingStrict).toHaveBeenCalledWith("tamperResistantAudit");
     expect(state.updateWhereCalled).toBe(1);
     expect(state.updateSet).toHaveLength(1);
     const integrity = state.updateSet[0].integrity;
     expect(typeof integrity).toBe("string");
     expect(integrity).toMatch(/^[0-9a-f]{64}$/); // sha256 hex
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 
   it("skips the HMAC entirely when DATA_ENCRYPTION_KEY is unset", async () => {
@@ -403,20 +416,65 @@ describe("auditLog tamper-resistant integrity", () => {
     await auditLog(makeLogger() as never, "USER_CREATED", { userId: "u1" });
     expect(state.updateWhereCalled).toBe(0);
     expect(state.selectIdx).toBe(0); // never even queried tamperResistantAudit
+    expect(getSettingStrict).not.toHaveBeenCalled();
   });
 
-  it("skips the HMAC when tamperResistantAudit is not exactly 'true'", async () => {
+  it("skips the HMAC when tamperResistantAudit is 'false'", async () => {
+    const logger = makeLogger();
     state.encryptionKey = "a".repeat(64);
-    state.selectRows = [[{ value: "1" }]]; // not "true"
-    await auditLog(makeLogger() as never, "USER_CREATED", { userId: "u1" });
+    state.selectRows = [[{ value: "false" }]];
+    await auditLog(logger as never, "USER_CREATED", { userId: "u1" });
+    expect(getSettingStrict).toHaveBeenCalledWith("tamperResistantAudit");
     expect(state.updateWhereCalled).toBe(0);
+    expect(logger.warn).not.toHaveBeenCalled();
   });
+
+  it.each(["TRUE", "1", ""])(
+    "computes and stores an integrity HMAC and logs a warning when tamperResistantAudit holds corrupt value %j (#3233)",
+    async (corruptValue) => {
+      const logger = makeLogger();
+      state.encryptionKey = "a".repeat(64);
+      state.selectRows = [[{ value: corruptValue }]];
+      await auditLog(logger as never, "USER_CREATED", { userId: "u1" });
+
+      expect(getSettingStrict).toHaveBeenCalledWith("tamperResistantAudit");
+      expect(state.updateWhereCalled).toBe(1);
+      expect(state.updateSet).toHaveLength(1);
+      expect(state.updateSet[0].integrity).toMatch(/^[0-9a-f]{64}$/);
+      expect(logger.warn).toHaveBeenCalledTimes(1);
+      expect(logger.warn).toHaveBeenCalledWith(
+        { key: "tamperResistantAudit", value: corruptValue },
+        "invalid boolean setting, treating tamperResistantAudit as enabled",
+      );
+    },
+  );
 
   it("skips the HMAC when the tamperResistantAudit setting row is absent", async () => {
+    const logger = makeLogger();
     state.encryptionKey = "a".repeat(64);
     state.selectRows = [[]]; // no row
-    await auditLog(makeLogger() as never, "USER_CREATED", { userId: "u1" });
+    await auditLog(logger as never, "USER_CREATED", { userId: "u1" });
+    expect(getSettingStrict).toHaveBeenCalledWith("tamperResistantAudit");
     expect(state.updateWhereCalled).toBe(0);
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("warns and still computes the integrity HMAC when reading tamperResistantAudit fails (#3233)", async () => {
+    const logger = makeLogger();
+    state.encryptionKey = "a".repeat(64);
+    state.selectThrows = true;
+
+    await expect(
+      auditLog(logger as never, "USER_CREATED", { userId: "u1" }),
+    ).resolves.toBeUndefined();
+    expect(state.updateWhereCalled).toBe(1);
+    expect(state.updateSet).toHaveLength(1);
+    expect(state.updateSet[0].integrity).toMatch(/^[0-9a-f]{64}$/);
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+    expect(logger.warn).toHaveBeenCalledWith(
+      { event: "USER_CREATED", err: expect.any(Error) },
+      "Failed to read tamperResistantAudit setting, treating as enabled",
+    );
   });
 
   it("warns but does not throw when the HMAC update fails", async () => {
