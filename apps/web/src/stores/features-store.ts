@@ -62,10 +62,14 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
   // Preserves the old one-shot retry-on-failure behavior now that the server
   // serializes installs and we no longer drive the queue from the client.
   const installAllRetried = new Set<string>();
+  let refreshSeq = 0;
+  let resetSeq = 0;
 
   const refreshBundles = async () => {
+    const seq = ++refreshSeq;
     try {
       const data = await apiGet<{ bundles: FeatureBundleState[] }>("/v1/features");
+      if (seq !== refreshSeq) return;
       set({ bundles: data.bundles, loaded: true });
     } catch {}
   };
@@ -119,9 +123,10 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
 
   const startPolling = (bundleId: string) => {
     if (pollRefs[bundleId]) return;
-    pollRefs[bundleId] = setInterval(async () => {
+    const timer = setInterval(async () => {
       try {
         await refreshBundles();
+        if (pollRefs[bundleId] !== timer) return;
         const updated = get().bundles.find((b) => b.id === bundleId);
 
         if (updated?.status === "queued") {
@@ -162,6 +167,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
         );
       } catch {}
     }, 3000);
+    pollRefs[bundleId] = timer;
   };
 
   const listenToProgress = (bundleId: string, jobId: string) => {
@@ -176,6 +182,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
     esRefs[bundleId] = es;
 
     es.onmessage = (event) => {
+      if (esRefs[bundleId] !== es) return;
       // Only an unparseable frame is ignorable. A throw past the parse is our
       // own handling failing, and must not vanish (#1287).
       let data: {
@@ -194,7 +201,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
         if (data.type === "heartbeat") return;
         if (data.phase === "complete") {
           es.close();
-          delete esRefs[bundleId];
+          if (esRefs[bundleId] === es) delete esRefs[bundleId];
           stopTracking(bundleId);
           refreshBundles();
           onInstallSettled(bundleId, null);
@@ -202,7 +209,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
         }
         if (data.phase === "failed") {
           es.close();
-          delete esRefs[bundleId];
+          if (esRefs[bundleId] === es) delete esRefs[bundleId];
           stopTracking(bundleId);
           onInstallSettled(bundleId, data.error ?? "Installation failed");
           return;
@@ -230,6 +237,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
     };
 
     es.onerror = () => {
+      if (esRefs[bundleId] !== es) return;
       es.close();
       delete esRefs[bundleId];
       startPolling(bundleId);
@@ -297,11 +305,15 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
         refreshBundles();
         return;
       }
+      const epoch = resetSeq;
+      const seq = ++refreshSeq;
       try {
         const data = await apiGet<{ bundles: FeatureBundleState[] }>("/v1/features");
+        if (epoch !== resetSeq || seq !== refreshSeq) return;
         set({ bundles: data.bundles, loaded: true, loadError: false });
         recoverActiveInstalls();
       } catch {
+        if (epoch !== resetSeq || seq !== refreshSeq) return;
         set({ loaded: true, loadError: true });
       }
     },
@@ -333,6 +345,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
       // Always POST immediately: the server owns the queue now, so a POST is
       // durable even if this tab closes. Optimistically show "installing"; the
       // response tells us whether it actually started or got queued.
+      const epoch = resetSeq;
       const errors = { ...get().errors };
       delete errors[bundleId];
       set({
@@ -346,6 +359,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
           `/v1/admin/features/${bundleId}/install`,
           {},
         );
+        if (epoch !== resetSeq) return;
         if (result.queued) {
           // Server queued it behind an active install; show the pill and poll
           // for the transition instead of holding an SSE connection open. An
@@ -363,6 +377,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
           listenToProgress(bundleId, result.jobId);
         }
       } catch (err) {
+        if (epoch !== resetSeq) return;
         stopTracking(bundleId);
 
         const message = err instanceof Error ? err.message : "Failed to start installation";
@@ -375,6 +390,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
           delete errors[bundleId];
           set({ errors });
           await refreshBundles();
+          if (epoch !== resetSeq) return;
           onInstallSettled(bundleId, null);
         } else {
           onInstallSettled(bundleId, message);
@@ -389,6 +405,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
       );
       if (targets.length === 0) return;
 
+      const epoch = resetSeq;
       const errors = { ...get().errors };
       const installing = { ...get().installing };
       const startTimes = { ...get().startTimes };
@@ -408,6 +425,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
           `/v1/admin/tools/${toolId}/features/install`,
           {},
         );
+        if (epoch !== resetSeq) return;
 
         for (const item of result.bundles) {
           if (item.skipped) {
@@ -437,6 +455,7 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
           await refreshBundles();
         }
       } catch (err) {
+        if (epoch !== resetSeq) return;
         const message = err instanceof Error ? err.message : "Failed to start installation";
         const nextErrors = { ...get().errors };
 
@@ -516,10 +535,21 @@ export const useFeaturesStore = create<FeaturesState>((set, get) => {
           "/v1/admin/features/reset",
           {},
         );
+        resetSeq++;
+        refreshSeq++;
+        installAllRetried.clear();
+        for (const [bundleId, es] of Object.entries(esRefs)) {
+          es.close();
+          delete esRefs[bundleId];
+        }
+        for (const bundleId of Object.keys(pollRefs)) {
+          stopPolling(bundleId);
+        }
         set({
           installing: {},
           errors: {},
           queued: [],
+          installAllActive: false,
           startTimes: {},
           // Older servers omit the flag; assume the reset was complete rather
           // than warning about a venv this build knows nothing about.
