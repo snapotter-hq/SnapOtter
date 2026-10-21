@@ -250,9 +250,10 @@ const MAX_STAGING_OPEN_ATTEMPTS = 8;
  * Create a `.snapotter-staging/<name>.<uuid>.partial` file with `wx` after
  * ensuring `.snapotter-staging` exists. When concurrent writes share a parent
  * directory, one or more sibling writers' post-rename `rmdir(stagingDir)` calls
- * can land between our `mkdir(stagingDir)` and `open(stagingPath)` (#2728);
- * re-creating `stagingDir` and retrying the open recovers without exposing
- * partial files outside `.snapotter-staging`.
+ * can land either during `mkdir(stagingDir, { recursive: true })` (between
+ * libuv's `EEXIST` and `stat` checks, #3330) or between `mkdir(stagingDir)` and
+ * `open(stagingPath)` (#2728); re-creating `stagingDir` and retrying the open
+ * recovers without exposing partial files outside `.snapotter-staging`.
  */
 async function writeStagedFile(
   stagingDir: string,
@@ -262,20 +263,22 @@ async function writeStagedFile(
   signal?: AbortSignal,
 ): Promise<void> {
   for (let attempt = 1; ; attempt += 1) {
-    await mkdir(stagingDir, { recursive: true, mode: 0o700 });
-    signal?.throwIfAborted();
+    let writeStarted = false;
     try {
+      await mkdir(stagingDir, { recursive: true, mode: 0o700 });
+      signal?.throwIfAborted();
+      writeStarted = true;
       await writeFile(stagingPath, data, { flag: "wx", mode: 0o600 });
       onOwned();
       return;
     } catch (writeErr) {
       const errno = writeErr as NodeJS.ErrnoException | null;
-      if (errno?.syscall !== "open") {
+      if (writeStarted && errno?.syscall !== "open") {
         onOwned();
       }
       if (
         errno?.code === "ENOENT" &&
-        errno?.syscall === "open" &&
+        (errno?.syscall === "open" || errno?.syscall === "mkdir") &&
         attempt < MAX_STAGING_OPEN_ATTEMPTS
       ) {
         signal?.throwIfAborted();

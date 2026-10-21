@@ -365,9 +365,12 @@ describe("object-storage (local backend)", () => {
     let notifyStagingMkdirReached!: () => void;
     let releaseStagingMkdir!: () => void;
     let onWriteFileError: ((err: unknown, targetPath: string) => void) | null = null;
+    let simulatedMkdirFailuresRemaining = 0;
+    let simulatedMkdirAttempts = 0;
     let simulatedOpenFailuresRemaining = 0;
     let simulatedOpenAttempts = 0;
     let failWriteAfterRetryOpen = false;
+    const unlinkedPaths: string[] = [];
 
     const resetGate = () => {
       pauseNextStagingMkdir = true;
@@ -388,8 +391,21 @@ describe("object-storage (local backend)", () => {
           target: Parameters<typeof actual.mkdir>[0],
           options?: Parameters<typeof actual.mkdir>[1],
         ) => {
+          const targetPath = String(target);
+          if (simulatedMkdirFailuresRemaining > 0 && targetPath === stagingDir) {
+            simulatedMkdirAttempts += 1;
+            if (simulatedMkdirAttempts > 8) {
+              throw new Error("exceeded max staging open attempts on mkdir");
+            }
+            simulatedMkdirFailuresRemaining -= 1;
+            throw Object.assign(new Error("ENOENT: no such file or directory, mkdir"), {
+              code: "ENOENT",
+              syscall: "mkdir",
+              path: targetPath,
+            });
+          }
           const res = await actual.mkdir(target, options);
-          if (pauseNextStagingMkdir && String(target) === stagingDir) {
+          if (pauseNextStagingMkdir && targetPath === stagingDir) {
             pauseNextStagingMkdir = false;
             const gate = new Promise<void>((resolve) => {
               releaseStagingMkdir = resolve;
@@ -398,6 +414,10 @@ describe("object-storage (local backend)", () => {
             await gate;
           }
           return res;
+        },
+        unlink: async (target: Parameters<typeof actual.unlink>[0]) => {
+          unlinkedPaths.push(String(target));
+          return actual.unlink(target);
         },
         writeFile: async (
           target: Parameters<typeof actual.writeFile>[0],
@@ -544,6 +564,90 @@ describe("object-storage (local backend)", () => {
       });
       expect(simulatedOpenAttempts).toBe(8);
       simulatedOpenFailuresRemaining = 0;
+
+      // Deterministic interleaving 5 (#3330): mkdir(stagingDir, { recursive: true })
+      // loses a race to a sibling rmdir(stagingDir) between EEXIST and stat and
+      // rejects with ENOENT (syscall: "mkdir") on attempts 1 and 2, then succeeds on
+      // attempt 3 for both putObject and putObjectStream.
+      simulatedMkdirFailuresRemaining = 2;
+      simulatedMkdirAttempts = 0;
+      await expect(
+        isolatedStorage.putObject(
+          `outputs/${putConcurrentJobId}/mkdir-race-put.bin`,
+          Buffer.from("payload-mkdir-put"),
+        ),
+      ).resolves.toBeUndefined();
+      expect(simulatedMkdirAttempts).toBe(2);
+      await expect(
+        isolatedStorage.getObjectBuffer(`outputs/${putConcurrentJobId}/mkdir-race-put.bin`),
+      ).resolves.toEqual(Buffer.from("payload-mkdir-put"));
+
+      simulatedMkdirFailuresRemaining = 2;
+      simulatedMkdirAttempts = 0;
+      await expect(
+        isolatedStorage.putObjectStream(
+          `outputs/${putConcurrentJobId}/mkdir-race-stream.bin`,
+          Readable.from([Buffer.from("payload-mkdir-stream")]),
+        ),
+      ).resolves.toBe(20);
+      expect(simulatedMkdirAttempts).toBe(2);
+      await expect(
+        isolatedStorage.getObjectBuffer(`outputs/${putConcurrentJobId}/mkdir-race-stream.bin`),
+      ).resolves.toEqual(Buffer.from("payload-mkdir-stream"));
+
+      // Bounded retry exhaustion on mkdir(stagingDir) ENOENT stops after 8 attempts
+      // without marking stagingOwned (no unlink attempted on the unopened stagingPath).
+      unlinkedPaths.length = 0;
+      simulatedMkdirFailuresRemaining = 10;
+      simulatedMkdirAttempts = 0;
+      await expect(
+        isolatedStorage.putObject(
+          `outputs/${putConcurrentJobId}/exhausted-mkdir.bin`,
+          Buffer.from("exhausted-mkdir"),
+        ),
+      ).rejects.toMatchObject({
+        code: "storage-write-failed",
+        statusCode: 503,
+        cause: expect.objectContaining({ code: "ENOENT", syscall: "mkdir" }),
+      });
+      expect(simulatedMkdirAttempts).toBe(8);
+      expect(unlinkedPaths).toEqual([]);
+      simulatedMkdirFailuresRemaining = 0;
+
+      unlinkedPaths.length = 0;
+      simulatedMkdirFailuresRemaining = 10;
+      simulatedMkdirAttempts = 0;
+      const exhaustedMkdirSource = Readable.from([Buffer.from("exhausted-mkdir-stream")]);
+      await expect(
+        isolatedStorage.putObjectStream(
+          `outputs/${putConcurrentJobId}/exhausted-mkdir-stream.bin`,
+          exhaustedMkdirSource,
+        ),
+      ).rejects.toMatchObject({
+        code: "storage-write-failed",
+        statusCode: 503,
+        cause: expect.objectContaining({ code: "ENOENT", syscall: "mkdir" }),
+      });
+      expect(simulatedMkdirAttempts).toBe(8);
+      expect(exhaustedMkdirSource.destroyed).toBe(true);
+      expect(unlinkedPaths).toEqual([]);
+      simulatedMkdirFailuresRemaining = 0;
+
+      // Aborting while mkdir(stagingDir) is paused before writeFile does not mark
+      // stagingOwned (no unlink attempted on the unopened stagingPath).
+      unlinkedPaths.length = 0;
+      const mkdirAbortController = new AbortController();
+      const mkdirAbortGate = resetGate();
+      const mkdirAbortedStream = isolatedStorage.putObjectStream(
+        `outputs/${putConcurrentJobId}/aborted-after-mkdir.bin`,
+        Readable.from([Buffer.from("never-opened")]),
+        { signal: mkdirAbortController.signal },
+      );
+      await mkdirAbortGate.reached;
+      mkdirAbortController.abort();
+      mkdirAbortGate.release();
+      await expect(mkdirAbortedStream).rejects.toMatchObject({ name: "AbortError" });
+      expect(unlinkedPaths).toEqual([]);
 
       // Burst of concurrent putObject and putObjectStream writes under one job directory.
       for (let round = 0; round < 20; round += 1) {
