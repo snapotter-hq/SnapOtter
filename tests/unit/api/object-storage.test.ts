@@ -38,6 +38,7 @@ describe("object-storage (local backend)", () => {
   const collisionJobId = `stream-collision-${process.pid}`;
   const putPartialJobId = `put-partial-${process.pid}`;
   const putCollisionJobId = `put-collision-${process.pid}`;
+  const putConcurrentJobId = `put-concurrent-${process.pid}`;
   const copyDir = mkdtempSync(join(tmpdir(), "snapotter-object-copy-"));
 
   const jobEntries = (jobId: string): string[] => {
@@ -59,6 +60,7 @@ describe("object-storage (local backend)", () => {
     await deletePrefix(`outputs/${collisionJobId}`).catch(() => {});
     await deletePrefix(`outputs/${putPartialJobId}`).catch(() => {});
     await deletePrefix(`outputs/${putCollisionJobId}`).catch(() => {});
+    await deletePrefix(`outputs/${putConcurrentJobId}`).catch(() => {});
     rmSync(copyDir, { recursive: true, force: true });
   });
 
@@ -347,6 +349,242 @@ describe("object-storage (local backend)", () => {
       vi.doUnmock("node:crypto");
       vi.resetModules();
       await deletePrefix(`outputs/${putCollisionJobId}`).catch(() => {});
+    }
+  });
+
+  it("completes concurrent putObject and putObjectStream writes in the same directory when staging cleanup interleaves (#2728)", async () => {
+    const stagingDir = join(
+      env.WORKSPACE_PATH,
+      "outputs",
+      putConcurrentJobId,
+      ".snapotter-staging",
+    );
+    let pauseNextStagingMkdir = false;
+    let notifyStagingMkdirReached!: () => void;
+    let releaseStagingMkdir!: () => void;
+    let onWriteFileError: ((err: unknown, targetPath: string) => void) | null = null;
+    let simulatedOpenFailuresRemaining = 0;
+    let simulatedOpenAttempts = 0;
+    let failWriteAfterRetryOpen = false;
+
+    const resetGate = () => {
+      pauseNextStagingMkdir = true;
+      return {
+        reached: new Promise<void>((resolve) => {
+          notifyStagingMkdirReached = resolve;
+        }),
+        release: () => releaseStagingMkdir(),
+      };
+    };
+
+    vi.resetModules();
+    vi.doMock("node:fs/promises", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("node:fs/promises")>();
+      return {
+        ...actual,
+        mkdir: async (
+          target: Parameters<typeof actual.mkdir>[0],
+          options?: Parameters<typeof actual.mkdir>[1],
+        ) => {
+          const res = await actual.mkdir(target, options);
+          if (pauseNextStagingMkdir && String(target) === stagingDir) {
+            pauseNextStagingMkdir = false;
+            const gate = new Promise<void>((resolve) => {
+              releaseStagingMkdir = resolve;
+            });
+            notifyStagingMkdirReached();
+            await gate;
+          }
+          return res;
+        },
+        writeFile: async (
+          target: Parameters<typeof actual.writeFile>[0],
+          data: Parameters<typeof actual.writeFile>[1],
+          options?: Parameters<typeof actual.writeFile>[2],
+        ) => {
+          const targetPath = String(target);
+          if (simulatedOpenFailuresRemaining > 0 && targetPath.startsWith(stagingDir)) {
+            simulatedOpenAttempts += 1;
+            if (simulatedOpenAttempts > 8) {
+              throw new Error("exceeded max staging open attempts");
+            }
+            simulatedOpenFailuresRemaining -= 1;
+            throw Object.assign(new Error("ENOENT: no such file or directory, open"), {
+              code: "ENOENT",
+              syscall: "open",
+            });
+          }
+          try {
+            await actual.writeFile(target, data, options);
+          } catch (err) {
+            onWriteFileError?.(err, targetPath);
+            throw err;
+          }
+          if (failWriteAfterRetryOpen && targetPath.startsWith(stagingDir)) {
+            failWriteAfterRetryOpen = false;
+            throw Object.assign(new Error("ENOSPC: no space left on device, write"), {
+              code: "ENOSPC",
+              syscall: "write",
+            });
+          }
+        },
+      };
+    });
+
+    try {
+      const isolatedStorage = await import("../../../apps/api/src/lib/object-storage.js");
+
+      // Deterministic interleaving 1 (multi-writer cascade): writer B loses the
+      // mkdir(stagingDir) -> open(stagingPath) window to writer A1 on attempt 1
+      // and again to writer A2 on attempt 2, then succeeds on attempt 3.
+      let putGate = resetGate();
+      const writerB = isolatedStorage.putObject(
+        `outputs/${putConcurrentJobId}/b.bin`,
+        Buffer.from("payload-b"),
+      );
+      await putGate.reached;
+      await isolatedStorage.putObject(
+        `outputs/${putConcurrentJobId}/a1.bin`,
+        Buffer.from("payload-a1"),
+      );
+      const putRetryGate = resetGate();
+      putGate.release();
+      await putRetryGate.reached;
+      await isolatedStorage.putObject(
+        `outputs/${putConcurrentJobId}/a2.bin`,
+        Buffer.from("payload-a2"),
+      );
+      putRetryGate.release();
+      await expect(writerB).resolves.toBeUndefined();
+
+      // Deterministic interleaving 2: putObjectStream writer D finishes mkdir(stagingDir),
+      // then writer C finishes rename + rmdir(stagingDir) before writer D opens stagingPath.
+      const streamGate = resetGate();
+      const writerD = isolatedStorage.putObjectStream(
+        `outputs/${putConcurrentJobId}/d.bin`,
+        Readable.from([Buffer.from("payload-d")]),
+      );
+      await streamGate.reached;
+      await isolatedStorage.putObject(
+        `outputs/${putConcurrentJobId}/c.bin`,
+        Buffer.from("payload-c"),
+      );
+      streamGate.release();
+      await expect(writerD).resolves.toBe(9);
+
+      // Deterministic interleaving 3: putObjectStream aborted right as attempt 1's
+      // writeFile fails with ENOENT on open does not retry attempt 2.
+      const abortController = new AbortController();
+      const abortGate = resetGate();
+      onWriteFileError = (err, targetPath) => {
+        if (
+          targetPath.includes("aborted-race.bin") &&
+          (err as NodeJS.ErrnoException | null)?.code === "ENOENT"
+        ) {
+          abortController.abort();
+        }
+      };
+      const abortedStream = isolatedStorage.putObjectStream(
+        `outputs/${putConcurrentJobId}/aborted-race.bin`,
+        Readable.from([Buffer.from("never-written")]),
+        { signal: abortController.signal },
+      );
+      await abortGate.reached;
+      await isolatedStorage.putObject(
+        `outputs/${putConcurrentJobId}/wiper.bin`,
+        Buffer.from("wiper"),
+      );
+      abortGate.release();
+      await expect(abortedStream).rejects.toMatchObject({ name: "AbortError" });
+      onWriteFileError = null;
+      await expect(
+        isolatedStorage.objectExists(`outputs/${putConcurrentJobId}/aborted-race.bin`),
+      ).resolves.toBe(false);
+
+      // Deterministic interleaving 4: attempt 1 hits ENOENT on open, attempt 2 opens
+      // the staging file and then fails mid-write with ENOSPC; the partial file is
+      // unlinked and stagingDir is removed.
+      putGate = resetGate();
+      const retryPartialWriter = isolatedStorage.putObject(
+        `outputs/${putConcurrentJobId}/retry-enospc.bin`,
+        Buffer.from("payload-enospc"),
+      );
+      await putGate.reached;
+      await isolatedStorage.putObject(
+        `outputs/${putConcurrentJobId}/wiper2.bin`,
+        Buffer.from("wiper2"),
+      );
+      failWriteAfterRetryOpen = true;
+      putGate.release();
+      await expect(retryPartialWriter).rejects.toMatchObject({
+        code: "storage-full",
+        statusCode: 503,
+        cause: expect.objectContaining({ code: "ENOSPC" }),
+      });
+      await expect(
+        isolatedStorage.objectExists(`outputs/${putConcurrentJobId}/retry-enospc.bin`),
+      ).resolves.toBe(false);
+      expect(existsSync(stagingDir)).toBe(false);
+
+      // Bounded retry exhaustion: persistent ENOENT on open stops after 8 attempts
+      // and surfaces 503 storage-write-failed.
+      simulatedOpenFailuresRemaining = 10;
+      simulatedOpenAttempts = 0;
+      await expect(
+        isolatedStorage.putObject(
+          `outputs/${putConcurrentJobId}/exhausted.bin`,
+          Buffer.from("exhausted"),
+        ),
+      ).rejects.toMatchObject({
+        code: "storage-write-failed",
+        statusCode: 503,
+        cause: expect.objectContaining({ code: "ENOENT", syscall: "open" }),
+      });
+      expect(simulatedOpenAttempts).toBe(8);
+      simulatedOpenFailuresRemaining = 0;
+
+      // Burst of concurrent putObject and putObjectStream writes under one job directory.
+      for (let round = 0; round < 20; round += 1) {
+        await Promise.all([
+          isolatedStorage.putObject(
+            `outputs/${putConcurrentJobId}/r${round}-0.bin`,
+            Buffer.from(`r${round}-0`),
+          ),
+          isolatedStorage.putObject(
+            `outputs/${putConcurrentJobId}/r${round}-1.bin`,
+            Buffer.from(`r${round}-1`),
+          ),
+          isolatedStorage.putObjectStream(
+            `outputs/${putConcurrentJobId}/r${round}-2.bin`,
+            Readable.from([Buffer.from(`r${round}-2`)]),
+          ),
+          isolatedStorage.putObjectStream(
+            `outputs/${putConcurrentJobId}/r${round}-3.bin`,
+            Readable.from([Buffer.from(`r${round}-3`)]),
+          ),
+        ]);
+      }
+
+      await expect(
+        isolatedStorage.getObjectBuffer(`outputs/${putConcurrentJobId}/a1.bin`),
+      ).resolves.toEqual(Buffer.from("payload-a1"));
+      await expect(
+        isolatedStorage.getObjectBuffer(`outputs/${putConcurrentJobId}/a2.bin`),
+      ).resolves.toEqual(Buffer.from("payload-a2"));
+      await expect(
+        isolatedStorage.getObjectBuffer(`outputs/${putConcurrentJobId}/b.bin`),
+      ).resolves.toEqual(Buffer.from("payload-b"));
+      await expect(
+        isolatedStorage.getObjectBuffer(`outputs/${putConcurrentJobId}/c.bin`),
+      ).resolves.toEqual(Buffer.from("payload-c"));
+      await expect(
+        isolatedStorage.getObjectBuffer(`outputs/${putConcurrentJobId}/d.bin`),
+      ).resolves.toEqual(Buffer.from("payload-d"));
+      expect(existsSync(stagingDir)).toBe(false);
+    } finally {
+      vi.doUnmock("node:fs/promises");
+      vi.resetModules();
+      await deletePrefix(`outputs/${putConcurrentJobId}`).catch(() => {});
     }
   });
 

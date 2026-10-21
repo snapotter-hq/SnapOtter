@@ -244,6 +244,48 @@ export async function assertLocalCapacity(): Promise<void> {
   }
 }
 
+const MAX_STAGING_OPEN_ATTEMPTS = 8;
+
+/**
+ * Create a `.snapotter-staging/<name>.<uuid>.partial` file with `wx` after
+ * ensuring `.snapotter-staging` exists. When concurrent writes share a parent
+ * directory, one or more sibling writers' post-rename `rmdir(stagingDir)` calls
+ * can land between our `mkdir(stagingDir)` and `open(stagingPath)` (#2728);
+ * re-creating `stagingDir` and retrying the open recovers without exposing
+ * partial files outside `.snapotter-staging`.
+ */
+async function writeStagedFile(
+  stagingDir: string,
+  stagingPath: string,
+  data: Buffer,
+  onOwned: () => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  for (let attempt = 1; ; attempt += 1) {
+    await mkdir(stagingDir, { recursive: true, mode: 0o700 });
+    signal?.throwIfAborted();
+    try {
+      await writeFile(stagingPath, data, { flag: "wx", mode: 0o600 });
+      onOwned();
+      return;
+    } catch (writeErr) {
+      const errno = writeErr as NodeJS.ErrnoException | null;
+      if (errno?.syscall !== "open") {
+        onOwned();
+      }
+      if (
+        errno?.code === "ENOENT" &&
+        errno?.syscall === "open" &&
+        attempt < MAX_STAGING_OPEN_ATTEMPTS
+      ) {
+        signal?.throwIfAborted();
+        continue;
+      }
+      throw writeErr;
+    }
+  }
+}
+
 export async function putObject(key: string, data: Buffer): Promise<void> {
   assertValidKey(key);
   if (isS3Enabled()) {
@@ -262,16 +304,9 @@ export async function putObject(key: string, data: Buffer): Promise<void> {
   try {
     await assertLocalCapacity();
     await mkdir(dirname(p), { recursive: true });
-    await mkdir(stagingDir, { recursive: true, mode: 0o700 });
-    try {
-      await writeFile(stagingPath, data, { flag: "wx", mode: 0o600 });
+    await writeStagedFile(stagingDir, stagingPath, data, () => {
       stagingOwned = true;
-    } catch (writeErr) {
-      if ((writeErr as NodeJS.ErrnoException | null)?.syscall !== "open") {
-        stagingOwned = true;
-      }
-      throw writeErr;
-    }
+    });
     await rename(stagingPath, p);
     await rmdir(stagingDir).catch(() => {});
   } catch (err) {
@@ -370,10 +405,15 @@ export async function putObjectStream(
       opts.signal?.throwIfAborted();
       await mkdir(dirname(p), { recursive: true });
       opts.signal?.throwIfAborted();
-      await mkdir(stagingDir, { recursive: true, mode: 0o700 });
-      opts.signal?.throwIfAborted();
-      await writeFile(stagingPath, Buffer.alloc(0), { flag: "wx", mode: 0o600 });
-      stagingOwned = true;
+      await writeStagedFile(
+        stagingDir,
+        stagingPath,
+        Buffer.alloc(0),
+        () => {
+          stagingOwned = true;
+        },
+        opts.signal,
+      );
       opts.signal?.throwIfAborted();
       await pipeline(counter(source), createWriteStream(stagingPath, { flags: "r+" }), {
         signal: opts.signal,
