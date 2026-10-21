@@ -134,8 +134,12 @@ let storageReady = false;
 export async function ensureStorageDir(): Promise<void> {
   if (storageReady) return;
   if (isS3Enabled()) {
-    const s3 = await getS3();
-    await s3.checkConnection();
+    try {
+      const s3 = await getS3();
+      await s3.checkConnection();
+    } catch (err) {
+      throw s3WriteFault(err);
+    }
     storageReady = true;
     return;
   }
@@ -327,8 +331,12 @@ export async function getCachedThumbnail(storedName: string): Promise<Buffer | n
 export async function saveThumbnail(storedName: string, buffer: Buffer): Promise<void> {
   assertSafeStoredName(storedName);
   if (isS3Enabled()) {
-    const s3 = await getS3();
-    await s3.putThumbnail(storedName, buffer);
+    try {
+      const s3 = await getS3();
+      await s3.putThumbnail(storedName, buffer);
+    } catch (err) {
+      throw s3WriteFault(err);
+    }
     return;
   }
   await ensureThumbDir();

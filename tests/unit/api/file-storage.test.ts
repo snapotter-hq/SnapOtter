@@ -20,6 +20,7 @@ const config = vi.hoisted(() => ({
 const s3Mocks = vi.hoisted(() => ({
   load: vi.fn<() => Promise<unknown>>(),
   configure: vi.fn(),
+  checkConnection: vi.fn(),
   putObject: vi.fn(),
   putThumbnail: vi.fn(),
   deleteObject: vi.fn(),
@@ -125,6 +126,8 @@ beforeEach(async () => {
   config.FILES_STORAGE_PATH = testDir;
   config.STORAGE_MODE = "local";
   s3Mocks.configure.mockReset();
+  s3Mocks.checkConnection.mockReset();
+  s3Mocks.checkConnection.mockResolvedValue(undefined);
   s3Mocks.putObject.mockReset();
   s3Mocks.putObject.mockResolvedValue(undefined);
   s3Mocks.putThumbnail.mockReset();
@@ -136,6 +139,7 @@ beforeEach(async () => {
   s3Mocks.load.mockReset();
   s3Mocks.load.mockResolvedValue({
     configureS3: s3Mocks.configure,
+    checkConnection: s3Mocks.checkConnection,
     putObject: s3Mocks.putObject,
     putThumbnail: s3Mocks.putThumbnail,
     deleteObject: s3Mocks.deleteObject,
@@ -1582,5 +1586,179 @@ describe("deleteStoredFile and deleteThumbnail in S3 mode (#2647)", () => {
     expect(s3Mocks.load).not.toHaveBeenCalled();
     expect(s3Mocks.deleteObject).not.toHaveBeenCalled();
     expect(s3Mocks.deleteThumbnail).not.toHaveBeenCalled();
+  });
+});
+
+describe("ensureStorageDir and saveThumbnail in S3 mode (#2882)", () => {
+  const UNAVAILABLE_MSG = "The server's storage service is unavailable.";
+
+  beforeEach(() => {
+    config.STORAGE_MODE = "s3";
+  });
+
+  it("delegates ensureStorageDir to s3.checkConnection once and caches readiness", async () => {
+    const { ensureStorageDir } = await importModule();
+    await ensureStorageDir();
+    await ensureStorageDir();
+    expect(s3Mocks.checkConnection).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries s3.checkConnection on a subsequent ensureStorageDir call after a probe failure", async () => {
+    const { ensureStorageDir } = await importModule();
+    const cause = Object.assign(new Error("Please reduce your request rate."), {
+      name: "SlowDown",
+      $metadata: { httpStatusCode: 503 },
+    });
+    s3Mocks.checkConnection.mockRejectedValueOnce(cause);
+
+    await expect(ensureStorageDir()).rejects.toMatchObject({
+      message: UNAVAILABLE_MSG,
+      isSafeMessage: true,
+      kind: "operational",
+      code: "storage-unavailable",
+      statusCode: 503,
+      cause,
+    });
+
+    await expect(ensureStorageDir()).resolves.toBeUndefined();
+    expect(s3Mocks.checkConnection).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    [
+      "S3 refusing access",
+      Object.assign(new Error("Access Denied"), {
+        name: "AccessDenied",
+        $metadata: { httpStatusCode: 403 },
+      }),
+    ],
+    [
+      "S3 throttling the request",
+      Object.assign(new Error("Please reduce your request rate."), {
+        name: "SlowDown",
+        $metadata: { httpStatusCode: 503 },
+      }),
+    ],
+    [
+      "S3 reporting a missing bucket",
+      Object.assign(new Error("The specified bucket does not exist"), {
+        name: "NoSuchBucket",
+        $metadata: { httpStatusCode: 404 },
+      }),
+    ],
+    [
+      "an unmodeled S3 404",
+      Object.assign(new Error("NotFound"), {
+        name: "NotFound",
+        $metadata: { httpStatusCode: 404 },
+      }),
+    ],
+    [
+      "S3 resetting the connection",
+      Object.assign(new Error("socket hang up"), {
+        name: "TimeoutError",
+        code: "ECONNRESET",
+        $metadata: { attempts: 3 },
+      }),
+    ],
+    [
+      "an S3 request timing out without $metadata",
+      Object.assign(new Error("Request timed out"), {
+        name: "TimeoutError",
+      }),
+    ],
+    [
+      "the S3 endpoint unreachable",
+      Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), { code: "ECONNREFUSED" }),
+    ],
+  ])(
+    "ensureStorageDir and saveThumbnail classify %s as a 503 storage-unavailable SafeError",
+    async (_case, cause) => {
+      const { ensureStorageDir, saveThumbnail } = await importModule();
+
+      s3Mocks.checkConnection.mockRejectedValueOnce(cause);
+      await expect(ensureStorageDir()).rejects.toMatchObject({
+        message: UNAVAILABLE_MSG,
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause,
+      });
+
+      s3Mocks.putThumbnail.mockRejectedValueOnce(cause);
+      await expect(saveThumbnail("photo.png", Buffer.from("jpg"))).rejects.toMatchObject({
+        message: UNAVAILABLE_MSG,
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause,
+      });
+    },
+  );
+
+  it("classifies a getS3() initialization failure through s3WriteFault in ensureStorageDir and saveThumbnail", async () => {
+    const netCause = Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), {
+      code: "ECONNREFUSED",
+    });
+    const { ensureStorageDir, saveThumbnail } = await importModule();
+
+    s3Mocks.load.mockRejectedValueOnce(netCause);
+    await expect(ensureStorageDir()).rejects.toMatchObject({
+      message: UNAVAILABLE_MSG,
+      isSafeMessage: true,
+      kind: "operational",
+      code: "storage-unavailable",
+      statusCode: 503,
+      cause: netCause,
+    });
+
+    s3Mocks.load.mockRejectedValueOnce(netCause);
+    await expect(saveThumbnail("photo.png", Buffer.from("jpg"))).rejects.toMatchObject({
+      message: UNAVAILABLE_MSG,
+      isSafeMessage: true,
+      kind: "operational",
+      code: "storage-unavailable",
+      statusCode: 503,
+      cause: netCause,
+    });
+
+    const dirInitBug = new TypeError("Invalid S3 configuration for ensureStorageDir");
+    s3Mocks.load.mockRejectedValueOnce(dirInitBug);
+    await expect(ensureStorageDir()).rejects.toBe(dirInitBug);
+    expect((dirInitBug as TypeError & { statusCode?: number }).statusCode).toBe(500);
+
+    const thumbInitBug = new TypeError("Invalid S3 configuration for saveThumbnail");
+    s3Mocks.load.mockRejectedValueOnce(thumbInitBug);
+    await expect(saveThumbnail("photo.png", Buffer.from("jpg"))).rejects.toBe(thumbInitBug);
+    expect((thumbInitBug as TypeError & { statusCode?: number }).statusCode).toBe(500);
+  });
+
+  it("stamps 500 on an unexpected non-S3 error during ensureStorageDir or saveThumbnail", async () => {
+    const { ensureStorageDir, saveThumbnail } = await importModule();
+
+    const dirBug = new TypeError("unexpected checkConnection failure");
+    s3Mocks.checkConnection.mockRejectedValueOnce(dirBug);
+    await expect(ensureStorageDir()).rejects.toBe(dirBug);
+    expect((dirBug as TypeError & { statusCode?: number }).statusCode).toBe(500);
+
+    const thumbBug = new TypeError("unexpected putThumbnail failure");
+    s3Mocks.putThumbnail.mockRejectedValueOnce(thumbBug);
+    await expect(saveThumbnail("photo.png", Buffer.from("jpg"))).rejects.toBe(thumbBug);
+    expect((thumbBug as TypeError & { statusCode?: number }).statusCode).toBe(500);
+  });
+
+  it("rejects traversal stored names in saveThumbnail with 400 INVALID_STORED_NAME before calling S3", async () => {
+    const { saveThumbnail } = await importModule();
+
+    await expect(saveThumbnail("../escape.png", Buffer.from("jpg"))).rejects.toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      code: "INVALID_STORED_NAME",
+      statusCode: 400,
+    });
+    expect(s3Mocks.load).not.toHaveBeenCalled();
+    expect(s3Mocks.putThumbnail).not.toHaveBeenCalled();
   });
 });
