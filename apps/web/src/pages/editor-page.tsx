@@ -41,6 +41,12 @@ import { cancelPendingRebakes, useEditorStore } from "@/stores/editor-store";
 const SERVER_DECODED_EXTS = new Set(["psd", "tga", "exr", "hdr"]);
 const EDITOR_OPEN_TOOL_ID = "editor-open";
 
+function isDocumentReplacementAction(action: { id: string }): boolean {
+  return (
+    action.id === "loadImage" || action.id === "loadProject" || action.id === "restoreAutosave"
+  );
+}
+
 export function EditorPage() {
   const { t } = useTranslation();
   // Read at failure time: the ?url= effect below must not re-run on a locale change.
@@ -56,8 +62,18 @@ export function EditorPage() {
   const [showImageResize, setShowImageResize] = useState(false);
   const [fillDialogOpen, setFillDialogOpen] = useState(false);
   const [showNewDocument, setShowNewDocument] = useState(false);
+  const isModalOpen =
+    showExport || showCanvasResize || showImageResize || fillDialogOpen || showNewDocument;
   const stopOpenRef = useRef<() => void>(() => {});
   const openRunRef = useRef(0);
+
+  const closeDocumentModals = useCallback(() => {
+    setShowExport(false);
+    setShowCanvasResize(false);
+    setShowImageResize(false);
+    setFillDialogOpen(false);
+    setShowNewDocument(false);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = useEditorStore.subscribe((state, prev) => {
@@ -69,13 +85,23 @@ export function EditorPage() {
         stopOpenRef.current();
         stopOpenRef.current = () => {};
       }
+      if (
+        (state.sourceImageUrl === null && prev.sourceImageUrl !== null) ||
+        (state.lastAction !== prev.lastAction &&
+          ((state._historyVersion > prev._historyVersion &&
+            isDocumentReplacementAction(state.lastAction)) ||
+            (state._historyVersion < prev._historyVersion &&
+              isDocumentReplacementAction(prev.lastAction))))
+      ) {
+        closeDocumentModals();
+      }
     });
     return () => {
       unsubscribe();
       openRunRef.current += 1;
       stopOpenRef.current();
     };
-  }, []);
+  }, [closeDocumentModals]);
 
   // Autosave recovery
   const { recoveryData, dismissRecovery, restoreRecovery } = useAutosave();
@@ -121,6 +147,7 @@ export function EditorPage() {
           URL.revokeObjectURL(url);
           return;
         }
+        closeDocumentModals();
         loadImage(url, img.naturalWidth, img.naturalHeight);
       };
       img.onerror = () => {
@@ -139,11 +166,12 @@ export function EditorPage() {
       };
       img.src = url;
     },
-    [loadImage],
+    [closeDocumentModals, loadImage],
   );
 
   const handlePaste = useCallback(
     (e: ClipboardEvent) => {
+      if (isModalOpen) return;
       const items = e.clipboardData?.items;
       if (!items) return;
       for (const item of items) {
@@ -160,7 +188,7 @@ export function EditorPage() {
         }
       }
     },
-    [loadBlobImage],
+    [isModalOpen, loadBlobImage],
   );
 
   useEffect(() => {
@@ -440,6 +468,7 @@ export function EditorPage() {
       img.crossOrigin = "anonymous";
       img.onload = () => {
         if (openRunRef.current !== runId) return;
+        closeDocumentModals();
         loadImage(url, img.naturalWidth, img.naturalHeight);
       };
       // Without CORS headers the browser refuses the image outright, and the
@@ -450,7 +479,7 @@ export function EditorPage() {
       };
       img.src = url;
     }
-  }, [loadImage]);
+  }, [closeDocumentModals, loadImage]);
 
   if (isMobile) {
     return (

@@ -52,6 +52,7 @@ vi.mock("@/components/editor/common/rulers", () => ({
   VerticalRuler: () => null,
 }));
 
+import { restoreAutosave } from "@/components/editor/common/export-dialog";
 import { WelcomeScreen } from "@/components/editor/common/welcome-screen";
 import { captureHandledError } from "@/lib/analytics";
 import { EditorPage } from "@/pages/editor-page";
@@ -131,6 +132,8 @@ beforeEach(() => {
       sourceImageUrl: url,
       sourceImageSize: { width, height },
       canvasSize: { width, height },
+      lastAction: { id: "loadImage" },
+      _historyVersion: useEditorStore.getState()._historyVersion + 1,
     });
   });
   useEditorStore.setState({
@@ -139,6 +142,8 @@ beforeEach(() => {
     canvasSize: { width: 800, height: 600 },
     loadImage: loadImageSpy,
     rulersVisible: false,
+    lastAction: { id: "initialState" },
+    _historyVersion: 0,
   });
 
   vi.stubGlobal("Image", FakeImage);
@@ -1167,6 +1172,282 @@ describe("EditorPage Open Image server decode (#2530)", () => {
     await waitFor(() => {
       expect(toastError).toHaveBeenCalledWith(en.editor.ui.autosaveRecovery.saveFailed);
     });
+  });
+
+  it("ignores clipboard image paste while a modal dialog is open, including while Canvas Size Apply is decoding (#2795)", async () => {
+    FakeImage.manual = true;
+    useEditorStore.setState({
+      sourceImageUrl: "blob:initial",
+      sourceImageSize: { width: 800, height: 600 },
+      canvasSize: { width: 800, height: 600 },
+    });
+
+    renderEditor();
+
+    const dispatchImagePaste = () => {
+      const pasteEvent = new Event("paste", { bubbles: true, cancelable: true });
+      Object.defineProperty(pasteEvent, "clipboardData", {
+        value: {
+          items: [
+            {
+              type: "image/png",
+              getAsFile: () => new File(["pasted-png"], "paste.png", { type: "image/png" }),
+            },
+          ],
+        },
+      });
+      document.dispatchEvent(pasteEvent);
+      return pasteEvent;
+    };
+
+    // 1. Canvas Size dialog open with Apply decoding in flight
+    fireEvent.click(screen.getByTestId("menu-image"));
+    fireEvent.click(screen.getByTestId("menu-item-canvas-size"));
+    const widthInput = screen.getByLabelText(en.editor.ui.widthPx);
+    fireEvent.change(widthInput, { target: { value: "1000" } });
+    fireEvent.click(screen.getByRole("button", { name: en.editor.ui.apply }));
+    expect(FakeImage.instances).toHaveLength(1);
+    const resizeDecodeImg = FakeImage.instances[0];
+
+    let pasteEvent = dispatchImagePaste();
+    expect(pasteEvent.defaultPrevented).toBe(false);
+    expect(FakeImage.instances).toHaveLength(1);
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    expect(loadImageSpy).not.toHaveBeenCalled();
+
+    // When the Canvas Size decode finishes, the resize commits and closes the dialog.
+    await act(async () => {
+      resizeDecodeImg.onload?.();
+    });
+    await waitFor(() => expect(screen.queryByLabelText(en.editor.ui.widthPx)).toBeNull());
+    expect(useEditorStore.getState().canvasSize).toEqual({ width: 1000, height: 600 });
+
+    // 2. Image Size dialog open
+    fireEvent.click(screen.getByTestId("menu-image"));
+    fireEvent.click(screen.getByTestId("menu-item-image-size"));
+    expect(screen.getByLabelText(en.editor.ui.widthPx)).toBeInTheDocument();
+    pasteEvent = dispatchImagePaste();
+    expect(pasteEvent.defaultPrevented).toBe(false);
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: en.common.cancel }));
+    expect(screen.queryByLabelText(en.editor.ui.widthPx)).toBeNull();
+
+    // 3. Fill dialog open
+    act(() => {
+      window.dispatchEvent(new CustomEvent("snapotter:open-fill-dialog"));
+    });
+    expect(screen.getByRole("dialog", { name: en.a11y.fill })).toBeInTheDocument();
+    pasteEvent = dispatchImagePaste();
+    expect(pasteEvent.defaultPrevented).toBe(false);
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: en.common.cancel }));
+    expect(screen.queryByRole("dialog", { name: en.a11y.fill })).toBeNull();
+
+    // 4. Export dialog open
+    fireEvent.click(screen.getByTestId("menu-file"));
+    fireEvent.click(screen.getByTestId("menu-item-export-as"));
+    expect(screen.getByText(en.editor.ui.exportDialog.heading)).toBeInTheDocument();
+    pasteEvent = dispatchImagePaste();
+    expect(pasteEvent.defaultPrevented).toBe(false);
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: en.common.close }));
+    expect(screen.queryByText(en.editor.ui.exportDialog.heading)).toBeNull();
+
+    // 5. New Document dialog open
+    fireEvent.click(screen.getByTestId("menu-file"));
+    fireEvent.click(screen.getByTestId("menu-item-new"));
+    expect(screen.getByText(en.editor.ui.newDocument.heading)).toBeInTheDocument();
+    pasteEvent = dispatchImagePaste();
+    expect(pasteEvent.defaultPrevented).toBe(false);
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: en.common.cancel }));
+    expect(screen.queryByText(en.editor.ui.newDocument.heading)).toBeNull();
+
+    // Once all dialogs are closed, pasting an image loads normally.
+    await act(async () => {
+      pasteEvent = dispatchImagePaste();
+    });
+    expect(pasteEvent.defaultPrevented).toBe(true);
+    expect(FakeImage.instances).toHaveLength(2);
+    act(() => {
+      FakeImage.instances[1].onload?.();
+    });
+    expect(loadImageSpy).toHaveBeenCalledWith("blob:opened-1", 320, 240);
+  });
+
+  it("closes open Canvas Size, Image Size, and Fill modals when a replacement image loads (#2795)", async () => {
+    FakeImage.manual = true;
+    useEditorStore.setState({
+      sourceImageUrl: "blob:initial",
+      sourceImageSize: { width: 800, height: 600 },
+      canvasSize: { width: 800, height: 600 },
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.includes("/tools/image/convert")) {
+          return {
+            ok: true,
+            status: 202,
+            json: async () => ({ jobId: "job-close-modals", async: true }),
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          blob: async () => new Blob(["png-bytes"], { type: "image/png" }),
+        };
+      }),
+    );
+
+    renderEditor();
+
+    // Start a 202 server-decoded open while the previous image is still displayed.
+    await openFileViaMenu(new File(["psd"], "incoming.psd"));
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const stream = FakeEventSource.instances[0];
+
+    // User opens Canvas Size (and starts Apply decode) and Fill dialogs while waiting for the server decode.
+    fireEvent.click(screen.getByTestId("menu-image"));
+    fireEvent.click(screen.getByTestId("menu-item-canvas-size"));
+    fireEvent.change(screen.getByLabelText(en.editor.ui.widthPx), { target: { value: "1000" } });
+    fireEvent.click(screen.getByRole("button", { name: en.editor.ui.apply }));
+    expect(FakeImage.instances).toHaveLength(1);
+    const resizeDecodeImg = FakeImage.instances[0];
+    act(() => {
+      window.dispatchEvent(new CustomEvent("snapotter:open-fill-dialog"));
+    });
+    expect(screen.getByLabelText(en.editor.ui.widthPx)).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: en.a11y.fill })).toBeInTheDocument();
+
+    // The server-decoded image finishes and calls loadImage while Canvas Size Apply is still decoding.
+    await act(async () => {
+      stream.onmessage?.({
+        data: JSON.stringify({
+          type: "single",
+          phase: "complete",
+          result: { downloadUrl: "/api/v1/download/job-close-modals/incoming.png" },
+        }),
+      });
+    });
+    await waitFor(() => expect(FakeImage.instances).toHaveLength(2));
+    await act(async () => {
+      FakeImage.instances[1].onload?.();
+      resizeDecodeImg.onload?.();
+    });
+
+    expect(loadImageSpy).toHaveBeenCalledWith("blob:opened-1", 320, 240);
+    expect(useEditorStore.getState().canvasSize).toEqual({ width: 320, height: 240 });
+    expect(screen.queryByLabelText(en.editor.ui.widthPx)).toBeNull();
+    expect(screen.queryByRole("dialog", { name: en.a11y.fill })).toBeNull();
+    expect(toastError).not.toHaveBeenCalled();
+
+    // Also verify Image Size, Export, and New Document close when the document is replaced or closed via the store,
+    // while undoing an in-document edit back to a loadImage history snapshot keeps modals open and undoing a
+    // document replacement itself closes open modals.
+    fireEvent.click(screen.getByTestId("menu-image"));
+    fireEvent.click(screen.getByTestId("menu-item-image-size"));
+    expect(screen.getByLabelText(en.editor.ui.widthPx)).toBeInTheDocument();
+    act(() => {
+      useEditorStore.setState({
+        lastAction: { id: "addObject", objectType: "rect" },
+        _historyVersion: useEditorStore.getState()._historyVersion + 1,
+      });
+      useEditorStore.setState({
+        lastAction: { id: "loadImage" },
+        _historyVersion: useEditorStore.getState()._historyVersion - 1,
+      });
+    });
+    expect(screen.getByLabelText(en.editor.ui.widthPx)).toBeInTheDocument();
+    act(() => {
+      useEditorStore.setState({
+        sourceImageUrl: "blob:previous-doc",
+        sourceImageSize: { width: 800, height: 600 },
+        canvasSize: { width: 800, height: 600 },
+        lastAction: { id: "initialState" },
+        _historyVersion: useEditorStore.getState()._historyVersion - 1,
+      });
+    });
+    expect(screen.queryByLabelText(en.editor.ui.widthPx)).toBeNull();
+
+    fireEvent.click(screen.getByTestId("menu-image"));
+    fireEvent.click(screen.getByTestId("menu-item-image-size"));
+    expect(screen.getByLabelText(en.editor.ui.widthPx)).toBeInTheDocument();
+    act(() => {
+      restoreAutosave({
+        version: 1,
+        timestamp: Date.now(),
+        state: {
+          canvasSize: { width: 640, height: 480 },
+          layers: useEditorStore.getState().layers,
+          objects: [],
+          adjustments: useEditorStore.getState().adjustments,
+          filters: useEditorStore.getState().filters,
+          levels: useEditorStore.getState().levels,
+          curves: useEditorStore.getState().curves,
+          guides: [],
+          sourceImageUrl: "data:image/png;base64,iVBORw0KGgo=",
+          sourceImageSize: { width: 640, height: 480 },
+          foregroundColor: "#000000",
+          backgroundColor: "#ffffff",
+        },
+      });
+    });
+    expect(screen.queryByLabelText(en.editor.ui.widthPx)).toBeNull();
+
+    fireEvent.click(screen.getByTestId("menu-file"));
+    fireEvent.click(screen.getByTestId("menu-item-export-as"));
+    expect(screen.getByText(en.editor.ui.exportDialog.heading)).toBeInTheDocument();
+    act(() => {
+      loadImageSpy("blob:direct-load", 400, 300);
+    });
+    expect(screen.queryByText(en.editor.ui.exportDialog.heading)).toBeNull();
+
+    fireEvent.click(screen.getByTestId("menu-file"));
+    fireEvent.click(screen.getByTestId("menu-item-new"));
+    expect(screen.getByText(en.editor.ui.newDocument.heading)).toBeInTheDocument();
+    act(() => {
+      useEditorStore.setState({
+        sourceImageUrl: "blob:project",
+        sourceImageSize: { width: 500, height: 400 },
+        canvasSize: { width: 500, height: 400 },
+        lastAction: { id: "loadProject" },
+        _historyVersion: useEditorStore.getState()._historyVersion + 1,
+      });
+    });
+    expect(screen.queryByText(en.editor.ui.newDocument.heading)).toBeNull();
+
+    fireEvent.click(screen.getByTestId("menu-image"));
+    fireEvent.click(screen.getByTestId("menu-item-canvas-size"));
+    expect(screen.getByLabelText(en.editor.ui.widthPx)).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("menu-file"));
+    fireEvent.click(screen.getByTestId("menu-item-close"));
+    expect(screen.queryByLabelText(en.editor.ui.widthPx)).toBeNull();
+  });
+
+  it("closes an open modal when a ?url= query-parameter image finishes decoding (#2795)", () => {
+    FakeImage.manual = true;
+    const prevHref = window.location.href;
+    window.history.replaceState({}, "", "/editor?url=https%3A%2F%2Fexample.com%2Fquery.png");
+    try {
+      renderEditor();
+      expect(FakeImage.instances).toHaveLength(1);
+      const urlImg = FakeImage.instances[0];
+
+      fireEvent.click(screen.getByTestId("menu-image"));
+      fireEvent.click(screen.getByTestId("menu-item-canvas-size"));
+      expect(screen.getByLabelText(en.editor.ui.widthPx)).toBeInTheDocument();
+
+      act(() => {
+        urlImg.onload?.();
+      });
+
+      expect(loadImageSpy).toHaveBeenCalledWith("https://example.com/query.png", 320, 240);
+      expect(screen.queryByLabelText(en.editor.ui.widthPx)).toBeNull();
+    } finally {
+      window.history.replaceState({}, "", prevHref);
+    }
   });
 
   describe("WelcomeScreen file intake (#2552)", () => {
