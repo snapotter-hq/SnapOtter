@@ -25,6 +25,7 @@ vi.mock("@/contexts/i18n-context", async (importOriginal) => {
 });
 
 import { BeautifySettings } from "@/components/tools/beautify-settings";
+import { ColorPaletteSettings } from "@/components/tools/color-palette-settings";
 import { CompareSettings } from "@/components/tools/compare-settings";
 import { ComposeSettings } from "@/components/tools/compose-settings";
 import { StitchSettings } from "@/components/tools/stitch-settings";
@@ -866,5 +867,134 @@ describe("self-posting tool panels: upload selected entry and land result by cap
       expect(screen.queryByTestId("stitch-download")).not.toBeInTheDocument();
       unmount();
     }
+  });
+
+  it("color-palette uploads the selected entry and scopes the extracted palette to its entry id (#2730)", async () => {
+    const red = image("red.png", "rrr");
+    const blue = image("blue.png", "bbb");
+    useFileStore.getState().setFiles([red, blue]);
+    useFileStore.getState().setSelectedIndex(1);
+
+    let uploadedFileName: string | undefined;
+    let resolveFetch!: (res: Response) => void;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init?: RequestInit) => {
+        const body = init?.body as FormData | undefined;
+        uploadedFileName = (body?.get("file") as File | undefined)?.name;
+        return new Promise<Response>((resolve) => {
+          resolveFetch = resolve;
+        });
+      }),
+    );
+
+    render(<ColorPaletteSettings />);
+    fireEvent.click(screen.getByTestId("color-palette-submit"));
+
+    expect(uploadedFileName).toBe("blue.png");
+
+    // Switch selection to red.png (index 0) while the color-palette request for blue.png is in flight.
+    act(() => {
+      useFileStore.getState().setSelectedIndex(0);
+    });
+
+    await act(async () => {
+      resolveFetch(
+        new Response(
+          JSON.stringify({
+            colors: ["rgb(0, 68, 255)", "rgb(0, 136, 255)"],
+            hex: ["#0044ff", "#0088ff"],
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+    // While viewing red.png (index 0), blue.png's extracted palette is not shown.
+    expect(screen.queryByTestId("color-palette-strip")).not.toBeInTheDocument();
+    expect(screen.queryByText("rgb(0, 68, 255)")).not.toBeInTheDocument();
+
+    // Switching back to blue.png (index 1) displays blue.png's extracted palette.
+    act(() => {
+      useFileStore.getState().setSelectedIndex(1);
+    });
+    const strip = screen.getByTestId("color-palette-strip");
+    expect(strip).toBeInTheDocument();
+    expect((strip.firstElementChild as HTMLElement | null)?.style.backgroundColor).toBe(
+      "rgb(0, 68, 255)",
+    );
+    expect(screen.getByText("rgb(0, 68, 255)")).toBeInTheDocument();
+    expect(screen.getByText("rgb(0, 136, 255)")).toBeInTheDocument();
+
+    // Reordering [red.png, blue.png] -> [blue.png, red.png] keeps blue.png's palette tied to its entry id.
+    act(() => {
+      useFileStore.getState().reorderFiles(1, 0);
+    });
+    expect(useFileStore.getState().currentEntry?.file.name).toBe("blue.png");
+    expect(screen.getByTestId("color-palette-strip")).toBeInTheDocument();
+
+    // Selecting red.png (now at index 1) hides blue.png's palette.
+    act(() => {
+      useFileStore.getState().setSelectedIndex(1);
+    });
+    expect(useFileStore.getState().currentEntry?.file.name).toBe("red.png");
+    expect(screen.queryByTestId("color-palette-strip")).not.toBeInTheDocument();
+  });
+
+  it("color-palette keeps each entry's palette distinct and clears only the re-extracted entry on a failed re-run (#2730)", async () => {
+    const red = image("red.png", "rrr");
+    const blue = image("blue.png", "bbb");
+    useFileStore.getState().setFiles([red, blue]);
+
+    let call = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        call++;
+        const uploaded = (init?.body as FormData | undefined)?.get("file") as File | undefined;
+        if (call === 1) {
+          expect(uploaded?.name).toBe("red.png");
+          return new Response(JSON.stringify({ colors: ["#ff0000"], hex: ["#ff0000"] }), {
+            status: 200,
+          });
+        }
+        if (call === 2) {
+          expect(uploaded?.name).toBe("blue.png");
+          return new Response(JSON.stringify({ colors: ["#0000ff"], hex: ["#0000ff"] }), {
+            status: 200,
+          });
+        }
+        return new Response(JSON.stringify({ error: "Palette extraction failed" }), {
+          status: 500,
+        });
+      }),
+    );
+
+    render(<ColorPaletteSettings />);
+
+    // Extract palette for red.png (index 0).
+    fireEvent.click(screen.getByTestId("color-palette-submit"));
+    await waitFor(() => expect(screen.getByText("#ff0000")).toBeInTheDocument());
+
+    // Switch to blue.png (index 1): red.png's palette is hidden; extract blue.png's palette.
+    act(() => {
+      useFileStore.getState().setSelectedIndex(1);
+    });
+    expect(screen.queryByText("#ff0000")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("color-palette-submit"));
+    await waitFor(() => expect(screen.getByText("#0000ff")).toBeInTheDocument());
+
+    // Re-running on blue.png when the request fails clears blue.png's stale palette,
+    // while leaving red.png's previously extracted palette intact.
+    fireEvent.click(screen.getByTestId("color-palette-submit"));
+    await waitFor(() => expect(screen.getByText("Palette extraction failed")).toBeInTheDocument());
+    expect(screen.queryByText("#0000ff")).not.toBeInTheDocument();
+
+    act(() => {
+      useFileStore.getState().setSelectedIndex(0);
+    });
+    expect(screen.getByText("#ff0000")).toBeInTheDocument();
   });
 });

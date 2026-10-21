@@ -10,18 +10,31 @@ import { useFileStore } from "@/stores/file-store";
 
 type ColorFormat = "hex" | "rgb" | "hsl";
 
+interface ExtractedPalette {
+  colors: string[];
+  hexColors: string[];
+}
+
+const FALLBACK_ENTRY_KEY = "__default__";
+
 export function ColorPaletteSettings() {
   const { t } = useTranslation();
   const ts = t.toolSettings["color-palette"];
-  const { files, processing, error, setProcessing, setError } = useFileStore();
+  const { entries, selectedIndex, files, processing, error, setProcessing, setError } =
+    useFileStore();
   const [count, setCount] = useState(8);
   const [format, setFormat] = useState<ColorFormat>("hex");
-  const [colors, setColors] = useState<string[]>([]);
-  const [hexColors, setHexColors] = useState<string[]>([]);
+  const [palettesByEntry, setPalettesByEntry] = useState<Record<string, ExtractedPalette>>({});
   const [swatchCopy, setSwatchCopy] = useState<{ idx: number; ok: boolean } | null>(null);
   const [exportCopy, setExportCopy] = useState<{ kind: "css" | "json"; ok: boolean } | null>(null);
   const later = useTimeouts();
   const abortRef = useRef<AbortController | null>(null);
+
+  const selectedEntry = entries[selectedIndex] ?? entries[0];
+  const activeEntryKey = selectedEntry?.id ?? FALLBACK_ENTRY_KEY;
+  const activePalette = palettesByEntry[activeEntryKey];
+  const colors = activePalette?.colors ?? [];
+  const hexColors = activePalette?.hexColors ?? [];
 
   useSettleOnUnmount(
     () => abortRef.current !== null,
@@ -29,7 +42,11 @@ export function ColorPaletteSettings() {
   );
 
   const handleProcess = async () => {
-    if (files.length === 0) return;
+    const { entries: currentEntries, selectedIndex, files: currentFiles } = useFileStore.getState();
+    const capturedEntry = currentEntries[selectedIndex] ?? currentEntries[0];
+    const targetFile = capturedEntry?.file ?? currentFiles[0];
+    if (!targetFile) return;
+    const targetEntryKey = capturedEntry?.id ?? FALLBACK_ENTRY_KEY;
 
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -37,8 +54,12 @@ export function ColorPaletteSettings() {
 
     setProcessing(true);
     setError(null);
-    setColors([]);
-    setHexColors([]);
+    setPalettesByEntry((prev) => {
+      if (!(targetEntryKey in prev)) return prev;
+      const next = { ...prev };
+      delete next[targetEntryKey];
+      return next;
+    });
 
     let storeReset = false;
     const unsubscribe = useFileStore.subscribe((state) => {
@@ -52,7 +73,7 @@ export function ColorPaletteSettings() {
 
     try {
       const formData = new FormData();
-      formData.append("file", files[0]);
+      formData.append("file", targetFile);
       formData.append("settings", JSON.stringify({ count, format }));
 
       const res = await fetch(appUrl("/api/v1/tools/image/color-palette"), {
@@ -69,8 +90,10 @@ export function ColorPaletteSettings() {
 
       const data = await res.json();
       if (controller.signal.aborted || storeReset) return;
-      setColors(data.colors);
-      setHexColors(data.hex);
+      setPalettesByEntry((prev) => ({
+        ...prev,
+        [targetEntryKey]: { colors: data.colors, hexColors: data.hex },
+      }));
     } catch (err) {
       if (
         controller.signal.aborted ||
