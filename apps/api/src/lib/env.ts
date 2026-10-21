@@ -194,7 +194,7 @@ const envSchema = z
     SAML_ENTITY_ID: z.string().trim().default(""),
     SAML_CALLBACK_URL: z.string().trim().default(""),
     SAML_IDP_SSO_URL: z.string().trim().default(""),
-    SAML_IDP_CERTIFICATE: z.string().default(""),
+    SAML_IDP_CERTIFICATE: z.string().trim().default(""),
     SAML_AUTO_CREATE_USERS: z
       .enum(["true", "false"])
       .default("true")
@@ -204,9 +204,13 @@ const envSchema = z
       .default("false")
       .transform((v) => v === "true"),
     SAML_DEFAULT_ROLE: z.string().default("user"),
-    SAML_PROVIDER_NAME: z.string().default(""),
-    SAML_USERNAME_ATTRIBUTE: z.string().default(""),
-    SAML_EMAIL_ATTRIBUTE: z.string().default("email"),
+    SAML_PROVIDER_NAME: z.string().trim().default(""),
+    SAML_USERNAME_ATTRIBUTE: z.string().trim().default(""),
+    SAML_EMAIL_ATTRIBUTE: z
+      .string()
+      .trim()
+      .default("email")
+      .transform((v) => v || "email"),
     // Callback and logout URLs append a path to this, so a trailing slash
     // would double up into "//api/auth/..." (#1599), and non-canonical
     // spellings (uppercase scheme or host, default port, backslash, dot

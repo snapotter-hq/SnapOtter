@@ -248,6 +248,70 @@ describe("SAML metadata", () => {
       env.SAML_ENTITY_ID = prevEntityId;
     }
   });
+
+  it("passes trimmed SAML_IDP_CERTIFICATE and SAML_PROVIDER_NAME from loadEnv to SAML and /api/v1/config/auth (#3295)", async () => {
+    const prevCert = env.SAML_IDP_CERTIFICATE;
+    const prevProvider = env.SAML_PROVIDER_NAME;
+    try {
+      const configured = loadEnv({
+        ...process.env,
+        SAML_ENABLED: "true",
+        BASE_PATH: env.BASE_PATH,
+        EXTERNAL_URL: env.EXTERNAL_URL,
+        SAML_IDP_SSO_URL: env.SAML_IDP_SSO_URL,
+        SAML_IDP_CERTIFICATE: " MIICpDCCAYwCCQDU+pQ4pHgSpDANBgkqhkiG9w0BAQsFADAUMRIw==\n",
+        SAML_PROVIDER_NAME: " Okta \n",
+      });
+      env.SAML_IDP_CERTIFICATE = configured.SAML_IDP_CERTIFICATE;
+      env.SAML_PROVIDER_NAME = configured.SAML_PROVIDER_NAME;
+      samlCtorMock.mockClear();
+      samlMock.generateServiceProviderMetadata.mockReturnValue(
+        '<?xml version="1.0"?><EntityDescriptor entityID="sp"/>',
+      );
+
+      const metaRes = await testApp.app.inject({ method: "GET", url: "/api/auth/saml/metadata" });
+      expect(metaRes.statusCode).toBe(200);
+      expect(samlCtorMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          idpCert: "MIICpDCCAYwCCQDU+pQ4pHgSpDANBgkqhkiG9w0BAQsFADAUMRIw==",
+        }),
+      );
+
+      const authConfigRes = await testApp.app.inject({
+        method: "GET",
+        url: "/api/v1/config/auth",
+      });
+      expect(authConfigRes.statusCode).toBe(200);
+      expect(authConfigRes.json()).toMatchObject({
+        samlEnabled: true,
+        samlProviderName: "Okta",
+      });
+
+      const blankProvider = loadEnv({
+        ...process.env,
+        SAML_ENABLED: "true",
+        BASE_PATH: env.BASE_PATH,
+        EXTERNAL_URL: env.EXTERNAL_URL,
+        SAML_IDP_SSO_URL: env.SAML_IDP_SSO_URL,
+        SAML_IDP_CERTIFICATE: env.SAML_IDP_CERTIFICATE,
+        SAML_PROVIDER_NAME: "   ",
+      });
+      env.SAML_PROVIDER_NAME = blankProvider.SAML_PROVIDER_NAME;
+
+      const fallbackRes = await testApp.app.inject({
+        method: "GET",
+        url: "/api/v1/config/auth",
+      });
+      expect(fallbackRes.statusCode).toBe(200);
+      expect(fallbackRes.json()).toMatchObject({
+        samlEnabled: true,
+        samlProviderName: "SSO",
+      });
+    } finally {
+      env.SAML_IDP_CERTIFICATE = prevCert;
+      env.SAML_PROVIDER_NAME = prevProvider;
+    }
+  });
 });
 
 describe("SAML login redirect", () => {
@@ -336,6 +400,59 @@ describe("SAML callback", () => {
       expect(user?.username).toContain(uid.toLowerCase());
     } finally {
       (env as Record<string, unknown>).SAML_USERNAME_ATTRIBUTE = undefined;
+    }
+  });
+
+  it("extracts email and username attributes when SAML_EMAIL_ATTRIBUTE and SAML_USERNAME_ATTRIBUTE have surrounding whitespace or blank email fallback (#3295)", async () => {
+    const prevUsernameAttr = env.SAML_USERNAME_ATTRIBUTE;
+    const prevEmailAttr = env.SAML_EMAIL_ATTRIBUTE;
+    try {
+      const configured = loadEnv({
+        ...process.env,
+        SAML_USERNAME_ATTRIBUTE: " uid \n",
+        SAML_EMAIL_ATTRIBUTE: " mail \n",
+      });
+      env.SAML_USERNAME_ATTRIBUTE = configured.SAML_USERNAME_ATTRIBUTE;
+      env.SAML_EMAIL_ATTRIBUTE = configured.SAML_EMAIL_ATTRIBUTE;
+
+      const uid = `trim${randomUUID().slice(0, 6)}`;
+      const mail = `${uid}@example.com`;
+      samlMock.validatePostResponseAsync.mockResolvedValue({
+        profile: { nameID: `id-${uid}`, mail, uid },
+      });
+      mfaOutcomeMock.mockReturnValue("proceed");
+      const res = await postCallback();
+      expect(res.statusCode).toBe(302);
+      const [user] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.externalId, `id-${uid}`));
+      expect(user?.username).toBe(uid.toLowerCase());
+      expect(user?.email).toBe(mail);
+
+      const blankEmail = loadEnv({
+        ...process.env,
+        SAML_USERNAME_ATTRIBUTE: "   ",
+        SAML_EMAIL_ATTRIBUTE: "   ",
+      });
+      env.SAML_USERNAME_ATTRIBUTE = blankEmail.SAML_USERNAME_ATTRIBUTE;
+      env.SAML_EMAIL_ATTRIBUTE = blankEmail.SAML_EMAIL_ATTRIBUTE;
+
+      const fallbackEmail = `fallback-${randomUUID().slice(0, 6)}@example.com`;
+      samlMock.validatePostResponseAsync.mockResolvedValue({
+        profile: { nameID: `id-${fallbackEmail}`, email: fallbackEmail, "   ": "wrong" },
+      });
+      const fallbackRes = await postCallback();
+      expect(fallbackRes.statusCode).toBe(302);
+      const [fallbackUser] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.externalId, `id-${fallbackEmail}`));
+      expect(fallbackUser?.email).toBe(fallbackEmail);
+      expect(fallbackUser?.username).toBe(fallbackEmail.split("@")[0].toLowerCase());
+    } finally {
+      env.SAML_USERNAME_ATTRIBUTE = prevUsernameAttr;
+      env.SAML_EMAIL_ATTRIBUTE = prevEmailAttr;
     }
   });
 

@@ -304,6 +304,105 @@ describe("loadEnv edge validation", () => {
     expect(env.SAML_ENTITY_ID).toBe("urn:snapotter:sp");
   });
 
+  it.each(["", "   ", "\t\n "])(
+    "rejects enabled SAML when SAML_IDP_CERTIFICATE is blank %j (#3295)",
+    (certificate) => {
+      expectLoadEnvError(
+        {
+          SAML_ENABLED: "true",
+          SAML_IDP_SSO_URL: "https://idp.example.com/sso",
+          SAML_IDP_CERTIFICATE: certificate,
+          EXTERNAL_URL: "http://snapotter.lan:1349",
+        },
+        "SAML_IDP_CERTIFICATE is required when SAML_ENABLED=true",
+        ["SAML_IDP_CERTIFICATE"],
+      );
+    },
+  );
+
+  it.each([
+    [
+      "MIICpDCCAYwCCQDU+pQ4pHgSpDANBgkqhkiG9w0BAQsFADAUMRIw==\n",
+      "MIICpDCCAYwCCQDU+pQ4pHgSpDANBgkqhkiG9w0BAQsFADAUMRIw==",
+    ],
+    [
+      "  MIICpDCCAYwCCQDU+pQ4pHgSpDANBgkqhkiG9w0BAQsFADAUMRIw= \r\n",
+      "MIICpDCCAYwCCQDU+pQ4pHgSpDANBgkqhkiG9w0BAQsFADAUMRIw=",
+    ],
+    [
+      "\n-----BEGIN CERTIFICATE-----\nMIICpDCCAYwCCQDU+pQ4pHgSpDANBgkqhkiG9w0BAQsFADAUMRIw==\n-----END CERTIFICATE-----\n\n",
+      "-----BEGIN CERTIFICATE-----\nMIICpDCCAYwCCQDU+pQ4pHgSpDANBgkqhkiG9w0BAQsFADAUMRIw==\n-----END CERTIFICATE-----",
+    ],
+  ])(
+    "trims SAML_IDP_CERTIFICATE %j to %j so @node-saml keyInfoToPem accepts it (#3295)",
+    (certificate, expected) => {
+      restoreEnv();
+      const env = loadEnv({
+        ...process.env,
+        SAML_ENABLED: "true",
+        SAML_IDP_SSO_URL: "https://idp.example.com/sso",
+        SAML_IDP_CERTIFICATE: certificate,
+        EXTERNAL_URL: "http://snapotter.lan:1349",
+      });
+      expect(env.SAML_IDP_CERTIFICATE).toBe(expected);
+    },
+  );
+
+  it.each([
+    ["", ""],
+    ["   ", ""],
+    ["\t\n ", ""],
+    [" Okta \n", "Okta"],
+    ["\tAzure AD ", "Azure AD"],
+  ])("trims SAML_PROVIDER_NAME %j to %j (#3295)", (providerName, expected) => {
+    restoreEnv();
+    const env = loadEnv({
+      ...process.env,
+      SAML_PROVIDER_NAME: providerName,
+    });
+    expect(env.SAML_PROVIDER_NAME).toBe(expected);
+  });
+
+  it.each([
+    ["", ""],
+    ["   ", ""],
+    ["\t\n ", ""],
+    [" uid \n", "uid"],
+    ["\tpreferred_username ", "preferred_username"],
+  ])("trims SAML_USERNAME_ATTRIBUTE %j to %j (#3295)", (usernameAttr, expected) => {
+    restoreEnv();
+    const env = loadEnv({
+      ...process.env,
+      SAML_USERNAME_ATTRIBUTE: usernameAttr,
+    });
+    expect(env.SAML_USERNAME_ATTRIBUTE).toBe(expected);
+  });
+
+  it.each([
+    [undefined, "email"],
+    ["", "email"],
+    ["   ", "email"],
+    ["\t\n ", "email"],
+    [" mail \n", "mail"],
+    [
+      "\thttp://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress ",
+      "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
+    ],
+  ])(
+    "trims SAML_EMAIL_ATTRIBUTE %j and falls back to %j when blank (#3295)",
+    (emailAttr, expected) => {
+      restoreEnv();
+      const rawEnv: NodeJS.ProcessEnv = { ...process.env };
+      if (emailAttr === undefined) {
+        delete rawEnv.SAML_EMAIL_ATTRIBUTE;
+      } else {
+        rawEnv.SAML_EMAIL_ATTRIBUTE = emailAttr;
+      }
+      const env = loadEnv(rawEnv);
+      expect(env.SAML_EMAIL_ATTRIBUTE).toBe(expected);
+    },
+  );
+
   it("rejects malformed encryption keys before settings encryption is used", () => {
     expectLoadEnvError(
       {
