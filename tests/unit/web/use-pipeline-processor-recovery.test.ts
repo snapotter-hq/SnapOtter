@@ -905,7 +905,15 @@ describe("usePipelineProcessor single-run entry settle (#1352)", () => {
   function expectEntryFailed(message: string) {
     expect(useFileStore.getState().error).toBe(message);
     expect(useFileStore.getState().processing).toBe(false);
-    expect(useFileStore.getState().entries[0]).toMatchObject({ status: "failed", error: message });
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: message,
+      processedUrl: null,
+      processedPreviewUrl: null,
+      processedFilename: null,
+      processedSize: null,
+      resultNotes: null,
+    });
   }
 
   it("fails the entry on a failed frame", () => {
@@ -1289,6 +1297,55 @@ describe("usePipelineProcessor single-run entry settle (#1352)", () => {
       processedUrl: SINGLE_RESULT.downloadUrl,
       error: null,
     });
+    unmount();
+  });
+
+  it("resets processedSize and resultNotes when a second single-file run starts or fails (#3280)", () => {
+    const { result, unmount } = startSingleRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 200;
+      xhrs[0].responseText = JSON.stringify(SINGLE_RESULT);
+      xhrs[0].onload?.();
+      useFileStore.getState().updateEntry(0, {
+        resultNotes: { targetKb: 10, targetMet: false },
+      });
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "completed",
+      processedSize: SINGLE_RESULT.processedSize,
+      resultNotes: { targetKb: 10, targetMet: false },
+    });
+    expect(useFileStore.getState().processedSize).toBe(SINGLE_RESULT.processedSize);
+    expect(result.current.processedSize).toBe(SINGLE_RESULT.processedSize);
+
+    act(() => {
+      result.current.processSingle(useFileStore.getState().files[0], STEPS);
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "processing",
+      processedUrl: null,
+      processedPreviewUrl: null,
+      processedFilename: null,
+      processedSize: null,
+      resultNotes: null,
+      error: null,
+    });
+    expect(useFileStore.getState().processedSize).toBeNull();
+    expect(result.current.processedSize).toBeNull();
+
+    act(() => {
+      xhrs[1].upload.onload?.();
+      xhrs[1].status = 500;
+      xhrs[1].responseText = JSON.stringify({ error: "Step 1 failed" });
+      xhrs[1].onload?.();
+    });
+
+    expectEntryFailed("error");
+    expect(useFileStore.getState().processedSize).toBeNull();
+    expect(result.current.processedSize).toBeNull();
     unmount();
   });
 });
@@ -1679,6 +1736,7 @@ describe("usePipelineProcessor batch entry settle (#1699)", () => {
         processedPreviewUrl: null,
         processedFilename: null,
         processedSize: null,
+        resultNotes: null,
       });
     }
   }
@@ -1774,6 +1832,48 @@ describe("usePipelineProcessor batch entry settle (#1699)", () => {
     expect(useFileStore.getState().processedUrl).toBeNull();
     // A server-side result URL is not a blob this page owns.
     expect(URL.revokeObjectURL).not.toHaveBeenCalledWith(SINGLE_RESULT.downloadUrl);
+    unmount();
+  });
+
+  it("resets resultNotes on every entry when a batch run starts or fails (#3280)", async () => {
+    const files = [
+      new File([new ArrayBuffer(16)], "first.png", { type: "image/png" }),
+      new File([new ArrayBuffer(16)], "second.jpg", { type: "image/jpeg" }),
+    ];
+    useFileStore.getState().setFiles(files);
+    useFileStore.getState().updateEntry(0, {
+      processedUrl: "blob:old-0",
+      processedSize: 100,
+      resultNotes: { targetKb: 10, targetMet: false },
+      status: "completed",
+    });
+    useFileStore.getState().updateEntry(1, {
+      processedUrl: "blob:old-1",
+      processedSize: 200,
+      resultNotes: { resizedTo: { width: 50, height: 50 } },
+      status: "completed",
+    });
+
+    const { result, unmount } = renderHook(() => usePipelineProcessor());
+    act(() => {
+      void result.current.processAll(files, STEPS);
+    });
+
+    for (const entry of useFileStore.getState().entries) {
+      expect(entry).toMatchObject({
+        status: "processing",
+        processedUrl: null,
+        processedPreviewUrl: null,
+        processedFilename: null,
+        processedSize: null,
+        resultNotes: null,
+        error: null,
+      });
+    }
+
+    act(() => respondError(0, 422, JSON.stringify({ error: "Step 1 (resize): bad width" })));
+
+    await settled(() => expectBatchFailed("error"));
     unmount();
   });
 

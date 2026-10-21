@@ -777,6 +777,8 @@ export function usePipelineProcessor() {
           processedUrl: null,
           processedPreviewUrl: null,
           processedFilename: null,
+          processedSize: null,
+          resultNotes: null,
           status: "processing",
           error: null,
         });
@@ -1128,6 +1130,7 @@ export function usePipelineProcessor() {
             processedPreviewUrl: null,
             processedFilename: null,
             processedSize: null,
+            resultNotes: null,
             status: "processing",
             error: null,
           });
