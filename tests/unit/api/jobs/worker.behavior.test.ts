@@ -3052,6 +3052,39 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
     expect(workerMod.timeoutMsFor("image", "compress")).toBe(15_000);
     expect(workerMod.timeoutMsFor("docs")).toBe(15_000);
     expect(workerMod.timeoutMsFor("docs", "unknown-tool")).toBe(15_000);
+    for (const aliasId of [
+      "brightness-contrast",
+      "saturation",
+      "color-channels",
+      "color-effects",
+    ]) {
+      expect(workerMod.timeoutMsFor("image", aliasId)).toBe(15_000);
+    }
+
+    const longCanonicalWorkerMod = await loadWorker("", () => {
+      vi.doMock("@snapotter/shared", () => ({
+        SafeError,
+        isSafeMessageError,
+        isToolInputError,
+        hasServerErrorStatus,
+        IMAGE_EXT_TO_MIME,
+        ANALYTICS_EVENTS: {},
+        TOOLS: TOOLS.map((t) =>
+          t.id === "adjust-colors" ? { ...t, executionHint: "long" as const } : t,
+        ),
+        COMPRESS_PRESETS: [],
+        getBundleForTool: vi.fn(() => null),
+        getOptionalBundleForTool: vi.fn(() => null),
+      }));
+    });
+    for (const aliasId of [
+      "brightness-contrast",
+      "saturation",
+      "color-channels",
+      "color-effects",
+    ]) {
+      expect(longCanonicalWorkerMod.timeoutMsFor("image", aliasId)).toBe(60_000);
+    }
   });
 
   it("runs a docs-pool pdf-to-word job under JOB_TIMEOUT_LONG_S instead of aborting at JOB_TIMEOUT_FAST_S", async () => {
@@ -3477,4 +3510,202 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
       }),
     );
   });
+});
+
+describe("legacy adjust-colors aliases in toolUsedBaseProps (#3386)", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  it.each(["brightness-contrast", "saturation", "color-channels", "color-effects"])(
+    "resolves legacy alias %s to adjust-colors in toolUsedBaseProps on completed and failed jobs",
+    async (aliasId) => {
+      const { TOOLS } = await vi.importActual<
+        typeof import("../../../../packages/shared/src/constants.js")
+      >("../../../../packages/shared/src/constants.js");
+      const { SafeError, isSafeMessageError, isToolInputError, hasServerErrorStatus } =
+        await vi.importActual<typeof import("../../../../packages/shared/src/tool-errors.js")>(
+          "../../../../packages/shared/src/tool-errors.js",
+        );
+      const { IMAGE_EXT_TO_MIME } = await vi.importActual<
+        typeof import("../../../../packages/shared/src/image-mime.js")
+      >("../../../../packages/shared/src/image-mime.js");
+
+      const processV2Mock = vi.fn();
+      const trackEventMock = vi.fn();
+      const getBundleForToolMock = vi.fn(() => null);
+      const getOptionalBundleForToolMock = vi.fn(() => null);
+      const dbSetMock = vi.fn(() => ({
+        where: vi.fn().mockResolvedValue(undefined),
+      }));
+
+      const workerMod = await loadWorker("", () => {
+        vi.doMock("@snapotter/shared", () => ({
+          SafeError,
+          isSafeMessageError,
+          isToolInputError,
+          hasServerErrorStatus,
+          IMAGE_EXT_TO_MIME,
+          ANALYTICS_EVENTS: { TOOL_USED: "tool_used" },
+          TOOLS,
+          COMPRESS_PRESETS: [],
+          CAMERA_RAW_INPUTS: [],
+          ONBOARDING_FIRST_PROCESSED_KEY: "onboarding_first_processed_at",
+          extractErrorCode: vi.fn(() => undefined),
+          getBundleForTool: getBundleForToolMock,
+          getOptionalBundleForTool: getOptionalBundleForToolMock,
+        }));
+        vi.doMock("node:fs/promises", () => ({
+          mkdir: vi.fn().mockResolvedValue(undefined),
+          readFile: vi.fn(),
+          rm: vi.fn().mockResolvedValue(undefined),
+        }));
+        vi.doMock("../../../../apps/api/src/db/index.js", () => ({
+          db: {
+            update: vi.fn(() => ({
+              set: dbSetMock,
+            })),
+          },
+          schema: { jobs: { id: "jobs.id" } },
+        }));
+        vi.doMock("../../../../apps/api/src/lib/analytics.js", () => ({
+          captureException: vi.fn(),
+          trackEvent: trackEventMock,
+        }));
+        vi.doMock("../../../../apps/api/src/lib/analytics-gate.js", () => ({
+          analyticsEnabled: vi.fn(() => true),
+        }));
+        vi.doMock("../../../../apps/api/src/lib/error-report.js", () => ({
+          classifyError: vi.fn(() => "bug"),
+          reportError: vi.fn(),
+          safeFormatTag: vi.fn((name?: string) => name?.split(".").pop()?.toLowerCase()),
+        }));
+        vi.doMock("../../../../apps/api/src/lib/settings-helpers.js", () => ({
+          setSettingIfAbsent: vi.fn().mockResolvedValue(undefined),
+        }));
+        vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+          getToolConfig: vi.fn(() => ({ processV2: processV2Mock })),
+        }));
+        vi.doMock("../../../../apps/api/src/jobs/ai-handlers.js", () => ({
+          hasAiJobHandler: vi.fn(() => false),
+          hasAiPathJobHandler: vi.fn(() => false),
+          runAiToolJob: vi.fn(),
+          runAiPathToolJob: vi.fn(),
+        }));
+        vi.doMock("../../../../apps/api/src/jobs/postprocess.js", () => ({
+          autoSaveToLibrary: vi.fn().mockResolvedValue({}),
+          buildOutputName: vi.fn((out: string) => out),
+          generatePreview: vi.fn().mockResolvedValue(undefined),
+          stageAutoSaveToLibrary: vi.fn().mockResolvedValue({}),
+        }));
+        vi.doMock("@snapotter/media-engine", () => ({
+          HW_ACCEL_FAMILIES: [],
+          hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+          softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+        }));
+        vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+          binaryOverrideWarning: vi.fn(),
+          checkBinaryOverrides: vi.fn(() => []),
+          isBinarySpawnFailure,
+          probeFailureLevel: vi.fn(() => "warn"),
+        }));
+      });
+
+      objectStorageMocks.getObjectBuffer.mockResolvedValue(Buffer.from("input-bytes"));
+      objectStorageMocks.putObject.mockResolvedValue(undefined);
+
+      const { Worker } = await import("bullmq");
+      workerMod.startWorkers();
+      const workerCalls = (Worker as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+      const imageCall = workerCalls.find(([queue]) => String(queue).endsWith("image"));
+      if (!imageCall) throw new Error("image pool worker not registered");
+      const processor = imageCall[1] as (job: unknown) => Promise<unknown>;
+
+      const canonicalTool = TOOLS.find((t) => t.id === "adjust-colors");
+      expect(canonicalTool?.category).toBe("adjustments");
+
+      // 1. Completed job emits canonical category ("adjustments") while preserving alias tool_id
+      processV2Mock.mockResolvedValueOnce({
+        buffer: Buffer.from("out-bytes"),
+        filename: "out.png",
+        contentType: "image/png",
+      });
+      await processor({
+        id: `job-ok-${aliasId}`,
+        attemptsMade: 0,
+        opts: { attempts: 1 },
+        updateProgress: vi.fn(),
+        data: {
+          jobId: `job-ok-${aliasId}`,
+          toolId: aliasId,
+          userId: null,
+          pool: "image",
+          inputRefs: [`uploads/job-ok-${aliasId}/in.png`],
+          filename: "in.png",
+          settings: {},
+          kind: "tool",
+          analyticsDistinctId: "distinct-3386",
+        },
+      });
+
+      expect(trackEventMock).toHaveBeenCalledTimes(1);
+      expect(trackEventMock).toHaveBeenCalledWith(
+        "tool_used",
+        expect.objectContaining({
+          tool_id: aliasId,
+          category: "adjustments",
+          is_ai_tool: false,
+          execution_hint: "fast",
+          status: "completed",
+          input_format: "png",
+          output_format: "png",
+        }),
+        "distinct-3386",
+      );
+      expect(getBundleForToolMock).toHaveBeenCalledWith("adjust-colors");
+      expect(getOptionalBundleForToolMock).toHaveBeenCalledWith("adjust-colors");
+
+      // 2. Failed job also emits canonical category ("adjustments") while preserving alias tool_id
+      trackEventMock.mockClear();
+      getBundleForToolMock.mockClear();
+      getOptionalBundleForToolMock.mockClear();
+      processV2Mock.mockRejectedValueOnce(new Error("encode failed"));
+      await expect(
+        processor({
+          id: `job-fail-${aliasId}`,
+          attemptsMade: 0,
+          opts: { attempts: 1 },
+          updateProgress: vi.fn(),
+          data: {
+            jobId: `job-fail-${aliasId}`,
+            toolId: aliasId,
+            userId: null,
+            pool: "image",
+            inputRefs: [`uploads/job-fail-${aliasId}/in.png`],
+            filename: "in.png",
+            settings: {},
+            kind: "tool",
+            analyticsDistinctId: "distinct-3386",
+          },
+        }),
+      ).rejects.toThrow("encode failed");
+
+      expect(trackEventMock).toHaveBeenCalledTimes(1);
+      expect(trackEventMock).toHaveBeenCalledWith(
+        "tool_used",
+        expect.objectContaining({
+          tool_id: aliasId,
+          category: "adjustments",
+          is_ai_tool: false,
+          execution_hint: "fast",
+          status: "failed",
+          input_format: "png",
+        }),
+        "distinct-3386",
+      );
+      expect(getBundleForToolMock).toHaveBeenCalledWith("adjust-colors");
+      expect(getOptionalBundleForToolMock).toHaveBeenCalledWith("adjust-colors");
+    },
+  );
 });

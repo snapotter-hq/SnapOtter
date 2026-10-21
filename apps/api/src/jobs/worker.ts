@@ -84,6 +84,7 @@ import {
 } from "../lib/object-storage.js";
 import { OCR_MAX_ENCODED_INPUT_BYTES } from "../lib/ocr-limits.js";
 import { SCRUB_PDF_PRODUCER_TOOLS, scrubPdfProducer } from "../lib/pdf-producer.js";
+import { resolveCanonicalToolId } from "../lib/pool.js";
 import { setSettingIfAbsent } from "../lib/settings-helpers.js";
 import { timeoutMessage } from "../lib/timeout.js";
 import { InputValidationError } from "../modality/contract.js";
@@ -147,7 +148,8 @@ function scratchRoot(): string {
 }
 
 export function timeoutMsFor(pool: Pool, toolId?: string): number {
-  const tool = toolId ? TOOLS.find((t) => t.id === toolId) : undefined;
+  const canonicalId = toolId ? resolveCanonicalToolId(toolId) : undefined;
+  const tool = canonicalId ? TOOLS.find((t) => t.id === canonicalId) : undefined;
   if (pool === "ai" || pool === "media" || tool?.executionHint === "long") {
     return env.JOB_TIMEOUT_LONG_S * 1000;
   }
@@ -355,13 +357,14 @@ export function buildLegacyResultPayload(
  * sync/async class.
  */
 function toolUsedBaseProps(data: ToolJobData, durationMs: number): Record<string, unknown> {
-  const tool = TOOLS.find((t) => t.id === data.toolId);
+  const canonicalId = resolveCanonicalToolId(data.toolId);
+  const tool = TOOLS.find((t) => t.id === canonicalId);
   return {
     tool_id: data.toolId,
     duration_ms: durationMs,
     category: tool?.category ?? "unknown",
     is_ai_tool:
-      getBundleForTool(data.toolId) !== null || getOptionalBundleForTool(data.toolId) !== null,
+      getBundleForTool(canonicalId) !== null || getOptionalBundleForTool(canonicalId) !== null,
     is_batch: data.kind === "batch-child",
     input_format: safeFormatTag(data.filename) ?? "unknown",
     execution_hint: tool?.executionHint ?? "fast",
