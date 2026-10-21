@@ -2,7 +2,7 @@
 
 import "@testing-library/jest-dom/vitest";
 import { en } from "@snapotter/shared";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const processor = vi.hoisted(() => ({
@@ -304,5 +304,199 @@ describe("remove-background incomplete image and invalid color validation (#2280
       />,
     );
     expect(screen.getByText(en.toolSettings["remove-background"].invalidHexColor)).toBeVisible();
+  });
+});
+
+describe("remove-background HEIC background preview lifecycle (#3204)", () => {
+  const heic = (name = "bg.heic") =>
+    new File([new Uint8Array([1, 2, 3])], name, { type: "image/heic" });
+
+  it("aborts an in-flight HEIC preview fetch on unmount and does not create a blob URL if it resolves late", async () => {
+    processor.downloadUrl = "/api/v1/download/JOB123/a_mask.png";
+    useFileStore.getState().setFiles([png("a.png")]);
+
+    const signals: Array<AbortSignal | undefined> = [];
+    let resolvePreview: ((res: Response) => void) | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init?: RequestInit) => {
+        signals.push(init?.signal ?? undefined);
+        return new Promise<Response>((resolve) => {
+          resolvePreview = resolve;
+        });
+      }),
+    );
+
+    const onBgPreview = vi.fn();
+    const { unmount } = render(<RemoveBgSettings onBgPreview={onBgPreview} />);
+    await screen.findByTestId("remove-background-download");
+
+    fireEvent.click(screen.getByRole("button", { name: imageLabel }));
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(fileInput, { target: { files: [heic("bg.heic")] } });
+
+    await waitFor(() => expect(resolvePreview).toBeDefined());
+    expect(signals[0]).toBeInstanceOf(AbortSignal);
+    expect(signals[0]?.aborted).toBe(false);
+
+    const createCallsBeforeUnmount = vi.mocked(URL.createObjectURL).mock.calls.length;
+    unmount();
+
+    expect(signals[0]?.aborted).toBe(true);
+
+    await act(async () => {
+      resolvePreview?.(
+        new Response("decoded-webp", { status: 200, headers: { "Content-Type": "image/webp" } }),
+      );
+    });
+
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(createCallsBeforeUnmount);
+  });
+
+  it("aborts in-flight HEIC preview fetches on file swap or removal, clears stale preview URLs while decoding, and revokes decoded URLs on cleanup", async () => {
+    let urlCounter = 0;
+    URL.createObjectURL = vi.fn(() => `blob:mock-${++urlCounter}`);
+    processor.downloadUrl = "/api/v1/download/JOB123/a_mask.png";
+    useFileStore.getState().setFiles([png("a.png")]);
+
+    const signals: Array<AbortSignal | undefined> = [];
+    const resolvers: Array<(res: Response) => void> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init?: RequestInit) => {
+        signals.push(init?.signal ?? undefined);
+        return new Promise<Response>((resolve) => {
+          resolvers.push(resolve);
+        });
+      }),
+    );
+
+    const onBgPreview = vi.fn();
+    const { unmount } = render(<RemoveBgSettings onBgPreview={onBgPreview} />);
+    await screen.findByTestId("remove-background-download");
+
+    fireEvent.click(screen.getByRole("button", { name: imageLabel }));
+
+    // 1. Pick a HEIC background, then remove it while /api/v1/preview is still in flight
+    let fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(fileInput, { target: { files: [heic("first.heic")] } });
+    await waitFor(() => expect(signals).toHaveLength(1));
+    expect(signals[0]).toBeInstanceOf(AbortSignal);
+    expect(signals[0]?.aborted).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: en.toolSettings["remove-bg"].remove }));
+    expect(signals[0]?.aborted).toBe(true);
+
+    // 2. Pick a PNG background, then verify a late resolution from first.heic cannot clobber it
+    fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(fileInput, { target: { files: [png("bg.png")] } });
+    const pngBlobUrl = vi.mocked(URL.createObjectURL).mock.results.at(-1)?.value as string;
+    const createCountAfterPng = vi.mocked(URL.createObjectURL).mock.calls.length;
+    expect(onBgPreview).toHaveBeenLastCalledWith({ backgroundSrc: pngBlobUrl });
+
+    await act(async () => {
+      resolvers[0]?.(
+        new Response("stale-heic", { status: 200, headers: { "Content-Type": "image/webp" } }),
+      );
+    });
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(createCountAfterPng);
+    expect(onBgPreview).toHaveBeenLastCalledWith({ backgroundSrc: pngBlobUrl });
+
+    fireEvent.click(screen.getByRole("button", { name: en.toolSettings["remove-bg"].remove }));
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(pngBlobUrl);
+
+    // 3. Pick a HEIF background, then verify switching tabs away from Image aborts the in-flight request
+    fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(fileInput, { target: { files: [heic("second.heif")] } });
+    await waitFor(() => expect(signals).toHaveLength(2));
+    expect(signals[1]).toBeInstanceOf(AbortSignal);
+    expect(signals[1]?.aborted).toBe(false);
+    // While the HEIF preview is still decoding, the revoked PNG blob URL must not remain active
+    expect(onBgPreview).toHaveBeenLastCalledWith({ showCheckerboard: true });
+
+    fireEvent.click(screen.getByRole("button", { name: en.toolSettings["remove-bg"].color }));
+    expect(signals[1]?.aborted).toBe(true);
+
+    // Switching back to Image re-fetches the retained HEIF background file
+    fireEvent.click(screen.getByRole("button", { name: imageLabel }));
+    await waitFor(() => expect(signals).toHaveLength(3));
+    expect(signals[2]?.aborted).toBe(false);
+
+    // Resolve the HEIF preview and verify the decoded blob URL is applied and later revoked on unmount
+    await act(async () => {
+      resolvers[2]?.(
+        new Response("decoded-webp", { status: 200, headers: { "Content-Type": "image/webp" } }),
+      );
+    });
+    const heifBlobUrl = vi.mocked(URL.createObjectURL).mock.results.at(-1)?.value as string;
+    await waitFor(() =>
+      expect(onBgPreview).toHaveBeenLastCalledWith({ backgroundSrc: heifBlobUrl }),
+    );
+
+    unmount();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(heifBlobUrl);
+  });
+
+  it("ignores an abort after fetch headers arrive while res.blob() is still streaming, and handles non-200 or rejected preview fetches", async () => {
+    processor.downloadUrl = "/api/v1/download/JOB123/a_mask.png";
+    useFileStore.getState().setFiles([png("a.png")]);
+
+    let resolveBlob: ((blob: Blob) => void) | undefined;
+    let callIndex = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init?: RequestInit) => {
+        callIndex += 1;
+        if (callIndex === 1) {
+          return Promise.resolve({
+            ok: true,
+            blob: () =>
+              new Promise<Blob>((resolve) => {
+                resolveBlob = resolve;
+              }),
+          } as Response);
+        }
+        if (callIndex === 2) {
+          return Promise.resolve(new Response(JSON.stringify({ error: "bad" }), { status: 422 }));
+        }
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            reject(new DOMException("The operation was aborted.", "AbortError"));
+          });
+        });
+      }),
+    );
+
+    const onBgPreview = vi.fn();
+    const firstView = render(<RemoveBgSettings onBgPreview={onBgPreview} />);
+    await screen.findByTestId("remove-background-download");
+    fireEvent.click(screen.getByRole("button", { name: imageLabel }));
+
+    // 1. Headers arrive, then component unmounts while res.blob() is still pending
+    let fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(fileInput, { target: { files: [heic("streaming.hif")] } });
+    await waitFor(() => expect(resolveBlob).toBeDefined());
+    const createCountBeforeAbort = vi.mocked(URL.createObjectURL).mock.calls.length;
+
+    firstView.unmount();
+    await act(async () => {
+      resolveBlob?.(new Blob(["late-body"], { type: "image/webp" }));
+    });
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(createCountBeforeAbort);
+
+    // 2. Non-200 (422) preview response leaves preview on checkerboard without creating a blob URL
+    const { unmount } = render(<RemoveBgSettings onBgPreview={onBgPreview} />);
+    await screen.findByTestId("remove-background-download-effects");
+    await act(async () => {});
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(createCountBeforeAbort);
+    expect(onBgPreview).toHaveBeenLastCalledWith({ showCheckerboard: true });
+
+    // 3. AbortError rejection on unmount is swallowed cleanly
+    fireEvent.click(screen.getByRole("button", { name: en.toolSettings["remove-bg"].remove }));
+    fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(fileInput, { target: { files: [heic("aborting.heic")] } });
+    unmount();
+    await act(async () => {});
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(createCountBeforeAbort);
   });
 });

@@ -1058,52 +1058,6 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     }
   }, [files]);
 
-  // Create a blob URL for the uploaded background image (for CSS preview).
-  // HEIC/HEIF files can't be displayed by browsers, so we decode them via the
-  // server preview endpoint first.
-  const [bgImageBlobUrl, setBgImageBlobUrl] = useState<string | null>(null);
-  const bgImageFileRef = useRef<File | null>(null);
-  useEffect(() => {
-    const file = settings._bgImageFile as File | undefined;
-    if (file && file !== bgImageFileRef.current) {
-      bgImageFileRef.current = file;
-      let revoke: (() => void) | null = null;
-
-      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-      const isHeic = ext === "heic" || ext === "heif" || ext === "hif";
-
-      if (isHeic) {
-        // Decode HEIC via server preview endpoint
-        const formData = new FormData();
-        formData.append("file", file);
-        fetch(appUrl("/api/v1/preview"), {
-          method: "POST",
-          headers: formatHeaders(),
-          body: formData,
-        })
-          .then((res) => (res.ok ? res.blob() : null))
-          .then((blob) => {
-            if (blob && bgImageFileRef.current === file) {
-              const url = URL.createObjectURL(blob);
-              revoke = () => URL.revokeObjectURL(url);
-              setBgImageBlobUrl(url);
-            }
-          })
-          .catch(() => {});
-      } else {
-        const url = URL.createObjectURL(file);
-        revoke = () => URL.revokeObjectURL(url);
-        setBgImageBlobUrl(url);
-      }
-
-      return () => revoke?.();
-    }
-    if (!file && bgImageFileRef.current) {
-      bgImageFileRef.current = null;
-      setBgImageBlobUrl(null);
-    }
-  }, [settings._bgImageFile]);
-
   const bgType = (settings.backgroundType as string | undefined) ?? "transparent";
   const bgColor =
     typeof settings.backgroundColor === "string" ? settings.backgroundColor.trim() : "";
@@ -1112,6 +1066,57 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   const gradColor2 =
     typeof settings.gradientColor2 === "string" ? settings.gradientColor2.trim() : "";
   const bgImageFile = settings._bgImageFile instanceof File ? settings._bgImageFile : undefined;
+
+  // Create a blob URL for the uploaded background image (for CSS preview).
+  // HEIC/HEIF files can't be displayed by browsers, so we decode them via the
+  // server preview endpoint first. Pairing the URL with the File it was created
+  // for keeps bgImageBlobUrl synchronously null on the render where bgImageFile
+  // is removed or replaced, before the effect cleanup runs.
+  const [bgImagePreview, setBgImagePreview] = useState<{ file: File; url: string } | null>(null);
+  const bgImageBlobUrl =
+    bgImagePreview && bgImagePreview.file === bgImageFile ? bgImagePreview.url : null;
+  useEffect(() => {
+    if (!bgImageFile) {
+      setBgImagePreview(null);
+      return;
+    }
+
+    const ext = bgImageFile.name.split(".").pop()?.toLowerCase() ?? "";
+    const isHeic = ext === "heic" || ext === "heif" || ext === "hif";
+
+    if (!isHeic) {
+      const url = URL.createObjectURL(bgImageFile);
+      setBgImagePreview({ file: bgImageFile, url });
+      return () => URL.revokeObjectURL(url);
+    }
+
+    setBgImagePreview(null);
+    const controller = new AbortController();
+    let objectUrl: string | null = null;
+
+    const formData = new FormData();
+    formData.append("file", bgImageFile);
+    fetch(appUrl("/api/v1/preview"), {
+      method: "POST",
+      headers: formatHeaders(),
+      body: formData,
+      signal: controller.signal,
+    })
+      .then((res) => (res.ok && !controller.signal.aborted ? res.blob() : null))
+      .then((blob) => {
+        if (!blob || controller.signal.aborted) return;
+        objectUrl = URL.createObjectURL(blob);
+        setBgImagePreview({ file: bgImageFile, url: objectUrl });
+      })
+      .catch(() => {});
+
+    return () => {
+      controller.abort();
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [bgImageFile]);
 
   const isValidBgColor = bgType !== "color" || HEX_COLOR_PATTERN.test(bgColor);
   const isValidGradColor =
