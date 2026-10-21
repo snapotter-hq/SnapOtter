@@ -1277,6 +1277,7 @@ describe("stranded-job reconciliation", () => {
 
         const row = await readJob(pipelineId);
         expect(row.status).toBe("completed");
+        expect(row.bytesIn).toBe(24_000);
         expect(row.outputRefs).toEqual([`outputs/${pipelineId}/photo_rotated.jpg`]);
         expect(
           (await listObjects(`outputs/${pipelineId}/`)).some(
@@ -1286,6 +1287,7 @@ describe("stranded-job reconciliation", () => {
 
         const result = resultOf(row);
         expect(result.reconciled).toBe(true);
+        expect(result.originalSize).toBe(24_000);
         expect(result.downloadUrl).toBe(`/api/v1/download/${pipelineId}/photo_rotated.jpg`);
         expect(result.stepsCompleted).toBe(2);
         expect(result.steps).toEqual([
@@ -1317,6 +1319,7 @@ describe("stranded-job reconciliation", () => {
           result: {
             jobId: pipelineId,
             downloadUrl: `/api/v1/download/${pipelineId}/photo_rotated.jpg`,
+            originalSize: 24_000,
             reconciled: true,
             stepsCompleted: 2,
             steps: result.steps,
@@ -1325,6 +1328,60 @@ describe("stranded-job reconciliation", () => {
       } finally {
         await imageQueue.remove(pipelineId).catch(() => {});
       }
+    });
+
+    it("restores bytesIn and originalSize from step 0 inputRefs when a pipeline-finalize row has empty inputRefs and step 0 bytesIn is null (#2717)", async () => {
+      const finalizeId = await seedJob({
+        status: "processing",
+        toolId: "pipeline",
+        pool: "image",
+        type: "pipeline-finalize",
+      });
+      const step0Id = `${finalizeId}-s0`;
+      const uploadBytes = Buffer.alloc(15_360, 0x42);
+      const outputBytes = Buffer.from("final-png-bytes");
+      seededPrefixes.push(`uploads/${step0Id}/`, `outputs/${finalizeId}/`);
+      await putObject(`uploads/${step0Id}/scan.png`, uploadBytes);
+      await seedOutput(finalizeId, "scan_out.png", outputBytes);
+      await seedOutput(
+        finalizeId,
+        ".result-payload.json",
+        Buffer.from(
+          JSON.stringify({
+            stepsCompleted: 1,
+            steps: [{ step: 1, toolId: "resize", size: outputBytes.length }],
+          }),
+          "utf8",
+        ),
+      );
+
+      await db.insert(schema.jobs).values({
+        id: step0Id,
+        toolId: "resize",
+        pool: "image",
+        type: "pipeline-step",
+        status: "completed",
+        bytesIn: null,
+        bytesOut: outputBytes.length,
+        inputRefs: [`uploads/${step0Id}/scan.png`],
+        outputRefs: [`outputs/${step0Id}/scan_out.png`],
+        completedAt: new Date(),
+      });
+
+      const summary = await reconcileStrandedJobs({ graceMs: 0 });
+      expect(summary.outcomes.find((o) => o.jobId === finalizeId)?.resolution).toBe("recovered");
+
+      const row = await readJob(finalizeId);
+      expect(row.status).toBe("completed");
+      expect(row.bytesIn).toBe(uploadBytes.length);
+      expect(row.bytesOut).toBe(outputBytes.length);
+      expect(resultOf(row)).toMatchObject({
+        jobId: finalizeId,
+        originalSize: uploadBytes.length,
+        processedSize: outputBytes.length,
+        reconciled: true,
+        stepsCompleted: 1,
+      });
     });
 
     it("restores a batch parent row's zipFilename, fileResults, fileNotes, and progress counters when batch-finalize's terminal DB write fails", async () => {

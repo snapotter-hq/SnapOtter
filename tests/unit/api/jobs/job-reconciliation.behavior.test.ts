@@ -10,6 +10,16 @@ const loggerErrorMock = vi.hoisted(() => vi.fn());
 const loggerWarnMock = vi.hoisted(() => vi.fn());
 const clearTerminalReplayKeyMock = vi.hoisted(() => vi.fn());
 const dbSelectRows = vi.hoisted(() => ({ rows: [] as unknown[] }));
+const dbStepRowsById = vi.hoisted(
+  () =>
+    new Map<
+      string,
+      {
+        bytesIn: number | null;
+        inputRefs: string[] | null;
+      }
+    >(),
+);
 const dbUpdateSetCalls = vi.hoisted(
   () => [] as Array<{ values: Record<string, unknown>; where?: unknown }>,
 );
@@ -27,6 +37,7 @@ async function loadJobReconciliation() {
   loggerWarnMock.mockReset();
   clearTerminalReplayKeyMock.mockReset().mockResolvedValue(undefined);
   dbSelectRows.rows = [];
+  dbStepRowsById.clear();
   dbUpdateSetCalls.length = 0;
   dbUpdateReturningQueue.length = 0;
 
@@ -70,11 +81,26 @@ async function loadJobReconciliation() {
     db: {
       select: vi.fn(() => ({
         from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            orderBy: vi.fn(() => ({
-              limit: vi.fn(async () => dbSelectRows.rows),
-            })),
-          })),
+          where: vi.fn((cond: unknown) => {
+            const eqCond = cond as { op?: string; col?: unknown; val?: unknown } | undefined;
+            const lookupStepRows = async () => {
+              if (
+                eqCond?.op === "eq" &&
+                eqCond.col === "jobs.id" &&
+                typeof eqCond.val === "string"
+              ) {
+                const row = dbStepRowsById.get(eqCond.val);
+                return row ? [row] : [];
+              }
+              return [];
+            };
+            const promise = lookupStepRows();
+            return Object.assign(promise, {
+              orderBy: vi.fn(() => ({
+                limit: vi.fn(async () => dbSelectRows.rows),
+              })),
+            });
+          }),
         })),
       })),
       transaction: vi.fn(async (fn: (tx: { update: typeof makeUpdateBuilder }) => unknown) =>
@@ -555,6 +581,194 @@ describe("reconcileStrandedJobs per-row fault isolation (#1498)", () => {
           vals: ["jobs.settings", "flow-failed", "jobs.settings", "flow-failed"],
         },
       ],
+    });
+  });
+
+  it("falls back to step 0 bytesIn and inputRefs when recovering pipeline and pipeline-finalize rows (#2717)", async () => {
+    const { reconcileStrandedJobs } = await loadJobReconciliation();
+
+    dbSelectRows.rows = [
+      {
+        id: "pipe-step0-bytes",
+        toolId: "pipeline",
+        pool: "image",
+        type: "pipeline",
+        status: "processing",
+        bytesIn: null,
+        inputRefs: [],
+        progress: null,
+      },
+      {
+        id: "pipe-finalize-step0-refs",
+        toolId: "pipeline",
+        pool: "image",
+        type: "pipeline-finalize",
+        status: "processing",
+        bytesIn: null,
+        inputRefs: [],
+        progress: null,
+      },
+      {
+        id: "pipe-own-refs-zero-step0",
+        toolId: "pipeline",
+        pool: "image",
+        type: "pipeline",
+        status: "processing",
+        bytesIn: null,
+        inputRefs: ["uploads/pipe-own-refs-zero-step0/photo.png"],
+        progress: null,
+      },
+      {
+        id: "pipe-missing-step0",
+        toolId: "pipeline",
+        pool: "docs",
+        type: "pipeline",
+        status: "processing",
+        bytesIn: null,
+        inputRefs: ["uploads/pipe-missing-step0/doc.pdf"],
+        progress: null,
+      },
+    ];
+
+    dbStepRowsById.set("pipe-step0-bytes-s0", {
+      bytesIn: 24_000,
+      inputRefs: ["uploads/pipe-step0-bytes/photo.jpg"],
+    });
+    dbStepRowsById.set("pipe-finalize-step0-refs-s0", {
+      bytesIn: null,
+      inputRefs: ["uploads/pipe-finalize-step0-refs-s0/scan.png"],
+    });
+    dbStepRowsById.set("pipe-own-refs-zero-step0-s0", {
+      bytesIn: 0,
+      inputRefs: ["uploads/pipe-own-refs-zero-step0/ignored.png"],
+    });
+
+    listObjectsMock.mockImplementation(async (prefix: string) => {
+      if (prefix === "outputs/pipe-step0-bytes/") {
+        return [{ key: "outputs/pipe-step0-bytes/photo_rotated.jpg", size: 1_900, mtimeMs: 1_000 }];
+      }
+      if (prefix === "outputs/pipe-finalize-step0-refs/") {
+        return [
+          {
+            key: "outputs/pipe-finalize-step0-refs/scan_out.png",
+            size: 3_200,
+            mtimeMs: 1_000,
+          },
+        ];
+      }
+      if (prefix === "outputs/pipe-own-refs-zero-step0/") {
+        return [
+          {
+            key: "outputs/pipe-own-refs-zero-step0/photo_out.png",
+            size: 4_100,
+            mtimeMs: 1_000,
+          },
+        ];
+      }
+      if (prefix === "outputs/pipe-missing-step0/") {
+        return [
+          {
+            key: "outputs/pipe-missing-step0/doc_out.pdf",
+            size: 5_400,
+            mtimeMs: 1_000,
+          },
+        ];
+      }
+      return [];
+    });
+    getObjectSizeMock.mockImplementation(async (key: string) => {
+      if (key === "uploads/pipe-finalize-step0-refs-s0/scan.png") return 18_500;
+      if (key === "uploads/pipe-own-refs-zero-step0/photo.png") return 12_300;
+      if (key === "uploads/pipe-missing-step0/doc.pdf") return 9_800;
+      throw new Error(`unexpected getObjectSize(${key})`);
+    });
+
+    const summary = await reconcileStrandedJobs({ graceMs: 0 });
+    expect(summary.recovered).toBe(4);
+    expect(getObjectSizeMock).toHaveBeenCalledTimes(3);
+    expect(getObjectSizeMock).toHaveBeenCalledWith("uploads/pipe-finalize-step0-refs-s0/scan.png");
+    expect(getObjectSizeMock).toHaveBeenCalledWith("uploads/pipe-own-refs-zero-step0/photo.png");
+    expect(getObjectSizeMock).toHaveBeenCalledWith("uploads/pipe-missing-step0/doc.pdf");
+
+    // dbUpdateSetCalls[0] = pipe-step0-bytes artifact row, [1] = its alias row
+    expect(dbUpdateSetCalls[0]?.values).toMatchObject({
+      status: "completed",
+      bytesIn: 24_000,
+      bytesOut: 1_900,
+      progress: {
+        percent: 100,
+        stage: "complete",
+        result: expect.objectContaining({
+          jobId: "pipe-step0-bytes",
+          originalSize: 24_000,
+          processedSize: 1_900,
+          reconciled: true,
+        }),
+      },
+    });
+    expect(dbUpdateSetCalls[1]?.values).toMatchObject({
+      status: "completed",
+      progress: {
+        percent: 100,
+        stage: "complete",
+        result: expect.objectContaining({
+          jobId: "pipe-step0-bytes",
+          originalSize: 24_000,
+          processedSize: 1_900,
+          reconciled: true,
+        }),
+      },
+    });
+
+    // dbUpdateSetCalls[2] = pipe-finalize-step0-refs artifact row
+    expect(dbUpdateSetCalls[2]?.values).toMatchObject({
+      status: "completed",
+      bytesIn: 18_500,
+      bytesOut: 3_200,
+      progress: {
+        percent: 100,
+        stage: "complete",
+        result: expect.objectContaining({
+          jobId: "pipe-finalize-step0-refs",
+          originalSize: 18_500,
+          processedSize: 3_200,
+          reconciled: true,
+        }),
+      },
+    });
+
+    // dbUpdateSetCalls[4] = pipe-own-refs-zero-step0 artifact row
+    expect(dbUpdateSetCalls[4]?.values).toMatchObject({
+      status: "completed",
+      bytesIn: 12_300,
+      bytesOut: 4_100,
+      progress: {
+        percent: 100,
+        stage: "complete",
+        result: expect.objectContaining({
+          jobId: "pipe-own-refs-zero-step0",
+          originalSize: 12_300,
+          processedSize: 4_100,
+          reconciled: true,
+        }),
+      },
+    });
+
+    // dbUpdateSetCalls[6] = pipe-missing-step0 artifact row
+    expect(dbUpdateSetCalls[6]?.values).toMatchObject({
+      status: "completed",
+      bytesIn: 9_800,
+      bytesOut: 5_400,
+      progress: {
+        percent: 100,
+        stage: "complete",
+        result: expect.objectContaining({
+          jobId: "pipe-missing-step0",
+          originalSize: 9_800,
+          processedSize: 5_400,
+          reconciled: true,
+        }),
+      },
     });
   });
 });

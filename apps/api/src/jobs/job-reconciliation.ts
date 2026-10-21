@@ -203,11 +203,25 @@ async function hasLiveQueueEntry(jobId: string, pool: string | null): Promise<bo
 
 /** Best-effort input size so a recovered row still reports a real size delta. */
 async function resolveOriginalSize(
-  jobId: string,
-  bytesIn: number | null,
-  inputRefs: string[] | null,
-) {
-  if (bytesIn !== null) return bytesIn;
+  row: Pick<StrandedRow, "id" | "type" | "bytesIn" | "inputRefs">,
+): Promise<number> {
+  if (row.bytesIn !== null) return row.bytesIn;
+  let inputRefs = row.inputRefs;
+  if (row.type === "pipeline" || row.type === "pipeline-finalize") {
+    const [step0] = await db
+      .select({
+        bytesIn: schema.jobs.bytesIn,
+        inputRefs: schema.jobs.inputRefs,
+      })
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, `${row.id}-s0`));
+    if (step0?.bytesIn !== null && step0?.bytesIn !== undefined && step0.bytesIn > 0) {
+      return step0.bytesIn;
+    }
+    if (!inputRefs?.length && step0?.inputRefs?.length) {
+      inputRefs = step0.inputRefs;
+    }
+  }
   if (!inputRefs?.length) return 0;
   let total = 0;
   for (const ref of inputRefs) {
@@ -216,7 +230,7 @@ async function resolveOriginalSize(
     } catch (err) {
       if (!isMissingObjectError(err)) {
         logger.warn(
-          { err, jobId, key: ref },
+          { err, jobId: row.id, key: ref },
           "Failed to read input object size during job reconciliation; counting as 0 bytes",
         );
       }
@@ -276,7 +290,7 @@ async function recoverFromOutputs(
   const primary = artifacts[0];
   const filename = primary.key.slice(primary.key.lastIndexOf("/") + 1);
   const preview = objects.find((object) => isPreviewKey(object.key));
-  const originalSize = await resolveOriginalSize(row.id, row.bytesIn, row.inputRefs);
+  const originalSize = await resolveOriginalSize(row);
   const outputRefs = artifacts.map((artifact) => artifact.key);
   const toolPayload = await readResultPayload(row.id, objects);
 

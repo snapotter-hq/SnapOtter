@@ -1519,4 +1519,36 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
       });
     }
   });
+
+  it("stamps inputRefs on the pipeline parent row so stranded-job reconciliation can resolve originalSize (#2717)", async () => {
+    vi.clearAllMocks();
+
+    const reply = await invokePipelineExecuteRoute([
+      { type: "file", filename: "photo.png", content: Buffer.from("photo-png-bytes") },
+      {
+        type: "field",
+        fieldname: "pipeline",
+        value: JSON.stringify({
+          steps: [
+            { toolId: executeTestToolId, settings: {} },
+            { toolId: executeTestToolId, settings: {} },
+          ],
+        }),
+      },
+    ]);
+
+    expect(reply.statusCode).toBe(202);
+    const parentInsert = insertValuesMock.mock.calls
+      .map((call) => call[0] as Record<string, unknown>)
+      .find((row) => row?.type === "pipeline");
+    expect(parentInsert).toBeDefined();
+    const flowId = String(parentInsert?.id ?? "");
+    expect(parentInsert).toEqual(
+      expect.objectContaining({
+        id: flowId,
+        type: "pipeline",
+        inputRefs: [`uploads/${flowId}/photo.png`],
+      }),
+    );
+  });
 });

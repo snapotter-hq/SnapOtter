@@ -785,7 +785,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             pool: pipelinePool,
             type: "pipeline",
             status: "queued",
-            inputRefs: [],
+            inputRefs: [uploadKey],
             // Cancel metadata (#771): requestCancel keys the cooperative
             // flag by clientJobId (the id the steps carry) and publishes
             // stepCount step ids for the active abort.
