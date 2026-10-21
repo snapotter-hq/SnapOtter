@@ -111,6 +111,7 @@ assert (
 
 # Verify _remove_one does not retry with alpha_matting=False when a CPU allocator OOM occurs,
 # and verify main()'s frame-0 probe falls back from birefnet* to u2net on CPU allocator OOM.
+import io  # noqa: E402
 import tempfile  # noqa: E402
 import types  # noqa: E402
 
@@ -197,21 +198,56 @@ def _verify_gif_cpu_oom_handling():
 
             created_models = []
             removed_sessions = []
+            create_err = [None]
             probe_err = [None]
+            live_sessions = []
+            sessions_alive_on_u2net_alloc = []
+
+            class _TrackedSession:
+                def __init__(self, model):
+                    self.model = model
+                    live_sessions.append(model)
+
+                def __del__(self):
+                    if self.model in live_sessions:
+                        live_sessions.remove(self.model)
+
+                def __eq__(self, other):
+                    return other == f"session:{self.model}" or (
+                        isinstance(other, _TrackedSession) and other.model == self.model
+                    )
+
+                def __hash__(self):
+                    return hash(f"session:{self.model}")
+
+                def __repr__(self):
+                    return f"session:{self.model}"
 
             def _stub_create_session(model, _providers, device):
+                if model == "u2net":
+                    import gc
+
+                    gc.collect()
+                    sessions_alive_on_u2net_alloc.append(list(live_sessions))
                 created_models.append(model)
-                return f"session:{model}", device
+                if create_err[0] is not None and model in create_err[0][0]:
+                    raise create_err[0][1]
+                return _TrackedSession(model), device
 
             def _stub_remove_one(_frame, session, *_args):
-                removed_sessions.append(session)
-                if probe_err[0] is not None and session in probe_err[0][0]:
+                removed_sessions.append(f"session:{session.model}")
+                if probe_err[0] is not None and f"session:{session.model}" in probe_err[0][0]:
                     raise probe_err[0][1]
                 return _FakeFrame()
+
+            stderr_captured = []
 
             def _run_main(settings_dict):
                 created_models.clear()
                 removed_sessions.clear()
+                live_sessions.clear()
+                sessions_alive_on_u2net_alloc.clear()
+                stderr_captured.clear()
                 sys.argv = [
                     "gif_remove_bg.py",
                     "in.gif",
@@ -219,18 +255,25 @@ def _verify_gif_cpu_oom_handling():
                     json.dumps(settings_dict),
                 ]
                 r_fd, w_fd = os.pipe()
+                err_buf = io.StringIO()
+                saved_stderr = sys.stderr
                 try:
                     saved_stdout_fd = os.dup(1)
                     os.dup2(w_fd, 1)
                     os.close(w_fd)
+                    sys.stderr = err_buf
                     try:
                         gif_remove_bg.main()
                     finally:
+                        sys.stderr = saved_stderr
                         os.dup2(saved_stdout_fd, 1)
                         os.close(saved_stdout_fd)
                     captured = os.read(r_fd, 4096).decode("utf-8")
                 finally:
                     os.close(r_fd)
+                stderr_captured.extend(
+                    line.strip() for line in err_buf.getvalue().splitlines() if line.strip()
+                )
                 return json.loads(captured.strip())
 
             gif_remove_bg._read_frames = lambda _p: ([_FakeFrame(), _FakeFrame()], [100, 100], 0)
@@ -239,6 +282,7 @@ def _verify_gif_cpu_oom_handling():
             gif_remove_bg._apply_effect = lambda cut, *_a: cut
             gif_remove_bg._encode = lambda *_a: None
             os.environ["U2NET_HOME"] = tmpdir
+            orig_allow_dl = os.environ.get("SNAPOTTER_ALLOW_MODEL_DOWNLOAD")
             try:
                 for oom_msg in (
                     "[enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes.",
@@ -246,6 +290,7 @@ def _verify_gif_cpu_oom_handling():
                     "[Errno 12] Cannot allocate memory",
                     "Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 30) and data type float32",
                 ):
+                    create_err[0] = None
                     probe_err[0] = ({"session:birefnet-general"}, RuntimeError(oom_msg))
                     probe_payload = _run_main({"model": "birefnet-general", "outputFormat": "webp"})
                     assert probe_payload == {
@@ -261,6 +306,187 @@ def _verify_gif_cpu_oom_handling():
                         "session:u2net",
                         "session:u2net",
                     ], removed_sessions
+                    assert sessions_alive_on_u2net_alloc == [[]], (
+                        f"failed birefnet session must be released before allocating u2net: {sessions_alive_on_u2net_alloc!r}"
+                    )
+                    warnings = [
+                        json.loads(line)["warning"]
+                        for line in stderr_captured
+                        if line.startswith("{") and "warning" in json.loads(line)
+                    ]
+                    assert any(
+                        "[gif-remove-bg]" in w
+                        and "birefnet-general" in w
+                        and "u2net" in w
+                        and oom_msg in w
+                        for w in warnings
+                    ), f"expected OOM fallback warning on stderr, got {stderr_captured!r}"
+                    assert "[gif-remove-bg] session device=cpu model=u2net" in stderr_captured, (
+                        f"expected u2net session log line on stderr, got {stderr_captured!r}"
+                    )
+
+                # _create_session OOM on birefnet-general also falls back to u2net, warns, and logs session.
+                probe_err[0] = None
+                create_err[0] = (
+                    {"birefnet-general"},
+                    RuntimeError("DefaultCPUAllocator: not enough memory"),
+                )
+                create_oom_payload = _run_main(
+                    {"model": "birefnet-general", "outputFormat": "webp"}
+                )
+                assert create_oom_payload == {
+                    "success": True,
+                    "model": "u2net",
+                    "device": "cpu",
+                    "frames": 2,
+                    "format": "webp",
+                }, create_oom_payload
+                assert created_models == ["birefnet-general", "u2net"], created_models
+                assert removed_sessions == ["session:u2net", "session:u2net"], removed_sessions
+                create_warnings = [
+                    json.loads(line)["warning"]
+                    for line in stderr_captured
+                    if line.startswith("{") and "warning" in json.loads(line)
+                ]
+                assert any(
+                    "[gif-remove-bg]" in w and "birefnet-general" in w and "u2net" in w
+                    for w in create_warnings
+                ), f"expected _create_session OOM warning on stderr, got {stderr_captured!r}"
+                assert "[gif-remove-bg] session device=cpu model=u2net" in stderr_captured, (
+                    f"expected u2net session log line after _create_session OOM, got {stderr_captured!r}"
+                )
+
+                # Bare MemoryError() in _create_session formats type(e).__name__ ("MemoryError") in warning.
+                create_err[0] = ({"birefnet-general"}, MemoryError())
+                bare_mem_payload = _run_main(
+                    {"model": "birefnet-general", "outputFormat": "webp"}
+                )
+                assert bare_mem_payload["success"] is True, bare_mem_payload
+                bare_warnings = [
+                    json.loads(line)["warning"]
+                    for line in stderr_captured
+                    if line.startswith("{") and "warning" in json.loads(line)
+                ]
+                assert any("(MemoryError)" in w for w in bare_warnings), (
+                    f"expected (MemoryError) detail in warning, got {bare_warnings!r}"
+                )
+
+                # _create_session non-OOM on birefnet-general does not fall back to u2net.
+                create_err[0] = (
+                    {"birefnet-general"},
+                    RuntimeError("Invalid ONNX model graph"),
+                )
+                create_non_oom_payload = _run_main(
+                    {"model": "birefnet-general", "outputFormat": "webp"}
+                )
+                assert create_non_oom_payload == {
+                    "success": False,
+                    "error": "Invalid ONNX model graph",
+                }, create_non_oom_payload
+                assert created_models == ["birefnet-general"], created_models
+
+                # _create_session OOM when already on u2net does not retry.
+                create_err[0] = (
+                    {"u2net"},
+                    RuntimeError("DefaultCPUAllocator: not enough memory"),
+                )
+                create_u2net_oom_payload = _run_main(
+                    {"model": "u2net", "outputFormat": "webp"}
+                )
+                assert create_u2net_oom_payload == {
+                    "success": False,
+                    "error": "DefaultCPUAllocator: not enough memory",
+                }, create_u2net_oom_payload
+                assert created_models == ["u2net"], created_models
+
+                # Preserves initial_device ("cuda") for u2net fallback even when birefnet-general
+                # degraded device to "cpu" before frame-0 OOM.
+                create_err[0] = None
+                probe_err[0] = (
+                    {"session:birefnet-general"},
+                    RuntimeError("DefaultCPUAllocator: not enough memory"),
+                )
+                seen_devices = []
+
+                def _stub_cuda_degrade_create_session(model, _providers, device):
+                    seen_devices.append((model, device))
+                    created_models.append(model)
+                    if model == "birefnet-general":
+                        return _TrackedSession(model), "cpu"
+                    return _TrackedSession(model), device
+
+                fake_gpu.onnx_providers = lambda: (
+                    ["CUDAExecutionProvider", "CPUExecutionProvider"],
+                    "cuda",
+                )
+                gif_remove_bg._create_session = _stub_cuda_degrade_create_session
+                try:
+                    cuda_fallback_payload = _run_main(
+                        {"model": "birefnet-general", "outputFormat": "webp"}
+                    )
+                    assert cuda_fallback_payload == {
+                        "success": True,
+                        "model": "u2net",
+                        "device": "cuda",
+                        "frames": 2,
+                        "format": "webp",
+                    }, cuda_fallback_payload
+                    assert seen_devices == [
+                        ("birefnet-general", "cuda"),
+                        ("u2net", "cuda"),
+                    ], seen_devices
+                    assert "[gif-remove-bg] session device=cuda model=u2net" in stderr_captured, (
+                        stderr_captured
+                    )
+                finally:
+                    fake_gpu.onnx_providers = lambda: (["CPUExecutionProvider"], "cpu")
+                    gif_remove_bg._create_session = _stub_create_session
+
+                # Offline guard is enforced for u2net fallback when u2net.onnx is absent and downloads are disabled.
+                u2net_onnx = os.path.join(tmpdir, "u2net.onnx")
+                os.remove(u2net_onnx)
+                os.environ["SNAPOTTER_ALLOW_MODEL_DOWNLOAD"] = "0"
+                try:
+                    # 1) Frame-0 probe OOM with missing u2net.onnx
+                    create_err[0] = None
+                    probe_err[0] = (
+                        {"session:birefnet-general"},
+                        RuntimeError("DefaultCPUAllocator: not enough memory"),
+                    )
+                    offline_probe_payload = _run_main(
+                        {"model": "birefnet-general", "outputFormat": "webp"}
+                    )
+                    assert offline_probe_payload["success"] is False, offline_probe_payload
+                    assert "Background removal model 'u2net' is missing" in offline_probe_payload["error"], (
+                        offline_probe_payload
+                    )
+                    assert created_models == ["birefnet-general"], (
+                        f"_create_session('u2net') must not run when offline_guard rejects: {created_models!r}"
+                    )
+
+                    # 2) _create_session OOM with missing u2net.onnx
+                    probe_err[0] = None
+                    create_err[0] = (
+                        {"birefnet-general"},
+                        RuntimeError("DefaultCPUAllocator: not enough memory"),
+                    )
+                    offline_create_payload = _run_main(
+                        {"model": "birefnet-general", "outputFormat": "webp"}
+                    )
+                    assert offline_create_payload["success"] is False, offline_create_payload
+                    assert "Background removal model 'u2net' is missing" in offline_create_payload["error"], (
+                        offline_create_payload
+                    )
+                    assert created_models == ["birefnet-general"], (
+                        f"_create_session('u2net') must not run when offline_guard rejects: {created_models!r}"
+                    )
+                finally:
+                    open(u2net_onnx, "wb").close()
+                    if orig_allow_dl is None:
+                        os.environ.pop("SNAPOTTER_ALLOW_MODEL_DOWNLOAD", None)
+                    else:
+                        os.environ["SNAPOTTER_ALLOW_MODEL_DOWNLOAD"] = orig_allow_dl
+                create_err[0] = None
 
                 # Non-OOM error on birefnet-general does not fall back to u2net.
                 probe_err[0] = (

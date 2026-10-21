@@ -222,6 +222,13 @@ def _encode(frames, durations, loop, fmt, out_path):
         )
 
 
+def _ensure_model_available(model, model_home):
+    if not os.path.exists(os.path.join(model_home, f"{model}.onnx")):
+        from offline_guard import ensure_download_allowed
+
+        ensure_download_allowed(f"Background removal model '{model}'")
+
+
 def _create_session(model, providers, device):
     from rembg import new_session
     from rembg.sessions import sessions_class
@@ -327,36 +334,54 @@ def main():
         model_home = os.path.expanduser(
             os.getenv("U2NET_HOME", os.path.join(os.getenv("XDG_DATA_HOME", "~"), ".u2net"))
         )
-        if not os.path.exists(os.path.join(model_home, f"{model}.onnx")):
-            from offline_guard import ensure_download_allowed
-
-            ensure_download_allowed(f"Background removal model '{model}'")
+        _ensure_model_available(model, model_home)
 
         emit_progress(5, "Loading model")
-        providers, device = onnx_providers()
-        session, device = _create_session(model, providers, device)
+        providers, initial_device = onnx_providers()
         # Per-frame pymatting runs on the CPU whatever the session device and
         # costs seconds per frame (it dominated a 30-frame GIF at ~12s/frame
         # on an otherwise idle GPU host, #668), and its per-frame noise
         # flickers across an animation. Stills keep matting; animations never
         # use it.
         use_alpha = False
-        print(
-            f"[gif-remove-bg] session device={device} model={model}",
-            file=sys.stderr,
-            flush=True,
-        )
+        session = None
 
         # Probe frame 0 to settle the model once (OOM -> lighter model for the
         # WHOLE animation, never per-frame; switching mid-animation would
-        # flicker).
+        # flicker). Wrap both session creation and the frame-0 probe so an OOM
+        # while loading birefnet* weights or running frame 0 falls back to u2net.
         try:
+            session, device = _create_session(model, providers, initial_device)
+            print(
+                f"[gif-remove-bg] session device={device} model={model}",
+                file=sys.stderr,
+                flush=True,
+            )
             _remove_one(frames[0], session, use_alpha, settings, target, orig_size)
         except Exception as e:
             if _is_oom(e) and model.startswith("birefnet"):
+                prev_model = model
+                detail = str(e).strip() or type(e).__name__
+                session = None
+                e.__traceback__ = None
                 model = "u2net"
+                sys.stderr.write(
+                    json.dumps(
+                        {
+                            "warning": f"[gif-remove-bg] {prev_model} ran out of memory ({detail}); retrying with u2net"
+                        }
+                    )
+                    + "\n"
+                )
+                sys.stderr.flush()
+                _ensure_model_available(model, model_home)
                 emit_progress(5, "Retrying with a lighter model")
-                session, device = _create_session(model, providers, device)
+                session, device = _create_session(model, providers, initial_device)
+                print(
+                    f"[gif-remove-bg] session device={device} model={model}",
+                    file=sys.stderr,
+                    flush=True,
+                )
             else:
                 raise
 
