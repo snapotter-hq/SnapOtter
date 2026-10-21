@@ -462,6 +462,20 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
         changes,
       });
 
+      if (preparedSettings.some((s) => s.key === "analyticsEnabled")) {
+        // The setting is already persisted. A Redis hiccup here must not turn a
+        // successful import into a 500; the TTL refresh converges replicas anyway.
+        try {
+          const { refreshAnalyticsGate, publishAnalyticsGateInvalidation } = await import(
+            "../../lib/analytics-gate.js"
+          );
+          await refreshAnalyticsGate();
+          await publishAnalyticsGateInvalidation();
+        } catch (err) {
+          request.log.warn({ err }, "analytics gate invalidation failed (import still applied)");
+        }
+      }
+
       return reply.send({ applied: true, changes });
     },
   );

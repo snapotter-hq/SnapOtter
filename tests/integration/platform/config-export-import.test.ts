@@ -1387,6 +1387,88 @@ describe("config import with enterprise license", () => {
       }
     }
   });
+
+  it("refreshes the analytics gate immediately when importing analyticsEnabled (#3021)", async () => {
+    const { __resetGateForTests, analyticsEnabled, refreshAnalyticsGate } = await import(
+      "../../../apps/api/src/lib/analytics-gate.js"
+    );
+    const [originalRow] = await db
+      .select()
+      .from(schema.settings)
+      .where(eq(schema.settings.key, "analyticsEnabled"));
+    process.env.ANALYTICS_BAKED_OVERRIDE = "on";
+
+    try {
+      await db.delete(schema.settings).where(eq(schema.settings.key, "analyticsEnabled"));
+      __resetGateForTests();
+      await refreshAnalyticsGate();
+      expect(analyticsEnabled()).toBe(true);
+
+      const dryRunRes = await licensedApp.app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        headers: { authorization: `Bearer ${licensedToken}` },
+        payload: {
+          dryRun: true,
+          config: {
+            configSchemaVersion: 1,
+            settings: { analyticsEnabled: "false" },
+          },
+        },
+      });
+      expect(dryRunRes.statusCode, dryRunRes.body).toBe(200);
+      expect(analyticsEnabled()).toBe(true);
+
+      const disableRes = await licensedApp.app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        headers: { authorization: `Bearer ${licensedToken}` },
+        payload: {
+          dryRun: false,
+          config: {
+            configSchemaVersion: 1,
+            settings: { analyticsEnabled: "false" },
+          },
+        },
+      });
+      expect(disableRes.statusCode, disableRes.body).toBe(200);
+      expect(analyticsEnabled()).toBe(false);
+
+      const analyticsConfigDisabled = JSON.parse(
+        (await licensedApp.app.inject({ method: "GET", url: "/api/v1/config/analytics" })).body,
+      );
+      expect(analyticsConfigDisabled.enabled).toBe(false);
+
+      const enableRes = await licensedApp.app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        headers: { authorization: `Bearer ${licensedToken}` },
+        payload: {
+          dryRun: false,
+          config: {
+            configSchemaVersion: 1,
+            settings: { analyticsEnabled: "true" },
+          },
+        },
+      });
+      expect(enableRes.statusCode, enableRes.body).toBe(200);
+      expect(analyticsEnabled()).toBe(true);
+    } finally {
+      if (originalRow === undefined) {
+        await db.delete(schema.settings).where(eq(schema.settings.key, "analyticsEnabled"));
+      } else {
+        await db
+          .insert(schema.settings)
+          .values({ key: "analyticsEnabled", value: originalRow.value })
+          .onConflictDoUpdate({
+            target: schema.settings.key,
+            set: { value: originalRow.value },
+          });
+      }
+      delete process.env.ANALYTICS_BAKED_OVERRIDE;
+      __resetGateForTests();
+    }
+  });
 });
 
 describe("config round-trip", () => {

@@ -1220,10 +1220,12 @@ describe("registerConfigRoutes POST /api/v1/enterprise/config/import settings up
     }
   });
 
-  it("propagates a mid-transaction settings upsert failure and skips CONFIG_IMPORTED audit log (#3014)", async () => {
+  it("propagates a mid-transaction settings upsert failure and skips CONFIG_IMPORTED audit log and analytics gate invalidation (#3014, #3021)", async () => {
     vi.resetModules();
     const upsertedKeys: string[] = [];
     const auditSpy = vi.fn();
+    const refreshAnalyticsGateSpy = vi.fn().mockResolvedValue(undefined);
+    const publishAnalyticsGateInvalidationSpy = vi.fn().mockResolvedValue(undefined);
 
     vi.doMock("drizzle-orm", () => ({
       and: (...args: unknown[]) => ({ op: "and", args }),
@@ -1239,6 +1241,10 @@ describe("registerConfigRoutes POST /api/v1/enterprise/config/import settings up
     }));
     vi.doMock("../../../apps/api/src/lib/enterprise-feature.js", () => ({
       isEnterpriseFeatureEnabled: async () => true,
+    }));
+    vi.doMock("../../../apps/api/src/lib/analytics-gate.js", () => ({
+      refreshAnalyticsGate: refreshAnalyticsGateSpy,
+      publishAnalyticsGateInvalidation: publishAnalyticsGateInvalidationSpy,
     }));
 
     const txHandle = {
@@ -1295,15 +1301,160 @@ describe("registerConfigRoutes POST /api/v1/enterprise/config/import settings up
             configSchemaVersion: 1,
             settings: {
               defaultTheme: "dark",
-              defaultLocale: "de",
+              analyticsEnabled: "false",
             },
           },
         },
       });
 
       expect(res.statusCode).toBe(500);
-      expect(upsertedKeys).toEqual(["defaultLocale", "defaultTheme"]);
+      expect(upsertedKeys).toEqual(["analyticsEnabled", "defaultTheme"]);
       expect(auditSpy).not.toHaveBeenCalled();
+      expect(refreshAnalyticsGateSpy).not.toHaveBeenCalled();
+      expect(publishAnalyticsGateInvalidationSpy).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("refreshes and publishes analytics gate invalidation when importing analyticsEnabled, skips on dryRun or non-analytics imports, and logs a warning if invalidation fails (#3021)", async () => {
+    vi.resetModules();
+    const refreshAnalyticsGateSpy = vi.fn().mockResolvedValue(undefined);
+    const publishAnalyticsGateInvalidationSpy = vi.fn().mockResolvedValue(undefined);
+
+    vi.doMock("drizzle-orm", () => ({
+      and: (...args: unknown[]) => ({ op: "and", args }),
+      eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+    }));
+    vi.doMock("../../../apps/api/src/config.js", () => ({
+      env: {
+        DATA_ENCRYPTION_KEY: "",
+        DATA_ENCRYPTION_KEY_PREVIOUS: "",
+        OIDC_ENABLED: false,
+        SAML_ENABLED: false,
+      },
+    }));
+    vi.doMock("../../../apps/api/src/lib/enterprise-feature.js", () => ({
+      isEnterpriseFeatureEnabled: async () => true,
+    }));
+    vi.doMock("../../../apps/api/src/lib/analytics-gate.js", () => ({
+      refreshAnalyticsGate: refreshAnalyticsGateSpy,
+      publishAnalyticsGateInvalidation: publishAnalyticsGateInvalidationSpy,
+    }));
+
+    const txHandle = {
+      insert: () => ({
+        values: () => ({
+          onConflictDoUpdate: () => Promise.resolve(),
+        }),
+      }),
+      delete: () => ({
+        where: () => Promise.resolve(),
+      }),
+    };
+
+    vi.doMock("../../../apps/api/src/db/index.js", () => ({
+      db: {
+        select: () => ({
+          from: () => Promise.resolve([]),
+        }),
+        transaction: async (cb: (tx: typeof txHandle) => Promise<unknown>) => cb(txHandle),
+      },
+      schema: {
+        settings: { key: "settings.key", value: "settings.value" },
+        roles: { id: "roles.id", name: "roles.name", isBuiltin: "roles.isBuiltin" },
+        teams: { id: "teams.id", name: "teams.name" },
+      },
+    }));
+    vi.doMock("../../../apps/api/src/permissions.js", () => ({
+      requireFullAdmin: async () => ({ id: "admin-1", username: "admin", role: "admin" }),
+    }));
+    vi.doMock("../../../apps/api/src/lib/audit.js", () => ({
+      auditFromRequest: () => async () => {},
+    }));
+
+    const { registerConfigRoutes } = await import(
+      "../../../apps/api/src/routes/enterprise/config.js"
+    );
+    const app = Fastify();
+    await registerConfigRoutes(app);
+    await app.ready();
+    const warnLogSpy = vi.spyOn(app.log, "warn");
+
+    try {
+      const dryRunRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        payload: {
+          dryRun: true,
+          config: {
+            configSchemaVersion: 1,
+            settings: { analyticsEnabled: "false" },
+          },
+        },
+      });
+      expect(dryRunRes.statusCode).toBe(200);
+      expect(refreshAnalyticsGateSpy).not.toHaveBeenCalled();
+      expect(publishAnalyticsGateInvalidationSpy).not.toHaveBeenCalled();
+
+      const otherSettingRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        payload: {
+          dryRun: false,
+          config: {
+            configSchemaVersion: 1,
+            settings: { defaultTheme: "dark" },
+          },
+        },
+      });
+      expect(otherSettingRes.statusCode).toBe(200);
+      expect(refreshAnalyticsGateSpy).not.toHaveBeenCalled();
+      expect(publishAnalyticsGateInvalidationSpy).not.toHaveBeenCalled();
+
+      const applyRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        payload: {
+          dryRun: false,
+          config: {
+            configSchemaVersion: 1,
+            settings: { analyticsEnabled: "false" },
+          },
+        },
+      });
+      expect(applyRes.statusCode).toBe(200);
+      expect(refreshAnalyticsGateSpy).toHaveBeenCalledTimes(1);
+      expect(publishAnalyticsGateInvalidationSpy).toHaveBeenCalledTimes(1);
+      expect(refreshAnalyticsGateSpy.mock.invocationCallOrder[0]).toBeLessThan(
+        publishAnalyticsGateInvalidationSpy.mock.invocationCallOrder[0],
+      );
+      expect(warnLogSpy).not.toHaveBeenCalled();
+
+      publishAnalyticsGateInvalidationSpy.mockRejectedValueOnce(new Error("redis pubsub down"));
+      const redisFailRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        payload: {
+          dryRun: false,
+          config: {
+            configSchemaVersion: 1,
+            settings: { analyticsEnabled: "true" },
+          },
+        },
+      });
+      expect(redisFailRes.statusCode).toBe(200);
+      expect(redisFailRes.json()).toEqual({
+        applied: true,
+        changes: { settings: 1, roles: 0, teams: 0 },
+      });
+      expect(refreshAnalyticsGateSpy).toHaveBeenCalledTimes(2);
+      expect(publishAnalyticsGateInvalidationSpy).toHaveBeenCalledTimes(2);
+      expect(warnLogSpy).toHaveBeenCalledWith(
+        { err: expect.any(Error) },
+        "analytics gate invalidation failed (import still applied)",
+      );
     } finally {
       await app.close();
       vi.restoreAllMocks();
