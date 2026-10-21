@@ -337,6 +337,13 @@ function singleFileErrorRow(progress: Omit<SingleFileProgress, "type">): {
 
 export type SingleFileProgressInput = Omit<SingleFileProgress, "type"> & {
   /**
+   * When set, the durable write requires the row's settings.artifactJobId to
+   * still equal this job id (#3408). If a newer single-tool run re-pointed the
+   * clientJobId alias row in the meantime, the stale run's write and
+   * announcement are skipped so the live run's channel is left untouched.
+   */
+  expectedArtifactJobId?: string;
+  /**
    * When set, the durable write requires the row's settings.pipelineFlowId to
    * still equal this flow id (#2741). If a newer pipeline run re-pointed the
    * clientJobId alias row in the meantime, the stale run's write and
@@ -356,6 +363,9 @@ async function persistSingleFileProgress(
         ? "failed"
         : "processing";
   const progressJsonb = buildPersistedSingleFileProgress(progress);
+  const hasExpectedPointer = Boolean(
+    progress.expectedArtifactJobId || progress.expectedPipelineFlowId,
+  );
   const [existing] = await executor
     .select({ id: schema.jobs.id })
     .from(schema.jobs)
@@ -384,16 +394,19 @@ async function persistSingleFileProgress(
           isTerminalFrame
             ? undefined
             : notInArray(schema.jobs.status, ["completed", "failed", "canceled"]),
+          progress.expectedArtifactJobId
+            ? sql`${schema.jobs.settings}->>'artifactJobId' = ${progress.expectedArtifactJobId}`
+            : undefined,
           progress.expectedPipelineFlowId
             ? sql`${schema.jobs.settings}->>'pipelineFlowId' = ${progress.expectedPipelineFlowId}`
             : undefined,
         ),
       );
-    return progress.expectedPipelineFlowId
+    return hasExpectedPointer
       ? ((res as { rowCount?: number | null } | undefined)?.rowCount ?? 0) > 0
       : true;
   }
-  if (progress.expectedPipelineFlowId) {
+  if (hasExpectedPointer) {
     return false;
   }
   await executor.insert(schema.jobs).values({
@@ -410,7 +423,10 @@ async function persistSingleFileProgress(
 async function persistDurable(
   payload:
     | (JobProgress & { type: "batch" })
-    | (SingleFileProgress & { expectedPipelineFlowId?: string }),
+    | (SingleFileProgress & {
+        expectedArtifactJobId?: string;
+        expectedPipelineFlowId?: string;
+      }),
 ): Promise<boolean> {
   if (payload.type === "single") {
     const { type: _, ...rest } = payload;
@@ -461,15 +477,22 @@ function announce(payload: (JobProgress & { type: "batch" }) | SingleFileProgres
 function publish(
   payload:
     | (JobProgress & { type: "batch" })
-    | (SingleFileProgress & { expectedPipelineFlowId?: string }),
+    | (SingleFileProgress & {
+        expectedArtifactJobId?: string;
+        expectedPipelineFlowId?: string;
+      }),
 ): Promise<void> {
   const isTerminal = isTerminalPayload(payload);
   const wirePayload: (JobProgress & { type: "batch" }) | SingleFileProgress =
     payload.type === "single"
-      ? (({ expectedPipelineFlowId: _, ...rest }) => rest)(payload)
+      ? (({ expectedArtifactJobId: _a, expectedPipelineFlowId: _p, ...rest }) => rest)(payload)
       : payload;
   const guardBeforeAnnounce =
-    isTerminal || Boolean(payload.type === "single" && payload.expectedPipelineFlowId);
+    isTerminal ||
+    Boolean(
+      payload.type === "single" &&
+        (payload.expectedArtifactJobId || payload.expectedPipelineFlowId),
+    );
   if (!guardBeforeAnnounce) {
     announce(wirePayload);
   }
@@ -519,7 +542,7 @@ export async function updateSingleFileProgressAtomically(
   progress: SingleFileProgressInput,
   mutateAuthoritative: (tx: ProgressTransaction) => Promise<void>,
 ): Promise<void> {
-  const { expectedPipelineFlowId, ...frameFields } = progress;
+  const { expectedArtifactJobId, expectedPipelineFlowId, ...frameFields } = progress;
   const event: SingleFileProgress = { ...frameFields, type: "single" };
   let applied = false;
   await enqueuePersist(progress.jobId, () =>
@@ -527,7 +550,11 @@ export async function updateSingleFileProgressAtomically(
       const executor = tx as unknown as ProgressTransaction;
       await mutateAuthoritative(executor);
       applied = await persistSingleFileProgress(
-        { ...frameFields, ...(expectedPipelineFlowId && { expectedPipelineFlowId }) },
+        {
+          ...frameFields,
+          ...(expectedArtifactJobId && { expectedArtifactJobId }),
+          ...(expectedPipelineFlowId && { expectedPipelineFlowId }),
+        },
         executor,
       );
     }),

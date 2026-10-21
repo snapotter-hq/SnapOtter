@@ -696,4 +696,104 @@ describe("expectedPipelineFlowId pointer guard (#2741)", () => {
     const publishedJson = (redisMocks.publish.mock.calls[0] as unknown[])[1] as string;
     expect(JSON.parse(publishedJson)).not.toHaveProperty("expectedPipelineFlowId");
   });
+
+  it("guards updateSingleFileProgressAtomically, updateSingleFileProgress, failSingleJobGuarded, and cancelSingleJobGuarded on expectedArtifactJobId, strips it from the wire frame, and skips insert or announcement when unmatched (#3408)", async () => {
+    const mutateAuthoritative = vi.fn().mockResolvedValue(undefined);
+    dbMocks.rowCount = 0;
+
+    await failSingleJobGuarded({
+      jobId: "alias-1",
+      message: "Tool processing failed",
+      expectedArtifactJobId: "job-1",
+    });
+    expect(JSON.stringify(dbMocks.whereClauses.at(-1))).toContain("artifactJobId");
+    expect(JSON.stringify(dbMocks.whereClauses.at(-1))).toContain("job-1");
+    expect(redisMocks.setex).not.toHaveBeenCalled();
+    expect(redisMocks.publish).not.toHaveBeenCalled();
+
+    await cancelSingleJobGuarded({
+      jobId: "alias-1",
+      expectedArtifactJobId: "job-1",
+    });
+    expect(JSON.stringify(dbMocks.whereClauses.at(-1))).toContain("artifactJobId");
+    expect(JSON.stringify(dbMocks.whereClauses.at(-1))).toContain("job-1");
+    expect(redisMocks.setex).not.toHaveBeenCalled();
+    expect(redisMocks.publish).not.toHaveBeenCalled();
+
+    await updateSingleFileProgressAtomically(
+      {
+        jobId: "alias-1",
+        phase: "complete",
+        percent: 100,
+        stage: "complete",
+        result: { downloadUrl: "/api/v1/download/job-1/out.png" },
+        expectedArtifactJobId: "job-1",
+      },
+      mutateAuthoritative,
+    );
+    expect(mutateAuthoritative).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(dbMocks.whereClauses.at(-1))).toContain("artifactJobId");
+    expect(JSON.stringify(dbMocks.whereClauses.at(-1))).toContain("job-1");
+    expect(redisMocks.setex).not.toHaveBeenCalled();
+    expect(redisMocks.publish).not.toHaveBeenCalled();
+
+    // Missing alias row with expectedArtifactJobId must not insert a pointerless row.
+    dbMocks.existing = [];
+    dbMocks.rowCount = 1;
+    await updateSingleFileProgress({
+      jobId: "alias-missing",
+      phase: "failed",
+      percent: 0,
+      error: "boom",
+      expectedArtifactJobId: "job-1",
+    });
+    expect(dbMocks.inserted).toHaveLength(0);
+    expect(redisMocks.setex).not.toHaveBeenCalled();
+    expect(redisMocks.publish).not.toHaveBeenCalled();
+
+    // Matching alias row persists and announces without leaking expectedArtifactJobId onto the wire.
+    dbMocks.existing = [{ id: "alias-1" }];
+    dbMocks.rowCount = 1;
+    await updateSingleFileProgressAtomically(
+      {
+        jobId: "alias-1",
+        phase: "complete",
+        percent: 100,
+        stage: "complete",
+        result: { downloadUrl: "/api/v1/download/job-1/out.png" },
+        expectedArtifactJobId: "job-1",
+      },
+      mutateAuthoritative,
+    );
+    expect(redisMocks.setex).toHaveBeenCalledTimes(1);
+    const cachedJson = (redisMocks.setex.mock.calls[0] as unknown[])[2] as string;
+    expect(JSON.parse(cachedJson)).not.toHaveProperty("expectedArtifactJobId");
+    await Promise.resolve();
+    expect(redisMocks.publish).toHaveBeenCalledTimes(1);
+
+    // Nonterminal updateSingleFileProgress with expectedArtifactJobId waits for the guarded DB update and strips expectedArtifactJobId from the wire payload.
+    redisMocks.setex.mockClear();
+    redisMocks.publish.mockClear();
+    dbMocks.rowCount = 0;
+    await updateSingleFileProgress({
+      jobId: "alias-1",
+      phase: "processing",
+      percent: 50,
+      stage: "Processing...",
+      expectedArtifactJobId: "job-1",
+    });
+    expect(redisMocks.publish).not.toHaveBeenCalled();
+
+    dbMocks.rowCount = 1;
+    await updateSingleFileProgress({
+      jobId: "alias-1",
+      phase: "processing",
+      percent: 50,
+      stage: "Processing...",
+      expectedArtifactJobId: "job-1",
+    });
+    expect(redisMocks.publish).toHaveBeenCalledTimes(1);
+    const publishedJson = (redisMocks.publish.mock.calls[0] as unknown[])[1] as string;
+    expect(JSON.parse(publishedJson)).not.toHaveProperty("expectedArtifactJobId");
+  });
 });

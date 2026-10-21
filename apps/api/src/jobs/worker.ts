@@ -820,6 +820,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
             percent: 100,
             stage: "complete",
             result: legacyResult,
+            ...(progressJobId !== jobId && { expectedArtifactJobId: jobId }),
           },
           async (tx) => {
             if (stagedSave.commit) {
@@ -1029,6 +1030,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
               });
             });
 
+          let aliasWriteFaulted = false;
           if (progressJobId !== jobId) {
             // Alias dual write (#808), the finalize's #766 pattern: a
             // reconnecting client replays from the alias row, so it needs
@@ -1050,6 +1052,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
                 expectedArtifactJobId: jobId,
               });
             } catch (aliasErr) {
+              aliasWriteFaulted = true;
               logger.error(
                 { err: aliasErr, jobId, progressJobId },
                 "canceled alias terminal write failed",
@@ -1063,19 +1066,21 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
               });
             }
           }
-          // Ephemeral terminal event for live SSE clients, published
-          // unconditionally: liveness must not depend on the durable write
-          // (which the guard also skips when a reused alias id is still
-          // terminal from an earlier run). publishEphemeral sets the
-          // replay key without overwriting the DB row (which stays
-          // "canceled").
-          publishEphemeral({
-            jobId: progressJobId,
-            type: "single",
-            phase: "failed",
-            percent: 0,
-            error: "Canceled",
-          });
+          // Ephemeral terminal event for live SSE clients, published when the
+          // run has no separate alias row or when the alias row's durable
+          // write faulted (#888, #3408). When a separate alias row settled
+          // cleanly via cancelSingleJobGuarded, that call already announced
+          // the frame if the pointer still matched and skipped announcement
+          // if a newer run re-pointed the channel.
+          if (progressJobId === jobId || aliasWriteFaulted) {
+            publishEphemeral({
+              jobId: progressJobId,
+              type: "single",
+              phase: "failed",
+              percent: 0,
+              error: "Canceled",
+            });
+          }
         } else {
           // Commit the authoritative failure row and the client replay alias
           // in one transaction before announcing (#2699). Swallowed so the
@@ -1093,6 +1098,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
               percent: 0,
               error: friendlyError(finalError),
               ...errorFields,
+              ...(progressJobId !== jobId && { expectedArtifactJobId: jobId }),
             },
             async (tx) => {
               await tx

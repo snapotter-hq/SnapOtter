@@ -3709,3 +3709,234 @@ describe("legacy adjust-colors aliases in toolUsedBaseProps (#3386)", () => {
     },
   );
 });
+
+describe("processToolJob expectedArtifactJobId alias guard (#3408)", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  it("passes expectedArtifactJobId on alias completion and failure writes and skips publishEphemeral when a separate alias cancel write succeeds (#3408)", async () => {
+    const processV2Mock = vi.fn();
+    const cancelSingleJobGuardedMock = vi.fn().mockResolvedValue(undefined);
+    const publishEphemeralMock = vi.fn();
+    const updateSingleFileProgressAtomicallyMock = vi.fn(
+      async (_progress: unknown, mutate?: (tx: unknown) => Promise<void>) => {
+        const { db } = await import("../../../../apps/api/src/db/index.js");
+        if (mutate && "update" in db) {
+          await mutate(db);
+        }
+      },
+    );
+    const wasUserCanceledMock = vi.fn(() => false);
+    const dbSetMock = vi.fn(() => ({
+      where: vi.fn().mockResolvedValue(undefined),
+    }));
+
+    const workerMod = await loadWorker("", () => {
+      vi.doMock("node:fs/promises", () => ({
+        mkdir: vi.fn().mockResolvedValue(undefined),
+        readFile: vi.fn(),
+        rm: vi.fn().mockResolvedValue(undefined),
+      }));
+      vi.doMock("../../../../apps/api/src/db/index.js", () => ({
+        db: {
+          select: vi.fn(() => ({
+            from: vi.fn(() => ({
+              where: vi.fn().mockResolvedValue([]),
+            })),
+          })),
+          update: vi.fn(() => ({
+            set: dbSetMock,
+          })),
+        },
+        schema: { jobs: { id: "jobs.id", status: "jobs.status", settings: "jobs.settings" } },
+      }));
+      vi.doMock("../../../../apps/api/src/routes/progress.js", () => ({
+        cancelSingleJobGuarded: cancelSingleJobGuardedMock,
+        publishEphemeral: publishEphemeralMock,
+        updateSingleFileProgress: vi.fn(),
+        updateSingleFileProgressAtomically: updateSingleFileProgressAtomicallyMock,
+      }));
+      vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+        getToolConfig: vi.fn(() => ({ processV2: processV2Mock })),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/ai-handlers.js", () => ({
+        hasAiJobHandler: vi.fn(() => false),
+        hasAiPathJobHandler: vi.fn(() => false),
+        runAiToolJob: vi.fn(),
+        runAiPathToolJob: vi.fn(),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/cancel.js", () => ({
+        claimFinalize: vi.fn(async () => true),
+        registerCancelable: vi.fn(() => new AbortController()),
+        releaseFinalize: vi.fn(async () => {}),
+        unregisterCancelable: vi.fn(),
+        userCancelSignal: vi.fn(() => new AbortController().signal),
+        wasUserCanceled: wasUserCanceledMock,
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/postprocess.js", () => ({
+        autoSaveToLibrary: vi.fn().mockResolvedValue({}),
+        buildOutputName: vi.fn((out: string) => out),
+        generatePreview: vi.fn().mockResolvedValue(undefined),
+        stageAutoSaveToLibrary: vi.fn().mockResolvedValue({}),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/error-report.js", () => ({
+        classifyError: vi.fn(() => "bug"),
+        reportError: vi.fn(),
+        safeFormatTag: vi.fn(() => "png"),
+      }));
+      vi.doMock("@snapotter/media-engine", () => ({
+        HW_ACCEL_FAMILIES: [],
+        hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+        softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+        binaryOverrideWarning: vi.fn(),
+        checkBinaryOverrides: vi.fn(() => []),
+        isBinarySpawnFailure,
+        probeFailureLevel: vi.fn(() => "warn"),
+      }));
+    });
+
+    objectStorageMocks.getObjectBuffer.mockResolvedValue(Buffer.from("input-bytes"));
+    objectStorageMocks.putObject.mockResolvedValue(undefined);
+    objectStorageMocks.deletePrefix.mockResolvedValue(undefined);
+
+    const { Worker, UnrecoverableError } = await import("bullmq");
+    workerMod.startWorkers();
+    const workerCalls = (Worker as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    const imageCall = workerCalls.find(([queue]) => String(queue).endsWith("image"));
+    if (!imageCall) throw new Error("image pool worker not registered");
+    const processor = imageCall[1] as (job: unknown) => Promise<unknown>;
+
+    const makeToolJob = (jobId: string, clientJobId?: string) => ({
+      id: jobId,
+      attemptsMade: 0,
+      opts: { attempts: 1 },
+      updateProgress: vi.fn(),
+      data: {
+        jobId,
+        ...(clientJobId ? { clientJobId } : {}),
+        toolId: "compress",
+        userId: null,
+        pool: "image",
+        inputRefs: [`uploads/${jobId}/in.png`],
+        filename: "in.png",
+        settings: {},
+        kind: "tool",
+      },
+    });
+
+    // 1. Completion with separate clientJobId passes expectedArtifactJobId: jobId
+    processV2Mock.mockResolvedValueOnce({
+      buffer: Buffer.from("out-bytes"),
+      filename: "out.png",
+      contentType: "image/png",
+    });
+    await processor(makeToolJob("job-done-alias", "client-done-alias"));
+    expect(updateSingleFileProgressAtomicallyMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        jobId: "client-done-alias",
+        phase: "complete",
+        expectedArtifactJobId: "job-done-alias",
+      }),
+      expect.any(Function),
+    );
+
+    // 1b. Completion without separate clientJobId omits expectedArtifactJobId
+    updateSingleFileProgressAtomicallyMock.mockClear();
+    processV2Mock.mockResolvedValueOnce({
+      buffer: Buffer.from("out-bytes"),
+      filename: "out.png",
+      contentType: "image/png",
+    });
+    await processor(makeToolJob("job-done-direct"));
+    const directCompleteArg = updateSingleFileProgressAtomicallyMock.mock.calls[0]?.[0] as Record<
+      string,
+      unknown
+    >;
+    expect(directCompleteArg).toMatchObject({
+      jobId: "job-done-direct",
+      phase: "complete",
+    });
+    expect(directCompleteArg).not.toHaveProperty("expectedArtifactJobId");
+
+    // 2. Failure with separate clientJobId passes expectedArtifactJobId: jobId
+    updateSingleFileProgressAtomicallyMock.mockClear();
+    processV2Mock.mockRejectedValueOnce(new Error("boom"));
+    await expect(processor(makeToolJob("job-fail-alias", "client-fail-alias"))).rejects.toThrow(
+      "boom",
+    );
+    expect(updateSingleFileProgressAtomicallyMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        jobId: "client-fail-alias",
+        phase: "failed",
+        error: "boom",
+        expectedArtifactJobId: "job-fail-alias",
+      }),
+      expect.any(Function),
+    );
+
+    // 2b. Failure without separate clientJobId omits expectedArtifactJobId
+    updateSingleFileProgressAtomicallyMock.mockClear();
+    processV2Mock.mockRejectedValueOnce(new Error("boom-direct"));
+    await expect(processor(makeToolJob("job-fail-direct"))).rejects.toThrow("boom-direct");
+    const directFailArg = updateSingleFileProgressAtomicallyMock.mock.calls[0]?.[0] as Record<
+      string,
+      unknown
+    >;
+    expect(directFailArg).toMatchObject({
+      jobId: "job-fail-direct",
+      phase: "failed",
+      error: "boom-direct",
+    });
+    expect(directFailArg).not.toHaveProperty("expectedArtifactJobId");
+
+    // 3. Cancel with separate clientJobId: when cancelSingleJobGuarded succeeds, publishEphemeral is NOT called
+    cancelSingleJobGuardedMock.mockClear();
+    publishEphemeralMock.mockClear();
+    wasUserCanceledMock.mockReturnValue(true);
+    processV2Mock.mockRejectedValueOnce(new Error("Canceled"));
+    await expect(
+      processor(makeToolJob("job-cancel-alias", "client-cancel-alias")),
+    ).rejects.toBeInstanceOf(UnrecoverableError);
+    expect(cancelSingleJobGuardedMock).toHaveBeenCalledWith({
+      jobId: "client-cancel-alias",
+      expectedArtifactJobId: "job-cancel-alias",
+    });
+    expect(publishEphemeralMock).not.toHaveBeenCalled();
+
+    // 3b. Cancel with separate clientJobId: when cancelSingleJobGuarded throws, publishEphemeral IS called as fallback
+    cancelSingleJobGuardedMock.mockClear();
+    publishEphemeralMock.mockClear();
+    cancelSingleJobGuardedMock.mockRejectedValueOnce(new Error("alias write fault"));
+    processV2Mock.mockRejectedValueOnce(new Error("Canceled"));
+    await expect(
+      processor(makeToolJob("job-cancel-fault", "client-cancel-fault")),
+    ).rejects.toBeInstanceOf(UnrecoverableError);
+    expect(publishEphemeralMock).toHaveBeenCalledWith({
+      jobId: "client-cancel-fault",
+      type: "single",
+      phase: "failed",
+      percent: 0,
+      error: "Canceled",
+    });
+
+    // 3c. Cancel without separate clientJobId: publishEphemeral IS called directly
+    cancelSingleJobGuardedMock.mockClear();
+    publishEphemeralMock.mockClear();
+    processV2Mock.mockRejectedValueOnce(new Error("Canceled"));
+    await expect(processor(makeToolJob("job-cancel-direct"))).rejects.toBeInstanceOf(
+      UnrecoverableError,
+    );
+    expect(cancelSingleJobGuardedMock).not.toHaveBeenCalled();
+    expect(publishEphemeralMock).toHaveBeenCalledWith({
+      jobId: "job-cancel-direct",
+      type: "single",
+      phase: "failed",
+      percent: 0,
+      error: "Canceled",
+    });
+  });
+});

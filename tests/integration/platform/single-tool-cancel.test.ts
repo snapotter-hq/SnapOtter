@@ -99,7 +99,7 @@ vi.mock("../../../apps/api/src/routes/progress.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../apps/api/src/routes/progress.js")>();
   return {
     ...actual,
-    cancelSingleJobGuarded: async (args: { jobId: string }) => {
+    cancelSingleJobGuarded: async (args: Parameters<typeof actual.cancelSingleJobGuarded>[0]) => {
       if (args.jobId === guardedWriteFault.target) {
         throw new Error("injected alias-write outage");
       }
@@ -204,7 +204,7 @@ import { registerToolProcessFn } from "../../../apps/api/src/routes/tool-factory
 const passthroughSchema = { parse: (v: unknown) => v } as never;
 
 interface RunSettings {
-  mode: "fast" | "slow" | "ignore-abort" | "retry-slow";
+  mode: "fast" | "slow" | "ignore-abort" | "retry-slow" | "fail";
   tag: string;
 }
 
@@ -228,6 +228,9 @@ registerToolProcessFn({
   ) => {
     const { mode, tag } = settings as RunSettings;
     invoked.push(tag);
+    if (mode === "fail") {
+      throw new Error(`wt-single-cancel failed: ${tag}`);
+    }
     const isRetry = invoked.filter((t) => t === tag).length > 1;
     if (mode === "slow" || (mode === "retry-slow" && isRetry)) {
       await new Promise<void>((resolve, reject) => {
@@ -1799,5 +1802,100 @@ describe("requestCancel through a single-tool alias (#808)", () => {
     const frame = await terminalFrame(jobId);
     expect(frame.phase).toBe("failed");
     expect(frame.error).toBe("Canceled");
+  });
+
+  it("leaves a re-pointed clientJobId alias row and Redis terminal key untouched when an earlier single-tool job completes, fails, or cancels (#3408)", async () => {
+    const owner = await createOwner();
+    const clientJobId = randomUUID();
+    const liveArtifactId = randomUUID();
+    const liveProgress = { percent: 15, stage: "Validating..." };
+    await db.insert(schema.jobs).values({
+      id: clientJobId,
+      userId: owner,
+      pool: "image",
+      type: "single",
+      status: "processing",
+      inputRefs: [],
+      progress: liveProgress,
+      settings: { artifactJobId: liveArtifactId },
+    });
+
+    const enqueueStaleSingleJob = async (
+      mode: RunSettings["mode"],
+      tag: string,
+    ): Promise<string> => {
+      const staleJobId = randomUUID();
+      const uploadKey = `uploads/${staleJobId}/input.png`;
+      await putObject(uploadKey, Buffer.from("payload"));
+      await db.insert(schema.jobs).values({
+        id: staleJobId,
+        userId: owner,
+        toolId: "wt-single-cancel",
+        pool: "image",
+        type: "tool",
+        status: "queued",
+        inputRefs: [uploadKey],
+        settings: { mode, tag },
+      });
+      await getQueue("image").add(
+        "wt-single-cancel",
+        {
+          kind: "tool",
+          jobId: staleJobId,
+          toolId: "wt-single-cancel",
+          userId: owner,
+          pool: "image",
+          inputRefs: [uploadKey],
+          filename: "input.png",
+          settings: { mode, tag },
+          clientJobId,
+        },
+        { jobId: staleJobId, attempts: 1 },
+      );
+      return staleJobId;
+    };
+
+    const assertLiveAliasUntouched = async () => {
+      const alias = await jobRow(clientJobId);
+      expect(alias?.status).toBe("processing");
+      expect(alias?.completedAt).toBeNull();
+      expect(alias?.error).toBeNull();
+      expect(alias?.progress).toEqual(liveProgress);
+      expect(alias?.settings).toEqual({ artifactJobId: liveArtifactId });
+      expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBeNull();
+    };
+
+    const [completedJobId, failedJobId, canceledJobId] = await Promise.all([
+      enqueueStaleSingleJob("fast", "stale-complete-3408"),
+      enqueueStaleSingleJob("fail", "stale-fail-3408"),
+      enqueueStaleSingleJob("slow", "stale-cancel-3408"),
+    ]);
+
+    await waitFor(async () => (invoked.includes("stale-cancel-3408") ? true : undefined));
+    expect(await requestCancel(canceledJobId)).toBe(true);
+
+    // Wait for all three BullMQ jobs to finish in the worker (not just the
+    // authoritative DB row update, which on cancel lands before the alias
+    // cancelSingleJobGuarded and publishEphemeral calls in processToolJob).
+    const queue = getQueue("image");
+    await Promise.all(
+      [completedJobId, failedJobId, canceledJobId].map((id) =>
+        waitFor(async () => {
+          const qJob = await queue.getJob(id);
+          return qJob?.finishedOn ? true : undefined;
+        }),
+      ),
+    );
+
+    const [completedRow, failedRow, canceledRow] = await Promise.all([
+      terminalRow(completedJobId),
+      terminalRow(failedJobId),
+      terminalRow(canceledJobId),
+    ]);
+    expect(completedRow.status).toBe("completed");
+    expect(failedRow.status).toBe("failed");
+    expect(canceledRow.status).toBe("canceled");
+
+    await assertLiveAliasUntouched();
   });
 });
