@@ -144,7 +144,22 @@ vi.mock("../../../../apps/api/src/routes/progress.js", async (importOriginal) =>
     await importOriginal<typeof import("../../../../apps/api/src/routes/progress.js")>();
   return {
     ...actual,
+    updateJobProgress: async (progress: Parameters<typeof actual.updateJobProgress>[0]) => {
+      if (progress.status === "failed" && faults.retireRowBeforeFault === progress.jobId) {
+        await db
+          .update(schema.jobs)
+          .set({ status: "canceled", completedAt: new Date() })
+          .where(eq(schema.jobs.id, faults.retireRowBeforeFault));
+      }
+      return actual.updateJobProgress(progress);
+    },
     failBatchJob: async (...args: Parameters<typeof actual.failBatchJob>) => {
+      if (faults.retireRowBeforeFault === args[0].jobId) {
+        await db
+          .update(schema.jobs)
+          .set({ status: "canceled", completedAt: new Date() })
+          .where(eq(schema.jobs.id, faults.retireRowBeforeFault));
+      }
       if (faults.replyErrorDuringSettle) {
         faults.replyErrorDuringSettle = false;
         await new Promise<void>((resolve) => {
@@ -617,5 +632,108 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
     } finally {
       process.off("uncaughtException", uncaught);
     }
+  });
+
+  it("settles an all-failed batch via failBatchJob with message 'All files failed processing' (#2765)", async () => {
+    const clientJobId = "batch-2765-all-failed";
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "bad1.pdf",
+        contentType: "application/pdf",
+        content: Buffer.from("not a pdf"),
+      },
+      {
+        name: "file",
+        filename: "bad2.pdf",
+        contentType: "application/pdf",
+        content: Buffer.from("still not a pdf"),
+      },
+      { name: "settings", content: JSON.stringify({ dpi: 72 }) },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/pdf/pdf-to-jpg/batch",
+      body,
+      headers: { "content-type": contentType, authorization: `Bearer ${token}` },
+    });
+
+    expect(res.statusCode).toBe(422);
+    expect(res.json()).toEqual({
+      error: "All files failed processing",
+      details: ["bad1.pdf: Invalid or corrupt PDF file", "bad2.pdf: Invalid or corrupt PDF file"],
+      errors: [
+        { filename: "bad1.pdf", error: "Invalid or corrupt PDF file" },
+        { filename: "bad2.pdf", error: "Invalid or corrupt PDF file" },
+      ],
+    });
+
+    const row = await readRow(clientJobId);
+    expect(row?.status).toBe("failed");
+    expect(row?.completedAt).not.toBeNull();
+    expect(row?.progress).toEqual({
+      percent: 100,
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 2,
+    });
+    expect(row?.error).toEqual({
+      message: "All files failed processing",
+      details: [
+        { filename: "bad1.pdf", error: "Invalid or corrupt PDF file" },
+        { filename: "bad2.pdf", error: "Invalid or corrupt PDF file" },
+      ],
+    });
+
+    const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`);
+    expect(cached).not.toBeNull();
+    expect(JSON.parse(cached as string)).toMatchObject({
+      jobId: clientJobId,
+      type: "batch",
+      status: "failed",
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 2,
+      errors: [
+        { filename: "bad1.pdf", error: "Invalid or corrupt PDF file" },
+        { filename: "bad2.pdf", error: "Invalid or corrupt PDF file" },
+      ],
+    });
+  });
+
+  it("does not overwrite a canceled row or announce a terminal frame when all files fail (#2765)", async () => {
+    const clientJobId = "batch-2765-all-failed-canceled";
+    faults.retireRowBeforeFault = clientJobId;
+    const { body, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "bad1.pdf",
+        contentType: "application/pdf",
+        content: Buffer.from("not a pdf"),
+      },
+      { name: "settings", content: JSON.stringify({ dpi: 72 }) },
+      { name: "clientJobId", content: clientJobId },
+    ]);
+
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/pdf/pdf-to-jpg/batch",
+      body,
+      headers: { "content-type": contentType, authorization: `Bearer ${token}` },
+    });
+
+    expect(res.statusCode).toBe(422);
+    expect((await readRow(clientJobId))?.status).toBe("canceled");
+    expect(await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`)).toBeNull();
+    expect(
+      warnLogs.some(
+        (entry) =>
+          (entry.bindings as { jobId?: string })?.jobId === clientJobId &&
+          entry.msg.includes("no terminal frame announced"),
+      ),
+      `expected warn log for ${clientJobId}, got ${JSON.stringify(warnLogs)}`,
+    ).toBe(true);
   });
 });

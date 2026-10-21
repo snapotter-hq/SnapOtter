@@ -342,19 +342,26 @@ export function registerSvgToRasterRoute(
 
     if (errors.length === files.length) {
       // Awaited: this route owns the row, and until it is terminal it counts
-      // against the user's concurrent-job limit (#1688). A failed write still
-      // sends the result, but is logged; nothing else will settle the row
+      // against the user's concurrent-job limit (#1688, #2765). A failed write
+      // still sends the result, but is logged; nothing else will settle the row
       // before the next restart.
-      await updateJobProgress({
+      const applied = await failBatchJob({
         jobId,
-        status: "failed",
         totalFiles: files.length,
         completedFiles,
         failedFiles: errors.length,
         errors,
-      }).catch((err) =>
-        request.log.error({ err, jobId }, "failed to persist an SVG batch's terminal progress"),
-      );
+        message: "All files failed processing",
+      }).catch((settleErr) => {
+        request.log.error({ err: settleErr, jobId }, "failed to settle a faulted SVG batch");
+        return null;
+      });
+      if (applied === false) {
+        request.log.warn(
+          { jobId },
+          "faulted SVG batch progress row was missing or already terminal; no terminal frame announced",
+        );
+      }
       return reply.status(422).send({ error: "All files failed processing", errors });
     }
 

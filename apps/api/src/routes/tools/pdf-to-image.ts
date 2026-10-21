@@ -661,17 +661,8 @@ export function registerPdfToImageRoute(
 
       if (errors.length === files.length) {
         // Awaited: this route owns the row, and until it is terminal it counts
-        // against the user's concurrent-job limit (#1688).
-        await updateJobProgress({
-          jobId,
-          status: "failed",
-          totalFiles: files.length,
-          completedFiles: files.length,
-          failedFiles: errors.length,
-          errors,
-        }).catch((err) =>
-          request.log.error({ err, jobId }, "failed to persist a PDF batch's terminal progress"),
-        );
+        // against the user's concurrent-job limit (#1688, #2765).
+        await settleFaultedBatch(errors.length, errors, "All files failed processing");
         // parseApiError on the client reads `error` and `details`, so the
         // per-file reasons have to ride in `details` to be seen at all.
         return reply.status(422).send({

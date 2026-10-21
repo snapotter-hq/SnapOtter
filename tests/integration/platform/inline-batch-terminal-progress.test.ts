@@ -42,6 +42,13 @@ vi.mock("../../../apps/api/src/routes/progress.js", async (importOriginal) => {
         terminal.persisted.add(progress.jobId);
       })();
     },
+    failBatchJob: async (args: Parameters<typeof actual.failBatchJob>[0]) => {
+      await new Promise((resolve) => setTimeout(resolve, terminal.delayMs));
+      if (terminal.fails) throw new Error("terminal progress write failed");
+      const applied = await actual.failBatchJob(args);
+      terminal.persisted.add(args.jobId);
+      return applied;
+    },
   };
 });
 
@@ -86,7 +93,7 @@ const ROUTES = [
 function postBatch(
   route: (typeof ROUTES)[number],
   clientJobId: string,
-  file: (typeof ROUTES)[number]["file"] = route.file,
+  file: (typeof ROUTES)[number]["file"] | (typeof ROUTES)[number]["bad"] = route.file,
 ) {
   const { body, contentType } = createMultipartPayload([
     { name: "file", ...file },
@@ -137,6 +144,17 @@ describe.each(ROUTES)("$name inline batch terminal progress (#1688)", (route) =>
     }
   });
 
+  it("settles an all-failed row before answering 422, so the slot is free when the client gets the error (#2765)", async () => {
+    const clientJobId = `batch-2765-${route.name}-all-failed-ordering`;
+    terminal.delayMs = 150;
+
+    const res = await postBatch(route, clientJobId, route.bad);
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(422);
+    expect(terminal.persisted.has(clientJobId), "answered before the terminal write").toBe(true);
+    expect((await readRow(clientJobId))?.status).toBe("failed");
+  });
+
   it("still answers 422 for an all-failed batch when the terminal write fails", async () => {
     const clientJobId = `batch-1688-${route.name}-all-failed`;
     terminal.fails = true;
@@ -148,6 +166,7 @@ describe.each(ROUTES)("$name inline batch terminal progress (#1688)", (route) =>
       expect(res.statusCode, res.body.slice(0, 300)).toBe(422);
       await new Promise((resolve) => setTimeout(resolve, 50));
       expect(unhandled).not.toHaveBeenCalled();
+      expect((await readRow(clientJobId))?.status).toBe("processing");
     } finally {
       process.off("unhandledRejection", unhandled);
     }

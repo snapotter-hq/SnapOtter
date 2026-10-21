@@ -55,6 +55,7 @@ vi.mock("../../../apps/api/src/permissions.js", async (importOriginal) => {
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
 import { registerImageToPdf } from "../../../apps/api/src/routes/tools/image-to-pdf.js";
 import { registerPdfToImage } from "../../../apps/api/src/routes/tools/pdf-to-image.js";
+import { registerSvgToRasterRoute } from "../../../apps/api/src/routes/tools/svg-to-raster.js";
 
 const PDF = readFileSync(join(__dirname, "../../fixtures/document/valid/test-3page.pdf"));
 
@@ -63,7 +64,7 @@ const logLines: string[] = [];
 async function buildApp(register: (app: ReturnType<typeof Fastify>) => void) {
   logLines.length = 0;
   const app = Fastify({
-    logger: { level: "error", stream: { write: (line: string) => void logLines.push(line) } },
+    logger: { level: "warn", stream: { write: (line: string) => void logLines.push(line) } },
   });
   await app.register(multipart);
   registerErrorHandler(app);
@@ -532,6 +533,169 @@ describe("pdf-to-image batch route (#1552)", () => {
       message: "Workspace is full.",
       code: "workspace-cap",
     });
+    await app.close();
+  });
+
+  it("settles an all-failed PDF batch via failBatchJob instead of updateJobProgress (#2765)", async () => {
+    const app = await buildApp(registerPdfToImage);
+    const res = await app.inject({
+      method: "POST",
+      url: `${apiToolPath("pdf-to-image")}/batch`,
+      ...multipartBody(
+        [
+          { name: "bad1.pdf", type: "application/pdf", data: Buffer.from("not a pdf") },
+          { name: "bad2.pdf", type: "application/pdf", data: Buffer.from("still not a pdf") },
+        ],
+        { dpi: 36 },
+      ),
+    });
+
+    expect(res.statusCode).toBe(422);
+    expect(res.json()).toMatchObject({
+      error: "All files failed processing",
+      errors: [
+        { filename: "bad1.pdf", error: "Invalid or corrupt PDF file" },
+        { filename: "bad2.pdf", error: "Invalid or corrupt PDF file" },
+      ],
+    });
+    expect(failBatchJob).toHaveBeenCalledWith({
+      jobId: expect.any(String),
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 2,
+      errors: [
+        { filename: "bad1.pdf", error: "Invalid or corrupt PDF file" },
+        { filename: "bad2.pdf", error: "Invalid or corrupt PDF file" },
+      ],
+      message: "All files failed processing",
+    });
+    expect(updateJobProgress).not.toHaveBeenCalledWith(
+      expect.objectContaining({ status: "failed" }),
+    );
+    await app.close();
+  });
+
+  it("logs a warning when failBatchJob returns false on an all-failed PDF batch (#2765)", async () => {
+    failBatchJob.mockResolvedValueOnce(false);
+    const app = await buildApp(registerPdfToImage);
+    const res = await app.inject({
+      method: "POST",
+      url: `${apiToolPath("pdf-to-image")}/batch`,
+      ...multipartBody(
+        [{ name: "bad.pdf", type: "application/pdf", data: Buffer.from("not a pdf") }],
+        { dpi: 36 },
+      ),
+    });
+
+    expect(res.statusCode).toBe(422);
+    expect(logLines.some((line) => line.includes("no terminal frame announced"))).toBe(true);
+    await app.close();
+  });
+
+  it("logs an error and still answers 422 when failBatchJob rejects on an all-failed PDF batch (#2765)", async () => {
+    failBatchJob.mockRejectedValueOnce(new Error("db down"));
+    const app = await buildApp(registerPdfToImage);
+    const res = await app.inject({
+      method: "POST",
+      url: `${apiToolPath("pdf-to-image")}/batch`,
+      ...multipartBody(
+        [{ name: "bad.pdf", type: "application/pdf", data: Buffer.from("not a pdf") }],
+        { dpi: 36 },
+      ),
+    });
+
+    expect(res.statusCode).toBe(422);
+    expect(logLines.some((line) => line.includes("failed to settle a faulted PDF batch"))).toBe(
+      true,
+    );
+    expect(logLines.some((line) => line.includes("no terminal frame announced"))).toBe(false);
+    await app.close();
+  });
+});
+
+describe("svg-to-raster batch route all-failed settlement (#2765)", () => {
+  beforeEach(() => {
+    dbInsertValues.mockReset().mockResolvedValue(undefined);
+    failBatchJob.mockReset().mockResolvedValue(true);
+    updateJobProgress.mockReset().mockResolvedValue(undefined);
+  });
+
+  const registerSvg = (app: ReturnType<typeof Fastify>) =>
+    registerSvgToRasterRoute(app, { toolId: "svg-to-raster" });
+
+  it("settles an all-failed SVG batch via failBatchJob instead of updateJobProgress (#2765)", async () => {
+    const app = await buildApp(registerSvg);
+    const res = await app.inject({
+      method: "POST",
+      url: `${apiToolPath("svg-to-raster")}/batch`,
+      ...multipartBody(
+        [
+          { name: "bad1.svg", type: "image/svg+xml", data: Buffer.from("not an svg") },
+          { name: "bad2.svg", type: "image/svg+xml", data: Buffer.from("still not an svg") },
+        ],
+        { outputFormat: "png" },
+      ),
+    });
+
+    expect(res.statusCode).toBe(422);
+    expect(res.json()).toMatchObject({
+      error: "All files failed processing",
+      errors: [
+        { filename: "bad1.svg", error: "Not a valid SVG file" },
+        { filename: "bad2.svg", error: "Not a valid SVG file" },
+      ],
+    });
+    expect(failBatchJob).toHaveBeenCalledWith({
+      jobId: expect.any(String),
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 2,
+      errors: [
+        { filename: "bad1.svg", error: "Not a valid SVG file" },
+        { filename: "bad2.svg", error: "Not a valid SVG file" },
+      ],
+      message: "All files failed processing",
+    });
+    expect(updateJobProgress).not.toHaveBeenCalledWith(
+      expect.objectContaining({ status: "failed" }),
+    );
+    await app.close();
+  });
+
+  it("logs a warning when failBatchJob returns false on an all-failed SVG batch (#2765)", async () => {
+    failBatchJob.mockResolvedValueOnce(false);
+    const app = await buildApp(registerSvg);
+    const res = await app.inject({
+      method: "POST",
+      url: `${apiToolPath("svg-to-raster")}/batch`,
+      ...multipartBody(
+        [{ name: "bad.svg", type: "image/svg+xml", data: Buffer.from("not an svg") }],
+        { outputFormat: "png" },
+      ),
+    });
+
+    expect(res.statusCode).toBe(422);
+    expect(logLines.some((line) => line.includes("no terminal frame announced"))).toBe(true);
+    await app.close();
+  });
+
+  it("logs an error and still answers 422 when failBatchJob rejects on an all-failed SVG batch (#2765)", async () => {
+    failBatchJob.mockRejectedValueOnce(new Error("db down"));
+    const app = await buildApp(registerSvg);
+    const res = await app.inject({
+      method: "POST",
+      url: `${apiToolPath("svg-to-raster")}/batch`,
+      ...multipartBody(
+        [{ name: "bad.svg", type: "image/svg+xml", data: Buffer.from("not an svg") }],
+        { outputFormat: "png" },
+      ),
+    });
+
+    expect(res.statusCode).toBe(422);
+    expect(logLines.some((line) => line.includes("failed to settle a faulted SVG batch"))).toBe(
+      true,
+    );
+    expect(logLines.some((line) => line.includes("no terminal frame announced"))).toBe(false);
     await app.close();
   });
 });
