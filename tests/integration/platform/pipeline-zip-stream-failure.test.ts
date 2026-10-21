@@ -17,7 +17,11 @@
  * getObjectBuffer, so normal processing is untouched.
  */
 
+import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { db, schema } from "../../../apps/api/src/db/index.js";
+import { sharedRedis } from "../../../apps/api/src/jobs/connection.js";
+import { bullPrefix } from "../../../apps/api/src/jobs/types.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
   buildTestApp,
@@ -37,6 +41,9 @@ const mocks = vi.hoisted(() => ({
   // workspace cap does, so the finalize settles the parent row with that
   // reason before it rethrows (#2180).
   capZipStoreForParentId: null as string | null,
+  // When set, putObject throws a non-SafeError 500 during ingress for
+  // uploads/<id>-f<N>-s0/... (#2816).
+  unmasked500IngressForParentId: null as string | null,
 }));
 
 vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
@@ -45,6 +52,16 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
   const { SafeError } = await import("@snapotter/shared");
   return {
     ...actual,
+    putObject: async (key: string, data: Buffer) => {
+      const faultParent = mocks.unmasked500IngressForParentId;
+      if (faultParent && key.startsWith(`uploads/${faultParent}-f`)) {
+        throw Object.assign(
+          new TypeError("Cannot read properties of undefined (reading 'byteLength')"),
+          { statusCode: 500 },
+        );
+      }
+      return actual.putObject(key, data);
+    },
     putObjectStream: async (key: string, stream: Parameters<typeof actual.putObjectStream>[1]) => {
       const capParent = mocks.capZipStoreForParentId;
       if (capParent && key.startsWith(`outputs/${capParent}/`)) {
@@ -93,6 +110,7 @@ afterEach(() => {
   mocks.failEntryStreamsForParentId = null;
   mocks.failZipObjectForParentId = null;
   mocks.capZipStoreForParentId = null;
+  mocks.unmasked500IngressForParentId = null;
 });
 
 function postBatch(clientJobId: string) {
@@ -234,5 +252,33 @@ describe("Pipeline batch ZIP delivery", () => {
     if (!sawTransportFailure) {
       expect(payload?.includes(ZIP_EOCD)).toBe(false);
     }
+  }, 30_000);
+
+  it("masks non-SafeError 500 messages in the settled parent row and cached terminal frame when ingress faults (#2816)", async () => {
+    const parentId = "pipeline-batch-2816-unmasked-500";
+    mocks.unmasked500IngressForParentId = parentId;
+
+    const res = await postBatch(parentId);
+
+    expect(res.statusCode).toBe(500);
+
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, parentId));
+    expect(row?.status).toBe("failed");
+    expect(row?.error).toEqual({
+      message: "Internal server error",
+      details: [{ filename: "", error: "Internal server error" }],
+    });
+
+    const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${parentId}`);
+    expect(cached).not.toBeNull();
+    expect(JSON.parse(cached as string)).toMatchObject({
+      jobId: parentId,
+      type: "batch",
+      status: "failed",
+      totalFiles: 1,
+      completedFiles: 1,
+      failedFiles: 1,
+      errors: [{ filename: "", error: "Internal server error" }],
+    });
   }, 30_000);
 });

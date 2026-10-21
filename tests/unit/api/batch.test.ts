@@ -951,4 +951,113 @@ describe("batch route spooled multipart ingress (#1239)", () => {
       code: "queue-unavailable",
     });
   });
+
+  it("masks non-SafeError 5xx and statusless SafeError messages as 'Internal server error' in failBatchJob (#2816)", async () => {
+    const taggedServerFault = Object.assign(
+      new TypeError("Cannot read properties of undefined (reading 'byteLength')"),
+      { statusCode: 500 },
+    );
+    mocks.putObject.mockRejectedValueOnce(taggedServerFault);
+
+    await expect(
+      invokeBatchRoute({
+        section: "image",
+        toolId: "resize",
+        parts: [
+          { type: "file", filename: "a.png", content: Buffer.from("valid-png") },
+          { type: "field", fieldname: "settings", value: "{}" },
+          { type: "field", fieldname: "clientJobId", value: "batch-2816-tagged-500" },
+        ],
+      }),
+    ).rejects.toBe(taggedServerFault);
+
+    expect(mocks.failBatchJob).toHaveBeenCalledWith({
+      jobId: "batch-2816-tagged-500",
+      totalFiles: 1,
+      completedFiles: 1,
+      failedFiles: 1,
+      errors: [{ filename: "", error: "Internal server error" }],
+      message: "Internal server error",
+    });
+
+    mocks.failBatchJob.mockClear();
+    const untaggedRedisFault = new Error("Redis connection lost");
+    mocks.flowAdd.mockRejectedValueOnce(untaggedRedisFault);
+
+    await expect(
+      invokeBatchRoute({
+        section: "image",
+        toolId: "resize",
+        parts: [
+          { type: "file", filename: "a.png", content: Buffer.from("valid-png") },
+          { type: "field", fieldname: "settings", value: "{}" },
+          { type: "field", fieldname: "clientJobId", value: "batch-2816-untagged-500" },
+        ],
+      }),
+    ).rejects.toBe(untaggedRedisFault);
+
+    expect(mocks.failBatchJob).toHaveBeenCalledWith({
+      jobId: "batch-2816-untagged-500",
+      totalFiles: 1,
+      completedFiles: 1,
+      failedFiles: 1,
+      errors: [{ filename: "", error: "Internal server error" }],
+      message: "Internal server error",
+    });
+
+    mocks.failBatchJob.mockClear();
+    const statuslessSafeError = new SafeError("sidecar exited with internal stderr", {
+      code: "exit-1",
+    });
+    mocks.putObject.mockRejectedValueOnce(statuslessSafeError);
+
+    await expect(
+      invokeBatchRoute({
+        section: "image",
+        toolId: "resize",
+        parts: [
+          { type: "file", filename: "a.png", content: Buffer.from("valid-png") },
+          { type: "field", fieldname: "settings", value: "{}" },
+          { type: "field", fieldname: "clientJobId", value: "batch-2816-statusless-safe" },
+        ],
+      }),
+    ).rejects.toBe(statuslessSafeError);
+
+    expect(mocks.failBatchJob).toHaveBeenCalledWith({
+      jobId: "batch-2816-statusless-safe",
+      totalFiles: 1,
+      completedFiles: 1,
+      failedFiles: 1,
+      errors: [{ filename: "", error: "Internal server error" }],
+      message: "Internal server error",
+    });
+
+    mocks.failBatchJob.mockClear();
+    const upstreamGatewayFault = Object.assign(new Error("upstream gateway failure details"), {
+      statusCode: 502,
+      code: "ECONNRESET",
+    });
+    mocks.putObject.mockRejectedValueOnce(upstreamGatewayFault);
+
+    await expect(
+      invokeBatchRoute({
+        section: "image",
+        toolId: "resize",
+        parts: [
+          { type: "file", filename: "a.png", content: Buffer.from("valid-png") },
+          { type: "field", fieldname: "settings", value: "{}" },
+          { type: "field", fieldname: "clientJobId", value: "batch-2816-502-code" },
+        ],
+      }),
+    ).rejects.toBe(upstreamGatewayFault);
+
+    expect(mocks.failBatchJob).toHaveBeenCalledWith({
+      jobId: "batch-2816-502-code",
+      totalFiles: 1,
+      completedFiles: 1,
+      failedFiles: 1,
+      errors: [{ filename: "", error: "Internal server error" }],
+      message: "Internal server error",
+    });
+  });
 });

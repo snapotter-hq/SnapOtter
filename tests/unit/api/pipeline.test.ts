@@ -1252,6 +1252,131 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685)", () => {
       flowAddMock.mockResolvedValue(undefined);
     }
   });
+
+  it("masks non-SafeError 5xx and statusless SafeError messages as 'Internal server error' in failBatchJob (#2816)", async () => {
+    vi.clearAllMocks();
+    const taggedServerFault = Object.assign(
+      new TypeError("Cannot read properties of undefined (reading 'byteLength')"),
+      { statusCode: 500 },
+    );
+    putObjectMock.mockRejectedValueOnce(taggedServerFault);
+
+    try {
+      await expect(
+        invokePipelineBatchRoute([
+          { type: "file", filename: "a.png", content: Buffer.from("valid-png") },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({ steps: [{ toolId: batchTestToolId, settings: {} }] }),
+          },
+          { type: "field", fieldname: "clientJobId", value: "pipeline-batch-2816-tagged-500" },
+        ]),
+      ).rejects.toBe(taggedServerFault);
+
+      expect(failBatchJobMock).toHaveBeenCalledWith({
+        jobId: "pipeline-batch-2816-tagged-500",
+        totalFiles: 1,
+        completedFiles: 1,
+        failedFiles: 1,
+        errors: [{ filename: "", error: "Internal server error" }],
+        message: "Internal server error",
+      });
+
+      failBatchJobMock.mockClear();
+      const untaggedRedisFault = new Error("Redis connection lost");
+      flowAddMock.mockRejectedValueOnce(untaggedRedisFault);
+
+      await expect(
+        invokePipelineBatchRoute([
+          { type: "file", filename: "a.png", content: Buffer.from("valid-png") },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({ steps: [{ toolId: batchTestToolId, settings: {} }] }),
+          },
+          { type: "field", fieldname: "clientJobId", value: "pipeline-batch-2816-untagged-500" },
+        ]),
+      ).rejects.toBe(untaggedRedisFault);
+
+      expect(failBatchJobMock).toHaveBeenCalledWith({
+        jobId: "pipeline-batch-2816-untagged-500",
+        totalFiles: 1,
+        completedFiles: 1,
+        failedFiles: 1,
+        errors: [{ filename: "", error: "Internal server error" }],
+        message: "Internal server error",
+      });
+
+      failBatchJobMock.mockClear();
+      const statuslessSafeError = new SafeError("sidecar exited with internal stderr", {
+        code: "exit-1",
+      });
+      putObjectMock.mockRejectedValueOnce(statuslessSafeError);
+
+      await expect(
+        invokePipelineBatchRoute([
+          { type: "file", filename: "a.png", content: Buffer.from("valid-png") },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({ steps: [{ toolId: batchTestToolId, settings: {} }] }),
+          },
+          {
+            type: "field",
+            fieldname: "clientJobId",
+            value: "pipeline-batch-2816-statusless-safe",
+          },
+        ]),
+      ).rejects.toBe(statuslessSafeError);
+
+      expect(failBatchJobMock).toHaveBeenCalledWith({
+        jobId: "pipeline-batch-2816-statusless-safe",
+        totalFiles: 1,
+        completedFiles: 1,
+        failedFiles: 1,
+        errors: [{ filename: "", error: "Internal server error" }],
+        message: "Internal server error",
+      });
+
+      failBatchJobMock.mockClear();
+      const upstreamGatewayFault = Object.assign(new Error("upstream gateway failure details"), {
+        statusCode: 502,
+        code: "ECONNRESET",
+      });
+      putObjectMock.mockRejectedValueOnce(upstreamGatewayFault);
+
+      await expect(
+        invokePipelineBatchRoute([
+          { type: "file", filename: "a.png", content: Buffer.from("valid-png") },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({ steps: [{ toolId: batchTestToolId, settings: {} }] }),
+          },
+          {
+            type: "field",
+            fieldname: "clientJobId",
+            value: "pipeline-batch-2816-502-code",
+          },
+        ]),
+      ).rejects.toBe(upstreamGatewayFault);
+
+      expect(failBatchJobMock).toHaveBeenCalledWith({
+        jobId: "pipeline-batch-2816-502-code",
+        totalFiles: 1,
+        completedFiles: 1,
+        failedFiles: 1,
+        errors: [{ filename: "", error: "Internal server error" }],
+        message: "Internal server error",
+      });
+    } finally {
+      putObjectMock.mockReset();
+      putObjectMock.mockResolvedValue(undefined);
+      flowAddMock.mockReset();
+      flowAddMock.mockResolvedValue(undefined);
+    }
+  });
 });
 
 describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {

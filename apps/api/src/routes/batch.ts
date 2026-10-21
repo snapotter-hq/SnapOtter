@@ -912,9 +912,16 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
           const conflict = isUniqueViolation(err);
           if (stagedBatch) {
             const { parentId, totalFiles, childIds, preFailures } = stagedBatch;
+            const statusCode =
+              typeof (err as { statusCode?: unknown })?.statusCode === "number"
+                ? (err as { statusCode: number }).statusCode
+                : 500;
+            const safe = isSafeMessageError(err) && err.statusCode !== undefined;
             const message = conflict
               ? "Job ID already in use"
-              : friendlyError(err instanceof Error ? err.message : String(err));
+              : statusCode >= 500 && !safe
+                ? "Internal server error"
+                : friendlyError(err instanceof Error ? err.message : String(err));
             try {
               if (childIds.length > 0) {
                 await db.delete(schema.jobs).where(inArray(schema.jobs.id, childIds));
@@ -929,11 +936,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                   { filename: "", error: message },
                 ],
                 message,
-                ...(conflict
-                  ? { code: "CONFLICT" }
-                  : isSafeMessageError(err) && err.code
-                    ? { code: err.code }
-                    : {}),
+                ...(conflict ? { code: "CONFLICT" } : safe && err.code ? { code: err.code } : {}),
               });
               if (!applied) {
                 request.log.warn(

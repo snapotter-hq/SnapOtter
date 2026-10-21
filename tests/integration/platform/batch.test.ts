@@ -55,6 +55,7 @@ const storageMock = vi.hoisted(() => ({
   // way the workspace cap does (#1161), so the route's cleanup and the
   // finalize's message pass-through are testable without filling a disk.
   putObjectFail: new Map<string, string>(),
+  putObjectError: new Map<string, () => Error>(),
   putObjectStreamFail: new Map<string, string>(),
 }));
 
@@ -104,6 +105,9 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
   return {
     ...actual,
     putObject: async (key: string, data: Buffer) => {
+      for (const [prefix, buildErr] of storageMock.putObjectError) {
+        if (key.startsWith(prefix)) throw buildErr();
+      }
       for (const [prefix, message] of storageMock.putObjectFail) {
         if (key.startsWith(prefix)) throw capError(message);
       }
@@ -1441,6 +1445,43 @@ describe("Workspace storage cap during batch ingress", () => {
       ]);
     } finally {
       storageMock.putObjectFail.clear();
+    }
+  }, 30_000);
+
+  it("masks non-SafeError 500 messages in the settled row and cached terminal frame when ingress faults (#2816)", async () => {
+    const clientJobId = randomUUID();
+    storageMock.putObjectError.set(`uploads/${clientJobId}-f0/`, () =>
+      Object.assign(new TypeError("Cannot read properties of undefined (reading 'byteLength')"), {
+        statusCode: 500,
+      }),
+    );
+    try {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+        { name: "settings", content: JSON.stringify({ width: 50 }) },
+        { name: "clientJobId", content: clientJobId },
+      ]);
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/resize/batch",
+        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        body,
+      });
+
+      expect(res.statusCode).toBe(500);
+
+      const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+      expect(row?.status).toBe("failed");
+      expect(row?.error).toEqual({
+        message: "Internal server error",
+        details: [{ filename: "", error: "Internal server error" }],
+      });
+
+      const frame = await waitForTerminalFrame(clientJobId, 10_000);
+      expect(frame.status).toBe("failed");
+      expect(frame.errors).toEqual([{ filename: "", error: "Internal server error" }]);
+    } finally {
+      storageMock.putObjectError.clear();
     }
   }, 30_000);
 });
