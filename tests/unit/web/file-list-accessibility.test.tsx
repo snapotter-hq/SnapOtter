@@ -212,4 +212,86 @@ describe("FileList accessibility", () => {
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Download" })).not.toBeInTheDocument();
   });
+
+  it("cancels a pending search debounce timer on unmount (#2905)", async () => {
+    vi.useFakeTimers({
+      toFake: ["setTimeout", "clearTimeout"],
+      shouldAdvanceTime: true,
+    });
+    try {
+      const fetchFilesSpy = vi.fn(async () => {});
+      useFilesPageStore.setState({
+        files,
+        total: files.length,
+        checkedIds: new Set(),
+        searchQuery: "",
+        fetchFiles: fetchFilesSpy,
+      });
+
+      const { unmount } = render(<FileList />);
+      expect(fetchFilesSpy).toHaveBeenCalledTimes(1);
+
+      const searchInput = screen.getByPlaceholderText("Search files...");
+      fireEvent.change(searchInput, { target: { value: "otter" } });
+      expect(searchInput).toHaveValue("otter");
+
+      // Unmount before the 300ms debounce timer fires (e.g., switching to Upload tab).
+      unmount();
+      await act(async () => {
+        vi.advanceTimersByTime(300);
+      });
+
+      expect(useFilesPageStore.getState().searchQuery).toBe("");
+      expect(fetchFilesSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
+  it("restores searchQuery into the search input on remount and syncs external searchQuery updates (#2905)", async () => {
+    vi.useFakeTimers({
+      toFake: ["setTimeout", "clearTimeout"],
+      shouldAdvanceTime: true,
+    });
+    try {
+      const fetchFilesSpy = vi.fn(async () => {});
+      useFilesPageStore.setState({
+        files,
+        total: files.length,
+        checkedIds: new Set(),
+        searchQuery: "clip",
+        fetchFiles: fetchFilesSpy,
+      });
+
+      const firstRender = render(<FileList />);
+      expect(screen.getByPlaceholderText("Search files...")).toHaveValue("clip");
+      expect(fetchFilesSpy).toHaveBeenCalledTimes(1);
+
+      firstRender.unmount();
+
+      render(<FileList />);
+      const searchInput = screen.getByPlaceholderText("Search files...");
+      expect(searchInput).toHaveValue("clip");
+      expect(fetchFilesSpy).toHaveBeenCalledTimes(2);
+
+      // Start typing a new query, then externally reset searchQuery before the debounce fires.
+      fireEvent.change(searchInput, { target: { value: "beaver" } });
+      expect(searchInput).toHaveValue("beaver");
+
+      act(() => {
+        useFilesPageStore.getState().setSearchQuery("");
+      });
+      expect(searchInput).toHaveValue("");
+
+      await act(async () => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(useFilesPageStore.getState().searchQuery).toBe("");
+      expect(fetchFilesSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
 });

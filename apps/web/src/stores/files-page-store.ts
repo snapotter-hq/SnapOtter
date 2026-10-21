@@ -23,6 +23,8 @@ interface FilesPageState {
   setActiveTab: (tab: "recent" | "upload") => void;
 }
 
+let fetchRequestId = 0;
+
 export const useFilesPageStore = create<FilesPageState>((set, get) => ({
   files: [],
   knownFiles: new Map(),
@@ -36,10 +38,13 @@ export const useFilesPageStore = create<FilesPageState>((set, get) => ({
   error: null,
 
   fetchFiles: async () => {
+    const requestId = ++fetchRequestId;
     set({ loading: true, error: null });
     try {
-      const { searchQuery, files: prevFiles, knownFiles: prevKnownFiles } = get();
+      const { searchQuery } = get();
       const result = await apiListFiles({ search: searchQuery || undefined, limit: 200 });
+      if (requestId !== fetchRequestId) return;
+      const { files: prevFiles, knownFiles: prevKnownFiles } = get();
       const nextKnownFiles = new Map(prevKnownFiles);
       for (const f of prevFiles) {
         nextKnownFiles.set(f.id, f);
@@ -54,6 +59,7 @@ export const useFilesPageStore = create<FilesPageState>((set, get) => ({
         loading: false,
       });
     } catch (err) {
+      if (requestId !== fetchRequestId) return;
       set({
         files: [],
         knownFiles: new Map(),

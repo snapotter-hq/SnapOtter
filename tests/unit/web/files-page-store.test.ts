@@ -469,6 +469,182 @@ describe("useFilesPageStore", () => {
     expect(loadingDuringCall).toBe(true);
   });
 
+  it("fetchFiles ignores out-of-order responses from superseded requests (#2905)", async () => {
+    const initialFile = {
+      id: "initial",
+      originalName: "seal.png",
+      mimeType: "image/png",
+      size: 50,
+      width: 5,
+      height: 5,
+      version: 1,
+      toolChain: [],
+      createdAt: "",
+    };
+    const staleFile = {
+      id: "stale",
+      originalName: "beaver.png",
+      mimeType: "image/png",
+      size: 100,
+      width: 10,
+      height: 10,
+      version: 1,
+      toolChain: [],
+      createdAt: "",
+    };
+    const freshFile = {
+      id: "fresh",
+      originalName: "otter.png",
+      mimeType: "image/png",
+      size: 200,
+      width: 20,
+      height: 20,
+      version: 1,
+      toolChain: [],
+      createdAt: "",
+    };
+
+    useFilesPageStore.setState({ files: [initialFile], total: 1 });
+
+    let resolveFirst!: (value: { files: (typeof staleFile)[]; total: number }) => void;
+    let resolveSecond!: (value: { files: (typeof freshFile)[]; total: number }) => void;
+    mockApiListFiles
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirst = resolve;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveSecond = resolve;
+          }),
+      );
+
+    useFilesPageStore.getState().setSearchQuery("beaver");
+    const firstFetch = useFilesPageStore.getState().fetchFiles();
+
+    useFilesPageStore.getState().setSearchQuery("otter");
+    const secondFetch = useFilesPageStore.getState().fetchFiles();
+
+    resolveSecond({ files: [freshFile], total: 1 });
+    await secondFetch;
+
+    expect(useFilesPageStore.getState().files).toEqual([freshFile]);
+    expect(useFilesPageStore.getState().knownFiles).toEqual(
+      new Map([
+        ["initial", initialFile],
+        ["fresh", freshFile],
+      ]),
+    );
+    expect(useFilesPageStore.getState().total).toBe(1);
+    expect(useFilesPageStore.getState().loading).toBe(false);
+
+    resolveFirst({ files: [staleFile], total: 1 });
+    await firstFetch;
+
+    const s = useFilesPageStore.getState();
+    expect(s.files).toEqual([freshFile]);
+    expect(s.knownFiles).toEqual(
+      new Map([
+        ["initial", initialFile],
+        ["fresh", freshFile],
+      ]),
+    );
+    expect(s.total).toBe(1);
+    expect(s.loading).toBe(false);
+    expect(s.error).toBeNull();
+  });
+
+  it("fetchFiles ignores late rejections from superseded requests without wiping newer results (#2905)", async () => {
+    const freshFile = {
+      id: "fresh",
+      originalName: "otter.png",
+      mimeType: "image/png",
+      size: 200,
+      width: 20,
+      height: 20,
+      version: 1,
+      toolChain: [],
+      createdAt: "",
+    };
+
+    let rejectFirst!: (reason?: unknown) => void;
+    mockApiListFiles
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectFirst = reject;
+          }),
+      )
+      .mockResolvedValueOnce({ files: [freshFile], total: 1 });
+
+    useFilesPageStore.getState().setSearchQuery("beaver");
+    const firstFetch = useFilesPageStore.getState().fetchFiles();
+
+    useFilesPageStore.getState().setSearchQuery("otter");
+    await useFilesPageStore.getState().fetchFiles();
+    useFilesPageStore.setState({
+      selectedFileId: "fresh",
+      checkedIds: new Set(["fresh"]),
+    });
+
+    rejectFirst(new Error("Stale search failed"));
+    await firstFetch;
+
+    const s = useFilesPageStore.getState();
+    expect(s.files).toEqual([freshFile]);
+    expect(s.knownFiles).toEqual(new Map([["fresh", freshFile]]));
+    expect(s.total).toBe(1);
+    expect(s.selectedFileId).toBe("fresh");
+    expect(s.checkedIds).toEqual(new Set(["fresh"]));
+    expect(s.error).toBeNull();
+    expect(s.loading).toBe(false);
+  });
+
+  it("fetchFiles keeps loading true when an earlier request settles before the latest request (#2905)", async () => {
+    const freshFile = {
+      id: "fresh",
+      originalName: "otter.png",
+      mimeType: "image/png",
+      size: 200,
+      width: 20,
+      height: 20,
+      version: 1,
+      toolChain: [],
+      createdAt: "",
+    };
+
+    let resolveFirst!: (value: { files: (typeof freshFile)[]; total: number }) => void;
+    let resolveSecond!: (value: { files: (typeof freshFile)[]; total: number }) => void;
+    mockApiListFiles
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirst = resolve;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveSecond = resolve;
+          }),
+      );
+
+    const firstFetch = useFilesPageStore.getState().fetchFiles();
+    const secondFetch = useFilesPageStore.getState().fetchFiles();
+
+    resolveFirst({ files: [], total: 0 });
+    await firstFetch;
+    expect(useFilesPageStore.getState().loading).toBe(true);
+
+    resolveSecond({ files: [freshFile], total: 1 });
+    await secondFetch;
+    expect(useFilesPageStore.getState().loading).toBe(false);
+    expect(useFilesPageStore.getState().files).toEqual([freshFile]);
+  });
+
   // -- uploadFiles ----------------------------------------------------------
 
   it("uploadFiles calls API then refreshes files", async () => {

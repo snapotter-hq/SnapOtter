@@ -23,10 +23,11 @@ export function FileList({ filterMimePrefix, onFileActivate }: FileListProps) {
     fetchFiles,
     deleteChecked,
     toggleCheckAll,
+    searchQuery,
     setSearchQuery,
   } = useFilesPageStore();
 
-  const [inputValue, setInputValue] = useState("");
+  const [inputValue, setInputValue] = useState(searchQuery);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
@@ -36,11 +37,29 @@ export function FileList({ filterMimePrefix, onFileActivate }: FileListProps) {
     fetchFiles();
   }, [fetchFiles]);
 
+  useEffect(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    setInputValue(searchQuery);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+    };
+  }, []);
+
   function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
     const val = e.target.value;
     setInputValue(val);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
+      debounceRef.current = null;
       setSearchQuery(val);
       fetchFiles();
     }, 300);
