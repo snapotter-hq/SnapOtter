@@ -19,7 +19,7 @@ import { decryptSettingWithRotation } from "../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { reportError } from "../lib/error-report.js";
 import { logger } from "../lib/logger.js";
-import { getSettingString } from "../lib/settings-helpers.js";
+import { getSettingStrict } from "../lib/settings-helpers.js";
 
 /**
  * In-memory license check, no DB access. This evaluator runs every 60s on
@@ -73,7 +73,16 @@ export async function evaluateAlerts(): Promise<void> {
   if (!(await alertsLicensed())) return;
 
   // 1. Read webhook destinations from settings
-  const destJson = await getSettingString("webhook_destinations", "[]");
+  let destJson: string;
+  try {
+    destJson = (await getSettingStrict("webhook_destinations")) ?? "[]";
+  } catch (err) {
+    logger.warn(
+      { err, key: "webhook_destinations" },
+      "alert-evaluator: failed to read webhook_destinations setting",
+    );
+    return;
+  }
   let destinations: {
     name?: string;
     url: string;
@@ -144,7 +153,7 @@ export async function evaluateAlerts(): Promise<void> {
 
   // c. Backup staleness (> 48 hours)
   try {
-    const backupResult = await getSettingString("backup_last_completed", "");
+    const backupResult = await getSettingStrict("backup_last_completed");
     const backupTsMs = backupResult ? parseBackupTimestampMs(backupResult) : null;
     if (backupTsMs !== null) {
       const ageHours = (Date.now() - backupTsMs) / 3_600_000;
@@ -154,8 +163,12 @@ export async function evaluateAlerts(): Promise<void> {
     } else {
       alerts.push({ condition: "backup_never_run" });
     }
-  } catch {
+  } catch (err) {
     // Backup check is best-effort
+    logger.warn(
+      { err, key: "backup_last_completed" },
+      "alert-evaluator: failed to read backup_last_completed setting",
+    );
   }
 
   // d. License expiration (< 30 days)

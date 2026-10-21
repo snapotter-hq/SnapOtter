@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const statfsMock = vi.hoisted(() => vi.fn());
-const getSettingStringMock = vi.hoisted(() => vi.fn());
+const getSettingStrictMock = vi.hoisted(() => vi.fn());
 const deliverWebhookMock = vi.hoisted(() => vi.fn());
 const decryptSettingMock = vi.hoisted(() => vi.fn());
 const getActiveLicenseMock = vi.hoisted(() => vi.fn());
@@ -30,7 +30,7 @@ function queryChain<T>(result: T) {
 async function loadAlertEvaluator() {
   vi.resetModules();
   statfsMock.mockReset();
-  getSettingStringMock.mockReset();
+  getSettingStrictMock.mockReset();
   deliverWebhookMock.mockReset();
   decryptSettingMock.mockReset();
   getActiveLicenseMock.mockReset();
@@ -85,7 +85,7 @@ async function loadAlertEvaluator() {
   }));
 
   vi.doMock("../../../../apps/api/src/lib/settings-helpers.js", () => ({
-    getSettingString: getSettingStringMock,
+    getSettingStrict: getSettingStrictMock,
   }));
 
   vi.doMock("../../../../apps/api/src/lib/encryption.js", () => ({
@@ -128,14 +128,41 @@ describe("alert evaluator behavior", () => {
 
     await expect(evaluateAlerts()).resolves.toBeUndefined();
 
-    expect(getSettingStringMock).not.toHaveBeenCalled();
+    expect(getSettingStrictMock).not.toHaveBeenCalled();
+    expect(statfsMock).not.toHaveBeenCalled();
+    expect(deliverWebhookMock).not.toHaveBeenCalled();
+  });
+
+  it("returns early and logs a warning when reading webhook_destinations hits a DB error (#3052)", async () => {
+    const { evaluateAlerts } = await loadAlertEvaluator();
+    const dbError = new Error("connection terminated unexpectedly");
+    getSettingStrictMock.mockRejectedValueOnce(dbError);
+
+    await expect(evaluateAlerts()).resolves.toBeUndefined();
+
+    expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      { err: dbError, key: "webhook_destinations" },
+      "alert-evaluator: failed to read webhook_destinations setting",
+    );
+    expect(statfsMock).not.toHaveBeenCalled();
+    expect(deliverWebhookMock).not.toHaveBeenCalled();
+  });
+
+  it("returns early when webhook_destinations setting is absent (undefined) (#3052)", async () => {
+    const { evaluateAlerts } = await loadAlertEvaluator();
+    getSettingStrictMock.mockResolvedValueOnce(undefined);
+
+    await expect(evaluateAlerts()).resolves.toBeUndefined();
+
+    expect(loggerMock.warn).not.toHaveBeenCalled();
     expect(statfsMock).not.toHaveBeenCalled();
     expect(deliverWebhookMock).not.toHaveBeenCalled();
   });
 
   it("returns early and logs a warning when webhook destination settings are invalid JSON (#2554)", async () => {
     const { evaluateAlerts } = await loadAlertEvaluator();
-    getSettingStringMock.mockResolvedValueOnce("{invalid");
+    getSettingStrictMock.mockResolvedValueOnce("{invalid");
 
     await evaluateAlerts();
 
@@ -166,7 +193,7 @@ describe("alert evaluator behavior", () => {
       ]),
     ]) {
       loggerMock.warn.mockClear();
-      getSettingStringMock.mockResolvedValueOnce(nonObjectArray);
+      getSettingStrictMock.mockResolvedValueOnce(nonObjectArray);
 
       await expect(evaluateAlerts()).resolves.toBeUndefined();
 
@@ -182,7 +209,7 @@ describe("alert evaluator behavior", () => {
 
   it("returns early when no enabled alert destinations are configured", async () => {
     const { evaluateAlerts } = await loadAlertEvaluator();
-    getSettingStringMock.mockResolvedValueOnce(
+    getSettingStrictMock.mockResolvedValueOnce(
       JSON.stringify([
         { url: "https://example.test/siem", authHeader: "", enabled: true, type: "siem" },
         { url: "https://example.test/alerts", authHeader: "", enabled: false, type: "alerts" },
@@ -199,7 +226,7 @@ describe("alert evaluator behavior", () => {
     vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
     const { evaluateAlerts } = await loadAlertEvaluator();
 
-    getSettingStringMock
+    getSettingStrictMock
       .mockResolvedValueOnce(
         JSON.stringify([
           {
@@ -250,7 +277,7 @@ describe("alert evaluator behavior", () => {
 
     await expect(evaluateAlerts()).resolves.toBeUndefined();
 
-    expect(getSettingStringMock).not.toHaveBeenCalled();
+    expect(getSettingStrictMock).not.toHaveBeenCalled();
     expect(statfsMock).not.toHaveBeenCalled();
     expect(deliverWebhookMock).not.toHaveBeenCalled();
   });
@@ -259,7 +286,7 @@ describe("alert evaluator behavior", () => {
     vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
     const { evaluateAlerts } = await loadAlertEvaluator();
 
-    getSettingStringMock
+    getSettingStrictMock
       // webhook_destinations: one enabled alerts destination
       .mockResolvedValueOnce(
         JSON.stringify([
@@ -289,32 +316,92 @@ describe("alert evaluator behavior", () => {
     vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
     const { evaluateAlerts } = await loadAlertEvaluator();
 
-    getSettingStringMock
+    for (const absentBackup of [undefined, ""]) {
+      loggerMock.warn.mockClear();
+      deliverWebhookMock.mockClear();
+      getSettingStrictMock
+        .mockResolvedValueOnce(
+          JSON.stringify([
+            { url: "https://example.test/alerts", authHeader: "", enabled: true, type: "alerts" },
+          ]),
+        )
+        // backup_last_completed absent or empty -> never run
+        .mockResolvedValueOnce(absentBackup);
+      statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
+      selectMock.mockReturnValue(queryChain([{ count: 0 }]));
+      getActiveLicenseMock.mockReturnValue(null);
+      deliverWebhookMock.mockResolvedValue({ success: true });
+
+      await evaluateAlerts();
+
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+      expect(deliverWebhookMock).toHaveBeenCalledTimes(1);
+      const [, , alertsArg] = deliverWebhookMock.mock.calls[0];
+      expect(alertsArg).toEqual([{ condition: "backup_never_run" }]);
+    }
+  });
+
+  it("logs a warning and skips backup_never_run when reading backup_last_completed hits a DB error (#3052)", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
+    const { evaluateAlerts } = await loadAlertEvaluator();
+    const dbError = new Error("connection terminated unexpectedly");
+
+    getSettingStrictMock
       .mockResolvedValueOnce(
         JSON.stringify([
           { url: "https://example.test/alerts", authHeader: "", enabled: true, type: "alerts" },
         ]),
       )
-      // backup_last_completed empty -> never run
-      .mockResolvedValueOnce("");
+      .mockRejectedValueOnce(dbError);
     statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
     selectMock.mockReturnValue(queryChain([{ count: 0 }]));
     getActiveLicenseMock.mockReturnValue(null);
     deliverWebhookMock.mockResolvedValue({ success: true });
 
-    await evaluateAlerts();
+    await expect(evaluateAlerts()).resolves.toBeUndefined();
 
-    expect(loggerMock.warn).not.toHaveBeenCalled();
+    expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      { err: dbError, key: "backup_last_completed" },
+      "alert-evaluator: failed to read backup_last_completed setting",
+    );
+    expect(deliverWebhookMock).not.toHaveBeenCalled();
+  });
+
+  it("still evaluates subsequent conditions and delivers surviving alerts when reading backup_last_completed hits a DB error (#3052)", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
+    const { evaluateAlerts } = await loadAlertEvaluator();
+    const dbError = new Error("connection terminated unexpectedly");
+
+    getSettingStrictMock
+      .mockResolvedValueOnce(
+        JSON.stringify([
+          { url: "https://example.test/alerts", authHeader: "", enabled: true, type: "alerts" },
+        ]),
+      )
+      .mockRejectedValueOnce(dbError);
+    statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
+    selectMock.mockReturnValue(queryChain([{ count: 0 }]));
+    getActiveLicenseMock.mockReturnValue({ expiresAt: "2026-07-05T12:00:00.000Z" });
+    deliverWebhookMock.mockResolvedValue({ success: true });
+
+    await expect(evaluateAlerts()).resolves.toBeUndefined();
+
+    expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      { err: dbError, key: "backup_last_completed" },
+      "alert-evaluator: failed to read backup_last_completed setting",
+    );
     expect(deliverWebhookMock).toHaveBeenCalledTimes(1);
     const [, , alertsArg] = deliverWebhookMock.mock.calls[0];
-    expect(alertsArg).toEqual([{ condition: "backup_never_run" }]);
+    expect(alertsArg).toEqual([{ condition: "license_expiring", daysLeft: 6 }]);
   });
 
   it("logs a warning and emits backup_never_run when backup_last_completed is malformed JSON (#3039)", async () => {
     vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
     const { evaluateAlerts } = await loadAlertEvaluator();
 
-    getSettingStringMock
+    getSettingStrictMock
       .mockResolvedValueOnce(
         JSON.stringify([
           { url: "https://example.test/alerts", authHeader: "", enabled: true, type: "alerts" },
@@ -355,7 +442,7 @@ describe("alert evaluator behavior", () => {
     ]) {
       loggerMock.warn.mockClear();
       deliverWebhookMock.mockClear();
-      getSettingStringMock
+      getSettingStrictMock
         .mockResolvedValueOnce(
           JSON.stringify([
             { url: "https://example.test/alerts", authHeader: "", enabled: true, type: "alerts" },
@@ -384,7 +471,7 @@ describe("alert evaluator behavior", () => {
     vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
     const { evaluateAlerts } = await loadAlertEvaluator();
 
-    getSettingStringMock
+    getSettingStrictMock
       .mockResolvedValueOnce(
         JSON.stringify([
           { url: "https://example.test/alerts", authHeader: "", enabled: true, type: "alerts" },
@@ -413,7 +500,7 @@ describe("alert evaluator behavior", () => {
     vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
     const { evaluateAlerts } = await loadAlertEvaluator();
 
-    getSettingStringMock
+    getSettingStrictMock
       .mockResolvedValueOnce(
         JSON.stringify([
           { url: "https://example.test/alerts", authHeader: "", enabled: true, type: "alerts" },
@@ -435,7 +522,7 @@ describe("alert evaluator behavior", () => {
     vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
     const { evaluateAlerts } = await loadAlertEvaluator();
 
-    getSettingStringMock
+    getSettingStrictMock
       .mockResolvedValueOnce(
         JSON.stringify([
           {
@@ -468,7 +555,7 @@ describe("alert evaluator behavior", () => {
     vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
     const { evaluateAlerts } = await loadAlertEvaluator();
 
-    getSettingStringMock
+    getSettingStrictMock
       .mockResolvedValueOnce(
         JSON.stringify([
           {
@@ -523,7 +610,7 @@ describe("alert evaluator behavior", () => {
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     const { evaluateAlerts } = await loadAlertEvaluator();
 
-    getSettingStringMock
+    getSettingStrictMock
       .mockResolvedValueOnce(
         JSON.stringify([
           {
@@ -568,7 +655,7 @@ describe("alert evaluator behavior", () => {
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     const { evaluateAlerts } = await loadAlertEvaluator();
 
-    getSettingStringMock
+    getSettingStrictMock
       .mockResolvedValueOnce(
         JSON.stringify([
           {
@@ -604,7 +691,7 @@ describe("alert evaluator behavior", () => {
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     const { evaluateAlerts } = await loadAlertEvaluator();
 
-    getSettingStringMock
+    getSettingStrictMock
       .mockResolvedValueOnce(
         JSON.stringify([
           {
@@ -647,7 +734,7 @@ describe("alert evaluator behavior", () => {
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     const { evaluateAlerts } = await loadAlertEvaluator();
 
-    getSettingStringMock
+    getSettingStrictMock
       .mockResolvedValueOnce(
         JSON.stringify([
           {
@@ -693,7 +780,7 @@ describe("alert evaluator behavior", () => {
     vi.spyOn(Date, "now").mockReturnValue(new Date("2026-06-29T12:00:00.000Z").getTime());
     const { evaluateAlerts } = await loadAlertEvaluator();
 
-    getSettingStringMock
+    getSettingStrictMock
       .mockResolvedValueOnce(
         JSON.stringify([
           { url: "https://example.test/a", authHeader: "", enabled: true, type: "alerts" },
@@ -734,7 +821,7 @@ describe("alert evaluator behavior", () => {
       },
     ]);
 
-    getSettingStringMock.mockResolvedValueOnce(rawDestinations).mockResolvedValueOnce("");
+    getSettingStrictMock.mockResolvedValueOnce(rawDestinations).mockResolvedValueOnce("");
     statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
     selectMock.mockReturnValue(queryChain([{ count: 0 }]));
     getActiveLicenseMock.mockReturnValue(null);
@@ -805,7 +892,7 @@ describe("alert evaluator behavior", () => {
       },
     ]);
 
-    getSettingStringMock.mockResolvedValueOnce(rawDestinations).mockResolvedValueOnce("");
+    getSettingStrictMock.mockResolvedValueOnce(rawDestinations).mockResolvedValueOnce("");
     statfsMock.mockResolvedValue({ bfree: 10 * 1024 * 1024, bsize: 1024 });
     selectMock.mockReturnValue(queryChain([{ count: 0 }]));
     getActiveLicenseMock.mockReturnValue(null);
