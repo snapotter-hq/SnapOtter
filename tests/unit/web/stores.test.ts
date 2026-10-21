@@ -500,10 +500,13 @@ describe("FileStore", () => {
   it("setProcessedUrl with null resets current entry", () => {
     useFileStore.getState().setFiles([makeFile("a.png")]);
     useFileStore.getState().setProcessedUrl("blob:result");
+    useFileStore.getState().setSizes(1000, 500);
     useFileStore.getState().setProcessedUrl(null);
 
     const entry = useFileStore.getState().entries[0];
     expect(entry.processedUrl).toBeNull();
+    expect(entry.processedSize).toBeNull();
+    expect(useFileStore.getState().processedSize).toBeNull();
     expect(entry.status).toBe("pending");
   });
 

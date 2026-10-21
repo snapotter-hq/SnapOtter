@@ -376,6 +376,33 @@ describe("tool settings panels clear resultPayload and warning on Undo or file s
       expect(screen.queryByTestId("blur-faces-download")).not.toBeInTheDocument();
       expect(screen.queryByText("No faces detected in image")).not.toBeInTheDocument();
     });
+
+    it("hides the processed size readout when a second single-file run starts or fails (#2813)", () => {
+      useFileStore.getState().setFiles([png("a.png")]);
+      render(<BlurFacesSettings />);
+
+      fireEvent.click(screen.getByTestId("blur-faces-submit"));
+      respond200(BLUR_FACES_RESULT);
+
+      expect(screen.getByText("Processed: 2.0 KB")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId("blur-faces-submit"));
+
+      expect(screen.queryByText("Processed: 2.0 KB")).not.toBeInTheDocument();
+      expect(useFileStore.getState().entries[0]?.processedSize).toBeNull();
+      expect(useFileStore.getState().processedSize).toBeNull();
+
+      act(() => {
+        const xhr = xhrs[xhrs.length - 1];
+        xhr.status = 500;
+        xhr.responseText = JSON.stringify({ error: "boom" });
+        xhr.onload?.();
+      });
+
+      expect(screen.queryByText("Processed: 2.0 KB")).not.toBeInTheDocument();
+      expect(useFileStore.getState().entries[0]?.processedSize).toBeNull();
+      expect(useFileStore.getState().processedSize).toBeNull();
+    });
   });
 
   describe("useToolProcessor hook state", () => {

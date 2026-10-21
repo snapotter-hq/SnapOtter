@@ -532,6 +532,7 @@ export const useFileStore = create<FileState>((set, get) => ({
         processedUrl: null,
         processedPreviewUrl: null,
         processedFilename: null,
+        processedSize: null,
         resultNotes: null,
         status: "pending",
         claimed: false,

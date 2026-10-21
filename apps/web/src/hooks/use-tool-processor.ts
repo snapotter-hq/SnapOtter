@@ -1219,6 +1219,7 @@ export function useToolProcessor(toolId: string) {
             processedUrl: null,
             processedPreviewUrl: null,
             processedFilename: null,
+            processedSize: null,
             resultNotes: null,
             status: "processing",
             error: null,
