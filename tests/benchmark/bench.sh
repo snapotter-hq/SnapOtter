@@ -115,9 +115,16 @@ bench_tool_multifile() {
   local result
   result=$(curl "${curl_args[@]}" 2>/dev/null) || result=$'000\t0.000\tapplication/octet-stream'
 
+  local expected_mime="" expected_zip_entries=""
+  if [ "$tier" = "batch" ]; then
+    expected_mime="application/zip"
+    expected_zip_entries="${#files[@]}"
+  fi
+
   IFS=$'\t' read -r http_code time_s response_mime <<< "$result"
   resolve_benchmark_response "$BASE_URL" "$TOKEN" "$http_code" "$response_mime" \
-    "$admission_file" "$artifact_file" "$time_s" "$BENCH_JOB_TIMEOUT_MS" "" "" "$oracle" || true
+    "$admission_file" "$artifact_file" "$time_s" "$BENCH_JOB_TIMEOUT_MS" \
+    "$expected_mime" "$expected_zip_entries" "$oracle" || true
   pass="$BENCH_PASS"
   time_s="$BENCH_COMPLETION_LATENCY_S"
   output_size="$BENCH_OUTPUT_SIZE"
@@ -370,7 +377,7 @@ for batch_size in 3 5 10; do
   for i in $(seq 1 "$batch_size"); do
     files+=("$S")
   done
-  bench_tool_multifile "batch" "image/resize" "small-b${batch_size}" '{"width":100}' '{"zipEach":{"width":100}}' "${files[@]}"
+  bench_tool_multifile "batch" "image/resize/batch" "small-b${batch_size}" '{"width":100}' '{"zipEach":{"width":100}}' "${files[@]}"
 done
 
 for batch_size in 3 5; do
@@ -378,10 +385,10 @@ for batch_size in 3 5; do
   for i in $(seq 1 "$batch_size"); do
     files+=("$L")
   done
-  bench_tool_multifile "batch" "image/resize" "large-b${batch_size}" '{"width":800}' '{"zipEach":{"width":800}}' "${files[@]}"
+  bench_tool_multifile "batch" "image/resize/batch" "large-b${batch_size}" '{"width":800}' '{"zipEach":{"width":800}}' "${files[@]}"
 done
 
-bench_tool_multifile "batch" "image/convert" "mixed-5" '{"format":"webp","quality":80}' '' \
+bench_tool_multifile "batch" "image/convert/batch" "mixed-5" '{"format":"webp","quality":80}' '' \
   "$J" "$S" "${F}/image/valid/test-50x50.webp" "${F}/image/valid/test-200x150.heic" "${F}/image/formats/sample.avif"
 
 log "=== TIER 4: Pipeline Benchmarks ==="

@@ -191,3 +191,81 @@ test("bench-ai.sh targets the passport-photo analyze sub-route instead of the 40
   );
   assert.doesNotMatch(source, /\/api\/v1\/tools\/image\/passport-photo"/);
 });
+
+test("bench.sh and bench-limits.sh target the /batch endpoints for resize and convert batch runs", () => {
+  const bench = readFileSync(new URL("bench.sh", import.meta.url), "utf8");
+  const limits = readFileSync(new URL("bench-limits.sh", import.meta.url), "utf8");
+
+  const tier3Start = bench.indexOf("=== TIER 3: Batch Processing ===");
+  const tier4Start = bench.indexOf("=== TIER 4: Pipeline Benchmarks ===");
+  assert.ok(tier3Start >= 0);
+  assert.ok(tier4Start > tier3Start);
+  const batchSection = bench.slice(tier3Start, tier4Start);
+
+  const batchInvocations = [
+    ...batchSection.matchAll(/bench_tool_multifile\s+"batch"\s+"([^"]+)"/g),
+  ].map((match) => match[1]);
+  assert.deepEqual(batchInvocations, [
+    "image/resize/batch",
+    "image/resize/batch",
+    "image/convert/batch",
+  ]);
+
+  const multifileStart = bench.indexOf("bench_tool_multifile()");
+  const runNTimesStart = bench.indexOf("run_n_times()");
+  assert.ok(multifileStart >= 0);
+  assert.ok(runNTimesStart > multifileStart);
+  const multifileFn = bench.slice(multifileStart, runNTimesStart);
+  assert.match(multifileFn, /expected_mime="application\/zip"/);
+  assert.match(multifileFn, /expected_zip_entries="\$\{#files\[@\]\}"/);
+  assert.match(multifileFn, /"\$expected_mime"\s+"\$expected_zip_entries"\s+"\$oracle"/);
+
+  const probe = `
+    set -euo pipefail
+    BASE_URL="http://127.0.0.1:1349"
+    TOKEN="tok"
+    BENCH_CONTAINER_ID=""
+    BENCH_JOB_TIMEOUT_MS=300000
+    CURL_LOG=$(mktemp)
+    trap 'rm -f "$CURL_LOG"' EXIT
+    ${multifileFn}
+    curl() {
+      printf '%s\\n' "$@" > "$CURL_LOG"
+      printf '200\\t0.010\\tapplication/zip\\n'
+    }
+    resolve_benchmark_response() {
+      LAST_EXPECTED_MIME="$9"
+      LAST_EXPECTED_ENTRIES="\${10}"
+      LAST_ORACLE="\${11}"
+      BENCH_PASS="true"
+      BENCH_ADMISSION_STATUS="200"
+      BENCH_COMPLETION_STATUS="completed"
+      BENCH_COMPLETION_LATENCY_S="0.010"
+      BENCH_OUTPUT_SIZE="128"
+      BENCH_OUTPUT_MIME="application/zip"
+    }
+    docker_mem_mb() { echo "0"; }
+    docker_cpu_pct() { echo "0"; }
+    record() { :; }
+    log() { :; }
+
+    bench_tool_multifile "batch" "image/resize/batch" "small-b3" '{"width":100}' '{"zipEach":{"width":100}}' a.png b.png c.png
+    test "$LAST_EXPECTED_MIME" = "application/zip"
+    test "$LAST_EXPECTED_ENTRIES" = "3"
+    test "$LAST_ORACLE" = '{"zipEach":{"width":100}}'
+    grep -Fxq "http://127.0.0.1:1349/api/v1/tools/image/resize/batch" "$CURL_LOG"
+
+    bench_tool_multifile "core" "image/compose" "small-r1" '{"blendMode":"overlay"}' '' a.png b.png
+    test -z "$LAST_EXPECTED_MIME"
+    test -z "$LAST_EXPECTED_ENTRIES"
+  `;
+  execFileSync("bash", ["-c", probe]);
+
+  const batchBenchStart = limits.indexOf("run_batch_bench()");
+  const sweepStart = limits.indexOf("=== Resource Limit Sweep");
+  assert.ok(batchBenchStart >= 0);
+  assert.ok(sweepStart > batchBenchStart);
+  const batchBenchFn = limits.slice(batchBenchStart, sweepStart);
+  assert.match(batchBenchFn, /\/api\/v1\/tools\/image\/resize\/batch"/);
+  assert.doesNotMatch(batchBenchFn, /\/api\/v1\/tools\/image\/resize"/);
+});

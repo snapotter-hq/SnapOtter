@@ -4,12 +4,16 @@
  * Tests filename deduplication, batch size enforcement, skip-preprocess
  * logic for metadata tools, and the file results map construction.
  */
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { Readable } from "node:stream";
+import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 import { SafeError } from "@snapotter/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
 const mocks = vi.hoisted(() => ({
   autoOrient: vi.fn(async (buf: Buffer) => buf),
@@ -17,7 +21,7 @@ const mocks = vi.hoisted(() => ({
   failBatchJob: vi.fn(async () => true),
   flowAdd: vi.fn(async () => {}),
   getFirstMissingBundleForTool: vi.fn((): string | null => null),
-  getToolConfig: vi.fn(() => ({ settingsSchema: z.record(z.unknown()) })),
+  getToolConfig: vi.fn((_toolId?: string) => ({ settingsSchema: z.record(z.unknown()) })),
   putObject: vi.fn<(key: string, data: Buffer) => Promise<void>>(async () => {}),
   readFile: vi.fn<(...args: unknown[]) => Promise<Buffer>>(),
   recordChildOutcome: vi.fn(async () => {}),
@@ -96,9 +100,17 @@ vi.mock("../../../apps/api/src/permissions.js", () => ({
   requireToolAccess: mocks.requireToolAccess,
 }));
 
-vi.mock("../../../apps/api/src/routes/tool-factory.js", () => ({
-  getToolConfig: mocks.getToolConfig,
-}));
+vi.mock("../../../apps/api/src/routes/tool-factory.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/routes/tool-factory.js")>();
+  return {
+    ...actual,
+    getToolConfig: (...args: Parameters<typeof actual.getToolConfig>) =>
+      mocks.getToolConfig.getMockImplementation()
+        ? mocks.getToolConfig(...args)
+        : actual.getToolConfig(...args),
+  };
+});
 
 vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
   const actual =
@@ -153,6 +165,8 @@ vi.mock("../../../apps/api/src/routes/progress.js", () => ({
 }));
 
 import { registerBatchRoutes } from "../../../apps/api/src/routes/batch.js";
+import { registerConvert } from "../../../apps/api/src/routes/tools/convert.js";
+import { registerResize } from "../../../apps/api/src/routes/tools/resize.js";
 
 // ── Batch size enforcement ─────────────────────────────────────────────
 
@@ -1059,5 +1073,76 @@ describe("batch route spooled multipart ingress (#1239)", () => {
       errors: [{ filename: "", error: "Internal server error" }],
       message: "Internal server error",
     });
+  });
+
+  it("bench.sh and bench-limits.sh target /batch routes for multi-file resize and convert runs (#3001)", async () => {
+    const mockApp = { post: vi.fn() };
+    registerResize(mockApp as never);
+    registerConvert(mockApp as never);
+    mocks.getToolConfig.mockImplementation(undefined as never);
+
+    try {
+      const benchSh = readFileSync(resolve(REPO_ROOT, "tests/benchmark/bench.sh"), "utf8");
+      const benchLimitsSh = readFileSync(
+        resolve(REPO_ROOT, "tests/benchmark/bench-limits.sh"),
+        "utf8",
+      );
+
+      const benchBatchCalls = [
+        ...benchSh.matchAll(/bench_tool_multifile\s+"batch"\s+"([^"]+)"\s+"[^"]+"\s+'([^']*)'/g),
+      ].map((match) => ({ toolPath: match[1], settings: match[2] || "{}" }));
+
+      expect(benchBatchCalls).toEqual([
+        { toolPath: "image/resize/batch", settings: '{"width":100}' },
+        { toolPath: "image/resize/batch", settings: '{"width":800}' },
+        { toolPath: "image/convert/batch", settings: '{"format":"webp","quality":80}' },
+      ]);
+
+      const batchBenchStart = benchLimitsSh.indexOf("run_batch_bench()");
+      const sweepStart = benchLimitsSh.indexOf("=== Resource Limit Sweep");
+      const batchBenchFn = benchLimitsSh.slice(batchBenchStart, sweepStart);
+      const limitsBatchUrls = [
+        ...batchBenchFn.matchAll(/\$\{BASE_URL\}\/api\/v1\/tools\/([^\s"']+)/g),
+      ].map((match) => match[1]);
+      expect(limitsBatchUrls).toEqual(["image/resize/batch"]);
+      const limitsBatchSettings = [...batchBenchFn.matchAll(/-F\s+'settings=(\{[^']*\})'/g)].map(
+        (match) => match[1],
+      );
+      expect(limitsBatchSettings).toEqual(['{"width":100}']);
+
+      const invalidResizeReply = await invokeBatchRoute({
+        section: "image",
+        toolId: "resize",
+        parts: [
+          { type: "file", filename: "first.png", content: Buffer.from("first-png") },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ],
+      });
+      expect(invalidResizeReply.statusCode).toBe(400);
+
+      for (const { toolPath, settings } of [
+        ...benchBatchCalls,
+        { toolPath: limitsBatchUrls[0], settings: limitsBatchSettings[0] },
+      ]) {
+        const segments = toolPath.split("/");
+        expect(segments).toHaveLength(3);
+        expect(segments[2]).toBe("batch");
+        const [section, toolId] = segments;
+
+        const reply = await invokeBatchRoute({
+          section,
+          toolId,
+          parts: [
+            { type: "file", filename: "first.png", content: Buffer.from("first-png") },
+            { type: "file", filename: "second.png", content: Buffer.from("second-png") },
+            { type: "file", filename: "third.png", content: Buffer.from("third-png") },
+            { type: "field", fieldname: "settings", value: settings },
+          ],
+        });
+        expect(reply.statusCode).toBe(202);
+      }
+    } finally {
+      mocks.getToolConfig.mockImplementation(() => ({ settingsSchema: z.record(z.unknown()) }));
+    }
   });
 });
