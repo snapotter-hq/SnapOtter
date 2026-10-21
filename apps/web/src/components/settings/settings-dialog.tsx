@@ -64,6 +64,7 @@ import { changedSettings, writableSettings } from "@/lib/settings-payload";
 import { getCategoryName, getToolDescription, getToolName } from "@/lib/tool-i18n";
 import { cn, copyToClipboard } from "@/lib/utils";
 import { useAnalyticsStore } from "@/stores/analytics-store";
+import { useConnectionStore } from "@/stores/connection-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useThemeStore } from "@/stores/theme-store";
 import { AlertMessages } from "../common/alert-messages";
@@ -909,6 +910,9 @@ export function SystemSection() {
                 a.click();
                 URL.revokeObjectURL(url);
               } catch (err) {
+                if (err instanceof TypeError) {
+                  useConnectionStore.getState().setDisconnected();
+                }
                 setBundleError(apiErrorMessage(t, err, {}, t.settings.system.supportBundleFailed));
               } finally {
                 setBundleLoading(false);
@@ -1572,8 +1576,10 @@ export function PeopleSection() {
     try {
       const data = await apiGet<{ teams: TeamEntry[] }>("/v1/teams");
       setTeams(data.teams);
-    } catch {
+    } catch (err) {
       setTeams([]);
+      if (err instanceof ApiError && err.code === "FORBIDDEN") return;
+      console.warn("Team list read failed; People picker uses Default", err);
     }
   }, []);
 
@@ -1599,8 +1605,10 @@ export function PeopleSection() {
     try {
       const data = await apiGet<{ roles: RoleEntry[] }>("/v1/roles");
       setAvailableRoles(data.roles);
-    } catch {
+    } catch (err) {
       setAvailableRoles([]);
+      if (err instanceof ApiError && err.code === "FORBIDDEN") return;
+      console.warn("Role list read failed; People picker uses built-in roles", err);
     }
   }, []);
 
@@ -3853,6 +3861,7 @@ export function ToolsSection() {
   const handleSave = useCallback(async () => {
     setSaving(true);
     setSaveError(null);
+    setShowRestartBanner(false);
     try {
       await apiPut("/v1/settings", { disabledTools: JSON.stringify(disabledTools) });
       setShowRestartBanner(true);

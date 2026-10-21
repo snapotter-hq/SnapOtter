@@ -59,6 +59,7 @@ import { TwoFactorSettings } from "@/components/settings/two-factor-settings";
 import { I18nProvider } from "@/contexts/i18n-context";
 import { ApiError } from "@/lib/api";
 import { format } from "@/lib/format";
+import { useConnectionStore } from "@/stores/connection-store";
 
 const s = de.settings;
 const SERVER_TEXT = "SERVER-TEXT";
@@ -144,6 +145,7 @@ const apiKey = {
 beforeEach(() => {
   storage.clear();
   storage.set("snapotter-locale", "de");
+  useConnectionStore.setState({ status: "connected", failedSince: null, lastHealthCheck: null });
   useAuth.mockReturnValue({
     loading: false,
     permissions: [],
@@ -888,6 +890,18 @@ describe("System: support bundle download (#2713)", () => {
     await download(502, undefined, "text/html");
     await expectShown(s.system.supportBundleFailed);
     expect(console.warn).toHaveBeenCalledWith(expect.any(String), expect.any(ApiError));
+    expect(useConnectionStore.getState().status).toBe("connected");
+  });
+
+  it("marks the connection disconnected when the support-bundle fetch fails with a network TypeError (#3200)", async () => {
+    const netErr = new TypeError("Failed to fetch");
+    vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(netErr);
+    renderDe(<SystemSection />);
+    fireEvent.click(await screen.findByRole("button", { name: s.system.supportBundleButton }));
+
+    await expectShown(s.system.supportBundleFailed);
+    expect(useConnectionStore.getState().status).toBe("disconnected");
+    expect(console.warn).toHaveBeenCalledWith(expect.any(String), netErr);
   });
 });
 
@@ -962,6 +976,18 @@ describe("Tools: save disabled tools (#2713)", () => {
     fireEvent.click(button);
     await expectShown(s.tools.restartBanner);
     expect(screen.queryByText(de.errors.sessionEnded)).toBeNull();
+  });
+
+  it("clears the restart banner when a subsequent save fails (#3200)", async () => {
+    apiPut.mockResolvedValueOnce({}).mockRejectedValueOnce(apiError(500));
+    renderDe(<ToolsSection />);
+    const button = await screen.findByRole("button", { name: s.tools.saveButton });
+    fireEvent.click(button);
+    await expectShown(s.tools.restartBanner);
+
+    fireEvent.click(button);
+    await expectShown(de.common.somethingWentWrong);
+    expect(screen.queryByText(s.tools.restartBanner)).toBeNull();
   });
 
   it("logs the server's reason when saving tools falls back", async () => {

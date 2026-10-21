@@ -9,7 +9,7 @@
 
 import "@testing-library/jest-dom/vitest";
 import { en } from "@snapotter/shared";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -39,9 +39,11 @@ import {
   SystemSection,
   TeamsSection,
 } from "@/components/settings/settings-dialog";
+import { ApiError } from "@/lib/api";
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   apiGet.mockReset();
   apiPost.mockReset();
 });
@@ -269,6 +271,43 @@ describe("People (#1447)", () => {
 
     expect(screen.getByDisplayValue("uploader")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Design")).toBeInTheDocument();
+  });
+
+  it("stays quiet when the team and role pickers return 403 FORBIDDEN (#3200)", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const forbidden = new ApiError("forbidden", 403, "FORBIDDEN", { code: "FORBIDDEN" });
+    apiGet.mockImplementation(async (path: string) => {
+      if (path.startsWith("/auth/users")) return { users: [user], maxUsers: 0 };
+      if (path.startsWith("/v1/settings")) return { settings: {} };
+      if (path.startsWith("/v1/teams") || path.startsWith("/v1/roles")) throw forbidden;
+      throw new Error(`unexpected GET ${path}`);
+    });
+
+    render(<PeopleSection />);
+    expect(await screen.findByText("ada")).toBeInTheDocument();
+    await act(async () => {});
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("logs non-FORBIDDEN team and role picker failures to console.warn (#3200)", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const teamsFailure = new ApiError("ip blocked", 403, "IP_NOT_ALLOWED", {
+      code: "IP_NOT_ALLOWED",
+    });
+    const rolesFailure = new ApiError("down", 500, undefined, { error: "down" });
+    apiGet.mockImplementation(async (path: string) => {
+      if (path.startsWith("/auth/users")) return { users: [user], maxUsers: 0 };
+      if (path.startsWith("/v1/settings")) return { settings: {} };
+      if (path.startsWith("/v1/teams")) throw teamsFailure;
+      if (path.startsWith("/v1/roles")) throw rolesFailure;
+      throw new Error(`unexpected GET ${path}`);
+    });
+
+    render(<PeopleSection />);
+    expect(await screen.findByText("ada")).toBeInTheDocument();
+    await act(async () => {});
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("Team"), teamsFailure);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("Role"), rolesFailure);
   });
 });
 
