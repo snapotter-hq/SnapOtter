@@ -1444,9 +1444,9 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   signal: ingressAbort.signal,
                   beforeStore: async () => {
                     await insertFileRows(uploadKey, processFilename);
-                    uncommittedOcrKeys.add(uploadKey);
                   },
                 });
+                uncommittedOcrKeys.add(uploadKey);
               } catch (err) {
                 if (err instanceof InputValidationError) {
                   reportEngineUnavailable(

@@ -38,7 +38,11 @@ const waitForJobMock = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => null),
 );
 const putObjectMock = vi.hoisted(() => vi.fn(async () => {}));
+const putObjectStreamMock = vi.hoisted(() =>
+  vi.fn<(key: string, stream: Readable, opts?: unknown) => Promise<number>>(async () => 42),
+);
 const deleteObjectMock = vi.hoisted(() => vi.fn(async () => {}));
+const validatePdfPathMock = vi.hoisted(() => vi.fn(async () => {}));
 
 // Mock DB
 vi.mock("../../../apps/api/src/db/index.js", () => ({
@@ -202,8 +206,18 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
   return {
     ...actual,
     putObject: putObjectMock,
+    putObjectStream: putObjectStreamMock,
     deleteObject: deleteObjectMock,
     getObjectStream: vi.fn(),
+  };
+});
+
+vi.mock("../../../apps/api/src/modality/document-input.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/modality/document-input.js")>();
+  return {
+    ...actual,
+    validatePdfPath: validatePdfPathMock,
   };
 });
 
@@ -239,6 +253,7 @@ vi.mock("../../../apps/api/src/permissions.js", () => ({
 import { autoOrient } from "../../../apps/api/src/lib/auto-orient.js";
 import { validateImageBuffer } from "../../../apps/api/src/lib/file-validation.js";
 import { createUniqueNamer } from "../../../apps/api/src/lib/filename.js";
+import { logger } from "../../../apps/api/src/lib/logger.js";
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
 import {
   pipelineDefinitionSchema,
@@ -1473,6 +1488,96 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
     } finally {
       readFileSpy.mockReset();
       rmSpy.mockReset();
+    }
+  });
+
+  it("calls deleteObject once for the failed upload and once for earlier committed uploads when storeValidatedOcrPdf fails after beforeStore on /api/v1/pipeline/batch (#2911)", async () => {
+    vi.clearAllMocks();
+    spoolMultipartFileSpy.mockReset();
+    storeValidatedOcrPdfSpy.mockReset();
+    putObjectStreamMock.mockReset();
+    validatePdfPathMock.mockReset();
+    validatePdfPathMock.mockResolvedValue(undefined);
+    deleteObjectMock.mockReset();
+
+    const storeErr = new Error("S3 stream failed");
+    const deleteErr = Object.assign(new Error("Access Denied"), { name: "AccessDenied" });
+    const pdfBytes = Buffer.from("%PDF-1.4 fake");
+    putObjectStreamMock
+      .mockImplementationOnce(async (_key: string, stream: Readable) => {
+        stream.destroy();
+        return pdfBytes.length;
+      })
+      .mockImplementationOnce(async (_key: string, stream: Readable) => {
+        stream.destroy();
+        throw storeErr;
+      });
+    deleteObjectMock.mockRejectedValue(deleteErr);
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+    try {
+      await expect(
+        invokePipelineBatchRoute([
+          { type: "file", filename: "first.pdf", content: pdfBytes },
+          { type: "file", filename: "second.pdf", content: pdfBytes },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: [{ toolId: "ocr-pdf", settings: { quality: "fast", pages: "1" } }],
+            }),
+          },
+          { type: "field", fieldname: "clientJobId", value: "pipeline-batch-2911" },
+        ]),
+      ).rejects.toBe(storeErr);
+
+      expect(deleteObjectMock.mock.calls).toEqual([
+        ["uploads/pipeline-batch-2911-f1-s0/second.pdf"],
+        ["uploads/pipeline-batch-2911-f0-s0/first.pdf"],
+      ]);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith(
+        { err: deleteErr, key: "uploads/pipeline-batch-2911-f1-s0/second.pdf" },
+        "Failed to delete failed OCR PDF upload",
+      );
+
+      // Post-write size mismatch inside storeValidatedOcrPdf also cleans up only once
+      deleteObjectMock.mockClear();
+      warnSpy.mockClear();
+      putObjectStreamMock.mockImplementationOnce(async (_key: string, stream: Readable) => {
+        stream.destroy();
+        return pdfBytes.length - 1;
+      });
+
+      await expect(
+        invokePipelineBatchRoute([
+          { type: "file", filename: "mismatch.pdf", content: pdfBytes },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: [{ toolId: "ocr-pdf", settings: { quality: "fast", pages: "1" } }],
+            }),
+          },
+          { type: "field", fieldname: "clientJobId", value: "pipeline-batch-2911-size" },
+        ]),
+      ).rejects.toThrow(
+        `OCR PDF scratch file changed size (${pdfBytes.length} to ${pdfBytes.length - 1} bytes)`,
+      );
+
+      expect(deleteObjectMock.mock.calls).toEqual([
+        ["uploads/pipeline-batch-2911-size-f0-s0/mismatch.pdf"],
+      ]);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      warnSpy.mockRestore();
+      storeValidatedOcrPdfSpy.mockReset();
+      putObjectStreamMock.mockReset();
+      putObjectStreamMock.mockResolvedValue(42);
+      validatePdfPathMock.mockReset();
+      validatePdfPathMock.mockResolvedValue(undefined);
+      deleteObjectMock.mockReset();
+      deleteObjectMock.mockResolvedValue(undefined);
     }
   });
 });

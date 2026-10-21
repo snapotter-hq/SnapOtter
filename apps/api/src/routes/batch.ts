@@ -450,9 +450,9 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                   signal: ingressAbort.signal,
                   beforeStore: async () => {
                     await insertChildRow(key);
-                    uncommittedKeys.add(key);
                   },
                 });
+                uncommittedKeys.add(key);
               } catch (err) {
                 if (err instanceof InputValidationError) {
                   reportEngineUnavailable(err, toolId, request.log);

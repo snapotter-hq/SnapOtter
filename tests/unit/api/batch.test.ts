@@ -23,16 +23,20 @@ const mocks = vi.hoisted(() => ({
   getFirstMissingBundleForTool: vi.fn((): string | null => null),
   getToolConfig: vi.fn((_toolId?: string) => ({ settingsSchema: z.record(z.unknown()) })),
   putObject: vi.fn<(key: string, data: Buffer) => Promise<void>>(async () => {}),
+  putObjectStream: vi.fn<(key: string, stream: Readable, opts?: unknown) => Promise<number>>(
+    async () => 42,
+  ),
   readFile: vi.fn<(...args: unknown[]) => Promise<Buffer>>(),
   recordChildOutcome: vi.fn(async () => {}),
   requireToolAccess: vi.fn(async () => ({ id: "user-1" })),
   rm: vi.fn<(...args: unknown[]) => Promise<void>>(async () => {}),
   spoolMultipartFile: vi.fn(),
-  storeValidatedOcrPdf: vi.fn(async () => 42),
+  storeValidatedOcrPdf: vi.fn<(...args: unknown[]) => Promise<number>>(async () => 42),
   updateJobProgress: vi.fn(),
   validateImageBuffer: vi.fn<
     (_buf: Buffer, _name: string) => Promise<{ valid: boolean; format: string }>
   >(async () => ({ valid: true, format: "png" })),
+  validatePdfPath: vi.fn(async () => {}),
   waitForJob: vi.fn(async () => null),
   workspaceHeadroomBytes: vi.fn(async (): Promise<number | null> => null),
 }));
@@ -120,7 +124,17 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
     deleteObject: mocks.deleteObject,
     getObjectStream: vi.fn(),
     putObject: mocks.putObject,
+    putObjectStream: mocks.putObjectStream,
     workspaceHeadroomBytes: mocks.workspaceHeadroomBytes,
+  };
+});
+
+vi.mock("../../../apps/api/src/modality/document-input.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/modality/document-input.js")>();
+  return {
+    ...actual,
+    validatePdfPath: mocks.validatePdfPath,
   };
 });
 
@@ -137,7 +151,14 @@ vi.mock("../../../apps/api/src/lib/ocr-pdf-ingress.js", async (importOriginal) =
       mocks.spoolMultipartFile(...args);
       return res;
     },
-    storeValidatedOcrPdf: mocks.storeValidatedOcrPdf,
+    storeValidatedOcrPdf: async (...args: Parameters<typeof actual.storeValidatedOcrPdf>) => {
+      if (mocks.storeValidatedOcrPdf.getMockImplementation()) {
+        return mocks.storeValidatedOcrPdf(...args);
+      }
+      const res = await actual.storeValidatedOcrPdf(...args);
+      mocks.storeValidatedOcrPdf(...args);
+      return res;
+    },
   };
 });
 
@@ -164,6 +185,7 @@ vi.mock("../../../apps/api/src/routes/progress.js", () => ({
   updateJobProgress: mocks.updateJobProgress,
 }));
 
+import { logger } from "../../../apps/api/src/lib/logger.js";
 import { registerBatchRoutes } from "../../../apps/api/src/routes/batch.js";
 import { registerConvert } from "../../../apps/api/src/routes/tools/convert.js";
 import { registerResize } from "../../../apps/api/src/routes/tools/resize.js";
@@ -411,6 +433,14 @@ describe("batch route spooled multipart ingress (#1239)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.spoolMultipartFile.mockReset();
+    mocks.storeValidatedOcrPdf.mockReset();
+    mocks.storeValidatedOcrPdf.mockImplementation(async () => 42);
+    mocks.putObjectStream.mockReset();
+    mocks.putObjectStream.mockResolvedValue(42);
+    mocks.validatePdfPath.mockReset();
+    mocks.validatePdfPath.mockResolvedValue(undefined);
+    mocks.deleteObject.mockReset();
+    mocks.deleteObject.mockResolvedValue(undefined);
     mocks.readFile.mockReset();
     mocks.waitForJob.mockResolvedValue(null);
     mocks.validateImageBuffer.mockResolvedValue({ valid: true, format: "png" });
@@ -594,6 +624,88 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     expect(mocks.spoolMultipartFile).toHaveBeenCalledTimes(1);
     expect(mocks.storeValidatedOcrPdf).toHaveBeenCalledTimes(1);
     expect(mocks.readFile).not.toHaveBeenCalled();
+  });
+
+  it("calls deleteObject once for the failed upload and once for earlier committed uploads when storeValidatedOcrPdf fails after beforeStore (#2911)", async () => {
+    mocks.storeValidatedOcrPdf.mockReset();
+    const storeErr = new Error("S3 stream failed");
+    const deleteErr = Object.assign(new Error("Access Denied"), { name: "AccessDenied" });
+    const pdfBytes = Buffer.from("%PDF-1.4 fake");
+    mocks.putObjectStream
+      .mockImplementationOnce(async (_key: string, stream: Readable) => {
+        stream.destroy();
+        return pdfBytes.length;
+      })
+      .mockImplementationOnce(async (_key: string, stream: Readable) => {
+        stream.destroy();
+        throw storeErr;
+      });
+    mocks.deleteObject.mockRejectedValue(deleteErr);
+    const log = { error: vi.fn(), warn: vi.fn() };
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+    try {
+      await expect(
+        invokeBatchRoute({
+          section: "pdf",
+          toolId: "ocr-pdf",
+          log,
+          parts: [
+            { type: "file", filename: "first.pdf", content: pdfBytes },
+            { type: "file", filename: "second.pdf", content: pdfBytes },
+            { type: "field", fieldname: "settings", value: '{"quality":"fast","pages":"1"}' },
+            { type: "field", fieldname: "clientJobId", value: "ocr-pdf-batch-2911" },
+          ],
+        }),
+      ).rejects.toBe(storeErr);
+
+      expect(mocks.deleteObject.mock.calls).toEqual([
+        ["uploads/ocr-pdf-batch-2911-f1/second.pdf"],
+        ["uploads/ocr-pdf-batch-2911-f0/first.pdf"],
+      ]);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith(
+        { err: deleteErr, key: "uploads/ocr-pdf-batch-2911-f1/second.pdf" },
+        "Failed to delete failed OCR PDF upload",
+      );
+      expect(log.warn).toHaveBeenCalledTimes(1);
+      expect(log.warn).toHaveBeenCalledWith(
+        { err: deleteErr, key: "uploads/ocr-pdf-batch-2911-f0/first.pdf" },
+        "batch ingress cleanup failed",
+      );
+
+      // Post-write size mismatch inside storeValidatedOcrPdf also cleans up only once
+      mocks.deleteObject.mockClear();
+      warnSpy.mockClear();
+      log.warn.mockClear();
+      mocks.putObjectStream.mockImplementationOnce(async (_key: string, stream: Readable) => {
+        stream.destroy();
+        return pdfBytes.length - 1;
+      });
+
+      await expect(
+        invokeBatchRoute({
+          section: "pdf",
+          toolId: "ocr-pdf",
+          log,
+          parts: [
+            { type: "file", filename: "mismatch.pdf", content: pdfBytes },
+            { type: "field", fieldname: "settings", value: '{"quality":"fast","pages":"1"}' },
+            { type: "field", fieldname: "clientJobId", value: "ocr-pdf-batch-2911-size" },
+          ],
+        }),
+      ).rejects.toThrow(
+        `OCR PDF scratch file changed size (${pdfBytes.length} to ${pdfBytes.length - 1} bytes)`,
+      );
+
+      expect(mocks.deleteObject.mock.calls).toEqual([
+        ["uploads/ocr-pdf-batch-2911-size-f0/mismatch.pdf"],
+      ]);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(log.warn).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it("cleans up the spooled file, settles the staged batch, and deletes earlier uploads if readFile fails mid-batch", async () => {
