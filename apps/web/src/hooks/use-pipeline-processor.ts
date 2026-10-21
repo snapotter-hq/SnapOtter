@@ -688,10 +688,11 @@ export function usePipelineProcessor() {
   useEffect(() => {
     settleStoppedRunRef.current = () => {
       if (!activeJobIdRef.current) return;
-      // A store that no longer carries the run (Clear all, a reset) has nothing
-      // left to settle, and an error written now would land on whatever the
-      // user does next.
-      if (!useFileStore.getState().processing) return;
+      // A store that no longer carries the run (Clear all, a reset, or a newer
+      // run started after an unmounted settling batch) has nothing left to
+      // settle, and an error written now would land on whatever the user does
+      // next (#2748).
+      if (storeWasReset()) return;
       // The job outlives its observer: the request and stream are gone, and so
       // is the handle that would cancel it. Ask the server to stop it before
       // clearing the job id.

@@ -432,4 +432,300 @@ describe("usePipelineProcessor unmount settles the run it stops (#2634)", () => 
       { error_class: "bug" },
     );
   });
+
+  it("does not overwrite a new run when a settling pipeline batch unmounts after the store was reset and taken over (#2748)", () => {
+    const download = new Promise<Blob>(() => {});
+    fetchMock.mockImplementation(async (url: string) =>
+      url === CANCEL_URL
+        ? new Response(JSON.stringify({ canceled: false }))
+        : { ok: true, status: 200, blob: () => download },
+    );
+    const files = [image("one.png"), image("two.png")];
+    useFileStore.getState().setFiles(files);
+    const hook = renderHook(() => usePipelineProcessor());
+    act(() => {
+      void hook.result.current.processAll(files, STEPS);
+    });
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    act(() => {
+      MockEventSource.instances.at(-1)?.onmessage?.({
+        data: JSON.stringify({
+          type: "batch",
+          jobId: JOB_ID,
+          status: "completed",
+          totalFiles: 2,
+          completedFiles: 2,
+          failedFiles: 0,
+          errors: [],
+          result: {
+            jobId: JOB_ID,
+            downloadUrl: `/api/v1/download/${JOB_ID}/batch-pipeline.zip`,
+            zipFilename: "batch-pipeline.zip",
+            fileResults: { "0": "one_resize.png", "1": "two_resize.png" },
+            processedSize: 16,
+          },
+        }),
+      } as MessageEvent);
+    });
+
+    act(() => {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("next-run.png")]);
+      useFileStore.getState().updateEntry(0, { status: "processing" });
+      useFileStore.getState().setProcessing(true);
+      useFileStore.getState().setActiveJob("77777777-7777-4777-8777-777777777777", null);
+    });
+
+    hook.unmount();
+
+    const state = useFileStore.getState();
+    expect(state.processing).toBe(true);
+    expect(state.error).toBeNull();
+    expect(state.activeJobId).toBe("77777777-7777-4777-8777-777777777777");
+    expect(state.entries[0].status).toBe("processing");
+    expect(cancelPosts()).toHaveLength(0);
+  });
+
+  it("does not overwrite a new run when an in-flight single-file pipeline unmounts after the store was reset and taken over (#2748)", () => {
+    const file = image("one.png");
+    useFileStore.getState().setFiles([file]);
+    const hook = renderHook(() => usePipelineProcessor());
+    act(() => {
+      hook.result.current.processSingle(file, STEPS);
+    });
+
+    act(() => {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("next-run.png")]);
+      useFileStore.getState().updateEntry(0, { status: "processing" });
+      useFileStore.getState().setProcessing(true);
+      useFileStore.getState().setActiveJob("77777777-7777-4777-8777-777777777777", null);
+    });
+
+    hook.unmount();
+
+    const state = useFileStore.getState();
+    expect(state.processing).toBe(true);
+    expect(state.error).toBeNull();
+    expect(state.activeJobId).toBe("77777777-7777-4777-8777-777777777777");
+    expect(state.entries[0].status).toBe("processing");
+    expect(cancelPosts()).toHaveLength(0);
+  });
+
+  it("drops an unmounted settling pipeline batch's ZIP when a new run starts while the ZIP is downloading (#2748)", async () => {
+    vi.useRealTimers();
+    const zip = new AdmZip();
+    zip.addFile("one_resize.png", Buffer.from([1, 2, 3, 4]));
+    zip.addFile("two_resize.png", Buffer.from([5, 6]));
+    const bytes = new Uint8Array(zip.toBuffer());
+    let deliverZip: (blob: Blob) => void = () => {};
+    const download = new Promise<Blob>((resolve) => {
+      deliverZip = resolve;
+    });
+    fetchMock.mockImplementation(async (url: string) =>
+      url === CANCEL_URL
+        ? new Response(JSON.stringify({ canceled: false }))
+        : { ok: true, status: 200, blob: () => download },
+    );
+    const files = [image("one.png"), image("two.png")];
+    useFileStore.getState().setFiles(files);
+    const hook = renderHook(() => usePipelineProcessor());
+    act(() => {
+      void hook.result.current.processAll(files, STEPS);
+    });
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    act(() => {
+      MockEventSource.instances.at(-1)?.onmessage?.({
+        data: JSON.stringify({
+          type: "batch",
+          jobId: JOB_ID,
+          status: "completed",
+          totalFiles: 2,
+          completedFiles: 2,
+          failedFiles: 0,
+          errors: [],
+          result: {
+            jobId: JOB_ID,
+            downloadUrl: `/api/v1/download/${JOB_ID}/batch-pipeline.zip`,
+            zipFilename: "batch-pipeline.zip",
+            fileResults: { "0": "one_resize.png", "1": "two_resize.png" },
+            processedSize: bytes.length,
+          },
+        }),
+      } as MessageEvent);
+    });
+
+    hook.unmount();
+    act(() => {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("next-run.png")]);
+      useFileStore.getState().updateEntry(0, { status: "processing" });
+      useFileStore.getState().setProcessing(true);
+      useFileStore.getState().setActiveJob("77777777-7777-4777-8777-777777777777", null);
+    });
+
+    await act(async () => {
+      deliverZip(new Blob([bytes.slice().buffer], { type: "application/zip" }));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    const state = useFileStore.getState();
+    expect(state.processing).toBe(true);
+    expect(state.error).toBeNull();
+    expect(state.activeJobId).toBe("77777777-7777-4777-8777-777777777777");
+    expect(state.batchZipBlob).toBeNull();
+    expect(state.entries).toHaveLength(1);
+    expect(state.entries[0]).toMatchObject({
+      status: "processing",
+      processedUrl: null,
+    });
+  });
+
+  it("drops an unmounted settling pipeline batch's ZIP when the store was reset before unmount (#2748)", async () => {
+    vi.useRealTimers();
+    const zip = new AdmZip();
+    zip.addFile("one_resize.png", Buffer.from([1, 2, 3, 4]));
+    zip.addFile("two_resize.png", Buffer.from([5, 6]));
+    const bytes = new Uint8Array(zip.toBuffer());
+    let deliverZip: (blob: Blob) => void = () => {};
+    const download = new Promise<Blob>((resolve) => {
+      deliverZip = resolve;
+    });
+    fetchMock.mockImplementation(async (url: string) =>
+      url === CANCEL_URL
+        ? new Response(JSON.stringify({ canceled: false }))
+        : { ok: true, status: 200, blob: () => download },
+    );
+    const files = [image("one.png"), image("two.png")];
+    useFileStore.getState().setFiles(files);
+    const hook = renderHook(() => usePipelineProcessor());
+    act(() => {
+      void hook.result.current.processAll(files, STEPS);
+    });
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    act(() => {
+      MockEventSource.instances.at(-1)?.onmessage?.({
+        data: JSON.stringify({
+          type: "batch",
+          jobId: JOB_ID,
+          status: "completed",
+          totalFiles: 2,
+          completedFiles: 2,
+          failedFiles: 0,
+          errors: [],
+          result: {
+            jobId: JOB_ID,
+            downloadUrl: `/api/v1/download/${JOB_ID}/batch-pipeline.zip`,
+            zipFilename: "batch-pipeline.zip",
+            fileResults: { "0": "one_resize.png", "1": "two_resize.png" },
+            processedSize: bytes.length,
+          },
+        }),
+      } as MessageEvent);
+    });
+
+    // Store is cleared before unmount (processing = false), then unmount happens,
+    // then a new run starts before the old ZIP resolves.
+    act(() => {
+      useFileStore.getState().reset();
+    });
+    hook.unmount();
+    act(() => {
+      useFileStore.getState().setFiles([image("next-run.png")]);
+      useFileStore.getState().updateEntry(0, { status: "processing" });
+      useFileStore.getState().setProcessing(true);
+      useFileStore.getState().setActiveJob(JOB_ID, null);
+    });
+
+    await act(async () => {
+      deliverZip(new Blob([bytes.slice().buffer], { type: "application/zip" }));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    const state = useFileStore.getState();
+    expect(state.processing).toBe(true);
+    expect(state.error).toBeNull();
+    expect(state.activeJobId).toBe(JOB_ID);
+    expect(state.batchZipBlob).toBeNull();
+    expect(state.entries).toHaveLength(1);
+    expect(state.entries[0]).toMatchObject({
+      status: "processing",
+      processedUrl: null,
+    });
+  });
+
+  it("stops retrying a settling pipeline batch's ZIP download when the store was reset before unmount (#2748)", async () => {
+    let downloadCalls = 0;
+    fetchMock.mockImplementation((url: string) => {
+      if (url === CANCEL_URL) {
+        return Promise.resolve(new Response(JSON.stringify({ canceled: false })));
+      }
+      downloadCalls++;
+      return Promise.reject(new Error("network blip"));
+    });
+    const files = [image("one.png"), image("two.png")];
+    useFileStore.getState().setFiles(files);
+    const hook = renderHook(() => usePipelineProcessor());
+    act(() => {
+      void hook.result.current.processAll(files, STEPS);
+    });
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].onerror?.();
+    });
+    act(() => {
+      MockEventSource.instances.at(-1)?.onmessage?.({
+        data: JSON.stringify({
+          type: "batch",
+          jobId: JOB_ID,
+          status: "completed",
+          totalFiles: 2,
+          completedFiles: 2,
+          failedFiles: 0,
+          errors: [],
+          result: {
+            jobId: JOB_ID,
+            downloadUrl: `/api/v1/download/${JOB_ID}/batch-pipeline.zip`,
+            zipFilename: "batch-pipeline.zip",
+            fileResults: { "0": "one_resize.png", "1": "two_resize.png" },
+            processedSize: 16,
+          },
+        }),
+      } as MessageEvent);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(downloadCalls).toBe(1);
+
+    act(() => {
+      useFileStore.getState().reset();
+    });
+    hook.unmount();
+    act(() => {
+      useFileStore.getState().setFiles([image("next-run.png")]);
+      useFileStore.getState().updateEntry(0, { status: "processing" });
+      useFileStore.getState().setProcessing(true);
+      useFileStore.getState().setActiveJob(JOB_ID, null);
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+
+    expect(downloadCalls).toBe(1);
+    const state = useFileStore.getState();
+    expect(state.processing).toBe(true);
+    expect(state.error).toBeNull();
+    expect(state.activeJobId).toBe(JOB_ID);
+  });
 });
