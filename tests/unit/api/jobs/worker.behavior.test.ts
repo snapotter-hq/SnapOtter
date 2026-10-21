@@ -2772,3 +2772,233 @@ describe("startWorkers sharp.concurrency wiring (#2708)", () => {
     expect(engineCall).toBeLessThan(fastifyStart);
   });
 });
+
+describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () => {
+  it("selects JOB_TIMEOUT_LONG_S for executionHint: 'long' tools on docs and image pools", async () => {
+    const { TOOLS } = await vi.importActual<
+      typeof import("../../../../packages/shared/src/constants.js")
+    >("../../../../packages/shared/src/constants.js");
+    const { SafeError, isSafeMessageError, isToolInputError, hasServerErrorStatus } =
+      await vi.importActual<typeof import("../../../../packages/shared/src/tool-errors.js")>(
+        "../../../../packages/shared/src/tool-errors.js",
+      );
+    const { IMAGE_EXT_TO_MIME } = await vi.importActual<
+      typeof import("../../../../packages/shared/src/image-mime.js")
+    >("../../../../packages/shared/src/image-mime.js");
+
+    const workerMod = await loadWorker("", () => {
+      vi.doMock("@snapotter/shared", () => ({
+        SafeError,
+        isSafeMessageError,
+        isToolInputError,
+        hasServerErrorStatus,
+        IMAGE_EXT_TO_MIME,
+        ANALYTICS_EVENTS: {},
+        TOOLS,
+        COMPRESS_PRESETS: [],
+        getBundleForTool: vi.fn(() => null),
+        getOptionalBundleForTool: vi.fn(() => null),
+      }));
+    });
+
+    expect(workerMod.timeoutMsFor("ai")).toBe(60_000);
+    expect(workerMod.timeoutMsFor("ai", "unknown-tool")).toBe(60_000);
+    expect(workerMod.timeoutMsFor("ai", "remove-background")).toBe(60_000);
+    expect(workerMod.timeoutMsFor("media")).toBe(60_000);
+    expect(workerMod.timeoutMsFor("media", "unknown-tool")).toBe(60_000);
+    expect(workerMod.timeoutMsFor("media", "convert-video")).toBe(60_000);
+    expect(workerMod.timeoutMsFor("docs", "pdf-to-word")).toBe(60_000);
+    expect(workerMod.timeoutMsFor("docs", "compress-pdf")).toBe(60_000);
+    expect(workerMod.timeoutMsFor("docs", "convert-document")).toBe(60_000);
+    expect(workerMod.timeoutMsFor("image", "content-aware-resize")).toBe(60_000);
+    expect(workerMod.timeoutMsFor("docs", "merge-pdf")).toBe(15_000);
+    expect(workerMod.timeoutMsFor("docs", "split-pdf")).toBe(15_000);
+    expect(workerMod.timeoutMsFor("image", "compress")).toBe(15_000);
+    expect(workerMod.timeoutMsFor("docs")).toBe(15_000);
+    expect(workerMod.timeoutMsFor("docs", "unknown-tool")).toBe(15_000);
+  });
+
+  it("runs a docs-pool pdf-to-word job under JOB_TIMEOUT_LONG_S instead of aborting at JOB_TIMEOUT_FAST_S", async () => {
+    vi.useFakeTimers();
+    const { TOOLS } = await vi.importActual<
+      typeof import("../../../../packages/shared/src/constants.js")
+    >("../../../../packages/shared/src/constants.js");
+    const { SafeError, isSafeMessageError, isToolInputError, hasServerErrorStatus } =
+      await vi.importActual<typeof import("../../../../packages/shared/src/tool-errors.js")>(
+        "../../../../packages/shared/src/tool-errors.js",
+      );
+    const { IMAGE_EXT_TO_MIME } = await vi.importActual<
+      typeof import("../../../../packages/shared/src/image-mime.js")
+    >("../../../../packages/shared/src/image-mime.js");
+
+    const processV2Mock = vi.fn(async (ctx: { signal: AbortSignal }) => {
+      await new Promise<void>((resolve, reject) => {
+        const onAbort = () => reject(new Error("Aborted by signal"));
+        ctx.signal.addEventListener("abort", onAbort, { once: true });
+        setTimeout(() => {
+          ctx.signal.removeEventListener("abort", onAbort);
+          resolve();
+        }, 20_000);
+      });
+      return {
+        scratchPath: "/tmp/job-pdf-to-word/out.docx",
+        filename: "out.docx",
+        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      };
+    });
+    const dbSetMock = vi.fn(() => ({
+      where: vi.fn().mockResolvedValue(undefined),
+    }));
+    const userCancelAc = new AbortController();
+    const timeoutSpy = vi
+      .spyOn(AbortSignal, "timeout")
+      .mockImplementation(() => new AbortController().signal);
+
+    try {
+      const workerMod = await loadWorker("", () => {
+        vi.doMock("@snapotter/shared", () => ({
+          SafeError,
+          isSafeMessageError,
+          isToolInputError,
+          hasServerErrorStatus,
+          IMAGE_EXT_TO_MIME,
+          ANALYTICS_EVENTS: {},
+          TOOLS,
+          COMPRESS_PRESETS: [],
+          getBundleForTool: vi.fn(() => null),
+          getOptionalBundleForTool: vi.fn(() => null),
+        }));
+        vi.doMock("node:fs", () => ({
+          createReadStream: vi.fn((p: string) => ({ path: p })),
+        }));
+        vi.doMock("node:fs/promises", () => ({
+          mkdir: vi.fn().mockResolvedValue(undefined),
+          readFile: vi.fn(),
+          rm: vi.fn().mockResolvedValue(undefined),
+          stat: vi.fn().mockResolvedValue({ size: 2 * 1024 ** 3 }),
+        }));
+        vi.doMock("../../../../apps/api/src/db/index.js", () => ({
+          db: {
+            update: vi.fn(() => ({
+              set: dbSetMock,
+            })),
+          },
+          schema: { jobs: { id: "jobs.id" } },
+        }));
+        vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+          getToolConfig: vi.fn(() => ({ processV2: processV2Mock })),
+        }));
+        vi.doMock("../../../../apps/api/src/jobs/ai-handlers.js", () => ({
+          hasAiJobHandler: vi.fn(() => false),
+          hasAiPathJobHandler: vi.fn(() => false),
+          runAiToolJob: vi.fn(),
+          runAiPathToolJob: vi.fn(),
+        }));
+        vi.doMock("../../../../apps/api/src/jobs/cancel.js", () => ({
+          claimFinalize: vi.fn(async () => true),
+          registerCancelable: vi.fn(() => new AbortController()),
+          releaseFinalize: vi.fn(async () => {}),
+          unregisterCancelable: vi.fn(),
+          userCancelSignal: vi.fn(() => userCancelAc.signal),
+          wasUserCanceled: vi.fn(() => false),
+        }));
+        vi.doMock("../../../../apps/api/src/jobs/postprocess.js", () => ({
+          autoSaveToLibrary: vi.fn().mockResolvedValue({}),
+          buildOutputName: vi.fn((out: string) => out),
+          generatePreview: vi.fn().mockResolvedValue(undefined),
+          stageAutoSaveToLibrary: vi.fn().mockResolvedValue({}),
+        }));
+        vi.doMock("@snapotter/media-engine", () => ({
+          HW_ACCEL_FAMILIES: [],
+          hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+          softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+        }));
+        vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+          binaryOverrideWarning: vi.fn(),
+          checkBinaryOverrides: vi.fn(() => []),
+          probeFailureLevel: vi.fn(() => "warn"),
+        }));
+      });
+
+      objectStorageMocks.getObjectBuffer.mockResolvedValue(Buffer.from("%PDF-1.4"));
+      objectStorageMocks.putObject.mockResolvedValue(undefined);
+      objectStorageMocks.putObjectStream.mockResolvedValue(1024);
+
+      const { Worker } = await import("bullmq");
+      workerMod.startWorkers();
+      const workerCalls = (Worker as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+      const docsCall = workerCalls.find(([queue]) => String(queue).endsWith("docs"));
+      if (!docsCall) throw new Error("docs pool worker not registered");
+      const processor = docsCall[1] as (job: unknown) => Promise<unknown>;
+
+      const jobPromise = processor({
+        id: "job-pdf-to-word",
+        attemptsMade: 0,
+        opts: { attempts: 1 },
+        updateProgress: vi.fn(),
+        data: {
+          jobId: "job-pdf-to-word",
+          toolId: "pdf-to-word",
+          userId: null,
+          pool: "docs",
+          inputRefs: ["uploads/job-pdf-to-word/in.pdf"],
+          filename: "in.pdf",
+          settings: {},
+          kind: "tool",
+        },
+      });
+
+      // 20s exceeds JOB_TIMEOUT_FAST_S (15s) but stays well within JOB_TIMEOUT_LONG_S (60s).
+      const [, result] = await Promise.all([vi.advanceTimersByTimeAsync(20_000), jobPromise]);
+      expect(result).toMatchObject({
+        filename: "out.docx",
+      });
+      expect(timeoutSpy).toHaveBeenCalledWith(60_000);
+
+      // And a docs-pool pdf-to-word job that exceeds JOB_TIMEOUT_LONG_S (60s) still times out at 60s.
+      processV2Mock.mockImplementationOnce(async (ctx: { signal: AbortSignal }) => {
+        await new Promise<void>((resolve, reject) => {
+          const onAbort = () => reject(new Error("Aborted by signal"));
+          ctx.signal.addEventListener("abort", onAbort, { once: true });
+          setTimeout(() => {
+            ctx.signal.removeEventListener("abort", onAbort);
+            resolve();
+          }, 90_000);
+        });
+        return {
+          scratchPath: "/tmp/job-pdf-to-word-timeout/out.docx",
+          filename: "out.docx",
+          contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        };
+      });
+
+      const slowJobPromise = processor({
+        id: "job-pdf-to-word-timeout",
+        attemptsMade: 0,
+        opts: { attempts: 1 },
+        updateProgress: vi.fn(),
+        data: {
+          jobId: "job-pdf-to-word-timeout",
+          toolId: "pdf-to-word",
+          userId: null,
+          pool: "docs",
+          inputRefs: ["uploads/job-pdf-to-word-timeout/in.pdf"],
+          filename: "in.pdf",
+          settings: {},
+          kind: "tool",
+        },
+      });
+      const slowOutcome = slowJobPromise.then(
+        () => null,
+        (err: unknown) => err,
+      );
+      await vi.advanceTimersByTimeAsync(60_000);
+      const slowErr = await slowOutcome;
+      expect(slowErr).toBeInstanceOf(Error);
+      expect((slowErr as Error).message).toMatch(/Timed out after 60s/);
+    } finally {
+      timeoutSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+});

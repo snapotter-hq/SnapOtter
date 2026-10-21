@@ -145,8 +145,9 @@ function scratchRoot(): string {
   return env.SCRATCH_PATH || join(tmpdir(), "snapotter-scratch");
 }
 
-function timeoutMsFor(pool: Pool): number {
-  if (pool === "ai" || pool === "media") {
+export function timeoutMsFor(pool: Pool, toolId?: string): number {
+  const tool = toolId ? TOOLS.find((t) => t.id === toolId) : undefined;
+  if (pool === "ai" || pool === "media" || tool?.executionHint === "long") {
     return env.JOB_TIMEOUT_LONG_S * 1000;
   }
   return env.JOB_TIMEOUT_FAST_S * 1000;
@@ -471,7 +472,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
     const userCancel = userCancelSignal(jobId);
 
     // Timeout guard (0 means unlimited; only arm when positive)
-    const timeoutMs = timeoutMsFor(data.pool);
+    const timeoutMs = timeoutMsFor(data.pool, data.toolId);
     const timeoutHandle =
       timeoutMs > 0 ? setTimeout(() => ac.abort("timeout"), timeoutMs) : undefined;
 

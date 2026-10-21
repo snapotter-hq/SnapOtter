@@ -102,7 +102,9 @@ const { closeWorkers, startWorkers } = await import("../../../apps/api/src/jobs/
 const { readStoredFile } = await import("../../../apps/api/src/lib/file-storage.js");
 const { logger } = await import("../../../apps/api/src/lib/logger.js");
 const { listObjects, putObject } = await import("../../../apps/api/src/lib/object-storage.js");
-const { registerToolProcessFn } = await import("../../../apps/api/src/routes/tool-factory.js");
+const { getToolConfig, registerToolProcessFn } = await import(
+  "../../../apps/api/src/routes/tool-factory.js"
+);
 const { env } = await import("../../../apps/api/src/config.js");
 
 // Sanity: the env override must have taken effect.
@@ -133,8 +135,8 @@ registerToolProcessFn({
   },
 });
 
-// A tool that never reads the signal and finishes after the timeout fired, like
-// pdf-to-word's own longer budget inside the docs pool's 120s job timeout.
+// A tool whose legacy 3-argument process fn never reads ctx.signal and finishes
+// after the worker deadline fired.
 registerToolProcessFn({
   toolId: "timeout-ignores-signal",
   settingsSchema: { parse: (v: unknown) => v } as never,
@@ -803,6 +805,56 @@ describe("Worker timeout classification", () => {
       errorLog.mockRestore();
     }
   }, 30_000);
+
+  it("grants JOB_TIMEOUT_LONG_S to executionHint: 'long' tools on the docs pool (#3253)", async () => {
+    const previousConfig = getToolConfig("pdf-to-word");
+    registerToolProcessFn({
+      toolId: "pdf-to-word",
+      settingsSchema: { parse: (v: unknown) => v } as never,
+      process: async () => {
+        throw new Error("legacy process must not run when processV2 is registered");
+      },
+      processV2: async (ctx) => {
+        // Run for 1.8s (past JOB_TIMEOUT_FAST_S = 1s), checking ctx.signal every 100ms.
+        for (let i = 0; i < 18; i++) {
+          if (ctx.signal.aborted) {
+            throw new Error("Aborted by signal");
+          }
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        return {
+          buffer: Buffer.from("docx-bytes"),
+          filename: "converted.docx",
+          contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        };
+      },
+    });
+
+    try {
+      const jobId = randomUUID();
+      const inputRef = `uploads/${jobId}/sample.pdf`;
+      await putObject(inputRef, Buffer.from("%PDF-1.4"));
+
+      await enqueueToolJob({
+        jobId,
+        toolId: "pdf-to-word",
+        userId: null,
+        pool: "docs",
+        inputRefs: [inputRef],
+        filename: "sample.pdf",
+        settings: {},
+        kind: "tool",
+      });
+
+      const finalRow = await terminalJobRow(jobId, 40);
+      expect(finalRow?.status).toBe("completed");
+      expect(finalRow?.attempts).toBe(1);
+    } finally {
+      if (previousConfig) {
+        registerToolProcessFn(previousConfig);
+      }
+    }
+  }, 25_000);
 });
 
 /** Poll the job row until it leaves queued/processing; undefined after ~20s. */
