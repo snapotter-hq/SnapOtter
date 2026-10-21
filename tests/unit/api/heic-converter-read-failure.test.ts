@@ -231,6 +231,18 @@ describe("verifyDecodedImageLimits and metadata preflight fault handling (#2883)
     expect(err.message).toBe("Input image exceeds pixel limit");
   });
 
+  it("still runs metadata preflight when an ispe box has 0x0 dimensions (#2896)", async () => {
+    const zeroIspe = Buffer.alloc(20);
+    zeroIspe.writeUInt32BE(20, 0);
+    zeroIspe.write("ispe", 4, 4, "ascii");
+    failures.metadataError = new Error("Input image exceeds pixel limit");
+    const err = await decodeError(Buffer.concat([makeHeicHeaderWithoutIspe(), zeroIspe]), {
+      maxPixels: 50_000,
+    });
+    expect(isDecoderUnavailable(err)).toBe(false);
+    expect(err.message).toBe("Input image exceeds pixel limit");
+  });
+
   it("attaches Sharp's metadata error as cause when encoded dimensions are unavailable", async () => {
     const err = await decodeError(makeHeicHeaderWithoutIspe(), { maxPixels: 1_000_000 });
     expect(isDecoderUnavailable(err)).toBe(false);

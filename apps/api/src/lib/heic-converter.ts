@@ -147,11 +147,11 @@ export async function decodeHeic(buffer: Buffer, options: HeicDecodeOptions = {}
   for (const dimensions of encodedDimensions) {
     assertImageLimits(dimensions.width, dimensions.height, options.maxPixels, options.maxDimension);
   }
+  const hasVerifiedIspe =
+    encodedDimensions.length > 0 &&
+    encodedDimensions.every((dimensions) => dimensions.width > 0 && dimensions.height > 0);
 
-  if (
-    (options.maxPixels !== undefined || options.maxDimension !== undefined) &&
-    encodedDimensions.length === 0
-  ) {
+  if ((options.maxPixels !== undefined || options.maxDimension !== undefined) && !hasVerifiedIspe) {
     let dimensionsVerified = false;
     let metadataError: unknown;
     try {

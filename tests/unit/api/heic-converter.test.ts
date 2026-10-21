@@ -72,6 +72,77 @@ describe("decodeHeic", () => {
     ).rejects.toThrow(/dimension safety limit.*40,001x1/i);
   });
 
+  it("does not let a 0x0 or zero-side ispe box bypass the dimension preflight when safety limits are set (#2896)", async () => {
+    const originalPath = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      for (const [width, height] of [
+        [0, 0],
+        [0, 100],
+        [100, 0],
+      ] as const) {
+        const zeroIspe = Buffer.concat([makeHeicHeader("heic"), makeIspeBox(width, height)]);
+        await expect(decodeHeic(zeroIspe, { maxPixels: 1_000_000 })).rejects.toThrow(
+          /encoded dimensions are unavailable/i,
+        );
+        await expect(decodeHeic(zeroIspe, { maxDimension: 1_000 })).rejects.toThrow(
+          /encoded dimensions are unavailable/i,
+        );
+      }
+    } finally {
+      process.env.PATH = originalPath;
+    }
+  });
+
+  it("does not trust a small valid ispe box when another ispe box has zero dimensions (#2896)", async () => {
+    const originalPath = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      for (const boxes of [
+        [makeIspeBox(100, 100), makeIspeBox(0, 0)],
+        [makeIspeBox(0, 0), makeIspeBox(100, 100)],
+        [makeIspeBox(100, 100), makeIspeBox(100, 0)],
+        [makeIspeBox(100, 100), makeIspeBox(0, 100)],
+      ]) {
+        const mixedIspe = Buffer.concat([makeHeicHeader("heic"), ...boxes]);
+        await expect(decodeHeic(mixedIspe, { maxPixels: 1_000_000 })).rejects.toThrow(
+          /encoded dimensions are unavailable/i,
+        );
+        await expect(decodeHeic(mixedIspe, { maxDimension: 1_000 })).rejects.toThrow(
+          /encoded dimensions are unavailable/i,
+        );
+      }
+    } finally {
+      process.env.PATH = originalPath;
+    }
+  });
+
+  it("still rejects an oversized ispe box before metadata preflight when paired with a 0x0 ispe box (#2896)", async () => {
+    const mixedOversized = Buffer.concat([
+      makeHeicHeader("heic"),
+      makeIspeBox(0, 0),
+      makeIspeBox(10_000, 10_000),
+    ]);
+    await expect(decodeHeic(mixedOversized, { maxPixels: 1_000_000 })).rejects.toThrow(
+      /pixel safety limit.*10000x10000/i,
+    );
+  });
+
+  it("recovers via Sharp metadata preflight when a valid mif1 AV1 container has a trailing 0x0 ispe box (#2896)", async () => {
+    const mif1WithTrailingZeroIspe = Buffer.concat([makeMif1Av1Buffer(), makeIspeBox(0, 0)]);
+    const originalPath = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      const result = await decodeHeic(mif1WithTrailingZeroIspe, {
+        maxPixels: 1_000_000,
+        maxDimension: 1_000,
+      });
+      expect(isPng(result)).toBe(true);
+    } finally {
+      process.env.PATH = originalPath;
+    }
+  });
+
   it("honors an already-aborted request", async () => {
     const controller = new AbortController();
     controller.abort();
