@@ -206,6 +206,26 @@ describe("hasToolAccess for custom category-mode roles", () => {
     });
     expect(await hasToolAccess("photographer", "no-such-tool")).toBe(false);
   });
+
+  it.each(["brightness-contrast", "saturation", "color-channels", "color-effects"])(
+    "resolves legacy alias %s to adjust-colors in category mode (#2858)",
+    async (aliasId) => {
+      const { hasToolAccess } = await loadPermissions({
+        customRoles: [
+          {
+            permissions: ["tools:use"],
+            toolPermissions: { mode: "category", allowed: ["image"] },
+          },
+          {
+            permissions: ["tools:use"],
+            toolPermissions: { mode: "category", allowed: ["video"] },
+          },
+        ],
+      });
+      expect(await hasToolAccess("photographer", aliasId)).toBe(true);
+      expect(await hasToolAccess("videographer", aliasId)).toBe(false);
+    },
+  );
 });
 
 // ── hasToolAccess: custom role, tool mode (enterprise gated) ─────────
@@ -244,6 +264,37 @@ describe("hasToolAccess for custom tool-mode roles", () => {
     });
     expect(await hasToolAccess("restricted", "resize")).toBe(false);
   });
+
+  it.each(["brightness-contrast", "saturation", "color-channels", "color-effects"])(
+    "resolves legacy alias %s to adjust-colors when per_tool_permissions IS enforced (#2858)",
+    async (aliasId) => {
+      const { hasToolAccess } = await loadPermissions({
+        perToolEnforced: true,
+        customRoles: [
+          {
+            permissions: ["tools:use"],
+            toolPermissions: { mode: "tool", allowed: ["adjust-colors"] },
+          },
+          {
+            permissions: ["tools:use"],
+            toolPermissions: { mode: "tool", allowed: ["crop"] },
+          },
+          {
+            permissions: ["tools:use"],
+            toolPermissions: { mode: "tool", allowed: [aliasId] },
+          },
+          {
+            permissions: ["tools:use"],
+            toolPermissions: { mode: "tool", allowed: [aliasId] },
+          },
+        ],
+      });
+      expect(await hasToolAccess("color-editor", aliasId)).toBe(true);
+      expect(await hasToolAccess("crop-only", aliasId)).toBe(false);
+      expect(await hasToolAccess("alias-only", aliasId)).toBe(true);
+      expect(await hasToolAccess("alias-only", "adjust-colors")).toBe(false);
+    },
+  );
 
   it("treats tool restrictions as unrestricted when the enterprise import throws", async () => {
     // isPerToolPermissionEnforced catch => fail-closed to "not enforced", which
@@ -419,6 +470,92 @@ describe("tool-scope containment (canGrantRoleDefinition)", () => {
     expect(ok).toBe(true);
     // Admin resolves from ROLE_PERMISSIONS, so no DB lookup.
     expect(selectMock).not.toHaveBeenCalled();
+  });
+
+  it("category and tool actors contain adjust-colors legacy alias targets without escalating alias-only actors (#2858)", async () => {
+    const { canGrantRoleDefinition } = await loadPermissions({
+      perToolEnforced: true,
+      customRoles: [
+        { permissions: ["tools:use"], toolPermissions: { mode: "category", allowed: ["image"] } },
+        { permissions: ["tools:use"], toolPermissions: { mode: "category", allowed: ["video"] } },
+        {
+          permissions: ["tools:use"],
+          toolPermissions: { mode: "tool", allowed: ["adjust-colors"] },
+        },
+        {
+          permissions: ["tools:use"],
+          toolPermissions: { mode: "tool", allowed: ["brightness-contrast"] },
+        },
+        {
+          permissions: ["tools:use"],
+          toolPermissions: { mode: "tool", allowed: ["brightness-contrast"] },
+        },
+        {
+          permissions: ["tools:use"],
+          toolPermissions: { mode: "tool", allowed: ["brightness-contrast"] },
+        },
+      ],
+    });
+    expect(
+      await canGrantRoleDefinition(
+        makeUser({ role: "image-category-actor", id: "a1" }),
+        ["tools:use"],
+        {
+          mode: "tool",
+          allowed: ["brightness-contrast", "saturation"],
+        },
+      ),
+    ).toBe(true);
+    expect(
+      await canGrantRoleDefinition(
+        makeUser({ role: "video-category-actor", id: "a2" }),
+        ["tools:use"],
+        {
+          mode: "tool",
+          allowed: ["brightness-contrast"],
+        },
+      ),
+    ).toBe(false);
+    expect(
+      await canGrantRoleDefinition(
+        makeUser({ role: "adjust-colors-actor", id: "a3" }),
+        ["tools:use"],
+        {
+          mode: "tool",
+          allowed: ["brightness-contrast", "color-effects"],
+        },
+      ),
+    ).toBe(true);
+    expect(
+      await canGrantRoleDefinition(
+        makeUser({ role: "alias-only-actor", id: "a4" }),
+        ["tools:use"],
+        {
+          mode: "tool",
+          allowed: ["brightness-contrast"],
+        },
+      ),
+    ).toBe(true);
+    expect(
+      await canGrantRoleDefinition(
+        makeUser({ role: "alias-only-actor", id: "a4" }),
+        ["tools:use"],
+        {
+          mode: "tool",
+          allowed: ["saturation"],
+        },
+      ),
+    ).toBe(false);
+    expect(
+      await canGrantRoleDefinition(
+        makeUser({ role: "alias-only-actor", id: "a4" }),
+        ["tools:use"],
+        {
+          mode: "tool",
+          allowed: ["adjust-colors"],
+        },
+      ),
+    ).toBe(false);
   });
 });
 

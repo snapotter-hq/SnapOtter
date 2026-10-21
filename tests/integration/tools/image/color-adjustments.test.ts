@@ -13,6 +13,7 @@ import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
   createMultipartPayload,
+  createUserAndLogin,
   loginAsAdmin,
   type TestApp,
 } from "../../test-server.js";
@@ -1052,8 +1053,8 @@ describe("Sharpness exact boundaries", () => {
   });
 });
 
-// ── Backwards-compatible legacy alias routes (#2826) ──────────
-describe("Legacy alias routes (#2826)", () => {
+// ── Backwards-compatible legacy alias routes (#2826, #2858) ───
+describe("Legacy alias routes (#2826, #2858)", () => {
   it.each([
     ["brightness-contrast", { brightness: 25, contrast: 15 }],
     ["saturation", { saturation: 40 }],
@@ -1078,4 +1079,71 @@ describe("Legacy alias routes (#2826)", () => {
       expect(result.processedSize).toBeGreaterThan(0);
     },
   );
+
+  it("allows an image-category custom role and rejects a video-category custom role on legacy alias routes (#2858)", async () => {
+    const suffix = Date.now().toString(36);
+    const imageRole = `image-alias-${suffix}`;
+    const videoRole = `video-alias-${suffix}`;
+
+    for (const [roleName, allowed] of [
+      [imageRole, ["image"]],
+      [videoRole, ["video"]],
+    ] as const) {
+      const roleRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/roles",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: {
+          name: roleName,
+          permissions: ["tools:use"],
+          toolPermissions: { mode: "category", allowed },
+        },
+      });
+      expect(roleRes.statusCode).toBe(201);
+    }
+
+    const { token: imageToken } = await createUserAndLogin(app, `img-user-${suffix}`, imageRole);
+    const { token: videoToken } = await createUserAndLogin(app, `vid-user-${suffix}`, videoRole);
+
+    const { body: payload, contentType } = makePayload({ brightness: 20 });
+    const allowedRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/brightness-contrast",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${imageToken}`,
+      },
+    });
+    expect(allowedRes.statusCode).toBe(200);
+
+    const deniedRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/brightness-contrast",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${videoToken}`,
+      },
+    });
+    expect(deniedRes.statusCode).toBe(403);
+  });
+
+  it("processes a batch of PNGs via POST /api/v1/tools/image/brightness-contrast/batch (#2858)", async () => {
+    const { body: payload, contentType } = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ brightness: 15 }) },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/brightness-contrast/batch",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect([200, 202]).toContain(res.statusCode);
+  });
 });

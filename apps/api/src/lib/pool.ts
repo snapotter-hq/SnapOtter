@@ -3,12 +3,16 @@ import { hasAiJobHandler } from "../jobs/ai-handlers.js";
 import type { Pool } from "../jobs/types.js";
 
 /** Backwards-compatible route aliases consolidated into canonical catalog tools. */
-const LEGACY_TOOL_ALIASES: Readonly<Record<string, string>> = {
+export const LEGACY_TOOL_ALIASES: Readonly<Record<string, string>> = {
   "brightness-contrast": "adjust-colors",
   saturation: "adjust-colors",
   "color-channels": "adjust-colors",
   "color-effects": "adjust-colors",
 };
+
+export function resolveCanonicalToolId(toolId: string): string {
+  return Object.hasOwn(LEGACY_TOOL_ALIASES, toolId) ? LEGACY_TOOL_ALIASES[toolId] : toolId;
+}
 
 const SECTION_POOL: Readonly<Record<Section, Pool>> = {
   image: "image",
@@ -20,7 +24,7 @@ const SECTION_POOL: Readonly<Record<Section, Pool>> = {
 
 /** ai handler/bundle wins; else the tool's modality decides (spec 4.5). */
 export function resolveToolPool(toolId: string, section?: Section): Pool {
-  const canonicalId = LEGACY_TOOL_ALIASES[toolId] ?? toolId;
+  const canonicalId = resolveCanonicalToolId(toolId);
   if (hasAiJobHandler(canonicalId) || TOOL_BUNDLE_MAP[canonicalId]) return "ai";
   const tool = TOOLS.find((t) => t.id === canonicalId);
   if (tool) return MODALITY_POOL[tool.modality];

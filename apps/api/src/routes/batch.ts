@@ -73,7 +73,7 @@ import {
   storeValidatedOcrPdf,
 } from "../lib/ocr-pdf-ingress.js";
 import { isUniqueViolation } from "../lib/pg-errors.js";
-import { resolveToolPool } from "../lib/pool.js";
+import { resolveCanonicalToolId, resolveToolPool } from "../lib/pool.js";
 import { withRouteScratch } from "../lib/route-scratch.js";
 import { settledFailureResponse } from "../lib/settled-failure.js";
 import { toStorableJson } from "../lib/storable-json.js";
@@ -106,7 +106,8 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
       reply: FastifyReply,
     ) => {
       const { section, toolId } = request.params;
-      const tool = TOOLS.find((t) => t.id === toolId);
+      const canonicalId = resolveCanonicalToolId(toolId);
+      const tool = TOOLS.find((t) => t.id === canonicalId);
       if (!tool || toolSection(tool) !== section) {
         return reply.status(404).send({ error: "Not found", code: "NOT_FOUND" });
       }

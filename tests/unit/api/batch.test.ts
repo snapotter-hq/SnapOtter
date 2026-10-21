@@ -1145,4 +1145,51 @@ describe("batch route spooled multipart ingress (#1239)", () => {
       mocks.getToolConfig.mockImplementation(() => ({ settingsSchema: z.record(z.unknown()) }));
     }
   });
+
+  it.each(["brightness-contrast", "saturation", "color-channels", "color-effects"])(
+    "accepts adjust-colors legacy alias %s under the image section (#2858)",
+    async (aliasId) => {
+      const reply = await invokeBatchRoute({
+        section: "image",
+        toolId: aliasId,
+        parts: [
+          { type: "file", filename: "a.png", content: Buffer.from("png-a") },
+          { type: "file", filename: "b.png", content: Buffer.from("png-b") },
+          { type: "field", fieldname: "settings", value: "{}" },
+          { type: "field", fieldname: "clientJobId", value: `batch-2858-${aliasId}` },
+        ],
+      });
+
+      expect(reply.statusCode).toBe(202);
+      expect(mocks.requireToolAccess).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        aliasId,
+      );
+      expect(mocks.getToolConfig).toHaveBeenCalledWith(aliasId);
+      expect(mocks.flowAdd).toHaveBeenCalledWith(
+        expect.objectContaining({
+          children: expect.arrayContaining([
+            expect.objectContaining({
+              name: aliasId,
+              data: expect.objectContaining({ toolId: aliasId, pool: "image" }),
+            }),
+          ]),
+        }),
+      );
+    },
+  );
+
+  it("rejects adjust-colors legacy aliases under a mismatched section with 404 (#2858)", async () => {
+    const reply = await invokeBatchRoute({
+      section: "video",
+      toolId: "brightness-contrast",
+      parts: [{ type: "file", filename: "a.png", content: Buffer.from("png-a") }],
+    });
+
+    expect(reply.statusCode).toBe(404);
+    expect(reply.payload).toEqual({ error: "Not found", code: "NOT_FOUND" });
+    expect(mocks.requireToolAccess).not.toHaveBeenCalled();
+    expect(mocks.getToolConfig).not.toHaveBeenCalled();
+  });
 });

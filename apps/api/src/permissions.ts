@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { db, schema } from "./db/index.js";
 import { isEnterpriseFeatureEnabled } from "./lib/enterprise-feature.js";
+import { resolveCanonicalToolId } from "./lib/pool.js";
 import { type AuthUser, getAuthUser } from "./plugins/auth.js";
 
 const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
@@ -181,9 +182,11 @@ async function toolPermissionAllows(
 ): Promise<boolean> {
   if (!toolPermissions) return true;
 
+  const canonicalId = resolveCanonicalToolId(toolId);
+
   if (toolPermissions.mode === "category") {
     const { TOOLS } = await import("@snapotter/shared");
-    const tool = TOOLS.find((candidate) => candidate.id === toolId);
+    const tool = TOOLS.find((candidate) => candidate.id === canonicalId);
     if (!tool) return false;
     return toolPermissions.allowed.includes(tool.modality ?? tool.category);
   }
@@ -192,7 +195,9 @@ async function toolPermissionAllows(
     // Preserve the historical graceful degradation behavior: without the
     // enterprise feature, per-tool restrictions behave as unrestricted.
     if (!perToolPermissionEnforced) return true;
-    return toolPermissions.allowed.includes(toolId);
+    return (
+      toolPermissions.allowed.includes(canonicalId) || toolPermissions.allowed.includes(toolId)
+    );
   }
 
   return true;
@@ -217,6 +222,11 @@ async function isToolScopeContained(
 
   if (actorMode === targetMode) {
     const actorAllowed = new Set(actorToolPermissions.allowed);
+    if (actorMode === "tool") {
+      return targetToolPermissions.allowed.every(
+        (allowed) => actorAllowed.has(allowed) || actorAllowed.has(resolveCanonicalToolId(allowed)),
+      );
+    }
     return targetToolPermissions.allowed.every((allowed) => actorAllowed.has(allowed));
   }
 
@@ -227,7 +237,8 @@ async function isToolScopeContained(
   const { TOOLS } = await import("@snapotter/shared");
   const actorAllowed = new Set(actorToolPermissions.allowed);
   return targetToolPermissions.allowed.every((toolId) => {
-    const tool = TOOLS.find((candidate) => candidate.id === toolId);
+    const canonicalId = resolveCanonicalToolId(toolId);
+    const tool = TOOLS.find((candidate) => candidate.id === canonicalId);
     return tool ? actorAllowed.has(tool.modality ?? tool.category) : false;
   });
 }
