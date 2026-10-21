@@ -1274,6 +1274,59 @@ print("RESTORE_3086_OK")
         expect(res.status, res.stderr).toBe(0);
         expect(res.stdout).toContain("RESTORE_3086_OK");
       });
+
+      it("exits 1 and reports an error when cv2.imwrite returns False (issue #3087)", () => {
+        const res = runPy(`
+import contextlib, importlib.util, io, json, os, sys, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+import gpu
+
+spec = importlib.util.spec_from_file_location("restore_mod", os.path.join(py_dir, "restore.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+class FakeImg:
+    shape = (64, 64, 3)
+    def copy(self):
+        return self
+
+mod._IMPORT_ERROR = None
+mod.cv2 = types.SimpleNamespace(
+    IMREAD_COLOR=1,
+    imread=lambda _p, _f: FakeImg(),
+    imwrite=lambda _p, _img: False,
+)
+mod.is_grayscale = lambda _img: False
+gpu.onnx_gpu_available = lambda: False
+
+settings = json.dumps({
+    "scratchRemoval": False,
+    "faceEnhancement": False,
+    "denoise": False,
+    "colorize": False,
+})
+sys.argv = ["restore.py", "/tmp/in.png", "/tmp/out_restore.png", settings]
+out_buf, err_buf = io.StringIO(), io.StringIO()
+try:
+    with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+        mod.main()
+except SystemExit as exc:
+    assert exc.code == 1, exc.code
+    payload = json.loads(out_buf.getvalue().strip())
+    assert payload == {
+        "success": False,
+        "error": "Failed to write output image: /tmp/out_restore.png",
+    }, payload
+else:
+    raise AssertionError(f"Expected SystemExit(1) when cv2.imwrite returns False, got stdout={out_buf.getvalue()!r}")
+
+print("RESTORE_3087_OK")
+`);
+        expect(res.status, res.stderr).toBe(0);
+        expect(res.stdout).toContain("RESTORE_3087_OK");
+      });
     },
   );
 });

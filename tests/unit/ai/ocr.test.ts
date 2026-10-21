@@ -1,4 +1,8 @@
+import { spawnSync } from "node:child_process";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { hasPython, pythonBin } from "../../helpers/python-gate.js";
 
 vi.mock("sharp", () => ({
   default: vi.fn(() => ({
@@ -513,5 +517,70 @@ describe("extractText error and progress behavior", () => {
 
     const result = await extractText(INPUT, "/tmp/ocr", { quality: "fast" });
     expect(result.text).toBe("こんにちは\n안녕하세요\n你好");
+  });
+
+  describe.skipIf(!hasPython)("ocr_preprocess.py cv2.imwrite return check (issue #3087)", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const pyDir = resolve(here, "../../../packages/ai/python");
+
+    it("raises RuntimeError when cv2.imwrite returns False in preprocess()", () => {
+      const res = spawnSync(
+        pythonBin as string,
+        [
+          "-c",
+          `
+import importlib.util, os, sys, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+
+class FakeImg:
+    shape = (64, 64, 3)
+
+fake_cv2 = types.ModuleType("cv2")
+fake_cv2.COLOR_BGR2GRAY = 6
+fake_cv2.COLOR_GRAY2BGR = 8
+fake_cv2.COLOR_BGR2LAB = 44
+fake_cv2.COLOR_LAB2BGR = 56
+fake_cv2.ADAPTIVE_THRESH_GAUSSIAN_C = 1
+fake_cv2.THRESH_BINARY = 0
+fake_cv2.imread = lambda _p: FakeImg()
+fake_cv2.imwrite = lambda _p, _img: False
+fake_cv2.cvtColor = lambda img, _c: img
+fake_cv2.Canny = lambda _g, _a, _b, apertureSize=3: FakeImg()
+fake_cv2.HoughLinesP = lambda *_a, **_k: None
+fake_cv2.split = lambda img: (img, img, img)
+fake_cv2.merge = lambda chs: chs[0]
+fake_cv2.createCLAHE = lambda **_k: types.SimpleNamespace(apply=lambda ch: ch)
+fake_cv2.bilateralFilter = lambda img, *_a: img
+fake_cv2.adaptiveThreshold = lambda img, *_a: img
+sys.modules["cv2"] = fake_cv2
+
+fake_np = types.ModuleType("numpy")
+fake_np.pi = 3.141592653589793
+sys.modules["numpy"] = fake_np
+
+spec = importlib.util.spec_from_file_location("ocr_preprocess_mod", os.path.join(py_dir, "ocr_preprocess.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+try:
+    mod.preprocess("/tmp/in_ocr.png", "/tmp/out_ocr.png")
+except RuntimeError as exc:
+    assert str(exc) == "Failed to write output image: /tmp/out_ocr.png", exc
+else:
+    raise AssertionError("Expected RuntimeError when cv2.imwrite returns False in ocr_preprocess.preprocess")
+
+fake_cv2.imwrite = lambda _p, _img: True
+assert mod.preprocess("/tmp/in_ocr.png", "/tmp/out_ocr.png") == "/tmp/out_ocr.png"
+
+print("OCR_PREPROCESS_3087_OK")
+`,
+        ],
+        { encoding: "utf8", timeout: 30_000 },
+      );
+      expect(res.status, res.stderr).toBe(0);
+      expect(res.stdout).toContain("OCR_PREPROCESS_3087_OK");
+    });
   });
 });

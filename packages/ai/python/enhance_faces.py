@@ -216,10 +216,11 @@ def enhance_with_codeformer(img_array, fidelity_weight):
         img_bgr = img_array[:, :, ::-1].copy()
 
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_in:
-            cv2.imwrite(tmp_in.name, img_bgr)
             tmp_in_path = tmp_in.name
 
         try:
+            if not cv2.imwrite(tmp_in_path, img_bgr):
+                raise RuntimeError(f"Failed to write output image: {tmp_in_path}")
             result_path = inference_app(
                 image=tmp_in_path,
                 background_enhance=False,

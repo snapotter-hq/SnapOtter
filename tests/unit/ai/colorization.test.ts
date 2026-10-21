@@ -1,5 +1,9 @@
+import { spawnSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { hasPython, pythonBin } from "../../helpers/python-gate.js";
 
 vi.mock("sharp", () => {
   const mockSharp = vi.fn(() => ({
@@ -241,6 +245,74 @@ describe("colorize", () => {
       const result = await colorize(FAKE_INPUT, FAKE_OUTPUT_DIR);
       expect(result.width).toBe(0);
       expect(result.height).toBe(0);
+    });
+  });
+
+  describe.skipIf(!hasPython)("colorize.py cv2.imwrite return check (issue #3087)", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const pyDir = resolve(here, "../../../packages/ai/python");
+
+    it("exits 1 and reports an error when cv2.imwrite returns False", () => {
+      const res = spawnSync(
+        pythonBin as string,
+        [
+          "-c",
+          `
+import contextlib, importlib.util, io, json, os, sys, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+
+class FakeImg:
+    shape = (64, 64, 3)
+
+fake_cv2 = types.ModuleType("cv2")
+fake_cv2.IMREAD_COLOR = 1
+fake_cv2.imread = lambda _p, _f: FakeImg()
+fake_cv2.imwrite = lambda _p, _img: False
+sys.modules["cv2"] = fake_cv2
+sys.modules["numpy"] = types.ModuleType("numpy")
+fake_pil = types.ModuleType("PIL")
+fake_pil.Image = types.SimpleNamespace()
+sys.modules["PIL"] = fake_pil
+
+spec = importlib.util.spec_from_file_location("colorize_mod", os.path.join(py_dir, "colorize.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+mod.DDCOLOR_MODEL_PATH = os.path.join(py_dir, "colorize.py")
+mod.colorize_ddcolor = lambda img, _intensity: (img, "ddcolor")
+
+sys.argv = ["colorize.py", "/tmp/in.png", "/tmp/out_colorize.png", json.dumps({"model": "ddcolor"})]
+out_buf, err_buf = io.StringIO(), io.StringIO()
+try:
+    with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+        mod.main()
+except SystemExit as exc:
+    assert exc.code == 1, exc.code
+    payload = json.loads(out_buf.getvalue().strip())
+    assert payload == {
+        "success": False,
+        "error": "Failed to write output image: /tmp/out_colorize.png",
+    }, payload
+else:
+    raise AssertionError(f"Expected SystemExit(1) when cv2.imwrite returns False, got stdout={out_buf.getvalue()!r}")
+
+fake_cv2.imwrite = lambda _p, _img: True
+out_ok, err_ok = io.StringIO(), io.StringIO()
+with contextlib.redirect_stdout(out_ok), contextlib.redirect_stderr(err_ok):
+    mod.main()
+payload_ok = json.loads(out_ok.getvalue().strip())
+assert payload_ok["success"] is True, payload_ok
+assert payload_ok["output_path"] == "/tmp/out_colorize.png", payload_ok
+
+print("COLORIZE_3087_OK")
+`,
+        ],
+        { encoding: "utf8", timeout: 30_000 },
+      );
+      expect(res.status, res.stderr).toBe(0);
+      expect(res.stdout).toContain("COLORIZE_3087_OK");
     });
   });
 });

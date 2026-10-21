@@ -223,7 +223,8 @@ def main():
         emit_progress(90, "Saving result")
 
         # Save output as PNG (API route handles format conversion)
-        cv2.imwrite(output_path, result_bgr)
+        if not cv2.imwrite(output_path, result_bgr):
+            raise RuntimeError(f"Failed to write output image: {output_path}")
 
         print(json.dumps({
             "success": True,

@@ -82,5 +82,6 @@ def preprocess(input_path, output_path):
     image = denoise(image)
     image = binarize(image)
 
-    cv2.imwrite(output_path, image)
+    if not cv2.imwrite(output_path, image):
+        raise RuntimeError(f"Failed to write output image: {output_path}")
     return output_path

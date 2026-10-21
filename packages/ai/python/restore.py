@@ -884,7 +884,8 @@ def main():
             emit_progress(92, "Colorization skipped")
 
         emit_progress(95, "Saving result")
-        cv2.imwrite(output_path, result)
+        if not cv2.imwrite(output_path, result):
+            raise RuntimeError(f"Failed to write output image: {output_path}")
 
         print(json.dumps({
             "success": True,
