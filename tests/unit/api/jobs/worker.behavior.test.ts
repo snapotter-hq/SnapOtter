@@ -2576,6 +2576,7 @@ describe("processPipelineFinalize (#3167, #2703)", () => {
   it.each([
     ["scan.tif", "edit-metadata", "image/tiff", "outputs/pf-ok/preview.webp"],
     ["photo.jxl", "convert", "image/jxl", "outputs/pf-ok/preview.webp"],
+    ["vector.eps", "convert", "application/postscript", "outputs/pf-ok/preview.webp"],
     ["book.epub", "to-epub", "application/epub+zip", undefined],
     ["bundle.zip", "create-zip", "application/zip", undefined],
   ])(
@@ -2655,6 +2656,8 @@ describe("contentTypeForFilename (#2703)", () => {
     ["sprite.qoi", "image/qoi"],
     ["frame.ppm", "image/x-portable-pixmap"],
     ["texture.tga", "image/x-tga"],
+    ["vector.eps", "application/postscript"],
+    ["vector.epsf", "application/postscript"],
     ["raw.dng", "image/x-adobe-dng"],
     ["vector.svgz", "image/svg+xml"],
     ["book.epub", "application/epub+zip"],

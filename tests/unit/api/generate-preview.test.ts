@@ -145,6 +145,34 @@ describe("generatePreview honesty (#746)", () => {
     },
   );
 
+  it("decodes application/postscript EPS output from convert via decodeToSharpCompat before encoding preview.webp (#3183)", async () => {
+    const epsBuffer = readFixture(fixtures.image.formats("eps"));
+    const decodedPng = await sharp({
+      create: { width: 12, height: 12, channels: 3, background: { r: 30, g: 60, b: 90 } },
+    })
+      .png()
+      .toBuffer();
+    const decodeSpy = vi
+      .spyOn(formatDecoders, "decodeToSharpCompat")
+      .mockResolvedValueOnce(decodedPng);
+
+    try {
+      const key = await generatePreview(epsBuffer, "application/postscript", JOB_ID, "convert");
+
+      expect(decodeSpy).toHaveBeenCalledWith(epsBuffer, "eps");
+      expect(key).toBe(`outputs/${JOB_ID}/preview.webp`);
+      expect(putObjectMock).toHaveBeenCalledOnce();
+      const [, previewBytes] = putObjectMock.mock.calls[0] as [string, Buffer];
+      const meta = await sharp(previewBytes).metadata();
+      expect(meta.format).toBe("webp");
+      expect(meta.width).toBe(12);
+      expect(meta.height).toBe(12);
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+    } finally {
+      decodeSpy.mockRestore();
+    }
+  });
+
   it("reports a missing CLI decoder through reportEngineUnavailable and stays non-fatal (#2704)", async () => {
     const decodeSpy = vi
       .spyOn(formatDecoders, "decodeToSharpCompat")

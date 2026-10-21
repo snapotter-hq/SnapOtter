@@ -433,10 +433,10 @@ describe("Animated format preservation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Preview generation for CLI-encoded convert outputs (#2704)
+// Preview generation for CLI-encoded convert outputs (#2704, #3183)
 // ---------------------------------------------------------------------------
 describe("CLI-encoded convert output previews (#2704)", () => {
-  it.each(["ico", "psd", "tga", "jxl", "jp2", "qoi", "ppm"] as const)(
+  it.each(["ico", "psd", "tga", "jxl", "jp2", "qoi", "ppm", "eps"] as const)(
     "returns a working preview.webp when converting png -> %s",
     async (outputFmt) => {
       const input = inputs.png;

@@ -249,6 +249,7 @@ describe("generatePreview", () => {
     ["image/x-cineon", "dpx"],
     ["image/fits", "fits"],
     ["image/x-eps", "eps"],
+    ["application/postscript", "eps"],
   ])(
     "decodes %s via decodeToSharpCompat(%s) before passing to Sharp (#2704)",
     async (contentType, expectedFormat) => {

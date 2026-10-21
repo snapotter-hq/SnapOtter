@@ -136,6 +136,7 @@ const CLI_DECODE_FORMAT_BY_MIME: Readonly<Record<string, string>> = {
   "image/x-cineon": "dpx",
   "image/fits": "fits",
   "image/x-eps": "eps",
+  "application/postscript": "eps",
 };
 
 /**
@@ -169,8 +170,10 @@ export async function generatePreview(
     return key;
   }
 
-  // Image logic unchanged below
-  if (!contentType.startsWith("image/")) return undefined;
+  // Image logic unchanged below (application/postscript is EPS's registered MIME)
+  if (!contentType.startsWith("image/") && contentType !== "application/postscript") {
+    return undefined;
+  }
   if (BROWSER_PREVIEWABLE.has(contentType)) return undefined;
 
   const key = `outputs/${jobId}/preview.webp`;
