@@ -107,9 +107,17 @@ function keepSubscriberSocketProbed(connection: Redis): void {
   connection.once("end", () => clearInterval(timer));
 }
 
-// ioredis 5.11 vs BullMQ's bundled 5.10 type mismatch
+/**
+ * Return plain ConnectionOptions so BullMQ constructs and owns its ioredis
+ * instances (shared: false) and closes them on .close() (#3284).
+ */
 export function createBullMQConnection(): ConnectionOptions {
-  return createRedisConnection() as unknown as ConnectionOptions;
+  return {
+    url: env.REDIS_URL,
+    maxRetriesPerRequest: null,
+    enableReadyCheck: true,
+    socketTimeout: SOCKET_TIMEOUT_MS,
+  };
 }
 
 let _shared: Redis | null = null;

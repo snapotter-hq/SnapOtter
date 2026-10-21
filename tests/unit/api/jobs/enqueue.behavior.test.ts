@@ -11,6 +11,7 @@ const queueEventRun = vi.hoisted(() => vi.fn());
 const queueEventOn = vi.hoisted(() => vi.fn());
 const queueEventsCtor = vi.hoisted(() => vi.fn());
 const flowProducerClose = vi.hoisted(() => vi.fn());
+const flowProducerOn = vi.hoisted(() => vi.fn());
 const assertAiJobQuotaMock = vi.hoisted(() => vi.fn());
 const isFeatureEnabledMock = vi.hoisted(() => vi.fn());
 const propagationInjectMock = vi.hoisted(() => vi.fn());
@@ -51,6 +52,7 @@ async function loadEnqueueModule(
   getJob.mockReset();
   queueEventClose.mockReset();
   flowProducerClose.mockReset();
+  flowProducerOn.mockReset();
   assertAiJobQuotaMock.mockReset();
   isFeatureEnabledMock.mockReset();
   propagationInjectMock.mockReset();
@@ -121,6 +123,7 @@ async function loadEnqueueModule(
     }),
     FlowProducer: vi.fn(() => ({
       close: flowProducerClose,
+      on: flowProducerOn,
     })),
   }));
 
@@ -407,11 +410,18 @@ describe("job enqueue helpers", () => {
     }
   });
 
-  it("getFlowProducer returns the same cached instance on repeated calls", async () => {
+  it("getFlowProducer returns the same cached instance on repeated calls and attaches an error listener", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const { mod } = await loadEnqueueModule();
     const a = mod.getFlowProducer();
     const b = mod.getFlowProducer();
     expect(a).toBe(b);
+    expect(flowProducerOn).toHaveBeenCalledTimes(1);
+    expect(flowProducerOn).toHaveBeenCalledWith("error", expect.any(Function));
+    const handler = flowProducerOn.mock.calls[0][1] as (err: Error) => void;
+    const boom = new Error("flow redis blip");
+    handler(boom);
+    expect(errorSpy).toHaveBeenCalledWith("[flow-producer] connection error", boom);
   });
 
   it("closeFlowProducer is a no-op when no producer was created", async () => {

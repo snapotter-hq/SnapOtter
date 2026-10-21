@@ -23,6 +23,9 @@ export function getQueue(pool: Pool): Queue<ToolJobData, ToolJobResult> {
         removeOnFail: { age: 24 * 3600, count: 5000 },
       },
     });
+    q.on("error", (err) => {
+      console.error(`[queue] ${queueName(pool)} error`, err);
+    });
     queues.set(pool, q);
   }
   return q;
@@ -30,9 +33,9 @@ export function getQueue(pool: Pool): Queue<ToolJobData, ToolJobResult> {
 
 /** Close all queue connections. */
 export async function closeQueues(): Promise<void> {
-  const promises = [...queues.values()].map((q) => q.close());
-  await Promise.all(promises);
+  const entries = [...queues.values()];
   queues.clear();
+  await Promise.all(entries.map((q) => q.close()));
 }
 
 /** Aggregate counts across all pools. */

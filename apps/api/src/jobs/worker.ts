@@ -2656,6 +2656,6 @@ function logHwAccel(): void {
 }
 
 export async function closeWorkers(): Promise<void> {
-  await Promise.all(workers.map((w) => w.close()));
-  workers.length = 0;
+  const entries = workers.splice(0);
+  await Promise.all(entries.map((w) => w.close()));
 }

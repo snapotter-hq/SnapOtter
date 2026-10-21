@@ -72,9 +72,9 @@ async function superviseQueueEvents(pool: Pool, qe: QueueEvents): Promise<void> 
 }
 
 export async function closeQueueEvents(): Promise<void> {
-  const promises = [...queueEventsMap.values()].map((qe) => qe.close());
-  await Promise.all(promises);
+  const entries = [...queueEventsMap.values()];
   queueEventsMap.clear();
+  await Promise.all(entries.map((qe) => qe.close()));
 }
 
 /**
@@ -103,14 +103,18 @@ export function getFlowProducer(): FlowProducer {
     _flowProducer = new FlowProducer({
       connection: createBullMQConnection(),
     });
+    _flowProducer.on("error", (err) => {
+      console.error("[flow-producer] connection error", err);
+    });
   }
   return _flowProducer;
 }
 
 export async function closeFlowProducer(): Promise<void> {
-  if (_flowProducer) {
-    await _flowProducer.close();
-    _flowProducer = null;
+  const fp = _flowProducer;
+  _flowProducer = null;
+  if (fp) {
+    await fp.close();
   }
 }
 

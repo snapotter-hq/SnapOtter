@@ -1,11 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type RedisStub = {
+  status: string;
+  options: Record<string, unknown>;
   ping: ReturnType<typeof vi.fn>;
   quit: ReturnType<typeof vi.fn>;
+  connect: ReturnType<typeof vi.fn>;
+  disconnect: ReturnType<typeof vi.fn>;
+  duplicate: ReturnType<typeof vi.fn>;
+  defineCommand: ReturnType<typeof vi.fn>;
   info: ReturnType<typeof vi.fn>;
+  getMaxListeners: ReturnType<typeof vi.fn>;
+  setMaxListeners: ReturnType<typeof vi.fn>;
   once: ReturnType<typeof vi.fn>;
   on: ReturnType<typeof vi.fn>;
+  off: ReturnType<typeof vi.fn>;
+  removeListener: ReturnType<typeof vi.fn>;
   /** Fires the handler registered via once(), as ioredis would. */
   emitOnce: (event: string) => void;
   /** Fires every handler registered via on(). Throws if none exist, like an EventEmitter "error" would. */
@@ -14,13 +24,55 @@ type RedisStub = {
 
 const { RedisMock, stubs } = vi.hoisted(() => {
   const created: RedisStub[] = [];
-  const mock = vi.fn(function RedisMock() {
+  const mock = vi.fn(function RedisMock(
+    urlOrOpts?: string | Record<string, unknown>,
+    maybeOpts?: Record<string, unknown>,
+  ) {
     const handlers = new Map<string, () => void>();
     const onHandlers = new Map<string, ((...args: unknown[]) => void)[]>();
+    const parsedOpts =
+      typeof urlOrOpts === "string" ? { url: urlOrOpts, ...maybeOpts } : { ...urlOrOpts };
+    let maxListeners = 10;
+    const removeHandler = (event: string, handler: (...args: unknown[]) => void) => {
+      const current = onHandlers.get(event);
+      if (current) {
+        onHandlers.set(
+          event,
+          current.filter((fn) => fn !== handler),
+        );
+      }
+      if (handlers.get(event) === handler) {
+        handlers.delete(event);
+      }
+      return stub;
+    };
     const stub: RedisStub = {
+      status: "ready",
+      options: parsedOpts,
       ping: vi.fn().mockResolvedValue("PONG"),
-      quit: vi.fn().mockResolvedValue("OK"),
+      quit: vi.fn(async () => {
+        stub.status = "end";
+        handlers.get("end")?.();
+        return "OK";
+      }),
+      connect: vi.fn().mockResolvedValue(undefined),
+      disconnect: vi.fn(() => {
+        stub.status = "end";
+        handlers.get("end")?.();
+      }),
+      duplicate: vi.fn((override?: Record<string, unknown>) => {
+        return new (mock as unknown as new (opts: Record<string, unknown>) => RedisStub)({
+          ...parsedOpts,
+          ...override,
+        });
+      }),
+      defineCommand: vi.fn(),
       info: vi.fn().mockResolvedValue("# Server\r\nredis_version:8.0.1\r\n"),
+      getMaxListeners: vi.fn(() => maxListeners),
+      setMaxListeners: vi.fn((n: number) => {
+        maxListeners = n;
+        return stub;
+      }),
       once: vi.fn((event: string, handler: () => void) => {
         handlers.set(event, handler);
         return stub;
@@ -29,6 +81,8 @@ const { RedisMock, stubs } = vi.hoisted(() => {
         onHandlers.set(event, [...(onHandlers.get(event) ?? []), handler]);
         return stub;
       }),
+      off: vi.fn(removeHandler),
+      removeListener: vi.fn(removeHandler),
       emitOnce: (event: string) => handlers.get(event)?.(),
       emitOn: (event: string, ...args: unknown[]) => {
         const listeners = onHandlers.get(event);
@@ -115,20 +169,100 @@ describe("Redis connection factory", () => {
     }
   });
 
-  it("createBullMQConnection builds a command connection and returns the ioredis instance", async () => {
+  it("createBullMQConnection returns plain ConnectionOptions", async () => {
+    const { isRedisInstance } = await import("bullmq");
+    const { env } = await import("../../../../apps/api/src/config.js");
     const { createBullMQConnection } = await freshModule();
 
     const conn = createBullMQConnection();
 
-    // It constructs exactly one command-style connection (ready checks on)...
-    expect(RedisMock).toHaveBeenCalledTimes(1);
-    expect(RedisMock).toHaveBeenCalledWith(expect.any(String), {
+    // Plain options rather than a pre-constructed ioredis instance so BullMQ
+    // sets shared: false on RedisConnection and avoids duplicating an unused
+    // socket inside QueueEvents (#3284).
+    expect(RedisMock).not.toHaveBeenCalled();
+    expect(isRedisInstance(conn)).toBe(false);
+    expect(conn).toEqual({
+      url: env.REDIS_URL,
       enableReadyCheck: true,
       maxRetriesPerRequest: null,
       socketTimeout: SOCKET_TIMEOUT_MS,
     });
-    // ...and hands the raw instance straight through (cast only).
-    expect(conn).toBe(stubs[0]);
+  });
+
+  it("closes every underlying ioredis socket when BullMQ Queue, QueueEvents, Worker, and FlowProducer close", async () => {
+    const { Queue, Worker, QueueEvents, FlowProducer, RedisConnection } = await import("bullmq");
+    const { env } = await import("../../../../apps/api/src/config.js");
+    const { createBullMQConnection } = await freshModule();
+    const rcClass = RedisConnection as unknown as {
+      clientFactory?: (opts: Record<string, unknown>) => unknown;
+    };
+    const prevFactory = rcClass.clientFactory;
+    rcClass.clientFactory = (opts) =>
+      new (RedisMock as unknown as new (o: Record<string, unknown>) => RedisStub)(opts);
+
+    try {
+      const qErrors: Error[] = [];
+      const q = new Queue("test-q", { connection: createBullMQConnection() });
+      q.on("error", (err: Error) => qErrors.push(err));
+      await q.waitUntilReady();
+      expect(stubs).toHaveLength(1);
+      expect(stubs[0].options).toMatchObject({
+        url: env.REDIS_URL,
+        enableReadyCheck: true,
+        maxRetriesPerRequest: null,
+        socketTimeout: SOCKET_TIMEOUT_MS,
+      });
+      stubs[0].emitOn("error", new Error("queue blip"));
+      expect(qErrors).toHaveLength(1);
+      await q.close();
+      expect(stubs[0].quit).toHaveBeenCalledTimes(1);
+      expect(stubs[0].status).toBe("end");
+
+      const qeErrors: Error[] = [];
+      const qe = new QueueEvents("test-qe", {
+        connection: createBullMQConnection(),
+        autorun: false,
+      });
+      qe.on("error", (err: Error) => qeErrors.push(err));
+      await qe.waitUntilReady();
+      expect(stubs).toHaveLength(2);
+      stubs[1].emitOn("error", new Error("qe blip"));
+      expect(qeErrors).toHaveLength(1);
+      await qe.close();
+      expect(stubs[1].disconnect).toHaveBeenCalledTimes(1);
+      expect(stubs[1].quit).toHaveBeenCalledTimes(1);
+      expect(stubs[1].status).toBe("end");
+
+      const workerErrors: Error[] = [];
+      const worker = new Worker("test-w", async () => {}, {
+        connection: createBullMQConnection(),
+        autorun: false,
+      });
+      worker.on("error", (err: Error) => workerErrors.push(err));
+      await worker.waitUntilReady();
+      expect(stubs).toHaveLength(4);
+      stubs[2].emitOn("error", new Error("worker conn blip"));
+      stubs[3].emitOn("error", new Error("worker blocking blip"));
+      expect(workerErrors).toHaveLength(2);
+      await worker.close();
+      expect(stubs[2].quit).toHaveBeenCalledTimes(1);
+      expect(stubs[3].quit).toHaveBeenCalledTimes(1);
+      expect(stubs[2].status).toBe("end");
+      expect(stubs[3].status).toBe("end");
+
+      const fpErrors: Error[] = [];
+      const fp = new FlowProducer({ connection: createBullMQConnection() });
+      fp.on("error", (err: Error) => fpErrors.push(err));
+      await fp.waitUntilReady();
+      expect(stubs).toHaveLength(5);
+      stubs[4].emitOn("error", new Error("fp blip"));
+      expect(fpErrors).toHaveLength(1);
+      await fp.close();
+      expect(stubs[4].quit).toHaveBeenCalledTimes(1);
+      expect(stubs[4].status).toBe("end");
+    } finally {
+      rcClass.clientFactory = prevFactory;
+    }
   });
 
   it("keeps a subscriber socket probed so a dead one can be noticed", async () => {
