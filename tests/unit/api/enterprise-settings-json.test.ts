@@ -199,6 +199,65 @@ describe("enterprise settings JSON resilience (#2554)", () => {
 
       await app.close();
     });
+
+    it("returns empty authHeader instead of *** when stored siem_config has a non-string authHeader (#3237)", async () => {
+      isEnterpriseFeatureEnabledMock.mockResolvedValue(true);
+      requirePermissionMock.mockResolvedValue({ id: "admin-1", username: "admin" });
+
+      const { registerSiemRoutes } = await import(
+        "../../../apps/api/src/routes/enterprise/siem.js"
+      );
+      const app = Fastify();
+      await registerSiemRoutes(app);
+
+      try {
+        for (const badAuthHeader of [123, true, {}, ["Bearer token"], null, "", undefined]) {
+          mockSelectRow(
+            JSON.stringify({
+              webhookUrl: "https://siem.example.com/events",
+              authHeader: badAuthHeader,
+              flushIntervalSeconds: 30,
+              enabled: true,
+            }),
+          );
+
+          const res = await app.inject({
+            method: "GET",
+            url: "/api/v1/enterprise/siem/config",
+          });
+
+          expect(res.statusCode).toBe(200);
+          expect(res.json()).toEqual({
+            webhookUrl: "https://siem.example.com/events",
+            authHeader: "",
+            flushIntervalSeconds: 30,
+            enabled: true,
+          });
+        }
+
+        mockSelectRow(
+          JSON.stringify({
+            webhookUrl: "https://siem.example.com/events",
+            authHeader: "Bearer secret",
+            flushIntervalSeconds: 30,
+            enabled: true,
+          }),
+        );
+        const maskedRes = await app.inject({
+          method: "GET",
+          url: "/api/v1/enterprise/siem/config",
+        });
+        expect(maskedRes.statusCode).toBe(200);
+        expect(maskedRes.json()).toEqual({
+          webhookUrl: "https://siem.example.com/events",
+          authHeader: "***",
+          flushIntervalSeconds: 30,
+          enabled: true,
+        });
+      } finally {
+        await app.close();
+      }
+    });
   });
 
   describe("PUT /api/v1/enterprise/siem/config", () => {
@@ -635,6 +694,181 @@ describe("enterprise settings JSON resilience (#2554)", () => {
           ],
           { maxRetries: 0 },
         );
+      } finally {
+        await app.close();
+      }
+    });
+  });
+
+  describe("GET /api/v1/enterprise/webhooks (#3237)", () => {
+    it("returns empty authHeader on GET /api/v1/enterprise/webhooks when stored authHeader is not a string (#3237)", async () => {
+      isEnterpriseFeatureEnabledMock.mockResolvedValue(true);
+      requirePermissionMock.mockResolvedValue({ id: "admin-1", username: "admin" });
+      mockSelectRow(
+        JSON.stringify([
+          {
+            name: "Number Auth Hook",
+            url: "https://example.com/hook-number",
+            authHeader: 123,
+            eventFilter: [],
+            batchIntervalSeconds: 30,
+            enabled: true,
+            type: "alerts",
+          },
+          {
+            name: "Boolean Auth Hook",
+            url: "https://example.com/hook-bool",
+            authHeader: true,
+            eventFilter: [],
+            batchIntervalSeconds: 30,
+            enabled: true,
+            type: "siem",
+          },
+          {
+            name: "Object Auth Hook",
+            url: "https://example.com/hook-obj",
+            authHeader: { token: "secret" },
+            eventFilter: [],
+            batchIntervalSeconds: 30,
+            enabled: true,
+            type: "alerts",
+          },
+          {
+            name: "Array Auth Hook",
+            url: "https://example.com/hook-arr",
+            authHeader: ["Bearer token"],
+            eventFilter: [],
+            batchIntervalSeconds: 30,
+            enabled: true,
+            type: "alerts",
+          },
+          {
+            name: "Null Auth Hook",
+            url: "https://example.com/hook-null",
+            authHeader: null,
+            eventFilter: [],
+            batchIntervalSeconds: 30,
+            enabled: true,
+            type: "alerts",
+          },
+          {
+            name: "Omitted Auth Hook",
+            url: "https://example.com/hook-omitted",
+            eventFilter: [],
+            batchIntervalSeconds: 30,
+            enabled: true,
+            type: "alerts",
+          },
+          {
+            name: "Empty String Auth Hook",
+            url: "https://example.com/hook-empty",
+            authHeader: "",
+            eventFilter: [],
+            batchIntervalSeconds: 30,
+            enabled: true,
+            type: "alerts",
+          },
+          {
+            name: "Valid Auth Hook",
+            url: "https://example.com/hook-valid",
+            authHeader: "Bearer token",
+            eventFilter: [],
+            batchIntervalSeconds: 30,
+            enabled: true,
+            type: "alerts",
+          },
+        ]),
+      );
+
+      const { registerWebhookRoutes } = await import(
+        "../../../apps/api/src/routes/enterprise/webhooks.js"
+      );
+      const app = Fastify();
+      await registerWebhookRoutes(app);
+
+      try {
+        const res = await app.inject({
+          method: "GET",
+          url: "/api/v1/enterprise/webhooks",
+        });
+
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toEqual({
+          destinations: [
+            {
+              name: "Number Auth Hook",
+              url: "https://example.com/hook-number",
+              authHeader: "",
+              eventFilter: [],
+              batchIntervalSeconds: 30,
+              enabled: true,
+              type: "alerts",
+            },
+            {
+              name: "Boolean Auth Hook",
+              url: "https://example.com/hook-bool",
+              authHeader: "",
+              eventFilter: [],
+              batchIntervalSeconds: 30,
+              enabled: true,
+              type: "siem",
+            },
+            {
+              name: "Object Auth Hook",
+              url: "https://example.com/hook-obj",
+              authHeader: "",
+              eventFilter: [],
+              batchIntervalSeconds: 30,
+              enabled: true,
+              type: "alerts",
+            },
+            {
+              name: "Array Auth Hook",
+              url: "https://example.com/hook-arr",
+              authHeader: "",
+              eventFilter: [],
+              batchIntervalSeconds: 30,
+              enabled: true,
+              type: "alerts",
+            },
+            {
+              name: "Null Auth Hook",
+              url: "https://example.com/hook-null",
+              authHeader: "",
+              eventFilter: [],
+              batchIntervalSeconds: 30,
+              enabled: true,
+              type: "alerts",
+            },
+            {
+              name: "Omitted Auth Hook",
+              url: "https://example.com/hook-omitted",
+              authHeader: "",
+              eventFilter: [],
+              batchIntervalSeconds: 30,
+              enabled: true,
+              type: "alerts",
+            },
+            {
+              name: "Empty String Auth Hook",
+              url: "https://example.com/hook-empty",
+              authHeader: "",
+              eventFilter: [],
+              batchIntervalSeconds: 30,
+              enabled: true,
+              type: "alerts",
+            },
+            {
+              name: "Valid Auth Hook",
+              url: "https://example.com/hook-valid",
+              authHeader: "***",
+              eventFilter: [],
+              batchIntervalSeconds: 30,
+              enabled: true,
+              type: "alerts",
+            },
+          ],
+        });
       } finally {
         await app.close();
       }

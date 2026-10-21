@@ -132,7 +132,7 @@ export async function registerWebhookRoutes(app: FastifyInstance): Promise<void>
     // Mask auth headers in response
     const masked = destinations.map((d) => ({
       ...d,
-      authHeader: d.authHeader ? "***" : "",
+      authHeader: typeof d.authHeader === "string" && d.authHeader ? "***" : "",
     }));
 
     return reply.send({ destinations: masked });

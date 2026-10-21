@@ -81,7 +81,7 @@ export async function registerSiemRoutes(app: FastifyInstance): Promise<void> {
 
       return reply.send({
         ...config,
-        authHeader: config.authHeader ? "***" : "",
+        authHeader: typeof config.authHeader === "string" && config.authHeader ? "***" : "",
       });
     },
   );
