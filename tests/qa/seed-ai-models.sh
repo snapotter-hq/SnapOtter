@@ -256,7 +256,7 @@ install_background_removal() {
   # --- pip packages ---
   pip_install "onnxruntime==1.20.1" || true  # likely already installed
   pip_install "mediapipe>=0.10.18"  || true  # likely already installed
-  pip_install "rembg==2.0.62"       || { fail "rembg pip failed"; BUNDLE_STATUS[background-removal]="FAILED: pip rembg"; return 1; }
+  pip_install "rembg==2.0.69"       || { fail "rembg pip failed"; BUNDLE_STATUS[background-removal]="FAILED: pip rembg"; return 1; }
 
   # --- Standard rembg sessions (6 models) ---
   local STANDARD_SESSIONS=("u2net" "isnet-general-use" "bria-rmbg" "birefnet-general-lite" "birefnet-portrait" "birefnet-general")
