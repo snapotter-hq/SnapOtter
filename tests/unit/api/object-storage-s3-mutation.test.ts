@@ -967,6 +967,21 @@ describe("object-storage S3 dispatch (STORAGE_MODE=s3)", () => {
       /Invalid object key/,
     );
     expect(s3.putObject).not.toHaveBeenCalled();
+
+    const streamSource = new Readable({
+      read() {
+        this.push(Buffer.from("x"));
+        this.push(null);
+      },
+      destroy(_err, callback) {
+        callback(new Error("destroy-time source error"));
+      },
+    });
+    await expect(putObjectStream("uploads/../etc/passwd", streamSource)).rejects.toThrow(
+      /Invalid object key/,
+    );
+    expect(streamSource.destroyed).toBe(true);
+    expect(s3.putStream).not.toHaveBeenCalled();
   });
 
   it("configures the S3 client once with the exact env credentials, then memoizes", async () => {

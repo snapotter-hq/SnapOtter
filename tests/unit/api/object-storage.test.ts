@@ -182,8 +182,9 @@ describe("object-storage (local backend)", () => {
       await expect(objectExists(unavailableKey)).resolves.toBe(false);
 
       // Pre-aborted timeout signal (e.g., shared uploadSignal expired before extra output).
+      const preAbortedSource = Readable.from([Buffer.from("extra")]);
       await expect(
-        putObjectStream(unavailableKey, Readable.from([Buffer.from("extra")]), {
+        putObjectStream(unavailableKey, preAbortedSource, {
           signal: timeoutSignal,
         }),
       ).rejects.toMatchObject({
@@ -194,6 +195,7 @@ describe("object-storage (local backend)", () => {
         statusCode: 503,
         cause: timeoutSignal.reason,
       });
+      expect(preAbortedSource.destroyed).toBe(true);
       await expect(objectExists(unavailableKey)).resolves.toBe(false);
 
       // Node's pipeline(..., { signal }) wraps a signal timeout in AbortError({ cause: TimeoutError }).
@@ -1540,6 +1542,87 @@ describe("object-storage missing-key + robustness paths", () => {
       /maxBytes/i,
     );
     expect(source.destroyed).toBe(true);
+  });
+
+  it("destroys the source stream when putObjectStream fails before pipeline() (#2797)", async () => {
+    const makeSource = () =>
+      new Readable({
+        read() {
+          this.push(Buffer.from("payload"));
+          this.push(null);
+        },
+        destroy(_err, callback) {
+          callback(new Error("destroy-time source error"));
+        },
+      });
+
+    // 1. Entry assertValidKey failure.
+    const invalidKeySource = makeSource();
+    const invalidKeyErr = await putObjectStream("outputs/job-1/.", invalidKeySource).catch(
+      (e: unknown) => e,
+    );
+    expect(invalidKeyErr).toBeInstanceOf(Error);
+    expect((invalidKeyErr as Error).message).toMatch(/invalid object key/i);
+    expect((invalidKeyErr as { statusCode?: unknown }).statusCode).toBeUndefined();
+    expect(invalidKeySource.destroyed).toBe(true);
+
+    // 2. Pre-aborted AbortSignal at entry (before any "abort" event fires).
+    const preAbortedController = new AbortController();
+    preAbortedController.abort();
+    const preAbortedSource = makeSource();
+    await expect(
+      putObjectStream(`outputs/pre-abort-${process.pid}/out.bin`, preAbortedSource, {
+        signal: preAbortedController.signal,
+      }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(preAbortedSource.destroyed).toBe(true);
+
+    // 3. assertLocalCapacity() rejecting with 503 workspace-cap before pipeline().
+    const originalWorkspace = env.WORKSPACE_PATH;
+    const originalMaxGb = env.MAX_WORKSPACE_SIZE_GB;
+    const capRoot = mkdtempSync(join(tmpdir(), "snapotter-stream-cap-"));
+    const seededDir = join(capRoot, "uploads", "job-1");
+    await mkdir(seededDir, { recursive: true });
+    await writeFile(join(seededDir, "a.bin"), Buffer.alloc(2 * 1024 * 1024));
+    (env as { WORKSPACE_PATH: string }).WORKSPACE_PATH = capRoot;
+    (env as { MAX_WORKSPACE_SIZE_GB: number }).MAX_WORKSPACE_SIZE_GB = 0.001;
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(9_200_000_000_000);
+    try {
+      const capSource = makeSource();
+      await expect(putObjectStream("outputs/job-1/out.bin", capSource)).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "workspace-cap",
+        statusCode: 503,
+      });
+      expect(capSource.destroyed).toBe(true);
+    } finally {
+      nowSpy.mockRestore();
+      (env as { WORKSPACE_PATH: string }).WORKSPACE_PATH = originalWorkspace;
+      (env as { MAX_WORKSPACE_SIZE_GB: number }).MAX_WORKSPACE_SIZE_GB = originalMaxGb;
+      rmSync(capRoot, { recursive: true, force: true });
+    }
+
+    // 4. Pre-pipeline mkdir failure (file blocking the job directory).
+    const blockerJobId = `stream-blocker-${process.pid}`;
+    const blockerPath = join(env.WORKSPACE_PATH, "outputs", blockerJobId);
+    await mkdir(join(env.WORKSPACE_PATH, "outputs"), { recursive: true });
+    writeFileSync(blockerPath, "x");
+    try {
+      const mkdirSource = makeSource();
+      await expect(
+        putObjectStream(`outputs/${blockerJobId}/out.bin`, mkdirSource),
+      ).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-write-failed",
+        statusCode: 503,
+        cause: expect.objectContaining({ syscall: "mkdir" }),
+      });
+      expect(mkdirSource.destroyed).toBe(true);
+    } finally {
+      rmSync(blockerPath, { force: true });
+    }
   });
 
   it("silently ignores deleting an object that is not present", async () => {

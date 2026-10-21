@@ -323,7 +323,20 @@ export async function putObjectStream(
   source: Readable,
   opts: { maxBytes?: number; signal?: AbortSignal } = {},
 ): Promise<number> {
-  assertValidKey(key);
+  const destroySource = () => {
+    if (!source.destroyed) {
+      if (source.listenerCount("error") === 0) source.once("error", () => {});
+      source.destroy();
+    }
+  };
+  let p = "";
+  try {
+    assertValidKey(key);
+    if (!isS3Enabled()) p = localPath(key);
+  } catch (err) {
+    destroySource();
+    throw err;
+  }
   const abortSource = () => {
     const reason =
       opts.signal?.reason instanceof Error
@@ -371,10 +384,7 @@ export async function putObjectStream(
         opts.signal?.throwIfAborted();
         return written;
       } catch (error) {
-        if (!source.destroyed) {
-          if (source.listenerCount("error") === 0) source.once("error", () => {});
-          source.destroy();
-        }
+        destroySource();
         if (streamStarted) {
           await s3?.deleteGenericObject(key).catch((err) => {
             logger.warn({ err, key }, "Failed to delete partial S3 upload");
@@ -393,7 +403,6 @@ export async function putObjectStream(
       opts.signal?.removeEventListener("abort", abortSource);
     }
   }
-  const p = localPath(key);
   const stagingDir = join(dirname(p), ".snapotter-staging");
   const stagingPath = join(stagingDir, `${basename(p)}.${randomUUID()}.partial`);
   let stagingOwned = false;
@@ -422,6 +431,7 @@ export async function putObjectStream(
       await rename(stagingPath, p);
       await rmdir(stagingDir).catch(() => {});
     } catch (err) {
+      destroySource();
       if (stagingOwned) await unlink(stagingPath).catch(() => {});
       await rmdir(stagingDir).catch(() => {});
       throw localWriteFault(err);
