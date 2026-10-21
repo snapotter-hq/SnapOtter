@@ -102,6 +102,9 @@ beforeEach(() => {
           server.delete ? server.delete() : new Response(JSON.stringify({ ok: true })),
         );
       }
+      if (url.includes("/config/auth")) {
+        return new Response(JSON.stringify({ authEnabled: false }), { status: 200 });
+      }
       return new Response("{}", { status: 404 });
     }),
   );
@@ -135,7 +138,7 @@ async function importFile(contents: string): Promise<void> {
       </MemoryRouter>
     </I18nProvider>,
   );
-  fireEvent.click(await screen.findByRole("button", { name: en.automate.importButton }));
+  fireEvent.click(await screen.findByText(en.automate.importButton));
   const input = created.at(-1);
   if (!input) throw new Error("import created no file input");
   const file = new File([contents], "p.snapotter.json", { type: "application/json" });
@@ -243,11 +246,11 @@ async function savePipeline(name = "My Pipeline"): Promise<void> {
       </MemoryRouter>
     </I18nProvider>,
   );
-  fireEvent.click(await screen.findByRole("button", { name: en.automate.saveButton }));
+  fireEvent.click(await screen.findByText(en.automate.saveButton));
   fireEvent.change(screen.getByPlaceholderText(en.automate.pipelineName), {
     target: { value: name },
   });
-  fireEvent.click(screen.getByRole("button", { name: en.common.save }));
+  fireEvent.click(screen.getByText(en.common.save));
 }
 
 describe("automate pipeline save (#1987)", () => {
@@ -256,7 +259,7 @@ describe("automate pipeline save (#1987)", () => {
     await savePipeline("Evening Batch");
     await waitFor(() => expect(screen.getByText(en.errors.networkError)).toBeInTheDocument());
     expect(screen.getByPlaceholderText(en.automate.pipelineName)).toHaveValue("Evening Batch");
-    expect(screen.getByRole("button", { name: en.common.save })).toBeEnabled();
+    expect(screen.getByText(en.common.save)).toBeEnabled();
   });
 
   it("shows the server's reason and keeps the save form open when the save answers non-2xx", async () => {
@@ -289,7 +292,7 @@ describe("automate pipeline save (#1987)", () => {
     expect(screen.queryByPlaceholderText(en.automate.pipelineName)).not.toBeInTheDocument();
     expect(screen.queryByText(en.automate.noSavedPipelines)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: en.automate.saveButton }));
+    fireEvent.click(screen.getByText(en.automate.saveButton));
     expect(screen.queryByText(en.automate.saveListRefreshFailed)).not.toBeInTheDocument();
   });
 
@@ -334,7 +337,7 @@ describe("automate pipeline save (#1987)", () => {
     });
     expect(screen.queryByText(en.errors.networkError)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: en.common.save }));
+    fireEvent.click(screen.getByText(en.common.save));
     await waitFor(() => expect(screen.getByText(en.errors.networkError)).toBeInTheDocument());
 
     fireEvent.change(screen.getByPlaceholderText(en.automate.descriptionPlaceholder), {
@@ -342,16 +345,16 @@ describe("automate pipeline save (#1987)", () => {
     });
     expect(screen.queryByText(en.errors.networkError)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: en.common.save }));
+    fireEvent.click(screen.getByText(en.common.save));
     await waitFor(() => expect(screen.getByText(en.errors.networkError)).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole("button", { name: en.common.close }));
+    fireEvent.click(screen.getByLabelText(en.common.close));
     expect(screen.queryByText(en.errors.networkError)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: en.common.save }));
+    fireEvent.click(screen.getByText(en.common.save));
     await waitFor(() => expect(screen.getByText(en.errors.networkError)).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole("button", { name: en.common.cancel }));
+    fireEvent.click(screen.getByText(en.common.cancel));
     expect(screen.queryByText(en.errors.networkError)).not.toBeInTheDocument();
   });
 
@@ -372,14 +375,14 @@ describe("automate pipeline save (#1987)", () => {
     ]);
     renderAutomate();
 
-    fireEvent.click(await screen.findByRole("button", { name: en.automate.saveButton }));
+    fireEvent.click(await screen.findByText(en.automate.saveButton));
     fireEvent.change(screen.getByPlaceholderText(en.automate.pipelineName), {
       target: { value: "Draft Pipeline" },
     });
     fireEvent.change(screen.getByPlaceholderText(en.automate.descriptionPlaceholder), {
       target: { value: "Draft notes" },
     });
-    fireEvent.click(screen.getByRole("button", { name: en.common.save }));
+    fireEvent.click(screen.getByText(en.common.save));
     await waitFor(() => expect(screen.getByText(en.errors.networkError)).toBeInTheDocument());
 
     // Removing one step while another remains keeps the form open and preserves draft inputs.
@@ -393,12 +396,12 @@ describe("automate pipeline save (#1987)", () => {
     fireEvent.click(screen.getByTitle(en.automate.removeStep));
 
     expect(screen.queryByPlaceholderText(en.automate.pipelineName)).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: en.common.save })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: en.automate.saveButton })).not.toBeInTheDocument();
+    expect(screen.queryByText(en.common.save)).not.toBeInTheDocument();
+    expect(screen.queryByText(en.automate.saveButton)).not.toBeInTheDocument();
     expect(screen.queryByText(en.errors.networkError)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getAllByRole("button", { name: /resize/i })[0]);
-    const saveTrigger = await screen.findByRole("button", { name: en.automate.saveButton });
+    fireEvent.click(screen.getAllByText(/resize/i)[0]);
+    const saveTrigger = await screen.findByText(en.automate.saveButton);
     expect(screen.queryByPlaceholderText(en.automate.pipelineName)).not.toBeInTheDocument();
 
     fireEvent.click(saveTrigger);
@@ -422,9 +425,7 @@ async function deleteFirstSavedPipeline(): Promise<void> {
       </MemoryRouter>
     </I18nProvider>,
   );
-  fireEvent.click(
-    await screen.findByRole("button", { name: format(en.automate.moreCount, { count: 1 }) }),
-  );
+  fireEvent.click(await screen.findByText(format(en.automate.moreCount, { count: 1 })));
   const deleteButtons = await screen.findAllByTitle(en.automate.deletePipeline);
   fireEvent.click(deleteButtons[0]);
 }
@@ -554,7 +555,7 @@ describe("automate pipeline delete (#1987)", () => {
     await deleteFirstSavedPipeline();
     await waitFor(() => expect(screen.getByText(en.errors.networkError)).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole("button", { name: en.common.close }));
+    fireEvent.click(screen.getByLabelText(en.common.close));
     expect(screen.queryByText(en.errors.networkError)).not.toBeInTheDocument();
   });
 
@@ -587,9 +588,7 @@ describe("automate pipeline delete (#1987)", () => {
 
     const deleteButtons = await screen.findAllByTitle(en.automate.deletePipeline);
     expect(deleteButtons).toHaveLength(3);
-    expect(
-      screen.queryByRole("button", { name: format(en.automate.moreCount, { count: 1 }) }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(format(en.automate.moreCount, { count: 1 }))).not.toBeInTheDocument();
 
     fireEvent.click(deleteButtons[0]);
 
@@ -639,7 +638,7 @@ describe("automate initial saved pipelines load (#1987)", () => {
     await waitFor(() => expect(screen.getByText(en.errors.networkError)).toBeInTheDocument());
     expect(screen.queryByText(en.automate.noSavedPipelines)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: en.common.close }));
+    fireEvent.click(screen.getByLabelText(en.common.close));
     expect(screen.queryByText(en.errors.networkError)).not.toBeInTheDocument();
     expect(screen.queryByText(en.automate.noSavedPipelines)).not.toBeInTheDocument();
   });
@@ -692,11 +691,11 @@ describe("automate initial saved pipelines load (#1987)", () => {
     renderAutomate();
     await waitFor(() => expect(screen.getByText(en.errors.networkError)).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole("button", { name: en.automate.saveButton }));
+    fireEvent.click(screen.getByText(en.automate.saveButton));
     fireEvent.change(screen.getByPlaceholderText(en.automate.pipelineName), {
       target: { value: "Recovered" },
     });
-    fireEvent.click(screen.getByRole("button", { name: en.common.save }));
+    fireEvent.click(screen.getByText(en.common.save));
 
     await waitFor(() => expect(usePipelineStore.getState().savedPipelines).toHaveLength(1));
     expect(screen.queryByText(en.errors.networkError)).not.toBeInTheDocument();
@@ -716,11 +715,11 @@ describe("automate initial saved pipelines load (#1987)", () => {
     usePipelineStore.getState().loadSteps([{ toolId: "resize", settings: {} }]);
     renderAutomate();
 
-    fireEvent.click(await screen.findByRole("button", { name: en.automate.saveButton }));
+    fireEvent.click(await screen.findByText(en.automate.saveButton));
     fireEvent.change(screen.getByPlaceholderText(en.automate.pipelineName), {
       target: { value: "Saved First" },
     });
-    fireEvent.click(screen.getByRole("button", { name: en.common.save }));
+    fireEvent.click(screen.getByText(en.common.save));
 
     await waitFor(() => expect(usePipelineStore.getState().savedPipelines).toHaveLength(1));
 

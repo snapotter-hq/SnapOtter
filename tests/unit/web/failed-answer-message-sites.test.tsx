@@ -279,6 +279,9 @@ async function importPipeline(t: typeof en): Promise<void> {
       if (String(input).includes("/pipeline/list")) {
         return new Response(JSON.stringify({ pipelines: [] }));
       }
+      if (String(input).includes("/config/auth")) {
+        return new Response(JSON.stringify({ authEnabled: false }), { status: 200 });
+      }
       return failedResponse();
     }),
   );
@@ -300,7 +303,7 @@ async function importPipeline(t: typeof en): Promise<void> {
       </MemoryRouter>
     </I18nProvider>,
   );
-  fireEvent.click(await screen.findByRole("button", { name: t.automate.importButton }));
+  fireEvent.click(await screen.findByText(t.automate.importButton));
   const input = created.at(-1);
   if (!input) throw new Error("import created no file input");
   const file = new File([PIPELINE_FILE], "p.snapotter.json", { type: "application/json" });

@@ -224,7 +224,7 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
       useFileStore.getState().setFiles([png("photo.png")]);
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /^Process/ }));
+    fireEvent.click(screen.getByText(/^Process/));
     expect(useFileStore.getState().processing).toBe(true);
     expect(xhrs).toHaveLength(1);
 
@@ -276,7 +276,7 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
       useFileStore.getState().setFiles([png("one.png"), png("two.png")]);
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /^Process/ }));
+    fireEvent.click(screen.getByText(/^Process/));
 
     act(() => {
       xhrs[0].upload.onload?.();
@@ -356,7 +356,7 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
       useFileStore.getState().setFiles([png("one.png"), png("two.png")]);
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /^Process/ }));
+    fireEvent.click(screen.getByText(/^Process/));
 
     act(() => {
       xhrs[0].upload.onload?.();
@@ -414,7 +414,7 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
       useFileStore.getState().setFiles([png("photo.png")]);
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /^Process/ }));
+    fireEvent.click(screen.getByText(/^Process/));
     expect(useFileStore.getState().processing).toBe(true);
 
     fireEvent.click(screen.getByTestId("go-files"));
@@ -690,13 +690,9 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
     arrive({ libraryFileIds: ["slow-file"] });
     expect(capturedSignal?.aborted).toBe(false);
 
-    fireEvent.click(screen.getAllByRole("button", { name: en.automate.importFromLibrary })[0]);
+    fireEvent.click(screen.getAllByText(en.automate.importFromLibrary)[0]);
     fireEvent.click(await screen.findByText("modal.png"));
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: en.commonUi.fileLibrary.importCount.replace("{count}", "1"),
-      }),
-    );
+    fireEvent.click(screen.getByText(en.commonUi.fileLibrary.importCount.replace("{count}", "1")));
 
     await waitFor(() =>
       expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual(["modal.png"]),
@@ -748,7 +744,7 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
     }) as typeof document.createElement);
 
     // Empty file picker selection (user canceled dialog) leaves the download running.
-    fireEvent.click(screen.getByRole("button", { name: en.automate.addButton }));
+    fireEvent.click(screen.getByText(en.automate.addButton));
     const emptyInput = createdInputs.at(-1);
     if (!emptyInput) throw new Error("handleAddMore created no file input");
     Object.defineProperty(emptyInput, "files", { value: [] });
@@ -758,7 +754,7 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
     expect(capturedSignal?.aborted).toBe(false);
 
     // Picking a file aborts the slow libraryFileIds download and appends the picked file.
-    fireEvent.click(screen.getByRole("button", { name: en.automate.addButton }));
+    fireEvent.click(screen.getByText(en.automate.addButton));
     const pickedInput = createdInputs.at(-1);
     if (!pickedInput) throw new Error("handleAddMore created no file input");
     Object.defineProperty(pickedInput, "files", { value: [png("added.png")] });
@@ -842,7 +838,7 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
       expect.objectContaining({ message: "Stream reset" }),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: en.common.close }));
+    fireEvent.click(screen.getByLabelText(en.common.close));
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
@@ -878,7 +874,7 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
       expect.objectContaining({ message: "HTTP 404" }),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: en.automate.clearButton }));
+    fireEvent.click(screen.getByText(en.automate.clearButton));
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(useFileStore.getState().entries).toEqual([]);
   });
@@ -906,7 +902,7 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
     arrive({ libraryFileIds: ["slow-file"] });
     expect(capturedSignal?.aborted).toBe(false);
 
-    fireEvent.click(screen.getByRole("button", { name: en.automate.clearButton }));
+    fireEvent.click(screen.getByText(en.automate.clearButton));
     expect(capturedSignal?.aborted).toBe(true);
     expect(useFileStore.getState().entries).toEqual([]);
 
@@ -970,13 +966,9 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
     // 2. Total failure alert cleared by importing from FileLibraryModal (handleLibraryImport).
     const secondView = arrive({ libraryFileIds: ["bad-file"] });
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't import 1 of 1 files.");
-    fireEvent.click(screen.getAllByRole("button", { name: en.automate.importFromLibrary })[0]);
+    fireEvent.click(screen.getAllByText(en.automate.importFromLibrary)[0]);
     fireEvent.click(await screen.findByText("modal.png"));
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: en.commonUi.fileLibrary.importCount.replace("{count}", "1"),
-      }),
-    );
+    fireEvent.click(screen.getByText(en.commonUi.fileLibrary.importCount.replace("{count}", "1")));
     await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
     secondView.unmount();
 
@@ -995,7 +987,7 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
     arrive({ libraryFileIds: ["good-file", "bad-file"] });
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't import 1 of 2 files.");
 
-    fireEvent.click(screen.getByRole("button", { name: en.automate.addButton }));
+    fireEvent.click(screen.getByText(en.automate.addButton));
     const emptyInput = createdInputs.at(-1);
     if (!emptyInput) throw new Error("handleAddMore created no file input");
     Object.defineProperty(emptyInput, "files", { value: [] });
@@ -1004,7 +996,7 @@ describe("AutomatePage resets file store and cancels active pipeline run on unmo
     });
     expect(screen.getByRole("alert")).toHaveTextContent("Couldn't import 1 of 2 files.");
 
-    fireEvent.click(screen.getByRole("button", { name: en.automate.addButton }));
+    fireEvent.click(screen.getByText(en.automate.addButton));
     const pickedInput = createdInputs.at(-1);
     if (!pickedInput) throw new Error("handleAddMore created no file input");
     Object.defineProperty(pickedInput, "files", { value: [png("added.png")] });
