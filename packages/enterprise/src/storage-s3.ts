@@ -77,11 +77,42 @@ function thumbKey(storedName: string): string {
   return `${prefix}thumbs/${storedName}.thumb.jpg`;
 }
 
+function armResponseBodyTimeout<T>(body: T): T {
+  if (typeof body !== "object" || body === null) {
+    return body;
+  }
+  const socketTimeout = cfg().socketTimeout ?? S3_SOCKET_TIMEOUT_MS;
+  const readable = body as {
+    setTimeout?: (msecs: number, callback: () => void) => unknown;
+    destroy?: (err?: Error) => void;
+    listenerCount?: (event: string) => number;
+    once?: (event: string, listener: () => void) => void;
+    socket?: unknown;
+  };
+  if (
+    socketTimeout > 0 &&
+    typeof readable.setTimeout === "function" &&
+    (!("socket" in readable) || Boolean(readable.socket))
+  ) {
+    readable.setTimeout(socketTimeout, () => {
+      const timeoutError = Object.assign(
+        new Error(`S3 response body stream timed out after ${socketTimeout} ms of inactivity`),
+        { name: "TimeoutError", code: "ETIMEDOUT" },
+      );
+      if (typeof readable.listenerCount === "function" && readable.listenerCount("error") === 0) {
+        readable.once?.("error", () => {});
+      }
+      readable.destroy?.(timeoutError);
+    });
+  }
+  return body;
+}
+
 function requireObjectBody(response: GetObjectCommandOutput, key: string) {
   if (!response.Body) {
     throw new Error(`S3 object response for ${key} did not include a body`);
   }
-  return response.Body;
+  return armResponseBodyTimeout(response.Body);
 }
 
 export async function checkConnection(): Promise<void> {
@@ -353,7 +384,7 @@ export async function getGenericObjectStream(
     params.Range = `bytes=${range.start}-${range.end ?? ""}`;
   }
   const response = await getClient().send(new GetObjectCommand(params));
-  return response.Body as Readable;
+  return armResponseBodyTimeout(response.Body) as Readable;
 }
 
 export async function getGenericObjectSize(key: string): Promise<number> {

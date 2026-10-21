@@ -149,6 +149,97 @@ describe("S3Client stalled endpoint timeout (#2755)", () => {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
   });
+
+  it("arms the idle socket timeout on S3 response body streams when headers arrive under 3s and rejects mid-body stalls (#2773)", async () => {
+    const sockets = new Set<net.Socket>();
+    const server = http.createServer((_req, res) => {
+      res.writeHead(200, { "Content-Length": "1000" });
+      res.write("hello");
+    });
+    server.on("connection", (socket) => sockets.add(socket));
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as net.AddressInfo;
+
+    try {
+      // 1. Default S3_SOCKET_TIMEOUT_MS (30,000 ms >= 6,000 ms): @smithy/node-http-handler
+      // defers setSocketTimeout by 3,000 ms and clearTimeouts() cancels it when headers
+      // arrive in <3s. Verify the response body stream still arms socket.timeout.
+      s3.configureS3({
+        bucket: "stalled-body-bucket",
+        region: "us-east-1",
+        endpoint: `http://127.0.0.1:${port}`,
+        accessKeyId: "k",
+        secretAccessKey: "s",
+        forcePathStyle: true,
+        prefix: "",
+      });
+
+      const objStream = await s3.getObjectStream("photo.png");
+      expect((objStream as { socket?: { timeout?: number } }).socket?.timeout).toBe(
+        s3.S3_SOCKET_TIMEOUT_MS,
+      );
+      objStream.destroy();
+
+      const genericStream = await s3.getGenericObjectStream("outputs/job-1/result.png");
+      expect((genericStream as { socket?: { timeout?: number } }).socket?.timeout).toBe(
+        s3.S3_SOCKET_TIMEOUT_MS,
+      );
+      genericStream.destroy();
+
+      // 2. Short socketTimeout: mid-body stalls after fast 200 OK headers reject with
+      // TimeoutError (code: ETIMEDOUT) across getObject, getThumbnail, getObjectStream,
+      // and getGenericObjectStream.
+      s3.configureS3({
+        bucket: "stalled-body-bucket",
+        region: "us-east-1",
+        endpoint: `http://127.0.0.1:${port}`,
+        accessKeyId: "k",
+        secretAccessKey: "s",
+        forcePathStyle: true,
+        prefix: "",
+        socketTimeout: 80,
+      });
+
+      const getObjectErr = await Promise.race([
+        s3.getObject("photo.png").then(
+          () => null,
+          (err: unknown) => err,
+        ),
+        new Promise<string>((resolve) => setTimeout(() => resolve("HUNG"), 5000)),
+      ]);
+      expect(getObjectErr).toBeInstanceOf(Error);
+      expect(getObjectErr).toMatchObject({ name: "TimeoutError", code: "ETIMEDOUT" });
+      expect(s3.isMissingObjectError(getObjectErr)).toBe(false);
+
+      const getThumbErr = await Promise.race([
+        s3.getThumbnail("photo.png").then(
+          () => null,
+          (err: unknown) => err,
+        ),
+        new Promise<string>((resolve) => setTimeout(() => resolve("HUNG"), 5000)),
+      ]);
+      expect(getThumbErr).toBeInstanceOf(Error);
+      expect(getThumbErr).toMatchObject({ name: "TimeoutError", code: "ETIMEDOUT" });
+      expect(s3.isMissingObjectError(getThumbErr)).toBe(false);
+
+      const streamToConsume = await s3.getGenericObjectStream("outputs/job-1/result.png");
+      const streamErr = await Promise.race([
+        (async () => {
+          for await (const _chunk of streamToConsume) {
+            // consume until stalled body times out
+          }
+          return null;
+        })().catch((err: unknown) => err),
+        new Promise<string>((resolve) => setTimeout(() => resolve("HUNG"), 5000)),
+      ]);
+      expect(streamErr).toBeInstanceOf(Error);
+      expect(streamErr).toMatchObject({ name: "TimeoutError", code: "ETIMEDOUT" });
+      expect(s3.isMissingObjectError(streamErr)).toBe(false);
+    } finally {
+      for (const socket of sockets) socket.destroy();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
 });
 
 describe("checkConnection missing-bucket normalization (#996)", () => {

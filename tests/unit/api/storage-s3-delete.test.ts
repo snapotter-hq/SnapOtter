@@ -31,7 +31,9 @@ const {
   deleteGenericPrefix,
   deleteObject,
   deleteThumbnail,
+  getGenericObjectStream,
   getObject,
+  getObjectStream,
   getThumbnail,
   putThumbnail,
 } = await import("../../../packages/enterprise/src/storage-s3.js");
@@ -472,5 +474,118 @@ describe("S3Client requestHandler timeouts (#2755)", () => {
       connectionTimeout: 0,
       socketTimeout: 0,
     });
+  });
+
+  it("arms an idle socket timeout on response body streams and destroys the stream with TimeoutError on inactivity (#2773)", async () => {
+    const createTimedStream = () => {
+      let timeoutHandler: (() => void) | undefined;
+      const stream = Object.assign(new PassThrough(), {
+        setTimeout: vi.fn((_ms: number, cb: () => void) => {
+          timeoutHandler = cb;
+          return stream;
+        }),
+        transformToByteArray: () =>
+          new Promise<Uint8Array>((_resolve, reject) => {
+            if (!timeoutHandler) {
+              reject(new Error("body.setTimeout was not called"));
+              return;
+            }
+            stream.once("error", reject);
+            timeoutHandler();
+          }),
+      });
+      return { stream, triggerTimeout: () => timeoutHandler?.() };
+    };
+
+    const objBody = createTimedStream();
+    send.mockResolvedValueOnce({ Body: objBody.stream });
+    await expect(getObject("photo.png")).rejects.toMatchObject({
+      name: "TimeoutError",
+      code: "ETIMEDOUT",
+    });
+    expect(objBody.stream.setTimeout).toHaveBeenCalledWith(
+      S3_SOCKET_TIMEOUT_MS,
+      expect.any(Function),
+    );
+
+    const thumbBody = createTimedStream();
+    send.mockResolvedValueOnce({ Body: thumbBody.stream });
+    await expect(getThumbnail("photo.png")).rejects.toMatchObject({
+      name: "TimeoutError",
+      code: "ETIMEDOUT",
+    });
+    expect(thumbBody.stream.setTimeout).toHaveBeenCalledWith(
+      S3_SOCKET_TIMEOUT_MS,
+      expect.any(Function),
+    );
+
+    const objStreamBody = createTimedStream();
+    send.mockResolvedValueOnce({ Body: objStreamBody.stream });
+    const returnedObjStream = await getObjectStream("photo.png");
+    expect(returnedObjStream).toBe(objStreamBody.stream);
+    expect(objStreamBody.stream.setTimeout).toHaveBeenCalledWith(
+      S3_SOCKET_TIMEOUT_MS,
+      expect.any(Function),
+    );
+
+    const genericStreamBody = createTimedStream();
+    send.mockResolvedValueOnce({ Body: genericStreamBody.stream });
+    const returnedGenericStream = await getGenericObjectStream("outputs/job-1/result.png");
+    expect(returnedGenericStream).toBe(genericStreamBody.stream);
+    expect(genericStreamBody.stream.setTimeout).toHaveBeenCalledWith(
+      S3_SOCKET_TIMEOUT_MS,
+      expect.any(Function),
+    );
+
+    // Triggering the timeout before a consumer attaches an error listener must
+    // not emit an uncaught error event.
+    const uncaught: unknown[] = [];
+    const onUncaught = (err: unknown) => uncaught.push(err);
+    process.on("uncaughtException", onUncaught);
+    try {
+      genericStreamBody.triggerTimeout();
+      await new Promise((r) => setImmediate(r));
+    } finally {
+      process.off("uncaughtException", onUncaught);
+    }
+    expect(uncaught).toEqual([]);
+    expect(genericStreamBody.stream.destroyed).toBe(true);
+  });
+
+  it("skips body.setTimeout when socketTimeout is 0 or the response socket is null (#2773)", async () => {
+    configureS3({
+      bucket: "b",
+      region: "us-east-1",
+      endpoint: "",
+      accessKeyId: "k",
+      secretAccessKey: "s",
+      forcePathStyle: true,
+      prefix: "",
+      socketTimeout: 0,
+    });
+    const zeroTimeoutStream = Object.assign(new PassThrough(), {
+      setTimeout: vi.fn(),
+    });
+    send.mockResolvedValueOnce({ Body: zeroTimeoutStream });
+    await getGenericObjectStream("outputs/job-1/result.png");
+    expect(zeroTimeoutStream.setTimeout).not.toHaveBeenCalled();
+
+    configureS3({
+      bucket: "b",
+      region: "us-east-1",
+      endpoint: "",
+      accessKeyId: "k",
+      secretAccessKey: "s",
+      forcePathStyle: true,
+      prefix: "",
+      socketTimeout: 500,
+    });
+    const nullSocketStream = Object.assign(new PassThrough(), {
+      socket: null,
+      setTimeout: vi.fn(),
+    });
+    send.mockResolvedValueOnce({ Body: nullSocketStream });
+    await getGenericObjectStream("outputs/job-1/result.png");
+    expect(nullSocketStream.setTimeout).not.toHaveBeenCalled();
   });
 });
