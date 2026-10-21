@@ -29,13 +29,21 @@ vi.mock("../../../apps/api/src/config.js", () => ({
   },
 }));
 
+vi.mock("../../../apps/api/src/lib/object-storage.js", () => ({
+  getObjectBuffer: vi.fn(),
+}));
+
 vi.mock("@snapotter/doc-engine", () => ({
   gsCompressPdfTuned: vi.fn(),
   htmlToPdfPy: vi.fn(),
   pdfFlattenPy: vi.fn(),
+  pdfMetadataGetPy: vi.fn(async () => ({ Title: "Updated" })),
+  pdfMetadataSetPy: vi.fn(),
   pdfRedactPy: vi.fn(async () => ({ found: 3 })),
   pdfScrubProducerPy: vi.fn(),
+  pdfSignPy: vi.fn(async () => ({ placed: 1 })),
   pdfTextPy: vi.fn(async () => ({ chars: 12, hasText: true })),
+  pdfToWordPy: vi.fn(),
   qpdfAvailable: vi.fn(() => false),
   qpdfCheck: vi.fn(),
   qpdfPageCount: vi.fn(),
@@ -51,20 +59,30 @@ import {
   gsCompressPdfTuned,
   htmlToPdfPy,
   pdfFlattenPy,
+  pdfMetadataGetPy,
+  pdfMetadataSetPy,
   pdfRedactPy,
   pdfScrubProducerPy,
+  pdfSignPy,
   pdfTextPy,
+  pdfToWordPy,
   runPandoc,
 } from "@snapotter/doc-engine";
 import type { FastifyInstance } from "fastify";
+import { runAiToolJob } from "../../../apps/api/src/jobs/ai-handlers.js";
+import type { ToolJobData } from "../../../apps/api/src/jobs/types.js";
+import { getObjectBuffer } from "../../../apps/api/src/lib/object-storage.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerCompressPdf } from "../../../apps/api/src/routes/tools/compress-pdf.js";
 import { registerEpubConvert } from "../../../apps/api/src/routes/tools/epub-convert.js";
 import { registerFlattenPdf } from "../../../apps/api/src/routes/tools/flatten-pdf.js";
 import { registerHtmlToPdf } from "../../../apps/api/src/routes/tools/html-to-pdf.js";
 import { registerMarkdownToPdf } from "../../../apps/api/src/routes/tools/markdown-to-pdf.js";
+import { registerPdfMetadata } from "../../../apps/api/src/routes/tools/pdf-metadata.js";
 import { registerPdfToText } from "../../../apps/api/src/routes/tools/pdf-to-text.js";
+import { registerPdfToWord } from "../../../apps/api/src/routes/tools/pdf-to-word.js";
 import { registerRedactPdf } from "../../../apps/api/src/routes/tools/redact-pdf.js";
+import "../../../apps/api/src/routes/tools/sign-pdf.js";
 import { registerToEpub } from "../../../apps/api/src/routes/tools/to-epub.js";
 import { pairwise } from "../../helpers/pairwise.js";
 import { pairwiseSettingsFor } from "../../helpers/tool-default-settings.js";
@@ -111,6 +129,7 @@ describe("document route processors", () => {
       expect(pdfTextPy).toHaveBeenCalledWith(
         join(scratchDir, "in-Quarterly_Report.pdf"),
         join(scratchDir, "Quarterly Report.txt"),
+        { signal: ctx.signal },
       );
       expect(await readFile(join(scratchDir, "in-Quarterly_Report.pdf"))).toEqual(
         Buffer.from("input"),
@@ -150,6 +169,7 @@ describe("document route processors", () => {
       expect(pdfFlattenPy).toHaveBeenCalledWith(
         join(scratchDir, "in-form.v2.pdf"),
         join(scratchDir, "form.v2_flattened.pdf"),
+        { signal: ctx.signal },
       );
       expect(ctx.report).toHaveBeenNthCalledWith(1, 10, "Flattening");
       expect(ctx.report).toHaveBeenNthCalledWith(2, 90, "Done");
@@ -173,6 +193,7 @@ describe("document route processors", () => {
         join(scratchDir, "in-landing_page.html"),
         join(scratchDir, "landing page.pdf"),
         "html",
+        { signal: ctx.signal },
       );
       expect(ctx.report).toHaveBeenNthCalledWith(1, 10, "Converting");
       expect(ctx.report).toHaveBeenNthCalledWith(2, 90, "Done");
@@ -196,6 +217,7 @@ describe("document route processors", () => {
         join(scratchDir, "in-release-notes.md"),
         join(scratchDir, "release-notes.pdf"),
         "markdown",
+        { signal: ctx.signal },
       );
       expect(ctx.report).toHaveBeenNthCalledWith(1, 10, "Converting");
       expect(ctx.report).toHaveBeenNthCalledWith(2, 90, "Done");
@@ -293,6 +315,156 @@ describe("document route processors", () => {
       );
     });
   });
+
+  it("converts PDFs to Word through pdfToWordPy with ctx.signal", async () => {
+    registerPdfToWord(createMockApp());
+    const config = getToolConfig("pdf-to-word");
+
+    await withScratch(async (scratchDir) => {
+      const ctx = createCtx(scratchDir, "contract draft.pdf");
+      const result = await config?.processV2?.(ctx);
+
+      expect(pdfToWordPy).toHaveBeenCalledWith(
+        join(scratchDir, "in-contract_draft.pdf"),
+        join(scratchDir, "contract draft.docx"),
+        { signal: ctx.signal },
+      );
+      expect(ctx.report).toHaveBeenNthCalledWith(1, 10, "Converting");
+      expect(ctx.report).toHaveBeenNthCalledWith(2, 90, "Done");
+      expect(result).toEqual({
+        scratchPath: join(scratchDir, "contract draft.docx"),
+        filename: "contract draft.docx",
+        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      });
+    });
+  });
+
+  it("writes and reads back PDF metadata through pdfMetadataSetPy and pdfMetadataGetPy with ctx.signal", async () => {
+    registerPdfMetadata(createMockApp());
+    const config = getToolConfig("pdf-metadata");
+
+    await withScratch(async (scratchDir) => {
+      const ctx = {
+        ...createCtx(scratchDir, "whitepaper.pdf"),
+        settings: { title: "Updated", author: "" },
+      };
+      const result = await config?.processV2?.(ctx);
+
+      expect(pdfMetadataSetPy).toHaveBeenCalledWith(
+        join(scratchDir, "in-whitepaper.pdf"),
+        join(scratchDir, "whitepaper_metadata.pdf"),
+        { Title: "Updated", Author: "" },
+        { signal: ctx.signal },
+      );
+      expect(pdfMetadataGetPy).toHaveBeenCalledWith(join(scratchDir, "whitepaper_metadata.pdf"), {
+        signal: ctx.signal,
+      });
+      expect(ctx.report).toHaveBeenNthCalledWith(1, 10, "Setting metadata");
+      expect(ctx.report).toHaveBeenNthCalledWith(2, 90, "Done");
+      expect(result).toEqual({
+        scratchPath: join(scratchDir, "whitepaper_metadata.pdf"),
+        filename: "whitepaper_metadata.pdf",
+        contentType: "application/pdf",
+        resultPayload: { metadata: { Title: "Updated" } },
+      });
+    });
+  });
+});
+
+describe("sign-pdf AI job handler", () => {
+  function createSignJobData(): ToolJobData {
+    return {
+      jobId: "job-sign-1",
+      toolId: "sign-pdf",
+      userId: null,
+      pool: "docs",
+      inputRefs: [
+        "uploads/job-sign-1/in.pdf",
+        "uploads/job-sign-1/sig0.png",
+        "uploads/job-sign-1/sig1.png",
+      ],
+      filename: "agreement.pdf",
+      settings: {
+        placements: [
+          { sig: 0, page: 0, x: 0.1, y: 0.2, w: 0.3, h: 0.1 },
+          { sig: 1, page: 0, x: 0.5, y: 0.2, w: 0.3, h: 0.1 },
+        ],
+      },
+      kind: "ai-tool",
+    };
+  }
+
+  it("fetches signature parts and forwards ctx.signal to pdfSignPy", async () => {
+    vi.mocked(getObjectBuffer)
+      .mockResolvedValueOnce(Buffer.from("sig-zero"))
+      .mockResolvedValueOnce(Buffer.from("sig-one"));
+    vi.mocked(pdfSignPy).mockImplementationOnce(async (_inPath: string, outPath: string) => {
+      await writeFile(outPath, Buffer.from("signed-pdf-bytes"));
+      return { placed: 2 };
+    });
+
+    await withScratch(async (scratchDir) => {
+      const ctx = createCtx(scratchDir, "agreement.pdf");
+      const output = await runAiToolJob(createSignJobData(), Buffer.from("pdf-bytes"), ctx);
+
+      expect(getObjectBuffer).toHaveBeenCalledTimes(2);
+      expect(pdfSignPy).toHaveBeenCalledWith(
+        expect.stringMatching(/in\.pdf$/),
+        expect.stringMatching(/out\.pdf$/),
+        [expect.stringMatching(/sig0\.png$/), expect.stringMatching(/sig1\.png$/)],
+        [
+          { sig: 0, page: 0, x: 0.1, y: 0.2, w: 0.3, h: 0.1 },
+          { sig: 1, page: 0, x: 0.5, y: 0.2, w: 0.3, h: 0.1 },
+        ],
+        { signal: ctx.signal },
+      );
+      expect(output).toEqual({
+        buffer: Buffer.from("signed-pdf-bytes"),
+        filename: "agreement_signed.pdf",
+        contentType: "application/pdf",
+      });
+    });
+  });
+
+  it("stops fetching remaining signature parts and skips pdfSignPy when ctx.signal aborts mid-loop", async () => {
+    const ac = new AbortController();
+    vi.mocked(getObjectBuffer).mockImplementationOnce(async () => {
+      ac.abort(new DOMException("The operation was aborted", "AbortError"));
+      return Buffer.from("sig-zero");
+    });
+
+    await withScratch(async (scratchDir) => {
+      const ctx = { ...createCtx(scratchDir, "agreement.pdf"), signal: ac.signal };
+      await expect(
+        runAiToolJob(createSignJobData(), Buffer.from("pdf-bytes"), ctx),
+      ).rejects.toMatchObject({ name: "AbortError" });
+
+      expect(getObjectBuffer).toHaveBeenCalledTimes(1);
+      expect(pdfSignPy).not.toHaveBeenCalled();
+      expect(ctx.report).not.toHaveBeenCalled();
+    });
+  });
+
+  it("skips stamping and pdfSignPy when ctx.signal aborts during the final signature fetch", async () => {
+    const ac = new AbortController();
+    vi.mocked(getObjectBuffer)
+      .mockResolvedValueOnce(Buffer.from("sig-zero"))
+      .mockImplementationOnce(async () => {
+        ac.abort(new DOMException("The operation was aborted", "AbortError"));
+        return Buffer.from("sig-one");
+      });
+
+    await withScratch(async (scratchDir) => {
+      const ctx = { ...createCtx(scratchDir, "agreement.pdf"), signal: ac.signal };
+      await expect(
+        runAiToolJob(createSignJobData(), Buffer.from("pdf-bytes"), ctx),
+      ).rejects.toMatchObject({ name: "AbortError" });
+
+      expect(getObjectBuffer).toHaveBeenCalledTimes(2);
+      expect(pdfSignPy).not.toHaveBeenCalled();
+      expect(ctx.report).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("redact-pdf route processor (no PyMuPDF)", () => {
@@ -327,6 +499,7 @@ describe("redact-pdf route processor (no PyMuPDF)", () => {
         join(scratchDir, "annual report_redacted.pdf"),
         ["Alice", "SSN"],
         true,
+        { signal: ctx.signal },
       );
       // The buffer actually landed on disk at the sanitized path.
       expect(await readFile(join(scratchDir, "in-annual_report.pdf"))).toEqual(
@@ -356,6 +529,7 @@ describe("redact-pdf route processor (no PyMuPDF)", () => {
         join(scratchDir, "doc_redacted.pdf"),
         ["confidential"],
         false,
+        { signal: ctx.signal },
       );
     });
   });
@@ -378,6 +552,7 @@ describe("redact-pdf route processor (no PyMuPDF)", () => {
         join(scratchDir, "My Secret (v2)/../evil_redacted.pdf"),
         ["x"],
         false,
+        { signal: ctx.signal },
       );
       // base is filename with the final extension stripped, unsanitized.
       expect(result?.filename).toBe("My Secret (v2)/../evil_redacted.pdf");

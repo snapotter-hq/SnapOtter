@@ -23,7 +23,7 @@ export function registerPdfToText(app: FastifyInstance) {
 
       const outPath = join(ctx.scratchDir, `${base}.txt`);
       ctx.report(10, "Extracting text");
-      const result = await pdfTextPy(inPath, outPath);
+      const result = await pdfTextPy(inPath, outPath, { signal: ctx.signal });
       // A scanned or image-only PDF has no text layer, so extraction returns an
       // empty file. Rather than hand back a silent 0-byte "success", tell the
       // user to run OCR instead (#589).

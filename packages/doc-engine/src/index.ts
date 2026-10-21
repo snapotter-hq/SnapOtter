@@ -43,6 +43,7 @@ export {
   type TextStampOptions,
 } from "./pdfcpu.js";
 export {
+  type DocsScriptOptions,
   htmlToPdfPy,
   pdfFlattenPy,
   pdfMetadataGetPy,

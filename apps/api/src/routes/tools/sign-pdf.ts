@@ -253,13 +253,17 @@ registerAiJobHandler(TOOL_ID, async (input, data, ctx) => {
     await writeFile(inPath, input);
     const sigPaths: string[] = [];
     for (let i = 1; i < data.inputRefs.length; i++) {
+      ctx.signal.throwIfAborted();
       const buf = await getObjectBuffer(data.inputRefs[i]);
       const p = join(dir, `sig${i - 1}.png`);
       await writeFile(p, buf);
       sigPaths.push(p);
     }
+    ctx.signal.throwIfAborted();
     ctx.report(20, "stamping");
-    await pdfSignPy(inPath, outPath, sigPaths, placements as SignPlacement[]);
+    await pdfSignPy(inPath, outPath, sigPaths, placements as SignPlacement[], {
+      signal: ctx.signal,
+    });
     ctx.report(90, "saving");
     const buffer = await readFile(outPath);
     const outName = `${data.filename.replace(/\.[^.]+$/, "")}_signed.pdf`;

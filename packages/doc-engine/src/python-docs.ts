@@ -73,9 +73,32 @@ function formatDocsError(error: unknown, stdout: string): string {
   return trimmed || stdout.slice(0, 200);
 }
 
+export interface DocsScriptOptions {
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}
+
+function buildDocsRunOpts(
+  opts?: DocsScriptOptions,
+  defaultTimeoutMs?: number,
+): DocsScriptOptions | undefined {
+  const timeoutMs = opts?.timeoutMs ?? defaultTimeoutMs;
+  const signal = opts?.signal;
+  if (timeoutMs === undefined && signal === undefined) return undefined;
+  return {
+    ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+    ...(signal !== undefined ? { signal } : {}),
+  };
+}
+
 /** Page count via the docs-profile Python dispatcher (pikepdf). */
-export async function pdfPageCountPy(absPath: string): Promise<number> {
-  const stdout = await runDocsScript("doc_pagecount", { path: absPath });
+export async function pdfPageCountPy(absPath: string, opts?: DocsScriptOptions): Promise<number> {
+  const runOpts = buildDocsRunOpts(opts);
+  const stdout = await runDocsScript(
+    "doc_pagecount",
+    { path: absPath },
+    ...(runOpts ? [runOpts] : []),
+  );
   const parsed = parseDocsJson<{ pages?: number; error?: string }>("doc_pagecount", stdout);
   if ("error" in parsed || typeof parsed.pages !== "number") {
     throw new Error(`doc_pagecount failed: ${formatDocsError(parsed.error, stdout)}`);
@@ -84,8 +107,17 @@ export async function pdfPageCountPy(absPath: string): Promise<number> {
 }
 
 /** Flatten forms/annotations into page content (PyMuPDF bake). */
-export async function pdfFlattenPy(inPath: string, outPath: string): Promise<void> {
-  const stdout = await runDocsScript("doc_flatten", { path: inPath, out: outPath });
+export async function pdfFlattenPy(
+  inPath: string,
+  outPath: string,
+  opts?: DocsScriptOptions,
+): Promise<void> {
+  const runOpts = buildDocsRunOpts(opts);
+  const stdout = await runDocsScript(
+    "doc_flatten",
+    { path: inPath, out: outPath },
+    ...(runOpts ? [runOpts] : []),
+  );
   const parsed = parseDocsJson<{ ok?: boolean; error?: string }>("doc_flatten", stdout);
   if ("error" in parsed) {
     throw new Error(`doc_flatten failed: ${formatDocsError(parsed.error, stdout)}`);
@@ -97,8 +129,17 @@ export async function pdfFlattenPy(inPath: string, outPath: string): Promise<voi
  * the conversion engine's self-promotion (LibreOffice, Ghostscript, pdfcpu,
  * WeasyPrint, PDFKit). Encrypted files are copied through untouched.
  */
-export async function pdfScrubProducerPy(inPath: string, outPath: string): Promise<void> {
-  const stdout = await runDocsScript("doc_scrub_meta", { path: inPath, out: outPath });
+export async function pdfScrubProducerPy(
+  inPath: string,
+  outPath: string,
+  opts?: DocsScriptOptions,
+): Promise<void> {
+  const runOpts = buildDocsRunOpts(opts);
+  const stdout = await runDocsScript(
+    "doc_scrub_meta",
+    { path: inPath, out: outPath },
+    ...(runOpts ? [runOpts] : []),
+  );
   const parsed = parseDocsJson<{ ok?: boolean; error?: string }>("doc_scrub_meta", stdout);
   if ("error" in parsed) {
     throw new Error(`doc_scrub_meta failed: ${formatDocsError(parsed.error, stdout)}`);
@@ -111,13 +152,19 @@ export async function pdfRedactPy(
   outPath: string,
   terms: string[],
   caseSensitive: boolean,
+  opts?: DocsScriptOptions,
 ): Promise<{ found: number }> {
-  const stdout = await runDocsScript("doc_redact", {
-    path: inPath,
-    out: outPath,
-    terms,
-    caseSensitive,
-  });
+  const runOpts = buildDocsRunOpts(opts);
+  const stdout = await runDocsScript(
+    "doc_redact",
+    {
+      path: inPath,
+      out: outPath,
+      terms,
+      caseSensitive,
+    },
+    ...(runOpts ? [runOpts] : []),
+  );
   const parsed = parseDocsJson<{
     found?: number;
     verified?: boolean;
@@ -136,8 +183,14 @@ export async function pdfRedactPy(
 export async function pdfTextPy(
   inPath: string,
   outTxtPath: string,
+  opts?: DocsScriptOptions,
 ): Promise<{ chars: number; hasText: boolean }> {
-  const stdout = await runDocsScript("doc_text", { path: inPath, out: outTxtPath });
+  const runOpts = buildDocsRunOpts(opts);
+  const stdout = await runDocsScript(
+    "doc_text",
+    { path: inPath, out: outTxtPath },
+    ...(runOpts ? [runOpts] : []),
+  );
   const parsed = parseDocsJson<{ chars?: number; hasText?: boolean; error?: string }>(
     "doc_text",
     stdout,
@@ -154,11 +207,15 @@ export async function pdfTextPy(
 }
 
 /** PDF to DOCX conversion (pdf2docx). Long-running: 5 min timeout. */
-export async function pdfToWordPy(inPath: string, outPath: string): Promise<void> {
+export async function pdfToWordPy(
+  inPath: string,
+  outPath: string,
+  opts?: DocsScriptOptions,
+): Promise<void> {
   const stdout = await runDocsScript(
     "doc_to_word",
     { path: inPath, out: outPath },
-    { timeoutMs: 300_000 },
+    buildDocsRunOpts(opts, 300_000),
   );
   const parsed = parseDocsJson<{ ok?: boolean; error?: string }>("doc_to_word", stdout);
   if ("error" in parsed) {
@@ -167,8 +224,16 @@ export async function pdfToWordPy(inPath: string, outPath: string): Promise<void
 }
 
 /** Read PDF document metadata (pikepdf docinfo). */
-export async function pdfMetadataGetPy(inPath: string): Promise<Record<string, string>> {
-  const stdout = await runDocsScript("doc_metadata", { path: inPath, mode: "get" });
+export async function pdfMetadataGetPy(
+  inPath: string,
+  opts?: DocsScriptOptions,
+): Promise<Record<string, string>> {
+  const runOpts = buildDocsRunOpts(opts);
+  const stdout = await runDocsScript(
+    "doc_metadata",
+    { path: inPath, mode: "get" },
+    ...(runOpts ? [runOpts] : []),
+  );
   const parsed = parseDocsJson<{ metadata?: Record<string, string>; error?: string }>(
     "doc_metadata",
     stdout,
@@ -187,13 +252,19 @@ export async function pdfMetadataSetPy(
   inPath: string,
   outPath: string,
   metadata: Record<string, string>,
+  opts?: DocsScriptOptions,
 ): Promise<void> {
-  const stdout = await runDocsScript("doc_metadata", {
-    path: inPath,
-    out: outPath,
-    mode: "set",
-    metadata,
-  });
+  const runOpts = buildDocsRunOpts(opts);
+  const stdout = await runDocsScript(
+    "doc_metadata",
+    {
+      path: inPath,
+      out: outPath,
+      mode: "set",
+      metadata,
+    },
+    ...(runOpts ? [runOpts] : []),
+  );
   const parsed = parseDocsJson<{ ok?: boolean; error?: string }>("doc_metadata", stdout);
   if ("error" in parsed) {
     throw new Error(`doc_metadata set failed: ${formatDocsError(parsed.error, stdout)}`);
@@ -205,15 +276,12 @@ export async function htmlToPdfPy(
   inPath: string,
   outPath: string,
   mode: "html" | "markdown",
-  opts?: { timeoutMs?: number; signal?: AbortSignal },
+  opts?: DocsScriptOptions,
 ): Promise<void> {
   const stdout = await runDocsScript(
     "doc_html_pdf",
     { path: inPath, out: outPath, mode },
-    {
-      timeoutMs: opts?.timeoutMs ?? 120_000,
-      ...(opts?.signal ? { signal: opts.signal } : {}),
-    },
+    buildDocsRunOpts(opts, 120_000),
   );
   const parsed = parseDocsJson<{ ok?: boolean; error?: string }>("doc_html_pdf", stdout);
   if ("error" in parsed) {
@@ -231,13 +299,19 @@ export async function pdfSignPy(
   outPath: string,
   signatures: string[],
   placements: SignPlacement[],
+  opts?: DocsScriptOptions,
 ): Promise<{ placed: number }> {
-  const stdout = await runDocsScript("doc_sign", {
-    input: inPath,
-    output: outPath,
-    signatures,
-    placements,
-  });
+  const runOpts = buildDocsRunOpts(opts);
+  const stdout = await runDocsScript(
+    "doc_sign",
+    {
+      input: inPath,
+      output: outPath,
+      signatures,
+      placements,
+    },
+    ...(runOpts ? [runOpts] : []),
+  );
   const parsed = parseDocsJson<{
     ok?: boolean;
     placed?: number;

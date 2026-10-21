@@ -22,7 +22,7 @@ export function registerHtmlToPdf(app: FastifyInstance) {
 
       const outPath = join(ctx.scratchDir, `${base}.pdf`);
       ctx.report(10, "Converting");
-      await htmlToPdfPy(inPath, outPath, "html");
+      await htmlToPdfPy(inPath, outPath, "html", { signal: ctx.signal });
       ctx.report(90, "Done");
 
       return {

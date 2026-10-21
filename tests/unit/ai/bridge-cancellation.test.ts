@@ -178,4 +178,44 @@ describe("Python bridge cancellation", () => {
 
     await bridge.shutdownDocsDispatcher();
   });
+
+  it("recovers a concurrent docs request via per-request fallback when a sibling docs request aborts the shared dispatcher", async () => {
+    const docsDispatcherProc = createMockProcess();
+    const fallbackRequestProc = createMockProcess();
+    vi.mocked(spawn)
+      .mockReturnValueOnce(docsDispatcherProc.process)
+      .mockReturnValueOnce(fallbackRequestProc.process);
+
+    const bridge = await import("../../../packages/ai/src/bridge.js");
+    const ready = bridge.getDocsDispatcher().init();
+    docsDispatcherProc.stderr.emit("data", Buffer.from('{"ready":true,"gpu":false}\n'));
+    await ready;
+
+    const canceledAc = new AbortController();
+    const siblingAc = new AbortController();
+    const canceledRun = bridge.runDocsScript(
+      "doc_sign",
+      { input: "/a.pdf", output: "/a-out.pdf", signatures: ["s.png"], placements: [] },
+      { signal: canceledAc.signal },
+    );
+    const siblingRun = bridge.runDocsScript(
+      "doc_pagecount",
+      { path: "/b.pdf" },
+      { signal: siblingAc.signal },
+    );
+    expect(docsDispatcherProc.stdinWrites).toHaveLength(2);
+
+    canceledAc.abort("user canceled job A");
+    await expect(canceledRun).rejects.toMatchObject({ name: "AbortError" });
+    expect(docsDispatcherProc.process.kill).toHaveBeenCalledWith("SIGTERM");
+
+    docsDispatcherProc.emit("close", null, "SIGTERM");
+    await Promise.resolve();
+    fallbackRequestProc.stdout.emit("data", Buffer.from('{"pages":5}\n'));
+    fallbackRequestProc.emit("close", 0, null);
+
+    await expect(siblingRun).resolves.toBe('{"pages":5}');
+    expect(bridge.getDocsDispatcher().getStatus().consecutiveCrashes).toBe(0);
+    await bridge.shutdownDocsDispatcher();
+  });
 });

@@ -26,7 +26,9 @@ export function registerRedactPdf(app: FastifyInstance) {
 
       const outPath = join(ctx.scratchDir, `${base}_redacted.pdf`);
       ctx.report(10, "Redacting");
-      const { found } = await pdfRedactPy(inPath, outPath, settings.terms, settings.caseSensitive);
+      const { found } = await pdfRedactPy(inPath, outPath, settings.terms, settings.caseSensitive, {
+        signal: ctx.signal,
+      });
       ctx.report(90, "Done");
 
       return {
