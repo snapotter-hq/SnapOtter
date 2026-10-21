@@ -316,18 +316,83 @@ describe("eyedropper (#2139)", () => {
 
   it("reports no-context when sampling throws after capture succeeds on click", () => {
     act(() => useEditorStore.getState().setEyedropperSampleSize(3));
-    const { stage, hook } = setup(
-      fakeContext({ fullReadThrows: new RangeError("sample read failed") }),
-    );
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const ctx = fakeContext({ fullReadThrows: new RangeError("sample read failed") });
+    const { stage, toCanvas, hook } = setup(ctx);
+    useEditorStore.setState({ eyedropperSampledColor: "#123456" });
 
-    try {
-      act(() => hook.result.current.handleEyedropperClick(pointerEvent(stage)));
-      expect(reportFailure).toHaveBeenCalledWith("no-context", messages);
-      expect(hook.result.current.sampledColor).toBeNull();
-    } finally {
-      consoleError.mockRestore();
+    act(() => hook.result.current.handleEyedropperClick(pointerEvent(stage)));
+    expect(reportFailure).toHaveBeenCalledWith("no-context", messages);
+    expect(hook.result.current.sampledColor).toBeNull();
+
+    // Subsequent moves after a failed click do not retry sampling until the next press.
+    const readsAfterClick = ctx.getImageData.mock.calls.length;
+    act(() => hook.result.current.handleEyedropperMove(pointerEvent(stage)));
+    expect(toCanvas).toHaveBeenCalledTimes(1);
+    expect(ctx.getImageData).toHaveBeenCalledTimes(readsAfterClick);
+  });
+
+  it("stops retrying on hover when sampling fails after the 1px probe succeeded (#2993)", () => {
+    act(() => useEditorStore.getState().setEyedropperSampleSize(3));
+    const ctx = fakeContext({ fullReadThrows: new RangeError("sample read failed") });
+    const { stage, toCanvas, hook } = setup(ctx);
+    useEditorStore.setState({ eyedropperSampledColor: "#123456" });
+
+    act(() => hook.result.current.handleEyedropperMove(pointerEvent(stage)));
+    const readsAfterFirstMove = ctx.getImageData.mock.calls.length;
+    expect(hook.result.current.sampledColor).toBeNull();
+    expect(reportFailure).not.toHaveBeenCalled();
+
+    for (let i = 0; i < 4; i++) {
+      act(() => hook.result.current.handleEyedropperMove(pointerEvent(stage)));
     }
+    expect(toCanvas).toHaveBeenCalledTimes(1);
+    expect(ctx.getImageData).toHaveBeenCalledTimes(readsAfterFirstMove);
+
+    // The next press retries and reports the failure.
+    act(() => hook.result.current.handleEyedropperClick(pointerEvent(stage)));
+    expect(toCanvas).toHaveBeenCalledTimes(2);
+    expect(reportFailure).toHaveBeenCalledTimes(1);
+    expect(reportFailure).toHaveBeenCalledWith("no-context", messages);
+  });
+
+  it("reports tainted when sampling throws SecurityError after capture succeeded (#2993)", () => {
+    act(() => useEditorStore.getState().setEyedropperSampleSize(3));
+    const ctx = fakeContext({ fullReadThrows: tainted() });
+    const { stage, hook } = setup(ctx);
+    useEditorStore.setState({ eyedropperSampledColor: "#123456" });
+
+    act(() => hook.result.current.handleEyedropperClick(pointerEvent(stage)));
+
+    expect(reportFailure).toHaveBeenCalledTimes(1);
+    expect(reportFailure).toHaveBeenCalledWith("tainted", messages);
+    expect(hook.result.current.sampledColor).toBeNull();
+  });
+
+  it("rethrows an unexpected sampling error once per press without reporting capture failure (#2993)", () => {
+    act(() => useEditorStore.getState().setEyedropperSampleSize(3));
+    const ctx = fakeContext({ fullReadThrows: new TypeError("sample bug") });
+    const { stage, toCanvas, hook } = setup(ctx);
+    useEditorStore.setState({ eyedropperSampledColor: "#123456" });
+
+    expect(() => act(() => hook.result.current.handleEyedropperMove(pointerEvent(stage)))).toThrow(
+      "sample bug",
+    );
+    expect(hook.result.current.sampledColor).toBeNull();
+    expect(reportFailure).not.toHaveBeenCalled();
+
+    const readsAfterFirstMove = ctx.getImageData.mock.calls.length;
+    for (let i = 0; i < 4; i++) {
+      act(() => hook.result.current.handleEyedropperMove(pointerEvent(stage)));
+    }
+    expect(toCanvas).toHaveBeenCalledTimes(1);
+    expect(ctx.getImageData).toHaveBeenCalledTimes(readsAfterFirstMove);
+
+    useEditorStore.setState({ eyedropperSampledColor: "#123456" });
+    expect(() => act(() => hook.result.current.handleEyedropperClick(pointerEvent(stage)))).toThrow(
+      "sample bug",
+    );
+    expect(hook.result.current.sampledColor).toBeNull();
+    expect(reportFailure).not.toHaveBeenCalled();
   });
 
   it("clears sampledColor without capturing when stageRef.current is null", () => {

@@ -6,6 +6,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useEditorStore } from "@/stores/editor-store";
 import {
   captureDocumentContext,
+  classifyCaptureError,
   type DocumentContext,
   reportCaptureFailure,
 } from "../stage-capture";
@@ -118,11 +119,12 @@ export function useEyedropperTool({ stageRef }: UseEyedropperToolOptions) {
       try {
         color = samplePixelColor(ctx, x, y, sampleSize);
       } catch (err) {
-        if (report) {
-          console.error("Failed to sample pixel color:", err);
-          reportCaptureFailure("no-context", captureMessages);
-        }
+        contextCache.current = null;
+        captureFailed.current = true;
         setSampledColor(null);
+        const reason = classifyCaptureError(err);
+        if (!reason) throw err;
+        if (report) reportCaptureFailure(reason, captureMessages);
         return null;
       }
 
