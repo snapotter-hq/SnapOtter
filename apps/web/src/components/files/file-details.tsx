@@ -29,25 +29,27 @@ function AuthImage({ src, alt, className }: { src: string; alt: string; classNam
 
   useEffect(() => {
     let revoked = false;
+    let objectUrl: string | null = null;
+    const controller = new AbortController();
     setFailed(false);
-    fetch(src, { headers: formatHeaders() })
+    fetch(src, { headers: formatHeaders(), signal: controller.signal })
       .then((res) => {
         if (!res.ok) throw new Error();
         return res.blob();
       })
       .then((blob) => {
         if (revoked) return;
-        setBlobUrl(URL.createObjectURL(blob));
+        objectUrl = URL.createObjectURL(blob);
+        setBlobUrl(objectUrl);
       })
       .catch(() => {
         if (!revoked) setFailed(true);
       });
     return () => {
       revoked = true;
-      setBlobUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return null;
-      });
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      setBlobUrl(null);
     };
   }, [src]);
 
@@ -113,6 +115,15 @@ export function FilePreview({
   // Bumped on every file change and request, so a reply for a file that is no
   // longer shown is dropped instead of landing on the current one.
   const previewRequest = useRef(0);
+  const previewSrcRef = useRef<string | null>(null);
+
+  const revokePreviewSrc = useCallback(() => {
+    if (previewSrcRef.current) {
+      URL.revokeObjectURL(previewSrcRef.current);
+      previewSrcRef.current = null;
+    }
+    setPreviewSrc(null);
+  }, []);
 
   const isMedia = mimeType.startsWith("video/") || mimeType.startsWith("audio/");
   const nativePlayable = isMedia && isNativePlayable(mimeType, name);
@@ -129,10 +140,7 @@ export function FilePreview({
   useEffect(() => {
     // Reset server-side preview state on every file change
     previewRequest.current += 1;
-    setPreviewSrc((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return null;
-    });
+    revokePreviewSrc();
     setPreviewLoading(false);
     setPreviewError(null);
     setMediaError(false);
@@ -140,14 +148,12 @@ export function FilePreview({
     if (!isPdf && !nativePlayable) {
       return () => {
         previewRequest.current += 1;
-        setPreviewSrc((prev) => {
-          if (prev) URL.revokeObjectURL(prev);
-          return null;
-        });
+        revokePreviewSrc();
       };
     }
 
     let revoked = false;
+    let objectUrl: string | null = null;
     const controller = new AbortController();
     fetch(getFileDownloadUrl(fileId), {
       headers: formatHeaders(),
@@ -158,7 +164,9 @@ export function FilePreview({
         return res.blob();
       })
       .then((blob) => {
-        if (!revoked) setMediaSrc(URL.createObjectURL(blob));
+        if (revoked) return;
+        objectUrl = URL.createObjectURL(blob);
+        setMediaSrc(objectUrl);
       })
       .catch((err) => {
         if (revoked || controller.signal.aborted) return;
@@ -170,16 +178,11 @@ export function FilePreview({
       controller.abort();
       previewRequest.current += 1;
       setMediaError(false);
-      setMediaSrc((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return null;
-      });
-      setPreviewSrc((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return null;
-      });
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      setMediaSrc(null);
+      revokePreviewSrc();
     };
-  }, [nativePlayable, isPdf, fileId, mediaRetry]);
+  }, [nativePlayable, isPdf, fileId, mediaRetry, revokePreviewSrc]);
 
   const handleGeneratePreview = useCallback(() => {
     const request = ++previewRequest.current;
@@ -197,10 +200,12 @@ export function FilePreview({
       })
       .then((blob) => {
         if (!current()) return;
-        setPreviewSrc((prev) => {
-          if (prev) URL.revokeObjectURL(prev);
-          return URL.createObjectURL(blob);
-        });
+        if (previewSrcRef.current) {
+          URL.revokeObjectURL(previewSrcRef.current);
+        }
+        const nextUrl = URL.createObjectURL(blob);
+        previewSrcRef.current = nextUrl;
+        setPreviewSrc(nextUrl);
       })
       .catch((err) => {
         if (!current()) return;

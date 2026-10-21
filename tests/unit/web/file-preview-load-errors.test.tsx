@@ -432,4 +432,156 @@ describe("FilePreview direct-download error handling (#1346)", () => {
     fireEvent.error(img);
     expect(screen.queryByRole("img")).toBeNull();
   });
+
+  it.each([
+    ["image thumbnail", "image/png", "photo.png", "img"],
+    ["PDF", "application/pdf", "report.pdf", "iframe"],
+    ["native video", "video/mp4", "clip.mp4", "video"],
+    ["native audio", "audio/mpeg", "track.mp3", '[data-testid="waveform-player"]'],
+  ])(
+    "revokes the active blob URL when unmounted for %s (#2966)",
+    async (_label, mimeType, name, selector) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({
+          ok: true,
+          status: 200,
+          blob: async () => new Blob(["bytes"], { type: mimeType }),
+        })),
+      );
+
+      const first = render(<FilePreview fileId="f0" mimeType={mimeType} name={name} />);
+      await waitFor(() => {
+        expect(first.container.querySelector(selector)).not.toBeNull();
+      });
+      first.unmount();
+      vi.mocked(URL.revokeObjectURL).mockClear();
+
+      const view = render(<FilePreview fileId="f1" mimeType={mimeType} name={name} />);
+      await waitFor(() => {
+        expect(view.container.querySelector(selector)).not.toBeNull();
+      });
+      expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+
+      view.unmount();
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:loaded");
+    },
+  );
+
+  it("revokes the generated previewSrc blob URL when unmounted without changing fileId first (#2966)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        blob: async () => new Blob(["%PDF-1.4"], { type: "application/pdf" }),
+      })),
+    );
+
+    const view = render(
+      <FilePreview
+        fileId="f1"
+        mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        name="report.docx"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: en.toolPage.generatePreview }));
+    expect(await screen.findByTitle("report.docx")).toHaveAttribute("src", "blob:loaded");
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+
+    view.unmount();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:loaded");
+  });
+
+  it("revokes the image thumbnail blob URL when switching from an image to a non-image file (#2966)", async () => {
+    let call = 0;
+    vi.mocked(URL.createObjectURL).mockImplementation(() => {
+      call += 1;
+      return `blob:url-${call}`;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        blob: async () => new Blob(["bytes"]),
+      })),
+    );
+
+    const view = render(<FilePreview fileId="f1" mimeType="image/png" name="photo.png" />);
+    expect(await screen.findByRole("img", { name: "photo.png" })).toHaveAttribute(
+      "src",
+      "blob:url-1",
+    );
+
+    view.rerender(<FilePreview fileId="f2" mimeType="application/pdf" name="report.pdf" />);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:url-1");
+    expect(await screen.findByTitle("report.pdf")).toHaveAttribute("src", "blob:url-2");
+  });
+
+  it("aborts an in-flight image thumbnail fetch when switching files or unmounting and ignores late resolution or rejection (#2966)", async () => {
+    const signals: AbortSignal[] = [];
+    let rejectFirst: (err: Error) => void = () => {};
+    let resolveSecond: (res: unknown) => void = () => {};
+    let resolveThird: (res: unknown) => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string, init?: RequestInit) => {
+        if (init?.signal) signals.push(init.signal);
+        const url = String(input);
+        if (url.includes("/f1/")) {
+          return new Promise((_resolve, reject) => {
+            rejectFirst = reject;
+          });
+        }
+        if (url.includes("/f2/")) {
+          return new Promise((resolve) => {
+            resolveSecond = resolve;
+          });
+        }
+        return new Promise((resolve) => {
+          resolveThird = resolve;
+        });
+      }),
+    );
+
+    const view = render(<FilePreview fileId="f1" mimeType="image/png" name="first.png" />);
+    expect(signals).toHaveLength(1);
+    expect(signals[0].aborted).toBe(false);
+
+    view.rerender(<FilePreview fileId="f2" mimeType="image/png" name="second.png" />);
+    expect(signals[0].aborted).toBe(true);
+    expect(signals[1].aborted).toBe(false);
+
+    await act(async () => {
+      rejectFirst(new DOMException("The operation was aborted.", "AbortError"));
+    });
+    expect(view.container.querySelector(".animate-spin")).not.toBeNull();
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+
+    view.rerender(<FilePreview fileId="f3" mimeType="image/png" name="third.png" />);
+    expect(signals[1].aborted).toBe(true);
+    expect(signals[2].aborted).toBe(false);
+
+    await act(async () => {
+      resolveSecond({
+        ok: true,
+        status: 200,
+        blob: async () => new Blob(["stale-png"], { type: "image/png" }),
+      });
+    });
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+
+    view.unmount();
+    expect(signals[2].aborted).toBe(true);
+
+    await act(async () => {
+      resolveThird({
+        ok: true,
+        status: 200,
+        blob: async () => new Blob(["unmounted-png"], { type: "image/png" }),
+      });
+    });
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+  });
 });
