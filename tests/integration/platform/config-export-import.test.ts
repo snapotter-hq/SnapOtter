@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
+import { raceInserts } from "../../helpers/pg-race.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 const ADMIN_PERMISSIONS = [
@@ -1467,6 +1468,207 @@ describe("config import with enterprise license", () => {
       }
       delete process.env.ANALYTICS_BAKED_OVERRIDE;
       __resetGateForTests();
+    }
+  });
+
+  it("upserts concurrent first-time role and case-insensitive team imports in deterministic name order without a unique-constraint collision and preserves dry-run order (#3022)", async () => {
+    const suffix = Date.now().toString(36);
+    const roleA = `cfg-role-a-${suffix}`;
+    const roleZ = `cfg-role-z-${suffix}`;
+    const teamAlphaUpper = `Cfg Team Alpha ${suffix}`;
+    const teamAlphaLower = teamAlphaUpper.toLowerCase();
+    const teamZetaUpper = `Cfg Team Zeta ${suffix}`;
+    const teamZetaLower = teamZetaUpper.toLowerCase();
+    const seededRoleId = randomUUID();
+    const seededTeamId = randomUUID();
+
+    try {
+      await db.insert(schema.roles).values({
+        id: seededRoleId,
+        name: roleZ,
+        description: "seeded-z",
+        permissions: ["settings:read"],
+        toolPermissions: null,
+        isBuiltin: false,
+      });
+      await db.insert(schema.teams).values({
+        id: seededTeamId,
+        name: teamZetaUpper,
+        storageQuota: 50,
+        retentionHours: 12,
+      });
+
+      const dryRunRes = await licensedApp.app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        headers: { authorization: `Bearer ${licensedToken}` },
+        payload: {
+          dryRun: true,
+          config: {
+            configSchemaVersion: 1,
+            roles: [
+              { name: roleZ, permissions: ["audit:read"] },
+              { name: roleA, permissions: ["files:own"] },
+            ],
+            teams: [
+              { name: teamZetaLower, storageQuota: 100 },
+              { name: teamAlphaUpper, storageQuota: 200 },
+            ],
+          },
+        },
+      });
+      expect(dryRunRes.statusCode, dryRunRes.body).toBe(200);
+      expect(JSON.parse(dryRunRes.body).details.roles).toEqual([
+        { name: roleZ, action: "update" },
+        { name: roleA, action: "create" },
+      ]);
+      expect(JSON.parse(dryRunRes.body).details.teams).toEqual([
+        { name: teamZetaLower, action: "update" },
+        { name: teamAlphaUpper, action: "create" },
+      ]);
+
+      const [firstRolesRes, secondRolesRes] = await raceInserts("roles", 2, () =>
+        Promise.all([
+          licensedApp.app.inject({
+            method: "POST",
+            url: "/api/v1/enterprise/config/import",
+            headers: { authorization: `Bearer ${licensedToken}` },
+            payload: {
+              dryRun: false,
+              config: {
+                configSchemaVersion: 1,
+                roles: [
+                  {
+                    name: roleZ,
+                    description: "first-z",
+                    permissions: ["audit:read"],
+                    toolPermissions: { mode: "category", allowed: ["image"] },
+                  },
+                  {
+                    name: roleA,
+                    description: "first-a",
+                    permissions: ["files:own"],
+                  },
+                ],
+              },
+            },
+          }),
+          licensedApp.app.inject({
+            method: "POST",
+            url: "/api/v1/enterprise/config/import",
+            headers: { authorization: `Bearer ${licensedToken}` },
+            payload: {
+              dryRun: false,
+              config: {
+                configSchemaVersion: 1,
+                roles: [
+                  {
+                    name: roleA,
+                    description: "second-a",
+                    permissions: ["settings:read"],
+                  },
+                  {
+                    name: roleZ,
+                    description: "second-z",
+                    permissions: ["audit:read", "settings:read"],
+                    toolPermissions: null,
+                  },
+                ],
+              },
+            },
+          }),
+        ]),
+      );
+
+      expect(firstRolesRes.statusCode, firstRolesRes.body).toBe(200);
+      expect(secondRolesRes.statusCode, secondRolesRes.body).toBe(200);
+
+      const [roleARow] = await db.select().from(schema.roles).where(eq(schema.roles.name, roleA));
+      const [roleZRow] = await db.select().from(schema.roles).where(eq(schema.roles.name, roleZ));
+      expect(roleZRow?.id).toBe(seededRoleId);
+      expect(["first-a", "second-a"]).toContain(roleARow?.description);
+      if (roleARow?.description === "first-a") {
+        expect(roleARow.permissions).toEqual(["files:own"]);
+        expect(roleZRow?.description).toBe("first-z");
+        expect(roleZRow?.permissions).toEqual(["audit:read"]);
+        expect(roleZRow?.toolPermissions).toEqual({ mode: "category", allowed: ["image"] });
+      } else {
+        expect(roleARow?.permissions).toEqual(["settings:read"]);
+        expect(roleZRow?.description).toBe("second-z");
+        expect(roleZRow?.permissions).toEqual(["audit:read", "settings:read"]);
+        expect(roleZRow?.toolPermissions).toBeNull();
+      }
+
+      const [firstTeamsRes, secondTeamsRes] = await raceInserts("teams", 2, () =>
+        Promise.all([
+          licensedApp.app.inject({
+            method: "POST",
+            url: "/api/v1/enterprise/config/import",
+            headers: { authorization: `Bearer ${licensedToken}` },
+            payload: {
+              dryRun: false,
+              config: {
+                configSchemaVersion: 1,
+                teams: [
+                  { name: teamZetaUpper, storageQuota: 300, retentionHours: 24 },
+                  { name: teamAlphaUpper, storageQuota: 100, retentionHours: 12 },
+                ],
+              },
+            },
+          }),
+          licensedApp.app.inject({
+            method: "POST",
+            url: "/api/v1/enterprise/config/import",
+            headers: { authorization: `Bearer ${licensedToken}` },
+            payload: {
+              dryRun: false,
+              config: {
+                configSchemaVersion: 1,
+                teams: [
+                  { name: teamAlphaLower, storageQuota: 200, retentionHours: 36 },
+                  { name: teamZetaLower, storageQuota: 400, retentionHours: 48 },
+                ],
+              },
+            },
+          }),
+        ]),
+      );
+
+      expect(firstTeamsRes.statusCode, firstTeamsRes.body).toBe(200);
+      expect(secondTeamsRes.statusCode, secondTeamsRes.body).toBe(200);
+
+      const alphaRows = await db
+        .select()
+        .from(schema.teams)
+        .where(sql`lower(${schema.teams.name}) = ${teamAlphaLower}`);
+      const zetaRows = await db
+        .select()
+        .from(schema.teams)
+        .where(sql`lower(${schema.teams.name}) = ${teamZetaLower}`);
+      expect(alphaRows).toHaveLength(1);
+      expect(zetaRows).toHaveLength(1);
+      expect(zetaRows[0]?.id).toBe(seededTeamId);
+      expect(zetaRows[0]?.name).toBe(teamZetaUpper);
+      // Whichever contender inserted teamAlpha first kept its name casing, and
+      // the second contender's ON CONFLICT DO UPDATE overwrote the quotas on
+      // both teamAlpha and teamZeta.
+      if (alphaRows[0]?.name === teamAlphaUpper) {
+        expect(alphaRows[0]?.storageQuota).toBe(200);
+        expect(alphaRows[0]?.retentionHours).toBe(36);
+        expect(zetaRows[0]?.storageQuota).toBe(400);
+        expect(zetaRows[0]?.retentionHours).toBe(48);
+      } else {
+        expect(alphaRows[0]?.name).toBe(teamAlphaLower);
+        expect(alphaRows[0]?.storageQuota).toBe(100);
+        expect(alphaRows[0]?.retentionHours).toBe(12);
+        expect(zetaRows[0]?.storageQuota).toBe(300);
+        expect(zetaRows[0]?.retentionHours).toBe(24);
+      }
+    } finally {
+      await db.delete(schema.roles).where(eq(schema.roles.name, roleA));
+      await db.delete(schema.roles).where(eq(schema.roles.name, roleZ));
+      await db.delete(schema.teams).where(sql`lower(${schema.teams.name}) = ${teamAlphaLower}`);
+      await db.delete(schema.teams).where(sql`lower(${schema.teams.name}) = ${teamZetaLower}`);
     }
   });
 });

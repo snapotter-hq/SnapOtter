@@ -15,6 +15,11 @@ describe("settings route logic", () => {
     vi.doMock("drizzle-orm", () => ({
       and: (...args: unknown[]) => ({ op: "and", args }),
       eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+      sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({
+        op: "sql",
+        strings: [...strings],
+        values,
+      }),
     }));
     vi.doMock("../../../apps/api/src/config.js", () => ({
       env: {
@@ -421,6 +426,11 @@ describe("settingsRoutes decryption failure handling (#2534)", () => {
     vi.doMock("drizzle-orm", () => ({
       and: (...args: unknown[]) => ({ op: "and", args }),
       eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+      sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({
+        op: "sql",
+        strings: [...strings],
+        values,
+      }),
     }));
     vi.doMock("../../../apps/api/src/config.js", () => ({
       env: {
@@ -595,6 +605,11 @@ describe("settingsRoutes PUT /api/v1/settings transactional upsert (#2502)", () 
     vi.doMock("drizzle-orm", () => ({
       and: (...args: unknown[]) => ({ op: "and", args }),
       eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+      sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({
+        op: "sql",
+        strings: [...strings],
+        values,
+      }),
     }));
     vi.doMock("../../../apps/api/src/config.js", () => ({
       env: {
@@ -719,6 +734,11 @@ describe("settingsRoutes PUT /api/v1/settings transactional upsert (#2502)", () 
     vi.doMock("drizzle-orm", () => ({
       and: (...args: unknown[]) => ({ op: "and", args }),
       eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+      sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({
+        op: "sql",
+        strings: [...strings],
+        values,
+      }),
     }));
     vi.doMock("../../../apps/api/src/config.js", () => ({
       env: {
@@ -784,6 +804,11 @@ describe("settingsRoutes PUT /api/v1/settings transactional upsert (#2502)", () 
     vi.doMock("drizzle-orm", () => ({
       and: (...args: unknown[]) => ({ op: "and", args }),
       eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+      sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({
+        op: "sql",
+        strings: [...strings],
+        values,
+      }),
     }));
     vi.doMock("../../../apps/api/src/config.js", () => ({
       env: {
@@ -904,6 +929,11 @@ describe("settingsRoutes PUT /api/v1/settings transactional upsert (#2502)", () 
     vi.doMock("drizzle-orm", () => ({
       and: (...args: unknown[]) => ({ op: "and", args }),
       eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+      sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({
+        op: "sql",
+        strings: [...strings],
+        values,
+      }),
     }));
     vi.doMock("../../../apps/api/src/config.js", () => ({
       env: {
@@ -1052,6 +1082,11 @@ describe("registerConfigRoutes POST /api/v1/enterprise/config/import settings up
     vi.doMock("drizzle-orm", () => ({
       and: (...args: unknown[]) => ({ op: "and", args }),
       eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+      sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({
+        op: "sql",
+        strings: [...strings],
+        values,
+      }),
     }));
     vi.doMock("../../../apps/api/src/config.js", () => ({
       env: {
@@ -1230,6 +1265,11 @@ describe("registerConfigRoutes POST /api/v1/enterprise/config/import settings up
     vi.doMock("drizzle-orm", () => ({
       and: (...args: unknown[]) => ({ op: "and", args }),
       eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+      sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({
+        op: "sql",
+        strings: [...strings],
+        values,
+      }),
     }));
     vi.doMock("../../../apps/api/src/config.js", () => ({
       env: {
@@ -1326,6 +1366,11 @@ describe("registerConfigRoutes POST /api/v1/enterprise/config/import settings up
     vi.doMock("drizzle-orm", () => ({
       and: (...args: unknown[]) => ({ op: "and", args }),
       eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+      sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({
+        op: "sql",
+        strings: [...strings],
+        values,
+      }),
     }));
     vi.doMock("../../../apps/api/src/config.js", () => ({
       env: {
@@ -1455,6 +1500,405 @@ describe("registerConfigRoutes POST /api/v1/enterprise/config/import settings up
         { err: expect.any(Error) },
         "analytics gate invalidation failed (import still applied)",
       );
+    } finally {
+      await app.close();
+      vi.restoreAllMocks();
+    }
+  });
+});
+
+describe("registerConfigRoutes POST /api/v1/enterprise/config/import roles and teams upsert (#3022)", () => {
+  it("writes roles in sorted name order via tx.insert(...).onConflictDoUpdate(...) and teams in sorted lowercase-name order via tx.execute(...) inside db.transaction, without calling tx.select or tx.update, while preserving dry-run order", async () => {
+    vi.resetModules();
+    const operations: Array<Record<string, unknown>> = [];
+    const auditCalls: Array<{ event: string; details: Record<string, unknown> }> = [];
+    let transactionCount = 0;
+
+    vi.doMock("drizzle-orm", () => ({
+      and: (...args: unknown[]) => ({ op: "and", args }),
+      eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+      sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({
+        op: "sql",
+        strings: [...strings],
+        values,
+      }),
+    }));
+    vi.doMock("../../../apps/api/src/config.js", () => ({
+      env: {
+        DATA_ENCRYPTION_KEY: "",
+        DATA_ENCRYPTION_KEY_PREVIOUS: "",
+        OIDC_ENABLED: false,
+        SAML_ENABLED: false,
+      },
+    }));
+    vi.doMock("../../../apps/api/src/lib/enterprise-feature.js", () => ({
+      isEnterpriseFeatureEnabled: async () => true,
+    }));
+
+    const rolesTable = { id: "roles.id", name: "roles.name", isBuiltin: "roles.isBuiltin" };
+    const teamsTable = { id: "teams.id", name: "teams.name" };
+
+    const txHandle = {
+      insert: (table: unknown) => ({
+        values: (vals: Record<string, unknown>) => ({
+          onConflictDoUpdate: (conflict: Record<string, unknown>) => {
+            operations.push({ op: "upsert", table, vals, conflict });
+            return Promise.resolve();
+          },
+        }),
+      }),
+      execute: (query: unknown) => {
+        operations.push({ op: "execute", query });
+        return Promise.resolve();
+      },
+    };
+
+    vi.doMock("../../../apps/api/src/db/index.js", () => ({
+      db: {
+        select: () => ({
+          from: (table: unknown) => {
+            if (table === rolesTable) {
+              return {
+                where: () =>
+                  Promise.resolve([
+                    {
+                      id: "role-existing",
+                      name: "z-auditor",
+                      description: "old",
+                      permissions: ["audit:read"],
+                      toolPermissions: null,
+                      isBuiltin: false,
+                    },
+                  ]),
+              };
+            }
+            if (table === teamsTable) {
+              return Promise.resolve([
+                {
+                  id: "team-existing",
+                  name: "ZETA OPS",
+                  storageQuota: 100,
+                  retentionHours: 24,
+                },
+              ]);
+            }
+            return Promise.resolve([]);
+          },
+        }),
+        transaction: async (cb: (tx: typeof txHandle) => Promise<unknown>) => {
+          transactionCount += 1;
+          return cb(txHandle);
+        },
+      },
+      schema: {
+        settings: { key: "settings.key", value: "settings.value" },
+        roles: rolesTable,
+        teams: teamsTable,
+      },
+    }));
+    vi.doMock("../../../apps/api/src/permissions.js", () => ({
+      requireFullAdmin: async () => ({ id: "admin-1", username: "admin", role: "admin" }),
+    }));
+    vi.doMock("../../../apps/api/src/lib/audit.js", () => ({
+      auditFromRequest: () => async (event: string, details: Record<string, unknown>) => {
+        auditCalls.push({ event, details });
+      },
+    }));
+
+    const { registerConfigRoutes } = await import(
+      "../../../apps/api/src/routes/enterprise/config.js"
+    );
+    const app = Fastify();
+    await registerConfigRoutes(app);
+    await app.ready();
+
+    try {
+      const payload = {
+        configSchemaVersion: 1,
+        roles: [
+          {
+            name: "z-auditor",
+            description: "Updated auditor",
+            permissions: ["audit:read", "settings:read"],
+            toolPermissions: { mode: "category", allowed: ["image"] },
+          },
+          {
+            name: "a-viewer",
+            permissions: ["files:own"],
+          },
+        ],
+        teams: [
+          { name: "Zeta Ops", storageQuota: 500, retentionHours: 72 },
+          { name: "alpha team", storageQuota: 250 },
+        ],
+      };
+
+      const dryRunRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        payload: {
+          dryRun: true,
+          config: payload,
+        },
+      });
+
+      expect(dryRunRes.statusCode).toBe(200);
+      expect(dryRunRes.json()).toEqual({
+        dryRun: true,
+        changes: { settings: 0, roles: 2, teams: 2 },
+        details: {
+          settings: [],
+          roles: [
+            { name: "z-auditor", action: "update" },
+            { name: "a-viewer", action: "create" },
+          ],
+          teams: [
+            { name: "Zeta Ops", action: "update" },
+            { name: "alpha team", action: "create" },
+          ],
+        },
+      });
+      expect(transactionCount).toBe(0);
+
+      const applyRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        payload: {
+          dryRun: false,
+          config: payload,
+        },
+      });
+
+      expect(applyRes.statusCode).toBe(200);
+      expect(applyRes.json()).toEqual({
+        applied: true,
+        changes: { settings: 0, roles: 2, teams: 2 },
+      });
+      expect(transactionCount).toBe(1);
+      expect(operations).toEqual([
+        {
+          op: "upsert",
+          table: rolesTable,
+          vals: {
+            id: expect.any(String),
+            name: "a-viewer",
+            description: "",
+            permissions: ["files:own"],
+            toolPermissions: null,
+            isBuiltin: false,
+            createdAt: expect.any(Date),
+            updatedAt: expect.any(Date),
+          },
+          conflict: {
+            target: "roles.name",
+            set: {
+              description: "",
+              permissions: ["files:own"],
+              toolPermissions: null,
+              updatedAt: expect.any(Date),
+            },
+          },
+        },
+        {
+          op: "upsert",
+          table: rolesTable,
+          vals: {
+            id: expect.any(String),
+            name: "z-auditor",
+            description: "Updated auditor",
+            permissions: ["audit:read", "settings:read"],
+            toolPermissions: { mode: "category", allowed: ["image"] },
+            isBuiltin: false,
+            createdAt: expect.any(Date),
+            updatedAt: expect.any(Date),
+          },
+          conflict: {
+            target: "roles.name",
+            set: {
+              description: "Updated auditor",
+              permissions: ["audit:read", "settings:read"],
+              toolPermissions: { mode: "category", allowed: ["image"] },
+              updatedAt: expect.any(Date),
+            },
+          },
+        },
+        {
+          op: "execute",
+          query: {
+            op: "sql",
+            strings: expect.arrayContaining([
+              expect.stringContaining("ON CONFLICT (lower("),
+              expect.stringContaining("DO UPDATE SET"),
+            ]),
+            values: [
+              teamsTable,
+              expect.any(String),
+              "alpha team",
+              250,
+              null,
+              expect.any(Date),
+              "teams.name",
+            ],
+          },
+        },
+        {
+          op: "execute",
+          query: {
+            op: "sql",
+            strings: expect.arrayContaining([
+              expect.stringContaining("ON CONFLICT (lower("),
+              expect.stringContaining("DO UPDATE SET"),
+            ]),
+            values: [
+              teamsTable,
+              expect.any(String),
+              "Zeta Ops",
+              500,
+              72,
+              expect.any(Date),
+              "teams.name",
+            ],
+          },
+        },
+      ]);
+      expect(auditCalls).toEqual([
+        {
+          event: "CONFIG_IMPORTED",
+          details: {
+            adminId: "admin-1",
+            username: "admin",
+            dryRun: false,
+            changes: { settings: 0, roles: 2, teams: 2 },
+          },
+        },
+      ]);
+
+      operations.length = 0;
+      const emptyRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        payload: {
+          dryRun: false,
+          config: {
+            configSchemaVersion: 1,
+            roles: [],
+            teams: [],
+          },
+        },
+      });
+      expect(emptyRes.statusCode).toBe(200);
+      expect(operations).toEqual([]);
+    } finally {
+      await app.close();
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("propagates a mid-transaction role or team upsert failure and skips CONFIG_IMPORTED audit log (#3022)", async () => {
+    vi.resetModules();
+    const upsertedRoles: string[] = [];
+    const upsertedTeams: string[] = [];
+    const auditSpy = vi.fn();
+
+    vi.doMock("drizzle-orm", () => ({
+      and: (...args: unknown[]) => ({ op: "and", args }),
+      eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+      sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({
+        op: "sql",
+        strings: [...strings],
+        values,
+      }),
+    }));
+    vi.doMock("../../../apps/api/src/config.js", () => ({
+      env: {
+        DATA_ENCRYPTION_KEY: "",
+        DATA_ENCRYPTION_KEY_PREVIOUS: "",
+        OIDC_ENABLED: false,
+        SAML_ENABLED: false,
+      },
+    }));
+    vi.doMock("../../../apps/api/src/lib/enterprise-feature.js", () => ({
+      isEnterpriseFeatureEnabled: async () => true,
+    }));
+
+    const rolesTable = { id: "roles.id", name: "roles.name", isBuiltin: "roles.isBuiltin" };
+    const teamsTable = { id: "teams.id", name: "teams.name" };
+
+    const txHandle = {
+      insert: () => ({
+        values: (vals: { name: string }) => ({
+          onConflictDoUpdate: () => {
+            upsertedRoles.push(vals.name);
+            return Promise.resolve();
+          },
+        }),
+      }),
+      execute: (query: { values: unknown[] }) => {
+        const teamName = query.values.find((v): v is string => v === "Alpha" || v === "Zeta");
+        if (teamName) upsertedTeams.push(teamName);
+        if (upsertedTeams.length === 2) {
+          return Promise.reject(new Error("simulated db failure on second team upsert"));
+        }
+        return Promise.resolve();
+      },
+    };
+
+    vi.doMock("../../../apps/api/src/db/index.js", () => ({
+      db: {
+        select: () => ({
+          from: (table: unknown) => {
+            if (table === rolesTable) {
+              return { where: () => Promise.resolve([]) };
+            }
+            return Promise.resolve([]);
+          },
+        }),
+        transaction: async (cb: (tx: typeof txHandle) => Promise<unknown>) => cb(txHandle),
+      },
+      schema: {
+        settings: { key: "settings.key", value: "settings.value" },
+        roles: rolesTable,
+        teams: teamsTable,
+      },
+    }));
+    vi.doMock("../../../apps/api/src/permissions.js", () => ({
+      requireFullAdmin: async () => ({ id: "admin-1", username: "admin", role: "admin" }),
+    }));
+    vi.doMock("../../../apps/api/src/lib/audit.js", () => ({
+      auditFromRequest: () => auditSpy,
+    }));
+
+    const { registerConfigRoutes } = await import(
+      "../../../apps/api/src/routes/enterprise/config.js"
+    );
+    const app = Fastify();
+    await registerConfigRoutes(app);
+    await app.ready();
+
+    try {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/enterprise/config/import",
+        payload: {
+          dryRun: false,
+          config: {
+            configSchemaVersion: 1,
+            roles: [
+              { name: "z-role", permissions: ["files:own"] },
+              { name: "a-role", permissions: ["audit:read"] },
+            ],
+            teams: [
+              { name: "Zeta", storageQuota: 100 },
+              { name: "Alpha", storageQuota: 200 },
+            ],
+          },
+        },
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(upsertedRoles).toEqual(["a-role", "z-role"]);
+      expect(upsertedTeams).toEqual(["Alpha", "Zeta"]);
+      expect(auditSpy).not.toHaveBeenCalled();
     } finally {
       await app.close();
       vi.restoreAllMocks();

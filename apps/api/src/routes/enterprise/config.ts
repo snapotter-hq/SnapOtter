@@ -7,7 +7,7 @@ import {
   ROLE_NAME_MIN_LENGTH,
   ROLE_NAME_PATTERN,
 } from "@snapotter/shared";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../../db/index.js";
@@ -393,64 +393,55 @@ export async function registerConfigRoutes(app: FastifyInstance): Promise<void> 
           }
         }
 
-        if (config.roles) {
-          const existingRoles = await tx
-            .select()
-            .from(schema.roles)
-            .where(eq(schema.roles.isBuiltin, false));
-          const existingRoleMap = new Map(existingRoles.map((role) => [role.name, role]));
+        if (config.roles && config.roles.length > 0) {
+          const sortedRoles = [...config.roles].sort((a, b) =>
+            a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
+          );
 
-          for (const role of config.roles) {
-            const existing = existingRoleMap.get(role.name);
-            if (existing) {
-              await tx
-                .update(schema.roles)
-                .set({
-                  description: role.description ?? "",
-                  permissions: role.permissions,
-                  toolPermissions: role.toolPermissions ?? null,
-                  updatedAt: now,
-                })
-                .where(eq(schema.roles.id, existing.id));
-            } else {
-              await tx.insert(schema.roles).values({
+          for (const role of sortedRoles) {
+            const description = role.description ?? "";
+            const toolPermissions = role.toolPermissions ?? null;
+            await tx
+              .insert(schema.roles)
+              .values({
                 id: randomUUID(),
                 name: role.name,
-                description: role.description ?? "",
+                description,
                 permissions: role.permissions,
-                toolPermissions: role.toolPermissions ?? null,
+                toolPermissions,
                 isBuiltin: false,
                 createdAt: now,
                 updatedAt: now,
+              })
+              .onConflictDoUpdate({
+                target: schema.roles.name,
+                set: {
+                  description,
+                  permissions: role.permissions,
+                  toolPermissions,
+                  updatedAt: now,
+                },
               });
-            }
           }
         }
 
-        if (config.teams) {
-          const existingTeams = await tx.select().from(schema.teams);
-          const existingTeamMap = new Map(
-            existingTeams.map((team) => [team.name.toLowerCase(), team]),
-          );
+        if (config.teams && config.teams.length > 0) {
+          const sortedTeams = [...config.teams].sort((a, b) => {
+            const aKey = a.name.toLowerCase();
+            const bKey = b.name.toLowerCase();
+            return aKey < bKey ? -1 : aKey > bKey ? 1 : 0;
+          });
 
-          for (const team of config.teams) {
-            const existing = existingTeamMap.get(team.name.toLowerCase());
-            if (existing) {
-              await tx
-                .update(schema.teams)
-                .set({
-                  storageQuota: team.storageQuota ?? null,
-                  retentionHours: team.retentionHours ?? null,
-                })
-                .where(eq(schema.teams.id, existing.id));
-            } else {
-              await tx.insert(schema.teams).values({
-                id: randomUUID(),
-                name: team.name,
-                storageQuota: team.storageQuota ?? null,
-                retentionHours: team.retentionHours ?? null,
-              });
-            }
+          for (const team of sortedTeams) {
+            const storageQuota = team.storageQuota ?? null;
+            const retentionHours = team.retentionHours ?? null;
+            await tx.execute(sql`
+              INSERT INTO ${schema.teams} ("id", "name", "storage_quota", "retention_hours", "created_at")
+              VALUES (${randomUUID()}, ${team.name}, ${storageQuota}, ${retentionHours}, ${now})
+              ON CONFLICT (lower(${schema.teams.name})) DO UPDATE SET
+                "storage_quota" = EXCLUDED."storage_quota",
+                "retention_hours" = EXCLUDED."retention_hours"
+            `);
           }
         }
       });
