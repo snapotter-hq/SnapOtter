@@ -67,6 +67,19 @@ echo "magick: improper image header \\\`x' @ error/exr.c/ReadEXRImage/200." >&2
 exit 1`;
 const HEIF_VERSION = 'if [ "$1" = "--version" ]; then echo "1.17.6"; exit 0; fi';
 
+function makeCorruptMif1Av1(): Buffer {
+  const buf = Buffer.from(readFixture(fixtures.image.formats("avif")));
+  const ftypSize = buf.readUInt32BE(0);
+  buf.write("mif1", 8, 4, "ascii");
+  for (let offset = 16; offset + 4 <= ftypSize && offset + 4 <= buf.length; offset += 4) {
+    if (buf.subarray(offset, offset + 4).toString("ascii") === "avif") {
+      buf.write("mif1", offset, 4, "ascii");
+    }
+  }
+  buf.fill(0xff, buf.length - 200);
+  return buf;
+}
+
 describe("decoders with no support for the format (#1429)", () => {
   it("ImageMagick without the JXL delegate, and no djxl, is an unavailable decoder", async () => {
     useShims({ magick: magickNoDelegate });
@@ -76,6 +89,21 @@ describe("decoders with no support for the format (#1429)", () => {
     );
 
     expect(err).toBeInstanceOf(DecoderUnavailableError);
+  });
+
+  // Runs before any test caches cachedDecodeCmd so findDecodeCmd probes the
+  // candidate binaries and rejects via noDecoderFound (#2895).
+  it("a corrupt AV1 image in a mif1 HEIF container keeps Sharp's rejection when no CLI HEIF decoder is installed or its probe fails (#2895)", async () => {
+    const cases: Array<Record<string, string>> = [{}, { "heif-convert": "exit 1" }];
+    for (const shims of cases) {
+      useShims(shims);
+
+      const err = await decodeHeic(makeCorruptMif1Av1()).catch((e) => e);
+
+      expect(err).toBeInstanceOf(Error);
+      expect(isDecoderUnavailable(err)).toBe(false);
+      expect(String(err.message)).toMatch(/Corrupt frame|Invalid input/i);
+    }
   });
 
   it("a HEIF decoder without its HEVC plugin is an unavailable decoder", async () => {
@@ -116,25 +144,38 @@ exit 1`,
 echo "Could not decode image: No decoding plugin installed for this compression format" >&2
 exit 1`,
     });
-    const corruptMif1Av1 = Buffer.from(readFixture(fixtures.image.formats("avif")));
-    const ftypSize = corruptMif1Av1.readUInt32BE(0);
-    corruptMif1Av1.write("mif1", 8, 4, "ascii");
-    for (
-      let offset = 16;
-      offset + 4 <= ftypSize && offset + 4 <= corruptMif1Av1.length;
-      offset += 4
-    ) {
-      if (corruptMif1Av1.subarray(offset, offset + 4).toString("ascii") === "avif") {
-        corruptMif1Av1.write("mif1", offset, 4, "ascii");
-      }
-    }
-    corruptMif1Av1.fill(0xff, corruptMif1Av1.length - 200);
 
-    const err = await decodeHeic(corruptMif1Av1).catch((e) => e);
+    const err = await decodeHeic(makeCorruptMif1Av1()).catch((e) => e);
 
     expect(err).toBeInstanceOf(Error);
     expect(isDecoderUnavailable(err)).toBe(false);
     expect(String(err.message)).toMatch(/Corrupt frame|Invalid input/i);
+  });
+
+  it("a corrupt AV1 image in a mif1 HEIF container keeps Sharp's rejection when the cached CLI decoder cannot start or exits 127 (#2895)", async () => {
+    const cases: Array<Record<string, string>> = [
+      { "heif-convert": `${HEIF_VERSION}\nexit 127` },
+      {},
+    ];
+    for (const shims of cases) {
+      useShims(shims);
+
+      const err = await decodeHeic(makeCorruptMif1Av1()).catch((e) => e);
+
+      expect(err).toBeInstanceOf(Error);
+      expect(isDecoderUnavailable(err)).toBe(false);
+      expect(String(err.message)).toMatch(/Corrupt frame|Invalid input/i);
+    }
+  });
+
+  it("a corrupt AV1 image in a mif1 HEIF container still surfaces DecoderOutOfMemoryError when the CLI fallback is killed by SIGKILL (#2895)", async () => {
+    useShims({ "heif-convert": `${HEIF_VERSION}\nkill -9 $$` });
+
+    const err = await decodeHeic(makeCorruptMif1Av1()).catch((e) => e);
+
+    expect(err).toBeInstanceOf(DecoderUnavailableError);
+    expect(err.name).toBe("DecoderOutOfMemoryError");
+    expect(isDecoderUnavailable(err)).toBe(true);
   });
 
   it("a decoder that exits 127 (shared libraries won't load) is an unavailable decoder", async () => {

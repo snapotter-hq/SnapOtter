@@ -157,6 +157,29 @@ describe("findDecodeCmd probe fault handling (#2883)", () => {
     expect(err.message).toContain("thread or process limit");
     expect(failures.probed).toEqual(["heif-convert"]);
   });
+
+  it("still surfaces a killed heif-convert --version probe as a 503 DecoderOutOfMemoryError when Sharp already rejected a corrupt mif1 AV1 container (#2895)", async () => {
+    const corruptMif1Av1 = Buffer.from(readFixture(fixtures.image.formats("avif")));
+    const ftypSize = corruptMif1Av1.readUInt32BE(0);
+    corruptMif1Av1.write("mif1", 8, 4, "ascii");
+    for (
+      let offset = 16;
+      offset + 4 <= ftypSize && offset + 4 <= corruptMif1Av1.length;
+      offset += 4
+    ) {
+      if (corruptMif1Av1.subarray(offset, offset + 4).toString("ascii") === "avif") {
+        corruptMif1Av1.write("mif1", offset, 4, "ascii");
+      }
+    }
+    corruptMif1Av1.fill(0xff, corruptMif1Av1.length - 200);
+
+    failures.probe = { code: null, signal: "SIGKILL", stderr: "" };
+    const err = await decodeError(corruptMif1Av1);
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect(err.name).toBe("DecoderOutOfMemoryError");
+    expect((err.cause as { signal?: string } | undefined)?.signal).toBe("SIGKILL");
+    expect(failures.probed).toEqual(["heif-convert"]);
+  });
 });
 
 describe("verifyDecodedImageLimits and metadata preflight fault handling (#2883)", () => {

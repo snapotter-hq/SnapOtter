@@ -9,7 +9,8 @@ import sharp from "sharp";
 import {
   asDecoderOutOfMemory,
   asDecoderUnavailable,
-  lacksFormatSupport,
+  DecoderOutOfMemoryError,
+  DecoderUnavailableError,
   noDecoderFound,
 } from "./format-decoders.js";
 
@@ -224,7 +225,13 @@ export async function decodeHeic(buffer: Buffer, options: HeicDecodeOptions = {}
     return await verifyDecodedImageLimits(sharpDecoded, options);
   }
 
-  const cmd = await findDecodeCmd(options);
+  const cmd = await findDecodeCmd(options).catch((err: unknown) => {
+    options.signal?.throwIfAborted();
+    if (sharpVerdict !== undefined && !(err instanceof DecoderOutOfMemoryError)) {
+      throw sharpVerdict;
+    }
+    throw err;
+  });
   // Include the PID so concurrent processes (and test workers) write to
   // distinct, attributable temp paths in the shared tmpdir.
   const id = `${process.pid}-${randomUUID()}`;
@@ -238,10 +245,16 @@ export async function decodeHeic(buffer: Buffer, options: HeicDecodeOptions = {}
       timeout: 120_000,
       signal: options.signal,
     }).catch((err: unknown) => {
-      if (sharpVerdict !== undefined && lacksFormatSupport(err)) {
+      options.signal?.throwIfAborted();
+      const classified = asDecoderUnavailable(asDecoderOutOfMemory(err));
+      if (
+        sharpVerdict !== undefined &&
+        classified instanceof DecoderUnavailableError &&
+        !(classified instanceof DecoderOutOfMemoryError)
+      ) {
         throw sharpVerdict;
       }
-      throw asDecoderUnavailable(asDecoderOutOfMemory(err));
+      throw classified;
     });
     options.signal?.throwIfAborted();
 
