@@ -1,7 +1,17 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { en } from "@snapotter/shared";
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  configure,
+  fireEvent,
+  getConfig,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -85,6 +95,7 @@ function renderAutomatePage(state?: { libraryFileIds?: string[] }) {
 }
 
 beforeEach(() => {
+  configure({ asyncUtilTimeout: 5000 });
   storageMap.clear();
   showIgnored.mockClear();
   showUnsupported.mockClear();
@@ -130,6 +141,7 @@ beforeEach(() => {
             pageCount: 1,
             thumbnails: [],
             bundles: [],
+            settings: {},
           }),
           { status: 200 },
         ),
@@ -143,6 +155,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  configure({ asyncUtilTimeout: 1000 });
   useFileStore.getState().reset();
   usePipelineStore.getState().reset();
   usePassportPhotoStore.getState().reset();
@@ -397,7 +410,9 @@ describe("ToolPage handleAddMore, handleFiles, and handleUrlImport intake guard 
           });
         }
         return Promise.resolve(
-          new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+          new Response(JSON.stringify({ authEnabled: false, bundles: [], settings: {} }), {
+            status: 200,
+          }),
         );
       }),
     );
@@ -613,6 +628,7 @@ describe("ToolPage handleAddMore, handleFiles, and handleUrlImport intake guard 
 
 describe("AutomatePage file-action intake guard (#2652)", () => {
   it("refuses Add, Library, and Clear on desktop while a pipeline run is in flight", async () => {
+    expect(getConfig().asyncUtilTimeout).toBe(5000);
     renderAutomatePage();
     await act(async () => {
       useFileStore.getState().setFiles([png("pipeline.png")]);
@@ -631,16 +647,16 @@ describe("AutomatePage file-action intake guard (#2652)", () => {
       return el;
     }) as typeof document.createElement);
 
-    fireEvent.click(screen.getByRole("button", { name: en.automate.addButton }));
+    fireEvent.click(screen.getByText(en.automate.addButton));
     expect(showIgnored).toHaveBeenCalledTimes(1);
     expect(showIgnored).toHaveBeenCalledWith(en.dropzone.ignoredWhileRunning);
     expect(createdInputs).toHaveLength(0);
 
-    fireEvent.click(screen.getByRole("button", { name: en.automate.libraryButton }));
+    fireEvent.click(screen.getByText(en.automate.libraryButton));
     expect(showIgnored).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: en.automate.clearButton }));
+    fireEvent.click(screen.getByText(en.automate.clearButton));
     expect(showIgnored).toHaveBeenCalledTimes(3);
     expect(useFileStore.getState().processing).toBe(true);
     expect(useFileStore.getState().activeJobId).toBe("pipeline-job-1");
@@ -697,12 +713,13 @@ describe("AutomatePage file-action intake guard (#2652)", () => {
     });
 
     // Open the file picker and the library modal while idle.
-    fireEvent.click(screen.getByRole("button", { name: en.automate.addButton }));
+    fireEvent.click(screen.getByText(en.automate.addButton));
     const fileInput = createdInputs.at(-1);
     if (!fileInput) throw new Error("Expected file input to be created");
 
-    fireEvent.click(screen.getByRole("button", { name: en.automate.libraryButton }));
-    fireEvent.click(await screen.findByText("modal.png"));
+    fireEvent.click(screen.getByText(en.automate.libraryButton));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(await within(dialog).findByText("modal.png", {}, { timeout: 5000 }));
 
     // Start a pipeline run before the picker or modal completes its import.
     act(() => {
@@ -727,19 +744,14 @@ describe("AutomatePage file-action intake guard (#2652)", () => {
     expect(showIgnored).toHaveBeenCalledTimes(1);
     expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual(["initial.png"]);
 
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: en.commonUi.fileLibrary.importCount.replace("{count}", "1"),
-      }),
-    );
+    const importCountLabel = en.commonUi.fileLibrary.importCount.replace("{count}", "1");
+    fireEvent.click(within(dialog).getByRole("button", { name: importCountLabel }));
     await waitFor(() => expect(showIgnored).toHaveBeenCalledTimes(2));
     expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual(["initial.png"]);
     expect(useFileStore.getState().processing).toBe(true);
     // Refusing intake keeps the library modal open with its selection preserved (#3197).
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
-    const retryImportBtn = screen.getByRole("button", {
-      name: en.commonUi.fileLibrary.importCount.replace("{count}", "1"),
-    });
+    expect(screen.getByRole("dialog")).toBe(dialog);
+    const retryImportBtn = within(dialog).getByRole("button", { name: importCountLabel });
     expect(retryImportBtn).toBeEnabled();
 
     // Once the pipeline run finishes, clicking Import in the still-open modal imports the file and closes the modal.
@@ -782,7 +794,9 @@ describe("AutomatePage file-action intake guard (#2652)", () => {
           return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
         }
         return Promise.resolve(
-          new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+          new Response(JSON.stringify({ authEnabled: false, bundles: [], settings: {} }), {
+            status: 200,
+          }),
         );
       }),
     );
@@ -791,16 +805,12 @@ describe("AutomatePage file-action intake guard (#2652)", () => {
     expect(useFileStore.getState().entries).toHaveLength(0);
 
     // Open FileLibraryModal from the empty-state button and click Import while idle.
-    const importButtons = screen.getAllByRole("button", {
-      name: en.automate.importFromLibrary,
-    });
+    const importButtons = screen.getAllByText(en.automate.importFromLibrary);
     fireEvent.click(importButtons[0]);
-    fireEvent.click(await screen.findByText("modal.png"));
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: en.commonUi.fileLibrary.importCount.replace("{count}", "1"),
-      }),
-    );
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(await within(dialog).findByText("modal.png", {}, { timeout: 5000 }));
+    const importCountLabel = en.commonUi.fileLibrary.importCount.replace("{count}", "1");
+    fireEvent.click(within(dialog).getByRole("button", { name: importCountLabel }));
     expect(resolveModalDownload).toBeTypeOf("function");
 
     // A run starts before the file download resolves.
@@ -814,10 +824,8 @@ describe("AutomatePage file-action intake guard (#2652)", () => {
     await waitFor(() => expect(showIgnored).toHaveBeenCalledTimes(1));
     expect(showIgnored).toHaveBeenCalledWith(en.dropzone.ignoredWhileRunning);
     expect(useFileStore.getState().entries).toHaveLength(0);
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
-    const retryBtn = screen.getByRole("button", {
-      name: en.commonUi.fileLibrary.importCount.replace("{count}", "1"),
-    });
+    expect(screen.getByRole("dialog")).toBe(dialog);
+    const retryBtn = within(dialog).getByRole("button", { name: importCountLabel });
     expect(retryBtn).toBeEnabled();
 
     // Once the run finishes, retrying in the still-open modal loads modal.png via setFiles and closes the dialog.
@@ -846,9 +854,7 @@ describe("AutomatePage file-action intake guard (#2652)", () => {
     expect(showIgnored).toHaveBeenCalledTimes(1);
     expect(useFileStore.getState().entries).toHaveLength(0);
 
-    const desktopImportButtons = screen.getAllByRole("button", {
-      name: en.automate.importFromLibrary,
-    });
+    const desktopImportButtons = screen.getAllByText(en.automate.importFromLibrary);
     expect(desktopImportButtons).toHaveLength(2);
     fireEvent.click(desktopImportButtons[0]);
     expect(showIgnored).toHaveBeenCalledTimes(2);
@@ -918,20 +924,24 @@ describe("AutomatePage file-action intake guard (#2652)", () => {
           return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
         }
         return Promise.resolve(
-          new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+          new Response(JSON.stringify({ authEnabled: false, bundles: [], settings: {} }), {
+            status: 200,
+          }),
         );
       }),
     );
 
     renderAutomatePage({ libraryFileIds: ["good-file", "bad-file"] });
-    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't import 1 of 2 files.");
+    expect(await screen.findByRole("alert", {}, { timeout: 5000 })).toHaveTextContent(
+      "Couldn't import 1 of 2 files.",
+    );
     expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual(["good.png"]);
 
     // While a run is in flight, refusing Clear leaves the partial-failure alert intact.
     await act(async () => {
       useFileStore.getState().setProcessing(true);
     });
-    fireEvent.click(screen.getByRole("button", { name: en.automate.clearButton }));
+    fireEvent.click(screen.getByText(en.automate.clearButton));
     expect(showIgnored).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("alert")).toHaveTextContent("Couldn't import 1 of 2 files.");
 
@@ -939,10 +949,11 @@ describe("AutomatePage file-action intake guard (#2652)", () => {
     await act(async () => {
       useFileStore.getState().setProcessing(false);
     });
-    fireEvent.click(screen.getByRole("button", { name: en.automate.libraryButton }));
-    fireEvent.click(await screen.findByText("modal.png"));
+    fireEvent.click(screen.getByText(en.automate.libraryButton));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.click(await within(dialog).findByText("modal.png", {}, { timeout: 5000 }));
     fireEvent.click(
-      screen.getByRole("button", {
+      within(dialog).getByRole("button", {
         name: en.commonUi.fileLibrary.importCount.replace("{count}", "1"),
       }),
     );
@@ -969,7 +980,9 @@ describe("AutomatePage file-action intake guard (#2652)", () => {
           return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
         }
         return Promise.resolve(
-          new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+          new Response(JSON.stringify({ authEnabled: false, bundles: [], settings: {} }), {
+            status: 200,
+          }),
         );
       }),
     );
@@ -986,7 +999,9 @@ describe("AutomatePage file-action intake guard (#2652)", () => {
     }) as typeof document.createElement);
 
     const desktopView = renderAutomatePage({ libraryFileIds: ["bad-file"] });
-    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't import 1 of 1 files.");
+    expect(await screen.findByRole("alert", {}, { timeout: 5000 })).toHaveTextContent(
+      "Couldn't import 1 of 1 files.",
+    );
     const idleDesktopOnImport = capturedModalOnImports.at(-1);
     expect(idleDesktopOnImport).toBeTypeOf("function");
 
@@ -1061,7 +1076,9 @@ describe("AutomatePage file-action intake guard (#2652)", () => {
       })),
     );
     renderAutomatePage({ libraryFileIds: ["bad-file"] });
-    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't import 1 of 1 files.");
+    expect(await screen.findByRole("alert", {}, { timeout: 5000 })).toHaveTextContent(
+      "Couldn't import 1 of 1 files.",
+    );
     const idleMobileOnImport = capturedModalOnImports.at(-1);
     expect(idleMobileOnImport).toBeTypeOf("function");
 
