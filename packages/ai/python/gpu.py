@@ -1,9 +1,52 @@
 """Runtime GPU/CUDA detection utility."""
+import errno
 import functools
 import json
 import os
 import subprocess
 import sys
+
+
+_OOM_MARKERS = (
+    "out of memory",
+    "not enough memory",
+    "can't allocate memory",
+    "cannot allocate memory",
+    "unable to allocate",
+    "failed to allocate",
+    "cudaerrormemoryallocation",
+    "cublas_status_alloc_failed",
+    "bad_alloc",
+    "memoryerror",
+)
+_HOST_OOM_MARKERS = (
+    "not enough memory",
+    "can't allocate memory",
+    "cannot allocate memory",
+    "unable to allocate",
+    "bad_alloc",
+    "memoryerror",
+)
+
+
+def _is_oom(err):
+    if isinstance(err, MemoryError):
+        return True
+    if isinstance(err, OSError) and err.errno == errno.ENOMEM:
+        return True
+    m = str(err).lower()
+    return any(s in m for s in _OOM_MARKERS)
+
+
+def _is_host_oom(err):
+    if isinstance(err, MemoryError):
+        return True
+    if isinstance(err, OSError) and err.errno == errno.ENOMEM:
+        return True
+    m = str(err).lower()
+    if any(s in m for s in _HOST_OOM_MARKERS):
+        return True
+    return "defaultcpuallocator" in m and _is_oom(err)
 
 
 def emit_info(msg):
@@ -219,7 +262,7 @@ def safe_onnx_session(model_path, providers=None):
         session = ort.InferenceSession(model_path, providers=providers)
         return session, device
     except Exception as e:
-        if "CUDAExecutionProvider" in providers:
+        if "CUDAExecutionProvider" in providers and not _is_host_oom(e):
             emit_info(f"CUDA init failed ({e}), falling back to CPU")
             session = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
             return session, "cpu"

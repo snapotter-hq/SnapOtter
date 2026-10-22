@@ -87,17 +87,21 @@ for script_file in AI_ENTRYPOINT_SCRIPTS:
     assert "type(e).__name__" in src, f"{script_file} does not fall back to type(e).__name__"
 
 import gif_remove_bg  # noqa: E402
+import gpu  # noqa: E402
 import remove_bg  # noqa: E402
 import restore  # noqa: E402
 import upscale  # noqa: E402
 assert remove_bg._OOM_MARKERS == gif_remove_bg._OOM_MARKERS
 assert restore._OOM_MARKERS == gif_remove_bg._OOM_MARKERS
+assert gpu._OOM_MARKERS == gif_remove_bg._OOM_MARKERS
 assert upscale.OOM_ERROR_PATTERNS == gif_remove_bg._OOM_MARKERS
 assert remove_bg._HOST_OOM_MARKERS == gif_remove_bg._HOST_OOM_MARKERS
+assert gpu._HOST_OOM_MARKERS == gif_remove_bg._HOST_OOM_MARKERS
 for oom_mod, oom_fn in (
     (gif_remove_bg, gif_remove_bg._is_oom),
     (remove_bg, remove_bg._is_oom),
     (restore, restore._is_oom),
+    (gpu, gpu._is_oom),
     (upscale, upscale.is_oom_error),
 ):
     assert oom_fn(MemoryError()) is True, (
@@ -134,7 +138,7 @@ for oom_mod, oom_fn in (
     )
     assert oom_fn(OSError(13, "Permission denied")) is False
     assert oom_fn(OSError("disk read failed")) is False
-for host_oom_mod in (gif_remove_bg, remove_bg):
+for host_oom_mod in (gif_remove_bg, remove_bg, gpu):
     assert host_oom_mod._is_host_oom(MemoryError()) is True, (
         f"{host_oom_mod.__name__}._is_host_oom must recognize bare MemoryError()"
     )
@@ -896,6 +900,108 @@ def _verify_gif_cuda_session_host_oom():
 
 
 _verify_gif_cuda_session_host_oom()
+
+
+def _verify_safe_onnx_session_host_oom():
+    calls = []
+    active_err = [None]
+
+    def _fake_inference_session(model_path, providers=None):
+        calls.append((model_path, list(providers) if providers is not None else None))
+        if (
+            active_err[0] is not None
+            and providers is not None
+            and "CUDAExecutionProvider" in providers
+        ):
+            raise active_err[0]
+        return f"session:{model_path}:{providers[0] if providers else 'default'}"
+
+    fake_ort = types.ModuleType("onnxruntime")
+    fake_ort.InferenceSession = _fake_inference_session
+    prev_ort = sys.modules.get("onnxruntime")
+    orig_onnx_providers = gpu.onnx_providers
+    sys.modules["onnxruntime"] = fake_ort
+
+    try:
+        cuda_providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+
+        # 1) safe_onnx_session re-raises host-memory OOMs immediately without retrying CPUExecutionProvider (#3439).
+        for host_oom_exc in (
+            MemoryError(),
+            RuntimeError("MemoryError"),
+            RuntimeError("std::bad_alloc"),
+            RuntimeError(
+                "[enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes."
+            ),
+            RuntimeError(
+                "DefaultCPUAllocator: can't allocate memory: you tried to allocate 104857600 bytes."
+            ),
+            RuntimeError("DefaultCPUAllocator: failed to allocate memory"),
+            RuntimeError("DefaultCPUAllocator: out of memory"),
+            RuntimeError("DefaultCPUAllocator: NOT ENOUGH MEMORY"),
+            RuntimeError("DefaultCPUAllocator: CAN'T ALLOCATE MEMORY"),
+            RuntimeError("OSError: [Errno 12] Cannot allocate memory"),
+            OSError(12, "Cannot allocate memory"),
+            OSError(12, "Nicht genügend Hauptspeicher verfügbar"),
+            RuntimeError(
+                "Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 30) and data type float32"
+            ),
+        ):
+            for explicit_providers in (cuda_providers, None):
+                calls.clear()
+                active_err[0] = host_oom_exc
+                gpu.onnx_providers = lambda: (list(cuda_providers), "cuda")
+                err_buf = io.StringIO()
+                saved_stderr = sys.stderr
+                sys.stderr = err_buf
+                try:
+                    gpu.safe_onnx_session("/tmp/model.onnx", providers=explicit_providers)
+                    raise AssertionError(
+                        f"gpu.safe_onnx_session did not re-raise {host_oom_exc!r}"
+                    )
+                except Exception as caught:
+                    assert caught is host_oom_exc, (caught, host_oom_exc)
+                finally:
+                    sys.stderr = saved_stderr
+                assert calls == [("/tmp/model.onnx", cuda_providers)], (
+                    f"gpu.safe_onnx_session must not retry on CPU for host OOM {host_oom_exc!r}, got {calls!r}"
+                )
+                assert "falling back to CPU" not in err_buf.getvalue(), err_buf.getvalue()
+
+        # 2) safe_onnx_session still falls back to CPUExecutionProvider on CUDA VRAM / driver errors (#3439).
+        for cuda_exc in (
+            RuntimeError("CUDA out of memory"),
+            RuntimeError("Failed to allocate memory for requested buffer"),
+            RuntimeError("cudaErrorMemoryAllocation: out of memory"),
+            RuntimeError("CUBLAS_STATUS_ALLOC_FAILED"),
+            RuntimeError("CUDA driver version is insufficient"),
+        ):
+            calls.clear()
+            active_err[0] = cuda_exc
+            gpu.onnx_providers = lambda: (list(cuda_providers), "cuda")
+            err_buf = io.StringIO()
+            saved_stderr = sys.stderr
+            sys.stderr = err_buf
+            try:
+                sess, dev = gpu.safe_onnx_session("/tmp/model.onnx")
+            finally:
+                sys.stderr = saved_stderr
+            assert sess == "session:/tmp/model.onnx:CPUExecutionProvider", sess
+            assert dev == "cpu", dev
+            assert calls == [
+                ("/tmp/model.onnx", cuda_providers),
+                ("/tmp/model.onnx", ["CPUExecutionProvider"]),
+            ], calls
+            assert "falling back to CPU" in err_buf.getvalue(), err_buf.getvalue()
+    finally:
+        gpu.onnx_providers = orig_onnx_providers
+        if prev_ort is None:
+            sys.modules.pop("onnxruntime", None)
+        else:
+            sys.modules["onnxruntime"] = prev_ort
+
+
+_verify_safe_onnx_session_host_oom()
 
 
 def _verify_remove_bg_oom_handling():

@@ -112,3 +112,72 @@ def test_gpu_frameworks_available_reports_each_framework_independently(monkeypat
         "ctranslate2": False,
     }
 
+
+def test_safe_onnx_session_reraises_host_oom_without_cpu_retry(monkeypatch, capsys):
+    cuda_providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+    for host_oom in (
+        MemoryError(),
+        RuntimeError("DefaultCPUAllocator: not enough memory"),
+        RuntimeError("DefaultCPUAllocator: can't allocate memory"),
+        RuntimeError("DefaultCPUAllocator: failed to allocate memory"),
+        RuntimeError("DefaultCPUAllocator: out of memory"),
+        OSError(12, "Cannot allocate memory"),
+        OSError(12, "Nicht genügend Hauptspeicher verfügbar"),
+        RuntimeError("Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 30)"),
+        RuntimeError("std::bad_alloc"),
+    ):
+        calls = []
+
+        def fake_inference_session(model_path, providers=None, _exc=host_oom):
+            calls.append((model_path, list(providers) if providers is not None else None))
+            if providers and "CUDAExecutionProvider" in providers:
+                raise _exc
+            return "cpu-session"
+
+        fake_ort = types.SimpleNamespace(InferenceSession=fake_inference_session)
+        monkeypatch.setitem(sys.modules, "onnxruntime", fake_ort)
+        monkeypatch.setattr(gpu, "onnx_providers", lambda: (list(cuda_providers), "cuda"))
+
+        for explicit_providers in (cuda_providers, None):
+            calls.clear()
+            try:
+                gpu.safe_onnx_session("/tmp/model.onnx", providers=explicit_providers)
+                raise AssertionError(f"Expected {host_oom!r} to be re-raised")
+            except Exception as exc:
+                assert exc is host_oom
+
+            assert calls == [("/tmp/model.onnx", cuda_providers)]
+            assert "falling back to CPU" not in capsys.readouterr().err
+
+
+def test_safe_onnx_session_falls_back_to_cpu_on_cuda_error(monkeypatch, capsys):
+    cuda_providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+    for cuda_err in (
+        RuntimeError("CUDA out of memory"),
+        RuntimeError("Failed to allocate memory for requested buffer"),
+        RuntimeError("cudaErrorMemoryAllocation: out of memory"),
+        RuntimeError("CUBLAS_STATUS_ALLOC_FAILED"),
+        RuntimeError("CUDA driver version is insufficient"),
+    ):
+        calls = []
+
+        def fake_inference_session(model_path, providers=None, _exc=cuda_err):
+            calls.append((model_path, list(providers) if providers is not None else None))
+            if providers and "CUDAExecutionProvider" in providers:
+                raise _exc
+            return "cpu-session"
+
+        fake_ort = types.SimpleNamespace(InferenceSession=fake_inference_session)
+        monkeypatch.setitem(sys.modules, "onnxruntime", fake_ort)
+        monkeypatch.setattr(gpu, "onnx_providers", lambda: (list(cuda_providers), "cuda"))
+
+        session, device = gpu.safe_onnx_session("/tmp/model.onnx")
+        assert session == "cpu-session"
+        assert device == "cpu"
+        assert calls == [
+            ("/tmp/model.onnx", cuda_providers),
+            ("/tmp/model.onnx", ["CPUExecutionProvider"]),
+        ]
+        assert "falling back to CPU" in capsys.readouterr().err
+
+

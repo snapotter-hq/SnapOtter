@@ -1,9 +1,13 @@
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { EventEmitter } from "node:events";
+import { dirname, resolve } from "node:path";
 import { Writable } from "node:stream";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { hasPython, pythonBin } from "../../helpers/python-gate.js";
 
-vi.mock("node:child_process", () => ({
+vi.mock("node:child_process", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("node:child_process")>()),
   spawn: vi.fn(),
 }));
 
@@ -227,5 +231,130 @@ describe("buildMinimalEnv - env passthrough", () => {
 
     delete process.env.SECRET_API_KEY;
     delete process.env.DATABASE_URL;
+  });
+});
+
+describe.skipIf(!hasPython)("gpu.safe_onnx_session host OOM handling (issue #3439)", () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const pyDir = resolve(here, "../../../packages/ai/python");
+
+  it("re-raises host-memory OOMs during CUDA init without retrying on CPUExecutionProvider", () => {
+    const res = spawnSync(
+      pythonBin as string,
+      [
+        "-c",
+        `
+import io, json, sys, types
+
+sys.path.insert(0, ${JSON.stringify(pyDir)})
+import gpu
+
+calls = []
+active_err = [None]
+
+def fake_inference_session(model_path, providers=None):
+    calls.append((model_path, list(providers) if providers is not None else None))
+    if active_err[0] is not None and providers is not None and "CUDAExecutionProvider" in providers:
+        raise active_err[0]
+    return f"session:{model_path}:{providers[0] if providers else 'default'}"
+
+fake_ort = types.ModuleType("onnxruntime")
+fake_ort.InferenceSession = fake_inference_session
+sys.modules["onnxruntime"] = fake_ort
+
+cuda_providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+
+# 1. Host-memory OOMs must re-raise immediately without a second CPUExecutionProvider call.
+for host_oom_exc in (
+    MemoryError(),
+    RuntimeError("MemoryError"),
+    RuntimeError("std::bad_alloc"),
+    RuntimeError("[enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes."),
+    RuntimeError("DefaultCPUAllocator: can't allocate memory: you tried to allocate 104857600 bytes."),
+    RuntimeError("DefaultCPUAllocator: out of memory"),
+    RuntimeError("DefaultCPUAllocator: failed to allocate memory"),
+    RuntimeError("DefaultCPUAllocator: NOT ENOUGH MEMORY"),
+    RuntimeError("DefaultCPUAllocator: CAN'T ALLOCATE MEMORY"),
+    RuntimeError("OSError: [Errno 12] Cannot allocate memory"),
+    OSError(12, "Cannot allocate memory"),
+    OSError(12, "Nicht genügend Hauptspeicher verfügbar"),
+    RuntimeError("Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 30) and data type float32"),
+):
+    for explicit_providers in (cuda_providers, None):
+        calls.clear()
+        active_err[0] = host_oom_exc
+        gpu.onnx_providers = lambda: (list(cuda_providers), "cuda")
+        err_buf = io.StringIO()
+        saved_stderr = sys.stderr
+        sys.stderr = err_buf
+        try:
+            gpu.safe_onnx_session("/tmp/model.onnx", providers=explicit_providers)
+            raise AssertionError(f"Expected safe_onnx_session to re-raise {host_oom_exc!r}")
+        except Exception as caught:
+            assert caught is host_oom_exc, (caught, host_oom_exc)
+        finally:
+            sys.stderr = saved_stderr
+        assert calls == [("/tmp/model.onnx", cuda_providers)], (
+            f"safe_onnx_session must not retry on CPU for host OOM {host_oom_exc!r}, got {calls!r}"
+        )
+        assert "falling back to CPU" not in err_buf.getvalue(), err_buf.getvalue()
+
+# 2. Non-host-OOM CUDA / VRAM / driver errors still fall back to CPUExecutionProvider.
+for cuda_exc in (
+    RuntimeError("CUDA out of memory"),
+    RuntimeError("Failed to allocate memory for requested buffer"),
+    RuntimeError("cudaErrorMemoryAllocation: out of memory"),
+    RuntimeError("CUBLAS_STATUS_ALLOC_FAILED"),
+    RuntimeError("CUDA driver version is insufficient for CUDA runtime version"),
+):
+    calls.clear()
+    active_err[0] = cuda_exc
+    gpu.onnx_providers = lambda: (list(cuda_providers), "cuda")
+    err_buf = io.StringIO()
+    saved_stderr = sys.stderr
+    sys.stderr = err_buf
+    try:
+        sess, dev = gpu.safe_onnx_session("/tmp/model.onnx")
+    finally:
+        sys.stderr = saved_stderr
+    assert sess == "session:/tmp/model.onnx:CPUExecutionProvider", sess
+    assert dev == "cpu", dev
+    assert calls == [
+        ("/tmp/model.onnx", cuda_providers),
+        ("/tmp/model.onnx", ["CPUExecutionProvider"]),
+    ], calls
+    info_event = json.loads(err_buf.getvalue().strip())
+    assert "CUDA init failed" in info_event["info"] and "falling back to CPU" in info_event["info"], info_event
+
+# 3. Successful CUDA init returns session and device without fallback.
+calls.clear()
+active_err[0] = None
+gpu.onnx_providers = lambda: (list(cuda_providers), "cuda")
+sess_ok, dev_ok = gpu.safe_onnx_session("/tmp/model.onnx")
+assert sess_ok == "session:/tmp/model.onnx:CUDAExecutionProvider", sess_ok
+assert dev_ok == "cuda", dev_ok
+assert calls == [("/tmp/model.onnx", cuda_providers)], calls
+
+# 4. CPU-only providers re-raise any error without retrying.
+calls.clear()
+cpu_err = RuntimeError("corrupt model graph")
+def fake_cpu_fail(model_path, providers=None):
+    calls.append((model_path, list(providers) if providers is not None else None))
+    raise cpu_err
+fake_ort.InferenceSession = fake_cpu_fail
+try:
+    gpu.safe_onnx_session("/tmp/model.onnx", providers=["CPUExecutionProvider"])
+    raise AssertionError("Expected safe_onnx_session to re-raise CPU error")
+except RuntimeError as caught_cpu:
+    assert caught_cpu is cpu_err, caught_cpu
+assert calls == [("/tmp/model.onnx", ["CPUExecutionProvider"])], calls
+
+print("SAFE_ONNX_SESSION_3439_OK")
+`,
+      ],
+      { encoding: "utf8", timeout: 30_000 },
+    );
+    expect(res.status, res.stderr).toBe(0);
+    expect(res.stdout).toContain("SAFE_ONNX_SESSION_3439_OK");
   });
 });
