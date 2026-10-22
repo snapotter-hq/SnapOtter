@@ -1591,13 +1591,19 @@ describe("bridge - initDispatcher", () => {
     expect(getDispatcherStatus().consecutiveCrashes).toBe(0);
   });
 
-  it("does not count a shutdown()-induced stdin EPIPE as a crash", async () => {
+  it("does not count or log a shutdown()-induced stdin EPIPE as a crash", async () => {
     // Regression: shutdown() ends stdin then SIGTERMs the child. On a real
     // pipe that teardown can surface as an EPIPE/ERR_STREAM_DESTROYED on the
     // stdin stream (observed in the container shutdown log as a spurious
     // "[bridge] Dispatcher crash #1"). The "close" handler alone is guarded,
     // but the stdin error handler must be too; otherwise shutdownDispatcher()
-    // on every AI bundle install accrues false crashes toward the disable cap.
+    // on every AI bundle install accrues false crashes toward the disable cap
+    // and emits spurious error-level log lines (#3707).
+    const { setAiLogger } = await import("../../../packages/ai/src/log.js");
+    const sink = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    setAiLogger(sink);
+    onTestFinished(() => setAiLogger(null));
+
     const mock = createMockProcess();
     vi.mocked(spawn).mockReturnValue(mock.process);
 
@@ -1610,13 +1616,26 @@ describe("bridge - initDispatcher", () => {
     epipe.code = "EPIPE";
     mock.stdin.emit("error", epipe);
 
+    const destroyed = new Error(
+      "Cannot call write after a stream was destroyed",
+    ) as NodeJS.ErrnoException;
+    destroyed.code = "ERR_STREAM_DESTROYED";
+    mock.stdin.emit("error", destroyed);
+
     expect(getDispatcherStatus().consecutiveCrashes).toBe(0);
     expect(getDispatcherStatus().failed).toBe(false);
+    expect(sink.error).not.toHaveBeenCalled();
   });
 
-  it("does not count a shutdown()-induced process error as a crash", async () => {
-    // The proc "error" handler (non-ENOENT) also records crashes; a kill during
-    // shutdown can emit one (e.g. ESRCH), which must not be counted.
+  it("does not count or log a shutdown()-induced process error as a crash", async () => {
+    // The proc "error" handler (non-ENOENT) also records crashes and logs
+    // errors; a kill during shutdown can emit one (e.g. ESRCH), which must not
+    // be counted or logged at error level (#3707).
+    const { setAiLogger } = await import("../../../packages/ai/src/log.js");
+    const sink = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    setAiLogger(sink);
+    onTestFinished(() => setAiLogger(null));
+
     const mock = createMockProcess();
     vi.mocked(spawn).mockReturnValue(mock.process);
 
@@ -1631,6 +1650,54 @@ describe("bridge - initDispatcher", () => {
 
     expect(getDispatcherStatus().consecutiveCrashes).toBe(0);
     expect(getDispatcherStatus().failed).toBe(false);
+    expect(sink.error).not.toHaveBeenCalled();
+  });
+
+  it("logs and counts an unexpected stdin EPIPE or non-ENOENT process error as a crash", async () => {
+    const { setAiLogger } = await import("../../../packages/ai/src/log.js");
+    const sink = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    setAiLogger(sink);
+    onTestFinished(() => setAiLogger(null));
+
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    const promise = initDispatcher();
+    mock.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+    await promise;
+
+    const epipe = new Error("write EPIPE") as NodeJS.ErrnoException;
+    epipe.code = "EPIPE";
+    mock.stdin.emit("error", epipe);
+
+    expect(getDispatcherStatus().consecutiveCrashes).toBe(1);
+    expect(sink.error).toHaveBeenCalledWith(
+      "[bridge] Dispatcher stdin pipe broken (EPIPE), rejecting pending requests",
+      epipe,
+    );
+
+    const destroyed = new Error(
+      "Cannot call write after a stream was destroyed",
+    ) as NodeJS.ErrnoException;
+    destroyed.code = "ERR_STREAM_DESTROYED";
+    mock.stdin.emit("error", destroyed);
+
+    expect(getDispatcherStatus().consecutiveCrashes).toBe(2);
+    expect(sink.error).toHaveBeenCalledWith(
+      "[bridge] Dispatcher stdin pipe broken (ERR_STREAM_DESTROYED), rejecting pending requests",
+      destroyed,
+    );
+
+    const procErr = new Error("unexpected EPERM") as NodeJS.ErrnoException;
+    procErr.code = "EPERM";
+    mock.emitEvent("error", procErr);
+
+    expect(getDispatcherStatus().consecutiveCrashes).toBe(3);
+    expect(sink.error).toHaveBeenCalledWith(
+      "[bridge] Dispatcher error: unexpected EPERM (code: EPERM)",
+      procErr,
+    );
+    expect(sink.error).toHaveBeenCalledTimes(3);
   });
 });
 
@@ -4750,7 +4817,13 @@ describe("bridge - dispatcher failure recycling and diagnostics (issue #2709)", 
   it("recycles the dispatcher after 3 consecutive script failures and resets on success without tripping MAX_CONSECUTIVE_CRASHES", async () => {
     const { getDispatcherStatus, initDispatcher, runPythonWithProgress, shutdownDispatcher } =
       await import("../../../packages/ai/src/bridge.js");
-    onTestFinished(() => shutdownDispatcher());
+    const { setAiLogger } = await import("../../../packages/ai/src/log.js");
+    const sink = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    setAiLogger(sink);
+    onTestFinished(() => {
+      setAiLogger(null);
+      shutdownDispatcher();
+    });
 
     const mock1 = createMockProcess();
     vi.mocked(spawn).mockReturnValue(mock1.process);
@@ -4801,6 +4874,12 @@ describe("bridge - dispatcher failure recycling and diagnostics (issue #2709)", 
     expect(getDispatcherStatus().running).toBe(true);
 
     await sendAndRespond(mock1, 1, '{"success": false, "error": "fail 3"}');
+    const recycleEpipe = new Error("write EPIPE") as NodeJS.ErrnoException;
+    recycleEpipe.code = "EPIPE";
+    mock1.stdin.emit("error", recycleEpipe);
+    const recycleEsrch = new Error("kill ESRCH") as NodeJS.ErrnoException;
+    recycleEsrch.code = "ESRCH";
+    mock1.emitEvent("error", recycleEsrch);
     mock1.emitEvent("close", null, "SIGTERM");
 
     const statusAfterRecycle = getDispatcherStatus();
@@ -4811,6 +4890,7 @@ describe("bridge - dispatcher failure recycling and diagnostics (issue #2709)", 
     expect(statusAfterRecycle.consecutiveScriptFailures).toBe(3);
     expect(statusAfterRecycle.lastRecycleReason).toBe("consecutive_failures");
     expect(mock1.process.kill).toHaveBeenCalledWith("SIGTERM");
+    expect(sink.error).not.toHaveBeenCalled();
   });
 
   it("records lastRecycleReason as max_requests when dispatcher shuts down at request limit", async () => {
@@ -5032,7 +5112,11 @@ describe("bridge - dispatcherRun onAbort timeout vs cancel crash accounting (iss
       shutdownDispatcher,
       shutdownDocsDispatcher,
     } = await import("../../../packages/ai/src/bridge.js");
+    const { setAiLogger } = await import("../../../packages/ai/src/log.js");
+    const sink = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    setAiLogger(sink);
     onTestFinished(async () => {
+      setAiLogger(null);
       shutdownDispatcher();
       await shutdownDocsDispatcher();
     });
@@ -5065,9 +5149,16 @@ describe("bridge - dispatcherRun onAbort timeout vs cancel crash accounting (iss
       expect(getDispatcherStatus().running).toBe(false);
       expect(getDispatcherStatus().ready).toBe(false);
 
+      const cancelEpipe = new Error("write EPIPE") as NodeJS.ErrnoException;
+      cancelEpipe.code = "EPIPE";
+      mockCancel.stdin.emit("error", cancelEpipe);
+      const cancelEsrch = new Error("kill ESRCH") as NodeJS.ErrnoException;
+      cancelEsrch.code = "ESRCH";
+      mockCancel.emitEvent("error", cancelEsrch);
       mockCancel.emitEvent("close", null, "SIGTERM");
       expect(getDispatcherStatus().consecutiveCrashes).toBe(0);
       expect(getDispatcherStatus().failed).toBe(false);
+      expect(sink.error).not.toHaveBeenCalled();
     }
 
     // 2. Pre-aborted timeout signal rejects before touching or killing a ready dispatcher

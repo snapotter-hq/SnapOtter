@@ -597,10 +597,6 @@ export class PythonDispatcher {
 
       proc.stdin?.on("error", (err: NodeJS.ErrnoException) => {
         if (err.code === "EPIPE" || err.code === "ERR_STREAM_DESTROYED") {
-          aiLog.error(
-            `[bridge] Dispatcher stdin pipe broken (${err.code}), rejecting pending requests`,
-            err,
-          );
           this.rejectPendingForGeneration(
             gen,
             new SafeError("Python dispatcher stdin closed unexpectedly", {
@@ -610,11 +606,17 @@ export class PythonDispatcher {
           );
           // An intentional shutdown() ends stdin then SIGTERMs the child,
           // which can surface here as an EPIPE/ERR_STREAM_DESTROYED. That is
-          // not a crash: counting it would let repeated legitimate restarts
-          // (shutdownDispatcher() runs after every AI bundle install) trip
-          // the crash limit and permanently disable the dispatcher. Guard
-          // mirrors the "close" handler below.
-          if (!this.stoppedChildren.has(proc)) this.recordCrash();
+          // not a crash: counting or logging it would let repeated legitimate
+          // restarts (shutdownDispatcher() runs after every AI bundle install)
+          // emit spurious errors and trip the crash limit to permanently
+          // disable the dispatcher. Guard mirrors the "close" handler below.
+          if (!this.stoppedChildren.has(proc)) {
+            aiLog.error(
+              `[bridge] Dispatcher stdin pipe broken (${err.code}), rejecting pending requests`,
+              err,
+            );
+            this.recordCrash();
+          }
           if (this.child === proc) {
             this.child = null;
             this.childReady = false;
@@ -740,12 +742,14 @@ export class PythonDispatcher {
       });
 
       proc.on("error", (err: NodeJS.ErrnoException) => {
-        aiLog.error(`[bridge] Dispatcher error: ${err.message} (code: ${err.code})`, err);
         if (err.code === "ENOENT") {
+          aiLog.error(`[bridge] Dispatcher error: ${err.message} (code: ${err.code})`, err);
           this.childFailed = true;
         } else if (!this.stoppedChildren.has(proc)) {
-          // Skip crash accounting when we initiated the teardown (shutdown()
-          // marks the child stopped before killing it); mirrors "close".
+          // Skip error logging and crash accounting when we initiated the
+          // teardown (shutdown() marks the child stopped before killing it);
+          // mirrors "close".
+          aiLog.error(`[bridge] Dispatcher error: ${err.message} (code: ${err.code})`, err);
           this.recordCrash();
         }
         this.rejectPendingForGeneration(
