@@ -206,6 +206,7 @@ const passthroughSchema = { parse: (v: unknown) => v } as never;
 interface RunSettings {
   mode: "fast" | "slow" | "ignore-abort" | "retry-slow" | "fail";
   tag: string;
+  reportProgress?: { percent: number; stage: string };
 }
 
 // Behavior keyed on settings: fast returns instantly, slow waits on the
@@ -226,7 +227,10 @@ registerToolProcessFn({
     filename: string,
     ctx?: ToolProcessCtx,
   ) => {
-    const { mode, tag } = settings as RunSettings;
+    const { mode, tag, reportProgress } = settings as RunSettings;
+    if (reportProgress) {
+      ctx?.report(reportProgress.percent, reportProgress.stage);
+    }
     invoked.push(tag);
     if (mode === "fail") {
       throw new Error(`wt-single-cancel failed: ${tag}`);
@@ -1804,7 +1808,7 @@ describe("requestCancel through a single-tool alias (#808)", () => {
     expect(frame.error).toBe("Canceled");
   });
 
-  it("leaves a re-pointed clientJobId alias row and Redis terminal key untouched when an earlier single-tool job completes, fails, or cancels (#3408)", async () => {
+  it("leaves a re-pointed clientJobId alias row and Redis terminal key untouched when an earlier single-tool job reports progress, completes, fails, or cancels (#3408, #3409)", async () => {
     const owner = await createOwner();
     const clientJobId = randomUUID();
     const liveArtifactId = randomUUID();
@@ -1826,6 +1830,11 @@ describe("requestCancel through a single-tool alias (#808)", () => {
     ): Promise<string> => {
       const staleJobId = randomUUID();
       const uploadKey = `uploads/${staleJobId}/input.png`;
+      const settings: RunSettings = {
+        mode,
+        tag,
+        reportProgress: { percent: 55, stage: `Stale ${tag}` },
+      };
       await putObject(uploadKey, Buffer.from("payload"));
       await db.insert(schema.jobs).values({
         id: staleJobId,
@@ -1835,7 +1844,7 @@ describe("requestCancel through a single-tool alias (#808)", () => {
         type: "tool",
         status: "queued",
         inputRefs: [uploadKey],
-        settings: { mode, tag },
+        settings: settings as unknown as Record<string, unknown>,
       });
       await getQueue("image").add(
         "wt-single-cancel",
@@ -1847,7 +1856,7 @@ describe("requestCancel through a single-tool alias (#808)", () => {
           pool: "image",
           inputRefs: [uploadKey],
           filename: "input.png",
-          settings: { mode, tag },
+          settings,
           clientJobId,
         },
         { jobId: staleJobId, attempts: 1 },

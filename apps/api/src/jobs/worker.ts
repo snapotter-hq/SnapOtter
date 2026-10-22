@@ -550,6 +550,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
           phase: "processing",
           percent,
           stage,
+          ...(progressJobId !== jobId && { expectedArtifactJobId: jobId }),
         });
         void job.updateProgress({ percent, stage });
       });
@@ -1292,6 +1293,10 @@ async function processPipelineStep(job: Job<ToolJobData>): Promise<ToolJobResult
   // Report pipeline-level progress to the pipeline's SSE channel.
   const pipelineProgressId = data.clientJobId;
   if (pipelineProgressId) {
+    const stepSuffix = `-s${data.stepIndex ?? 0}`;
+    const flowId = data.jobId.endsWith(stepSuffix)
+      ? data.jobId.slice(0, -stepSuffix.length)
+      : data.jobId;
     const percent = Math.round(((data.stepIndex ?? 0) / (data.totalSteps ?? 1)) * 90);
     const stage = `Step ${(data.stepIndex ?? 0) + 1}/${data.totalSteps}: ${data.toolId}`;
     void updateSingleFileProgress({
@@ -1299,6 +1304,7 @@ async function processPipelineStep(job: Job<ToolJobData>): Promise<ToolJobResult
       phase: "processing",
       percent,
       stage,
+      ...(pipelineProgressId !== flowId && { expectedPipelineFlowId: flowId }),
     });
   }
 

@@ -3720,6 +3720,7 @@ describe("processToolJob expectedArtifactJobId alias guard (#3408)", () => {
     const processV2Mock = vi.fn();
     const cancelSingleJobGuardedMock = vi.fn().mockResolvedValue(undefined);
     const publishEphemeralMock = vi.fn();
+    const updateSingleFileProgressMock = vi.fn().mockResolvedValue(undefined);
     const updateSingleFileProgressAtomicallyMock = vi.fn(
       async (_progress: unknown, mutate?: (tx: unknown) => Promise<void>) => {
         const { db } = await import("../../../../apps/api/src/db/index.js");
@@ -3755,7 +3756,7 @@ describe("processToolJob expectedArtifactJobId alias guard (#3408)", () => {
       vi.doMock("../../../../apps/api/src/routes/progress.js", () => ({
         cancelSingleJobGuarded: cancelSingleJobGuardedMock,
         publishEphemeral: publishEphemeralMock,
-        updateSingleFileProgress: vi.fn(),
+        updateSingleFileProgress: updateSingleFileProgressMock,
         updateSingleFileProgressAtomically: updateSingleFileProgressAtomicallyMock,
       }));
       vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
@@ -3938,5 +3939,134 @@ describe("processToolJob expectedArtifactJobId alias guard (#3408)", () => {
       percent: 0,
       error: "Canceled",
     });
+
+    // 4. Non-terminal progress in processToolJob passes expectedArtifactJobId when clientJobId !== jobId and omits it when direct (#3409)
+    wasUserCanceledMock.mockReturnValue(false);
+    updateSingleFileProgressMock.mockClear();
+    processV2Mock.mockImplementationOnce(
+      async (ctx: { report: (percent: number, stage?: string) => void }) => {
+        ctx.report(45, "Encoding...");
+        return {
+          buffer: Buffer.from("out-bytes"),
+          filename: "out.png",
+          contentType: "image/png",
+        };
+      },
+    );
+    await processor(makeToolJob("job-progress-alias", "client-progress-alias"));
+    expect(updateSingleFileProgressMock).toHaveBeenCalledWith({
+      jobId: "client-progress-alias",
+      phase: "processing",
+      percent: 45,
+      stage: "Encoding...",
+      expectedArtifactJobId: "job-progress-alias",
+    });
+
+    updateSingleFileProgressMock.mockClear();
+    processV2Mock.mockImplementationOnce(
+      async (ctx: { report: (percent: number, stage?: string) => void }) => {
+        ctx.report(45, "Encoding...");
+        return {
+          buffer: Buffer.from("out-bytes"),
+          filename: "out.png",
+          contentType: "image/png",
+        };
+      },
+    );
+    await processor(makeToolJob("job-progress-direct"));
+    const directProgressArg = updateSingleFileProgressMock.mock.calls[0]?.[0] as Record<
+      string,
+      unknown
+    >;
+    expect(directProgressArg).toEqual({
+      jobId: "job-progress-direct",
+      phase: "processing",
+      percent: 45,
+      stage: "Encoding...",
+    });
+    expect(directProgressArg).not.toHaveProperty("expectedArtifactJobId");
+
+    // 5. Non-terminal progress in processPipelineStep passes expectedPipelineFlowId when clientJobId !== flowId and omits it when clientJobId === flowId (#3409)
+    updateSingleFileProgressMock.mockClear();
+    processV2Mock.mockImplementationOnce(
+      async (ctx: { report: (percent: number, stage?: string) => void }) => {
+        ctx.report(60, "Inner tool progress");
+        return {
+          buffer: Buffer.from("step-bytes"),
+          filename: "step.png",
+          contentType: "image/png",
+        };
+      },
+    );
+    await processor({
+      id: "flow-step-alias-s1",
+      attemptsMade: 0,
+      opts: { attempts: 1 },
+      updateProgress: vi.fn(),
+      data: {
+        kind: "pipeline-step",
+        jobId: "flow-step-alias-s1",
+        clientJobId: "client-pipeline-alias",
+        toolId: "compress",
+        userId: null,
+        pool: "image",
+        stepIndex: 1,
+        totalSteps: 2,
+        inputRefs: ["uploads/flow-step-alias-s0/mid.png"],
+        filename: "mid.png",
+        settings: {},
+      },
+    });
+    expect(updateSingleFileProgressMock).toHaveBeenNthCalledWith(1, {
+      jobId: "client-pipeline-alias",
+      phase: "processing",
+      percent: 45,
+      stage: "Step 2/2: compress",
+      expectedPipelineFlowId: "flow-step-alias",
+    });
+    // The inner processToolJob runs with data.clientJobId cleared, so its own report targets the step row without expectedArtifactJobId or expectedPipelineFlowId.
+    expect(updateSingleFileProgressMock).toHaveBeenNthCalledWith(2, {
+      jobId: "flow-step-alias-s1",
+      phase: "processing",
+      percent: 60,
+      stage: "Inner tool progress",
+    });
+
+    updateSingleFileProgressMock.mockClear();
+    processV2Mock.mockResolvedValueOnce({
+      buffer: Buffer.from("step-bytes"),
+      filename: "step.png",
+      contentType: "image/png",
+    });
+    await processor({
+      id: "flow-step-direct-s0",
+      attemptsMade: 0,
+      opts: { attempts: 1 },
+      updateProgress: vi.fn(),
+      data: {
+        kind: "pipeline-step",
+        jobId: "flow-step-direct-s0",
+        clientJobId: "flow-step-direct",
+        toolId: "compress",
+        userId: null,
+        pool: "image",
+        stepIndex: 0,
+        totalSteps: 2,
+        inputRefs: ["uploads/flow-step-direct-s0/in.png"],
+        filename: "in.png",
+        settings: {},
+      },
+    });
+    const directStepProgressArg = updateSingleFileProgressMock.mock.calls[0]?.[0] as Record<
+      string,
+      unknown
+    >;
+    expect(directStepProgressArg).toEqual({
+      jobId: "flow-step-direct",
+      phase: "processing",
+      percent: 0,
+      stage: "Step 1/2: compress",
+    });
+    expect(directStepProgressArg).not.toHaveProperty("expectedPipelineFlowId");
   });
 });

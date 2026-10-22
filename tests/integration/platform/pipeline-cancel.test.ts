@@ -770,7 +770,7 @@ describe("cooperative step skip and canceled finalize", () => {
     expect((await jobRow(clientJobId))?.status).toBe("processing");
   });
 
-  it("leaves a re-pointed clientJobId alias row untouched when an earlier pipeline's finalize or failed safety net settles (#2741)", async () => {
+  it("leaves a re-pointed clientJobId alias row untouched when an earlier pipeline's step progress, finalize, or failed safety net settles (#2741, #3409)", async () => {
     const clientJobId = randomUUID();
     const liveFlowId = randomUUID();
     const liveProgress = { percent: 0, stage: "Preparing pipeline..." };
@@ -782,6 +782,38 @@ describe("cooperative step skip and canceled finalize", () => {
       progress: liveProgress,
       settings: { pipelineFlowId: liveFlowId },
     });
+
+    const enqueueStaleStep = async (inputKey: string): Promise<string> => {
+      const staleStepFlowId = randomUUID();
+      const stepJobId = `${staleStepFlowId}-s0`;
+      await db.insert(schema.jobs).values({
+        id: stepJobId,
+        type: "pipeline-step",
+        toolId: "wt-pipeline-cancel",
+        pool: "image",
+        status: "queued",
+        inputRefs: [inputKey],
+        settings: { mode: "fast", tag: `stale-step-${staleStepFlowId.slice(0, 8)}` },
+      });
+      await getQueue("image").add(
+        "wt-pipeline-cancel",
+        {
+          kind: "pipeline-step",
+          jobId: stepJobId,
+          toolId: "wt-pipeline-cancel",
+          userId: null,
+          pool: "image",
+          stepIndex: 0,
+          totalSteps: 2,
+          clientJobId,
+          inputRefs: [inputKey],
+          filename: "input.png",
+          settings: { mode: "fast", tag: `stale-step-${staleStepFlowId.slice(0, 8)}` },
+        } satisfies ToolJobData,
+        { jobId: stepJobId, attempts: 1 },
+      );
+      return stepJobId;
+    };
 
     const enqueueStaleFinalize = async (
       stepOverride: Partial<typeof schema.jobs.$inferInsert>,
@@ -839,33 +871,37 @@ describe("cooperative step skip and canceled finalize", () => {
     const completedOutputKey = `outputs/seed-${randomUUID()}/out.png`;
     await putObject(completedOutputKey, Buffer.from("done"));
 
-    const [canceledFlowId, failedFlowId, completedFlowId, crashedFlowId] = await Promise.all([
-      enqueueStaleFinalize({
-        status: "canceled",
-        error: { message: "Canceled" },
-      }),
-      enqueueStaleFinalize({
-        status: "failed",
-        error: { message: "Step boom", code: "ENGINE_UNAVAILABLE", httpStatus: 503 },
-      }),
-      enqueueStaleFinalize({
-        status: "completed",
-        outputRefs: [completedOutputKey],
-        bytesIn: 4,
-        bytesOut: 4,
-      }),
-      enqueueStaleFinalize({
-        status: "completed",
-        outputRefs: [],
-      }),
-    ]);
+    const [staleStepId, canceledFlowId, failedFlowId, completedFlowId, crashedFlowId] =
+      await Promise.all([
+        enqueueStaleStep(completedOutputKey),
+        enqueueStaleFinalize({
+          status: "canceled",
+          error: { message: "Canceled" },
+        }),
+        enqueueStaleFinalize({
+          status: "failed",
+          error: { message: "Step boom", code: "ENGINE_UNAVAILABLE", httpStatus: 503 },
+        }),
+        enqueueStaleFinalize({
+          status: "completed",
+          outputRefs: [completedOutputKey],
+          bytesIn: 4,
+          bytesOut: 4,
+        }),
+        enqueueStaleFinalize({
+          status: "completed",
+          outputRefs: [],
+        }),
+      ]);
 
-    const [canceledRow, failedRow, completedRow, crashedRow] = await Promise.all([
+    const [staleStepRow, canceledRow, failedRow, completedRow, crashedRow] = await Promise.all([
+      terminalRow(staleStepId),
       terminalRow(canceledFlowId),
       terminalRow(failedFlowId),
       terminalRow(completedFlowId),
       terminalRow(crashedFlowId),
     ]);
+    expect(staleStepRow.status).toBe("completed");
     expect(canceledRow.status).toBe("canceled");
     expect(failedRow.status).toBe("failed");
     expect(completedRow.status).toBe("completed");
