@@ -1714,6 +1714,73 @@ describe("own-store tool handlers abort and ignore late completions on store res
     expect(useMemeStore.getState().resultUrl).toBeNull();
     expect(useMemeStore.getState().phase).toBe("gallery");
   });
+
+  it("meme-generator: aborts fetchTemplates on reset() and ignores late failure or completion (#3158)", async () => {
+    let resolveTemplates: (res: Response) => void = () => {};
+    let rejectTemplates: (err: unknown) => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init?: RequestInit) => {
+        fetchSignals.push(init?.signal ?? undefined);
+        return new Promise<Response>((resolve, reject) => {
+          resolveTemplates = resolve;
+          rejectTemplates = reject;
+        });
+      }),
+    );
+
+    const fetchPromise = useMemeStore.getState().fetchTemplates();
+    expect(useMemeStore.getState().loading).toBe(true);
+    expect(fetchSignals).toHaveLength(1);
+
+    useMemeStore.getState().reset();
+
+    expect(fetchSignals[0]?.aborted).toBe(true);
+    expect(useMemeStore.getState().loading).toBe(true);
+    expect(useMemeStore.getState().error).toBeNull();
+
+    rejectTemplates(new Error("Network down"));
+    await fetchPromise;
+
+    expect(useMemeStore.getState().loading).toBe(true);
+    expect(useMemeStore.getState().error).toBeNull();
+    expect(useMemeStore.getState().templates).toEqual([]);
+
+    const secondPromise = useMemeStore.getState().fetchTemplates();
+    expect(fetchSignals).toHaveLength(2);
+
+    useMemeStore.getState().reset();
+    expect(fetchSignals[1]?.aborted).toBe(true);
+
+    resolveTemplates(
+      new Response(
+        JSON.stringify({
+          version: 1,
+          categories: ["reaction"],
+          templates: [
+            {
+              id: "drake",
+              name: "Drake Hotline Bling",
+              aliases: ["drake"],
+              tags: ["reaction"],
+              category: "reaction",
+              filename: "drake.jpg",
+              width: 600,
+              height: 600,
+              popularity: 100,
+              textBoxes: [{ id: "top", x: 0, y: 0, width: 50, height: 50 }],
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    await secondPromise;
+
+    expect(useMemeStore.getState().loading).toBe(true);
+    expect(useMemeStore.getState().error).toBeNull();
+    expect(useMemeStore.getState().templates).toEqual([]);
+  });
 });
 
 describe("self-posting panels clear processing and abort on removeFile mid-run (#3091)", () => {

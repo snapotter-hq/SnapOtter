@@ -164,6 +164,14 @@ const STORES: StoreRow[] = [
     },
   },
   {
+    site: "meme templates",
+    fallback: `Failed to load templates: ${STATUS}`,
+    run: async (t) => {
+      await useMemeStore.getState().fetchTemplates(t);
+      return useMemeStore.getState().error;
+    },
+  },
+  {
     site: "meme generate",
     fallback: `Generation failed: ${STATUS}`,
     run: async (t) => {
@@ -350,13 +358,14 @@ describe("no store, hook, or screen reads a failed answer's body by hand", () =>
 
   // The stores have no `t` of their own; each panel hands its locale in.
   it.each([
-    ["pdf-to-image", /store\.loadPreview\(file, t\)/],
-    ["pdf-to-image", /store\.convert\(t\)/],
-    ["html-to-image", /store\.capture\(t\)/],
-    ["meme-generator", /generateMeme\(t\)/],
-  ])("the %s panel passes its locale to the store", (id, pattern) => {
+    ["pdf-to-image-settings.tsx", /store\.loadPreview\(file, t\)/],
+    ["pdf-to-image-settings.tsx", /store\.convert\(t\)/],
+    ["html-to-image-settings.tsx", /store\.capture\(t\)/],
+    ["meme-generator-settings.tsx", /generateMeme\(t\)/],
+    ["meme-generator-preview.tsx", /fetchTemplates\(t\)/],
+  ])("components/tools/%s passes its locale to the store", (file, pattern) => {
     const source = readFileSync(
-      resolve(__dirname, `../../../apps/web/src/components/tools/${id}-settings.tsx`),
+      resolve(__dirname, `../../../apps/web/src/components/tools/${file}`),
       "utf8",
     );
     expect(source).toMatch(pattern);

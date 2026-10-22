@@ -253,8 +253,17 @@ interface MemeState {
   reset: () => void;
 }
 
+let templatesController: AbortController | null = null;
+let templatesRunId = 0;
 let generateController: AbortController | null = null;
 let generateRunId = 0;
+
+function cancelActiveTemplates() {
+  templatesRunId++;
+  const controller = templatesController;
+  templatesController = null;
+  controller?.abort();
+}
 
 function cancelActiveGeneration() {
   generateRunId++;
@@ -345,24 +354,42 @@ export const useMemeStore = create<MemeState>((set, get) => ({
   setAllCaps: (v) => set({ allCaps: v }),
 
   fetchTemplates: async (t = en) => {
+    cancelActiveTemplates();
+    const controller = new AbortController();
+    templatesController = controller;
+    const runId = ++templatesRunId;
+    const isCurrent = () => runId === templatesRunId && !controller.signal.aborted;
+
     set({ loading: true, error: null });
     try {
-      const res = await fetch(appUrl("/api/v1/meme-templates"), { headers: formatHeaders() });
-      if (!res.ok) throw new Error(`Failed to load templates: ${res.status}`);
+      const res = await fetch(appUrl("/api/v1/meme-templates"), {
+        headers: formatHeaders(),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(
+          failedAnswerMessage(t, body, res.status, `Failed to load templates: ${res.status}`),
+        );
+      }
       const raw = await res.json().catch((err: unknown) => {
         if (err instanceof SyntaxError) return null;
         throw err;
       });
+      if (!isCurrent()) return;
       if (!isTemplateManifest(raw)) {
         throw new Error(t.errors.invalidServerResponse);
       }
       set({ templates: raw.templates, loading: false });
     } catch (err) {
+      if (!isCurrent() || (err instanceof DOMException && err.name === "AbortError")) return;
       set({
         templates: [],
         error: err instanceof Error ? err.message : "Failed to load templates",
         loading: false,
       });
+    } finally {
+      if (templatesController === controller) templatesController = null;
     }
   },
 
@@ -466,6 +493,7 @@ export const useMemeStore = create<MemeState>((set, get) => ({
   backToEditor: () => set({ phase: "editor", resultUrl: null, downloadUrl: null }),
 
   reset: () => {
+    cancelActiveTemplates();
     cancelActiveGeneration();
     const oldUrl = get().customImageUrl;
     if (oldUrl) URL.revokeObjectURL(oldUrl);

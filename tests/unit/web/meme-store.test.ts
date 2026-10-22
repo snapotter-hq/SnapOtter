@@ -330,6 +330,136 @@ describe("useMemeStore", () => {
       expect(s.loading).toBe(false);
     });
 
+    it("on non-ok response: routes body through failedAnswerMessage (#3158)", async () => {
+      fetchMock.mockReturnValueOnce(failResponse(503, { error: "Template catalog unavailable" }));
+      await useMemeStore.getState().fetchTemplates();
+      expect(useMemeStore.getState().error).toBe("Template catalog unavailable");
+      expect(useMemeStore.getState().loading).toBe(false);
+
+      fetchMock.mockReturnValueOnce(failResponse(500, { details: "Storage offline" }));
+      await useMemeStore.getState().fetchTemplates();
+      expect(useMemeStore.getState().error).toBe("Storage offline");
+
+      fetchMock.mockReturnValueOnce(failResponse(502, { error: { nested: true } }));
+      await useMemeStore.getState().fetchTemplates();
+      expect(useMemeStore.getState().error).toBe("Failed to load templates: 502");
+    });
+
+    it("aborts an in-flight fetchTemplates on reset() and ignores late settlement (#3158)", async () => {
+      const outcomes: Array<
+        (settled: { resolve: (res: Response) => void; reject: (err: unknown) => void }) => void
+      > = [
+        ({ reject }) => reject(new Error("Network down")),
+        ({ resolve }) =>
+          resolve({
+            ok: false,
+            status: 500,
+            json: async () => ({ error: "Boom" }),
+          } as unknown as Response),
+        ({ resolve }) =>
+          resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ version: 1, categories: ["reaction"], templates: [TEMPLATE] }),
+          } as unknown as Response),
+        ({ reject }) => reject(new DOMException("Aborted", "AbortError")),
+      ];
+
+      for (const settle of outcomes) {
+        let capturedSignal: AbortSignal | undefined;
+        let deferred!: { resolve: (res: Response) => void; reject: (err: unknown) => void };
+        fetchMock.mockImplementationOnce((_url: string, init?: RequestInit) => {
+          capturedSignal = init?.signal ?? undefined;
+          return new Promise<Response>((resolve, reject) => {
+            deferred = { resolve, reject };
+          });
+        });
+
+        const pending = useMemeStore.getState().fetchTemplates();
+        expect(capturedSignal).toBeInstanceOf(AbortSignal);
+        expect(capturedSignal?.aborted).toBe(false);
+
+        useMemeStore.getState().reset();
+        expect(capturedSignal?.aborted).toBe(true);
+        expect(useMemeStore.getState().loading).toBe(true);
+        expect(useMemeStore.getState().error).toBeNull();
+        expect(useMemeStore.getState().templates).toEqual([]);
+
+        settle(deferred);
+        await pending;
+
+        expect(useMemeStore.getState().loading).toBe(true);
+        expect(useMemeStore.getState().error).toBeNull();
+        expect(useMemeStore.getState().templates).toEqual([]);
+      }
+
+      for (const isOk of [true, false]) {
+        let resolveJson: (body: unknown) => void = () => {};
+        fetchMock.mockImplementationOnce(() =>
+          Promise.resolve({
+            ok: isOk,
+            status: isOk ? 200 : 500,
+            json: () =>
+              new Promise((resolve) => {
+                resolveJson = resolve;
+              }),
+          } as unknown as Response),
+        );
+
+        const pending = useMemeStore.getState().fetchTemplates();
+        await Promise.resolve();
+
+        useMemeStore.getState().reset();
+        resolveJson(
+          isOk
+            ? { version: 1, categories: ["reaction"], templates: [TEMPLATE] }
+            : { error: "Boom" },
+        );
+        await pending;
+
+        expect(useMemeStore.getState().loading).toBe(true);
+        expect(useMemeStore.getState().error).toBeNull();
+        expect(useMemeStore.getState().templates).toEqual([]);
+      }
+    });
+
+    it("aborts an earlier in-flight fetchTemplates when called again and keeps loading until the latest settles (#3158)", async () => {
+      const signals: Array<AbortSignal | undefined> = [];
+      const resolvers: Array<{ resolve: (res: Response) => void; reject: (err: unknown) => void }> =
+        [];
+      fetchMock.mockImplementation((_url: string, init?: RequestInit) => {
+        signals.push(init?.signal ?? undefined);
+        return new Promise<Response>((resolve, reject) => {
+          resolvers.push({ resolve, reject });
+        });
+      });
+
+      const first = useMemeStore.getState().fetchTemplates();
+      const second = useMemeStore.getState().fetchTemplates();
+
+      expect(signals).toHaveLength(2);
+      expect(signals[0]?.aborted).toBe(true);
+      expect(signals[1]?.aborted).toBe(false);
+
+      resolvers[0]?.reject(new Error("Stale network error"));
+      await first;
+
+      expect(useMemeStore.getState().loading).toBe(true);
+      expect(useMemeStore.getState().error).toBeNull();
+      expect(useMemeStore.getState().templates).toEqual([]);
+
+      resolvers[1]?.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ version: 1, categories: ["reaction"], templates: [TEMPLATE] }),
+      } as unknown as Response);
+      await second;
+
+      expect(useMemeStore.getState().loading).toBe(false);
+      expect(useMemeStore.getState().error).toBeNull();
+      expect(useMemeStore.getState().templates).toEqual([TEMPLATE]);
+    });
+
     it("rejects malformed 2xx template manifests with invalidServerResponse (#3142)", async () => {
       const badManifests: unknown[] = [
         null,

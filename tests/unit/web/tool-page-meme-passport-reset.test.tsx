@@ -732,6 +732,65 @@ describe("ToolPage resets usePassportPhotoStore and useMemeStore across tool cha
     expect(screen.getByTestId("work-probe")).toHaveTextContent("clean");
   });
 
+  it("aborts in-flight fetchTemplates when navigating away from /image/meme-generator so a late rejection does not strand re-entry on ErrorView (#3158)", async () => {
+    const signals: Array<AbortSignal | undefined> = [];
+    let rejectFirstRequest: (err: unknown) => void = () => {};
+    let templateRequests = 0;
+
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/api/v1/meme-templates")) {
+        templateRequests++;
+        signals.push(init?.signal ?? undefined);
+        if (templateRequests === 1) {
+          return new Promise<Response>((_resolve, reject) => {
+            rejectFirstRequest = reject;
+          });
+        }
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ version: 1, categories: ["reaction"], templates: [TEMPLATE] }),
+            { status: 200 },
+          ),
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+      );
+    });
+
+    renderRoutes("/image/meme-generator");
+
+    await waitFor(() => {
+      expect(templateRequests).toBe(1);
+    });
+    expect(signals[0]?.aborted).toBe(false);
+
+    // Navigate away before /api/v1/meme-templates settles.
+    fireEvent.click(screen.getByTestId("go-rotate"));
+
+    await waitFor(() => {
+      expect(signals[0]?.aborted).toBe(true);
+    });
+    expect(useMemeStore.getState().loading).toBe(true);
+    expect(useMemeStore.getState().error).toBeNull();
+
+    // First request rejects after reset(); the reset store must ignore it.
+    await act(async () => {
+      rejectFirstRequest(new Error("Network down"));
+    });
+    expect(useMemeStore.getState().loading).toBe(true);
+    expect(useMemeStore.getState().error).toBeNull();
+    expect(useMemeStore.getState().templates).toEqual([]);
+
+    // Re-entering /image/meme-generator retries fetchTemplates and renders the template gallery.
+    fireEvent.click(screen.getByTestId("go-meme"));
+    expect(await screen.findByTestId("template-drake")).toBeInTheDocument();
+    expect(templateRequests).toBe(2);
+    expect(useMemeStore.getState().error).toBeNull();
+    expect(useMemeStore.getState().loading).toBe(false);
+  });
+
   it("re-analyzes and clears generateResult when replacing a portrait via drop or paste on /image/passport-photo, including across 768px (#2689)", async () => {
     renderRoutes("/image/passport-photo");
 
