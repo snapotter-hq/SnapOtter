@@ -130,11 +130,13 @@ TOOL_BUNDLE_MAP = {
 
 def _get_installed_bundles():
     try:
-        with open(INSTALLED_PATH) as f:
+        with open(INSTALLED_PATH, encoding="utf-8") as f:
             data = json.load(f)
-            return set(data.get("bundles", {}).keys())
-    except (FileNotFoundError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return set()
+    if isinstance(data, dict) and isinstance(data.get("bundles"), dict):
+        return set(data["bundles"].keys())
+    return set()
 
 
 def emit_progress(percent, stage):

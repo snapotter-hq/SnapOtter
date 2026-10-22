@@ -76,6 +76,54 @@ def test_installed_bundles_empty_on_malformed_json(monkeypatch, tmp_path):
     assert dispatcher._get_installed_bundles() == set()
 
 
+@pytest.mark.parametrize(
+    "shape",
+    [
+        "[]",
+        "null",
+        "123",
+        '"str"',
+        "true",
+        "{}",
+        '{"bundles": null}',
+        '{"bundles": []}',
+        '{"bundles": ["face-detection"]}',
+        '{"bundles": "not-a-dict"}',
+        '{"bundles": 42}',
+        '{"bundles": true}',
+    ],
+)
+def test_installed_bundles_empty_on_non_dict_shapes_and_gates_script(monkeypatch, tmp_path, shape):
+    p = tmp_path / "installed.json"
+    p.write_text(shape)
+    monkeypatch.setattr(dispatcher, "INSTALLED_PATH", str(p))
+    assert dispatcher._get_installed_bundles() == set()
+
+    monkeypatch.setattr(dispatcher, "ALLOWED_SCRIPTS", {"remove_bg"})
+    out, code = dispatcher._run_script_main("remove_bg", ["in.png"])
+    assert code == 1
+    assert json.loads(out) == {
+        "success": False,
+        "error": "feature_not_installed",
+        "feature": "background-removal",
+        "message": "Feature bundle 'background-removal' is not installed",
+    }
+
+
+def test_installed_bundles_empty_on_os_and_unicode_errors(monkeypatch, tmp_path):
+    # Directory at INSTALLED_PATH raises IsADirectoryError (an OSError subclass).
+    dir_path = tmp_path / "installed_dir"
+    dir_path.mkdir()
+    monkeypatch.setattr(dispatcher, "INSTALLED_PATH", str(dir_path))
+    assert dispatcher._get_installed_bundles() == set()
+
+    # Invalid UTF-8 bytes raise UnicodeDecodeError.
+    bad_utf8 = tmp_path / "bad_utf8.json"
+    bad_utf8.write_bytes(b"\xff\xfe\x00")
+    monkeypatch.setattr(dispatcher, "INSTALLED_PATH", str(bad_utf8))
+    assert dispatcher._get_installed_bundles() == set()
+
+
 # --- emit_progress ----------------------------------------------------------
 
 

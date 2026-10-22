@@ -7,6 +7,7 @@ import {
   availableSidecarMemoryBytes,
   BUNDLE_CPU_FREE_MEMORY_BYTES,
   BUNDLE_GPU_FRAMEWORK,
+  installedBundles,
   isFrameworkGpuAvailable,
   missingBundleForScript,
   SCRIPT_BUNDLE_MAP,
@@ -89,6 +90,93 @@ describe("missingBundleForScript", () => {
     writeFileSync(join(tempDir, "ai", "installed.json"), "{{{not json", "utf-8");
     expect(missingBundleForScript("face_landmarks")).toBe("face-detection");
   });
+
+  it("normalizes non-object root or non-object bundles values to an empty set (issue #3124)", () => {
+    const installedPath = join(tempDir, "ai", "installed.json");
+    for (const badShape of [
+      "[]",
+      "null",
+      "123",
+      '"str"',
+      "true",
+      "{}",
+      '{"bundles": null}',
+      '{"bundles": []}',
+      '{"bundles": ["face-detection"]}',
+      '{"bundles": "abc"}',
+      '{"bundles": 42}',
+      '{"bundles": true}',
+    ]) {
+      writeFileSync(installedPath, badShape, "utf-8");
+      expect([...installedBundles()], badShape).toEqual([]);
+      expect(missingBundleForScript("face_landmarks"), badShape).toBe("face-detection");
+    }
+
+    setInstalled(["face-detection", "background-removal"]);
+    expect([...installedBundles()]).toEqual(["face-detection", "background-removal"]);
+  });
+
+  it.skipIf(!hasPython)(
+    "normalizes non-dict shapes and OS/decode errors in dispatcher._get_installed_bundles (issue #3124)",
+    () => {
+      const pyDir = join(process.cwd(), "packages/ai/python");
+      const script = `
+import json, os, sys, tempfile
+os.environ["DISPATCHER_PROFILE"] = "docs"
+sys.path.insert(0, ${JSON.stringify(pyDir)})
+import dispatcher
+
+dispatcher.ALLOWED_SCRIPTS = {"remove_bg"}
+
+with tempfile.TemporaryDirectory() as d:
+    p = os.path.join(d, "installed.json")
+    dispatcher.INSTALLED_PATH = p
+    for shape in [
+        "[]",
+        "null",
+        "123",
+        '"str"',
+        "true",
+        "{}",
+        '{"bundles": null}',
+        '{"bundles": []}',
+        '{"bundles": ["face-detection"]}',
+        '{"bundles": "abc"}',
+        '{"bundles": 42}',
+        '{"bundles": true}',
+    ]:
+        with open(p, "w", encoding="utf-8") as f:
+            f.write(shape)
+        assert dispatcher._get_installed_bundles() == set(), f"non-empty for {shape}"
+        out, code = dispatcher._run_script_main("remove_bg", ["in.png"])
+        assert code == 1, f"unexpected code {code} for {shape}"
+        payload = json.loads(out)
+        assert payload == {
+            "success": False,
+            "error": "feature_not_installed",
+            "feature": "background-removal",
+            "message": "Feature bundle 'background-removal' is not installed",
+        }, f"unexpected payload {payload} for {shape}"
+
+    with open(p, "wb") as f:
+        f.write(b"\\xff\\xfe\\x00")
+    assert dispatcher._get_installed_bundles() == set()
+
+    dir_path = os.path.join(d, "installed_dir")
+    os.mkdir(dir_path)
+    dispatcher.INSTALLED_PATH = dir_path
+    assert dispatcher._get_installed_bundles() == set()
+
+print("PY_DISPATCHER_INSTALLED_SHAPES_OK")
+`;
+      const res = spawnSync(pythonBin as string, ["-c", script], {
+        encoding: "utf8",
+        timeout: 15_000,
+      });
+      expect(res.status, res.stderr).toBe(0);
+      expect(res.stdout).toContain("PY_DISPATCHER_INSTALLED_SHAPES_OK");
+    },
+  );
 
   it("gates both of passport-photo's scripts (issue #327)", () => {
     setInstalled(["background-removal"]); // face-detection still missing

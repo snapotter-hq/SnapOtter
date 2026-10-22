@@ -32,6 +32,7 @@ export {
   availableSidecarMemoryBytes,
   BUNDLE_CPU_FREE_MEMORY_BYTES,
   BUNDLE_GPU_FRAMEWORK,
+  installedBundles,
   isFrameworkGpuAvailable,
   missingBundleForScript,
   SCRIPT_BUNDLE_MAP,

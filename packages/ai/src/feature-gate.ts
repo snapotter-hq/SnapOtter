@@ -320,15 +320,19 @@ export function sidecarMemoryRefusal(
 }
 
 /** Bundle ids currently recorded as installed in DATA_DIR/ai/installed.json. */
-function installedBundles(): Set<string> {
+export function installedBundles(): Set<string> {
   // Resolve DATA_DIR the same way the API config does for native checkouts.
   // Docker images set DATA_DIR=/data explicitly.
   const installedPath = join(process.env.DATA_DIR || "./data", "ai", "installed.json");
   try {
-    const data = JSON.parse(readFileSync(installedPath, "utf-8")) as {
-      bundles?: Record<string, unknown>;
-    };
-    return new Set(Object.keys(data.bundles ?? {}));
+    const data: unknown = JSON.parse(readFileSync(installedPath, "utf-8"));
+    if (typeof data === "object" && data !== null && !Array.isArray(data)) {
+      const bundles = (data as { bundles?: unknown }).bundles;
+      if (typeof bundles === "object" && bundles !== null && !Array.isArray(bundles)) {
+        return new Set(Object.keys(bundles));
+      }
+    }
+    return new Set();
   } catch {
     // Fail closed, exactly like dispatcher._get_installed_bundles(): a missing
     // or unreadable installed.json reads as "nothing installed".
