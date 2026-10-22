@@ -1,12 +1,15 @@
 // tests/unit/api/openapi-i18n.test.ts
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
 import {
   generateLocaleLlmsTxt,
   resolveSpecFile,
 } from "../../../apps/api/src/routes/openapi-i18n.js";
+import { proseFields } from "../../../scripts/i18n/adapters/api-spec.mjs";
+import { hash } from "../../../scripts/i18n/lib/hash.mjs";
 
 describe("resolveSpecFile", () => {
   let dir: string;
@@ -72,5 +75,70 @@ describe("generateLocaleLlmsTxt", () => {
     });
     // Still lists the tool by id with the sync mode, never crashes.
     expect(out).toContain("(resize, sync)");
+  });
+});
+
+describe("openapi.zh-TW.yaml auth and roles descriptions (#3585)", () => {
+  const specDir = resolve(import.meta.dirname, "../../../apps/api/src");
+  const english = load(readFileSync(join(specDir, "openapi.yaml"), "utf8")) as {
+    paths: Record<string, Record<string, { description?: string }>>;
+  };
+  const zhtw = load(readFileSync(join(specDir, "openapi.zh-TW.yaml"), "utf8")) as {
+    paths: Record<string, Record<string, { description?: string }>>;
+    "x-i18n": {
+      entries: Record<string, { sourceHash: string; outputHash: string; stale?: boolean }>;
+    };
+  };
+
+  const simplifiedOnlyChars = /[户码创权义给该将认无删备]/;
+
+  const expectedDescriptions: Array<{
+    path: string;
+    method: string;
+    expected: string;
+  }> = [
+    {
+      path: "/api/auth/users/{id}/reset-password",
+      method: "post",
+      expected:
+        "重設本機使用者的密碼。需要對目標目前角色的 users:manage 權限和權限，包括層次結構、權限、工具存取權限和任何 API-key 範圍。\n",
+    },
+    {
+      path: "/api/v1/roles",
+      method: "post",
+      expected:
+        "建立具有指定權限的新自訂角色。角色名稱必須是\n2-30 字符，帶有連字符和下劃線的小寫字母數字。\n需要 security:manage 權限。新角色的權限與工具\n存取必須包含在行為者的有效權限內。\n",
+    },
+    {
+      path: "/api/v1/roles/{id}",
+      method: "delete",
+      expected:
+        '刪除自訂角色。指派給該角色的使用者將重新指派為\n預設的 "user" 角色。內建角色無法刪除。需要\nsecurity:manage 權限、對目前角色的權限，以及\n指派後備角色的權限。\n',
+    },
+  ];
+
+  it.each(expectedDescriptions)(
+    "uses Traditional Chinese and valid x-i18n hashes for $method $path",
+    ({ path, method, expected }) => {
+      const id = `paths.${path}.${method}.description`;
+      const sourceText = english.paths[path]?.[method]?.description ?? "";
+      const translatedText = zhtw.paths[path]?.[method]?.description ?? "";
+      const stamp = zhtw["x-i18n"].entries[id];
+
+      expect(sourceText).not.toBe("");
+      expect(translatedText).not.toMatch(simplifiedOnlyChars);
+      expect(translatedText).toBe(expected);
+      expect(stamp).toBeDefined();
+      expect(stamp.sourceHash).toBe(hash(sourceText));
+      expect(stamp.outputHash).toBe(hash(translatedText));
+      expect(stamp.stale).toBeUndefined();
+    },
+  );
+
+  it("contains none of the leaked Simplified-only characters across any prose field in openapi.zh-TW.yaml", () => {
+    const offending = proseFields(zhtw)
+      .filter(([, text]) => simplifiedOnlyChars.test(text))
+      .map(([id]) => id);
+    expect(offending).toEqual([]);
   });
 });

@@ -6458,7 +6458,7 @@ paths:
         - Auth
       summary: 重設使用者密碼
       description: |
-        重置本地用户的密码。需要對目標目前角色的 users:manage 權限和權限，包括層次結構、權限、工具存取權限和任何 API-key 範圍。
+        重設本機使用者的密碼。需要對目標目前角色的 users:manage 權限和權限，包括層次結構、權限、工具存取權限和任何 API-key 範圍。
       security:
         - bearerAuth: []
       parameters:
@@ -7657,9 +7657,9 @@ paths:
         - Roles
       summary: 建立自訂角色
       description: |
-        创建具有指定权限的新自定义角色。角色名稱必須是
+        建立具有指定權限的新自訂角色。角色名稱必須是
         2-30 字符，帶有連字符和下劃線的小寫字母數字。
-        需要 security:manage 權限。新角色的权限和工具
+        需要 security:manage 權限。新角色的權限與工具
         存取必須包含在行為者的有效權限內。
       security:
         - bearerAuth: []
@@ -7821,10 +7821,10 @@ paths:
         - Roles
       summary: 刪除自訂角色
       description: |
-        刪除自訂角色。分配给该角色的用户将被重新分配给
-        默认“用户”角色。内置角色无法删除。需要
-        security:manage 權限，對目前角色的權限，以及
-        分配后备角色的权限。
+        刪除自訂角色。指派給該角色的使用者將重新指派為
+        預設的 "user" 角色。內建角色無法刪除。需要
+        security:manage 權限、對目前角色的權限，以及
+        指派後備角色的權限。
       security:
         - bearerAuth: []
       parameters:
@@ -21070,7 +21070,7 @@ x-i18n:
     paths./api/auth/users/{id}/reset-password.post.description:
       sourceHash: 6d1bf8229cb6
       provenance: machine
-      outputHash: 293a97d8ab88
+      outputHash: fe30469252e9
     paths./api/v1/api-keys.get.summary:
       sourceHash: ad0527749f03
       provenance: machine
@@ -21238,7 +21238,7 @@ x-i18n:
     paths./api/v1/roles.post.description:
       sourceHash: 12c3b80c8afa
       provenance: machine
-      outputHash: 6db095e42114
+      outputHash: c4e4b038287f
     paths./api/v1/roles/{id}.put.summary:
       sourceHash: 6c0cda1bc967
       provenance: machine
@@ -21254,7 +21254,7 @@ x-i18n:
     paths./api/v1/roles/{id}.delete.description:
       sourceHash: a748a77794fc
       provenance: machine
-      outputHash: 2d2e5f6c53c4
+      outputHash: 58cb35c086be
     paths./api/v1/tools/video/convert-video.post.summary:
       sourceHash: b4defe1d6906
       provenance: machine
