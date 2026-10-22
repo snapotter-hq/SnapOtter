@@ -362,7 +362,7 @@ function AutomatePageContent({
 
   const handleLibraryImport = useCallback(
     (imported: File[]) => {
-      if (!allowIntake()) return false;
+      if (!allowIntakeRef.current()) return false;
       libraryImportAbortRef.current?.abort();
       setLibraryImportFailed(null);
       if (files.length === 0) {
@@ -372,18 +372,18 @@ function AutomatePageContent({
         addFiles(imported);
       }
     },
-    [allowIntake, libraryImportAbortRef, files.length, resetFiles, setFiles, addFiles],
+    [libraryImportAbortRef, files.length, resetFiles, setFiles, addFiles],
   );
 
   const handleFiles = useCallback(
     (newFiles: File[]) => {
-      if (!allowIntake()) return;
+      if (!allowIntakeRef.current()) return;
       libraryImportAbortRef.current?.abort();
       setLibraryImportFailed(null);
       resetFiles();
       setFiles(newFiles);
     },
-    [allowIntake, libraryImportAbortRef, setFiles, resetFiles],
+    [libraryImportAbortRef, setFiles, resetFiles],
   );
 
   const handleAddMore = useCallback(() => {

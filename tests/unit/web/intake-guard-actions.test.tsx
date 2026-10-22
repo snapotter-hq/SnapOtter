@@ -7,10 +7,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const showIgnored = vi.hoisted(() => vi.fn());
 const showUnsupported = vi.hoisted(() => vi.fn());
+const capturedModalOnImports = vi.hoisted(
+  () => [] as Array<(files: File[]) => boolean | undefined>,
+);
 vi.mock("@/lib/intake-notice", () => ({
   showIntakeIgnored: showIgnored,
   showUnsupportedFileType: showUnsupported,
 }));
+
+vi.mock("@/components/common/file-library-modal", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/components/common/file-library-modal")>();
+  return {
+    ...actual,
+    FileLibraryModal: (props: Parameters<typeof actual.FileLibraryModal>[0]) => {
+      capturedModalOnImports.push(props.onImport);
+      return actual.FileLibraryModal(props);
+    },
+  };
+});
 
 vi.mock("@/lib/analytics", async () => {
   const { analyticsModuleMock } = await import("../../helpers/mock-analytics.js");
@@ -74,6 +88,7 @@ beforeEach(() => {
   storageMap.clear();
   showIgnored.mockClear();
   showUnsupported.mockClear();
+  capturedModalOnImports.length = 0;
   vi.stubGlobal("localStorage", localStorageMock);
   let blobCounter = 0;
   vi.stubGlobal("URL", {
@@ -837,5 +852,164 @@ describe("AutomatePage file-action intake guard (#2652)", () => {
     );
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(showIgnored).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses Dropzone Upload picker onchange and pre-run handleLibraryImport on desktop and mobile when a pipeline run starts after intake begins (#3211)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/files/bad-file/download")) {
+          return Promise.resolve(new Response("Not found", { status: 404 }));
+        }
+        if (url.includes("/pipeline/list")) {
+          return Promise.resolve(new Response(JSON.stringify({ pipelines: [] })));
+        }
+        return Promise.resolve(
+          new Response(JSON.stringify({ authEnabled: false, bundles: [] }), { status: 200 }),
+        );
+      }),
+    );
+
+    const createdInputs: HTMLInputElement[] = [];
+    const realCreate = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation(((tag: string) => {
+      const el = realCreate(tag);
+      if (tag === "input") {
+        createdInputs.push(el as HTMLInputElement);
+        (el as HTMLInputElement).click = () => {};
+      }
+      return el;
+    }) as typeof document.createElement);
+
+    const desktopView = renderAutomatePage({ libraryFileIds: ["bad-file"] });
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't import 1 of 1 files.");
+    const idleDesktopOnImport = capturedModalOnImports.at(-1);
+    expect(idleDesktopOnImport).toBeTypeOf("function");
+
+    // Open Dropzone's Upload file picker on desktop while idle.
+    const countBeforeDesktopClick = createdInputs.length;
+    fireEvent.click(screen.getByText(en.common.upload));
+    expect(createdInputs).toHaveLength(countBeforeDesktopClick + 1);
+    const desktopInput = createdInputs.at(-1);
+    if (!desktopInput) throw new Error("Expected desktop file input to be created");
+    expect(desktopInput.type).toBe("file");
+
+    // Start a pipeline run while the native file picker is still open.
+    act(() => {
+      useFileStore.getState().setProcessing(true);
+      useFileStore.getState().setActiveJob("pipeline-dropzone-picker", null);
+    });
+    expect(capturedModalOnImports.at(-1)).toBe(idleDesktopOnImport);
+
+    // A handleLibraryImport callback captured while idle checks allowIntakeRef.current(), refuses intake, and preserves the alert.
+    let importResult: boolean | undefined;
+    act(() => {
+      importResult = idleDesktopOnImport?.([png("desktop-library-busy.png")]);
+    });
+    expect(importResult).toBe(false);
+    expect(showIgnored).toHaveBeenCalledTimes(1);
+    expect(showIgnored).toHaveBeenLastCalledWith(en.dropzone.ignoredWhileRunning);
+    expect(useFileStore.getState().entries).toHaveLength(0);
+    expect(screen.getByRole("alert")).toHaveTextContent("Couldn't import 1 of 1 files.");
+
+    // Picking a file from the already-open dialog while busy is refused by handleFiles via allowIntakeRef and preserves the alert.
+    Object.defineProperty(desktopInput, "files", {
+      value: [png("desktop-picked-busy.png")],
+      configurable: true,
+    });
+    act(() => {
+      desktopInput.onchange?.({ target: desktopInput } as unknown as Event);
+    });
+    expect(showIgnored).toHaveBeenCalledTimes(2);
+    expect(showIgnored).toHaveBeenLastCalledWith(en.dropzone.ignoredWhileRunning);
+    expect(useFileStore.getState().entries).toHaveLength(0);
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().activeJobId).toBe("pipeline-dropzone-picker");
+    expect(screen.getByRole("alert")).toHaveTextContent("Couldn't import 1 of 1 files.");
+
+    // Once the run finishes, the same picker onchange loads the file via handleFiles and clears the alert.
+    act(() => {
+      useFileStore.getState().setProcessing(false);
+    });
+    Object.defineProperty(desktopInput, "files", {
+      value: [png("desktop-picked-idle.png")],
+      configurable: true,
+    });
+    act(() => {
+      desktopInput.onchange?.({ target: desktopInput } as unknown as Event);
+    });
+    expect(showIgnored).toHaveBeenCalledTimes(2);
+    expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual([
+      "desktop-picked-idle.png",
+    ]);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    desktopView.unmount();
+
+    // Verify the mobile Dropzone Upload picker and handleLibraryImport follow the same allowIntakeRef guard.
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({
+        matches: query.includes("max-width"),
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    renderAutomatePage({ libraryFileIds: ["bad-file"] });
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't import 1 of 1 files.");
+    const idleMobileOnImport = capturedModalOnImports.at(-1);
+    expect(idleMobileOnImport).toBeTypeOf("function");
+
+    const countBeforeMobileClick = createdInputs.length;
+    fireEvent.click(screen.getByText(en.common.upload));
+    expect(createdInputs).toHaveLength(countBeforeMobileClick + 1);
+    const mobileInput = createdInputs.at(-1);
+    if (!mobileInput) throw new Error("Expected mobile file input to be created");
+    expect(mobileInput.type).toBe("file");
+
+    act(() => {
+      useFileStore.getState().setProcessing(true);
+    });
+    expect(capturedModalOnImports.at(-1)).toBe(idleMobileOnImport);
+
+    act(() => {
+      importResult = idleMobileOnImport?.([png("mobile-library-busy.png")]);
+    });
+    expect(importResult).toBe(false);
+    expect(showIgnored).toHaveBeenCalledTimes(3);
+    expect(showIgnored).toHaveBeenLastCalledWith(en.dropzone.ignoredWhileRunning);
+    expect(useFileStore.getState().entries).toHaveLength(0);
+    expect(screen.getByRole("alert")).toHaveTextContent("Couldn't import 1 of 1 files.");
+
+    Object.defineProperty(mobileInput, "files", {
+      value: [png("mobile-picked-busy.png")],
+      configurable: true,
+    });
+    act(() => {
+      mobileInput.onchange?.({ target: mobileInput } as unknown as Event);
+    });
+    expect(showIgnored).toHaveBeenCalledTimes(4);
+    expect(showIgnored).toHaveBeenLastCalledWith(en.dropzone.ignoredWhileRunning);
+    expect(useFileStore.getState().entries).toHaveLength(0);
+    expect(screen.getByRole("alert")).toHaveTextContent("Couldn't import 1 of 1 files.");
+
+    act(() => {
+      useFileStore.getState().setProcessing(false);
+    });
+    Object.defineProperty(mobileInput, "files", {
+      value: [png("mobile-picked-idle.png")],
+      configurable: true,
+    });
+    act(() => {
+      mobileInput.onchange?.({ target: mobileInput } as unknown as Event);
+    });
+    expect(showIgnored).toHaveBeenCalledTimes(4);
+    expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual([
+      "mobile-picked-idle.png",
+    ]);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
