@@ -117,7 +117,7 @@ describe("permission enforcement on routes", () => {
       throw new Error(`User login failed: ${loginRes.body}`);
     }
     userToken = loginBody.token;
-  }, 15_000);
+  });
 
   // -- User cannot access admin-only routes (403) --
 

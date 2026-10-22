@@ -75,7 +75,7 @@ beforeAll(async () => {
 afterAll(async () => {
   for (const prefix of seededPrefixes) await deletePrefix(prefix).catch(() => {});
   await testApp.cleanup();
-}, 15_000);
+});
 
 type Seed = {
   status?: "queued" | "processing" | "completed" | "failed" | "canceled";

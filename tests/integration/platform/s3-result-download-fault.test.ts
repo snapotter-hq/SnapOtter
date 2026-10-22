@@ -106,7 +106,7 @@ describe.skipIf(!minioAvailable)("S3-mode tool-result download fault classificat
       // Best-effort cleanup
     }
     await testApp?.cleanup();
-  }, 15_000);
+  });
 
   it("downloads a stored result and 404s a genuinely missing one", async () => {
     const ok = await testApp.app.inject({

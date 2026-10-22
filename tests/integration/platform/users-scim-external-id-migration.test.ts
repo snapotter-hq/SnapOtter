@@ -135,7 +135,7 @@ afterAll(async () => {
     await asAdmin((admin) => admin.query(`DROP DATABASE IF EXISTS ${name}`));
   }
   if (preScimColumnFolder) rmSync(preScimColumnFolder, { recursive: true, force: true });
-}, 30_000);
+});
 
 describe("migration: SCIM externalId gets its own column (#1510)", () => {
   it("moves SCIM rows' external_id over and leaves OIDC, SAML, and local rows alone", async () => {

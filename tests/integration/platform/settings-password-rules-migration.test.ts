@@ -96,7 +96,7 @@ afterAll(async () => {
     await asAdmin((admin) => admin.query(`DROP DATABASE IF EXISTS ${name}`));
   }
   if (prePasswordRulesFolder) rmSync(prePasswordRulesFolder, { recursive: true, force: true });
-}, 30_000);
+});
 
 describe("migration 0012: password-rule settings normalization and alias cleanup (#2036)", () => {
   it("normalizes non-canonical rule values and moves passwordRequireNumber into passwordRequireDigit when missing", async () => {

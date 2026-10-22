@@ -118,7 +118,7 @@ afterAll(async () => {
     await asAdmin((admin) => admin.query(`DROP DATABASE IF EXISTS ${name}`));
   }
   if (preTeamIdsFolder) rmSync(preTeamIdsFolder, { recursive: true, force: true });
-}, 30_000);
+});
 
 describe("migration 0009: users.team names become team ids (#1474)", () => {
   it("maps names to ids and a leftover 'Default' to the seeded team, and sets the new default", async () => {

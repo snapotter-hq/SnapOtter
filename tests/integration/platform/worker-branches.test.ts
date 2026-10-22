@@ -470,7 +470,7 @@ afterAll(async () => {
   await closeQueues();
   __resetGateForTests();
   vi.unstubAllEnvs();
-}, 20_000);
+});
 
 beforeEach(() => {
   trackEventMock.mockClear();

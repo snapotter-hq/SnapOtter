@@ -83,7 +83,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await testApp.cleanup();
   rmSync(testRoot, { recursive: true, force: true });
-}, 15_000);
+});
 
 describe("Remove GIF Background (#496)", () => {
   it("returns 501 naming background-removal when the bundle is not installed", async () => {

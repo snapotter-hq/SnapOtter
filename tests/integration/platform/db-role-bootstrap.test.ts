@@ -220,7 +220,7 @@ afterAll(async () => {
     await execAsOwner("DROP ROLE IF EXISTS %I", name).catch(() => {});
   }
   await owner.end();
-}, 15_000);
+});
 
 describe("runtime role provisioning", () => {
   it("derives a role name that Postgres accepts as an identifier", () => {

@@ -430,7 +430,7 @@ afterAll(async () => {
   await stopCancelListener();
   await closeQueues();
   await sharedRedis().quit();
-}, 20_000);
+});
 
 // ── requestCancel resolution ────────────────────────────────────
 

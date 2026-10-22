@@ -108,7 +108,7 @@ describe.skipIf(!minioAvailable)("S3-mode download fault classification", () => 
       // Best-effort cleanup
     }
     await testApp?.cleanup();
-  }, 15_000);
+  });
 
   async function uploadLibraryFile(filename: string): Promise<{ id: string; storedName: string }> {
     const { body, contentType } = createMultipartPayload([
