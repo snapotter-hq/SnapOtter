@@ -1126,6 +1126,17 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
               id === "fetch-urls",
           ),
         ).toHaveLength(2);
+
+        const previewRes = await post("/api/v1/preview", [
+          { name: "file", filename: "photo.tiff", contentType: "image/tiff", content: tiffBytes },
+        ]);
+        expect(previewRes.statusCode, previewRes.body).toBe(503);
+        expect(previewRes.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+        const previewReports = engineReports("file-preview");
+        expect(previewReports).toHaveLength(1);
+        expect((previewReports[0]?.[0] as { cause?: { name?: string } })?.cause?.name).toBe(
+          "DecoderOutOfMemoryError",
+        );
       } finally {
         vi.unstubAllGlobals();
         webpSpy.mockRestore();

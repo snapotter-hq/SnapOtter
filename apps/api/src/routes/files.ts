@@ -10,6 +10,7 @@ import { readImageDimensions } from "../lib/exiftool.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import {
+  asDecoderOutOfMemory,
   DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
@@ -378,7 +379,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
       try {
         buffer = await decodeHeic(buffer);
       } catch (rawErr) {
-        const err = normalizeOperationalWriteError(rawErr);
+        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
         if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
           return sendInputValidationError(
             reply,
@@ -396,7 +397,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
       try {
         buffer = await decodeToSharpCompat(buffer, validation.format, ext);
       } catch (rawDecodeErr) {
-        const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+        const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
         if (
           decodeErr instanceof DecoderOutOfMemoryError ||
           (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
@@ -412,7 +413,16 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
         try {
           await sharp(buffer).metadata();
           await sharp(buffer).resize(1).raw().toBuffer();
-        } catch {
+        } catch (rawProbeErr) {
+          const probeErr = asDecoderOutOfMemory(rawProbeErr);
+          if (probeErr instanceof DecoderOutOfMemoryError) {
+            return sendInputValidationError(
+              reply,
+              engineUnavailable(probeErr),
+              "file-preview",
+              request.log,
+            );
+          }
           if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
             return sendInputValidationError(
               reply,
@@ -451,7 +461,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
         .header("X-Original-Height", String(origHeight))
         .send(webp);
     } catch (rawErr) {
-      const err = normalizeOperationalWriteError(rawErr);
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
         return sendInputValidationError(reply, engineUnavailable(err), "file-preview", request.log);
       }

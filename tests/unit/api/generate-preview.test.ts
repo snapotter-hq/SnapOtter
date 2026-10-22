@@ -415,6 +415,43 @@ describe("generatePreview honesty (#746)", () => {
     } finally {
       webpSpy.mockRestore();
     }
+
+    putObjectMock.mockReset();
+    reportEngineUnavailableMock.mockReset();
+    loggerMock.warn.mockReset();
+    const dngUnavailableSpy = vi
+      .spyOn(formatDecoders, "decodeToSharpCompat")
+      .mockRejectedValueOnce(new DecoderUnavailableError("No dcraw_emu found."));
+    const rawProbeSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
+      this: sharp.Sharp,
+    ) {
+      return {
+        toBuffer: async () => {
+          throw new RangeError("Array buffer allocation failed");
+        },
+      } as unknown as sharp.Sharp;
+    });
+    try {
+      const dngProbeOomKey = await generatePreview(
+        tiffHeadedDng,
+        "image/x-adobe-dng",
+        JOB_ID,
+        "edit-metadata",
+      );
+      expect(dngProbeOomKey).toBeUndefined();
+      expect(putObjectMock).not.toHaveBeenCalled();
+      expect(reportEngineUnavailableMock).toHaveBeenCalledOnce();
+      expect(reportEngineUnavailableMock.mock.calls[0]?.[0]).toMatchObject({
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: expect.objectContaining({ name: "DecoderOutOfMemoryError" }),
+      });
+      expect(reportEngineUnavailableMock.mock.calls[0]?.[1]).toBe("edit-metadata");
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+    } finally {
+      rawProbeSpy.mockRestore();
+      dngUnavailableSpy.mockRestore();
+    }
   });
 
   it("reports a missing CLI decoder through reportEngineUnavailable and stays non-fatal (#2704)", async () => {

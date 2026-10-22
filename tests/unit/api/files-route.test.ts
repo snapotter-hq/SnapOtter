@@ -1552,6 +1552,241 @@ describe("files route logic", () => {
       expect(reply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
     });
 
+    it("answers 503 ENGINE_UNAVAILABLE and reports DecoderOutOfMemoryError when Sharp preview encode, CLI/HEIC decode, or the DNG fallback probe hits V8 buffer allocation OOM (#3619)", async () => {
+      const sharpMod = (await import("sharp")).default;
+      const formatDecoders = await import("../../../apps/api/src/lib/format-decoders.js");
+      const tiffBytes = await sharpMod({
+        create: { width: 12, height: 12, channels: 3, background: { r: 40, g: 80, b: 120 } },
+      })
+        .tiff()
+        .toBuffer();
+      const heicBytes = readFileSync(
+        resolve(process.cwd(), "tests/fixtures/image/valid/test-200x150.heic"),
+      );
+      const psdBytes = readFileSync(
+        resolve(process.cwd(), "tests/fixtures/image/formats/sample.psd"),
+      );
+
+      // 1. Final Sharp WebP preview encode rejects with V8 RangeError("Array buffer allocation failed") vs non-OOM RangeError
+      const webpSpy = vi
+        .spyOn(sharpMod.prototype, "webp")
+        .mockImplementationOnce(function (this: InstanceType<typeof sharpMod>) {
+          return {
+            toBuffer: async () => {
+              throw new RangeError("Array buffer allocation failed");
+            },
+          } as unknown as InstanceType<typeof sharpMod>;
+        })
+        .mockImplementationOnce(function (this: InstanceType<typeof sharpMod>) {
+          return {
+            toBuffer: async () => {
+              throw new RangeError("Invalid WebP parameter");
+            },
+          } as unknown as InstanceType<typeof sharpMod>;
+        });
+      let fakeNow = Date.now() + 20 * 60_000;
+      const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => fakeNow);
+      try {
+        mocks.reportError.mockClear();
+        const warnOom = vi.fn();
+        const webpOomReply = makePreviewReply();
+        await previewHandler(
+          {
+            log: { warn: warnOom, error: vi.fn() },
+            file: async () => ({ filename: "photo.tiff", toBuffer: async () => tiffBytes }),
+          },
+          webpOomReply,
+        );
+        expect(webpOomReply.statusCode).toBe(503);
+        expect(webpOomReply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+        expect(warnOom).toHaveBeenCalledWith(
+          expect.objectContaining({
+            code: "ENGINE_UNAVAILABLE",
+            cause: "DecoderOutOfMemoryError",
+            toolId: "file-preview",
+          }),
+          "Tool engine unavailable during input preparation",
+        );
+        expect(mocks.reportError).toHaveBeenCalledOnce();
+
+        fakeNow += 11 * 60_000;
+        mocks.reportError.mockClear();
+        const warnNonOom = vi.fn();
+        const nonOomReply = makePreviewReply();
+        await previewHandler(
+          {
+            log: { warn: warnNonOom, error: vi.fn() },
+            file: async () => ({ filename: "photo.tiff", toBuffer: async () => tiffBytes }),
+          },
+          nonOomReply,
+        );
+        expect(nonOomReply.statusCode).toBe(422);
+        expect(nonOomReply.payload).toEqual({
+          error: "Failed to generate preview for TIFF file",
+        });
+        expect(warnNonOom).not.toHaveBeenCalled();
+        expect(mocks.reportError).not.toHaveBeenCalled();
+
+        // 1b. Final sharp(buffer).metadata() rejecting with V8 RangeError("Array buffer allocation failed")
+        fakeNow += 11 * 60_000;
+        mocks.reportError.mockClear();
+        const origMetadata = sharpMod.prototype.metadata;
+        let metaCallCount = 0;
+        const metaSpy = vi.spyOn(sharpMod.prototype, "metadata").mockImplementation(function (
+          this: InstanceType<typeof sharpMod>,
+        ) {
+          metaCallCount += 1;
+          // Call 1 is inside validateImageBuffer; call 2 is preMeta in POST /api/v1/preview
+          if (metaCallCount === 2) {
+            return Promise.reject(new RangeError("Array buffer allocation failed"));
+          }
+          return origMetadata.call(this);
+        });
+        try {
+          const warnMetaOom = vi.fn();
+          const metaOomReply = makePreviewReply();
+          await previewHandler(
+            {
+              log: { warn: warnMetaOom, error: vi.fn() },
+              file: async () => ({ filename: "photo.tiff", toBuffer: async () => tiffBytes }),
+            },
+            metaOomReply,
+          );
+          expect(metaOomReply.statusCode).toBe(503);
+          expect(metaOomReply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+          expect(warnMetaOom).toHaveBeenCalledWith(
+            expect.objectContaining({
+              code: "ENGINE_UNAVAILABLE",
+              cause: "DecoderOutOfMemoryError",
+              toolId: "file-preview",
+            }),
+            "Tool engine unavailable during input preparation",
+          );
+          expect(mocks.reportError).toHaveBeenCalledOnce();
+        } finally {
+          metaSpy.mockRestore();
+        }
+
+        // 2. DNG Sharp fallback probe rejecting with V8 RangeError("Array buffer allocation failed") surfaces DecoderOutOfMemoryError over DecoderUnavailableError
+        fakeNow += 11 * 60_000;
+        mocks.reportError.mockClear();
+        mocks.decodeToSharpCompat.mockRejectedValueOnce(
+          new formatDecoders.DecoderUnavailableError("No dcraw_emu found."),
+        );
+        const rawSpy = vi.spyOn(sharpMod.prototype, "raw").mockImplementationOnce(function (
+          this: InstanceType<typeof sharpMod>,
+        ) {
+          return {
+            toBuffer: async () => {
+              throw new RangeError("Array buffer allocation failed");
+            },
+          } as unknown as InstanceType<typeof sharpMod>;
+        });
+        try {
+          const warnDngProbeOom = vi.fn();
+          const dngProbeReply = makePreviewReply();
+          await previewHandler(
+            {
+              log: { warn: warnDngProbeOom, error: vi.fn() },
+              file: async () => ({ filename: "photo.dng", toBuffer: async () => tiffBytes }),
+            },
+            dngProbeReply,
+          );
+          expect(dngProbeReply.statusCode).toBe(503);
+          expect(dngProbeReply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+          expect(warnDngProbeOom).toHaveBeenCalledWith(
+            expect.objectContaining({
+              code: "ENGINE_UNAVAILABLE",
+              cause: "DecoderOutOfMemoryError",
+              toolId: "file-preview",
+            }),
+            "Tool engine unavailable during input preparation",
+          );
+          expect(mocks.reportError).toHaveBeenCalledOnce();
+        } finally {
+          rawSpy.mockRestore();
+        }
+
+        // 3. Raw SIGKILL and V8 RangeError at decodeHeic and decodeToSharpCompat (PSD + DNG)
+        for (const makeRawOom of [
+          () => Object.assign(new Error("decoder exited SIGKILL"), { signal: "SIGKILL" }),
+          () => new RangeError("Array buffer allocation failed"),
+        ]) {
+          fakeNow += 11 * 60_000;
+          mocks.reportError.mockClear();
+          mocks.decodeHeic.mockRejectedValueOnce(makeRawOom());
+          const warnHeic = vi.fn();
+          const heicReply = makePreviewReply();
+          await previewHandler(
+            {
+              log: { warn: warnHeic, error: vi.fn() },
+              file: async () => ({ filename: "photo.heic", toBuffer: async () => heicBytes }),
+            },
+            heicReply,
+          );
+          expect(heicReply.statusCode).toBe(503);
+          expect(heicReply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+          expect(warnHeic).toHaveBeenCalledWith(
+            expect.objectContaining({
+              code: "ENGINE_UNAVAILABLE",
+              cause: "DecoderOutOfMemoryError",
+              toolId: "file-preview",
+            }),
+            "Tool engine unavailable during input preparation",
+          );
+
+          fakeNow += 11 * 60_000;
+          mocks.reportError.mockClear();
+          mocks.decodeToSharpCompat.mockRejectedValueOnce(makeRawOom());
+          const warnPsd = vi.fn();
+          const psdReply = makePreviewReply();
+          await previewHandler(
+            {
+              log: { warn: warnPsd, error: vi.fn() },
+              file: async () => ({ filename: "layer.psd", toBuffer: async () => psdBytes }),
+            },
+            psdReply,
+          );
+          expect(psdReply.statusCode).toBe(503);
+          expect(psdReply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+          expect(warnPsd).toHaveBeenCalledWith(
+            expect.objectContaining({
+              code: "ENGINE_UNAVAILABLE",
+              cause: "DecoderOutOfMemoryError",
+              toolId: "file-preview",
+            }),
+            "Tool engine unavailable during input preparation",
+          );
+
+          fakeNow += 11 * 60_000;
+          mocks.reportError.mockClear();
+          mocks.decodeToSharpCompat.mockRejectedValueOnce(makeRawOom());
+          const warnDng = vi.fn();
+          const dngReply = makePreviewReply();
+          await previewHandler(
+            {
+              log: { warn: warnDng, error: vi.fn() },
+              file: async () => ({ filename: "photo.dng", toBuffer: async () => tiffBytes }),
+            },
+            dngReply,
+          );
+          expect(dngReply.statusCode).toBe(503);
+          expect(dngReply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+          expect(warnDng).toHaveBeenCalledWith(
+            expect.objectContaining({
+              code: "ENGINE_UNAVAILABLE",
+              cause: "DecoderOutOfMemoryError",
+              toolId: "file-preview",
+            }),
+            "Tool engine unavailable during input preparation",
+          );
+        }
+      } finally {
+        webpSpy.mockRestore();
+        nowSpy.mockRestore();
+      }
+    });
+
     it("uses extname instead of split('.').pop() at POST /api/v1/preview and every decodeToSharpCompat call site (#3246)", () => {
       const filesRouteSrc = readFileSync(
         resolve(process.cwd(), "apps/api/src/routes/files.ts"),

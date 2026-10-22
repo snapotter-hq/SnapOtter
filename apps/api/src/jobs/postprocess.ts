@@ -250,7 +250,11 @@ export async function generatePreview(
           try {
             await sharp(buffer).metadata();
             await sharp(buffer).resize(1).raw().toBuffer();
-          } catch {
+          } catch (rawProbeErr) {
+            const probeErr = asDecoderOutOfMemory(rawProbeErr);
+            if (probeErr instanceof DecoderOutOfMemoryError) {
+              throw probeErr;
+            }
             throw decodeErr;
           }
         }
