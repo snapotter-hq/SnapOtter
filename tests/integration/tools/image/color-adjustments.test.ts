@@ -902,6 +902,15 @@ describe("Sepia with extreme values", () => {
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();
     expect(result.processedSize).toBeGreaterThan(0);
+
+    const dl = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dl.statusCode).toBe(200);
+    const raw = await sharp(dl.rawPayload).raw().toBuffer();
+    expect([raw[0], raw[1], raw[2]]).toEqual([172, 153, 119]);
   });
 });
 

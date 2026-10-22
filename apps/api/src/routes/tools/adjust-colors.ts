@@ -126,6 +126,11 @@ async function processColorAdjustments(
   filename: string,
 ) {
   const outputFormat = await resolveOutputFormat(inputBuffer, filename);
+  const hasPreRecomb =
+    settings.brightness !== 0 ||
+    settings.contrast !== 0 ||
+    settings.saturation !== 0 ||
+    settings.hue !== 0;
   const hasRecomb =
     settings.temperature !== 0 ||
     settings.tint !== 0 ||
@@ -133,16 +138,18 @@ async function processColorAdjustments(
     settings.green !== 100 ||
     settings.blue !== 100 ||
     settings.effect === "sepia";
-  const needsRecombMaterialize =
+  const needsPreRecombMaterialize = hasRecomb && hasPreRecomb;
+  const needsPostRecombMaterialize =
     hasRecomb &&
     (settings.exposure > 0 || settings.effect === "grayscale" || settings.effect === "invert");
+  const needsRecombMaterialize = needsPreRecombMaterialize || needsPostRecombMaterialize;
 
   // Everything here works pixel by pixel except sharpening, which samples
   // neighbouring rows and so reaches into the next frame of Sharp's stacked
   // strip, and intermediate PNG materialisation (needsRecombMaterialize), which
   // would flatten a multi-frame strip into a single tall frame. Those go frame
   // by frame; the rest keep the cheaper single pass over the whole animation
-  // (#1083, #3120).
+  // (#1083, #3120, #3133).
   if (settings.sharpness > 0 || needsRecombMaterialize) {
     try {
       const perFrame = await runPerFrame(inputBuffer, outputFormat.format, async (frame) => {
@@ -165,6 +172,9 @@ async function processColorAdjustments(
     if (settings.brightness !== 0) {
       image = await adjustBrightness(image, { value: settings.brightness });
     }
+    if (settings.contrast !== 0) {
+      image = await adjustContrast(image, { value: settings.contrast });
+    }
     if (settings.exposure < 0) {
       // Sharp's gamma() accepts values between 1.0 and 3.0.
       // Negative exposure -> darken midtones -> apply gamma > 1.0 on input.
@@ -180,6 +190,15 @@ async function processColorAdjustments(
       if (settings.hue !== 0) modOpts.hue = settings.hue;
       image = image.modulate(modOpts);
     }
+
+    // Sharp's C++ pipeline executes sharp::Recomb before sharp::Modulate
+    // (brightness, saturation, hue) and sharp::Linear (contrast). Materialise
+    // pre-recomb adjustments to 8-bit uchar first so recomb (temperature/tint,
+    // channel multipliers, sepia) runs on the adjusted pixels (#3133).
+    if (needsPreRecombMaterialize) {
+      image = sharp(await image.png().toBuffer());
+    }
+
     if (settings.temperature !== 0 || settings.tint !== 0) {
       image = image.recomb(colorTempTintMatrix(settings.temperature, settings.tint));
     }
@@ -208,7 +227,7 @@ async function processColorAdjustments(
     // bands (0..255) and runs after .grayscale() in Sharp's internal pipeline.
     // Materialising through PNG casts back to 8-bit uchar before gammaOut
     // (positive exposure), grayscale, invert, or LZW TIFF output (#2586, #3120).
-    if (needsRecombMaterialize) {
+    if (needsPostRecombMaterialize) {
       image = sharp(await image.png().toBuffer());
     }
 
@@ -217,9 +236,6 @@ async function processColorAdjustments(
       const strength = settings.exposure / 100;
       const g = 1 + strength * 2; // 1.0..3.0
       image = image.gamma(1, g);
-    }
-    if (settings.contrast !== 0) {
-      image = await adjustContrast(image, { value: settings.contrast });
     }
 
     // Effects
@@ -233,7 +249,7 @@ async function processColorAdjustments(
     }
 
     const finalImage =
-      outputFormat.format === "tiff" && !needsRecombMaterialize
+      outputFormat.format === "tiff" && !needsPostRecombMaterialize
         ? sharp(await image.png().toBuffer())
         : image;
     buffer = await finalImage.toFormat(outputFormat.format, outputFormat.encoderOptions).toBuffer();

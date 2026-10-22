@@ -346,4 +346,121 @@ describe("adjust-colors combined recomb matrices (#2608)", () => {
     expect(tiffPx[1]).toBeGreaterThan(200);
     expect(tiffPx[2]).toBe(255);
   });
+
+  it("applies saturation and hue before sepia, channels, and temperature/tint instead of overwriting recomb (#3133)", async () => {
+    const sample = await makeSolidPng(200, 100, 50);
+
+    const desatSepia = await runAdjustColors(sample, {
+      saturation: -100,
+      effect: "sepia",
+    });
+    const hueSepia = await runAdjustColors(sample, {
+      hue: 180,
+      effect: "sepia",
+    });
+    const desatChannels = await runAdjustColors(sample, {
+      saturation: -100,
+      red: 150,
+      green: 100,
+      blue: 50,
+    });
+    const desatTempTint = await runAdjustColors(sample, {
+      saturation: -100,
+      temperature: 100,
+      tint: 100,
+    });
+
+    // Desaturating rgb(200, 100, 50) yields [128, 128, 128]; sepia on [128, 128, 128] -> [172, 153, 119]
+    expect(await firstPixel(desatSepia)).toEqual([172, 153, 119]);
+    // Rotating hue by 180 deg then applying warm sepia matrix -> [152, 136, 106]
+    expect(await firstPixel(hueSepia)).toEqual([152, 136, 106]);
+    // Desaturating to [128, 128, 128] then scaling channels by [1.5, 1.0, 0.5] -> [192, 128, 64]
+    expect(await firstPixel(desatChannels)).toEqual([192, 128, 64]);
+    // Desaturating to [128, 128, 128] then scaling temp/tint by [1.25, 0.9, 0.95] -> [160, 115, 121]
+    expect(await firstPixel(desatTempTint)).toEqual([160, 115, 121]);
+  });
+
+  it("applies brightness and contrast before sepia and channel multipliers without unclamped float drift (#3133)", async () => {
+    const sample = await makeSolidPng(200, 100, 50);
+    const rgbaSample = await makeSolidPng(200, 100, 50, 0.5);
+
+    const darkSepia = await runAdjustColors(sample, {
+      brightness: -50,
+      effect: "sepia",
+    });
+    const flatContrastSepia = await runAdjustColors(sample, {
+      contrast: -100,
+      effect: "sepia",
+    });
+    const brightFlatContrastSepia = await runAdjustColors(sample, {
+      brightness: 100,
+      contrast: -100,
+      effect: "sepia",
+    });
+    const redContrastExp0 = await runAdjustColors(rgbaSample, {
+      red: 150,
+      contrast: -50,
+      exposure: 0,
+    });
+    const redContrastExp1 = await runAdjustColors(rgbaSample, {
+      red: 150,
+      contrast: -50,
+      exposure: 1,
+    });
+    const desatChannelsInverted = await runAdjustColors(rgbaSample, {
+      saturation: -100,
+      red: 150,
+      green: 100,
+      blue: 50,
+      effect: "invert",
+    });
+
+    // Darkening rgb(200, 100, 50) by 50% yields [100, 50, 25]; sepia on [100, 50, 25] -> [72, 64, 50]
+    expect(await firstPixel(darkSepia)).toEqual([72, 64, 50]);
+    // Flattening contrast to [128, 128, 128] before sepia -> warm sepia [172, 153, 119]
+    expect(await firstPixel(flatContrastSepia)).toEqual([172, 153, 119]);
+    expect(await firstPixel(brightFlatContrastSepia)).toEqual([172, 153, 119]);
+    // Contrast -50 on [200, 100, 50] -> [164, 114, 89], then red=150 -> [246, 114, 89, 128]
+    expect(await firstPixel(redContrastExp0)).toEqual([246, 114, 89, 128]);
+    expect(await firstPixel(redContrastExp1)).toEqual([246, 115, 90, 128]);
+    // Desaturate [128, 128, 128] -> channels [192, 128, 64] -> invert [63, 127, 191, 128]
+    expect(await firstPixel(desatChannelsInverted)).toEqual([63, 127, 191, 128]);
+  });
+
+  it("preserves animation frames and LZW TIFF uchar depth when pre-recomb materialisation is active (#3133)", async () => {
+    const animGif = readFixture(fixtures.image.animated.gif);
+    const inMeta = await sharp(animGif, { animated: true }).metadata();
+
+    const desatSepiaGif = await runAdjustColors(
+      animGif,
+      { saturation: -100, effect: "sepia" },
+      "anim.gif",
+    );
+    const outMeta = await sharp(desatSepiaGif, { animated: true }).metadata();
+    expect(outMeta.format).toBe("gif");
+    expect(outMeta.pages).toBe(inMeta.pages);
+    expect(outMeta.width).toBe(inMeta.width);
+    expect(outMeta.pageHeight).toBe(inMeta.pageHeight);
+    const frame0Px = await firstPixel(desatSepiaGif);
+    expect(frame0Px[0]).toBeGreaterThan(frame0Px[1]);
+    expect(frame0Px[1]).toBeGreaterThan(frame0Px[2]);
+    const frame1Raw = await sharp(desatSepiaGif, { page: 1, pages: 1 })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    expect(frame1Raw.data[0]).toBeGreaterThanOrEqual(frame1Raw.data[1]);
+    expect(frame1Raw.data[1]).toBeGreaterThan(frame1Raw.data[2]);
+
+    const sampleTiff = await sharp(await makeSolidPng(200, 100, 50))
+      .tiff({ compression: "lzw" })
+      .toBuffer();
+    const outTiff = await runAdjustColors(
+      sampleTiff,
+      { contrast: -100, effect: "sepia" },
+      "sample.tiff",
+    );
+    const tiffMeta = await sharp(outTiff).metadata();
+    expect(tiffMeta.format).toBe("tiff");
+    expect(tiffMeta.depth).toBe("uchar");
+    expect(await firstPixel(outTiff)).toEqual([172, 153, 119]);
+  });
 });
