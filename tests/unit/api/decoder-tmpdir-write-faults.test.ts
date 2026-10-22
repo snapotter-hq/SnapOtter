@@ -19,6 +19,7 @@ const deletePrefix = vi.fn();
 const decodeHeic = vi.fn();
 const decodeToSharpCompat = vi.fn();
 const writeFileFailure = { next: null as Error | null };
+const readFileFailure = { next: null as Error | null };
 const infoExifPaths: string[] = [];
 const uploadedBuffers = new Map<string, Buffer>();
 
@@ -27,8 +28,10 @@ vi.mock("node:fs/promises", async (importOriginal) => {
   return {
     ...actual,
     writeFile: (async (path: unknown, ...rest: unknown[]) => {
-      if (/info-exif-/.test(String(path))) {
-        infoExifPaths.push(String(path));
+      if (/(?:info-exif|exif-inspect|exif-write)-/.test(String(path))) {
+        if (/info-exif-/.test(String(path))) {
+          infoExifPaths.push(String(path));
+        }
         if (writeFileFailure.next) {
           const err = writeFileFailure.next;
           writeFileFailure.next = null;
@@ -37,6 +40,14 @@ vi.mock("node:fs/promises", async (importOriginal) => {
       }
       return (actual.writeFile as (...args: unknown[]) => unknown)(path, ...rest);
     }) as typeof actual.writeFile,
+    readFile: (async (path: unknown, ...rest: unknown[]) => {
+      if (/exif-write-/.test(String(path)) && readFileFailure.next) {
+        const err = readFileFailure.next;
+        readFileFailure.next = null;
+        throw err;
+      }
+      return (actual.readFile as (...args: unknown[]) => unknown)(path, ...rest);
+    }) as typeof actual.readFile,
   };
 });
 
@@ -95,6 +106,7 @@ import { registerBarcodeRead } from "../../../apps/api/src/routes/tools/barcode-
 import { registerBeautify } from "../../../apps/api/src/routes/tools/beautify.js";
 import { registerCollage } from "../../../apps/api/src/routes/tools/collage.js";
 import { registerColorPalette } from "../../../apps/api/src/routes/tools/color-palette.js";
+import { registerEditMetadata } from "../../../apps/api/src/routes/tools/edit-metadata.js";
 import { registerFavicon } from "../../../apps/api/src/routes/tools/favicon.js";
 import { registerFindDuplicates } from "../../../apps/api/src/routes/tools/find-duplicates.js";
 import { registerImageEnhancement } from "../../../apps/api/src/routes/tools/image-enhancement.js";
@@ -165,6 +177,7 @@ async function buildApp() {
   registerFavicon(app);
   registerImageToBase64(app);
   registerBeautify(app);
+  registerEditMetadata(app);
   registerInfo(app);
   await app.ready();
   return app;
@@ -388,6 +401,7 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
     decodeHeic.mockReset().mockResolvedValue(PNG);
     decodeToSharpCompat.mockReset().mockResolvedValue(PNG);
     writeFileFailure.next = null;
+    readFileFailure.next = null;
     infoExifPaths.length = 0;
   });
 
@@ -596,6 +610,91 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
         expect(decodeToSharpCompat).toHaveBeenCalledWith(rafMagic, "raw", expectedExt);
         expect(infoExifPaths).toHaveLength(1);
         expect(infoExifPaths[0]).toMatch(new RegExp(`info-exif-\\d+\\${expectedSuffix}$`));
+      },
+    );
+  });
+
+  describe("edit-metadata and edit-metadata/inspect exiftool tmpdir faults (#3548)", () => {
+    it.each(WRITE_ERRNOS)(
+      "answers 503 %s (%s) on POST /api/v1/tools/image/edit-metadata/inspect when inspectMetadata fails writing to tmpdir",
+      async (errno, expectedCode) => {
+        writeFileFailure.next = errnoError(errno);
+        const res = await app.inject({
+          method: "POST",
+          url: "/api/v1/tools/image/edit-metadata/inspect",
+          ...multipartBody([{ filename: "photo.png", contentType: "image/png", content: PNG }]),
+        });
+        expect(res.statusCode, res.body).toBe(503);
+        expect(res.json()).toMatchObject({ code: expectedCode });
+      },
+    );
+
+    it.each(WRITE_ERRNOS)(
+      "answers 503 %s (%s) on POST /api/v1/tools/image/edit-metadata when writeMetadata fails writing or reading tmpdir",
+      async (errno, expectedCode) => {
+        writeFileFailure.next = errnoError(errno);
+        const writeRes = await app.inject({
+          method: "POST",
+          url: apiToolPath("edit-metadata"),
+          ...multipartBody([{ filename: "photo.png", contentType: "image/png", content: PNG }], {
+            artist: "Ada",
+          }),
+        });
+        expect(writeRes.statusCode, writeRes.body).toBe(503);
+        expect(writeRes.json()).toMatchObject({ code: expectedCode });
+
+        readFileFailure.next = errnoError(errno, "read");
+        const readRes = await app.inject({
+          method: "POST",
+          url: apiToolPath("edit-metadata"),
+          ...multipartBody([{ filename: "photo.png", contentType: "image/png", content: PNG }], {
+            artist: "Ada",
+          }),
+        });
+        expect(readRes.statusCode, readRes.body).toBe(503);
+        expect(readRes.json()).toMatchObject({ code: expectedCode });
+      },
+    );
+
+    it("answers 503 ENGINE_UNAVAILABLE on POST /api/v1/tools/image/edit-metadata and /inspect when exiftool or readFile hits an ENGINE_UNAVAILABLE fault", async () => {
+      readFileFailure.next = new RangeError("Array buffer allocation failed");
+      const res = await app.inject({
+        method: "POST",
+        url: apiToolPath("edit-metadata"),
+        ...multipartBody([{ filename: "photo.png", contentType: "image/png", content: PNG }], {
+          artist: "Ada",
+        }),
+      });
+      expect(res.statusCode, res.body).toBe(503);
+      expect(res.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+
+      writeFileFailure.next = new DecoderOutOfMemoryError("The image decoder ran out of memory.");
+      const inspectOomRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/edit-metadata/inspect",
+        ...multipartBody([{ filename: "photo.png", contentType: "image/png", content: PNG }]),
+      });
+      expect(inspectOomRes.statusCode, inspectOomRes.body).toBe(503);
+      expect(inspectOomRes.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+    });
+
+    it.each(WRITE_ERRNOS)(
+      "surfaces 503 %s (%s) from the edit-metadata registered process function when writeMetadata hits a tmpdir write or read fault",
+      async (errno, expectedCode) => {
+        const cfg = getToolConfig("edit-metadata");
+        expect(cfg).toBeDefined();
+
+        writeFileFailure.next = errnoError(errno);
+        await expect(cfg?.process(PNG, { artist: "Ada" }, "photo.png")).rejects.toMatchObject({
+          statusCode: 503,
+          code: expectedCode,
+        });
+
+        readFileFailure.next = errnoError(errno, "read");
+        await expect(cfg?.process(PNG, { artist: "Ada" }, "photo.png")).rejects.toMatchObject({
+          statusCode: 503,
+          code: expectedCode,
+        });
       },
     );
   });

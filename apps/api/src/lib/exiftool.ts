@@ -4,7 +4,16 @@ import { readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { promisify } from "node:util";
+import { hasServerErrorStatus } from "@snapotter/shared";
 import { stripInternalPaths } from "./errors.js";
+import {
+  asDecoderOutOfMemory,
+  asDecoderUnavailable,
+  DecoderOutOfMemoryError,
+  DecoderUnavailableError,
+  isDecoderUnavailable,
+} from "./format-decoders.js";
+import { normalizeOperationalWriteError } from "./object-storage.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -65,9 +74,12 @@ async function findExiftool(): Promise<string> {
     await execFileAsync("exiftool", ["-ver"], { timeout: 5_000 });
     cachedBinary = "exiftool";
     return "exiftool";
-  } catch {
-    throw new Error(
+  } catch (err) {
+    const outOfMemory = asDecoderOutOfMemory(err);
+    if (outOfMemory !== err) throw outOfMemory;
+    throw new DecoderUnavailableError(
       "ExifTool not found. Install libimage-exiftool-perl (Linux) or brew install exiftool (macOS).",
+      err,
     );
   }
 }
@@ -137,7 +149,9 @@ export async function inspectMetadata(buffer: Buffer, filename: string): Promise
       gps: Object.keys(gps).length > 0 ? gps : null,
       keywords: uniqueKeywords,
     };
-  } catch (err) {
+  } catch (rawErr) {
+    const err = normalizeOperationalWriteError(asDecoderUnavailable(asDecoderOutOfMemory(rawErr)));
+    if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(stripInternalPaths(message));
   } finally {
@@ -169,7 +183,9 @@ export async function writeMetadata(
       maxBuffer: 10 * 1024 * 1024,
     });
     return await readFile(tempPath);
-  } catch (err) {
+  } catch (rawErr) {
+    const err = normalizeOperationalWriteError(asDecoderUnavailable(asDecoderOutOfMemory(rawErr)));
+    if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(stripInternalPaths(message));
   } finally {
@@ -181,28 +197,36 @@ export async function readImageDimensions(
   buffer: Buffer,
   ext?: string,
 ): Promise<{ width: number; height: number } | null> {
+  let bin: string;
   try {
-    const bin = await findExiftool();
-    const safeExt = ext?.replace(/[^a-z0-9]/gi, "");
-    const suffix = safeExt ? `.${safeExt}` : ".jpg";
-    const id = randomUUID();
-    const tempPath = join(tmpdir(), `exif-dim-${id}${suffix}`);
-
-    try {
-      await writeFile(tempPath, buffer);
-      const { stdout } = await execFileAsync(
-        bin,
-        ["-json", "-ImageWidth", "-ImageHeight", tempPath],
-        { timeout: 10_000 },
-      );
-      const [data] = JSON.parse(stdout);
-      if (!data?.ImageWidth || !data?.ImageHeight) return null;
-      return { width: data.ImageWidth, height: data.ImageHeight };
-    } finally {
-      await rm(tempPath, { force: true }).catch(() => {});
-    }
-  } catch {
+    bin = await findExiftool();
+  } catch (err) {
+    if (err instanceof DecoderOutOfMemoryError) throw err;
     return null;
+  }
+  const safeExt = ext?.replace(/[^a-z0-9]/gi, "");
+  const suffix = safeExt ? `.${safeExt}` : ".jpg";
+  const id = randomUUID();
+  const tempPath = join(tmpdir(), `exif-dim-${id}${suffix}`);
+
+  try {
+    await writeFile(tempPath, buffer).catch((writeErr: unknown) => {
+      throw normalizeOperationalWriteError(writeErr);
+    });
+    const { stdout } = await execFileAsync(
+      bin,
+      ["-json", "-ImageWidth", "-ImageHeight", tempPath],
+      { timeout: 10_000 },
+    );
+    const [data] = JSON.parse(stdout);
+    if (!data?.ImageWidth || !data?.ImageHeight) return null;
+    return { width: data.ImageWidth, height: data.ImageHeight };
+  } catch (rawErr) {
+    const err = asDecoderOutOfMemory(rawErr);
+    if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+    return null;
+  } finally {
+    await rm(tempPath, { force: true }).catch(() => {});
   }
 }
 

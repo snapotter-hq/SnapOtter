@@ -450,7 +450,11 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
         .header("X-Original-Width", String(origWidth))
         .header("X-Original-Height", String(origHeight))
         .send(webp);
-    } catch {
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(rawErr);
+      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+        return sendInputValidationError(reply, engineUnavailable(err), "file-preview", request.log);
+      }
       return reply.status(422).send({
         error: `Failed to generate preview for ${validation.format.toUpperCase()} file`,
       });

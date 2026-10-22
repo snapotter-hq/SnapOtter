@@ -20,11 +20,15 @@ const { mockExecFile, mockWriteFile, mockReadFile, mockRm } = vi.hoisted(() => (
 
 vi.mock("node:child_process", () => ({ execFile: mockExecFile }));
 vi.mock("node:util", () => ({ promisify: () => mockExecFile }));
-vi.mock("node:fs/promises", () => ({
-  writeFile: mockWriteFile,
-  readFile: mockReadFile,
-  rm: mockRm,
-}));
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return {
+    ...actual,
+    writeFile: mockWriteFile,
+    readFile: mockReadFile,
+    rm: mockRm,
+  };
+});
 
 import {
   buildTagArgs,
@@ -103,11 +107,15 @@ async function loadFreshExiftool(exec: ReturnType<typeof vi.fn>): Promise<Exifto
   vi.resetModules();
   vi.doMock("node:child_process", () => ({ execFile: exec }));
   vi.doMock("node:util", () => ({ promisify: () => exec }));
-  vi.doMock("node:fs/promises", () => ({
-    writeFile: vi.fn().mockResolvedValue(undefined),
-    readFile: vi.fn().mockResolvedValue(Buffer.from("readback-bytes")),
-    rm: vi.fn().mockResolvedValue(undefined),
-  }));
+  vi.doMock("node:fs/promises", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("node:fs/promises")>();
+    return {
+      ...actual,
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      readFile: vi.fn().mockResolvedValue(Buffer.from("readback-bytes")),
+      rm: vi.fn().mockResolvedValue(undefined),
+    };
+  });
   return import("../../../apps/api/src/lib/exiftool.js");
 }
 
@@ -139,12 +147,56 @@ describe("findExiftool (via public API, fresh module)", () => {
     expect(verCalls).toHaveLength(1);
   });
 
-  it("surfaces the install-hint message from inspectMetadata when the probe fails", async () => {
-    const exec = vi.fn().mockRejectedValue(new Error("spawn exiftool ENOENT"));
+  it("surfaces a 503 ENGINE_UNAVAILABLE install-hint error from inspectMetadata and writeMetadata when the probe fails (#3548)", async () => {
+    const probeErr = Object.assign(new Error("spawn exiftool ENOENT"), {
+      code: "ENOENT",
+      syscall: "spawn exiftool",
+    });
+    const exec = vi.fn().mockRejectedValue(probeErr);
     const mod = await loadFreshExiftool(exec);
-    await expect(mod.inspectMetadata(Buffer.from("img"), "photo.jpg")).rejects.toThrow(
-      "ExifTool not found. Install libimage-exiftool-perl (Linux) or brew install exiftool (macOS).",
-    );
+    await expect(mod.inspectMetadata(Buffer.from("img"), "photo.jpg")).rejects.toMatchObject({
+      message:
+        "ExifTool not found. Install libimage-exiftool-perl (Linux) or brew install exiftool (macOS).",
+      isSafeMessage: true,
+      kind: "operational",
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: probeErr,
+    });
+    await expect(
+      mod.writeMetadata(Buffer.from("img"), "photo.jpg", ["-Artist=Bob"]),
+    ).rejects.toMatchObject({
+      message:
+        "ExifTool not found. Install libimage-exiftool-perl (Linux) or brew install exiftool (macOS).",
+      isSafeMessage: true,
+      kind: "operational",
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: probeErr,
+    });
+  });
+
+  it("surfaces a 503 DecoderOutOfMemoryError when the -ver probe is killed by OOM (#3548)", async () => {
+    const oomProbeErr = Object.assign(new Error("Command failed: exiftool -ver"), {
+      code: null,
+      signal: "SIGKILL",
+      stderr: "",
+    });
+    const exec = vi.fn().mockRejectedValue(oomProbeErr);
+    const mod = await loadFreshExiftool(exec);
+    for (const call of [
+      () => mod.inspectMetadata(Buffer.from("img"), "photo.jpg"),
+      () => mod.writeMetadata(Buffer.from("img"), "photo.jpg", ["-Artist=Bob"]),
+      () => mod.readImageDimensions(Buffer.from("img"), "jpg"),
+    ]) {
+      await expect(call()).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        isSafeMessage: true,
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: oomProbeErr,
+      });
+    }
   });
 
   it("readImageDimensions swallows a missing binary and returns null", async () => {
@@ -410,6 +462,69 @@ describe("inspectMetadata error handling", () => {
     expect(mockRm).toHaveBeenCalledTimes(1);
     expect(mockRm.mock.calls[0][1]).toEqual({ force: true });
   });
+
+  it.each([
+    ["ENOSPC", "storage-full"],
+    ["EDQUOT", "storage-full"],
+    ["EACCES", "storage-not-writable"],
+    ["EPERM", "storage-not-writable"],
+    ["EROFS", "storage-not-writable"],
+  ] as const)(
+    "preserves 503 %s (%s) when writeFile fails on tmpdir in inspectMetadata (#3548)",
+    async (errno, expectedCode) => {
+      withExiftool(() => exifJson({ "EXIF:Make": "Canon" }));
+      const fsErr = Object.assign(new Error(`${errno}: temp write failed`), {
+        code: errno,
+        syscall: "open",
+      });
+      mockWriteFile.mockRejectedValueOnce(fsErr);
+      await expect(inspectMetadata(Buffer.from("img"), "photo.jpg")).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        statusCode: 503,
+        code: expectedCode,
+        cause: fsErr,
+      });
+      expect(mockRm).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("preserves 503 DecoderOutOfMemoryError when exiftool is killed by SIGKILL in inspectMetadata (#3548)", async () => {
+    const oomErr = Object.assign(new Error("Command failed: exiftool"), {
+      code: null,
+      signal: "SIGKILL",
+      stderr: "",
+    });
+    withExiftool(() => {
+      throw oomErr;
+    });
+    await expect(inspectMetadata(Buffer.from("img"), "photo.jpg")).rejects.toMatchObject({
+      name: "DecoderOutOfMemoryError",
+      isSafeMessage: true,
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: oomErr,
+    });
+    expect(mockRm).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves 503 DecoderUnavailableError when cached exiftool fails to spawn in inspectMetadata (#3548)", async () => {
+    const spawnErr = Object.assign(new Error("spawn exiftool ENOENT"), {
+      code: "ENOENT",
+      syscall: "spawn exiftool",
+    });
+    withExiftool(() => {
+      throw spawnErr;
+    });
+    await expect(inspectMetadata(Buffer.from("img"), "photo.jpg")).rejects.toMatchObject({
+      name: "DecoderUnavailableError",
+      isSafeMessage: true,
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: spawnErr,
+    });
+    expect(mockRm).toHaveBeenCalledTimes(1);
+  });
 });
 
 // ===========================================================================
@@ -502,6 +617,101 @@ describe("writeMetadata", () => {
     );
     expect(mockRm).toHaveBeenCalled();
     expect(mockRm.mock.calls[0][1]).toEqual({ force: true });
+  });
+
+  it.each([
+    ["ENOSPC", "storage-full"],
+    ["EDQUOT", "storage-full"],
+    ["EACCES", "storage-not-writable"],
+    ["EPERM", "storage-not-writable"],
+    ["EROFS", "storage-not-writable"],
+  ] as const)(
+    "preserves 503 %s (%s) when writeFile or readFile fails on tmpdir in writeMetadata (#3548)",
+    async (errno, expectedCode) => {
+      withExiftool(() => ({ stdout: "", stderr: "" }));
+      const writeErr = Object.assign(new Error(`${errno}: temp write failed`), {
+        code: errno,
+        syscall: "open",
+      });
+      mockWriteFile.mockRejectedValueOnce(writeErr);
+      await expect(
+        writeMetadata(Buffer.from("img"), "photo.png", ["-Artist=Bob"]),
+      ).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        statusCode: 503,
+        code: expectedCode,
+        cause: writeErr,
+      });
+
+      const readErr = Object.assign(new Error(`${errno}: temp read failed`), {
+        code: errno,
+        syscall: "read",
+      });
+      mockReadFile.mockRejectedValueOnce(readErr);
+      await expect(
+        writeMetadata(Buffer.from("img"), "photo.png", ["-Artist=Bob"]),
+      ).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        statusCode: 503,
+        code: expectedCode,
+        cause: readErr,
+      });
+    },
+  );
+
+  it("preserves 503 DecoderOutOfMemoryError when exiftool is killed by SIGKILL or readFile hits V8 OOM in writeMetadata (#3548)", async () => {
+    const oomErr = Object.assign(new Error("Command failed: exiftool"), {
+      code: null,
+      signal: "SIGKILL",
+      stderr: "",
+    });
+    withExiftool(() => {
+      throw oomErr;
+    });
+    await expect(
+      writeMetadata(Buffer.from("img"), "photo.png", ["-Artist=Bob"]),
+    ).rejects.toMatchObject({
+      name: "DecoderOutOfMemoryError",
+      isSafeMessage: true,
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: oomErr,
+    });
+
+    withExiftool(() => ({ stdout: "", stderr: "" }));
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    mockReadFile.mockRejectedValueOnce(v8Oom);
+    await expect(
+      writeMetadata(Buffer.from("img"), "photo.png", ["-Artist=Bob"]),
+    ).rejects.toMatchObject({
+      name: "DecoderOutOfMemoryError",
+      isSafeMessage: true,
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: v8Oom,
+    });
+  });
+
+  it("preserves 503 DecoderUnavailableError when cached exiftool fails to spawn in writeMetadata (#3548)", async () => {
+    const spawnErr = Object.assign(new Error("spawn exiftool ENOENT"), {
+      code: "ENOENT",
+      syscall: "spawn exiftool",
+    });
+    withExiftool(() => {
+      throw spawnErr;
+    });
+    await expect(
+      writeMetadata(Buffer.from("img"), "photo.png", ["-Artist=Bob"]),
+    ).rejects.toMatchObject({
+      name: "DecoderUnavailableError",
+      isSafeMessage: true,
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: spawnErr,
+    });
+    expect(mockRm).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -622,6 +832,66 @@ describe("readImageDimensions", () => {
     await readImageDimensions(Buffer.from("img"), "jpg");
     expect(mockRm).toHaveBeenCalledTimes(1);
     expect(mockRm.mock.calls[0][1]).toEqual({ force: true });
+  });
+
+  it.each([
+    ["ENOSPC", "storage-full"],
+    ["EDQUOT", "storage-full"],
+    ["EACCES", "storage-not-writable"],
+    ["EPERM", "storage-not-writable"],
+    ["EROFS", "storage-not-writable"],
+  ] as const)(
+    "rethrows 503 %s (%s) when writeFile fails on tmpdir in readImageDimensions (#3548)",
+    async (errno, expectedCode) => {
+      withExiftool(() => ({
+        stdout: JSON.stringify([{ ImageWidth: 10, ImageHeight: 10 }]),
+        stderr: "",
+      }));
+      const fsErr = Object.assign(new Error(`${errno}: temp write failed`), {
+        code: errno,
+        syscall: "open",
+      });
+      mockWriteFile.mockRejectedValueOnce(fsErr);
+      await expect(readImageDimensions(Buffer.from("img"), "jpg")).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        statusCode: 503,
+        code: expectedCode,
+        cause: fsErr,
+      });
+      expect(mockRm).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("rethrows 503 DecoderOutOfMemoryError when exiftool is killed by SIGKILL in readImageDimensions (#3548)", async () => {
+    const oomErr = Object.assign(new Error("Command failed: exiftool"), {
+      code: null,
+      signal: "SIGKILL",
+      stderr: "",
+    });
+    withExiftool(() => {
+      throw oomErr;
+    });
+    await expect(readImageDimensions(Buffer.from("img"), "jpg")).rejects.toMatchObject({
+      name: "DecoderOutOfMemoryError",
+      isSafeMessage: true,
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: oomErr,
+    });
+    expect(mockRm).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns null rather than 503 storage-not-writable when cached exiftool fails to spawn with EACCES in readImageDimensions (#3548)", async () => {
+    const spawnEacces = Object.assign(new Error("spawn exiftool EACCES"), {
+      code: "EACCES",
+      syscall: "spawn exiftool",
+    });
+    withExiftool(() => {
+      throw spawnEacces;
+    });
+    await expect(readImageDimensions(Buffer.from("img"), "jpg")).resolves.toBeNull();
+    expect(mockRm).toHaveBeenCalledTimes(1);
   });
 });
 

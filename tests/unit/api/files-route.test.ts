@@ -1441,8 +1441,48 @@ describe("files route logic", () => {
         );
         expect(dngReply.statusCode).toBe(503);
         expect(dngReply.payload).toMatchObject({ code: expectedCode });
+
+        const objectStorage = await import("../../../apps/api/src/lib/object-storage.js");
+        for (const dimErr of [
+          fsErr(),
+          objectStorage.normalizeOperationalWriteError(fsErr()) as Error,
+        ]) {
+          mocks.decodeToSharpCompat.mockResolvedValueOnce(PNG_1X1);
+          mocks.readImageDimensions.mockRejectedValueOnce(dimErr);
+          const rawDimReply = makePreviewReply();
+          await previewHandler(
+            {
+              log: { warn: vi.fn(), error: vi.fn() },
+              file: async () => ({ filename: "photo.dng", toBuffer: async () => dngBytes }),
+            },
+            rawDimReply,
+          );
+          expect(rawDimReply.statusCode).toBe(503);
+          expect(rawDimReply.payload).toMatchObject({ code: expectedCode });
+        }
       },
     );
+
+    it("answers 503 ENGINE_UNAVAILABLE when readImageDimensions rejects with DecoderOutOfMemoryError (#3548)", async () => {
+      const dngBytes = readFileSync(
+        resolve(process.cwd(), "tests/fixtures/image/formats/sample.dng"),
+      );
+      const formatDecoders = await import("../../../apps/api/src/lib/format-decoders.js");
+      mocks.decodeToSharpCompat.mockResolvedValueOnce(PNG_1X1);
+      mocks.readImageDimensions.mockRejectedValueOnce(
+        new formatDecoders.DecoderOutOfMemoryError("The image decoder ran out of memory."),
+      );
+      const reply = makePreviewReply();
+      await previewHandler(
+        {
+          log: { warn: vi.fn(), error: vi.fn() },
+          file: async () => ({ filename: "photo.dng", toBuffer: async () => dngBytes }),
+        },
+        reply,
+      );
+      expect(reply.statusCode).toBe(503);
+      expect(reply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+    });
 
     it("uses extname instead of split('.').pop() at POST /api/v1/preview and every decodeToSharpCompat call site (#3246)", () => {
       const filesRouteSrc = readFileSync(
