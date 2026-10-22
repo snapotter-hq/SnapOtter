@@ -550,3 +550,72 @@ describe("ImageInputHandler SVG sanitization abort signal (#2830)", () => {
     });
   });
 });
+
+describe("ImageInputHandler operational tmpdir write faults (#2800)", () => {
+  function prepare(filename: string) {
+    return new ImageInputHandler().prepare(RAW, filename, { scratchDir: "/tmp/in" });
+  }
+
+  function detected(format: string) {
+    mocks.validateImageBuffer.mockResolvedValue({ valid: true, format, width: 1, height: 1 });
+  }
+
+  function errnoError(code: string): NodeJS.ErrnoException {
+    return Object.assign(new Error(`${code}: temp write failed`), {
+      code,
+      syscall: "open",
+    });
+  }
+
+  const cases: ReadonlyArray<readonly [string, string]> = [
+    ["ENOSPC", "storage-full"],
+    ["EDQUOT", "storage-full"],
+    ["EACCES", "storage-not-writable"],
+    ["EPERM", "storage-not-writable"],
+    ["EROFS", "storage-not-writable"],
+  ];
+
+  it.each(cases)(
+    "turns a %s write error in decodeHeic into 503 %s",
+    async (errno, expectedCode) => {
+      detected("heif");
+      mocks.decodeHeic.mockRejectedValue(errnoError(errno));
+
+      await expect(prepare("photo.heic")).rejects.toMatchObject({
+        name: "InputValidationError",
+        statusCode: 503,
+        code: expectedCode,
+      });
+    },
+  );
+
+  it.each(cases)(
+    "turns a %s write error in decodeToSharpCompat into 503 %s without falling back to Sharp",
+    async (errno, expectedCode) => {
+      detected("raw");
+      mocks.decodeToSharpCompat.mockRejectedValue(errnoError(errno));
+
+      await expect(prepare("photo.dng")).rejects.toMatchObject({
+        name: "InputValidationError",
+        statusCode: 503,
+        code: expectedCode,
+      });
+      expect(mocks.metadata).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(cases)(
+    "turns a %s write error in the AVIF CLI fallback into 503 %s",
+    async (errno, expectedCode) => {
+      detected("avif");
+      mocks.toBuffer.mockRejectedValue(new Error("heif: Unsupported bitstream"));
+      mocks.decodeAnyFormat.mockRejectedValue(errnoError(errno));
+
+      await expect(prepare("photo.avif")).rejects.toMatchObject({
+        name: "InputValidationError",
+        statusCode: 503,
+        code: expectedCode,
+      });
+    },
+  );
+});

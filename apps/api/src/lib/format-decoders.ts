@@ -10,6 +10,7 @@ import { isSafeMessageError, SafeError } from "@snapotter/shared";
 import sharp from "sharp";
 import { isBinarySpawnFailure } from "./binary-overrides.js";
 import { isRawExtension } from "./file-validation.js";
+import { normalizeOperationalWriteError } from "./object-storage.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -434,7 +435,7 @@ async function preflightEncodedDimensions(
       options.signal?.throwIfAborted();
       throw new DecoderUnavailableError(
         "The server could not write a temporary file to check image dimensions.",
-        error,
+        isSafeMessageError(error) && error.cause !== undefined ? error.cause : error,
       );
     }
     try {
@@ -488,11 +489,15 @@ async function preflightEncodedDimensions(
  * Prevents symlink / race-condition attacks on predictable temp paths.
  */
 async function writeTempExclusive(filePath: string, buffer: Buffer): Promise<void> {
-  const fh = await open(filePath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY);
   try {
-    await fh.writeFile(buffer);
-  } finally {
-    await fh.close();
+    const fh = await open(filePath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY);
+    try {
+      await fh.writeFile(buffer);
+    } finally {
+      await fh.close();
+    }
+  } catch (err) {
+    throw normalizeOperationalWriteError(err);
   }
 }
 
@@ -545,7 +550,7 @@ export async function decodeToSharpCompat(
   try {
     decoded = await decodeByFormat(buffer, format, ext, options);
   } catch (err) {
-    throw asDecoderUnavailable(asDecoderOutOfMemory(err));
+    throw normalizeOperationalWriteError(asDecoderUnavailable(asDecoderOutOfMemory(err)));
   }
   return assertDecodedWithinLimit(decoded, options);
 }

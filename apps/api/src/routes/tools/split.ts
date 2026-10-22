@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { extname } from "node:path";
 import type { Sharp, SharpFormat } from "@snapotter/image-engine";
+import { hasServerErrorStatus } from "@snapotter/shared";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
@@ -20,6 +21,7 @@ import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
+import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { registerToolProcessFn } from "../tool-factory.js";
@@ -139,8 +141,9 @@ export function registerSplit(app: FastifyInstance) {
       if (validation.format === "heif") {
         try {
           fileBuffer = await decodeHeic(fileBuffer);
-        } catch (err) {
-          if (isDecoderUnavailable(err)) throw err;
+        } catch (rawErr) {
+          const err = normalizeOperationalWriteError(rawErr);
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
           return reply.status(422).send({
             error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
             details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
@@ -154,13 +157,19 @@ export function registerSplit(app: FastifyInstance) {
         try {
           const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
           fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt);
-        } catch (decodeErr) {
-          if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+        } catch (rawDecodeErr) {
+          const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+          if (
+            decodeErr instanceof DecoderOutOfMemoryError ||
+            (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+          ) {
+            throw decodeErr;
+          }
           try {
             await sharp(fileBuffer).metadata();
             await sharp(fileBuffer).resize(1).raw().toBuffer();
           } catch (err) {
-            if (isDecoderUnavailable(decodeErr)) throw decodeErr;
+            if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) throw decodeErr;
             return reply.status(422).send({
               error: `Failed to decode ${validation.format.toUpperCase()} file`,
               details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
@@ -274,10 +283,11 @@ export function registerSplit(app: FastifyInstance) {
       }
 
       await archive.finalize();
-    } catch (err) {
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(rawErr);
       if (!reply.raw.headersSent) {
         // Once the ZIP is streaming, a rethrow would leave the client hanging.
-        if (isDecoderUnavailable(err)) throw err;
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
         return reply.status(422).send({
           error: "Split failed",
           details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),

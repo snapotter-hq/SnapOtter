@@ -30,7 +30,7 @@ import {
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
-import { putObject } from "../../lib/object-storage.js";
+import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 import { decompressSvgz, isSvgzClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { registerToolProcessFn } from "../tool-factory.js";
@@ -113,7 +113,8 @@ async function prepareBeautifyImage(
   if (validation.format === "heif") {
     try {
       buf = await decodeHeic(buf);
-    } catch (err) {
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(rawErr);
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
       throw await asInputErrorIfUndecodable(buf, err);
     }
@@ -123,8 +124,14 @@ async function prepareBeautifyImage(
     try {
       const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
       buf = await decodeToSharpCompat(buf, validation.format, fileExt);
-    } catch (decodeErr) {
-      if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+    } catch (rawDecodeErr) {
+      const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+      if (
+        decodeErr instanceof DecoderOutOfMemoryError ||
+        (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+      ) {
+        throw decodeErr;
+      }
       try {
         const meta = await sharp(buf).metadata();
         fallbackFormat = meta.format;

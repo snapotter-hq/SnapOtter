@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => ({
   >(() => Promise.resolve(null)),
   decodeToSharpCompat:
     vi.fn<(_buf: Buffer, _format: string, _ext?: string, _options?: unknown) => Promise<Buffer>>(),
+  decodeHeic: vi.fn<(_buf: Buffer, _options?: unknown) => Promise<Buffer>>(),
 }));
 
 vi.mock("../../../apps/api/src/db/index.js", () => ({
@@ -91,6 +92,15 @@ vi.mock("../../../apps/api/src/lib/format-decoders.js", async (importOriginal) =
     ...actual,
     decodeToSharpCompat: (...args: Parameters<typeof actual.decodeToSharpCompat>) =>
       mocks.decodeToSharpCompat(...args),
+  };
+});
+
+vi.mock("../../../apps/api/src/lib/heic-converter.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/heic-converter.js")>();
+  return {
+    ...actual,
+    decodeHeic: (...args: Parameters<typeof actual.decodeHeic>) => mocks.decodeHeic(...args),
   };
 });
 
@@ -1313,6 +1323,68 @@ describe("files route logic", () => {
       expect(reply.statusCode).toBe(503);
       expect(reply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
     });
+
+    it.each([
+      ["ENOSPC", "storage-full"],
+      ["EDQUOT", "storage-full"],
+      ["EACCES", "storage-not-writable"],
+      ["EPERM", "storage-not-writable"],
+      ["EROFS", "storage-not-writable"],
+    ] as const)(
+      "answers 503 %s (%s) when decodeHeic or decodeToSharpCompat fails writing to tmpdir, including on a DNG that Sharp can read (#2800)",
+      async (errno, expectedCode) => {
+        const heicBytes = readFileSync(
+          resolve(process.cwd(), "tests/fixtures/image/valid/test-200x150.heic"),
+        );
+        const psdBytes = readFileSync(
+          resolve(process.cwd(), "tests/fixtures/image/formats/sample.psd"),
+        );
+        const dngBytes = readFileSync(
+          resolve(process.cwd(), "tests/fixtures/image/formats/sample.dng"),
+        );
+        const fsErr = () =>
+          Object.assign(new Error(`${errno}: open temp file`), {
+            code: errno,
+            syscall: "open",
+          });
+
+        mocks.decodeHeic.mockRejectedValueOnce(fsErr());
+        const heicReply = makePreviewReply();
+        await previewHandler(
+          {
+            log: { warn: vi.fn(), error: vi.fn() },
+            file: async () => ({ filename: "photo.heic", toBuffer: async () => heicBytes }),
+          },
+          heicReply,
+        );
+        expect(heicReply.statusCode).toBe(503);
+        expect(heicReply.payload).toMatchObject({ code: expectedCode });
+
+        mocks.decodeToSharpCompat.mockRejectedValueOnce(fsErr());
+        const psdReply = makePreviewReply();
+        await previewHandler(
+          {
+            log: { warn: vi.fn(), error: vi.fn() },
+            file: async () => ({ filename: "layer.psd", toBuffer: async () => psdBytes }),
+          },
+          psdReply,
+        );
+        expect(psdReply.statusCode).toBe(503);
+        expect(psdReply.payload).toMatchObject({ code: expectedCode });
+
+        mocks.decodeToSharpCompat.mockRejectedValueOnce(fsErr());
+        const dngReply = makePreviewReply();
+        await previewHandler(
+          {
+            log: { warn: vi.fn(), error: vi.fn() },
+            file: async () => ({ filename: "photo.dng", toBuffer: async () => dngBytes }),
+          },
+          dngReply,
+        );
+        expect(dngReply.statusCode).toBe(503);
+        expect(dngReply.payload).toMatchObject({ code: expectedCode });
+      },
+    );
 
     it("uses extname instead of split('.').pop() at POST /api/v1/preview and every decodeToSharpCompat call site (#3246)", () => {
       const filesRouteSrc = readFileSync(

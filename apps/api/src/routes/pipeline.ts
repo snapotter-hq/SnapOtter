@@ -10,7 +10,13 @@
 import { randomUUID } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
 import { extname } from "node:path";
-import { FEATURE_BUNDLES, isSafeMessageError, MODALITY_POOL, TOOLS } from "@snapotter/shared";
+import {
+  FEATURE_BUNDLES,
+  hasServerErrorStatus,
+  isSafeMessageError,
+  MODALITY_POOL,
+  TOOLS,
+} from "@snapotter/shared";
 import type { FlowJob } from "bullmq";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -52,7 +58,12 @@ import {
 } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import { formatLimit, multipartFailure } from "../lib/multipart-parts.js";
-import { deleteObject, getObjectStream, putObject } from "../lib/object-storage.js";
+import {
+  deleteObject,
+  getObjectStream,
+  normalizeOperationalWriteError,
+  putObject,
+} from "../lib/object-storage.js";
 import { resolveOcrIngressSettings } from "../lib/ocr-capability.js";
 import { prepareOcrIngressImage } from "../lib/ocr-image-input.js";
 import {
@@ -461,8 +472,9 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                         processBuffer = await decodeHeic(processBuffer);
                         const ext = filename.match(/\.[^.]+$/)?.[0];
                         if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
-                      } catch (err) {
-                        if (isDecoderUnavailable(err)) throw err;
+                      } catch (rawErr) {
+                        const err = normalizeOperationalWriteError(rawErr);
+                        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
                         return reply.status(422).send({
                           error:
                             "Failed to decode HEIC file. Ensure libheif-examples is installed.",
@@ -485,8 +497,9 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                         );
                         const ext = filename.match(/\.[^.]+$/)?.[0];
                         if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
-                      } catch (err) {
-                        if (isDecoderUnavailable(err)) throw err;
+                      } catch (rawErr) {
+                        const err = normalizeOperationalWriteError(rawErr);
+                        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
                         return reply.status(422).send({
                           error: `Failed to decode ${validation.format} file`,
                           details: stripInternalPaths(
@@ -1515,8 +1528,9 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                     processBuffer = await decodeHeic(processBuffer);
                     const ext = processFilename.match(/\.[^.]+$/)?.[0];
                     if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
-                  } catch (err) {
-                    if (isDecoderUnavailable(err)) {
+                  } catch (rawErr) {
+                    const err = normalizeOperationalWriteError(rawErr);
+                    if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
                       const unavailable = engineUnavailable(err);
                       reportEngineUnavailable(
                         unavailable,
@@ -1551,8 +1565,12 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                     );
                     const ext = processFilename.match(/\.[^.]+$/)?.[0];
                     if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
-                  } catch (decodeErr) {
-                    if (decodeErr instanceof DecoderOutOfMemoryError) {
+                  } catch (rawDecodeErr) {
+                    const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+                    if (
+                      decodeErr instanceof DecoderOutOfMemoryError ||
+                      (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+                    ) {
                       const unavailable = engineUnavailable(decodeErr);
                       reportEngineUnavailable(
                         unavailable,
@@ -1571,7 +1589,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                       await sharp(processBuffer).metadata();
                       await sharp(processBuffer).resize(1).raw().toBuffer();
                     } catch {
-                      if (isDecoderUnavailable(decodeErr)) {
+                      if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
                         const unavailable = engineUnavailable(decodeErr);
                         reportEngineUnavailable(
                           unavailable,

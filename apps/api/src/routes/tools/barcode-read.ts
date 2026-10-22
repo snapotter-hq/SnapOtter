@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { extname } from "node:path";
+import { hasServerErrorStatus } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -19,7 +20,7 @@ import {
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
-import { putObject } from "../../lib/object-storage.js";
+import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
 /**
@@ -220,12 +221,15 @@ export function registerBarcodeRead(app: FastifyInstance) {
         if (validation.format === "heif") {
           try {
             fileBuffer = await decodeHeic(fileBuffer);
-          } catch (err) {
-            // A server fault (no decoder, no memory for its output) is not a
-            // bad file. decodeHeic reports running out of memory as decoder
-            // unavailable (#1577), which the outer catch hands to the global
-            // handler as a 503 (#1533).
-            if (isDecoderUnavailable(err) || isDecoderFault(err)) throw err;
+          } catch (rawErr) {
+            // A server fault (no decoder, no memory for its output, or a
+            // tmpdir write failure) is not a bad file. decodeHeic reports
+            // running out of memory as decoder unavailable (#1577), which the
+            // outer catch hands to the global handler as a 503 (#1533, #2800).
+            const err = normalizeOperationalWriteError(rawErr);
+            if (isDecoderUnavailable(err) || hasServerErrorStatus(err) || isDecoderFault(err)) {
+              throw err;
+            }
             return reply.status(422).send({
               error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
               details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
@@ -236,13 +240,21 @@ export function registerBarcodeRead(app: FastifyInstance) {
           try {
             const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
             fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt);
-          } catch (decodeErr) {
-            if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+          } catch (rawDecodeErr) {
+            const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+            if (
+              decodeErr instanceof DecoderOutOfMemoryError ||
+              (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+            ) {
+              throw decodeErr;
+            }
             try {
               await sharp(fileBuffer).metadata();
               await sharp(fileBuffer).resize(1).raw().toBuffer();
             } catch (err) {
-              if (isDecoderUnavailable(decodeErr)) throw decodeErr;
+              if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
+                throw decodeErr;
+              }
               return reply.status(422).send({
                 error: `Failed to decode ${validation.format.toUpperCase()} file`,
                 details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
@@ -351,8 +363,9 @@ export function registerBarcodeRead(app: FastifyInstance) {
           annotatedUrl: downloadUrl,
           previewUrl: downloadUrl,
         });
-      } catch (err) {
-        if (isDecoderUnavailable(err) || storing) throw err;
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(rawErr);
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err) || storing) throw err;
         // The decoder itself failing is a server fault, not a bad image
         // (isDecoderFault). zxing-wasm caches a failed instantiation for good,
         // so hand it the binary again: new overrides drop the cached instance

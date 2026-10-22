@@ -11,7 +11,13 @@
 import { randomUUID } from "node:crypto";
 import { readFile, rm } from "node:fs/promises";
 import { extname } from "node:path";
-import { FEATURE_BUNDLES, isSafeMessageError, TOOLS, toolSection } from "@snapotter/shared";
+import {
+  FEATURE_BUNDLES,
+  hasServerErrorStatus,
+  isSafeMessageError,
+  TOOLS,
+  toolSection,
+} from "@snapotter/shared";
 import type { FlowJob } from "bullmq";
 import { eq, inArray } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -56,6 +62,7 @@ import { formatLimit, multipartFailure } from "../lib/multipart-parts.js";
 import {
   deleteObject,
   getObjectStream,
+  normalizeOperationalWriteError,
   putObject,
   workspaceHeadroomBytes,
 } from "../lib/object-storage.js";
@@ -516,8 +523,9 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                     processBuffer = await decodeHeic(processBuffer);
                     const ext = processFilename.match(/\.[^.]+$/)?.[0];
                     if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
-                  } catch (err) {
-                    if (isDecoderUnavailable(err)) {
+                  } catch (rawErr) {
+                    const err = normalizeOperationalWriteError(rawErr);
+                    if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
                       const unavailable = engineUnavailable(err);
                       reportEngineUnavailable(unavailable, toolId, request.log);
                       preFailures.push({
@@ -548,8 +556,12 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                     );
                     const ext = processFilename.match(/\.[^.]+$/)?.[0];
                     if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
-                  } catch (decodeErr) {
-                    if (decodeErr instanceof DecoderOutOfMemoryError) {
+                  } catch (rawDecodeErr) {
+                    const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+                    if (
+                      decodeErr instanceof DecoderOutOfMemoryError ||
+                      (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+                    ) {
                       const unavailable = engineUnavailable(decodeErr);
                       reportEngineUnavailable(unavailable, toolId, request.log);
                       preFailures.push({
@@ -564,7 +576,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                       await sharp(processBuffer).metadata();
                       await sharp(processBuffer).resize(1).raw().toBuffer();
                     } catch {
-                      if (isDecoderUnavailable(decodeErr)) {
+                      if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
                         const unavailable = engineUnavailable(decodeErr);
                         reportEngineUnavailable(unavailable, toolId, request.log);
                         preFailures.push({

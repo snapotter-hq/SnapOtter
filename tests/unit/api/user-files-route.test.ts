@@ -1561,6 +1561,7 @@ describe("user files route logic", () => {
           width: 8,
           height: 8,
         });
+        const heicConverter = await import("../../../apps/api/src/lib/heic-converter.js");
         const cliScratchFault = Object.assign(new Error("ENOSPC: no space left on device"), {
           code: "ENOSPC",
           syscall: "open",
@@ -1568,6 +1569,7 @@ describe("user files route logic", () => {
         const decodeSpy = vi
           .spyOn(formatDecoders, "decodeToSharpCompat")
           .mockRejectedValueOnce(cliScratchFault);
+        const heicSpy = vi.spyOn(heicConverter, "decodeHeic");
         try {
           const warn = vi.fn();
           await expect(
@@ -1575,7 +1577,76 @@ describe("user files route logic", () => {
               { params: { id: dngRow.id }, log: { warn, error: vi.fn() } },
               makeReply(),
             ),
-          ).rejects.toBe(cliScratchFault);
+          ).rejects.toMatchObject({
+            isSafeMessage: true,
+            kind: "operational",
+            code: "storage-full",
+            statusCode: 503,
+            cause: cliScratchFault,
+          });
+          expect(warn).not.toHaveBeenCalled();
+
+          const heicRow = makeFileRow({
+            id: "file-heic-fault",
+            originalName: "photo.heic",
+            storedName: "stored-heic-fault.heic",
+            mimeType: "image/heic",
+          });
+          for (const [errno, expectedCode] of [
+            ["ENOSPC", "storage-full"],
+            ["EDQUOT", "storage-full"],
+            ["EACCES", "storage-not-writable"],
+            ["EPERM", "storage-not-writable"],
+            ["EROFS", "storage-not-writable"],
+          ] as const) {
+            const writeFault = Object.assign(new Error(`${errno}: temp write failed`), {
+              code: errno,
+              syscall: "open",
+            });
+            mocks.parentRows = [heicRow];
+            mocks.readStoredFile.mockResolvedValueOnce(Buffer.from("heic-bytes"));
+            mocks.validateImageBuffer.mockResolvedValueOnce({
+              valid: true as const,
+              format: "heif",
+              width: 8,
+              height: 8,
+            });
+            heicSpy.mockRejectedValueOnce(writeFault);
+            await expect(
+              thumbnailHandler(
+                { params: { id: heicRow.id }, log: { warn, error: vi.fn() } },
+                makeReply(),
+              ),
+            ).rejects.toMatchObject({
+              isSafeMessage: true,
+              kind: "operational",
+              code: expectedCode,
+              statusCode: 503,
+              cause: writeFault,
+            });
+
+            mocks.parentRows = [dngRow];
+            mocks.readStoredFile.mockResolvedValueOnce(tiffHeadedDng);
+            mocks.validateImageBuffer.mockResolvedValueOnce({
+              valid: true as const,
+              format: "raw",
+              width: 8,
+              height: 8,
+            });
+            decodeSpy.mockRejectedValueOnce(writeFault);
+            await expect(
+              thumbnailHandler(
+                { params: { id: dngRow.id }, log: { warn, error: vi.fn() } },
+                makeReply(),
+              ),
+            ).rejects.toMatchObject({
+              isSafeMessage: true,
+              kind: "operational",
+              code: expectedCode,
+              statusCode: 503,
+              cause: writeFault,
+            });
+          }
           expect(warn).not.toHaveBeenCalled();
 
           // When the CLI decoder is missing (DecoderUnavailableError), TIFF-headed
@@ -1699,6 +1770,7 @@ describe("user files route logic", () => {
           expect(rawSigkillReply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
         } finally {
           decodeSpy.mockRestore();
+          heicSpy.mockRestore();
         }
       });
 

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { extname } from "node:path";
 import { pipeline, type Readable, Transform } from "node:stream";
-import { IMAGE_EXT_TO_MIME } from "@snapotter/shared";
+import { hasServerErrorStatus, IMAGE_EXT_TO_MIME } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { sendInputValidationError } from "../lib/engine-unavailable.js";
@@ -23,6 +23,7 @@ import {
   isS3MissingShape,
   isStorageServiceFault,
   isValidObjectKey,
+  normalizeOperationalWriteError,
   normalizeS3ReadFault,
   putObject,
   verifyS3Bucket,
@@ -375,8 +376,9 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
     if (validation.format === "heif") {
       try {
         buffer = await decodeHeic(buffer);
-      } catch (err) {
-        if (isDecoderUnavailable(err)) {
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(rawErr);
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
           return sendInputValidationError(
             reply,
             engineUnavailable(err),
@@ -392,8 +394,12 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
     if (needsCliDecode(validation.format)) {
       try {
         buffer = await decodeToSharpCompat(buffer, validation.format, ext);
-      } catch (decodeErr) {
-        if (decodeErr instanceof DecoderOutOfMemoryError) {
+      } catch (rawDecodeErr) {
+        const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+        if (
+          decodeErr instanceof DecoderOutOfMemoryError ||
+          (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+        ) {
           return sendInputValidationError(
             reply,
             engineUnavailable(decodeErr),
@@ -406,7 +412,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
           await sharp(buffer).metadata();
           await sharp(buffer).resize(1).raw().toBuffer();
         } catch {
-          if (isDecoderUnavailable(decodeErr)) {
+          if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
             return sendInputValidationError(
               reply,
               engineUnavailable(decodeErr),

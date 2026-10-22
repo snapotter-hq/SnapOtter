@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
+import { hasServerErrorStatus } from "@snapotter/shared";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
@@ -20,6 +21,7 @@ import {
 import { encodeMultiIco, hasMagick } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
+import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
 const settingsSchema = z.object({
@@ -144,13 +146,21 @@ export function registerFavicon(app: FastifyInstance) {
         if (needsCliDecode(validation.format)) {
           try {
             buf = await decodeToSharpCompat(buf, validation.format, fileExt);
-          } catch (decodeErr) {
-            if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+          } catch (rawDecodeErr) {
+            const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+            if (
+              decodeErr instanceof DecoderOutOfMemoryError ||
+              (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+            ) {
+              throw decodeErr;
+            }
             try {
               await sharp(buf).metadata();
               await sharp(buf).resize(1).raw().toBuffer();
             } catch (err) {
-              if (isDecoderUnavailable(decodeErr)) throw decodeErr;
+              if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
+                throw decodeErr;
+              }
               throw err;
             }
           }
@@ -175,8 +185,9 @@ export function registerFavicon(app: FastifyInstance) {
         }
 
         decodedFiles.push({ buffer: buf, filename: file.filename });
-      } catch (err) {
-        if (isDecoderUnavailable(err)) throw err;
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(rawErr);
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
         const reason = err instanceof Error ? err.message : "Unknown decode error";
         skippedFiles.push({ filename: file.filename, reason });
       }

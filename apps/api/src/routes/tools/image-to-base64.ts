@@ -1,4 +1,5 @@
 import { basename, extname } from "node:path";
+import { hasServerErrorStatus } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -13,6 +14,7 @@ import {
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
+import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
 const settingsSchema = z.object({
@@ -129,15 +131,23 @@ export function registerImageToBase64(app: FastifyInstance) {
             try {
               const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
               decoded = await decodeToSharpCompat(decoded, validation.format, fileExt);
-            } catch (decodeErr) {
-              if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+            } catch (rawDecodeErr) {
+              const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+              if (
+                decodeErr instanceof DecoderOutOfMemoryError ||
+                (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+              ) {
+                throw decodeErr;
+              }
               try {
                 const meta = await sharp(decoded).metadata();
                 if (meta.format !== "svg") {
                   await sharp(decoded).resize(1).raw().toBuffer();
                 }
               } catch (err) {
-                if (isDecoderUnavailable(decodeErr)) throw decodeErr;
+                if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
+                  throw decodeErr;
+                }
                 throw err;
               }
             }
@@ -245,8 +255,9 @@ export function registerImageToBase64(app: FastifyInstance) {
             base64,
             dataUri: `data:${mimeType};base64,${base64}`,
           });
-        } catch (err) {
-          if (isDecoderUnavailable(err)) throw err;
+        } catch (rawErr) {
+          const err = normalizeOperationalWriteError(rawErr);
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
           errors.push({
             filename,
             error: stripInternalPaths(

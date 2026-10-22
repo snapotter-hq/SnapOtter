@@ -11,7 +11,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { extname } from "node:path";
-import { IMAGE_EXT_TO_MIME, SafeError } from "@snapotter/shared";
+import { hasServerErrorStatus, IMAGE_EXT_TO_MIME, SafeError } from "@snapotter/shared";
 import { and, desc, eq, inArray, like, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
@@ -45,7 +45,11 @@ import {
 import { decodeHeic } from "../lib/heic-converter.js";
 import { deleteLibraryFileStorage } from "../lib/library-cleanup.js";
 import { readFilePart } from "../lib/multipart-parts.js";
-import { isS3MissingShape, normalizeS3ReadFault } from "../lib/object-storage.js";
+import {
+  isS3MissingShape,
+  normalizeOperationalWriteError,
+  normalizeS3ReadFault,
+} from "../lib/object-storage.js";
 import { quotaRefusal } from "../lib/quota.js";
 import {
   decompressSvgz,
@@ -760,13 +764,18 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
         }
         let decoded: Buffer<ArrayBuffer> = Buffer.from(rawBuffer);
         if (validation.valid && validation.format === "heif") {
-          decoded = Buffer.from(await decodeHeic(rawBuffer));
+          try {
+            decoded = Buffer.from(await decodeHeic(rawBuffer));
+          } catch (rawHeicErr) {
+            throw normalizeOperationalWriteError(rawHeicErr);
+          }
         } else if (validation.valid && needsCliDecode(validation.format)) {
           try {
             const fileExt =
               extname(file.originalName).toLowerCase().replace(/^\./, "") || undefined;
             decoded = Buffer.from(await decodeToSharpCompat(rawBuffer, validation.format, fileExt));
-          } catch (decodeErr) {
+          } catch (rawDecodeErr) {
+            const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
             if (
               decodeErr instanceof DecoderOutOfMemoryError ||
               (!isDecoderUnavailable(decodeErr) && isPreviewServerFault(decodeErr))
@@ -777,7 +786,9 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
               await sharp(rawBuffer).metadata();
               await sharp(rawBuffer).resize(1).raw().toBuffer();
             } catch (err) {
-              if (isDecoderUnavailable(decodeErr)) throw decodeErr;
+              if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
+                throw decodeErr;
+              }
               throw err;
             }
           }

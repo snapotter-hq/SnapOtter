@@ -15,6 +15,9 @@ import { fixtureDir, fixtures, readFixture } from "../../fixtures/index.js";
  */
 const failures = vi.hoisted(() => ({
   next: null as Error | null,
+  open: null as Error | null,
+  writeFile: null as Error | null,
+  closedHandles: 0,
   // Which output read fails: heif-dec's single-image name or the -1 fallback.
   pattern: /heic-out-(?![^/\\]*-1\.png$)[^/\\]*\.png$/,
   kill: null as Record<string, unknown> | null,
@@ -50,6 +53,30 @@ vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
   return {
     ...actual,
+    open: (async (filePath: unknown, ...rest: unknown[]) => {
+      if (failures.open && /heic-in-[^/\\]*\.(?:heic|png)$/.test(String(filePath))) {
+        const err = failures.open;
+        failures.open = null;
+        throw err;
+      }
+      const handle = (await (actual.open as (...args: unknown[]) => Promise<unknown>)(
+        filePath,
+        ...rest,
+      )) as { writeFile: (...args: unknown[]) => Promise<unknown>; close: () => Promise<unknown> };
+      if (failures.writeFile && /heic-in-[^/\\]*\.(?:heic|png)$/.test(String(filePath))) {
+        const err = failures.writeFile;
+        failures.writeFile = null;
+        const origClose = handle.close.bind(handle);
+        handle.writeFile = async () => {
+          throw err;
+        };
+        handle.close = async () => {
+          failures.closedHandles += 1;
+          return origClose();
+        };
+      }
+      return handle;
+    }) as typeof actual.open,
     readFile: (async (path: unknown, ...rest: unknown[]) => {
       if (failures.next && failures.pattern.test(String(path))) {
         const err = failures.next;
@@ -96,7 +123,7 @@ vi.mock("node:child_process", async (importOriginal) => {
   return { ...actual, execFile };
 });
 
-const { decodeHeic } = await import("../../../apps/api/src/lib/heic-converter.js");
+const { decodeHeic, encodeHeic } = await import("../../../apps/api/src/lib/heic-converter.js");
 const { isDecoderUnavailable } = await import("../../../apps/api/src/lib/format-decoders.js");
 
 const SINGLE = /heic-out-(?![^/\\]*-1\.png$)[^/\\]*\.png$/;
@@ -104,6 +131,9 @@ const SUFFIXED = /heic-out-[^/\\]*-1\.png$/;
 
 afterEach(() => {
   failures.next = null;
+  failures.open = null;
+  failures.writeFile = null;
+  failures.closedHandles = 0;
   failures.pattern = SINGLE;
   failures.kill = null;
   failures.probe = null;
@@ -438,5 +468,63 @@ describe("decodeHeic when libheif runs out of memory", () => {
       signal: null,
       stderr: "what():  Resource temporarily unavailable\n",
     });
+  });
+});
+
+describe("writeTempExclusive operational write errors in decodeHeic and encodeHeic (#2800)", () => {
+  const cases: ReadonlyArray<readonly [string, string]> = [
+    ["ENOSPC", "storage-full"],
+    ["EDQUOT", "storage-full"],
+    ["EACCES", "storage-not-writable"],
+    ["EPERM", "storage-not-writable"],
+    ["EROFS", "storage-not-writable"],
+  ];
+
+  it.each(cases)(
+    "normalizes %s from writeTempExclusive in decodeHeic and encodeHeic into a 503 %s SafeError",
+    async (errno, expectedCode) => {
+      const fsErr = Object.assign(new Error(`${errno}: open temp file`), {
+        code: errno,
+        syscall: "open",
+      });
+      failures.open = fsErr;
+      const decodeErr = await decodeError(readFixture(fixtures.image.formats("heic")));
+      expect(decodeErr).toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        statusCode: 503,
+        code: expectedCode,
+        cause: fsErr,
+      });
+
+      failures.open = fsErr;
+      const encodeErr = await encodeHeic(readFixture(fixtures.image.base.png200)).catch(
+        (e: unknown) => e,
+      );
+      expect(encodeErr).toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        statusCode: 503,
+        code: expectedCode,
+        cause: fsErr,
+      });
+    },
+  );
+
+  it("closes the file handle and normalizes ENOSPC when fh.writeFile fails after open succeeds", async () => {
+    const writeErr = Object.assign(new Error("ENOSPC: no space left on device, write"), {
+      code: "ENOSPC",
+      syscall: "write",
+    });
+    failures.writeFile = writeErr;
+    const decodeErr = await decodeError(readFixture(fixtures.image.formats("heic")));
+    expect(decodeErr).toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      statusCode: 503,
+      code: "storage-full",
+      cause: writeErr,
+    });
+    expect(failures.closedHandles).toBe(1);
   });
 });

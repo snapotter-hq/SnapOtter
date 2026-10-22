@@ -1,0 +1,433 @@
+/**
+ * #2800: When writing the decoder temp file in decodeHeic or decodeToSharpCompat
+ * fails with ENOSPC, EDQUOT, EACCES, EPERM, or EROFS, inline decode routes must
+ * normalize the write error and surface 503 ("storage-full" or
+ * "storage-not-writable") instead of answering 422/400 or falling back to
+ * Sharp's native TIFF header read on DNG inputs.
+ */
+
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import multipart from "@fastify/multipart";
+import { apiToolPath } from "@snapotter/shared";
+import Fastify from "fastify";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+const putObject = vi.fn();
+const getObjectBuffer = vi.fn();
+const deletePrefix = vi.fn();
+const decodeHeic = vi.fn();
+const decodeToSharpCompat = vi.fn();
+const uploadedBuffers = new Map<string, Buffer>();
+
+vi.mock("../../../apps/api/src/permissions.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/permissions.js")>();
+  return {
+    ...actual,
+    requireToolAccess: vi.fn(async () => ({ id: "user-1", role: "admin" })),
+  };
+});
+
+vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>();
+  return {
+    ...actual,
+    putObject: (...args: unknown[]) => putObject(...args),
+    putObjectStream: async (key: string, source: AsyncIterable<Buffer>) => {
+      const chunks: Buffer[] = [];
+      for await (const chunk of source) chunks.push(Buffer.from(chunk));
+      const buf = Buffer.concat(chunks);
+      uploadedBuffers.set(key, buf);
+      return buf.length;
+    },
+    getObjectBuffer: (...args: unknown[]) => getObjectBuffer(...args),
+    deletePrefix: (...args: unknown[]) => deletePrefix(...args),
+  };
+});
+
+vi.mock("../../../apps/api/src/lib/heic-converter.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/heic-converter.js")>();
+  return {
+    ...actual,
+    decodeHeic: (...args: unknown[]) => decodeHeic(...args),
+  };
+});
+
+vi.mock("../../../apps/api/src/lib/format-decoders.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/format-decoders.js")>();
+  return {
+    ...actual,
+    decodeToSharpCompat: (...args: unknown[]) => decodeToSharpCompat(...args),
+  };
+});
+
+import { normalizeOperationalWriteError } from "../../../apps/api/src/lib/object-storage.js";
+import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
+import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
+import { registerBarcodeRead } from "../../../apps/api/src/routes/tools/barcode-read.js";
+import { registerBeautify } from "../../../apps/api/src/routes/tools/beautify.js";
+import { registerCollage } from "../../../apps/api/src/routes/tools/collage.js";
+import { registerColorPalette } from "../../../apps/api/src/routes/tools/color-palette.js";
+import { registerFavicon } from "../../../apps/api/src/routes/tools/favicon.js";
+import { registerFindDuplicates } from "../../../apps/api/src/routes/tools/find-duplicates.js";
+import { registerImageEnhancement } from "../../../apps/api/src/routes/tools/image-enhancement.js";
+import { registerImageToBase64 } from "../../../apps/api/src/routes/tools/image-to-base64.js";
+import { registerMemeGenerator } from "../../../apps/api/src/routes/tools/meme-generator.js";
+import { registerOptimizeForWeb } from "../../../apps/api/src/routes/tools/optimize-for-web.js";
+import { registerResize } from "../../../apps/api/src/routes/tools/resize.js";
+import { registerSplit } from "../../../apps/api/src/routes/tools/split.js";
+import { registerStitch } from "../../../apps/api/src/routes/tools/stitch.js";
+
+const PNG = readFileSync(join(__dirname, "../../fixtures/image/valid/test-200x150.png"));
+const HEIC = readFileSync(join(__dirname, "../../fixtures/image/valid/test-200x150.heic"));
+const PSD = readFileSync(join(__dirname, "../../fixtures/image/formats/sample.psd"));
+const DNG = readFileSync(join(__dirname, "../../fixtures/image/formats/sample.dng"));
+
+function errnoError(code: string, syscall = "open"): NodeJS.ErrnoException {
+  return Object.assign(new Error(`${code}: temp write failed, ${syscall} '/tmp/in-${code}'`), {
+    code,
+    syscall,
+  });
+}
+
+function multipartBody(
+  files: Array<{ filename: string; contentType: string; content: Buffer; fieldname?: string }>,
+  settings?: Record<string, unknown>,
+) {
+  const boundary = "----unit";
+  const parts: Buffer[] = [];
+  for (const file of files) {
+    const field = file.fieldname ?? "file";
+    parts.push(
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="${field}"; filename="${file.filename}"\r\nContent-Type: ${file.contentType}\r\n\r\n`,
+      ),
+      file.content,
+      Buffer.from("\r\n"),
+    );
+  }
+  if (settings !== undefined) {
+    parts.push(
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="settings"\r\n\r\n${JSON.stringify(settings)}\r\n`,
+      ),
+    );
+  }
+  parts.push(Buffer.from(`--${boundary}--\r\n`));
+  return {
+    payload: Buffer.concat(parts),
+    headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
+  };
+}
+
+async function buildApp() {
+  const app = Fastify({ logger: false });
+  await app.register(multipart, { limits: { fileSize: 20 * 1024 * 1024 } });
+  registerErrorHandler(app);
+  registerResize(app);
+  registerStitch(app);
+  registerCollage(app);
+  registerSplit(app);
+  registerColorPalette(app);
+  registerBarcodeRead(app);
+  registerMemeGenerator(app);
+  registerImageEnhancement(app);
+  registerOptimizeForWeb(app);
+  registerFindDuplicates(app);
+  registerFavicon(app);
+  registerImageToBase64(app);
+  registerBeautify(app);
+  await app.ready();
+  return app;
+}
+
+const WRITE_ERRNOS: ReadonlyArray<readonly [string, string]> = [
+  ["ENOSPC", "storage-full"],
+  ["EDQUOT", "storage-full"],
+  ["EACCES", "storage-not-writable"],
+  ["EPERM", "storage-not-writable"],
+  ["EROFS", "storage-not-writable"],
+];
+
+interface RouteSpec {
+  name: string;
+  url: string;
+  heicFiles: Array<{ filename: string; contentType: string; content: Buffer; fieldname?: string }>;
+  psdFiles: Array<{ filename: string; contentType: string; content: Buffer; fieldname?: string }>;
+  dngFiles: Array<{ filename: string; contentType: string; content: Buffer; fieldname?: string }>;
+  settings?: Record<string, unknown>;
+}
+
+const ROUTES: RouteSpec[] = [
+  {
+    name: "resize (factory ImageInputHandler)",
+    url: apiToolPath("resize"),
+    heicFiles: [{ filename: "photo.heic", contentType: "image/heic", content: HEIC }],
+    psdFiles: [{ filename: "layer.psd", contentType: "image/vnd.adobe.photoshop", content: PSD }],
+    dngFiles: [{ filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG }],
+    settings: { width: 100 },
+  },
+  {
+    name: "stitch",
+    url: apiToolPath("stitch"),
+    heicFiles: [
+      { filename: "a.heic", contentType: "image/heic", content: HEIC },
+      { filename: "b.png", contentType: "image/png", content: PNG },
+    ],
+    psdFiles: [
+      { filename: "a.psd", contentType: "image/vnd.adobe.photoshop", content: PSD },
+      { filename: "b.png", contentType: "image/png", content: PNG },
+    ],
+    dngFiles: [
+      { filename: "a.dng", contentType: "image/x-adobe-dng", content: DNG },
+      { filename: "b.png", contentType: "image/png", content: PNG },
+    ],
+  },
+  {
+    name: "collage",
+    url: apiToolPath("collage"),
+    heicFiles: [
+      { filename: "a.heic", contentType: "image/heic", content: HEIC },
+      { filename: "b.png", contentType: "image/png", content: PNG },
+    ],
+    psdFiles: [
+      { filename: "a.psd", contentType: "image/vnd.adobe.photoshop", content: PSD },
+      { filename: "b.png", contentType: "image/png", content: PNG },
+    ],
+    dngFiles: [
+      { filename: "a.dng", contentType: "image/x-adobe-dng", content: DNG },
+      { filename: "b.png", contentType: "image/png", content: PNG },
+    ],
+  },
+  {
+    name: "split",
+    url: apiToolPath("split"),
+    heicFiles: [{ filename: "photo.heic", contentType: "image/heic", content: HEIC }],
+    psdFiles: [{ filename: "layer.psd", contentType: "image/vnd.adobe.photoshop", content: PSD }],
+    dngFiles: [{ filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG }],
+  },
+  {
+    name: "color-palette",
+    url: apiToolPath("color-palette"),
+    heicFiles: [{ filename: "photo.heic", contentType: "image/heic", content: HEIC }],
+    psdFiles: [{ filename: "layer.psd", contentType: "image/vnd.adobe.photoshop", content: PSD }],
+    dngFiles: [{ filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG }],
+  },
+  {
+    name: "barcode-read",
+    url: apiToolPath("barcode-read"),
+    heicFiles: [{ filename: "photo.heic", contentType: "image/heic", content: HEIC }],
+    psdFiles: [{ filename: "layer.psd", contentType: "image/vnd.adobe.photoshop", content: PSD }],
+    dngFiles: [{ filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG }],
+  },
+  {
+    name: "meme-generator",
+    url: apiToolPath("meme-generator"),
+    heicFiles: [{ filename: "photo.heic", contentType: "image/heic", content: HEIC }],
+    psdFiles: [{ filename: "layer.psd", contentType: "image/vnd.adobe.photoshop", content: PSD }],
+    dngFiles: [{ filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG }],
+    settings: { topText: "TOP", bottomText: "BOTTOM" },
+  },
+  {
+    name: "image-enhancement/analyze",
+    url: "/api/v1/tools/image/image-enhancement/analyze",
+    heicFiles: [{ filename: "photo.heic", contentType: "image/heic", content: HEIC }],
+    psdFiles: [{ filename: "layer.psd", contentType: "image/vnd.adobe.photoshop", content: PSD }],
+    dngFiles: [{ filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG }],
+  },
+  {
+    name: "optimize-for-web/preview",
+    url: "/api/v1/tools/image/optimize-for-web/preview",
+    heicFiles: [{ filename: "photo.heic", contentType: "image/heic", content: HEIC }],
+    psdFiles: [{ filename: "layer.psd", contentType: "image/vnd.adobe.photoshop", content: PSD }],
+    dngFiles: [{ filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG }],
+  },
+  {
+    name: "find-duplicates",
+    url: apiToolPath("find-duplicates"),
+    heicFiles: [
+      { filename: "a.heic", contentType: "image/heic", content: HEIC },
+      { filename: "b.png", contentType: "image/png", content: PNG },
+    ],
+    psdFiles: [
+      { filename: "a.psd", contentType: "image/vnd.adobe.photoshop", content: PSD },
+      { filename: "b.png", contentType: "image/png", content: PNG },
+    ],
+    dngFiles: [
+      { filename: "a.dng", contentType: "image/x-adobe-dng", content: DNG },
+      { filename: "b.png", contentType: "image/png", content: PNG },
+    ],
+  },
+  {
+    name: "favicon",
+    url: apiToolPath("favicon"),
+    heicFiles: [
+      { filename: "b.png", contentType: "image/png", content: PNG },
+      { filename: "photo.heic", contentType: "image/heic", content: HEIC },
+    ],
+    psdFiles: [
+      { filename: "b.png", contentType: "image/png", content: PNG },
+      { filename: "layer.psd", contentType: "image/vnd.adobe.photoshop", content: PSD },
+    ],
+    dngFiles: [
+      { filename: "b.png", contentType: "image/png", content: PNG },
+      { filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG },
+    ],
+  },
+  {
+    name: "image-to-base64",
+    url: apiToolPath("image-to-base64"),
+    heicFiles: [
+      { filename: "b.png", contentType: "image/png", content: PNG },
+      { filename: "photo.heic", contentType: "image/heic", content: HEIC },
+    ],
+    psdFiles: [
+      { filename: "b.png", contentType: "image/png", content: PNG },
+      { filename: "layer.psd", contentType: "image/vnd.adobe.photoshop", content: PSD },
+    ],
+    dngFiles: [
+      { filename: "b.png", contentType: "image/png", content: PNG },
+      { filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG },
+    ],
+  },
+  {
+    name: "beautify",
+    url: apiToolPath("beautify"),
+    heicFiles: [{ filename: "photo.heic", contentType: "image/heic", content: HEIC }],
+    psdFiles: [{ filename: "layer.psd", contentType: "image/vnd.adobe.photoshop", content: PSD }],
+    dngFiles: [{ filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG }],
+  },
+  {
+    name: "beautify (backgroundImage)",
+    url: apiToolPath("beautify"),
+    heicFiles: [
+      { filename: "main.png", contentType: "image/png", content: PNG },
+      {
+        filename: "bg.heic",
+        contentType: "image/heic",
+        content: HEIC,
+        fieldname: "backgroundImage",
+      },
+    ],
+    psdFiles: [
+      { filename: "main.png", contentType: "image/png", content: PNG },
+      {
+        filename: "bg.psd",
+        contentType: "image/vnd.adobe.photoshop",
+        content: PSD,
+        fieldname: "backgroundImage",
+      },
+    ],
+    dngFiles: [
+      { filename: "main.png", contentType: "image/png", content: PNG },
+      {
+        filename: "bg.dng",
+        contentType: "image/x-adobe-dng",
+        content: DNG,
+        fieldname: "backgroundImage",
+      },
+    ],
+    settings: { backgroundType: "image" },
+  },
+];
+
+describe("inline decode routes surface operational tmpdir write faults as 503 (#2800)", () => {
+  let app: Awaited<ReturnType<typeof buildApp>>;
+
+  beforeAll(async () => {
+    app = await buildApp();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  beforeEach(() => {
+    uploadedBuffers.clear();
+    putObject.mockReset().mockResolvedValue(undefined);
+    getObjectBuffer
+      .mockReset()
+      .mockImplementation(async (key: unknown) => uploadedBuffers.get(String(key)) ?? PNG);
+    deletePrefix.mockReset().mockResolvedValue(undefined);
+    decodeHeic.mockReset().mockResolvedValue(PNG);
+    decodeToSharpCompat.mockReset().mockResolvedValue(PNG);
+  });
+
+  describe.each(ROUTES)("$name", (route) => {
+    it.each(WRITE_ERRNOS)(
+      "answers 503 %s (%s) when decodeHeic fails writing to tmpdir",
+      async (errno, expectedCode) => {
+        for (const err of [errnoError(errno), normalizeOperationalWriteError(errnoError(errno))]) {
+          decodeHeic.mockRejectedValue(err);
+          const res = await app.inject({
+            method: "POST",
+            url: route.url,
+            ...multipartBody(route.heicFiles, route.settings),
+          });
+          expect(res.statusCode, res.body).toBe(503);
+          expect(res.json()).toMatchObject({ code: expectedCode });
+        }
+      },
+    );
+
+    it.each(WRITE_ERRNOS)(
+      "answers 503 %s (%s) when decodeToSharpCompat fails writing to tmpdir on PSD",
+      async (errno, expectedCode) => {
+        for (const err of [errnoError(errno), normalizeOperationalWriteError(errnoError(errno))]) {
+          decodeToSharpCompat.mockRejectedValue(err);
+          const res = await app.inject({
+            method: "POST",
+            url: route.url,
+            ...multipartBody(route.psdFiles, route.settings),
+          });
+          expect(res.statusCode, res.body).toBe(503);
+          expect(res.json()).toMatchObject({ code: expectedCode });
+        }
+      },
+    );
+
+    it("answers 503 storage-full when decodeToSharpCompat hits ENOSPC even on a DNG that Sharp can read", async () => {
+      for (const err of [
+        errnoError("ENOSPC"),
+        normalizeOperationalWriteError(errnoError("ENOSPC")),
+      ]) {
+        decodeToSharpCompat.mockRejectedValue(err);
+        const res = await app.inject({
+          method: "POST",
+          url: route.url,
+          ...multipartBody(route.dngFiles, route.settings),
+        });
+        expect(res.statusCode, res.body).toBe(503);
+        expect(res.json()).toMatchObject({ code: "storage-full" });
+      }
+    });
+  });
+
+  describe.each([
+    ["meme-generator", { topText: "A", bottomText: "B" }],
+    ["beautify", { outputFormat: "png" }],
+  ] as const)("%s registered process function", (toolId, defaultSettings) => {
+    it.each(WRITE_ERRNOS)(
+      "surfaces 503 %s (%s) when decodeHeic or decodeToSharpCompat fails writing to tmpdir",
+      async (errno, expectedCode) => {
+        const cfg = getToolConfig(toolId);
+        expect(cfg).toBeDefined();
+
+        decodeHeic.mockRejectedValueOnce(errnoError(errno));
+        await expect(cfg?.process(HEIC, defaultSettings, "photo.heic")).rejects.toMatchObject({
+          statusCode: 503,
+          code: expectedCode,
+        });
+
+        decodeToSharpCompat.mockRejectedValueOnce(errnoError(errno));
+        await expect(cfg?.process(DNG, defaultSettings, "photo.dng")).rejects.toMatchObject({
+          statusCode: 503,
+          code: expectedCode,
+        });
+      },
+    );
+  });
+});

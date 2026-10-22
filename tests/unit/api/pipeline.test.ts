@@ -116,10 +116,15 @@ vi.mock("../../../apps/api/src/lib/filename.js", async (importOriginal) => {
   };
 });
 
-vi.mock("../../../apps/api/src/lib/format-decoders.js", () => ({
-  decodeToSharpCompat: vi.fn(),
-  needsCliDecode: vi.fn(() => false),
-}));
+vi.mock("../../../apps/api/src/lib/format-decoders.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/format-decoders.js")>();
+  return {
+    ...actual,
+    decodeToSharpCompat: vi.fn(),
+    needsCliDecode: vi.fn(() => false),
+  };
+});
 
 vi.mock("../../../apps/api/src/lib/heic-converter.js", () => ({
   decodeHeic: vi.fn(),
@@ -1580,6 +1585,75 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
       deleteObjectMock.mockResolvedValue(undefined);
     }
   });
+
+  it.each([
+    ["ENOSPC", "storage-full"],
+    ["EDQUOT", "storage-full"],
+    ["EACCES", "storage-not-writable"],
+    ["EPERM", "storage-not-writable"],
+    ["EROFS", "storage-not-writable"],
+  ] as const)(
+    "answers 503 %s (%s) when decodeHeic or decodeToSharpCompat fails writing to tmpdir on /api/v1/pipeline/batch, including on a DNG that Sharp can read (#2800)",
+    async (errno, expectedCode) => {
+      const { decodeHeic } = await import("../../../apps/api/src/lib/heic-converter.js");
+      const { decodeToSharpCompat, needsCliDecode } = await import(
+        "../../../apps/api/src/lib/format-decoders.js"
+      );
+      const { readFileSync } = await import("node:fs");
+      const { join } = await import("node:path");
+      const dngBytes = readFileSync(join(__dirname, "../../fixtures/image/formats/sample.dng"));
+      const fsErr = () =>
+        Object.assign(new Error(`${errno}: open temp file`), {
+          code: errno,
+          syscall: "open",
+        });
+
+      try {
+        vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+          valid: true,
+          format: "heif",
+          width: 10,
+          height: 10,
+        });
+        vi.mocked(decodeHeic).mockRejectedValueOnce(fsErr());
+        const batchHeicReply = await invokePipelineBatchRoute([
+          { type: "file", filename: "photo.heic", content: Buffer.from("heic-bytes") },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: [{ toolId: batchTestToolId, settings: {} }],
+            }),
+          },
+        ]);
+        expect(batchHeicReply.statusCode).toBe(503);
+        expect(batchHeicReply.payload).toMatchObject({ code: expectedCode });
+
+        vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+          valid: true,
+          format: "raw",
+          width: 10,
+          height: 10,
+        });
+        vi.mocked(needsCliDecode).mockReturnValueOnce(true);
+        vi.mocked(decodeToSharpCompat).mockRejectedValueOnce(fsErr());
+        const batchDngReply = await invokePipelineBatchRoute([
+          { type: "file", filename: "photo.dng", content: dngBytes },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: [{ toolId: batchTestToolId, settings: {} }],
+            }),
+          },
+        ]);
+        expect(batchDngReply.statusCode).toBe(503);
+        expect(batchDngReply.payload).toMatchObject({ code: expectedCode });
+      } finally {
+        vi.mocked(needsCliDecode).mockReturnValue(false);
+      }
+    },
+  );
 });
 
 describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
@@ -2277,4 +2351,81 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
     expect(clearTerminalReplayKeyMock).not.toHaveBeenCalled();
     expect(updateSingleFileProgressMock).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["ENOSPC", "storage-full"],
+    ["EDQUOT", "storage-full"],
+    ["EACCES", "storage-not-writable"],
+    ["EPERM", "storage-not-writable"],
+    ["EROFS", "storage-not-writable"],
+  ] as const)(
+    "surfaces 503 %s (%s) when decodeHeic or decodeToSharpCompat fails writing to tmpdir on /api/v1/pipeline/execute, including on a DNG that Sharp can read (#2800)",
+    async (errno, expectedCode) => {
+      const { decodeHeic } = await import("../../../apps/api/src/lib/heic-converter.js");
+      const { decodeToSharpCompat, needsCliDecode } = await import(
+        "../../../apps/api/src/lib/format-decoders.js"
+      );
+      const { readFileSync } = await import("node:fs");
+      const { join } = await import("node:path");
+      const dngBytes = readFileSync(join(__dirname, "../../fixtures/image/formats/sample.dng"));
+      const fsErr = () =>
+        Object.assign(new Error(`${errno}: open temp file`), {
+          code: errno,
+          syscall: "open",
+        });
+
+      try {
+        vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+          valid: true,
+          format: "heif",
+          width: 10,
+          height: 10,
+        });
+        vi.mocked(decodeHeic).mockRejectedValueOnce(fsErr());
+        await expect(
+          invokePipelineExecuteRoute([
+            { type: "file", filename: "photo.heic", content: Buffer.from("heic-bytes") },
+            {
+              type: "field",
+              fieldname: "pipeline",
+              value: JSON.stringify({
+                steps: [{ toolId: executeTestToolId, settings: {} }],
+              }),
+            },
+          ]),
+        ).rejects.toMatchObject({
+          isSafeMessage: true,
+          statusCode: 503,
+          code: expectedCode,
+        });
+
+        vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+          valid: true,
+          format: "raw",
+          width: 10,
+          height: 10,
+        });
+        vi.mocked(needsCliDecode).mockReturnValueOnce(true);
+        vi.mocked(decodeToSharpCompat).mockRejectedValueOnce(fsErr());
+        await expect(
+          invokePipelineExecuteRoute([
+            { type: "file", filename: "photo.dng", content: dngBytes },
+            {
+              type: "field",
+              fieldname: "pipeline",
+              value: JSON.stringify({
+                steps: [{ toolId: executeTestToolId, settings: {} }],
+              }),
+            },
+          ]),
+        ).rejects.toMatchObject({
+          isSafeMessage: true,
+          statusCode: 503,
+          code: expectedCode,
+        });
+      } finally {
+        vi.mocked(needsCliDecode).mockReturnValue(false);
+      }
+    },
+  );
 });

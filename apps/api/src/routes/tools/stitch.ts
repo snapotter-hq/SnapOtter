@@ -18,7 +18,7 @@ import {
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
-import { putObject } from "../../lib/object-storage.js";
+import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
 const settingsSchema = z.object({
@@ -95,8 +95,9 @@ export function registerStitch(app: FastifyInstance) {
       if (validation.format === "heif") {
         try {
           file.buffer = await decodeHeic(file.buffer);
-        } catch (err) {
-          if (isDecoderUnavailable(err)) throw err;
+        } catch (rawErr) {
+          const err = normalizeOperationalWriteError(rawErr);
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
           return reply.status(422).send({
             error: `Failed to decode "${file.filename}" (HEIC). Ensure libheif-examples is installed.`,
             details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
@@ -108,13 +109,19 @@ export function registerStitch(app: FastifyInstance) {
         const fileExt = extname(file.filename).toLowerCase().replace(/^\./, "") || undefined;
         try {
           file.buffer = await decodeToSharpCompat(file.buffer, validation.format, fileExt);
-        } catch (decodeErr) {
-          if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+        } catch (rawDecodeErr) {
+          const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+          if (
+            decodeErr instanceof DecoderOutOfMemoryError ||
+            (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+          ) {
+            throw decodeErr;
+          }
           try {
             await sharp(file.buffer).metadata();
             await sharp(file.buffer).resize(1).raw().toBuffer();
           } catch (err) {
-            if (isDecoderUnavailable(decodeErr)) throw decodeErr;
+            if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) throw decodeErr;
             return reply.status(422).send({
               error: `Failed to decode "${file.filename}" (${validation.format.toUpperCase()})`,
               details: stripInternalPaths(err instanceof Error ? err.message : String(err)),

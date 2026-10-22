@@ -1304,4 +1304,56 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     expect(mocks.requireToolAccess).not.toHaveBeenCalled();
     expect(mocks.getToolConfig).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["ENOSPC", "storage-full"],
+    ["EDQUOT", "storage-full"],
+    ["EACCES", "storage-not-writable"],
+    ["EPERM", "storage-not-writable"],
+    ["EROFS", "storage-not-writable"],
+  ] as const)(
+    "answers 503 %s (%s) when decodeHeic or decodeToSharpCompat fails writing to tmpdir on /batch, including on a DNG that Sharp can read (#2800)",
+    async (errno, expectedCode) => {
+      const heicConverter = await import("../../../apps/api/src/lib/heic-converter.js");
+      const formatDecoders = await import("../../../apps/api/src/lib/format-decoders.js");
+      const dngBytes = readFileSync(resolve(REPO_ROOT, "tests/fixtures/image/formats/sample.dng"));
+      const fsErr = () =>
+        Object.assign(new Error(`${errno}: open temp file`), {
+          code: errno,
+          syscall: "open",
+        });
+
+      const heicSpy = vi.spyOn(heicConverter, "decodeHeic").mockRejectedValueOnce(fsErr());
+      const decodeSpy = vi.spyOn(formatDecoders, "decodeToSharpCompat");
+      try {
+        mocks.validateImageBuffer.mockResolvedValueOnce({ valid: true, format: "heif" });
+        const heicReply = await invokeBatchRoute({
+          section: "image",
+          toolId: "resize",
+          parts: [
+            { type: "file", filename: "photo.heic", content: Buffer.from("heic-bytes") },
+            { type: "field", fieldname: "settings", value: "{}" },
+          ],
+        });
+        expect(heicReply.statusCode).toBe(503);
+        expect(heicReply.payload).toMatchObject({ code: expectedCode });
+
+        mocks.validateImageBuffer.mockResolvedValueOnce({ valid: true, format: "raw" });
+        decodeSpy.mockRejectedValueOnce(fsErr());
+        const dngReply = await invokeBatchRoute({
+          section: "image",
+          toolId: "resize",
+          parts: [
+            { type: "file", filename: "photo.dng", content: dngBytes },
+            { type: "field", fieldname: "settings", value: "{}" },
+          ],
+        });
+        expect(dngReply.statusCode).toBe(503);
+        expect(dngReply.payload).toMatchObject({ code: expectedCode });
+      } finally {
+        heicSpy.mockRestore();
+        decodeSpy.mockRestore();
+      }
+    },
+  );
 });

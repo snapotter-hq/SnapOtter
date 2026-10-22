@@ -18,7 +18,7 @@ import { decodeHeic } from "../../lib/heic-converter.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { renderMemeTextSvg } from "../../lib/meme-text-renderer.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
-import { putObject } from "../../lib/object-storage.js";
+import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
@@ -224,19 +224,31 @@ export function registerMemeGenerator(app: FastifyInstance) {
         let buf = inputBuffer;
         const validation = await validateImageBuffer(buf, filename);
         if (validation.valid && validation.format === "heif") {
-          buf = await decodeHeic(buf);
+          try {
+            buf = await decodeHeic(buf);
+          } catch (rawErr) {
+            throw normalizeOperationalWriteError(rawErr);
+          }
         }
         if (validation.valid && needsCliDecode(validation.format)) {
           try {
             const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
             buf = await decodeToSharpCompat(buf, validation.format, fileExt);
-          } catch (decodeErr) {
-            if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+          } catch (rawDecodeErr) {
+            const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+            if (
+              decodeErr instanceof DecoderOutOfMemoryError ||
+              (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+            ) {
+              throw decodeErr;
+            }
             try {
               await sharp(buf).metadata();
               await sharp(buf).resize(1).raw().toBuffer();
             } catch (err) {
-              if (isDecoderUnavailable(decodeErr)) throw decodeErr;
+              if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
+                throw decodeErr;
+              }
               throw await asInputErrorIfUndecodable(buf, err);
             }
           }
@@ -332,8 +344,9 @@ export function registerMemeGenerator(app: FastifyInstance) {
       if (validation.format === "heif") {
         try {
           imageBuffer = await decodeHeic(imageBuffer);
-        } catch (err) {
-          if (isDecoderUnavailable(err)) throw err;
+        } catch (rawErr) {
+          const err = normalizeOperationalWriteError(rawErr);
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
           return reply.status(422).send({
             error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
             details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
@@ -344,13 +357,19 @@ export function registerMemeGenerator(app: FastifyInstance) {
         try {
           const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
           imageBuffer = await decodeToSharpCompat(imageBuffer, validation.format, fileExt);
-        } catch (decodeErr) {
-          if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+        } catch (rawDecodeErr) {
+          const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+          if (
+            decodeErr instanceof DecoderOutOfMemoryError ||
+            (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+          ) {
+            throw decodeErr;
+          }
           try {
             await sharp(imageBuffer).metadata();
             await sharp(imageBuffer).resize(1).raw().toBuffer();
           } catch (err) {
-            if (isDecoderUnavailable(decodeErr)) throw decodeErr;
+            if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) throw decodeErr;
             return reply.status(422).send({
               error: `Failed to decode ${validation.format.toUpperCase()} file`,
               details: stripInternalPaths(err instanceof Error ? err.message : String(err)),

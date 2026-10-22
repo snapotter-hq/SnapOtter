@@ -1,4 +1,5 @@
 import { extname } from "node:path";
+import { hasServerErrorStatus, isSafeMessageError } from "@snapotter/shared";
 import type { FastifyBaseLogger } from "fastify";
 import sharp from "sharp";
 import { autoOrient } from "../lib/auto-orient.js";
@@ -13,6 +14,7 @@ import {
 } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import { logger } from "../lib/logger.js";
+import { normalizeOperationalWriteError } from "../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { type InputHandler, InputValidationError, type PreparedInput } from "./contract.js";
 
@@ -59,12 +61,13 @@ export class ImageInputHandler implements InputHandler {
         opts.signal?.throwIfAborted();
         const ext = name.match(/\.[^.]+$/)?.[0];
         if (ext) name = `${name.slice(0, -ext.length)}.png`;
-      } catch (err) {
+      } catch (rawErr) {
         opts.signal?.throwIfAborted();
+        const err = normalizeOperationalWriteError(rawErr);
         if (isPixelSafetyError(err)) {
           throw new InputValidationError(err instanceof Error ? err.message : String(err));
         }
-        if (isDecoderUnavailable(err)) throw engineUnavailable(err);
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw engineUnavailable(err);
         throw new InputValidationError(
           "Failed to decode HEIC file. Ensure libheif-examples is installed.",
           422,
@@ -87,16 +90,21 @@ export class ImageInputHandler implements InputHandler {
           signal: opts.signal,
         });
         opts.signal?.throwIfAborted();
-      } catch (decodeErr) {
+      } catch (rawDecodeErr) {
         opts.signal?.throwIfAborted();
+        const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
         if (isPixelSafetyError(decodeErr)) {
           throw new InputValidationError(
             decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
           );
         }
-        // Out of memory says nothing about whether Sharp can read the format
-        // (DNG's TIFF header, say): surface it instead of falling back (#1453).
-        if (decodeErr instanceof DecoderOutOfMemoryError) {
+        // Out of memory or a storage write fault says nothing about whether
+        // Sharp can read the format (DNG's TIFF header, say): surface it
+        // instead of falling back (#1453, #2800).
+        if (
+          decodeErr instanceof DecoderOutOfMemoryError ||
+          (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+        ) {
           throw engineUnavailable(decodeErr);
         }
         try {
@@ -105,7 +113,9 @@ export class ImageInputHandler implements InputHandler {
         } catch (err) {
           // Sharp reads some of these formats itself (DNG is a TIFF), so a
           // missing CLI decoder only matters once that fallback fails too.
-          if (isDecoderUnavailable(decodeErr)) throw engineUnavailable(decodeErr);
+          if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
+            throw engineUnavailable(decodeErr);
+          }
           throw new InputValidationError(
             `Failed to decode ${validation.format.toUpperCase()} file`,
             422,
@@ -160,12 +170,15 @@ export class ImageInputHandler implements InputHandler {
           opts.signal?.throwIfAborted();
           const ext = name.match(/\.[^.]+$/)?.[0];
           if (ext) name = `${name.slice(0, -ext.length)}.png`;
-        } catch (fallbackErr) {
+        } catch (rawFallbackErr) {
           opts.signal?.throwIfAborted();
+          const fallbackErr = normalizeOperationalWriteError(rawFallbackErr);
           if (isPixelSafetyError(fallbackErr)) {
             throw new InputValidationError(errorMessage(fallbackErr));
           }
-          if (isDecoderUnavailable(fallbackErr)) throw engineUnavailable(fallbackErr);
+          if (isDecoderUnavailable(fallbackErr) || hasServerErrorStatus(fallbackErr)) {
+            throw engineUnavailable(fallbackErr);
+          }
           // execFile's message ends with the tool's stderr, newline included,
           // so trim before joining or the second reason starts its own line.
           throw new InputValidationError(
@@ -220,11 +233,16 @@ export class ImageInputHandler implements InputHandler {
  * path and errno are the only record of which binary failed and why.
  */
 export function engineUnavailable(err: unknown): InputValidationError {
+  const code =
+    isSafeMessageError(err) && typeof err.code === "string" && err.code.length > 0
+      ? err.code
+      : "ENGINE_UNAVAILABLE";
+  const statusCode = hasServerErrorStatus(err) ? err.statusCode : 503;
   const converted = new InputValidationError(
     err instanceof Error ? err.message : String(err),
-    503,
+    statusCode,
     undefined,
-    "ENGINE_UNAVAILABLE",
+    code,
   );
   converted.cause = err;
   return converted;

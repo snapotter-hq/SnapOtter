@@ -1,5 +1,5 @@
 import { extname } from "node:path";
-import { isToolInputError } from "@snapotter/shared";
+import { hasServerErrorStatus, isToolInputError } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -18,6 +18,7 @@ import { decodeHeic } from "../../lib/heic-converter.js";
 import { asInputErrorIfUndecodable } from "../../lib/image-error.js";
 import { logger } from "../../lib/logger.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
+import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
 const settingsSchema = z.object({
@@ -180,10 +181,12 @@ export function registerFindDuplicates(app: FastifyInstance) {
         if (validation.format === "heif") {
           try {
             file.buffer = await decodeHeic(file.buffer);
-          } catch (err) {
-            // A missing decoder is the operator's problem, not this file's:
-            // the outer catch rethrows it so the request answers 503.
-            if (isDecoderUnavailable(err)) throw err;
+          } catch (rawErr) {
+            // A missing decoder or storage write fault is the operator's
+            // problem, not this file's: the outer catch rethrows it so the
+            // request answers 503 (#2800).
+            const err = normalizeOperationalWriteError(rawErr);
+            if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
             logger.warn(
               { err, filename: file.filename, format: validation.format },
               "find-duplicates: skipping file, HEIC decode failed",
@@ -196,15 +199,23 @@ export function registerFindDuplicates(app: FastifyInstance) {
           try {
             const fileExt = extname(file.filename).toLowerCase().replace(/^\./, "") || undefined;
             file.buffer = await decodeToSharpCompat(file.buffer, validation.format, fileExt);
-          } catch (decodeErr) {
-            if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+          } catch (rawDecodeErr) {
+            const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+            if (
+              decodeErr instanceof DecoderOutOfMemoryError ||
+              (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+            ) {
+              throw decodeErr;
+            }
             // Sharp reads some of these formats itself (DNG is a TIFF), so the
             // decoder's failure only matters once that fallback fails too.
             try {
               await sharp(file.buffer).metadata();
               await sharp(file.buffer).resize(1).raw().toBuffer();
             } catch (err) {
-              if (isDecoderUnavailable(decodeErr)) throw decodeErr;
+              if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
+                throw decodeErr;
+              }
               // pino serializes only the `err` key as an Error, so the decoder's
               // failure goes in as its message or it would land as `{}`.
               logger.warn(
@@ -391,10 +402,11 @@ export function registerFindDuplicates(app: FastifyInstance) {
         spaceSaveable,
         skippedFiles: skippedFiles.length > 0 ? skippedFiles : undefined,
       });
-    } catch (err) {
-      // Let the global handler answer a missing decoder as 503 and report it,
-      // the way the other custom routes do (#795, #1428).
-      if (isDecoderUnavailable(err)) throw err;
+    } catch (rawErr) {
+      // Let the global handler answer a missing decoder or storage write fault
+      // as 503 and report it, the way the other custom routes do (#795, #1428, #2800).
+      const err = normalizeOperationalWriteError(rawErr);
+      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
       return reply.status(422).send({
         error: "Duplicate detection failed",
         details: err instanceof Error ? err.message : "Unknown error",

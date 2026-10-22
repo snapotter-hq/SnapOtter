@@ -17,6 +17,8 @@ const failures = vi.hoisted(() => ({
   // Per binary, for fallback chains: each listed command's decode fails once.
   byCommand: {} as Record<string, Record<string, unknown>>,
   open: null as Error | null,
+  writeFile: null as Error | null,
+  closedHandles: 0,
   read: null as Error | null,
   writeOutput: null as Buffer | null,
   sharpToBuffer: null as Error | null,
@@ -65,12 +67,28 @@ vi.mock("node:fs/promises", async (importOriginal) => {
   return {
     ...actual,
     open: (async (path: unknown, ...rest: unknown[]) => {
-      if (failures.open && /dimensions-[^/\\]*\.\w+$/.test(String(path))) {
+      if (failures.open && /(?:dimensions|psd-in|any-in)-[^/\\]*\.\w+$/.test(String(path))) {
         const err = failures.open;
         failures.open = null;
         throw err;
       }
-      return (actual.open as (...args: unknown[]) => unknown)(path, ...rest);
+      const handle = (await (actual.open as (...args: unknown[]) => Promise<unknown>)(
+        path,
+        ...rest,
+      )) as { writeFile: (...args: unknown[]) => Promise<unknown>; close: () => Promise<unknown> };
+      if (failures.writeFile && /(?:psd-in|any-in)-[^/\\]*\.\w+$/.test(String(path))) {
+        const err = failures.writeFile;
+        failures.writeFile = null;
+        const origClose = handle.close.bind(handle);
+        handle.writeFile = async () => {
+          throw err;
+        };
+        handle.close = async () => {
+          failures.closedHandles += 1;
+          return origClose();
+        };
+      }
+      return handle;
     }) as typeof actual.open,
     readFile: (async (path: unknown, ...rest: unknown[]) => {
       if (
@@ -651,4 +669,74 @@ describe("decodeNetpbm and EXR/JXL/JP2 primary readFile fault handling (#2884)",
       expect(failures.spawned).toEqual([primaryBinary]);
     },
   );
+});
+
+describe("writeTempExclusive operational write errors in decodeToSharpCompat and decodeAnyFormat (#2800)", () => {
+  const cases: ReadonlyArray<readonly [string, string]> = [
+    ["ENOSPC", "storage-full"],
+    ["EDQUOT", "storage-full"],
+    ["EACCES", "storage-not-writable"],
+    ["EPERM", "storage-not-writable"],
+    ["EROFS", "storage-not-writable"],
+  ];
+
+  it.each(cases)(
+    "normalizes %s from writeTempExclusive in decodeToSharpCompat and decodeAnyFormat into a 503 %s SafeError",
+    async (errno, expectedCode) => {
+      const { fixtures, readFixture } = await import("../../fixtures/index.js");
+      const fsErr = Object.assign(new Error(`${errno}: open temp file`), {
+        code: errno,
+        syscall: "open",
+      });
+
+      failures.open = fsErr;
+      const psdErr = await decodeToSharpCompat(
+        readFixture(fixtures.image.formats("psd")),
+        "psd",
+        "psd",
+      ).catch((e: unknown) => e);
+      expect(psdErr).toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        statusCode: 503,
+        code: expectedCode,
+        cause: fsErr,
+      });
+
+      failures.open = fsErr;
+      const avifErr = await decodeAnyFormat(Buffer.from("avif-bytes"), "avif").catch(
+        (e: unknown) => e,
+      );
+      expect(avifErr).toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        statusCode: 503,
+        code: expectedCode,
+        cause: fsErr,
+      });
+    },
+  );
+
+  it("closes the file handle and normalizes ENOSPC when fh.writeFile fails after open succeeds", async () => {
+    const { fixtures, readFixture } = await import("../../fixtures/index.js");
+    const writeErr = Object.assign(new Error("ENOSPC: no space left on device, write"), {
+      code: "ENOSPC",
+      syscall: "write",
+    });
+    failures.closedHandles = 0;
+    failures.writeFile = writeErr;
+    const psdErr = await decodeToSharpCompat(
+      readFixture(fixtures.image.formats("psd")),
+      "psd",
+      "psd",
+    ).catch((e: unknown) => e);
+    expect(psdErr).toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      statusCode: 503,
+      code: "storage-full",
+      cause: writeErr,
+    });
+    expect(failures.closedHandles).toBe(1);
+  });
 });

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { extname } from "node:path";
-import { COLLAGE_PAN_LIMIT, isToolInputError } from "@snapotter/shared";
+import { COLLAGE_PAN_LIMIT, hasServerErrorStatus, isToolInputError } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp, { type OverlayOptions } from "sharp";
 import { z } from "zod";
@@ -18,7 +18,7 @@ import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { asInputErrorIfUndecodable } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
-import { putObject } from "../../lib/object-storage.js";
+import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
 import { InputValidationError } from "../../modality/contract.js";
 
@@ -478,10 +478,12 @@ export function registerCollage(app: FastifyInstance) {
       if (validation.format === "heif") {
         try {
           file.buffer = await decodeHeic(file.buffer);
-        } catch (err) {
-          // A missing decoder is this server's fault, not the user's file:
-          // rethrow so the global handler logs and reports it as a 503 (#795).
-          if (isDecoderUnavailable(err)) throw err;
+        } catch (rawErr) {
+          // A missing decoder or storage write fault is this server's fault,
+          // not the user's file: rethrow so the global handler logs and
+          // reports it as a 503 (#795, #2800).
+          const err = normalizeOperationalWriteError(rawErr);
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
           return reply.status(422).send({
             error: `Failed to decode "${file.filename}" (HEIC). Ensure libheif-examples is installed.`,
             details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
@@ -492,15 +494,21 @@ export function registerCollage(app: FastifyInstance) {
         try {
           const fileExt = extname(file.filename).toLowerCase().replace(/^\./, "") || undefined;
           file.buffer = await decodeToSharpCompat(file.buffer, validation.format, fileExt);
-        } catch (decodeErr) {
-          if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
+        } catch (rawDecodeErr) {
+          const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+          if (
+            decodeErr instanceof DecoderOutOfMemoryError ||
+            (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+          ) {
+            throw decodeErr;
+          }
           try {
             await sharp(file.buffer).metadata();
             await sharp(file.buffer).resize(1).raw().toBuffer();
           } catch (err) {
             // Sharp can read some of these formats itself, so a missing CLI
             // decoder only matters once that fallback fails too (#795).
-            if (isDecoderUnavailable(decodeErr)) throw decodeErr;
+            if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) throw decodeErr;
             return reply.status(422).send({
               error: `Failed to decode "${file.filename}" (${validation.format.toUpperCase()})`,
               details: stripInternalPaths(err instanceof Error ? err.message : String(err)),

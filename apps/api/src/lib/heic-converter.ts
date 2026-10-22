@@ -13,6 +13,7 @@ import {
   DecoderUnavailableError,
   noDecoderFound,
 } from "./format-decoders.js";
+import { normalizeOperationalWriteError } from "./object-storage.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -93,11 +94,15 @@ function readIspeDimensions(buffer: Buffer): Array<{ width: number; height: numb
  * Prevents symlink / race-condition attacks on predictable temp paths.
  */
 async function writeTempExclusive(filePath: string, buffer: Buffer): Promise<void> {
-  const fh = await open(filePath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY);
   try {
-    await fh.writeFile(buffer);
-  } finally {
-    await fh.close();
+    const fh = await open(filePath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY);
+    try {
+      await fh.writeFile(buffer);
+    } finally {
+      await fh.close();
+    }
+  } catch (err) {
+    throw normalizeOperationalWriteError(err);
   }
 }
 
