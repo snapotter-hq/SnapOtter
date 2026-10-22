@@ -1766,36 +1766,65 @@ describe("useCollageStore", () => {
     expect(useCollageStore.getState().images[0].previewBlobUrl).toBe("blob:preview-decoded");
   });
 
-  it("addImages preview callback handles image removed before resolve", async () => {
+  it("addImages preview callback revokes late preview blob URL when image is removed before resolve (#3229)", async () => {
     const imagePreview = await import("@/lib/image-preview");
     const needsMock = vi.mocked(imagePreview.needsServerPreview);
     const fetchPreviewMock = vi.mocked(imagePreview.fetchDecodedPreview);
     const revokePreviewMock = vi.mocked(imagePreview.revokePreviewUrl);
+
+    for (const [keepSecondImage, removeAction] of [
+      [false, () => useCollageStore.getState().removeImage(0)] as const,
+      [true, () => useCollageStore.getState().removeImage(0)] as const,
+      [false, () => useCollageStore.getState().clearImages()] as const,
+      [false, () => useCollageStore.getState().reset()] as const,
+    ]) {
+      useCollageStore.getState().reset();
+      revokePreviewMock.mockClear();
+      needsMock.mockReturnValueOnce(true);
+
+      let resolvePreview!: (v: import("@/lib/image-preview").DecodedPreview | null) => void;
+      fetchPreviewMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolvePreview = resolve;
+        }),
+      );
+
+      const heicFile = new File(["data"], "gone.heic", { type: "image/heic" });
+      const keepFile = new File(["png"], "keep.png", { type: "image/png" });
+      useCollageStore.getState().addImages(keepSecondImage ? [heicFile, keepFile] : [heicFile]);
+
+      // Remove the image before the preview resolves
+      removeAction();
+      expect(revokePreviewMock).not.toHaveBeenCalled();
+
+      // Resolve the preview now; it should revoke the orphaned blob URL (#3229)
+      resolvePreview({ url: "blob:late-preview", originalWidth: 100, originalHeight: 100 });
+
+      await vi.waitFor(() => {
+        expect(revokePreviewMock).toHaveBeenCalledTimes(1);
+      });
+      expect(revokePreviewMock).toHaveBeenCalledWith("blob:late-preview");
+      expect(useCollageStore.getState().images.map((i) => i.file)).toEqual(
+        keepSecondImage ? [keepFile] : [],
+      );
+    }
+
+    // Also verify a null result after removal does not call revokePreviewUrl
+    useCollageStore.getState().reset();
     revokePreviewMock.mockClear();
     needsMock.mockReturnValueOnce(true);
-
-    let resolvePreview!: (v: import("@/lib/image-preview").DecodedPreview | null) => void;
+    let resolveNullPreview!: (v: import("@/lib/image-preview").DecodedPreview | null) => void;
     fetchPreviewMock.mockReturnValueOnce(
       new Promise((resolve) => {
-        resolvePreview = resolve;
+        resolveNullPreview = resolve;
       }),
     );
-
-    const heicFile = new File(["data"], "gone.heic", { type: "image/heic" });
+    const heicFile = new File(["data"], "gone-null.heic", { type: "image/heic" });
     useCollageStore.getState().addImages([heicFile]);
-
-    // Remove the image before the preview resolves
     useCollageStore.getState().removeImage(0);
-
-    // Now resolve the preview -- should revoke the orphaned preview blob URL
-    resolvePreview({ url: "blob:late-preview", originalWidth: null, originalHeight: null });
-
-    await vi.waitFor(() => {
-      expect(revokePreviewMock).toHaveBeenCalledWith("blob:late-preview");
-    });
-
-    // Store should still be in reset state
-    expect(useCollageStore.getState().images).toEqual([]);
+    resolveNullPreview(null);
+    await Promise.resolve();
+    expect(revokePreviewMock).not.toHaveBeenCalled();
   });
 
   it("reset keeps nextImageId monotonic so an in-flight preview from before reset does not attach to a newly added image (#3521)", async () => {
