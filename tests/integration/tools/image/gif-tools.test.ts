@@ -27,7 +27,7 @@ beforeAll(async () => {
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
   animatedGif = readFixture(fixtures.image.animated.gif);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();

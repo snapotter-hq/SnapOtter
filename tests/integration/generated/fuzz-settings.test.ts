@@ -90,7 +90,7 @@ describe.skipIf(!FUZZ)("settings fuzz (property-based)", () => {
       console.warn("[fuzz-config] FC_SEED is deprecated; use FUZZ_SEED instead");
     }
     testApp = await buildTestApp();
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await testApp.cleanup();

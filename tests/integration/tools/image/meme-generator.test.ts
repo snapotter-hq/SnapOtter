@@ -41,7 +41,7 @@ beforeAll(async () => {
   const firstTemplate = manifest.templates[0];
   firstTemplateId = firstTemplate.id;
   firstTemplateTextBoxIds = firstTemplate.textBoxes.map((tb: { id: string }) => tb.id);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();

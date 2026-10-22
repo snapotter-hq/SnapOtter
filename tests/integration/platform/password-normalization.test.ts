@@ -50,7 +50,7 @@ beforeAll(async () => {
   // Keep the per-username failed-login throttle (#820) out of the way of the wrong-password cases.
   await setSetting("loginThrottleMaxFailures", "100000");
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await clearSetting("loginThrottleMaxFailures");

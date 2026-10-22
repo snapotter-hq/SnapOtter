@@ -94,7 +94,7 @@ describe.skipIf(!minioAvailable)("S3-mode download fault classification", () => 
 
     testApp = await buildTestApp();
     adminToken = await loginAsAdmin(testApp.app);
-  }, 30_000);
+  });
 
   afterAll(async () => {
     (env as Record<string, unknown>).STORAGE_MODE = originalStorageMode;

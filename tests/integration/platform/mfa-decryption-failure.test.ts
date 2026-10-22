@@ -77,7 +77,7 @@ beforeAll(async () => {
   adminToken = await loginAsAdmin(testApp.app);
   const [admin] = await db.select().from(schema.users).where(eq(schema.users.username, "admin"));
   adminId = admin.id;
-}, 30_000);
+});
 
 // buildTestApp runs with `logger: false`, in which Fastify hands every request
 // the app's own logger object, so spying on app.log sees request.log calls.

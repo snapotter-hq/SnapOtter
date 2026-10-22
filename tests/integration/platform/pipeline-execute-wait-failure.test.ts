@@ -60,7 +60,7 @@ beforeAll(async () => {
   testApp = await buildTestApp();
   app = testApp.app;
   token = await loginAsAdmin(app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();

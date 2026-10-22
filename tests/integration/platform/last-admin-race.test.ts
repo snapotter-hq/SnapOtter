@@ -48,7 +48,7 @@ beforeAll(async () => {
     .insert(schema.settings)
     .values({ key: "scim_token_hash", value: hash })
     .onConflictDoUpdate({ target: schema.settings.key, set: { value: hash } });
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();

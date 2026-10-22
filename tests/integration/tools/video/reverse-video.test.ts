@@ -26,7 +26,7 @@ beforeAll(async () => {
   writeFileSync(srcFile, MP4);
   const info = await probeMedia(srcFile);
   sourceDurationS = info.durationS ?? 1;
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();

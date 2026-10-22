@@ -98,7 +98,7 @@ beforeAll(async () => {
     .from(schema.users)
     .where(eq(schema.users.username, "admin"));
   adminId = admin.id;
-}, 30_000);
+});
 
 afterAll(async () => {
   if (keptIds.length)

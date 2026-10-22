@@ -61,7 +61,7 @@ beforeAll(async () => {
       durationMs: 50,
     },
   ]);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();

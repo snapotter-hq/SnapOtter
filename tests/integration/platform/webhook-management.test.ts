@@ -11,7 +11,7 @@ describe("webhook management", () => {
     beforeAll(async () => {
       testApp = await buildTestApp();
       adminToken = await loginAsAdmin(testApp.app);
-    }, 30_000);
+    });
 
     afterAll(async () => {
       await testApp.cleanup();
@@ -101,7 +101,7 @@ describe("webhook management", () => {
       const testServer = await import("../test-server.js");
       testApp = await testServer.buildTestApp();
       adminToken = await testServer.loginAsAdmin(testApp.app);
-    }, 30_000);
+    });
 
     afterAll(async () => {
       await testApp.cleanup();

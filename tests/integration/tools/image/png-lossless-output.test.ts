@@ -85,7 +85,7 @@ beforeAll(async () => {
   // provably lossy. Fail loudly if a fixture change ever drops below that.
   expect(await distinctColours(busyPng)).toBeGreaterThan(256);
   expect(await distinctColours(gradientTiff)).toBeGreaterThan(256);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();

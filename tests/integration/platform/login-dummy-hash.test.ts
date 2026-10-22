@@ -39,7 +39,7 @@ beforeAll(async () => {
     .insert(schema.settings)
     .values({ key: "loginThrottleMaxFailures", value: "100000" })
     .onConflictDoUpdate({ target: schema.settings.key, set: { value: "100000" } });
-}, 30_000);
+});
 
 afterAll(async () => {
   await db.delete(schema.settings).where(eq(schema.settings.key, "loginThrottleMaxFailures"));

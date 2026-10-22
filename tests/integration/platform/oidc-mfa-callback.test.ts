@@ -194,7 +194,7 @@ beforeAll(async () => {
   (env as any).OIDC_CLIENT_SECRET = "test-client-secret";
 
   oidcApp = await buildTestApp();
-}, 30_000);
+});
 
 afterEach(async () => {
   await setMfaPolicy("optional");

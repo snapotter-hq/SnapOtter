@@ -64,7 +64,7 @@ async function login(username: string, password: string) {
 
 beforeAll(async () => {
   testApp = await buildTestApp();
-}, 30_000);
+});
 
 afterEach(async () => {
   // Never let a required policy bleed into sibling tests in the fork.

@@ -20,7 +20,7 @@ beforeAll(async () => {
   app = testApp.app;
   adminToken = await loginAsAdmin(app);
   await ensureAnonymousUser();
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();

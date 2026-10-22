@@ -406,7 +406,7 @@ beforeAll(async () => {
   // promises. Warm the consumers up front, the way the production spine
   // does for exactly this reason.
   await warmQueueEvents();
-}, 30_000);
+});
 
 afterAll(async () => {
   await closeWorkers();

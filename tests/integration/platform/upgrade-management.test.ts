@@ -10,7 +10,7 @@ describe("upgrade management - without enterprise license", () => {
   beforeAll(async () => {
     testApp = await buildTestApp();
     adminToken = await loginAsAdmin(testApp.app);
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await testApp.cleanup();
@@ -85,7 +85,7 @@ describe("upgrade management - with enterprise license", () => {
     const { buildTestApp, loginAsAdmin } = await import("../test-server.js");
     entApp = await buildTestApp();
     entAdminToken = await loginAsAdmin(entApp.app);
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await entApp.cleanup();

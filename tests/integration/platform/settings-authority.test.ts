@@ -124,7 +124,7 @@ beforeAll(async () => {
     "settings:write",
     "compliance:manage",
   ]);
-}, 30_000);
+});
 
 afterAll(async () => {
   for (const [key, value] of originalSettings) {

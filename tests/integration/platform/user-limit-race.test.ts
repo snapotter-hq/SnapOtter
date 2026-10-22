@@ -30,7 +30,7 @@ const origMaxUsers = env.MAX_USERS;
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   (env as Record<string, unknown>).MAX_USERS = origMaxUsers;

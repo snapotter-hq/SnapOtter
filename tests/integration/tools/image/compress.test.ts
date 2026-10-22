@@ -31,7 +31,7 @@ beforeAll(async () => {
 
   // Create a larger JPEG at max quality for compression tests
   largeJpg = await sharp(PNG).jpeg({ quality: 100 }).toBuffer();
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();

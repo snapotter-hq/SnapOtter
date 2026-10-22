@@ -487,7 +487,7 @@ export function setupMatrixApp(): void {
     testApp = await buildTestApp();
     app = testApp.app;
     adminToken = await loginAsAdmin(app);
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await testApp.cleanup();

@@ -51,7 +51,7 @@ beforeAll(async () => {
   adminToken = await loginAsAdmin(testApp.app);
   const [admin] = await db.select().from(schema.users).where(eq(schema.users.username, "admin"));
   adminId = admin.id;
-}, 30_000);
+});
 
 afterEach(async () => {
   await db.delete(schema.jobs).where(and(eq(schema.jobs.userId, adminId)));

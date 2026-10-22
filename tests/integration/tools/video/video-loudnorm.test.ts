@@ -34,7 +34,7 @@ beforeAll(async () => {
     throw new Error(`Failed to generate silent fixture: ${result.stderr?.toString()}`);
   }
   silentMp4 = readFileSync(silentPath);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();

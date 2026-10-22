@@ -434,7 +434,7 @@ beforeAll(async () => {
   // Use sample.png as the mask for erase-object
   const maskPath = fixtures.image.formats("png");
   maskBuffer = readFileSync(maskPath);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();

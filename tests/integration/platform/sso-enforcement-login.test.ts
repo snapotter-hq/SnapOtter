@@ -60,7 +60,7 @@ beforeAll(async () => {
   adminToken = await loginAsAdmin(testApp.app);
   await createUserAndLogin(testApp.app, LOCAL_USER, "user", LOCAL_PASSWORD);
   await createUserAndLogin(testApp.app, THROTTLE_USER, "user", THROTTLE_PASSWORD);
-}, 30_000);
+});
 
 afterEach(async () => {
   await clearSetting("ssoEnforcement");

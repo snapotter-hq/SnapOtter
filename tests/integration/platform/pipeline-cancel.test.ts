@@ -423,7 +423,7 @@ async function finalizeReturnValue(flowId: string): Promise<Record<string, unkno
 beforeAll(async () => {
   await startCancelListener();
   startWorkers();
-}, 30_000);
+});
 
 afterAll(async () => {
   await closeWorkers();

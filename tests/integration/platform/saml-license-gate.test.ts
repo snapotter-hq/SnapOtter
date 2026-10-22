@@ -38,7 +38,7 @@ beforeAll(async () => {
     (env as Record<string, unknown>)[k] = v;
   }
   testApp = await buildTestApp();
-}, 30_000);
+});
 
 afterAll(async () => {
   for (const [k, v] of Object.entries(saved)) {

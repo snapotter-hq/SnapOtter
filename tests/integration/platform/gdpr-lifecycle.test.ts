@@ -16,7 +16,7 @@ describe("GDPR lifecycle without enterprise license", () => {
   beforeAll(async () => {
     testApp = await buildTestApp();
     adminToken = await loginAsAdmin(testApp.app);
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await testApp.cleanup();
@@ -322,7 +322,7 @@ describe("GDPR purge role hierarchy", () => {
       payload: { username, password: "TestPass1" },
     });
     complianceManagerToken = JSON.parse(loginRes.body).token as string;
-  }, 30_000);
+  });
 
   afterAll(async () => {
     if (complianceManagerId) {

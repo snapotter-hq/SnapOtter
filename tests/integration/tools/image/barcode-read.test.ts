@@ -52,7 +52,7 @@ beforeAll(async () => {
     url: genResult.downloadUrl,
   });
   qrCodePng = dlRes.rawPayload;
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();

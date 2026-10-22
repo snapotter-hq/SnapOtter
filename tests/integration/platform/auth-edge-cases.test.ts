@@ -65,7 +65,7 @@ beforeAll(async () => {
   // login-throttle.test.ts.
   await setSetting("loginThrottleMaxFailures", "100000");
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await clearSetting("loginThrottleMaxFailures");

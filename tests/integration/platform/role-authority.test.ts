@@ -68,7 +68,7 @@ beforeAll(async () => {
     allowed: ["image"],
   });
   scopeManagerToken = await createUserAndLogin(uniqueName("scope-manager-user"), scopeManagerRole);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();

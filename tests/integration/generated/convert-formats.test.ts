@@ -112,7 +112,7 @@ beforeAll(async () => {
     filename: "test.svg",
     contentType: "image/svg+xml",
   };
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();

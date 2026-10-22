@@ -59,7 +59,7 @@ beforeAll(async () => {
   adminToken = await loginAsAdmin(app);
   owner = await createUserAndLogin(app, "stream_owner");
   stranger = await createUserAndLogin(app, "stream_stranger");
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();

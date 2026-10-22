@@ -61,7 +61,7 @@ let token: string;
 beforeAll(async () => {
   testApp = await buildTestApp();
   token = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterEach(() => {
   terminal.delayMs = 0;

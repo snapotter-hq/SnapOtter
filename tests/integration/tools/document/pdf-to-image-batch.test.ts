@@ -50,7 +50,7 @@ beforeAll(async () => {
     },
   });
   noToolsToken = (await createUserAndLogin(app, "nopdfuser", "nopdftools")).token;
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();

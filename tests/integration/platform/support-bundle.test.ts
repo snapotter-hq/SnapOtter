@@ -30,7 +30,7 @@ beforeAll(async () => {
     error: { message: "test failure" },
     durationMs: 123,
   });
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();

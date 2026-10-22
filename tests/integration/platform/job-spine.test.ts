@@ -80,7 +80,7 @@ let testApp: TestApp;
 // Workers + cancel listener are started by test-server.ts (ensureSpine).
 beforeAll(async () => {
   testApp = await buildTestApp();
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();

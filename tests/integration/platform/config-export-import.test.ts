@@ -32,7 +32,7 @@ describe("config export and import without enterprise license", () => {
   beforeAll(async () => {
     testApp = await buildTestApp();
     adminToken = await loginAsAdmin(testApp.app);
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await testApp.cleanup();
@@ -100,7 +100,7 @@ describe("config export with enterprise license", () => {
     const { buildTestApp, loginAsAdmin } = await import("../test-server.js");
     licensedApp = await buildTestApp();
     licensedToken = await loginAsAdmin(licensedApp.app);
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await licensedApp.cleanup();
@@ -415,7 +415,7 @@ describe("config import with enterprise license", () => {
     const { buildTestApp, loginAsAdmin } = await import("../test-server.js");
     licensedApp = await buildTestApp();
     licensedToken = await loginAsAdmin(licensedApp.app);
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await licensedApp.cleanup();
@@ -1684,7 +1684,7 @@ describe("config round-trip", () => {
     const { buildTestApp, loginAsAdmin } = await import("../test-server.js");
     licensedApp = await buildTestApp();
     licensedToken = await loginAsAdmin(licensedApp.app);
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await licensedApp.cleanup();

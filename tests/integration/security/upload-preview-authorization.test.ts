@@ -48,7 +48,7 @@ beforeAll(async () => {
   adminToken = await loginAsAdmin(testApp.app);
   scopedKey = await createKey("no-file-rights", ["settings:read"]);
   capableKey = await createKey("file-rights", ["tools:use", "files:own"]);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();

@@ -30,7 +30,7 @@ beforeAll(async () => {
   const v = info.streams.find((s) => s.type === "video");
   sourceW = v?.width ?? 0;
   sourceH = v?.height ?? 0;
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();

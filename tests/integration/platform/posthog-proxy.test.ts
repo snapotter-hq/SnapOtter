@@ -67,7 +67,7 @@ describe("PostHog first-party proxy (/ingest)", () => {
     process.env.SNAPOTTER_POSTHOG_UPSTREAM = api.url();
     process.env.SNAPOTTER_POSTHOG_ASSETS_UPSTREAM = assets.url();
     testApp = await buildTestApp();
-  }, 30_000);
+  });
 
   afterEach(() => {
     api.received.length = 0;
@@ -184,7 +184,7 @@ describe("PostHog proxy upstream failure observability (#788)", () => {
     process.env.SNAPOTTER_POSTHOG_UPSTREAM = `http://127.0.0.1:${deadPort}`;
     process.env.SNAPOTTER_POSTHOG_ASSETS_UPSTREAM = `http://127.0.0.1:${deadPort}`;
     deadApp = await buildTestApp();
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await deadApp.cleanup();

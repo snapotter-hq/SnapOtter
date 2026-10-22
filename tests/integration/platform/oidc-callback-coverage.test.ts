@@ -212,7 +212,7 @@ describe("OIDC callback discovery failure (cold cache)", () => {
     (env as any).OIDC_CLIENT_SECRET = "test-client-secret";
 
     oidcApp = await buildTestApp();
-  }, 30_000);
+  });
 
   afterAll(async () => {
     (env as any).OIDC_ENABLED = origOidcEnabled;
@@ -395,7 +395,7 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     (env as any).MAX_USERS = 0;
 
     oidcApp = await buildTestApp();
-  }, 30_000);
+  });
 
   // Cleared before (not after) each test so a report from the cold-cache
   // describe above can't leak into the first assertion here.

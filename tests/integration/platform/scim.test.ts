@@ -43,7 +43,7 @@ describe("SCIM 2.0 provisioning", () => {
       .insert(schema.settings)
       .values({ key: "scim_token_hash", value: tokenHash })
       .onConflictDoNothing();
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await testApp.cleanup();
@@ -510,7 +510,7 @@ describe("SCIM global token administration", () => {
       throw new Error(`Failed to create scoped admin API key: ${apiKeyRes.body}`);
     }
     scopedAdminKey = JSON.parse(apiKeyRes.body).key as string;
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await db.delete(schema.settings).where(eq(schema.settings.key, "scim_token_hash"));
@@ -988,7 +988,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         target: schema.settings.key,
         set: { value: tokenHash },
       });
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await db.delete(schema.settings).where(eq(schema.settings.key, "scim_token_hash"));

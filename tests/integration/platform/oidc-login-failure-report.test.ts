@@ -192,7 +192,7 @@ describe("OIDC sign-in faults reach Sentry (#1869)", () => {
     mutableEnv.OIDC_CLIENT_ID = "test-client-id";
     mutableEnv.OIDC_CLIENT_SECRET = CLIENT_SECRET;
     oidcApp = await buildTestApp();
-  }, 30_000);
+  });
 
   afterAll(async () => {
     Object.assign(mutableEnv, orig);

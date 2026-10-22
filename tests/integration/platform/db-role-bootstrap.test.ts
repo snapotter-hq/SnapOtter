@@ -204,7 +204,7 @@ beforeAll(async () => {
   // Created AFTER the grants, standing in for a table that a future release's
   // migration adds. Nothing grants anything on it explicitly.
   await owner.query("CREATE TABLE probe_future_table (id serial PRIMARY KEY, note text)");
-}, 30_000);
+});
 
 afterAll(async () => {
   // A failed beforeAll leaves nothing to clean up, and throwing here would bury
@@ -469,7 +469,7 @@ describe("split-mode boot that succeeds", () => {
     await owner.query("CREATE TABLE probe_after_boot_table (id serial PRIMARY KEY, note text)");
     await settleTo(backendCount, backendsBefore);
     backendsAfter = await backendCount();
-  }, 30_000);
+  });
 
   it("provisions the runtime role as a non-superuser that can log in", async () => {
     const { rows } = await owner.query(

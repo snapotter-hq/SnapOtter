@@ -38,7 +38,7 @@ async function setMfaPolicy(value: "optional" | "admins_only" | "required"): Pro
 
 beforeAll(async () => {
   testApp = await buildTestApp();
-}, 30_000);
+});
 
 afterEach(async () => {
   await db.delete(schema.settings).where(eq(schema.settings.key, "mfaPolicy"));

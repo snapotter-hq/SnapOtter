@@ -57,7 +57,7 @@ beforeAll(async () => {
     cb: (tx: object) => Promise<unknown>,
     config?: unknown,
   ) => realTransaction((tx) => cb(failingDelete(tx)), config)) as unknown as typeof db.transaction);
-}, 30_000);
+});
 
 afterAll(async () => {
   vi.restoreAllMocks();

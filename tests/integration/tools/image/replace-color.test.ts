@@ -35,7 +35,7 @@ beforeAll(async () => {
   })
     .png()
     .toBuffer();
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();

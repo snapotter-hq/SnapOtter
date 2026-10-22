@@ -34,7 +34,7 @@ describe("MFA Race Condition #2328", () => {
 
   beforeAll(async () => {
     testApp = await buildTestApp();
-  }, 30_000);
+  });
 
   afterEach(async () => {
     await db.delete(schema.settings).where(eq(schema.settings.key, "mfaPolicy"));

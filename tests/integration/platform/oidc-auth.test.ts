@@ -47,7 +47,7 @@ let adminToken: string;
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();
@@ -458,7 +458,7 @@ describe("Config endpoint with OIDC enabled", () => {
     env.OIDC_PROVIDER_NAME = "TestProvider";
 
     oidcApp = await buildTestApp();
-  }, 30_000);
+  });
 
   afterAll(async () => {
     // Restore original env values
@@ -607,7 +607,7 @@ describe("OIDC login discovery failure", () => {
     resetOidcDiscoveryCacheForTests();
 
     oidcApp = await buildTestApp();
-  }, 30_000);
+  });
 
   afterAll(async () => {
     env.OIDC_ENABLED = origOidcEnabled;
@@ -694,7 +694,7 @@ describe("OIDC login redirect", () => {
     const _oidcModule = await import("../../../apps/api/src/plugins/oidc.js");
     // The module caches config in a module-level variable; rebuild app to get fresh routes
     oidcApp = await buildTestApp();
-  }, 30_000);
+  });
 
   afterAll(async () => {
     // Restore original env values
@@ -902,7 +902,7 @@ describe("OIDC callback edge cases", () => {
     env.OIDC_CLIENT_SECRET = "test-client-secret";
 
     oidcApp = await buildTestApp();
-  }, 30_000);
+  });
 
   afterAll(async () => {
     env.OIDC_ENABLED = origOidcEnabled;

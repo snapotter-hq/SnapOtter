@@ -45,7 +45,7 @@ beforeAll(async () => {
     },
   });
   noToolsToken = (await createUserAndLogin(app, "notools645user", "notools645")).token;
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();

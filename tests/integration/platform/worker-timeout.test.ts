@@ -224,7 +224,7 @@ await runMigrations();
 beforeAll(async () => {
   await startCancelListener();
   startWorkers();
-}, 30_000);
+});
 
 afterAll(async () => {
   await closeWorkers();

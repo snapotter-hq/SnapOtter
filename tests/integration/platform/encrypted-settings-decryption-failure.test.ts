@@ -46,7 +46,7 @@ const originalPreviousKey = env.DATA_ENCRYPTION_KEY_PREVIOUS;
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 let appLogError: ReturnType<typeof vi.spyOn>;
 let pinoLogError: ReturnType<typeof vi.spyOn>;

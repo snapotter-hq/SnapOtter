@@ -35,7 +35,7 @@ const RACE_USERNAMES = [
 
 beforeAll(async () => {
   testApp = await buildTestApp();
-}, 30_000);
+});
 
 afterEach(() => {
   vi.restoreAllMocks();

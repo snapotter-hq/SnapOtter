@@ -83,7 +83,7 @@ describe("OIDC discovery and the EXTERNAL_URL scheme", () => {
     mutableEnv.OIDC_CLIENT_ID = "test-client-id";
     mutableEnv.OIDC_CLIENT_SECRET = "test-client-secret";
     oidcApp = await buildTestApp();
-  }, 30_000);
+  });
 
   afterAll(async () => {
     mutableEnv.OIDC_ENABLED = origOidcEnabled;

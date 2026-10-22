@@ -108,16 +108,16 @@ function findLifecycleHookTimeoutArgs(source: string, fileName = "sample.ts"): H
 }
 
 /**
- * 342 files still pass `beforeAll(..., 30_000)` (#3595); reject `< 30_000` on
- * `beforeAll`, `<= 30_000` on `afterAll`, `beforeEach`, and `afterEach`, and any
- * non-literal timeout expression (`timeoutMs === null`).
+ * Reject `<= 30_000` on any lifecycle hook (`beforeAll`, `afterAll`,
+ * `beforeEach`, `afterEach`) so hooks inherit `vitest.config.ts` `hookTimeout`
+ * (and respect `VITEST_HOOK_TIMEOUT`), plus any non-literal timeout expression
+ * (`timeoutMs === null`).
  */
 function isDisallowedHookTimeout(match: HookTimeoutMatch): boolean {
-  const maxDisallowed = match.hook === "beforeAll" ? 29_999 : 30_000;
-  return match.timeoutMs === null || match.timeoutMs <= maxDisallowed;
+  return match.timeoutMs === null || match.timeoutMs <= 30_000;
 }
 
-describe("integration lifecycle hook timeout policy (#3357, #3584)", () => {
+describe("integration lifecycle hook timeout policy (#3357, #3584, #3595)", () => {
   it("configures a global hookTimeout of at least 30_000ms in vitest.config.ts", () => {
     expect(rootConfig.test?.hookTimeout).toBeGreaterThanOrEqual(30_000);
   });
@@ -153,8 +153,13 @@ describe("integration lifecycle hook timeout policy (#3357, #3584)", () => {
       "  await testApp.cleanup();",
       "}, 30_000);",
       "vi.beforeEach(async () => {}, 20_000);",
+      "beforeEach(async () => {}, (15_000 + +15_000));",
       "vitest.afterEach(async () => {}, { timeout: 10 * 1000 },);",
+      'afterEach(async () => {}, { "timeout": 60_000 });',
       "afterAll(async () => {}, CUSTOM_TIMEOUT);",
+      "beforeAll(async () => {",
+      "  await testApp.cleanup();",
+      "}, 60_000);",
       "afterAll(async () => {",
       "  await testApp.cleanup();",
       "}, 100_000);",
@@ -167,14 +172,22 @@ describe("integration lifecycle hook timeout policy (#3357, #3584)", () => {
       { hook: "beforeAll", line: 23, timeoutArg: "30_000", timeoutMs: 30_000 },
       { hook: "afterAll", line: 26, timeoutArg: "30_000", timeoutMs: 30_000 },
       { hook: "beforeEach", line: 29, timeoutArg: "20_000", timeoutMs: 20_000 },
+      { hook: "beforeEach", line: 30, timeoutArg: "(15_000 + +15_000)", timeoutMs: 30_000 },
       {
         hook: "afterEach",
-        line: 30,
+        line: 31,
         timeoutArg: "{ timeout: 10 * 1000 }",
         timeoutMs: 10_000,
       },
-      { hook: "afterAll", line: 31, timeoutArg: "CUSTOM_TIMEOUT", timeoutMs: null },
-      { hook: "afterAll", line: 32, timeoutArg: "100_000", timeoutMs: 100_000 },
+      {
+        hook: "afterEach",
+        line: 32,
+        timeoutArg: '{ "timeout": 60_000 }',
+        timeoutMs: 60_000,
+      },
+      { hook: "afterAll", line: 33, timeoutArg: "CUSTOM_TIMEOUT", timeoutMs: null },
+      { hook: "beforeAll", line: 34, timeoutArg: "60_000", timeoutMs: 60_000 },
+      { hook: "afterAll", line: 37, timeoutArg: "100_000", timeoutMs: 100_000 },
     ]);
 
     expect(
@@ -184,14 +197,16 @@ describe("integration lifecycle hook timeout policy (#3357, #3584)", () => {
     ).toEqual([
       "afterAll:17 (10_000)",
       "beforeAll:20 (15_000)",
+      "beforeAll:23 (30_000)",
       "afterAll:26 (30_000)",
       "beforeEach:29 (20_000)",
-      "afterEach:30 ({ timeout: 10 * 1000 })",
-      "afterAll:31 (CUSTOM_TIMEOUT)",
+      "beforeEach:30 ((15_000 + +15_000))",
+      "afterEach:31 ({ timeout: 10 * 1000 })",
+      "afterAll:33 (CUSTOM_TIMEOUT)",
     ]);
   });
 
-  it("does not lower vitest hookTimeout or pass redundant afterAll/beforeEach/afterEach timeouts in tests/integration", () => {
+  it("does not lower vitest hookTimeout or pass redundant lifecycle hook timeouts in tests/integration", () => {
     const files = integrationSourceFiles();
     expect(files.length).toBeGreaterThan(390);
 

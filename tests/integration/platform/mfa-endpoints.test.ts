@@ -47,7 +47,7 @@ async function clearMfaState(username: string): Promise<void> {
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await clearMfaState("admin");

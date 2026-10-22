@@ -70,7 +70,7 @@ const seededPrefixes: string[] = [];
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   for (const prefix of seededPrefixes) await deletePrefix(prefix).catch(() => {});

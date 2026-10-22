@@ -35,7 +35,7 @@ beforeAll(async () => {
     // Verify sampleRate is populated correctly from ffprobe
     expect(audioStream.sampleRate).toBe(44100);
   }
-}, 30_000);
+});
 
 afterAll(async () => {
   await testApp.cleanup();

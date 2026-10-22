@@ -46,7 +46,7 @@ async function createUser(): Promise<{ username: string; password: string }> {
 beforeAll(async () => {
   testApp = await buildTestApp();
   adminToken = await loginAsAdmin(testApp.app);
-}, 30_000);
+});
 
 afterAll(async () => {
   await db.delete(schema.settings).where(eq(schema.settings.key, "mfaPolicy"));

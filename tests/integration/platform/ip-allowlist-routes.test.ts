@@ -10,7 +10,7 @@ describe("IP allowlist without enterprise license", () => {
   beforeAll(async () => {
     testApp = await buildTestApp();
     adminToken = await loginAsAdmin(testApp.app);
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await testApp.cleanup();
@@ -92,7 +92,7 @@ describe("IP allowlist with enterprise license", () => {
       payload: { username: "ipallowlistuser", password: "TestPass1" },
     });
     userToken = JSON.parse(loginRes.body).token;
-  }, 30_000);
+  });
 
   afterAll(async () => {
     await enterpriseApp.cleanup();
