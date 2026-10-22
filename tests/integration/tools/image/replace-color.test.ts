@@ -222,15 +222,18 @@ describe("Error handling", () => {
 // ── Branch coverage: line 82 (makeTransparent on non-alpha format → forced PNG) ──
 describe("Alpha format fallback", () => {
   it("forces PNG when makeTransparent is used on a JPEG input", async () => {
-    // Use solidRedBuffer with matching sourceColor to ensure transparency is applied
+    // Encode a real JPEG buffer so resolveOutputFormat detects "jpeg" and
+    // exercises the forced-PNG fallback branch when makeTransparent is enabled.
+    const solidRedJpeg = await sharp(solidRedBuffer).jpeg({ quality: 100 }).toBuffer();
     const res = await postTool(
       { sourceColor: "#FF0000", makeTransparent: true, tolerance: 30 },
-      solidRedBuffer,
+      solidRedJpeg,
       "test.jpg",
       "image/jpeg",
     );
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toMatch(/\/test\.png$/);
 
     const dlRes = await app.inject({
       method: "GET",
@@ -240,6 +243,9 @@ describe("Alpha format fallback", () => {
     const meta = await sharp(dlRes.rawPayload).metadata();
     // JPEG doesn't support alpha, so output is forced to PNG
     expect(meta.format).toBe("png");
+    expect(meta.channels).toBe(4);
+    const { data } = await sharp(dlRes.rawPayload).raw().toBuffer({ resolveWithObject: true });
+    expect(data[3]).toBe(0);
   });
 
   it("keeps PNG when makeTransparent is used on a PNG input", async () => {
@@ -251,6 +257,7 @@ describe("Alpha format fallback", () => {
     );
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toMatch(/\/test_replace-color\.png$/);
 
     const dlRes = await app.inject({
       method: "GET",
