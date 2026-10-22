@@ -208,6 +208,11 @@ async function compositeCutout(
   };
 }
 
+/** Where Phase 1 caches the input that effects composites over. */
+function phase1OriginalKey(jobId: string, filename: string): string {
+  return `uploads/${jobId}/${filename.replace(/\.[^.]+$/, "")}_original.png`;
+}
+
 // ── AI job handler (runs inside the BullMQ worker) ────────────────
 // Standalone jobs ("ai-tool") are Phase 1 of the two-phase flow and return the
 // transparent mask. The composite below is the belt to the registry process
@@ -253,12 +258,14 @@ registerAiJobHandler(
         );
       }
 
-      // The mask IS the transparent result; cache original for effects re-apply
+      // The mask IS the transparent result. The original is cached for effects
+      // under uploads/, which /api/v1/download never serves: outputs/<jobId>/
+      // is reachable by anyone holding the cutout's link, and that link must
+      // not hand out the input it was cut from.
       const maskFilename = `${data.filename.replace(/\.[^.]+$/, "")}_mask.png`;
-      const originalFilename = `${data.filename.replace(/\.[^.]+$/, "")}_original.png`;
+      await putObject(phase1OriginalKey(data.jobId, data.filename), input);
 
       const maskUrl = `/api/v1/download/${data.jobId}/${encodeURIComponent(maskFilename)}`;
-      const originalUrl = `/api/v1/download/${data.jobId}/${encodeURIComponent(originalFilename)}`;
 
       return {
         buffer: transparentResult,
@@ -266,11 +273,9 @@ registerAiJobHandler(
         contentType: "image/png",
         resultPayload: {
           maskUrl,
-          originalUrl,
           filename: data.filename,
           model: settings.model,
         },
-        extraOutputs: [{ name: originalFilename, buffer: input, contentType: "image/png" }],
       };
     },
   ),
@@ -531,7 +536,7 @@ export function registerRemoveBackground(app: FastifyInstance) {
 
       const baseName = filename.replace(/\.[^.]+$/, "");
       const maskKey = `outputs/${jobId}/${baseName}_mask.png`;
-      const originalKey = `outputs/${jobId}/${baseName}_original.png`;
+      const originalKey = phase1OriginalKey(jobId, filename);
       // A key the store would refuse is the client's mistake, not a fault.
       if (!isValidObjectKey(maskKey) || !isValidObjectKey(originalKey)) {
         return reply.status(400).send({ error: "Invalid jobId or filename" });
@@ -637,8 +642,8 @@ export function registerRemoveBackground(app: FastifyInstance) {
         }
 
         // Save the final output under a fresh server-generated jobId so
-        // Phase 2 never writes into a client-selected prefix or exposes
-        // Phase 1's _original.png and _mask.png in the final downloadUrl.
+        // Phase 2 never writes into a client-selected prefix or exposes the
+        // Phase 1 jobId in the final downloadUrl.
         const outputJobId = randomUUID();
         const outputFilename = `${baseName}_nobg.${fmt}`;
         const outputKey = `outputs/${outputJobId}/${outputFilename}`;

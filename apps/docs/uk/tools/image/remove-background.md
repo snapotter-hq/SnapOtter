@@ -72,7 +72,6 @@ data: {"phase":"processing","stage":"Removing background...","percent":50}
     "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "downloadUrl": "/api/v1/download/{jobId}/photo_mask.png",
     "maskUrl": "/api/v1/download/{jobId}/photo_mask.png",
-    "originalUrl": "/api/v1/download/{jobId}/photo_original.png",
     "originalSize": 245000,
     "processedSize": 180000,
     "filename": "photo.jpg",

@@ -638,7 +638,9 @@ export function registerPassportPhoto(app: FastifyInstance) {
         const outputJobId = randomUUID();
         const stem = filename.replace(/\.[^.]+$/, "");
         const outputFilename = `${stem}_passport.jpg`;
-        const outputs = [{ key: `outputs/${outputJobId}/${outputFilename}`, buffer: cropped }];
+        const outputs: { key: string; buffer: Buffer }[] = [
+          { key: `outputs/${outputJobId}/${outputFilename}`, buffer: cropped },
+        ];
 
         const response: Record<string, unknown> = {
           jobId: outputJobId,

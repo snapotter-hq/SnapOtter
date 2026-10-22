@@ -500,3 +500,31 @@ describe("remove-background HEIC background preview lifecycle (#3204)", () => {
     expect(URL.createObjectURL).toHaveBeenCalledTimes(createCountBeforeAbort);
   });
 });
+
+// The server keeps the Phase 1 original out of the public download prefix, so
+// the blur preview has to draw the browser's own copy of the loaded file.
+describe("remove-background blur preview source", () => {
+  it("draws the loaded file's blob URL behind the cutout, never a server _original.png", async () => {
+    URL.createObjectURL = vi.fn(() => "blob:loaded-original");
+    processor.downloadUrl = "/api/v1/download/JOB123/a_mask.png";
+    useFileStore.getState().setFiles([png("a.png")]);
+    const onBgPreview = vi.fn();
+    render(<RemoveBgSettings onBgPreview={onBgPreview} />);
+    await screen.findByTestId("remove-background-download");
+
+    fireEvent.click(screen.getByRole("button", { name: en.toolSettings["remove-bg"].effects }));
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: en.toolSettings["remove-background"].blurBackground }),
+    );
+
+    await waitFor(() =>
+      expect(onBgPreview).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          backgroundSrc: "blob:loaded-original",
+          backgroundBlur: expect.stringMatching(/^blur\(/),
+        }),
+      ),
+    );
+    expect(JSON.stringify(onBgPreview.mock.calls)).not.toContain("_original");
+  });
+});

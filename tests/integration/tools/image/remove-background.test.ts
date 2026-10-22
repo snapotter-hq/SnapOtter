@@ -491,7 +491,7 @@ describe("Remove Background", () => {
     const jobId = randomUUID();
     await mkdir(join(env.WORKSPACE_PATH, "outputs", jobId, "test_mask.png"), { recursive: true });
     await putObject(
-      `outputs/${jobId}/test_original.png`,
+      `uploads/${jobId}/test_original.png`,
       await sharp({
         create: { width: 8, height: 8, channels: 3, background: "#888" },
       })
@@ -783,8 +783,9 @@ async function getFileDetail(id: string) {
 
 /**
  * Seed the cached Phase 1 artifacts the effects route reads: a transparent
- * subject (`_mask.png`) and the original (`_original.png`) under the job's
- * output prefix, both matching the `<base>` derived from the filename.
+ * subject (`_mask.png`) under the job's output prefix and the original
+ * (`_original.png`) under its upload prefix, which the download route never
+ * serves. Both match the `<base>` derived from the filename.
  */
 async function seedPhase1Cache(jobId: string, base: string): Promise<void> {
   const mask = await sharp({
@@ -798,7 +799,7 @@ async function seedPhase1Cache(jobId: string, base: string): Promise<void> {
     .png()
     .toBuffer();
   await putObject(`outputs/${jobId}/${base}_mask.png`, mask);
-  await putObject(`outputs/${jobId}/${base}_original.png`, original);
+  await putObject(`uploads/${jobId}/${base}_original.png`, original);
 }
 
 function effectsPayload(fields: Array<{ name: string; content: string }>) {
@@ -983,10 +984,7 @@ describe("Remove Background effects route: Phase 1 ownership", () => {
     expect(res.statusCode).toBe(404);
     expect(JSON.parse(res.body)).toEqual({ error: "Job not found" });
     const keys = (await listObjects(`outputs/${jobId}/`)).map((o) => o.key);
-    expect(keys.sort()).toEqual([
-      `outputs/${jobId}/test_mask.png`,
-      `outputs/${jobId}/test_original.png`,
-    ]);
+    expect(keys).toEqual([`outputs/${jobId}/test_mask.png`]);
   });
 
   it("answers 404 to a non-admin for a jobId no job row owns", async () => {

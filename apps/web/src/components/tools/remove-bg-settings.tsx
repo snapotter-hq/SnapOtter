@@ -143,7 +143,6 @@ interface EffectsErrorRecord {
 function parseMaskDownloadUrl(downloadUrl: string | null): {
   jobId: string;
   baseName: string;
-  originalUrl: string;
 } | null {
   if (!downloadUrl) return null;
   const match = /\/api\/v1\/download\/([^/?#]+)\/([^/?#]+)$/.exec(downloadUrl);
@@ -153,12 +152,7 @@ function parseMaskDownloadUrl(downloadUrl: string | null): {
   if (!jobId || !filename) return null;
   const stripped = filename.replace(/_mask\.png$|_nobg\.png$/, "");
   const baseName = stripped || filename.replace(/\.[^.]+$/, "");
-  const origFilename = `${baseName}_original.png`;
-  return {
-    jobId,
-    baseName,
-    originalUrl: appUrl(`/api/v1/download/${jobId}/${encodeURIComponent(origFilename)}`),
-  };
+  return { jobId, baseName };
 }
 
 function seedModelState(model: unknown): {
@@ -1038,9 +1032,6 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
   const [bgFilename, setBgFilename] = useState<string | null>(
     () => initialParsedDownload?.baseName ?? null,
   );
-  const [bgOriginalUrl, setBgOriginalUrl] = useState<string | null>(
-    () => initialParsedDownload?.originalUrl ?? null,
-  );
 
   // The file a finished removal belongs to, and the file the running one was
   // started on. The result only counts while that file is the one loaded:
@@ -1134,6 +1125,10 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     Boolean(downloadUrl) &&
     files.length === 1 &&
     files[0] === bgResultFile;
+  // The blur preview draws the loaded original behind the cutout. The server
+  // keeps its copy of the original private, so the browser's own one is used.
+  const bgOriginalUrl =
+    bgRemoved && currentEntry?.file === bgResultFile ? currentEntry.blobUrl : null;
   const bgRemovedRef = useRef(bgRemoved);
   bgRemovedRef.current = bgRemoved;
   const bgJobIdRef = useRef(bgJobId);
@@ -1257,7 +1252,6 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
     setApplyingEffects(false);
     setBgJobId(null);
     setBgFilename(null);
-    setBgOriginalUrl(null);
     setEffectsError(null);
 
     if (files.length > 1) {
@@ -1265,7 +1259,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
       return;
     }
 
-    // Custom XHR to capture the extended response (jobId, maskUrl, originalUrl)
+    // Custom XHR to capture the extended response (jobId, maskUrl)
     const formData = new FormData();
     formData.append("file", files[0]);
 
@@ -1322,7 +1316,6 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
       setEffectsError(null);
     }
     setBgFilename(parsed.baseName);
-    setBgOriginalUrl(parsed.originalUrl);
   }, [downloadUrl, processing, setEffectsError]);
 
   // A removal that failed or was cancelled leaves its own error on screen; the

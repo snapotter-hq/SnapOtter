@@ -10,8 +10,13 @@ import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerRemoveBackground } from "../../../apps/api/src/routes/tools/remove-background.js";
 
 const aiMocks = vi.hoisted(() => ({ removeBackground: vi.fn() }));
+const putObject = vi.hoisted(() => vi.fn());
 
 vi.mock("@snapotter/ai", () => ({ removeBackground: aiMocks.removeBackground }));
+vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>()),
+  putObject: (...args: unknown[]) => putObject(...args),
+}));
 
 const ctx: ToolProcessCtx = {
   signal: new AbortController().signal,
@@ -41,6 +46,7 @@ beforeAll(async () => {
 beforeEach(() => {
   vi.clearAllMocks();
   aiMocks.removeBackground.mockResolvedValue(transparent);
+  putObject.mockResolvedValue(undefined);
 });
 
 function job(kind: ToolJobData["kind"], settings: unknown): ToolJobData {
@@ -124,7 +130,7 @@ describe("remove-background AI handler in pipelines and batches (#1047)", () => 
     expect((await cornerPixel(out.buffer))[3]).toBe(0);
   });
 
-  it("leaves the standalone Phase 1 contract alone: transparent mask plus original", async () => {
+  it("keeps the standalone Phase 1 contract: transparent mask, original cached under uploads/", async () => {
     const out = await runAiToolJob(
       job("ai-tool", { model: "u2net", edgeRefine: 2, decontaminate: true }),
       original,
@@ -133,7 +139,14 @@ describe("remove-background AI handler in pipelines and batches (#1047)", () => 
 
     expect(out.filename).toBe("photo_mask.png");
     expect(out.buffer).toEqual(transparent);
-    expect(out.extraOutputs?.map((e) => e.name)).toEqual(["photo_original.png"]);
+    // outputs/<jobId>/ is reachable by anyone holding the cutout's link, so
+    // the original stays out of it and out of the result payload.
+    expect(out.extraOutputs ?? []).toEqual([]);
+    expect(out.resultPayload).not.toHaveProperty("originalUrl");
+    expect(putObject).toHaveBeenCalledWith(
+      "uploads/job-remove-background/photo_original.png",
+      original,
+    );
     expect(aiMocks.removeBackground).toHaveBeenCalledWith(
       original,
       ctx.scratchDir,

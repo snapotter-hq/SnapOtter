@@ -155,7 +155,7 @@ describe("remove-background effects: reading the stored mask and original", () =
 
   it("answers 410 when only the stored original is gone", async () => {
     getObjectBuffer.mockImplementation(async (key: string) => {
-      if (key.endsWith("_original.png")) throw enoent("/data/outputs/job/cat_original.png");
+      if (key.endsWith("_original.png")) throw enoent("/data/uploads/job/cat_original.png");
       return png(4);
     });
     app = await buildApp();
@@ -228,7 +228,7 @@ describe("remove-background effects: reading the stored mask and original", () =
     });
     expect(requestLogError).toHaveBeenCalledWith(
       expect.objectContaining({
-        key: "outputs/job/cat_original.png",
+        key: "uploads/job/cat_original.png",
         err: expect.objectContaining({
           name: "SafeError",
           isSafeMessage: true,
