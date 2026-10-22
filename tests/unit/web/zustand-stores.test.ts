@@ -1586,7 +1586,7 @@ vi.mock("@/lib/image-preview", () => ({
   revokePreviewUrl: vi.fn(),
 }));
 
-import { useCollageStore } from "@/stores/collage-store";
+import { beginCollageRun, useCollageStore } from "@/stores/collage-store";
 
 describe("useCollageStore", () => {
   beforeEach(() => {
@@ -1777,9 +1777,18 @@ describe("useCollageStore", () => {
     expect(s.cellTransforms).toEqual({});
   });
 
-  it("setTemplateId ignores unknown template IDs", () => {
+  it("setTemplateId ignores unknown template IDs without canceling active runs or clearing results", () => {
+    const abort = vi.fn();
+    const run = beginCollageRun(abort);
+    useCollageStore.getState().setResult("blob:result", 5000, 10000, "job-123");
     useCollageStore.getState().setTemplateId("nonexistent");
-    expect(useCollageStore.getState().templateId).toBe("2-h-equal");
+    const s = useCollageStore.getState();
+    expect(s.templateId).toBe("2-h-equal");
+    expect(s.phase).toBe("result");
+    expect(s.resultUrl).toBe("blob:result");
+    expect(abort).not.toHaveBeenCalled();
+    expect(run.isCurrent()).toBe(true);
+    run.end();
   });
 
   it("setCellAssignment updates a single cell", () => {
@@ -1851,17 +1860,23 @@ describe("useCollageStore", () => {
     expect(useCollageStore.getState().backgroundColor).toBe("transparent");
   });
 
-  it("setBgPreset with custom does not overwrite backgroundColor or clear result metadata", () => {
+  it("setBgPreset with custom does not overwrite backgroundColor, clear result metadata, or cancel active runs", () => {
     useCollageStore.getState().setBackgroundColor("#123456");
     useCollageStore.getState().setResult("blob:result", 5000, 10000, "job-123");
+    const abort = vi.fn();
+    const run = beginCollageRun(abort);
     useCollageStore.getState().setBgPreset("custom");
     const s = useCollageStore.getState();
     expect(s.bgPreset).toBe("custom");
     expect(s.backgroundColor).toBe("#123456");
+    expect(s.phase).toBe("result");
     expect(s.resultUrl).toBe("blob:result");
     expect(s.resultSize).toBe(5000);
     expect(s.originalSize).toBe(10000);
     expect(s.jobId).toBe("job-123");
+    expect(abort).not.toHaveBeenCalled();
+    expect(run.isCurrent()).toBe(true);
+    run.end();
   });
 
   it("setAspectRatio updates aspect ratio", () => {
@@ -1936,22 +1951,82 @@ describe("useCollageStore", () => {
       useCollageStore.getState().setResult("blob:result", 5000, 10000, "job-123");
       mutate();
       const s = useCollageStore.getState();
+      const expectedPhase = name === "clearImages" || name === "reset" ? "upload" : "editing";
       expect(
         {
           mutator: name,
+          phase: s.phase,
           resultUrl: s.resultUrl,
           resultSize: s.resultSize,
           originalSize: s.originalSize,
           jobId: s.jobId,
         },
-        `${name} should clear all result metadata`,
+        `${name} should clear all result metadata and reset phase`,
       ).toEqual({
         mutator: name,
+        phase: expectedPhase,
         resultUrl: null,
         resultSize: null,
         originalSize: null,
         jobId: null,
       });
+    }
+  });
+
+  it("cancels an active run and resets phase from processing across setting and layout mutators (#3228)", () => {
+    const file1 = new File(["a"], "a.png", { type: "image/png" });
+    const file2 = new File(["b"], "b.png", { type: "image/png" });
+
+    const mutators: Array<[string, () => void]> = [
+      ["setTemplateId", () => useCollageStore.getState().setTemplateId("3-h-equal")],
+      ["setCellAssignment", () => useCollageStore.getState().setCellAssignment(0, 1)],
+      ["swapCells", () => useCollageStore.getState().swapCells(0, 1)],
+      ["setCellTransform", () => useCollageStore.getState().setCellTransform(0, { zoom: 1.5 })],
+      ["resetCellTransform", () => useCollageStore.getState().resetCellTransform(0)],
+      ["setGap", () => useCollageStore.getState().setGap(16)],
+      ["setCornerRadius", () => useCollageStore.getState().setCornerRadius(8)],
+      ["setBackgroundColor", () => useCollageStore.getState().setBackgroundColor("#123456")],
+      ["setBgPreset(black)", () => useCollageStore.getState().setBgPreset("black")],
+      ["setAspectRatio", () => useCollageStore.getState().setAspectRatio("16:9")],
+      ["setOutputFormat", () => useCollageStore.getState().setOutputFormat("webp")],
+      ["setQuality", () => useCollageStore.getState().setQuality(80)],
+    ];
+
+    for (const [name, mutate] of mutators) {
+      // With images loaded: processing -> editing
+      useCollageStore.getState().reset();
+      useCollageStore.getState().addImages([file1, file2]);
+      const abortWithImages = vi.fn();
+      const runWithImages = beginCollageRun(abortWithImages);
+      useCollageStore.getState().setPhase("processing");
+
+      mutate();
+
+      expect(abortWithImages, `${name} should abort active run`).toHaveBeenCalledTimes(1);
+      expect(runWithImages.isCurrent(), `${name} should invalidate run`).toBe(false);
+      expect(useCollageStore.getState().phase, `${name} with images should return to editing`).toBe(
+        "editing",
+      );
+
+      // Without images loaded: processing/result -> upload
+      useCollageStore.getState().reset();
+      const abortWithoutImages = vi.fn();
+      const runWithoutImages = beginCollageRun(abortWithoutImages);
+      useCollageStore.getState().setPhase("processing");
+
+      mutate();
+
+      expect(
+        abortWithoutImages,
+        `${name} without images should abort active run`,
+      ).toHaveBeenCalledTimes(1);
+      expect(runWithoutImages.isCurrent(), `${name} without images should invalidate run`).toBe(
+        false,
+      );
+      expect(
+        useCollageStore.getState().phase,
+        `${name} without images should return to upload`,
+      ).toBe("upload");
     }
   });
 

@@ -1448,6 +1448,98 @@ describe("own-store tool handlers abort and ignore late completions on store res
     expect(useCollageStore.getState().phase).toBe("upload");
   });
 
+  it("collage: aborts in-flight XHR and post-XHR delay when a setting mutator runs mid-flight and ignores late completion (#3228)", async () => {
+    useCollageStore.getState().addImages([image("one.png"), image("two.png")]);
+    render(<CollageSettings />);
+    fireEvent.click(screen.getByTestId("collage-submit"));
+    expect(FakeXhr.instances).toHaveLength(1);
+    expect(useCollageStore.getState().phase).toBe("processing");
+    expect(screen.getByTestId("collage-submit")).toBeDisabled();
+    const xhr1 = FakeXhr.instances[0];
+
+    // Mutating gap while XHR is in flight aborts XHR and returns phase to editing
+    act(() => {
+      useCollageStore.getState().setGap(20);
+    });
+    expect(xhr1.aborted).toBe(true);
+    expect(useCollageStore.getState().gap).toBe(20);
+    expect(useCollageStore.getState().phase).toBe("editing");
+    expect(useCollageStore.getState().error).toBeNull();
+    expect(screen.getByTestId("collage-submit")).not.toBeDisabled();
+
+    // Late 200 on the aborted XHR is ignored
+    act(() => {
+      xhr1.status = 200;
+      xhr1.responseText = JSON.stringify({
+        jobId: "j-col-stale-1",
+        downloadUrl: "/api/v1/download/j-col-stale-1/collage.png",
+        originalSize: 200,
+        processedSize: 150,
+      });
+      xhr1.onload?.();
+    });
+    await act(async () => {});
+    expect(useCollageStore.getState().resultUrl).toBeNull();
+    expect(useCollageStore.getState().phase).toBe("editing");
+    expect(useCollageStore.getState().error).toBeNull();
+
+    // Start a second run, complete XHR to enter the 800ms post-XHR delay, then mutate a setting
+    fireEvent.click(screen.getByTestId("collage-submit"));
+    expect(FakeXhr.instances).toHaveLength(2);
+    const xhr2 = FakeXhr.instances[1];
+
+    await act(async () => {
+      xhr2.status = 200;
+      xhr2.responseText = JSON.stringify({
+        jobId: "j-col-stale-2",
+        downloadUrl: "/api/v1/download/j-col-stale-2/collage.png",
+        originalSize: 200,
+        processedSize: 150,
+      });
+      xhr2.onload?.();
+    });
+
+    // Now inside the 800ms delay: changing template cancels the delay and returns to editing
+    act(() => {
+      useCollageStore.getState().setTemplateId("2-v-equal");
+    });
+    await act(async () => {});
+
+    expect(useCollageStore.getState().templateId).toBe("2-v-equal");
+    expect(useCollageStore.getState().resultUrl).toBeNull();
+    expect(useCollageStore.getState().phase).toBe("editing");
+    expect(useCollageStore.getState().error).toBeNull();
+    expect(screen.getByTestId("collage-submit")).not.toBeDisabled();
+
+    // Start a third run, cancel it via a setting edit, immediately start a fourth run,
+    // and confirm the canceled third run's late HTTP 500 does not disturb the fourth run
+    fireEvent.click(screen.getByTestId("collage-submit"));
+    expect(FakeXhr.instances).toHaveLength(3);
+    const xhr3 = FakeXhr.instances[2];
+
+    act(() => {
+      useCollageStore.getState().setOutputFormat("webp");
+    });
+    expect(xhr3.aborted).toBe(true);
+    expect(useCollageStore.getState().phase).toBe("editing");
+
+    fireEvent.click(screen.getByTestId("collage-submit"));
+    expect(FakeXhr.instances).toHaveLength(4);
+    expect(useCollageStore.getState().phase).toBe("processing");
+
+    await act(async () => {
+      xhr3.status = 500;
+      xhr3.responseText = JSON.stringify({ error: "stale server failure" });
+      xhr3.onload?.();
+    });
+    expect(useCollageStore.getState().error).toBeNull();
+    expect(useCollageStore.getState().phase).toBe("processing");
+
+    act(() => {
+      useCollageStore.getState().reset();
+    });
+  });
+
   it("passport-photo: aborts analyze and generate fetches on reset(), file change, and ANALYSIS_EXPIRED", async () => {
     let resolveAnalyze: (res: Response) => void = () => {};
     let resolveGenerate: (res: Response) => void = () => {};

@@ -116,6 +116,26 @@ function cancelActiveCollageRun() {
   abort?.();
 }
 
+function clearCollageResult(state: Pick<CollageState, "images" | "phase">): {
+  resultUrl: null;
+  resultSize: null;
+  originalSize: null;
+  jobId: null;
+  phase: Phase;
+} {
+  cancelActiveCollageRun();
+  const phase =
+    state.phase === "processing" || state.phase === "result"
+      ? state.images.length > 0
+        ? "editing"
+        : "upload"
+      : state.phase;
+  return {
+    ...CLEARED_RESULT,
+    phase,
+  };
+}
+
 function buildDefaultAssignments(imageCount: number, cellCount: number): number[] {
   const assignments: number[] = [];
   for (let i = 0; i < cellCount; i++) {
@@ -237,7 +257,7 @@ export const useCollageStore = create<CollageState>((set, get) => ({
       templateId: id,
       cellAssignments: assignments,
       cellTransforms: {},
-      ...CLEARED_RESULT,
+      ...clearCollageResult(state),
     });
   },
 
@@ -245,7 +265,7 @@ export const useCollageStore = create<CollageState>((set, get) => ({
     const state = get();
     const newAssignments = [...state.cellAssignments];
     newAssignments[cellIndex] = imageIndex;
-    set({ cellAssignments: newAssignments, ...CLEARED_RESULT });
+    set({ cellAssignments: newAssignments, ...clearCollageResult(state) });
   },
 
   swapCells: (a, b) => {
@@ -261,7 +281,7 @@ export const useCollageStore = create<CollageState>((set, get) => ({
     set({
       cellAssignments: newAssignments,
       cellTransforms: newTransforms,
-      ...CLEARED_RESULT,
+      ...clearCollageResult(state),
     });
   },
 
@@ -273,7 +293,7 @@ export const useCollageStore = create<CollageState>((set, get) => ({
         ...state.cellTransforms,
         [cellIndex]: { ...current, ...transform },
       },
-      ...CLEARED_RESULT,
+      ...clearCollageResult(state),
     });
   },
 
@@ -281,12 +301,12 @@ export const useCollageStore = create<CollageState>((set, get) => ({
     const state = get();
     const newTransforms = { ...state.cellTransforms };
     delete newTransforms[cellIndex];
-    set({ cellTransforms: newTransforms, ...CLEARED_RESULT });
+    set({ cellTransforms: newTransforms, ...clearCollageResult(state) });
   },
 
-  setGap: (v) => set({ gap: v, ...CLEARED_RESULT }),
-  setCornerRadius: (v) => set({ cornerRadius: v, ...CLEARED_RESULT }),
-  setBackgroundColor: (color) => set({ backgroundColor: color, ...CLEARED_RESULT }),
+  setGap: (v) => set({ gap: v, ...clearCollageResult(get()) }),
+  setCornerRadius: (v) => set({ cornerRadius: v, ...clearCollageResult(get()) }),
+  setBackgroundColor: (color) => set({ backgroundColor: color, ...clearCollageResult(get()) }),
   setBgPreset: (preset) => {
     const colors: Record<string, string> = {
       white: "#FFFFFF",
@@ -296,12 +316,12 @@ export const useCollageStore = create<CollageState>((set, get) => ({
     if (preset === "custom") {
       set({ bgPreset: preset });
     } else {
-      set({ bgPreset: preset, backgroundColor: colors[preset], ...CLEARED_RESULT });
+      set({ bgPreset: preset, backgroundColor: colors[preset], ...clearCollageResult(get()) });
     }
   },
-  setAspectRatio: (v) => set({ aspectRatio: v, ...CLEARED_RESULT }),
-  setOutputFormat: (v) => set({ outputFormat: v, ...CLEARED_RESULT }),
-  setQuality: (v) => set({ quality: v, ...CLEARED_RESULT }),
+  setAspectRatio: (v) => set({ aspectRatio: v, ...clearCollageResult(get()) }),
+  setOutputFormat: (v) => set({ outputFormat: v, ...clearCollageResult(get()) }),
+  setQuality: (v) => set({ quality: v, ...clearCollageResult(get()) }),
   setSelectedCell: (v) => set({ selectedCell: v }),
   setPhase: (v) => set(v === "processing" ? { phase: v, ...CLEARED_RESULT } : { phase: v }),
   setProgress: (v) => set({ progress: v }),
