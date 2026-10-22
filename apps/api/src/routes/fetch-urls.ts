@@ -158,6 +158,10 @@ export function getUniqueName(name: string, used: Set<string>): string {
   return candidate;
 }
 
+function unverifiedMime(claimedMime: string): string {
+  return claimedMime.toLowerCase().startsWith("image/") ? "application/octet-stream" : claimedMime;
+}
+
 export async function registerFetchUrlsRoute(app: FastifyInstance): Promise<void> {
   app.post(
     "/api/v1/fetch-urls",
@@ -327,7 +331,7 @@ async function fetchSingleUrl(
     const responseContentType = response.headers.get("content-type")?.split(";")[0]?.trim();
     const contentType = isValidImage
       ? (FORMAT_TO_MIME[validation.format] ?? "application/octet-stream")
-      : responseContentType || "application/octet-stream";
+      : unverifiedMime(responseContentType || "application/octet-stream");
     const downloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(filename)}`;
 
     // Formats in CLI_DECODED_FORMATS (HEIC, RAW, PSD, TGA, ...) validate

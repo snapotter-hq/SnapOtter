@@ -138,6 +138,18 @@ function createMockFetch() {
         return mockResponse("hello", {
           headers: { "Content-Type": "text/plain" },
         });
+      case "/fake-image.jpg":
+        return mockResponse("not an image", {
+          headers: { "Content-Type": "image/jpeg" },
+        });
+      case "/fake-image.tga":
+        return mockResponse("not an image", {
+          headers: { "Content-Type": "image/x-tga" },
+        });
+      case "/fake-mixed-case.png":
+        return mockResponse("<html>error</html>", {
+          headers: { "Content-Type": "Image/PNG; charset=utf-8" },
+        });
       case "/icon.svgz":
         return mockResponse(DIRTY_SVGZ, {
           headers: { "Content-Type": "application/gzip" },
@@ -911,6 +923,7 @@ describe("POST /api/v1/fetch-urls", () => {
     expect(body.results[2]).toMatchObject({
       success: true,
       filename: "xxe.svg",
+      contentType: "application/octet-stream",
     });
     const xxeDl = await app.inject({
       method: "GET",
@@ -932,6 +945,68 @@ describe("POST /api/v1/fetch-urls", () => {
       success: false,
       url: `${MOCK_ORIGIN}/over-cap.svg`,
       error: expect.stringMatching(/element count/i),
+    });
+  });
+
+  it("downgrades unverified image/* response Content-Type headers to application/octet-stream (#3544)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/fetch-urls",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        urls: [
+          `${MOCK_ORIGIN}/fake-image.jpg`,
+          `${MOCK_ORIGIN}/fake-image.tga`,
+          `${MOCK_ORIGIN}/fake-mixed-case.png`,
+          `${MOCK_ORIGIN}/not-image.txt`,
+          `${MOCK_ORIGIN}/report.dat`,
+        ],
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.results).toHaveLength(5);
+
+    expect(body.results[0]).toMatchObject({
+      success: true,
+      filename: "fake-image.jpg",
+      contentType: "application/octet-stream",
+      previewUrl: null,
+    });
+    expect(body.results[0].width).toBeUndefined();
+    expect(body.results[0].height).toBeUndefined();
+
+    expect(body.results[1]).toMatchObject({
+      success: true,
+      filename: "fake-image.tga",
+      contentType: "application/octet-stream",
+      previewUrl: null,
+    });
+    expect(body.results[1].width).toBeUndefined();
+    expect(body.results[1].height).toBeUndefined();
+
+    expect(body.results[2]).toMatchObject({
+      success: true,
+      filename: "fake-mixed-case.png",
+      contentType: "application/octet-stream",
+      previewUrl: null,
+    });
+    expect(body.results[2].width).toBeUndefined();
+    expect(body.results[2].height).toBeUndefined();
+
+    expect(body.results[3]).toMatchObject({
+      success: true,
+      filename: "not-image.txt",
+      contentType: "text/plain",
+      previewUrl: null,
+    });
+
+    expect(body.results[4]).toMatchObject({
+      success: true,
+      filename: "report.dat",
+      contentType: "application/pdf",
+      previewUrl: null,
     });
   });
 });

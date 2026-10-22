@@ -652,6 +652,7 @@ describe("registerFetchUrlsRoute nameOnly image validations (#3263)", () => {
       expect(body.results[5]).toMatchObject({
         success: true,
         filename: "xxe.svg",
+        contentType: "application/octet-stream",
       });
 
       // 6: over-cap SVG fails with element count message and is not stored
@@ -935,6 +936,119 @@ describe("registerFetchUrlsRoute nameOnly image validations (#3263)", () => {
         },
       ]);
       expect(reportErrorMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("downgrades unverified image/* response Content-Type headers to application/octet-stream while keeping non-image headers (#3544)", async () => {
+    const handler = await getFetchUrlsHandler();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string | URL | Request) => {
+        const href = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+        if (href.endsWith("/fake-jpeg.jpg")) {
+          return new Response("not an image", {
+            status: 200,
+            headers: { "Content-Type": "image/jpeg" },
+          });
+        }
+        if (href.endsWith("/fake-tga.tga")) {
+          return new Response("not an image", {
+            status: 200,
+            headers: { "Content-Type": "image/x-tga" },
+          });
+        }
+        if (href.endsWith("/mixed-case.png")) {
+          return new Response("<html>error</html>", {
+            status: 200,
+            headers: { "Content-Type": "Image/PNG; charset=utf-8" },
+          });
+        }
+        if (href.endsWith("/clip.mp4")) {
+          return new Response("fake video bytes", {
+            status: 200,
+            headers: { "Content-Type": "video/mp4" },
+          });
+        }
+        return new Response("plain text", {
+          status: 200,
+          headers: { "Content-Type": "text/plain" },
+        });
+      }),
+    );
+
+    try {
+      putObjectMock.mockClear();
+      const reply = makeReply();
+      await handler(
+        {
+          body: {
+            urls: [
+              "http://1.2.3.4:9999/fake-jpeg.jpg",
+              "http://1.2.3.4:9999/fake-tga.tga",
+              "http://1.2.3.4:9999/mixed-case.png",
+              "http://1.2.3.4:9999/clip.mp4",
+              "http://1.2.3.4:9999/readme.txt",
+            ],
+          },
+          log: { warn: vi.fn() },
+        },
+        reply,
+      );
+
+      expect(reply.statusCode).toBe(200);
+      const body = reply.payload as {
+        results: Array<{
+          success: boolean;
+          filename?: string;
+          contentType?: string;
+          width?: number;
+          height?: number;
+          previewUrl?: string | null;
+        }>;
+      };
+      expect(body.results).toHaveLength(5);
+      expect(body.results[0]).toMatchObject({
+        success: true,
+        filename: "fake-jpeg.jpg",
+        contentType: "application/octet-stream",
+        width: undefined,
+        height: undefined,
+        previewUrl: null,
+      });
+      expect(body.results[1]).toMatchObject({
+        success: true,
+        filename: "fake-tga.tga",
+        contentType: "application/octet-stream",
+        width: undefined,
+        height: undefined,
+        previewUrl: null,
+      });
+      expect(body.results[2]).toMatchObject({
+        success: true,
+        filename: "mixed-case.png",
+        contentType: "application/octet-stream",
+        width: undefined,
+        height: undefined,
+        previewUrl: null,
+      });
+      expect(body.results[3]).toMatchObject({
+        success: true,
+        filename: "clip.mp4",
+        contentType: "video/mp4",
+        width: undefined,
+        height: undefined,
+        previewUrl: null,
+      });
+      expect(body.results[4]).toMatchObject({
+        success: true,
+        filename: "readme.txt",
+        contentType: "text/plain",
+        width: undefined,
+        height: undefined,
+        previewUrl: null,
+      });
     } finally {
       vi.unstubAllGlobals();
     }
