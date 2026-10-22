@@ -233,7 +233,18 @@ def main():
 
     try:
         emit_progress(10, "Preparing")
-        from PIL import Image, ImageFilter
+        try:
+            from PIL import Image, ImageFilter
+        except ImportError:
+            print(
+                json.dumps(
+                    {
+                        "success": False,
+                        "error": "Pillow is not installed. Install with: pip install Pillow",
+                    }
+                )
+            )
+            sys.exit(1)
 
         img = Image.open(input_path).convert("RGB")
 
@@ -289,27 +300,23 @@ def main():
                 )
             )
 
-        except ImportError:
+        except ImportError as e:
+            msg = str(e).strip() or type(e).__name__
+            hint = (
+                "Fix with: apt-get install -y libgl1"
+                if "libGL" in msg
+                else "Install with: pip install mediapipe numpy opencv-python"
+            )
             print(
                 json.dumps(
                     {
                         "success": False,
-                        "error": "Face detection requires MediaPipe. Install with: pip install mediapipe",
+                        "error": f"Missing dependency: {msg}. {hint}",
                     }
                 )
             )
             sys.exit(1)
 
-    except ImportError:
-        print(
-            json.dumps(
-                {
-                    "success": False,
-                    "error": "Pillow is not installed. Install with: pip install Pillow",
-                }
-            )
-        )
-        sys.exit(1)
     except Exception as e:
         print(json.dumps({"success": False, "error": str(e).strip() or type(e).__name__}))
         sys.exit(1)

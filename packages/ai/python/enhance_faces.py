@@ -286,22 +286,40 @@ def main():
 
     try:
         emit_progress(10, "Preparing")
-        from PIL import Image
-        import numpy as np
-
-        img = Image.open(input_path).convert("RGB")
-        img_array = np.array(img)
-
-        # Detect faces with MediaPipe
         try:
-            emit_progress(20, "Scanning for faces")
-            faces = detect_faces_mediapipe(img_array, sensitivity)
+            from PIL import Image
         except ImportError:
             print(
                 json.dumps(
                     {
                         "success": False,
-                        "error": "Face detection requires MediaPipe. Install with: pip install mediapipe",
+                        "error": "Pillow is not installed. Install with: pip install Pillow",
+                    }
+                )
+            )
+            sys.exit(1)
+
+        img = Image.open(input_path).convert("RGB")
+
+        # Detect faces with MediaPipe
+        try:
+            import numpy as np
+
+            img_array = np.array(img)
+            emit_progress(20, "Scanning for faces")
+            faces = detect_faces_mediapipe(img_array, sensitivity)
+        except ImportError as e:
+            msg = str(e).strip() or type(e).__name__
+            hint = (
+                "Fix with: apt-get install -y libgl1"
+                if "libGL" in msg
+                else "Install with: pip install mediapipe numpy opencv-python"
+            )
+            print(
+                json.dumps(
+                    {
+                        "success": False,
+                        "error": f"Missing dependency: {msg}. {hint}",
                     }
                 )
             )
@@ -346,38 +364,55 @@ def main():
         model_used = None
 
         try:
-            if model_choice == "gfpgan":
-                enhanced = enhance_with_gfpgan(img_array, only_center_face)
-                model_used = "gfpgan"
-
-            elif model_choice == "codeformer":
-                fidelity_weight = 1.0 - strength
-                enhanced = enhance_with_codeformer(img_array, fidelity_weight)
-                model_used = "codeformer"
-
-            elif model_choice == "auto":
-                try:
-                    fidelity_weight = 1.0 - strength
-                    enhanced = enhance_with_codeformer(img_array, fidelity_weight)
-                    model_used = "codeformer"
-                except Exception as e:
-                    if _is_oom(e):
-                        raise
-                    import traceback
-                    detail = str(e).strip() or type(e).__name__
-                    print(f"[enhance-faces] CodeFormer failed, falling back to GFPGAN: {detail}", file=sys.stderr, flush=True)
-                    traceback.print_exc(file=sys.stderr)
-                    emit_progress(50, "Falling back to GFPGAN")
+            try:
+                if model_choice == "gfpgan":
                     enhanced = enhance_with_gfpgan(img_array, only_center_face)
                     model_used = "gfpgan"
 
-        finally:
-            # Restore stdout after ALL AI processing
-            sys.stdout.flush()
-            if stdout_fd is not None:
-                os.dup2(stdout_fd, 1)
-                os.close(stdout_fd)
-            sys.stdout = sys.__stdout__  # Restore Python-level stdout
+                elif model_choice == "codeformer":
+                    fidelity_weight = 1.0 - strength
+                    enhanced = enhance_with_codeformer(img_array, fidelity_weight)
+                    model_used = "codeformer"
+
+                elif model_choice == "auto":
+                    try:
+                        fidelity_weight = 1.0 - strength
+                        enhanced = enhance_with_codeformer(img_array, fidelity_weight)
+                        model_used = "codeformer"
+                    except Exception as e:
+                        if _is_oom(e):
+                            raise
+                        import traceback
+                        detail = str(e).strip() or type(e).__name__
+                        print(f"[enhance-faces] CodeFormer failed, falling back to GFPGAN: {detail}", file=sys.stderr, flush=True)
+                        traceback.print_exc(file=sys.stderr)
+                        emit_progress(50, "Falling back to GFPGAN")
+                        enhanced = enhance_with_gfpgan(img_array, only_center_face)
+                        model_used = "gfpgan"
+
+            finally:
+                # Restore stdout after ALL AI processing
+                sys.stdout.flush()
+                if stdout_fd is not None:
+                    os.dup2(stdout_fd, 1)
+                    os.close(stdout_fd)
+                sys.stdout = sys.__stdout__  # Restore Python-level stdout
+        except ImportError as e:
+            msg = str(e).strip() or type(e).__name__
+            hint = (
+                "Fix with: apt-get install -y libgl1"
+                if "libGL" in msg
+                else "Install with: pip install torch gfpgan codeformer-pip opencv-python numpy"
+            )
+            print(
+                json.dumps(
+                    {
+                        "success": False,
+                        "error": f"Missing dependency: {msg}. {hint}",
+                    }
+                )
+            )
+            sys.exit(1)
 
         if enhanced is None:
             raise RuntimeError("Face enhancement failed: no model available")
@@ -409,16 +444,6 @@ def main():
             )
         )
 
-    except ImportError:
-        print(
-            json.dumps(
-                {
-                    "success": False,
-                    "error": "Pillow is not installed. Install with: pip install Pillow",
-                }
-            )
-        )
-        sys.exit(1)
     except Exception as e:
         print(json.dumps({"success": False, "error": str(e).strip() or type(e).__name__}))
         sys.exit(1)

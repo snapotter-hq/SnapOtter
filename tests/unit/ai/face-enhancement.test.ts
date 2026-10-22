@@ -664,6 +664,237 @@ print("ENHANCE_FACES_3440_OK")
         expect(res.status, res.stderr).toBe(0);
         expect(res.stdout).toContain("ENHANCE_FACES_3440_OK");
       });
+
+      it("scopes Pillow ImportError to PIL import and reports downstream ImportErrors with detail and libGL hints (issue #3625)", () => {
+        const res = spawnSync(
+          pythonBin as string,
+          [
+            "-c",
+            `
+import contextlib, importlib.util, io, json, os, sys, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+
+class FakeArr:
+    shape = (64, 64, 3)
+    def __getitem__(self, _idx):
+        return self
+    def copy(self):
+        return self
+
+spec = importlib.util.spec_from_file_location("enhance_faces_mod", os.path.join(py_dir, "enhance_faces.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+orig_dunder_stdout = sys.__stdout__
+
+def run_main(settings):
+    sys.argv = ["enhance_faces.py", "/tmp/in.png", "/tmp/out_faces.png", json.dumps(settings)]
+    out_buf, err_buf = io.StringIO(), io.StringIO()
+    try:
+        sys.__stdout__ = out_buf
+        with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+            mod.main()
+    except SystemExit as exc:
+        assert exc.code == 1, exc.code
+    else:
+        raise AssertionError(f"Expected SystemExit(1), got stdout={out_buf.getvalue()!r}")
+    finally:
+        sys.__stdout__ = orig_dunder_stdout
+    return json.loads(out_buf.getvalue().strip())
+
+# 1. Missing PIL still reports Pillow installation message
+sys.modules["PIL"] = None
+try:
+    payload = run_main({"model": "gfpgan"})
+    assert payload == {
+        "success": False,
+        "error": "Pillow is not installed. Install with: pip install Pillow",
+    }, payload
+finally:
+    sys.modules.pop("PIL", None)
+
+# Install fake PIL and numpy for subsequent checks
+fake_pil = types.ModuleType("PIL")
+fake_pil.Image = types.SimpleNamespace(
+    open=lambda _p: types.SimpleNamespace(convert=lambda _m: FakeArr()),
+    fromarray=lambda _a: types.SimpleNamespace(save=lambda _p: None),
+)
+sys.modules["PIL"] = fake_pil
+
+# 2. Missing numpy after PIL succeeds reports numpy ImportError, not Pillow
+sys.modules["numpy"] = None
+try:
+    payload = run_main({"model": "gfpgan"})
+    assert payload["success"] is False, payload
+    assert "Pillow is not installed" not in payload["error"], payload
+    assert payload == {
+        "success": False,
+        "error": "Missing dependency: import of numpy halted; None in sys.modules. Install with: pip install mediapipe numpy opencv-python",
+    }, payload
+finally:
+    sys.modules.pop("numpy", None)
+
+# 2b. ImportError inside Image.open (e.g. missing codec plugin) is not misreported as missing Pillow
+fake_pil.Image.open = lambda _p: (_ for _ in ()).throw(ImportError("No module named 'pillow_heif'"))
+payload = run_main({"model": "gfpgan"})
+assert payload == {
+    "success": False,
+    "error": "No module named 'pillow_heif'",
+}, payload
+fake_pil.Image.open = lambda _p: types.SimpleNamespace(convert=lambda _m: FakeArr())
+
+fake_np = types.ModuleType("numpy")
+fake_np.array = lambda _img: FakeArr()
+sys.modules["numpy"] = fake_np
+
+# 3. Unstubbed detect_faces_mediapipe, enhance_with_gfpgan, and enhance_with_codeformer propagate real ImportErrors cleanly
+sys.modules["mediapipe"] = None
+try:
+    payload = run_main({"model": "gfpgan"})
+    assert payload == {
+        "success": False,
+        "error": "Missing dependency: import of mediapipe halted; None in sys.modules. Install with: pip install mediapipe numpy opencv-python",
+    }, payload
+finally:
+    sys.modules.pop("mediapipe", None)
+
+mod.detect_faces_mediapipe = lambda _arr, _s: [{"x": 0, "y": 0, "w": 32, "h": 32}]
+
+orig_cuda_fn = lambda: False
+fake_torch = types.ModuleType("torch")
+fake_torch.cuda = types.SimpleNamespace(is_available=orig_cuda_fn)
+sys.modules["torch"] = fake_torch
+
+fake_gpu = types.ModuleType("gpu")
+fake_gpu.torch_gpu_available = lambda: False
+sys.modules["gpu"] = fake_gpu
+
+fake_offline = types.ModuleType("offline_guard")
+fake_offline.prepare_codeformer_weights = lambda _b: None
+fake_offline.prepare_gfpgan_helper_weights = lambda _b: None
+sys.modules["offline_guard"] = fake_offline
+
+fake_cv2 = types.ModuleType("cv2")
+sys.modules["cv2"] = fake_cv2
+
+sys.modules["gfpgan"] = None
+try:
+    payload = run_main({"model": "gfpgan", "strength": 1.0})
+    assert payload == {
+        "success": False,
+        "error": "Missing dependency: import of gfpgan halted; None in sys.modules. Install with: pip install torch gfpgan codeformer-pip opencv-python numpy",
+    }, payload
+finally:
+    sys.modules.pop("gfpgan", None)
+
+sys.modules["codeformer"] = None
+sys.modules["codeformer.app"] = None
+try:
+    payload = run_main({"model": "codeformer", "strength": 1.0})
+    assert payload == {
+        "success": False,
+        "error": "Missing dependency: import of codeformer.app halted; None in sys.modules. Install with: pip install torch gfpgan codeformer-pip opencv-python numpy",
+    }, payload
+    assert fake_torch.cuda.is_available is orig_cuda_fn
+finally:
+    sys.modules.pop("codeformer", None)
+    sys.modules.pop("codeformer.app", None)
+
+# 3b. MediaPipe / cv2 / libGL ImportErrors in detect_faces_mediapipe include detail and appropriate hint
+for detect_exc, expected_error in (
+    (
+        ModuleNotFoundError("No module named 'mediapipe'"),
+        "Missing dependency: No module named 'mediapipe'. Install with: pip install mediapipe numpy opencv-python",
+    ),
+    (
+        ModuleNotFoundError("No module named 'cv2'"),
+        "Missing dependency: No module named 'cv2'. Install with: pip install mediapipe numpy opencv-python",
+    ),
+    (
+        ImportError("libGL.so.1: cannot open shared object file: No such file or directory"),
+        "Missing dependency: libGL.so.1: cannot open shared object file: No such file or directory. Fix with: apt-get install -y libgl1",
+    ),
+    (
+        ImportError(),
+        "Missing dependency: ImportError. Install with: pip install mediapipe numpy opencv-python",
+    ),
+    (
+        ImportError("   "),
+        "Missing dependency: ImportError. Install with: pip install mediapipe numpy opencv-python",
+    ),
+):
+    def raise_detect(_arr, _s, _exc=detect_exc):
+        raise _exc
+    mod.detect_faces_mediapipe = raise_detect
+    payload = run_main({"model": "gfpgan"})
+    assert payload == {"success": False, "error": expected_error}, (detect_exc, payload)
+
+# 4. Downstream GFPGAN / CodeFormer / torch / cv2 / libGL ImportErrors report actual cause, not Pillow
+mod.detect_faces_mediapipe = lambda _arr, _s: [{"x": 0, "y": 0, "w": 32, "h": 32}]
+
+for model_name, fn_attr, model_exc, expected_error in (
+    (
+        "gfpgan",
+        "enhance_with_gfpgan",
+        ModuleNotFoundError("No module named 'gfpgan'"),
+        "Missing dependency: No module named 'gfpgan'. Install with: pip install torch gfpgan codeformer-pip opencv-python numpy",
+    ),
+    (
+        "gfpgan",
+        "enhance_with_gfpgan",
+        ModuleNotFoundError("No module named 'torch'"),
+        "Missing dependency: No module named 'torch'. Install with: pip install torch gfpgan codeformer-pip opencv-python numpy",
+    ),
+    (
+        "codeformer",
+        "enhance_with_codeformer",
+        ModuleNotFoundError("No module named 'codeformer'"),
+        "Missing dependency: No module named 'codeformer'. Install with: pip install torch gfpgan codeformer-pip opencv-python numpy",
+    ),
+    (
+        "codeformer",
+        "enhance_with_codeformer",
+        ImportError("libGL.so.1: cannot open shared object file"),
+        "Missing dependency: libGL.so.1: cannot open shared object file. Fix with: apt-get install -y libgl1",
+    ),
+    (
+        "gfpgan",
+        "enhance_with_gfpgan",
+        ImportError(),
+        "Missing dependency: ImportError. Install with: pip install torch gfpgan codeformer-pip opencv-python numpy",
+    ),
+    (
+        "gfpgan",
+        "enhance_with_gfpgan",
+        ImportError("   "),
+        "Missing dependency: ImportError. Install with: pip install torch gfpgan codeformer-pip opencv-python numpy",
+    ),
+):
+    def raise_model(_arr, _arg, _exc=model_exc):
+        raise _exc
+    setattr(mod, fn_attr, raise_model)
+    payload = run_main({"model": model_name, "strength": 1.0})
+    assert payload == {"success": False, "error": expected_error}, (model_name, model_exc, payload)
+
+# 5. In auto mode, CodeFormer ImportError falls back to GFPGAN; if GFPGAN also raises ImportError, reports GFPGAN ImportError
+mod.enhance_with_codeformer = lambda _arr, _fid: (_ for _ in ()).throw(ModuleNotFoundError("No module named 'codeformer'"))
+mod.enhance_with_gfpgan = lambda _arr, _only_center: (_ for _ in ()).throw(ModuleNotFoundError("No module named 'gfpgan'"))
+payload = run_main({"model": "auto", "strength": 1.0})
+assert payload == {
+    "success": False,
+    "error": "Missing dependency: No module named 'gfpgan'. Install with: pip install torch gfpgan codeformer-pip opencv-python numpy",
+}, payload
+
+print("ENHANCE_FACES_3625_OK")
+`,
+          ],
+          { encoding: "utf8", timeout: 30_000 },
+        );
+        expect(res.status, res.stderr).toBe(0);
+        expect(res.stdout).toContain("ENHANCE_FACES_3625_OK");
+      });
     },
   );
 });

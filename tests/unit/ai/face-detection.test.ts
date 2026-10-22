@@ -1,5 +1,9 @@
+import { spawnSync } from "node:child_process";
 import { readFile, unlink, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { hasPython, pythonBin } from "../../helpers/python-gate.js";
 
 vi.mock("sharp", () => {
   const mockSharp = vi.fn(() => ({
@@ -346,4 +350,133 @@ describe("detectFaces", () => {
       await expect(detectFaces(FAKE_INPUT)).rejects.toThrow("Permission denied");
     });
   });
+
+  describe.skipIf(!hasPython)(
+    "detect_faces.py ImportError scoping and detail reporting (issue #3625)",
+    () => {
+      const here = dirname(fileURLToPath(import.meta.url));
+      const pyDir = resolve(here, "../../../packages/ai/python");
+
+      it("scopes Pillow ImportError to PIL import and includes detail and libGL hints on MediaPipe/NumPy/cv2 ImportErrors", () => {
+        const res = spawnSync(
+          pythonBin as string,
+          [
+            "-c",
+            `
+import contextlib, importlib.util, io, json, os, sys, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+
+class FakeArr:
+    shape = (64, 64, 3)
+
+spec = importlib.util.spec_from_file_location("detect_faces_mod", os.path.join(py_dir, "detect_faces.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+def run_main(settings=None):
+    sys.argv = ["detect_faces.py", "/tmp/in.png", "/tmp/out.png", json.dumps(settings or {"detectOnly": True})]
+    out_buf, err_buf = io.StringIO(), io.StringIO()
+    try:
+        with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+            mod.main()
+    except SystemExit as exc:
+        assert exc.code == 1, exc.code
+    else:
+        raise AssertionError(f"Expected SystemExit(1), got stdout={out_buf.getvalue()!r}")
+    return json.loads(out_buf.getvalue().strip())
+
+# 1. Missing PIL still reports Pillow installation message
+sys.modules["PIL"] = None
+try:
+    payload = run_main()
+    assert payload == {
+        "success": False,
+        "error": "Pillow is not installed. Install with: pip install Pillow",
+    }, payload
+finally:
+    sys.modules.pop("PIL", None)
+
+fake_pil = types.ModuleType("PIL")
+fake_pil.Image = types.SimpleNamespace(
+    open=lambda _p: types.SimpleNamespace(convert=lambda _m: FakeArr(), width=64, height=64),
+)
+fake_pil.ImageFilter = types.SimpleNamespace(GaussianBlur=lambda _r: None)
+sys.modules["PIL"] = fake_pil
+
+# 2. Missing numpy reports numpy ImportError with detail, not Pillow or generic MediaPipe
+sys.modules["numpy"] = None
+try:
+    payload = run_main()
+    assert payload == {
+        "success": False,
+        "error": "Missing dependency: import of numpy halted; None in sys.modules. Install with: pip install mediapipe numpy opencv-python",
+    }, payload
+finally:
+    sys.modules.pop("numpy", None)
+
+# 2b. ImportError inside Image.open (e.g. missing codec plugin) is not misreported as missing Pillow
+fake_pil.Image.open = lambda _p: (_ for _ in ()).throw(ImportError("No module named 'pillow_heif'"))
+payload = run_main()
+assert payload == {
+    "success": False,
+    "error": "No module named 'pillow_heif'",
+}, payload
+fake_pil.Image.open = lambda _p: types.SimpleNamespace(convert=lambda _m: FakeArr(), width=64, height=64)
+
+fake_np = types.ModuleType("numpy")
+fake_np.array = lambda _img: FakeArr()
+sys.modules["numpy"] = fake_np
+
+# 3. Unstubbed _detect_faces propagates real cv2 ImportError when cv2 is missing
+sys.modules["cv2"] = None
+try:
+    payload = run_main()
+    assert payload == {
+        "success": False,
+        "error": "Missing dependency: import of cv2 halted; None in sys.modules. Install with: pip install mediapipe numpy opencv-python",
+    }, payload
+finally:
+    sys.modules.pop("cv2", None)
+
+# 3b. MediaPipe / cv2 / libGL ImportErrors in _detect_faces include detail and appropriate hint
+for detect_exc, expected_error in (
+    (
+        ModuleNotFoundError("No module named 'mediapipe'"),
+        "Missing dependency: No module named 'mediapipe'. Install with: pip install mediapipe numpy opencv-python",
+    ),
+    (
+        ModuleNotFoundError("No module named 'cv2'"),
+        "Missing dependency: No module named 'cv2'. Install with: pip install mediapipe numpy opencv-python",
+    ),
+    (
+        ImportError("libGL.so.1: cannot open shared object file: No such file or directory"),
+        "Missing dependency: libGL.so.1: cannot open shared object file: No such file or directory. Fix with: apt-get install -y libgl1",
+    ),
+    (
+        ImportError(),
+        "Missing dependency: ImportError. Install with: pip install mediapipe numpy opencv-python",
+    ),
+    (
+        ImportError("   "),
+        "Missing dependency: ImportError. Install with: pip install mediapipe numpy opencv-python",
+    ),
+):
+    def raise_detect(_arr, _c, _exc=detect_exc):
+        raise _exc
+    mod._detect_faces = raise_detect
+    payload = run_main()
+    assert payload == {"success": False, "error": expected_error}, (detect_exc, payload)
+
+print("DETECT_FACES_3625_OK")
+`,
+          ],
+          { encoding: "utf8", timeout: 30_000 },
+        );
+        expect(res.status, res.stderr).toBe(0);
+        expect(res.stdout).toContain("DETECT_FACES_3625_OK");
+      });
+    },
+  );
 });

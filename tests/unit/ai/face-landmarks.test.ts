@@ -1,5 +1,9 @@
+import { spawnSync } from "node:child_process";
 import { unlink, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { hasPython, pythonBin } from "../../helpers/python-gate.js";
 
 vi.mock("sharp", () => {
   const mockSharp = vi.fn(() => ({
@@ -302,4 +306,131 @@ describe("detectFaceLandmarks", () => {
       expect(result.landmarks).toBeNull();
     });
   });
+
+  describe.skipIf(!hasPython)(
+    "face_landmarks.py ImportError scoping and detail reporting (issue #3625)",
+    () => {
+      const here = dirname(fileURLToPath(import.meta.url));
+      const pyDir = resolve(here, "../../../packages/ai/python");
+
+      it("scopes Pillow ImportError to PIL import and includes detail and libGL hints on MediaPipe/NumPy ImportErrors", () => {
+        const res = spawnSync(
+          pythonBin as string,
+          [
+            "-c",
+            `
+import contextlib, importlib.util, io, json, os, sys, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+
+class FakeArr:
+    shape = (64, 64, 3)
+
+spec = importlib.util.spec_from_file_location("face_landmarks_mod", os.path.join(py_dir, "face_landmarks.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+def run_main():
+    sys.argv = ["face_landmarks.py", "/tmp/in.png", "unused", "{}"]
+    out_buf, err_buf = io.StringIO(), io.StringIO()
+    try:
+        with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+            mod.main()
+    except SystemExit as exc:
+        assert exc.code == 1, exc.code
+    else:
+        raise AssertionError(f"Expected SystemExit(1), got stdout={out_buf.getvalue()!r}")
+    return json.loads(out_buf.getvalue().strip())
+
+# 1. Missing PIL still reports Pillow installation message
+sys.modules["PIL"] = None
+try:
+    payload = run_main()
+    assert payload == {
+        "success": False,
+        "error": "Pillow is not installed. Install with: pip install Pillow",
+    }, payload
+finally:
+    sys.modules.pop("PIL", None)
+
+fake_pil = types.ModuleType("PIL")
+fake_pil.Image = types.SimpleNamespace(
+    open=lambda _p: types.SimpleNamespace(convert=lambda _m: types.SimpleNamespace(size=(64, 64))),
+)
+sys.modules["PIL"] = fake_pil
+
+# 2. Missing mediapipe reports mediapipe ImportError with detail
+sys.modules["mediapipe"] = None
+try:
+    payload = run_main()
+    assert payload == {
+        "success": False,
+        "error": "Missing dependency: import of mediapipe halted; None in sys.modules. Install with: pip install mediapipe numpy",
+    }, payload
+finally:
+    sys.modules.pop("mediapipe", None)
+
+# 2b. ImportError inside Image.open (e.g. missing codec plugin) is not misreported as missing Pillow
+fake_pil.Image.open = lambda _p: (_ for _ in ()).throw(ImportError("No module named 'pillow_heif'"))
+payload = run_main()
+assert payload == {
+    "success": False,
+    "error": "No module named 'pillow_heif'",
+}, payload
+fake_pil.Image.open = lambda _p: types.SimpleNamespace(convert=lambda _m: types.SimpleNamespace(size=(64, 64)))
+
+fake_mp = types.ModuleType("mediapipe")
+sys.modules["mediapipe"] = fake_mp
+
+# 2c. Missing numpy when mediapipe is present reports numpy ImportError with detail
+sys.modules["numpy"] = None
+try:
+    payload = run_main()
+    assert payload == {
+        "success": False,
+        "error": "Missing dependency: import of numpy halted; None in sys.modules. Install with: pip install mediapipe numpy",
+    }, payload
+finally:
+    sys.modules.pop("numpy", None)
+
+fake_np = types.ModuleType("numpy")
+fake_np.array = lambda _img: FakeArr()
+sys.modules["numpy"] = fake_np
+
+# 3. MediaPipe / libGL / empty ImportErrors in detect_with_solutions include detail and appropriate hint
+for detect_exc, expected_error in (
+    (
+        ModuleNotFoundError("No module named 'mediapipe'"),
+        "Missing dependency: No module named 'mediapipe'. Install with: pip install mediapipe numpy",
+    ),
+    (
+        ImportError("libGL.so.1: cannot open shared object file: No such file or directory"),
+        "Missing dependency: libGL.so.1: cannot open shared object file: No such file or directory. Fix with: apt-get install -y libgl1",
+    ),
+    (
+        ImportError(),
+        "Missing dependency: ImportError. Install with: pip install mediapipe numpy",
+    ),
+    (
+        ImportError("   "),
+        "Missing dependency: ImportError. Install with: pip install mediapipe numpy",
+    ),
+):
+    def raise_detect(_arr, _max=1, _exc=detect_exc):
+        raise _exc
+    mod.detect_with_solutions = raise_detect
+    payload = run_main()
+    assert payload == {"success": False, "error": expected_error}, (detect_exc, payload)
+
+print("FACE_LANDMARKS_3625_OK")
+`,
+          ],
+          { encoding: "utf8", timeout: 30_000 },
+        );
+        expect(res.status, res.stderr).toBe(0);
+        expect(res.stdout).toContain("FACE_LANDMARKS_3625_OK");
+      });
+    },
+  );
 });
