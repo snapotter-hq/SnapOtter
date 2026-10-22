@@ -1014,6 +1014,78 @@ describe("OCR PDF path-backed processing", () => {
         warnSpy.mockRestore();
       }
     });
+
+    it("destroys the ReadStream and suppresses late ENOENT when the caller unlinks the scratch file immediately after putObjectStream settles (#3685)", async () => {
+      const { mkdtempSync, unlinkSync, writeFileSync } = await import("node:fs");
+      const scratchDir = mkdtempSync(join(tmpdir(), "ocr-pdf-3685-"));
+      const settledEarlyPath = join(scratchDir, "0-first.pdf");
+      const failedPath = join(scratchDir, "1-second.pdf");
+      writeFileSync(settledEarlyPath, "%PDF-1.4 first");
+      writeFileSync(failedPath, "%PDF-1.4 second");
+
+      const storeErr = new Error("S3 stream failed");
+      const capturedStreams: Readable[] = [];
+      const destroyedAtSettle: boolean[] = [];
+      const errorListenersAtSettle: number[] = [];
+      mocks.putObjectStream
+        .mockImplementationOnce(async (_key: string, stream: Readable) => {
+          capturedStreams.push(stream);
+          return 14;
+        })
+        .mockImplementationOnce(async (_key: string, stream: Readable) => {
+          capturedStreams.push(stream);
+          stream.destroy();
+          throw storeErr;
+        });
+
+      const unhandledErrors: unknown[] = [];
+      const onUncaught = (err: unknown) => {
+        unhandledErrors.push(err);
+      };
+      process.on("uncaughtException", onUncaught);
+      try {
+        try {
+          await expect(
+            storeValidatedOcrPdf(
+              { path: settledEarlyPath, filename: "first.pdf", size: 14 },
+              "uploads/ocr-pdf-job/first.pdf",
+              { maxBytes: 1024 },
+            ),
+          ).resolves.toBe(14);
+          destroyedAtSettle.push(Boolean(capturedStreams[0]?.destroyed));
+          errorListenersAtSettle.push(capturedStreams[0]?.listenerCount("error") ?? 0);
+        } finally {
+          unlinkSync(settledEarlyPath);
+        }
+
+        try {
+          await expect(
+            storeValidatedOcrPdf(
+              { path: failedPath, filename: "second.pdf", size: 15 },
+              "uploads/ocr-pdf-job/second.pdf",
+              { maxBytes: 1024 },
+            ),
+          ).rejects.toBe(storeErr);
+          destroyedAtSettle.push(Boolean(capturedStreams[1]?.destroyed));
+          errorListenersAtSettle.push(capturedStreams[1]?.listenerCount("error") ?? 0);
+        } finally {
+          unlinkSync(failedPath);
+        }
+
+        await Promise.all(
+          capturedStreams.map((s) =>
+            s.closed ? Promise.resolve() : new Promise<void>((resolve) => s.once("close", resolve)),
+          ),
+        );
+        expect(destroyedAtSettle).toEqual([true, true]);
+        expect(errorListenersAtSettle).toEqual([1, 1]);
+        expect(unhandledErrors).toEqual([]);
+      } finally {
+        process.off("uncaughtException", onUncaught);
+        mocks.putObjectStream.mockReset();
+        await rm(scratchDir, { recursive: true, force: true });
+      }
+    });
   });
 
   describe("OCR PDF route rollback delete logging (#2837)", () => {

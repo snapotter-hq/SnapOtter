@@ -47,8 +47,17 @@ export async function storeValidatedOcrPdf(
     signal: opts.signal,
   });
   await opts.beforeStore?.();
+  const stream = createReadStream(file.path);
   try {
-    const written = await putObjectStream(key, createReadStream(file.path), opts);
+    let written: number;
+    try {
+      written = await putObjectStream(key, stream, opts);
+    } finally {
+      stream.on("error", () => {});
+      if (!stream.destroyed) {
+        stream.destroy();
+      }
+    }
     if (written !== file.size) {
       throw new Error(`OCR PDF scratch file changed size (${file.size} to ${written} bytes)`);
     }
