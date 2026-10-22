@@ -23,7 +23,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 const OVER_LIMIT = Buffer.alloc(11 * 1024 * 1024, 1);
 const SMALL = Buffer.alloc(1024, 1);

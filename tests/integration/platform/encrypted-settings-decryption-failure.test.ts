@@ -77,7 +77,7 @@ afterEach(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 async function seedWebhookDestination(authHeader: string): Promise<void> {
   await upsertSetting(

@@ -44,7 +44,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await db.delete(schema.settings).where(eq(schema.settings.key, "loginThrottleMaxFailures"));
   await testApp.cleanup();
-}, 10_000);
+});
 
 async function wrongLogin(username: string): Promise<number> {
   const before = scrypts.calls;

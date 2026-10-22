@@ -45,7 +45,7 @@ afterAll(async () => {
     (env as Record<string, unknown>)[k] = v;
   }
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("SAML routes when saml_sso is not licensed", () => {
   it("does not register the metadata route (early return, feature unlicensed)", async () => {

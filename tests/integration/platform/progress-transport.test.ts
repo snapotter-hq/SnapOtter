@@ -35,7 +35,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Redis progress transport", () => {
   it("cannot miss a terminal publish while the connection is replaying prior state", async () => {

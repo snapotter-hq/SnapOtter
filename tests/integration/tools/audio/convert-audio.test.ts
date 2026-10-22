@@ -25,7 +25,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 async function runTool(settings: Record<string, unknown>, file = WAV, filename = "tiny.wav") {
   const { body, contentType } = createMultipartPayload([

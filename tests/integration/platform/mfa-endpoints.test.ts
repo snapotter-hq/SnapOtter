@@ -52,7 +52,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await clearMfaState("admin");
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("POST /api/auth/mfa/enroll", () => {
   afterEach(async () => {

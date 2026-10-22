@@ -52,7 +52,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 afterEach(async () => {
   // Put back every admin a test parked, so the seeded admin can log in again.

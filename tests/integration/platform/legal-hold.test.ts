@@ -13,7 +13,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("legal hold", () => {
   it("returns 403 for PUT without enterprise license", async () => {

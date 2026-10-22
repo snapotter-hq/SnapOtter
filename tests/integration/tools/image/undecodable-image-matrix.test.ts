@@ -109,7 +109,7 @@ describe("Undecodable image input matrix (#949)", () => {
 
   afterAll(async () => {
     await testApp.cleanup();
-  }, 10_000);
+  });
 
   it("covers every non-preset image tool in TOOLS (no silent drift)", () => {
     const presetIds = new Set<string>([

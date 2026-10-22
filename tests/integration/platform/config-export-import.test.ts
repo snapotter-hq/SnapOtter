@@ -36,7 +36,7 @@ describe("config export and import without enterprise license", () => {
 
   afterAll(async () => {
     await testApp.cleanup();
-  }, 10_000);
+  });
 
   describe("config export without enterprise license", () => {
     it("returns 403 without enterprise license", async () => {
@@ -105,7 +105,7 @@ describe("config export with enterprise license", () => {
   afterAll(async () => {
     await licensedApp.cleanup();
     vi.restoreAllMocks();
-  }, 10_000);
+  });
 
   it("closes the unlicensed job spine before starting the licensed app (#2805)", async () => {
     const { closeQueues, getQueue } = await import("../../../apps/api/src/jobs/queues.js");
@@ -420,7 +420,7 @@ describe("config import with enterprise license", () => {
   afterAll(async () => {
     await licensedApp.cleanup();
     vi.restoreAllMocks();
-  }, 10_000);
+  });
 
   it("returns 403 for non-admin users", async () => {
     await licensedApp.app.inject({
@@ -1689,7 +1689,7 @@ describe("config round-trip", () => {
   afterAll(async () => {
     await licensedApp.cleanup();
     vi.restoreAllMocks();
-  }, 10_000);
+  });
 
   it("export then dry-run import classifies existing records as updates", async () => {
     const exportRes = await licensedApp.app.inject({

@@ -491,5 +491,5 @@ export function setupMatrixApp(): void {
 
   afterAll(async () => {
     await testApp.cleanup();
-  }, 10_000);
+  });
 }

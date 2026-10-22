@@ -50,7 +50,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("V2 process contract", () => {
   it("loads all inputRefs and invokes processV2 with scratchPath output", async () => {

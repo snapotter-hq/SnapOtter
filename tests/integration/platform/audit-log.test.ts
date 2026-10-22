@@ -15,7 +15,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("audit log", () => {
   it("records login events in database", async () => {

@@ -24,7 +24,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe.skipIf(!ffmpegAvailable())("embed-subtitles (requires ffmpeg)", () => {
   it("embeds an SRT subtitle track into an MP4", async () => {

@@ -26,7 +26,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 /** Build a zip buffer in memory using archiver. */
 async function buildZipBuffer(entries: Array<{ name: string; content: Buffer }>): Promise<Buffer> {

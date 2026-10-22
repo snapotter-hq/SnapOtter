@@ -38,7 +38,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 function post(pdf: Buffer, filename: string, settings: Record<string, unknown>) {
   const { body, contentType } = createMultipartPayload([

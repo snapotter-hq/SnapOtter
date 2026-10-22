@@ -31,7 +31,7 @@ describe("New format support", () => {
 
   afterAll(async () => {
     await testApp?.cleanup();
-  }, 10_000);
+  });
 
   // ---------------------------------------------------------------------------
   // New output format conversions

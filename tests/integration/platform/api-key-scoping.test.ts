@@ -13,7 +13,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("API key permission scoping", () => {
   it("creates a key with scoped permissions", async () => {

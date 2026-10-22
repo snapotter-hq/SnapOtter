@@ -29,7 +29,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("watermark-text", () => {
   it("adds a text watermark with default settings", async () => {

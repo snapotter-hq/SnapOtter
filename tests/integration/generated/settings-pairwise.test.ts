@@ -53,7 +53,7 @@ describe("pairwise settings matrix", () => {
 
   afterAll(async () => {
     await testApp.cleanup();
-  }, 10_000);
+  });
 
   // The registry is populated by buildTestApp() in beforeAll, so the
   // FULL_MATRIX tool list comes from the static TOOLS catalog and configs are

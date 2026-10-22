@@ -32,7 +32,7 @@ describe("download endpoint over a real socket (#590)", () => {
   afterAll(async () => {
     await deletePrefix(`outputs/${jobId}/`);
     await testApp.cleanup();
-  }, 10_000);
+  });
 
   // Force the route's declared Content-Length (from getObjectSize) to exceed the
   // bytes the stream yields: #590 "cause 2", a stat/stream size disagreement.

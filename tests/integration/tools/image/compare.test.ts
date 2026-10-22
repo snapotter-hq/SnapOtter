@@ -31,7 +31,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Compare", () => {
   it("reports 100% similarity when comparing an image with itself", async () => {

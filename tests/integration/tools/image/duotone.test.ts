@@ -26,7 +26,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Duotone", () => {
   it("maps black pixels to shadow color and white pixels to highlight color", async () => {

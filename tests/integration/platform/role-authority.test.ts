@@ -72,7 +72,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("role authority containment", () => {
   it.each(["disabled:", "disabled:disabled", "disabled:disabled:", "disabled:disabled:admin"])(

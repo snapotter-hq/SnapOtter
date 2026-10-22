@@ -36,7 +36,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 function uploadDirs(): Set<string> {
   const root = path.join(process.env.WORKSPACE_PATH as string, "uploads");

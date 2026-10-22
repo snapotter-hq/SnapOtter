@@ -42,7 +42,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 // adminToken is created once in beforeAll — reuse it throughout.
 // Individual tests that need a fresh token should create their own.

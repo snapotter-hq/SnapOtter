@@ -26,7 +26,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 /**
  * Handles both the 200 sync-window path and the 202+poll path.

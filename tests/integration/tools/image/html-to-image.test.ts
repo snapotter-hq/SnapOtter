@@ -55,7 +55,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 function post(payload: Record<string, unknown>, token?: string) {
   return app.inject({

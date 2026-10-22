@@ -24,7 +24,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe.skipIf(!ffmpegAvailable())("images-to-video (requires ffmpeg)", () => {
   it("creates a slideshow from two images with default settings", async () => {

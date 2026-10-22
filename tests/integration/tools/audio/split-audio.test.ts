@@ -21,7 +21,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe.skipIf(!ffmpegAvailable())("split-audio (requires ffmpeg)", () => {
   it("splits into 2 parts via parts mode", async () => {

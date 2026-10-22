@@ -46,7 +46,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 type Sample = (typeof SAMPLES)[keyof typeof SAMPLES];
 type Part = { name: string; filename?: string; contentType?: string; content: Buffer | string };

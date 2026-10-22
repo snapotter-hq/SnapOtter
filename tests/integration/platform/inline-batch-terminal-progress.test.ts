@@ -71,7 +71,7 @@ afterEach(() => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 const ROUTES = [
   {

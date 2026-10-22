@@ -36,7 +36,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("compress-image-to-N-kb presets", () => {
   // Both fixtures are ~80-90 KB, so every target forces real compression work.

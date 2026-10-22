@@ -438,7 +438,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 // ---------------------------------------------------------------------------
 // Cross-format matrix: every AI tool x every format

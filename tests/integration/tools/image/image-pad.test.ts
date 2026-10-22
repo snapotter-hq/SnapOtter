@@ -30,7 +30,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Image Pad", () => {
   // Unit tests for canvasFor helper

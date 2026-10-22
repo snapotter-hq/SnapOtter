@@ -48,7 +48,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("image-to-pdf", () => {
   it("converts a single image to PDF", async () => {

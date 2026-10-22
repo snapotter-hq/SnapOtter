@@ -24,7 +24,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("ensureAnonymousUser", () => {
   it("creates anonymous row in the users table", async () => {

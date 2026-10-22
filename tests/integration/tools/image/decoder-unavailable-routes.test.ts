@@ -63,7 +63,7 @@ afterAll(async () => {
   process.env.PATH = ORIGINAL_PATH;
   rmSync(emptyBinDir, { recursive: true, force: true });
   await testApp.cleanup();
-}, 10_000);
+});
 
 type Sample = (typeof SAMPLES)[keyof typeof SAMPLES];
 type Part = { name: string; filename?: string; contentType?: string; content: Buffer | string };

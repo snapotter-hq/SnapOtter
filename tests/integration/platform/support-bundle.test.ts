@@ -34,7 +34,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("GET /api/v1/admin/support-bundle", () => {
   it("rejects unauthenticated requests", async () => {

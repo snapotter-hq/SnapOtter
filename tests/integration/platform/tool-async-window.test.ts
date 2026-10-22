@@ -31,7 +31,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Tool async window (sync-wait path)", () => {
   it("returns 200 with legacy envelope keys", async () => {

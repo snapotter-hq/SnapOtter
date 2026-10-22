@@ -209,7 +209,7 @@ afterAll(async () => {
   (env as any).OIDC_CLIENT_SECRET = origClientSecret;
   await oidcApp.cleanup();
   await new Promise<void>((resolve) => mockServer.close(() => resolve()));
-}, 10_000);
+});
 
 describe("OIDC callback MFA outcomes", () => {
   it("creates a session directly when MFA is optional and the user isn't enrolled", async () => {

@@ -98,7 +98,7 @@ afterAll(async () => {
   if (originalFfmpegPath === undefined) delete process.env.FFMPEG_PATH;
   else process.env.FFMPEG_PATH = originalFfmpegPath;
   if (wrapperDir) rmSync(wrapperDir, { recursive: true, force: true });
-}, 10_000);
+});
 
 interface Upload {
   filename: string;

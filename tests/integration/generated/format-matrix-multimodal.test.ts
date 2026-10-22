@@ -115,7 +115,7 @@ describe("multi-modality tool x format matrix", () => {
 
   afterAll(async () => {
     await testApp.cleanup();
-  }, 10_000);
+  });
 
   // Sanity: we should have fixtures for each modality
   it("has video, audio, document, and data fixtures", () => {

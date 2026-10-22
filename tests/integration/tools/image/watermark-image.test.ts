@@ -31,7 +31,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("watermark-image", () => {
   it("overlays a watermark image with default settings", async () => {

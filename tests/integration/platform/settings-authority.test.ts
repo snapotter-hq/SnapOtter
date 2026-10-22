@@ -141,7 +141,7 @@ afterAll(async () => {
     await db.delete(schema.roles).where(eq(schema.roles.id, settingsManagerRoleId));
   }
   await testApp.cleanup();
-}, 10_000);
+});
 
 afterEach(() => {
   vi.restoreAllMocks();

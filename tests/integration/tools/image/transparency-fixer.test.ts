@@ -39,7 +39,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 /** Helper: build multipart payload and POST to the transparency-fixer endpoint. */
 async function postTransparencyFixer(

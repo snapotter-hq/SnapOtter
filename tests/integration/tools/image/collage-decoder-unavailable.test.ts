@@ -52,7 +52,7 @@ afterAll(async () => {
   process.env.PATH = ORIGINAL_PATH;
   rmSync(emptyBinDir, { recursive: true, force: true });
   await testApp.cleanup();
-}, 10_000);
+});
 
 function hideDecoderBinaries() {
   process.env.PATH = emptyBinDir;

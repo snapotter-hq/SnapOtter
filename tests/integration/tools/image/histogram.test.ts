@@ -29,7 +29,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Histogram", () => {
   it("generates a PNG histogram with bins and stats", async () => {

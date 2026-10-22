@@ -27,7 +27,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("LQIP Placeholder", () => {
   it("generates a placeholder with default settings", async () => {

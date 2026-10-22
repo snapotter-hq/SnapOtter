@@ -30,7 +30,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("vectorize", () => {
   it("vectorizes a PNG with default settings (bw mode)", async () => {

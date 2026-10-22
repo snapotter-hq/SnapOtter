@@ -59,7 +59,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Rounded Crop", () => {
   it("produces a rounded-square crop as a square PNG", async () => {

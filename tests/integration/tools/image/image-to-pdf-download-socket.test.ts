@@ -27,7 +27,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 async function convert(files: Buffer[], collate: boolean): Promise<string> {
   const parts = files.map((content, i) => ({

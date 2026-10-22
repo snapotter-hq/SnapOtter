@@ -45,7 +45,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 // ── Batch progress tracking via X-Job-Id ────────────────────────
 

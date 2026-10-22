@@ -33,7 +33,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Info", () => {
   it("returns correct metadata for a PNG image", async () => {

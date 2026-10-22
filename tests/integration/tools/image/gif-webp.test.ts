@@ -63,7 +63,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("GIF/WebP Converter", () => {
   it("converts animated GIF to WebP with multiple pages", async () => {

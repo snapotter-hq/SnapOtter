@@ -57,7 +57,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Find Duplicates", () => {
   it("detects duplicates when the same image is uploaded twice", async () => {

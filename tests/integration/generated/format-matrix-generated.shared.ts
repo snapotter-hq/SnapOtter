@@ -109,7 +109,7 @@ export function registerToolFormatMatrix(part: number): void {
 
     afterAll(async () => {
       await testApp.cleanup();
-    }, 10_000);
+    });
 
     // Registry-wide assertions, not per-tool ones, so one part carries them.
     if (part === 1) {

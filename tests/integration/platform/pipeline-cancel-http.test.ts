@@ -128,7 +128,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("route-stamped cancel metadata (#771)", () => {
   it("stamps the alias pointer, owner, and flow-row step count on /execute", async () => {

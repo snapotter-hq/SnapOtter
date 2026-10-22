@@ -241,7 +241,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 // ---------------------------------------------------------------------------
 // 1. Color-blindness simulation x all formats

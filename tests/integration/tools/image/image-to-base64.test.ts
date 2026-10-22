@@ -32,7 +32,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("image-to-base64", () => {
   it("converts a PNG to base64", async () => {

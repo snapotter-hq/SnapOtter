@@ -90,7 +90,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 function upload(url: string, filename: string, content: Buffer) {
   const { body, contentType } = createMultipartPayload([

@@ -52,7 +52,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("upload and preview authorization", () => {
   it("refuses an upload from a principal without file permissions", async () => {

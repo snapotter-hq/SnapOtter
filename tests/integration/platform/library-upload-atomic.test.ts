@@ -105,7 +105,7 @@ afterAll(async () => {
     await db.delete(schema.userFiles).where(inArray(schema.userFiles.id, keptIds));
   await Promise.all(keptBlobs.map((name) => deleteStoredFile(name)));
   await testApp.cleanup();
-}, 10_000);
+});
 
 beforeEach(() => {
   hooks.savedNames.length = 0;

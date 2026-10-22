@@ -33,7 +33,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 async function uploadAs(token: string): Promise<{ id: string; storedName: string }> {
   const payload = createMultipartPayload([

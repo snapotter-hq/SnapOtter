@@ -33,7 +33,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 /** POST a file to a tool route and return the raw response. */
 async function postTool(

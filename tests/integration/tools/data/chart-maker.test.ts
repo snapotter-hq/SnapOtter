@@ -27,7 +27,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 function makeCsv(rows: [string, number][]): Buffer {
   const lines = ["label,value", ...rows.map(([l, v]) => `${l},${v}`)];

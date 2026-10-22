@@ -21,7 +21,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("QR Generate", () => {
   it("generates a QR code from a URL string", async () => {

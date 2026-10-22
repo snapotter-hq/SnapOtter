@@ -22,7 +22,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Barcode Generate", () => {
   it("generates a code128 barcode from text", async () => {

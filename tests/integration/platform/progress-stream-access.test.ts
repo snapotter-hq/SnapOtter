@@ -63,7 +63,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 const DOWNLOAD_URL = "/api/v1/download/result-job/output.png";
 

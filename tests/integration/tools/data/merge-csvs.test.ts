@@ -20,7 +20,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("merge-csvs (pure JS, no skipIf)", () => {
   it("merges tiny-a.csv and tiny-b.csv into one file with both rows", async () => {

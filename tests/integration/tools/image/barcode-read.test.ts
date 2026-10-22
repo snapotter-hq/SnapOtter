@@ -56,7 +56,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Barcode Read", () => {
   it("detects and decodes a QR code from a generated image", async () => {

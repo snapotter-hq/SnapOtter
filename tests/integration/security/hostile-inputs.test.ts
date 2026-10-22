@@ -61,7 +61,7 @@ describe("hostile input matrix", () => {
 
   afterAll(async () => {
     await testApp.cleanup();
-  }, 10_000);
+  });
 
   async function postFile(toolId: string, fixtureName: string) {
     const content = readFileSync(join(fixtureDir.hostile, fixtureName));

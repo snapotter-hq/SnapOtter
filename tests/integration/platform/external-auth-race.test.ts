@@ -44,7 +44,7 @@ afterEach(() => {
 afterAll(async () => {
   await db.delete(schema.users).where(inArray(schema.users.username, RACE_USERNAMES));
   await testApp.cleanup();
-}, 10_000);
+});
 
 function baseParams(overrides: Partial<ExternalAuthParams>): ExternalAuthParams {
   return {

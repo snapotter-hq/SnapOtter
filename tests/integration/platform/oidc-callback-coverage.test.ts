@@ -222,7 +222,7 @@ describe("OIDC callback discovery failure (cold cache)", () => {
     (env as any).OIDC_CLIENT_SECRET = origClientSecret;
     await oidcApp.cleanup();
     await new Promise<void>((resolve) => deadServer.close(() => resolve()));
-  }, 10_000);
+  });
 
   it("redirects to oidc_provider_unreachable when discovery fails at callback time", async () => {
     // Signed cookie whose state matches the query, so the callback passes the
@@ -424,7 +424,7 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     (env as any).MAX_USERS = origMaxUsers;
     await oidcApp.cleanup();
     await new Promise<void>((resolve) => mockServer.close(() => resolve()));
-  }, 10_000);
+  });
 
   describe.each(SSO_DEPLOYMENTS)("deployment at '%s', EXTERNAL_URL %s", (basePath, typed) => {
     const originalBasePath = env.BASE_PATH;

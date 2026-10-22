@@ -20,7 +20,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("create-zip (pure JS, no skipIf)", () => {
   it("zips two fixture files into a valid ZIP with PK magic", async () => {

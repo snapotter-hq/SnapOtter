@@ -195,7 +195,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 let mockFetch: ReturnType<typeof createMockFetch>;
 

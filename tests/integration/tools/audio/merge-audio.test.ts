@@ -24,7 +24,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe.skipIf(!ffmpegAvailable())("merge-audio (requires ffmpeg)", () => {
   it("merges two audio files with different sample rates", async () => {

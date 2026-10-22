@@ -49,7 +49,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("favicon", () => {
   it("generates favicon ZIP from a single image", async () => {

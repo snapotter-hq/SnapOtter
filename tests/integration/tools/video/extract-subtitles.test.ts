@@ -21,7 +21,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe.skipIf(!ffmpegAvailable())("extract-subtitles (requires ffmpeg)", () => {
   it("extracts the subtitle track from an MKV with embedded subs", async () => {

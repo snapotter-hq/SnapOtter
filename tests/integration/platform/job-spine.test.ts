@@ -84,7 +84,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Job spine", () => {
   it("enqueue -> worker -> result round-trip (spine-echo)", async () => {

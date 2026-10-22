@@ -17,7 +17,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("conversion preset smoke", () => {
   it("jpg-to-png returns a png (fast/200)", async () => {

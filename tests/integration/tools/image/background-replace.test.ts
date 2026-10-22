@@ -47,7 +47,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("background-replace", () => {
   // -- Missing-capability contract --

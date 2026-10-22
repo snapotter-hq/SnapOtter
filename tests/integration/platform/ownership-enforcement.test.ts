@@ -78,7 +78,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 // ── File ownership ────────────────────────────────────────────────────
 

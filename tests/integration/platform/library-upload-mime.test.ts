@@ -45,7 +45,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 type Upload = { filename: string; contentType: string; content: Buffer };
 

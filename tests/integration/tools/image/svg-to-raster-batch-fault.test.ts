@@ -188,7 +188,7 @@ afterEach(() => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 function postBatch(
   clientJobId: string,

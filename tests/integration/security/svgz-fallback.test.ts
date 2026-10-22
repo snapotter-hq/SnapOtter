@@ -17,7 +17,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("SVGZ fallback behavior", () => {
   it("keeps .svgz extension if it does not contain a valid SVG", async () => {

@@ -14,7 +14,7 @@ describe("SIEM config without enterprise license", () => {
 
   afterAll(async () => {
     await testApp.cleanup();
-  }, 10_000);
+  });
 
   it("GET returns 403 without enterprise license", async () => {
     const res = await testApp.app.inject({
@@ -105,7 +105,7 @@ describe("SIEM config with enterprise license", () => {
   afterAll(async () => {
     await enterpriseApp.cleanup();
     vi.resetModules();
-  }, 10_000);
+  });
 
   it("closes the unlicensed job spine before starting the licensed app (#2805)", async () => {
     const { closeQueues, getQueue } = await import("../../../apps/api/src/jobs/queues.js");

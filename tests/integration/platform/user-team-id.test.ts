@@ -30,7 +30,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 afterEach(async () => {
   await db.update(schema.teams).set({ storageQuota: null });

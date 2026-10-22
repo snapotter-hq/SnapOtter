@@ -22,7 +22,7 @@ describe("sign-pdf", () => {
 
   afterAll(async () => {
     await testApp.cleanup();
-  }, 10_000);
+  });
 
   function runTool(placements: unknown) {
     const { body, contentType } = createMultipartPayload([

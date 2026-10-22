@@ -34,7 +34,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("svg-to-raster", () => {
   it("converts SVG to PNG with default settings", async () => {

@@ -29,7 +29,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Vignette", () => {
   it("applies vignette effect with default settings", async () => {

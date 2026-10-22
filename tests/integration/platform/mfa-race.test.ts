@@ -44,7 +44,7 @@ describe("MFA Race Condition #2328", () => {
     if (testApp) {
       await testApp.cleanup();
     }
-  }, 10_000);
+  });
 
   async function createEnrolledUser(): Promise<{
     userId: string;

@@ -34,7 +34,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 /** Upload a PNG into the library, return its file id. */
 async function uploadLibraryFile(filename: string): Promise<string> {

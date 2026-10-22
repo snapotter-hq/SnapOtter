@@ -199,7 +199,7 @@ describe("OIDC sign-in faults reach Sentry (#1869)", () => {
     resetOidcDiscoveryCacheForTests();
     await oidcApp.cleanup();
     await new Promise<void>((resolve) => mockServer.close(() => resolve()));
-  }, 10_000);
+  });
 
   beforeEach(() => {
     resetOidcDiscoveryCacheForTests();

@@ -70,7 +70,7 @@ afterEach(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 function login(username: string, password: string) {
   return testApp.app.inject({

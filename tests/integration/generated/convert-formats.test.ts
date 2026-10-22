@@ -116,7 +116,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 // ---------------------------------------------------------------------------
 // Raster-to-raster conversions via /api/v1/tools/image/convert

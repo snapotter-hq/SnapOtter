@@ -38,7 +38,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Smart Crop", () => {
   // ── Processing ───────────────────────────────────────────────────

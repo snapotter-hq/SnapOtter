@@ -83,7 +83,7 @@ describe("catalog integrity launch gate", () => {
 
   afterAll(async () => {
     await testApp.cleanup();
-  }, 10_000);
+  });
 
   it("TOOLS catalog is non-empty", () => {
     expect(TOOLS.length).toBeGreaterThan(0);

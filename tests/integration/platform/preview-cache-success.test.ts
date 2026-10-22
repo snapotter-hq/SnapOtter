@@ -27,7 +27,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 async function uploadToLibrary(filename: string, contentType: string, content: Buffer) {
   const payload = createMultipartPayload([{ name: "file", filename, contentType, content }]);

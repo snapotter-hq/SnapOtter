@@ -25,7 +25,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 /** Log in and return the raw Set-Cookie header for the session cookie. */
 async function loginSetCookie(

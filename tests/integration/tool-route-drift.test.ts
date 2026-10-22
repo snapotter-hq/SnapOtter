@@ -35,7 +35,7 @@ describe("tool route drift", () => {
 
   afterAll(async () => {
     await testApp.cleanup();
-  }, 10_000);
+  });
 
   it("every non-exempt TOOLS entry has a registered process fn", () => {
     const registered = new Set(getRegisteredToolIds());

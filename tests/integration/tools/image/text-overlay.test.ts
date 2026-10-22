@@ -29,7 +29,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("text-overlay", () => {
   it("adds text overlay with default settings", async () => {

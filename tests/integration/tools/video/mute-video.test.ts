@@ -23,7 +23,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe.skipIf(!ffmpegAvailable())("mute-video (requires ffmpeg)", () => {
   it("removes audio and returns 200 with settings {}", async () => {

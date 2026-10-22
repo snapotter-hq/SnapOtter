@@ -51,7 +51,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await db.delete(schema.settings).where(eq(schema.settings.key, "mfaPolicy"));
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("MFA lockout recovery (issue #515)", () => {
   it("reset-mfa-policy unlocks a user walled by a required policy", async () => {

@@ -108,7 +108,7 @@ afterAll(async () => {
     if (idx !== -1) TOOLS.splice(idx, 1);
   }
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Factory multi-input (maxInputs)", () => {
   it("accepts 3 files for a maxInputs:3 tool, concatenates, and records 3 inputRefs", async () => {

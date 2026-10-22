@@ -31,7 +31,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Compose", () => {
   it("overlays a small image onto a base image at default position", async () => {

@@ -55,7 +55,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await clearSetting("loginThrottleMaxFailures");
   await testApp.cleanup();
-}, 10_000);
+});
 
 /** Register a user through the API (so the password is hashed the way production does). */
 async function registerUser(password: string): Promise<string> {

@@ -20,7 +20,7 @@ describe("GDPR lifecycle without enterprise license", () => {
 
   afterAll(async () => {
     await testApp.cleanup();
-  }, 10_000);
+  });
 
   describe("GDPR data export", () => {
     it("returns 403 for POST without enterprise license", async () => {
@@ -333,7 +333,7 @@ describe("GDPR purge role hierarchy", () => {
     }
     await licensedApp.cleanup();
     vi.restoreAllMocks();
-  }, 10_000);
+  });
 
   async function createTarget(role: string, teamId?: string): Promise<string> {
     targetSequence += 1;

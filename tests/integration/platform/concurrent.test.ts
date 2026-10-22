@@ -36,7 +36,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 /** Helper to build an inject config for a tool request. */
 function buildToolRequest(

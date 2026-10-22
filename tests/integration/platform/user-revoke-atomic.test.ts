@@ -82,7 +82,7 @@ beforeAll(async () => {
 afterAll(async () => {
   vi.restoreAllMocks();
   await testApp.cleanup();
-}, 10_000);
+});
 
 afterEach(() => {
   failDeleteOn = null;

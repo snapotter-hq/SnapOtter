@@ -29,7 +29,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 // Helper: seed a Default team if not present
 async function ensureDefaultTeam(): Promise<string> {

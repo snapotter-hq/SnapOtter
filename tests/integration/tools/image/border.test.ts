@@ -30,7 +30,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Border", () => {
   it("adds a solid black border with default width", async () => {

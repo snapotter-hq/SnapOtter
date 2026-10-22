@@ -74,7 +74,7 @@ afterEach(async () => {
 afterAll(async () => {
   await db.delete(schema.settings).where(eq(schema.settings.key, "mfaPolicy"));
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("POST /api/auth/login forced enrollment (licensed)", () => {
   it("returns 200 requiresMfaEnrollment with a token, uri, and recovery codes for an unenrolled user under a required policy", async () => {

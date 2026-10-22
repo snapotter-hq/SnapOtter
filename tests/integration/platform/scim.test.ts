@@ -47,7 +47,7 @@ describe("SCIM 2.0 provisioning", () => {
 
   afterAll(async () => {
     await testApp.cleanup();
-  }, 10_000);
+  });
 
   // ── Discovery (no auth required) ───────────────────────────────
 
@@ -522,7 +522,7 @@ describe("SCIM global token administration", () => {
     }
     await licensedApp.cleanup();
     vi.restoreAllMocks();
-  }, 10_000);
+  });
 
   it("closes the unlicensed job spine before starting the licensed app (#2805)", async () => {
     const { closeQueues, getQueue } = await import("../../../apps/api/src/jobs/queues.js");
@@ -994,7 +994,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
     await db.delete(schema.settings).where(eq(schema.settings.key, "scim_token_hash"));
     await crudApp.cleanup();
     vi.restoreAllMocks();
-  }, 10_000);
+  });
 
   describe("Users create and read", () => {
     it("creates a user with primary email, externalId, and the Default team", async () => {

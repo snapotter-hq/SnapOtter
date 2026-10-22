@@ -11,7 +11,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("SIEM config", () => {
   it("returns 403 for GET without enterprise license", async () => {

@@ -26,7 +26,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 async function pollJob(jobId: string) {
   const { db, schema } = await import("../../../../apps/api/src/db/index.js");

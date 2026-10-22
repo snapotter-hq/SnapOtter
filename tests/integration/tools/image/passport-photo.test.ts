@@ -41,7 +41,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("passport-photo/analyze", () => {
   // ── Processing (sidecar-dependent) ────────────────────────────────

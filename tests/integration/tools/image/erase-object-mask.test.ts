@@ -57,7 +57,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("erase-object multipart contract", () => {
   it("accepts the web client's file + mask + fields shape", async () => {

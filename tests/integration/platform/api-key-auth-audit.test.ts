@@ -21,7 +21,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 // Every test uses a fresh random token so the Redis throttle key from one
 // test (or a previous local run) can never suppress another test's write.

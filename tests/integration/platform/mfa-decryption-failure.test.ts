@@ -101,7 +101,7 @@ afterEach(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 function expectReportedAsOperational(route: string): void {
   expect(reportErrorSpy).toHaveBeenCalledTimes(1);

@@ -66,7 +66,7 @@ afterAll(async () => {
   const rows = await db.select({ storedName: schema.userFiles.storedName }).from(schema.userFiles);
   await Promise.all(rows.map((r) => deleteStoredFile(r.storedName)));
   await testApp.cleanup();
-}, 10_000);
+});
 
 beforeEach(() => {
   hooks.savedNames.length = 0;

@@ -29,7 +29,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Sprite Sheet", () => {
   it("creates a sprite sheet from 4 images with 2 columns", async () => {

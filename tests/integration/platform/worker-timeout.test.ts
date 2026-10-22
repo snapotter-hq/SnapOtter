@@ -229,7 +229,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await closeWorkers();
   await stopCancelListener();
-}, 10_000);
+});
 
 describe("Worker timeout classification", () => {
   it("timed-out job is retried then fails with timeout message, not canceled", async () => {

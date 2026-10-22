@@ -78,7 +78,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 /** Helper to POST a multipart payload to a tool endpoint. */
 function postTool(

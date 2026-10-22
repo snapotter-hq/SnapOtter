@@ -35,7 +35,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ZERO-BYTE AND EMPTY FILES

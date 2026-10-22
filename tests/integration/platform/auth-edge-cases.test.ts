@@ -70,7 +70,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await clearSetting("loginThrottleMaxFailures");
   await testApp.cleanup();
-}, 10_000);
+});
 
 // Helper: register a user, clear mustChangePassword, return { username, password }
 async function createUser(

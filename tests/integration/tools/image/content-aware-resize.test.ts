@@ -32,7 +32,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Content-Aware Resize", () => {
   it("route exists and responds to POST", async () => {

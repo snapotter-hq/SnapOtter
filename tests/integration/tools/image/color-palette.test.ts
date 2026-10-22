@@ -31,7 +31,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 function makeFilePayload(buffer: Buffer, filename: string, contentType: string) {
   return createMultipartPayload([{ name: "file", filename, contentType, content: buffer }]);

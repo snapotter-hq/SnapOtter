@@ -31,7 +31,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Split", () => {
   it("splits a 200x150 image into a 2x2 grid", async () => {

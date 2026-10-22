@@ -29,7 +29,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 async function runTool(pdf: Buffer, filename: string, settings: Record<string, unknown> = {}) {
   const { body, contentType } = createMultipartPayload([

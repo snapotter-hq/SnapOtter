@@ -70,7 +70,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await testApp.cleanup();
   rmSync(testRoot, { recursive: true, force: true });
-}, 10_000);
+});
 
 describe("Object Eraser HQ (inpaint-hq) feature gate", () => {
   it("501s naming the base bundle when nothing is installed", async () => {

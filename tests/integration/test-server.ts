@@ -127,7 +127,7 @@ async function stopSpine(): Promise<void> {
 // suite, so every fork cleans up workers and cancel listener on exit.
 afterAll(async () => {
   await stopSpine();
-}, 10_000);
+});
 
 // ---------------------------------------------------------------------------
 // 3. Public API

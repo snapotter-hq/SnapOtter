@@ -13,7 +13,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("audit export", () => {
   it("returns 403 without enterprise license", async () => {

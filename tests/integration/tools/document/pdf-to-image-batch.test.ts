@@ -54,7 +54,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 /** POST the given files to a tool's /batch endpoint with `dpi: 72` settings. */
 function postBatch(

@@ -20,7 +20,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("permissions in auth responses", () => {
   it("login response includes permissions array for admin", async () => {

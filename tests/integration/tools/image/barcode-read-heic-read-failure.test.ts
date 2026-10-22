@@ -52,7 +52,7 @@ afterEach(() => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 function readHeic() {
   const { body, contentType } = createMultipartPayload([

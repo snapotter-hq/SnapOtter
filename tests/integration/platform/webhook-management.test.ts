@@ -15,7 +15,7 @@ describe("webhook management", () => {
 
     afterAll(async () => {
       await testApp.cleanup();
-    }, 10_000);
+    });
 
     it("GET /api/v1/enterprise/webhooks returns 403 without enterprise license", async () => {
       const res = await testApp.app.inject({
@@ -105,7 +105,7 @@ describe("webhook management", () => {
 
     afterAll(async () => {
       await testApp.cleanup();
-    }, 10_000);
+    });
 
     it("POST validates name is required", async () => {
       const res = await testApp.app.inject({

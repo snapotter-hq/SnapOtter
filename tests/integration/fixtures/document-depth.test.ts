@@ -35,7 +35,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 /** Download a result and return the raw payload. */
 async function download(downloadUrl: string): Promise<Buffer> {

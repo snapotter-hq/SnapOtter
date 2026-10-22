@@ -190,7 +190,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 // ── ZIP response validation ─────────────────────────────────────
 describe("ZIP response format", () => {

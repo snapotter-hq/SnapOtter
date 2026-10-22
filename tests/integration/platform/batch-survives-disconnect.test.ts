@@ -38,7 +38,7 @@ describe("batch survival and progress replay across client disconnects (#750)", 
 
   afterAll(async () => {
     await testApp.cleanup();
-  }, 10_000);
+  });
 
   /** Collect SSE frames for a job until the predicate matches or time runs out. */
   function waitForFrame(

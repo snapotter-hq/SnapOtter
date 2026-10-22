@@ -148,7 +148,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("route-stamped alias metadata (#808)", () => {
   it("stamps the alias pointer and owner on a factory tool route", async () => {

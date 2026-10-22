@@ -21,7 +21,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 function changePassword(token: string, newPassword: string) {
   return testApp.app.inject({

@@ -94,7 +94,7 @@ describe.skipIf(!FUZZ)("settings fuzz (property-based)", () => {
 
   afterAll(async () => {
     await testApp.cleanup();
-  }, 10_000);
+  });
 
   // The registry is populated by buildTestApp() in beforeAll, so tool configs
   // are looked up inside the test body; registry-exempt tools no-op here.

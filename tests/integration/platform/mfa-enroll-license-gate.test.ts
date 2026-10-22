@@ -22,7 +22,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("POST /api/auth/mfa/enroll (no mfa license)", () => {
   it("returns 401 without authentication (the auth guard runs first)", async () => {

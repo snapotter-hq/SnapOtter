@@ -65,7 +65,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("GET /api/v1/admin/usage", () => {
   it("rejects unauthenticated requests with 401", async () => {

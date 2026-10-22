@@ -51,7 +51,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 interface RouteTest {
   method: "GET" | "POST" | "PUT" | "DELETE";

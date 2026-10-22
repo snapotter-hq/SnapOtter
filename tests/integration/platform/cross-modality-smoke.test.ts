@@ -73,7 +73,7 @@ describe("cross-modality launch smoke", () => {
 
   afterAll(async () => {
     await testApp.cleanup();
-  }, 10_000);
+  });
 
   // ── Auth gate ─────────────────────────────────────────────────────
   it("unauthenticated request is rejected", async () => {

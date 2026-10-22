@@ -111,7 +111,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 afterEach(() => {
   decoderMocks.heic = null;

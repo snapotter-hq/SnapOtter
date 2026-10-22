@@ -35,7 +35,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 function post(url: string, payload: { body: Buffer; contentType: string }) {
   return app.inject({

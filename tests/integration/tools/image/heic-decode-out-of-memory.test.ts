@@ -54,7 +54,7 @@ afterEach(() => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 function post(toolId: string, settings: Record<string, unknown>) {
   const { body, contentType } = createMultipartPayload([

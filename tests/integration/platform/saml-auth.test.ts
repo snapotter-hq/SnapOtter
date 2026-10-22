@@ -152,7 +152,7 @@ afterAll(async () => {
     (env as Record<string, unknown>)[k] = v;
   }
   await testApp.cleanup();
-}, 10_000);
+});
 
 afterEach(() => {
   // An armed throw is consumed only if the ACS route reaches the resolver;

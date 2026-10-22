@@ -20,7 +20,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 // Helper: register a user, clear mustChangePassword, return credentials
 async function createUser(

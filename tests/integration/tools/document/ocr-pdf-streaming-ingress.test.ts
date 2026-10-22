@@ -71,7 +71,7 @@ afterAll(async () => {
   env.SCRATCH_PATH = originalScratchPath;
   await testApp.cleanup();
   await rm(scratchRoot, { recursive: true, force: true });
-}, 10_000);
+});
 
 beforeEach(() => {
   mocks.flowAdd.mockReset();

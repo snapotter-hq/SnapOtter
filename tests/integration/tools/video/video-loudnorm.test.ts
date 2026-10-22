@@ -38,7 +38,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe.skipIf(!ffmpegAvailable())("video-loudnorm (requires ffmpeg)", () => {
   it("normalizes audio and returns 200", async () => {

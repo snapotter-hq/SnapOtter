@@ -22,7 +22,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("POST /api/v1/tools/pdf/pdf-to-image/info", () => {
   it("returns page count for a valid PDF", async () => {

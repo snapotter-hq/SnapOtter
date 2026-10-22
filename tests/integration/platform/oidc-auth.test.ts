@@ -51,7 +51,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 /**
  * Insert an OIDC-only user directly into the DB (no passwordHash).
@@ -470,7 +470,7 @@ describe("Config endpoint with OIDC enabled", () => {
     env.OIDC_PROVIDER_NAME = origProviderName;
 
     await oidcApp.cleanup();
-  }, 10_000);
+  });
 
   it("config returns OIDC fields when enabled", async () => {
     const res = await oidcApp.app.inject({
@@ -618,7 +618,7 @@ describe("OIDC login discovery failure", () => {
 
     await oidcApp.cleanup();
     await new Promise<void>((resolve) => deadServer.close(() => resolve()));
-  }, 10_000);
+  });
 
   it("login redirects to oidc_provider_unreachable when discovery fails", async () => {
     const res = await oidcApp.app.inject({
@@ -706,7 +706,7 @@ describe("OIDC login redirect", () => {
 
     await oidcApp.cleanup();
     await new Promise<void>((resolve) => mockServer.close(() => resolve()));
-  }, 10_000);
+  });
 
   it("GET /api/auth/oidc/login returns 302 redirect to IdP", async () => {
     const res = await oidcApp.app.inject({
@@ -913,7 +913,7 @@ describe("OIDC callback edge cases", () => {
 
     await oidcApp.cleanup();
     await new Promise<void>((resolve) => mockServer.close(() => resolve()));
-  }, 10_000);
+  });
 
   it("callback without state cookie redirects to login with error", async () => {
     const res = await oidcApp.app.inject({

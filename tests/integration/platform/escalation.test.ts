@@ -15,7 +15,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 /**
  * Helper: register a user via the admin endpoint and return the response.

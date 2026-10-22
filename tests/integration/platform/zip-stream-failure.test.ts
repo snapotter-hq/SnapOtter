@@ -64,7 +64,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 /**
  * Run a request whose ZIP entries all come from poisoned storage and report

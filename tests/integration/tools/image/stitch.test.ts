@@ -31,7 +31,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("Stitch", () => {
   it("stitches two images horizontally with fit mode", async () => {

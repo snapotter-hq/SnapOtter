@@ -1169,7 +1169,7 @@ describe("settings variation matrix", () => {
 
   afterAll(async () => {
     await testApp.cleanup();
-  }, 10_000);
+  });
 
   for (const [toolId, variations] of Object.entries(SETTINGS_VARIATIONS)) {
     const runnableVariations = variations.filter(

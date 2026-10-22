@@ -31,7 +31,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("noise-removal", () => {
   // ── Processing (sidecar-dependent) ────────────────────────────────

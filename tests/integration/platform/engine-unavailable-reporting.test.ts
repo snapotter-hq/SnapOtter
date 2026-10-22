@@ -116,7 +116,7 @@ beforeAll(async () => {
 afterAll(async () => {
   prepareSpy.mockRestore();
   await testApp.cleanup();
-}, 10_000);
+});
 
 beforeEach(() => {
   mocks.reportError.mockReset();

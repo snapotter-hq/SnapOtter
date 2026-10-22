@@ -27,7 +27,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 type PlanItem = { doc: number; page: number; rot?: 90 | 180 | 270 };
 

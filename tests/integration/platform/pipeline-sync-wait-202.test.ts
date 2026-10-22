@@ -72,7 +72,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testApp.cleanup();
-}, 10_000);
+});
 
 describe("pipeline sync-wait expiry (#766)", () => {
   it("execute answers 202 and the terminal single frame still delivers the result", async () => {

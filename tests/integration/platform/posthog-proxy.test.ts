@@ -84,7 +84,7 @@ describe("PostHog first-party proxy (/ingest)", () => {
       else process.env[k] = savedEnv[k];
     }
     __resetGateForTests();
-  }, 10_000);
+  });
 
   it("forwards a capture POST to the ingestion host and strips the app session headers", async () => {
     const payload = JSON.stringify({ api_key: "phc_test", event: "$pageview" });
@@ -193,7 +193,7 @@ describe("PostHog proxy upstream failure observability (#788)", () => {
       else process.env[k] = savedEnv[k];
     }
     __resetGateForTests();
-  }, 10_000);
+  });
 
   it("keeps the best-effort 5xx and counts the failure in Prometheus", async () => {
     // Browser behavior unchanged: posthog-js sees a 5xx and retries. GET on

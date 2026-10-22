@@ -72,7 +72,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await testApp.cleanup();
   rmSync(testRoot, { recursive: true, force: true });
-}, 10_000);
+});
 
 describe("passport-photo feature guard (#327)", () => {
   it("returns 501 naming the primary bundle when nothing is installed", async () => {
