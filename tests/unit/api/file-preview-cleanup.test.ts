@@ -497,4 +497,124 @@ describe("ensurePreviewDir startup sweep (#1320)", () => {
       await app.close();
     }
   });
+
+  it("rejects extensionless and dotfile uploads on POST /api/v1/preview/generate with 400 (#3540)", async () => {
+    const { Readable } = await import("node:stream");
+    const { filePreviewRoutes } = await import("../../../apps/api/src/routes/file-preview.js");
+
+    type RouteHandler = (request: unknown, reply: unknown) => Promise<unknown>;
+    let generateHandler: RouteHandler | undefined;
+    const fakeApp = {
+      log: loggerMock,
+      get: vi.fn(),
+      post: vi.fn((path: string, _opts: unknown, handler?: RouteHandler) => {
+        if (path === "/api/v1/preview/generate") {
+          generateHandler = (typeof _opts === "function" ? _opts : handler) as RouteHandler;
+        }
+      }),
+    };
+    await filePreviewRoutes(fakeApp as never);
+    expect(generateHandler).toBeTypeOf("function");
+
+    for (const filename of ["mp4", ".mp4", "wav", ".wav", "clip."]) {
+      let statusCode = 200;
+      let payload: unknown;
+      const reply = {
+        raw: {
+          destroyed: false,
+          writableEnded: false,
+          on: vi.fn(),
+          off: vi.fn(),
+          once: vi.fn(),
+          removeListener: vi.fn(),
+        },
+        status(code: number) {
+          statusCode = code;
+          return reply;
+        },
+        header() {
+          return reply;
+        },
+        send(body: unknown) {
+          payload = body;
+          return reply;
+        },
+      };
+      const req = {
+        raw: {
+          destroyed: false,
+          socket: { destroyed: false },
+          on: vi.fn(),
+          off: vi.fn(),
+          once: vi.fn(),
+          removeListener: vi.fn(),
+        },
+        log: loggerMock,
+        async *parts() {
+          yield {
+            type: "file" as const,
+            fieldname: "file",
+            filename,
+            file: Readable.from([Buffer.from("not-media-bytes")]),
+          };
+        },
+      };
+
+      await generateHandler?.(req, reply);
+      expect(statusCode, `${filename} should be rejected with 400`).toBe(400);
+      expect(payload).toEqual({ error: "Unsupported file type for preview" });
+    }
+    expect(previewMocks.runFfmpeg).not.toHaveBeenCalled();
+
+    previewMocks.runFfmpeg.mockImplementationOnce(async (args: string[]) => {
+      const outPath = args.at(-1) ?? "";
+      await writeFile(outPath, "encoded-mp4");
+    });
+    let okStatus = 200;
+    let okPayload: unknown;
+    const okReply = {
+      raw: {
+        destroyed: false,
+        writableEnded: false,
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeListener: vi.fn(),
+      },
+      status(code: number) {
+        okStatus = code;
+        return okReply;
+      },
+      header() {
+        return okReply;
+      },
+      send(body: unknown) {
+        okPayload = body;
+        return okReply;
+      },
+    };
+    const okReq = {
+      raw: {
+        destroyed: false,
+        socket: { destroyed: false },
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeListener: vi.fn(),
+      },
+      log: loggerMock,
+      async *parts() {
+        yield {
+          type: "file" as const,
+          fieldname: "file",
+          filename: ".hidden.MP4",
+          file: Readable.from([Buffer.from("mp4-bytes")]),
+        };
+      },
+    };
+    await generateHandler?.(okReq, okReply);
+    expect(okStatus).toBe(200);
+    expect(Buffer.isBuffer(okPayload) && okPayload.toString()).toBe("encoded-mp4");
+    expect(previewMocks.runFfmpeg).toHaveBeenCalledTimes(1);
+  });
 });

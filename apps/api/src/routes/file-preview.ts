@@ -19,7 +19,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, join, resolve, sep } from "node:path";
+import { basename, extname, join, resolve, sep } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { convertDocument, sofficeAvailable } from "@snapotter/doc-engine";
 import { runFfmpeg, softwareEncoder } from "@snapotter/media-engine";
@@ -605,7 +605,7 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(400).send({ error: "No file provided" });
       }
 
-      const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+      const ext = extname(filename).toLowerCase().replace(/^\./, "");
       const videoExts = new Set([
         "avi",
         "mkv",

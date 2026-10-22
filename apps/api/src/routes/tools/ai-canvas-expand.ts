@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { extname, join } from "node:path";
 import { outpaint } from "@snapotter/ai";
 import {
   getBundleForTool,
@@ -372,7 +372,7 @@ export function registerAiCanvasExpand(app: FastifyInstance) {
         const s = settings as Settings;
 
         const cliCheck = await validateImageBuffer(inputBuffer, filename);
-        const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+        const ext = extname(filename).toLowerCase().replace(/^\./, "");
         const format = cliCheck.valid
           ? cliCheck.format
           : ["heic", "heif", "hif"].includes(ext)

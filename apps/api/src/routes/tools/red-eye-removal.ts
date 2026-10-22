@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { extname, join } from "node:path";
 import { removeRedEye } from "@snapotter/ai";
 import {
   getBundleForTool,
@@ -278,7 +278,7 @@ export function registerRedEyeRemoval(app: FastifyInstance) {
           quality?: number;
         };
         const validation = await validateImageBuffer(inputBuffer, filename);
-        const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+        const ext = extname(filename).toLowerCase().replace(/^\./, "");
         const format = validation.valid
           ? validation.format
           : ["heic", "heif", "hif"].includes(ext)

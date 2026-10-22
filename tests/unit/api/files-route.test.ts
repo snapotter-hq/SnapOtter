@@ -1460,26 +1460,31 @@ describe("files route logic", () => {
       const callerFiles = [
         "apps/api/src/lib/image-input-prep.ts",
         "apps/api/src/modality/image-input.ts",
+        "apps/api/src/routes/file-preview.ts",
         "apps/api/src/routes/user-files.ts",
         "apps/api/src/routes/batch.ts",
         "apps/api/src/routes/pipeline.ts",
+        "apps/api/src/routes/tools/ai-canvas-expand.ts",
         "apps/api/src/routes/tools/barcode-read.ts",
         "apps/api/src/routes/tools/beautify.ts",
+        "apps/api/src/routes/tools/blur-faces.ts",
         "apps/api/src/routes/tools/collage.ts",
         "apps/api/src/routes/tools/color-palette.ts",
+        "apps/api/src/routes/tools/content-aware-resize.ts",
         "apps/api/src/routes/tools/edit-metadata.ts",
         "apps/api/src/routes/tools/favicon.ts",
         "apps/api/src/routes/tools/find-duplicates.ts",
         "apps/api/src/routes/tools/image-to-base64.ts",
         "apps/api/src/routes/tools/image-to-pdf.ts",
         "apps/api/src/routes/tools/meme-generator.ts",
+        "apps/api/src/routes/tools/red-eye-removal.ts",
         "apps/api/src/routes/tools/split.ts",
         "apps/api/src/routes/tools/stitch.ts",
       ];
       for (const relPath of callerFiles) {
         const src = readFileSync(resolve(process.cwd(), relPath), "utf8");
-        expect(src, `${relPath} should not compute fileExt with split('.').pop()`).not.toMatch(
-          /const\s+fileExt\s*=\s*[^;]*\.split\(["']\.["']\)\.pop\(\)/,
+        expect(src, `${relPath} should not extract extensions with split('.').pop()`).not.toContain(
+          '.split(".").pop()',
         );
       }
     });

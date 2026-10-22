@@ -365,7 +365,7 @@ export function registerEditMetadata(app: FastifyInstance) {
         tags.length > 0 ? await writeMetadata(inputBuffer, filename, tags) : inputBuffer;
 
       // Determine content type from extension
-      const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+      const ext = extname(filename).toLowerCase().replace(/^\./, "");
 
       return {
         buffer,

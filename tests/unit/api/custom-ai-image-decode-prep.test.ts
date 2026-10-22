@@ -121,6 +121,7 @@ import { registerBlurBackground } from "../../../apps/api/src/routes/tools/blur-
 import { registerBlurFaces } from "../../../apps/api/src/routes/tools/blur-faces.js";
 import { registerColorize } from "../../../apps/api/src/routes/tools/colorize.js";
 import { registerContentAwareResize } from "../../../apps/api/src/routes/tools/content-aware-resize.js";
+import { registerEditMetadata } from "../../../apps/api/src/routes/tools/edit-metadata.js";
 import { registerEnhanceFaces } from "../../../apps/api/src/routes/tools/enhance-faces.js";
 import { registerEraseObject } from "../../../apps/api/src/routes/tools/erase-object.js";
 import { registerImageEnhancement } from "../../../apps/api/src/routes/tools/image-enhancement.js";
@@ -165,6 +166,7 @@ beforeAll(async () => {
   registerBlurBackground(fakeApp);
   registerColorize(fakeApp);
   registerContentAwareResize(fakeApp);
+  registerEditMetadata(fakeApp);
   registerEraseObject(fakeApp);
   registerEnhanceFaces(fakeApp);
   registerImageEnhancement(fakeApp);
@@ -740,8 +742,54 @@ describe("custom AI image routes input decode, fileExt, SVG prep, and error logg
         .process(Buffer.from("not an image"), settings, "corrupt.tga")
         .catch((e: unknown) => e);
       expect(isToolInputError(err)).toBe(true);
+
+      // #3540: extensionless or dotfile filenames ("heic", ".heic", "svg", ".svg")
+      // that fail validateImageBuffer must not set ext to the bare stem and invoke
+      // decodeHeic or sanitizeSvg, whereas dotted uppercase extensions (.HEIC, .SVG)
+      // still strip the leading dot and lowercase before matching.
+      const heicSpy = vi
+        .spyOn(heicConverter, "decodeHeic")
+        .mockRejectedValueOnce(new Error("invalid heic"));
+      const svgSpy = vi.spyOn(svgSanitize, "sanitizeSvg");
+      try {
+        for (const bareOrDotfile of ["heic", ".heic", "svg", ".svg"]) {
+          await config
+            .process(Buffer.from("not an image"), settings, bareOrDotfile)
+            .catch(() => null);
+        }
+        expect(heicSpy).not.toHaveBeenCalled();
+        expect(svgSpy).not.toHaveBeenCalled();
+
+        await config
+          .process(Buffer.from("not an image"), settings, ".hidden.HEIC")
+          .catch(() => null);
+        expect(heicSpy).toHaveBeenCalledTimes(1);
+
+        const commentPaddedSvg = Buffer.from(
+          `<!-- ${"x".repeat(4500)} --><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16"/></svg>`,
+        );
+        await config.process(commentPaddedSvg, settings, ".hidden.SVG");
+        expect(svgSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        heicSpy.mockRestore();
+        svgSpy.mockRestore();
+      }
     },
   );
+
+  it("edit-metadata pipeline process fn extracts extension with extname instead of split('.').pop() (#3540)", async () => {
+    const config = getToolConfig("edit-metadata");
+    if (!config) throw new Error("edit-metadata missing from toolRegistry");
+
+    const jpegBytes = await sharp(validPng).jpeg().toBuffer();
+    for (const extlessName of ["png", ".png", "webp", ".webp", "photo."]) {
+      const res = await config.process(jpegBytes, {}, extlessName);
+      expect(res.contentType, `${extlessName} should fall back to image/jpeg`).toBe("image/jpeg");
+    }
+
+    const pngRes = await config.process(validPng, {}, "photo.PNG");
+    expect(pngRes.contentType).toBe("image/png");
+  });
 
   it("handles comment-padded SVGs (.apng / .tga), svgLimitError 400, DecoderUnavailableError 503, and ENOSPC 503 across prepareRouteImage and routes (#3313)", async () => {
     const sanitizeSpy = vi.spyOn(svgSanitize, "sanitizeSvg");

@@ -332,4 +332,25 @@ describe("image-to-base64 SVG and SVGZ sanitization in original mode (#2594)", (
     expect(json.errors[1].error).toContain("valid SVG content");
     expect(json.errors[2].error).toContain("maximum element count");
   });
+
+  it("preserves original PNG MIME type and bytes for extensionless or dotfile filenames like 'heic' and '.heic' (#3540)", async () => {
+    const { statusCode, json } = await invokeRoute(
+      [
+        { filename: "heic", content: PNG_200 },
+        { filename: ".heic", content: PNG_200 },
+        { filename: "heif", content: PNG_200 },
+        { filename: ".hif", content: PNG_200 },
+      ],
+      { outputFormat: "original", maxWidth: 0, maxHeight: 0 },
+    );
+
+    expect(statusCode).toBe(200);
+    expect(json.errors).toEqual([]);
+    expect(json.results).toHaveLength(4);
+    for (const result of json.results) {
+      expect(result.mimeType).toBe("image/png");
+      expect(result.dataUri.startsWith("data:image/png;base64,")).toBe(true);
+      expect(Buffer.from(result.base64, "base64").equals(PNG_200)).toBe(true);
+    }
+  });
 });

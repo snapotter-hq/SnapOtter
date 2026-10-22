@@ -183,7 +183,7 @@ export function registerImageToBase64(app: FastifyInstance) {
           // Determine output format and encode
           let outputBuffer: Buffer;
           let mimeType: string;
-          const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+          const ext = extname(filename).toLowerCase().replace(/^\./, "");
           const isHeic = ["heic", "heif", "hif"].includes(ext);
 
           if (opts.outputFormat !== "original") {
