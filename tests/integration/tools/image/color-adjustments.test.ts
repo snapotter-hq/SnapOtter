@@ -707,14 +707,33 @@ describe("Output format verification", () => {
 // ── Effect combined with adjustments ───────────────────────────
 describe("Effect combined with adjustments", () => {
   it("applies grayscale effect with brightness and contrast", async () => {
-    const res = await postTool("adjust-colors", {
-      effect: "grayscale",
-      brightness: 15,
-      contrast: 20,
-    });
+    const sample = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 200, g: 50, b: 20 } },
+    })
+      .png()
+      .toBuffer();
+    const res = await postTool(
+      "adjust-colors",
+      {
+        effect: "grayscale",
+        brightness: 100,
+        contrast: 100,
+      },
+      sample,
+      "sample.png",
+      "image/png",
+    );
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();
+    const dl = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dl.statusCode).toBe(200);
+    const raw = await sharp(dl.rawPayload).raw().toBuffer();
+    expect([raw[0], raw[1], raw[2]]).toEqual([229, 229, 229]);
   });
 
   it("applies invert effect with channel adjustments", async () => {

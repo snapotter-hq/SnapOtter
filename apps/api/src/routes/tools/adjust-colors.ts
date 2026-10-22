@@ -135,8 +135,7 @@ async function processColorAdjustments(
     settings.green !== 100 ||
     settings.blue !== 100 ||
     settings.effect === "sepia";
-  const needsPreRecombMaterialize =
-    (hasRecomb && hasPreRecomb) || (settings.effect === "grayscale" && hasColorModulate);
+  const needsPreRecombMaterialize = (hasRecomb || settings.effect === "grayscale") && hasPreRecomb;
   const needsPostRecombMaterialize =
     hasRecomb &&
     (settings.exposure > 0 || settings.effect === "grayscale" || settings.effect === "invert");
@@ -147,7 +146,7 @@ async function processColorAdjustments(
   // strip, and intermediate PNG materialisation (needsRecombMaterialize), which
   // would flatten a multi-frame strip into a single tall frame. Those go frame
   // by frame; the rest keep the cheaper single pass over the whole animation
-  // (#1083, #3120, #3133, #3469).
+  // (#1083, #3120, #3133, #3469, #3473).
   if (settings.sharpness > 0 || needsRecombMaterialize) {
     try {
       const perFrame = await runPerFrame(inputBuffer, outputFormat.format, async (frame) => {
@@ -192,8 +191,8 @@ async function processColorAdjustments(
     // Sharp's C++ pipeline executes sharp::greyscale (pipeline.cc:388) and
     // sharp::Recomb (pipeline.cc:678) before sharp::Modulate (brightness,
     // saturation, hue) and sharp::Linear (contrast). Materialise pre-recomb
-    // adjustments before recomb (#3133) and saturation/hue before grayscale
-    // (#3469) so those stages run on the adjusted 8-bit uchar pixels.
+    // adjustments before recomb or grayscale (#3133, #3469, #3473) so those
+    // stages run on the adjusted 8-bit uchar pixels.
     if (needsPreRecombMaterialize) {
       image = sharp(await image.png().toBuffer());
     }

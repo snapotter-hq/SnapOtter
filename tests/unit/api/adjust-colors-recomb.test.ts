@@ -523,4 +523,65 @@ describe("adjust-colors combined recomb matrices (#2608)", () => {
     expect(frame1Raw.data[1]).toBe(frame1Raw.data[2]);
     expect(frame1Raw.data[0]).toBeGreaterThan(0);
   });
+
+  it("applies brightness and contrast in RGB before grayscale when saturation, hue, and recomb are inactive (#3473)", async () => {
+    const sample = await makeSolidPng(200, 50, 20);
+    const rgbaSample = await makeSolidPng(200, 50, 20, 0.5);
+
+    const contrastOnlyGray = await runAdjustColors(sample, {
+      contrast: 100,
+      effect: "grayscale",
+    });
+    const contrastHue1Gray = await runAdjustColors(sample, {
+      contrast: 100,
+      hue: 1,
+      effect: "grayscale",
+    });
+    const brightnessOnlyGray = await runAdjustColors(sample, {
+      brightness: 100,
+      effect: "grayscale",
+    });
+    const brightnessContrastGray = await runAdjustColors(sample, {
+      brightness: 100,
+      contrast: 100,
+      effect: "grayscale",
+    });
+    const rgbaContrastGray = await runAdjustColors(rgbaSample, {
+      contrast: 100,
+      effect: "grayscale",
+    });
+
+    // Contrast +100 in RGB clamps [200, 50, 20] to [255, 0, 0] before grayscale -> [127, 127, 127]
+    // (instead of grayscale [107, 107, 107] followed by linear(2, -128) -> [86, 86, 86])
+    expect(await firstPixel(contrastOnlyGray)).toEqual([127, 127, 127]);
+    expect(await firstPixel(contrastHue1Gray)).toEqual([127, 127, 127]);
+    // Brightness +100 in RGB clamps red at 255 before grayscale -> [196, 196, 196]
+    // (instead of grayscale [107, 107, 107] followed by LCh lightness x2 -> [228, 228, 228])
+    expect(await firstPixel(brightnessOnlyGray)).toEqual([196, 196, 196]);
+    // Combined brightness +100 and contrast +100 in RGB before grayscale -> [229, 229, 229]
+    expect(await firstPixel(brightnessContrastGray)).toEqual([229, 229, 229]);
+    // RGBA alpha=128 is preserved alongside RGB-clamped grayscale luminance
+    expect(await firstPixel(rgbaContrastGray)).toEqual([127, 127, 127, 128]);
+
+    const animGif = readFixture(fixtures.image.animated.gif);
+    const inMeta = await sharp(animGif, { animated: true }).metadata();
+    const animContrastGray = await runAdjustColors(
+      animGif,
+      { brightness: 50, contrast: 80, effect: "grayscale" },
+      "anim.gif",
+    );
+    const outMeta = await sharp(animContrastGray, { animated: true }).metadata();
+    expect(outMeta.format).toBe("gif");
+    expect(outMeta.pages).toBe(inMeta.pages);
+    expect(outMeta.width).toBe(inMeta.width);
+    expect(outMeta.pageHeight).toBe(inMeta.pageHeight);
+    const frame0Px = await firstPixel(animContrastGray);
+    expect(frame0Px).toEqual([154, 154, 154, 255]);
+    const frame1Raw = await sharp(animContrastGray, { page: 1, pages: 1 })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    expect(Array.from(frame1Raw.data.subarray(0, frame1Raw.info.channels))).toEqual([
+      251, 251, 251, 255,
+    ]);
+  });
 });
