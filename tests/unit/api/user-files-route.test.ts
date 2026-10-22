@@ -120,16 +120,14 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
           }),
         }),
         insert: () => ({
-          values: (vals: Record<string, unknown>) => {
-            mocks.insertedValues = vals;
+          values: (vals: Record<string, unknown> | Array<Record<string, unknown>>) => {
+            mocks.insertedValues = Array.isArray(vals) ? vals[0] : vals;
+            const rows = (Array.isArray(vals) ? vals : [vals]).map((v) => ({
+              ...v,
+              createdAt: new Date("2025-06-01T12:00:00Z"),
+            }));
             return {
-              returning: () =>
-                Promise.resolve([
-                  {
-                    ...vals,
-                    createdAt: new Date("2025-06-01T12:00:00Z"),
-                  },
-                ]),
+              returning: () => Promise.resolve(rows),
             };
           },
         }),
@@ -544,6 +542,7 @@ describe("user files route logic", () => {
     let listHandler: RouteHandler;
     let detailHandler: RouteHandler;
     let deleteHandler: RouteHandler;
+    let uploadHandler: RouteHandler;
     let saveResultHandler: RouteHandler;
     let downloadHandler: RouteHandler;
     let thumbnailHandler: RouteHandler;
@@ -559,6 +558,7 @@ describe("user files route logic", () => {
         }),
         post: vi.fn((path: string, arg2: unknown, arg3?: unknown) => {
           const handler = (typeof arg2 === "function" ? arg2 : arg3) as RouteHandler;
+          if (path === "/api/v1/files/upload") uploadHandler = handler;
           if (path === "/api/v1/files/save-result") saveResultHandler = handler;
         }),
         delete: vi.fn((path: string, arg2: unknown, arg3?: unknown) => {
@@ -1023,6 +1023,62 @@ describe("user files route logic", () => {
           { err: discardErr, storedName: "stored-result.png" },
           "Failed to discard a staged upload",
         );
+      });
+
+      it("treats a .svgz dotfile on POST /api/v1/files/upload as an extensionless file rather than an SVGZ archive (#3259)", async () => {
+        const corruptGzipDotfile = Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0xff, 0xff]);
+        mocks.validateImageBuffer.mockResolvedValueOnce({
+          valid: false,
+          reason: "Unrecognized image format",
+        } as never);
+        const uploadLog = { warn: vi.fn(), error: vi.fn() };
+        const uploadReply = makeReply();
+        await uploadHandler(
+          {
+            log: uploadLog,
+            parts: async function* () {
+              yield {
+                type: "file" as const,
+                fieldname: "file",
+                filename: ".svgz",
+                mimetype: "application/octet-stream",
+                file: Readable.from([corruptGzipDotfile]),
+              };
+            },
+          },
+          uploadReply,
+        );
+        expect(uploadReply.statusCode).toBe(201);
+        expect(uploadLog.warn).not.toHaveBeenCalled();
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: ".svgz",
+          mimeType: "application/octet-stream",
+          size: corruptGzipDotfile.length,
+        });
+      });
+
+      it("treats a .svgz dotfile on POST /api/v1/files/save-result as an extensionless file rather than an SVGZ archive (#3259)", async () => {
+        const corruptGzipDotfile = Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0xff, 0xff]);
+        mocks.parentRows = [makeParent({ originalName: "notes.txt", mimeType: "text/plain" })];
+        mocks.validateImageBuffer.mockResolvedValueOnce({
+          valid: false,
+          reason: "Unrecognized image format",
+        } as never);
+        const saveReq = makeSaveResultRequest({
+          filename: ".svgz",
+          parentId: "parent-1",
+          toolId: "convert",
+          buffer: corruptGzipDotfile,
+        });
+        const saveReply = makeReply();
+        await saveResultHandler(saveReq, saveReply);
+        expect(saveReply.statusCode).toBe(201);
+        expect(saveReq.log.warn).not.toHaveBeenCalled();
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: "notes.txt",
+          mimeType: "text/plain",
+          size: corruptGzipDotfile.length,
+        });
       });
     });
 

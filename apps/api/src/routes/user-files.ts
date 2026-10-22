@@ -362,7 +362,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           // reported 500 for anything unexpected. Either way the batch so far
           // is discarded first.
           let safeBuffer: Buffer = buffer;
-          const ext = part.filename?.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? "";
+          const ext = extname(part.filename ?? "").toLowerCase();
           let isDecompressedSvg = false;
           if (ext === ".svgz" || isSvgBuffer(buffer)) {
             try {
@@ -990,7 +990,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
 
     // Sanitize SVG results to prevent XXE, SSRF, and script injection
     let safeResultBuffer = fileBuffer;
-    const resultExt = filename?.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? "";
+    const resultExt = extname(filename).toLowerCase();
     let isDecompressedSvg = false;
     if (resultExt === ".svgz" || isSvgBuffer(fileBuffer)) {
       try {

@@ -375,6 +375,14 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         filename: "misnamed.svgz",
         fileSize: exifJpg.length,
       });
+
+      const dotfileReply = await invokeRoute(handler, [
+        { type: "file", filename: ".svgz", content: NOT_SVG_SVGZ },
+      ]);
+      expect(dotfileReply.statusCode).toBe(422);
+      expect(dotfileReply.payload).toMatchObject({
+        error: "Failed to read image metadata",
+      });
     });
 
     it("returns 400 when .svgz decompression or SVG sanitization rejects", async () => {

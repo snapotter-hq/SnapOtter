@@ -149,10 +149,6 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
           // Skip empty parts (e.g. empty file field)
           if (buffer.length === 0) continue;
 
-          // Try image validation; non-image files are accepted with format from extension
-          const validation = await validateImageBuffer(buffer, part.filename).catch(() => null);
-          const isValidImage = validation?.valid === true && !validation.nameOnly;
-
           // Sanitize SVG uploads to prevent XXE, SSRF, and script injection.
           // Keyed on content, NOT on isValidImage: a hostile SVG (a DOCTYPE with
           // an external entity, say) makes Sharp fail validation, and gating the
@@ -162,7 +158,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
           // return the sanitizer's reason for a size/element-cap rejection, and
           // report + 500 for anything unexpected rather than storing the file.
           let safeBuffer: Buffer = buffer;
-          const uploadExt = part.filename?.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? "";
+          const uploadExt = extname(part.filename ?? "").toLowerCase();
           let isDecompressedSvg = false;
           if (uploadExt === ".svgz" || isSvgBuffer(buffer)) {
             try {
@@ -205,6 +201,11 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
           if (isDecompressedSvg && safeName.toLowerCase().endsWith(".svgz")) {
             safeName = safeName.replace(/\.svgz$/i, ".svg");
           }
+
+          // Try image validation on the stored bytes; non-image files are accepted
+          // with format from extension
+          const validation = await validateImageBuffer(safeBuffer, safeName).catch(() => null);
+          const isValidImage = validation?.valid === true && !validation.nameOnly;
 
           // Write to object storage uploads prefix
           wroteUpload = true;

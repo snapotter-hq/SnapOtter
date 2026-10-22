@@ -1,3 +1,4 @@
+import { extname } from "node:path";
 import { parseExif, parseGps, parseXmp, stripMetadata } from "@snapotter/image-engine";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
@@ -127,7 +128,7 @@ export function registerStripMetadata(app: FastifyInstance) {
       }
 
       let inspectBuffer = fileBuffer;
-      if (filename.toLowerCase().endsWith(".svgz") || isSvgBuffer(fileBuffer)) {
+      if (extname(filename).toLowerCase() === ".svgz" || isSvgBuffer(fileBuffer)) {
         try {
           inspectBuffer = decompressSvgz(fileBuffer);
           if (isSvgBuffer(inspectBuffer)) {

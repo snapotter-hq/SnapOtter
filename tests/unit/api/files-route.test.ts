@@ -70,6 +70,7 @@ vi.mock("../../../apps/api/src/permissions.js", () => ({
 
 vi.mock("../../../apps/api/src/lib/svg-sanitize.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../apps/api/src/lib/svg-sanitize.js")>();
+  mocks.sanitizeSvg.mockImplementation(actual.sanitizeSvg);
   return {
     ...actual,
     sanitizeSvg: (...args: Parameters<typeof actual.sanitizeSvg>) => mocks.sanitizeSvg(...args),
@@ -832,12 +833,15 @@ describe("files route logic", () => {
       await fileRoutes(fakeApp as never);
     });
 
-    beforeEach(() => {
+    beforeEach(async () => {
       vi.clearAllMocks();
       mocks.deletePrefix.mockResolvedValue(undefined);
       mocks.putObject.mockResolvedValue(undefined);
       mocks.requireFileAccess.mockResolvedValue({ id: "user-1", role: "admin" });
-      mocks.sanitizeSvg.mockImplementation((buf: Buffer) => buf);
+      const { sanitizeSvg: realSanitizeSvg } = await vi.importActual<
+        typeof import("../../../apps/api/src/lib/svg-sanitize.js")
+      >("../../../apps/api/src/lib/svg-sanitize.js");
+      mocks.sanitizeSvg.mockImplementation(realSanitizeSvg);
     });
 
     function makeReply() {
@@ -1177,6 +1181,60 @@ describe("files route logic", () => {
           },
         ],
       });
+    });
+
+    it("stores a .svgz dotfile as an extensionless file without treating it as an SVGZ archive (#3259)", async () => {
+      const corruptGzipDotfile = Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0xff, 0xff]);
+      const log = { warn: vi.fn(), error: vi.fn() };
+      const req = makeRequest([filePart(".svgz", corruptGzipDotfile)], log);
+      const reply = makeReply();
+
+      await uploadHandler(req, reply);
+
+      expect(reply.statusCode).toBe(200);
+      expect(log.warn).not.toHaveBeenCalled();
+      expect(reply.payload).toEqual({
+        jobId: expect.any(String),
+        files: [{ name: ".svgz", size: corruptGzipDotfile.length, format: "" }],
+      });
+    });
+
+    it("validates DOCTYPE-bearing SVGs and SVGZ archives after sanitizeSvg strips the DOCTYPE (#3259)", async () => {
+      const parameterEntitySvg = Buffer.from(
+        '<?xml version="1.0"?><!DOCTYPE svg [<!ENTITY % p SYSTEM "http://127.0.0.1:1/evil.dtd"> %p;]>' +
+          '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>',
+      );
+      const req = makeRequest([
+        filePart("logo", parameterEntitySvg),
+        filePart("icon.svgz", gzipSync(parameterEntitySvg)),
+      ]);
+      const reply = makeReply();
+
+      await uploadHandler(req, reply);
+
+      expect(reply.statusCode).toBe(200);
+      expect(reply.payload).toEqual({
+        jobId: expect.any(String),
+        files: [
+          {
+            name: "logo",
+            size: expect.any(Number),
+            format: "svg",
+          },
+          {
+            name: "icon.svg",
+            size: expect.any(Number),
+            format: "svg",
+          },
+        ],
+      });
+      for (const callIdx of [0, 1]) {
+        const storedSvg = (
+          mocks.putObject.mock.calls[callIdx] as unknown as [string, Buffer]
+        )[1].toString("utf-8");
+        expect(storedSvg).not.toContain("DOCTYPE");
+        expect(storedSvg).toContain("<svg");
+      }
     });
   });
 
