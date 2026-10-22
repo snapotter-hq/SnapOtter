@@ -3355,6 +3355,7 @@ describe("bridge - dispatcher stderr partial buffering", () => {
 
 describe("bridge - dispatcher shutdown behavior", () => {
   let initDispatcher: typeof import("../../../packages/ai/src/bridge.js").initDispatcher;
+  let runPythonWithProgress: typeof import("../../../packages/ai/src/bridge.js").runPythonWithProgress;
   let shutdownDispatcher: typeof import("../../../packages/ai/src/bridge.js").shutdownDispatcher;
   let getDispatcherStatus: typeof import("../../../packages/ai/src/bridge.js").getDispatcherStatus;
   let isGpuAvailable: typeof import("../../../packages/ai/src/bridge.js").isGpuAvailable;
@@ -3365,6 +3366,7 @@ describe("bridge - dispatcher shutdown behavior", () => {
 
     const mod = await import("../../../packages/ai/src/bridge.js");
     initDispatcher = mod.initDispatcher;
+    runPythonWithProgress = mod.runPythonWithProgress;
     shutdownDispatcher = mod.shutdownDispatcher;
     getDispatcherStatus = mod.getDispatcherStatus;
     isGpuAvailable = mod.isGpuAvailable;
@@ -3433,6 +3435,75 @@ describe("bridge - dispatcher shutdown behavior", () => {
 
     // GPU status persists at module level even after shutdown
     expect(isGpuAvailable()).toBe(true);
+  });
+
+  it("rejects in-flight requests on shutdown and retries via runPerRequest before close fires (issue #3566)", async () => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+
+    const mockDispatcher1 = createMockProcess();
+    const mockPerReq1 = createMockProcess();
+    const mockPerReq2 = createMockProcess();
+    const mockDispatcher2 = createMockProcess();
+    vi.mocked(spawn)
+      .mockReturnValueOnce(mockDispatcher1.process)
+      .mockReturnValueOnce(mockPerReq1.process)
+      .mockReturnValueOnce(mockPerReq2.process)
+      .mockReturnValueOnce(mockDispatcher2.process);
+
+    const initPromise = initDispatcher();
+    mockDispatcher1.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+    await vi.advanceTimersByTimeAsync(60);
+    await initPromise;
+
+    const p1 = runPythonWithProgress("test1.py", ["arg1"], { timeout: 1000 });
+    const p2 = runPythonWithProgress("test2.py", ["arg2"], { timeout: 5000 });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(mockDispatcher1.stdinWrites).toHaveLength(2);
+    const oldReq1Id = JSON.parse(mockDispatcher1.stdinWrites[0].trim()).id;
+
+    // Shut down the dispatcher while both requests are in flight without emitting "close" yet.
+    shutdownDispatcher();
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Both in-flight requests immediately fall back to runPerRequest before "close" fires.
+    expect(spawn).toHaveBeenCalledTimes(3);
+
+    mockPerReq1.stdout.emit("data", Buffer.from('{"ok": 1}\n'));
+    mockPerReq1.emitEvent("close", 0, null);
+    await expect(p1).resolves.toMatchObject({
+      stdout: '{"ok": 1}',
+      stderr: expect.stringContaining("[bridge] retried after dispatcher crash"),
+    });
+
+    // Advancing past p1's original 1000ms timeout proves dispatcherRun cleaned up its timer on shutdown.
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(mockDispatcher1.process.kill).toHaveBeenCalledTimes(1);
+
+    mockPerReq2.stdout.emit("data", Buffer.from('{"ok": 2}\n'));
+    mockPerReq2.emitEvent("close", 0, null);
+    await expect(p2).resolves.toMatchObject({
+      stdout: '{"ok": 2}',
+      stderr: expect.stringContaining("[bridge] retried after dispatcher crash"),
+    });
+
+    // Spawn a replacement dispatcher before mockDispatcher1 finishes closing.
+    const initPromise2 = initDispatcher();
+    mockDispatcher2.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+    await vi.advanceTimersByTimeAsync(60);
+    await initPromise2;
+
+    // Late stdout and close from the stopped mockDispatcher1 are ignored and do not count as a crash.
+    mockDispatcher1.stdout.emit(
+      "data",
+      Buffer.from(`${JSON.stringify({ id: oldReq1Id, exitCode: 1, stdout: "" })}\n`),
+    );
+    mockDispatcher1.emitEvent("close", null, "SIGTERM");
+    expect(getDispatcherStatus().consecutiveCrashes).toBe(0);
+    expect(getDispatcherStatus().running).toBe(true);
+    expect(getDispatcherStatus().ready).toBe(true);
   });
 });
 

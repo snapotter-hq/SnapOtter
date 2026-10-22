@@ -1130,11 +1130,20 @@ export class PythonDispatcher {
     this.gpuFrameworks = undefined;
     this.childScriptFailures = 0;
     if (this.child && !this.child.killed) {
-      this.stoppedChildren.add(this.child);
-      this.child.stdin?.end();
-      this.child.kill("SIGTERM");
+      const proc = this.child;
+      const gen = this.generation;
+      this.stoppedChildren.add(proc);
       this.child = null;
       this.childReady = false;
+      this.rejectPendingForGeneration(
+        gen,
+        new SafeError("Python dispatcher exited unexpectedly", {
+          kind: "operational",
+          code: "dispatcher-exit",
+        }),
+      );
+      proc.stdin?.end();
+      proc.kill("SIGTERM");
     }
   }
 
