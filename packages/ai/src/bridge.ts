@@ -104,7 +104,7 @@ function getPythonPath(): string {
  * Extract a user-friendly error from a Python process error.
  */
 const OOM_EXIT_TEXT =
-  /out of memory|not enough memory|can't allocate memory|cannot allocate memory|unable to allocate|failed to allocate|cudaerrormemoryallocation|cublas_status_alloc_failed|bad_alloc|memoryerror/i;
+  /out of memory|not enough memory|can't allocate memory|cannot allocate memory|\[errno 12\]|unable to allocate|failed to allocate|cudaerrormemoryallocation|cublas_status_alloc_failed|bad_alloc|memoryerror/i;
 
 /**
  * Build the error to reject a non-zero Python exit with. The extracted reason is

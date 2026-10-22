@@ -34,7 +34,7 @@ const OOM_FALLBACK_MODEL = "u2net";
  */
 export function isMemoryAllocError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
-  return /out of memory|not enough memory|can't allocate memory|cannot allocate memory|unable to allocate|failed to allocate|cudaerrormemoryallocation|cublas_status_alloc_failed|bad_alloc|memoryerror/i.test(
+  return /out of memory|not enough memory|can't allocate memory|cannot allocate memory|\[errno 12\]|unable to allocate|failed to allocate|cudaerrormemoryallocation|cublas_status_alloc_failed|bad_alloc|memoryerror/i.test(
     err.message,
   );
 }

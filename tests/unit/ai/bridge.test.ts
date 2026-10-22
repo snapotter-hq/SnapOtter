@@ -3072,6 +3072,8 @@ describe("bridge - extractPythonError via dispatcher responses", () => {
       "RuntimeError: [enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes.",
       "DefaultCPUAllocator: can't allocate memory: you tried to allocate 104857600 bytes.",
       "OSError: [Errno 12] Cannot allocate memory",
+      "OSError: [Errno 12] Nicht genügend Hauptspeicher verfügbar",
+      "[Errno 12] Не удалось выделить память",
       "Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 30) and data type float32",
     ]) {
       const mock = await setupReadyDispatcher();

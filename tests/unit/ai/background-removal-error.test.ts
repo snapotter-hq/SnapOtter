@@ -85,6 +85,8 @@ describe("removeBackground error surfacing", () => {
       "RuntimeError: [enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes.",
       "DefaultCPUAllocator: can't allocate memory: you tried to allocate 104857600 bytes.",
       "Cannot allocate memory",
+      "[Errno 12] Nicht genügend Hauptspeicher verfügbar",
+      "OSError: [Errno 12] Не удалось выделить память",
       "Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 30) and data type float32",
     ]) {
       expect(isMemoryAllocError(new Error(msg))).toBe(true);
@@ -94,10 +96,13 @@ describe("removeBackground error surfacing", () => {
     expect(
       isMemoryAllocError(new Error("RuntimeError: DefaultCPUAllocator: invalid alignment")),
     ).toBe(false);
+    expect(isMemoryAllocError(new Error("OSError: [Errno 13] Permission denied"))).toBe(false);
+    expect(isMemoryAllocError(new Error("OSError: [Errno 122] Disk quota exceeded"))).toBe(false);
 
     for (const oomError of [
       "RuntimeError: [enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes.",
       "Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 30) and data type float32",
+      "[Errno 12] Nicht genügend Hauptspeicher verfügbar",
     ]) {
       runPythonWithProgress.mockReset();
       parseStdoutJson.mockReset();
@@ -128,6 +133,7 @@ describe("removeBackground error surfacing", () => {
     for (const cpuOom of [
       "RuntimeError: [enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes.",
       "Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 30) and data type float32",
+      "[Errno 12] Nicht genügend Hauptspeicher verfügbar",
     ]) {
       runPythonWithProgress.mockReset();
       parseStdoutJson.mockReset();

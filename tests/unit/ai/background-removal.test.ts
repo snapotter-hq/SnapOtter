@@ -514,6 +514,19 @@ describe("removeBackground", () => {
       expect(fallbackOpts.model).toBe("u2net");
     });
 
+    it("retries with u2net when a localized [Errno 12] OOM message is returned (#3460)", async () => {
+      vi.mocked(runPythonWithProgress)
+        .mockRejectedValueOnce(new Error("[Errno 12] Nicht genügend Hauptspeicher verfügbar"))
+        .mockResolvedValueOnce({ stdout: '{"success": true}', stderr: "" });
+
+      await removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, { model: "birefnet-general" });
+
+      expect(runPythonWithProgress).toHaveBeenCalledTimes(2);
+      const fallbackArgs = vi.mocked(runPythonWithProgress).mock.calls[1][1];
+      const fallbackOpts = JSON.parse(fallbackArgs[2]);
+      expect(fallbackOpts.model).toBe("u2net");
+    });
+
     it("fires progress callback on fallback retry", async () => {
       const onProgress = vi.fn();
       vi.mocked(runPythonWithProgress)

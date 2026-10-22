@@ -29,6 +29,7 @@ _OOM_MARKERS = (
     "not enough memory",
     "can't allocate memory",
     "cannot allocate memory",
+    "[errno 12]",
     "unable to allocate",
     "failed to allocate",
     "cudaerrormemoryallocation",

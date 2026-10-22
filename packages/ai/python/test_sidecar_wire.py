@@ -129,6 +129,7 @@ for oom_mod, oom_fn in (
             "DefaultCPUAllocator: can't allocate memory: you tried to allocate 104857600 bytes."
         ),
         RuntimeError("OSError: [Errno 12] Cannot allocate memory"),
+        RuntimeError("OSError: [Errno 12] Nicht genügend Hauptspeicher verfügbar"),
         OSError(12, "Cannot allocate memory"),
         OSError(12, "Nicht genügend Hauptspeicher verfügbar"),
         RuntimeError("DefaultCPUAllocator: NOT ENOUGH MEMORY"),
@@ -145,6 +146,8 @@ for oom_mod, oom_fn in (
         is False
     )
     assert oom_fn(OSError(13, "Permission denied")) is False
+    assert oom_fn(RuntimeError("OSError: [Errno 13] Permission denied")) is False
+    assert oom_fn(RuntimeError("OSError: [Errno 122] Disk quota exceeded")) is False
     assert oom_fn(OSError("disk read failed")) is False
 for host_oom_mod in (gif_remove_bg, remove_bg, gpu):
     assert host_oom_mod._is_host_oom(MemoryError()) is True, (
@@ -162,6 +165,7 @@ for host_oom_mod in (gif_remove_bg, remove_bg, gpu):
         RuntimeError("DefaultCPUAllocator: out of memory"),
         RuntimeError("DefaultCPUAllocator: failed to allocate memory"),
         RuntimeError("OSError: [Errno 12] Cannot allocate memory"),
+        RuntimeError("OSError: [Errno 12] Nicht genügend Hauptspeicher verfügbar"),
         OSError(12, "Cannot allocate memory"),
         OSError(12, "Nicht genügend Hauptspeicher verfügbar"),
         RuntimeError("DefaultCPUAllocator: NOT ENOUGH MEMORY"),
@@ -181,6 +185,8 @@ for host_oom_mod in (gif_remove_bg, remove_bg, gpu):
         RuntimeError("RuntimeError: DefaultCPUAllocator: invalid alignment"),
         RuntimeError("CUDA driver version is insufficient for CUDA runtime version"),
         OSError(13, "Permission denied"),
+        RuntimeError("OSError: [Errno 13] Permission denied"),
+        RuntimeError("OSError: [Errno 122] Disk quota exceeded"),
     ):
         assert host_oom_mod._is_host_oom(non_host_oom_err) is False, (
             f"{host_oom_mod.__name__}._is_host_oom must not match non-host-OOM: {non_host_oom_err!r}"
