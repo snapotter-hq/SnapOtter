@@ -130,7 +130,7 @@ async function runAndParse(
     if (!result.success) {
       throw toBgRemovalError(result.error || "Background removal failed");
     }
-    return readFile(outputPath);
+    return await readFile(outputPath);
   } catch (err) {
     const isOom = isMemoryAllocError(err);
     const fallbackModel = oomFallbackModel === undefined ? OOM_FALLBACK_MODEL : oomFallbackModel;
@@ -140,15 +140,19 @@ async function runAndParse(
 
     onProgress?.(5, `Retrying with lighter model (${fallbackModel})`);
     const fallbackOpts = { ...options, model: fallbackModel };
-    const { stdout } = await runPythonWithProgress(
-      "remove_bg.py",
-      [inputPath, outputPath, JSON.stringify(fallbackOpts)],
-      runOptions,
-    );
-    const result = parseStdoutJson(stdout);
-    if (!result.success) {
-      throw toBgRemovalError(result.error || "Background removal failed");
+    try {
+      const { stdout } = await runPythonWithProgress(
+        "remove_bg.py",
+        [inputPath, outputPath, JSON.stringify(fallbackOpts)],
+        runOptions,
+      );
+      const result = parseStdoutJson(stdout);
+      if (!result.success) {
+        throw toBgRemovalError(result.error || "Background removal failed");
+      }
+      return await readFile(outputPath);
+    } catch (fallbackErr) {
+      throw toBgRemovalError(fallbackErr);
     }
-    return readFile(outputPath);
   }
 }
