@@ -350,6 +350,15 @@ function pythonAbortError(): Error {
   return error;
 }
 
+function isTimeoutAbortReason(reason: unknown): boolean {
+  if (reason === "timeout") return true;
+  return (
+    typeof reason === "object" &&
+    reason !== null &&
+    (reason as { name?: unknown }).name === "TimeoutError"
+  );
+}
+
 // ── PythonDispatcher class ─────────────────────────────────────────
 
 interface PendingRequest {
@@ -855,8 +864,14 @@ export class PythonDispatcher {
         this.pending.delete(id);
         // The dispatcher executes synchronously and has no request-level cancel
         // protocol, so stopping the process is the only way to stop Python work.
-        // Treat this as intentional teardown, not a dispatcher crash.
-        this.stoppedChildren.add(proc);
+        // Treat user cancellation as intentional teardown, not a dispatcher
+        // crash; a deadline abort ("timeout" / TimeoutError) leaves proc out of
+        // stoppedChildren so a hung script still counts as a crash on close.
+        // Guard on !proc.killed so a sibling request canceled after a timeout
+        // already signaled proc cannot retroactively mask the timeout crash.
+        if (!proc.killed && !isTimeoutAbortReason(options.signal?.reason)) {
+          this.stoppedChildren.add(proc);
+        }
         if (this.child === proc) {
           this.child = null;
           this.childReady = false;

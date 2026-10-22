@@ -4824,3 +4824,178 @@ describe("bridge - dispatcher failure recycling and diagnostics (issue #2709)", 
     expect(mockChild2.process.kill).toHaveBeenCalledWith("SIGTERM");
   });
 });
+
+describe("bridge - dispatcherRun onAbort timeout vs cancel crash accounting (issue #3274)", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.mocked(spawn).mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("increments consecutiveCrashes when options.signal aborts with reason 'timeout' and keeps it at 0 on standard AbortError", async () => {
+    const {
+      getDispatcherStatus,
+      getDocsDispatcher,
+      initDispatcher,
+      runDocsScript,
+      runPythonWithProgress,
+      shutdownDispatcher,
+      shutdownDocsDispatcher,
+    } = await import("../../../packages/ai/src/bridge.js");
+    onTestFinished(async () => {
+      shutdownDispatcher();
+      await shutdownDocsDispatcher();
+    });
+
+    // 1. Standard user cancel (5 consecutive cancels >= MAX_CONSECUTIVE_CRASHES across
+    // default AbortError, string, null, and Error reasons) must NOT count as a crash
+    for (const cancelReason of [
+      undefined,
+      "job canceled",
+      null,
+      new Error("user canceled"),
+      "abort",
+    ]) {
+      const mockCancel = createMockProcess();
+      vi.mocked(spawn).mockReturnValueOnce(mockCancel.process);
+      const readyCancel = initDispatcher();
+      mockCancel.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+      await readyCancel;
+
+      const cancelAc = new AbortController();
+      const cancelRun = runPythonWithProgress("test.py", [], { signal: cancelAc.signal });
+
+      if (cancelReason === undefined) {
+        cancelAc.abort();
+      } else {
+        cancelAc.abort(cancelReason);
+      }
+      await expect(cancelRun).rejects.toMatchObject({ name: "AbortError" });
+      expect(mockCancel.process.kill).toHaveBeenCalledWith("SIGTERM");
+      expect(getDispatcherStatus().running).toBe(false);
+      expect(getDispatcherStatus().ready).toBe(false);
+
+      mockCancel.emitEvent("close", null, "SIGTERM");
+      expect(getDispatcherStatus().consecutiveCrashes).toBe(0);
+      expect(getDispatcherStatus().failed).toBe(false);
+    }
+
+    // 2. Pre-aborted timeout signal rejects before touching or killing a ready dispatcher
+    const mockIdle = createMockProcess();
+    vi.mocked(spawn).mockReturnValueOnce(mockIdle.process);
+    const readyIdle = initDispatcher();
+    mockIdle.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+    await readyIdle;
+
+    const preAbortedAc = new AbortController();
+    preAbortedAc.abort("timeout");
+    await expect(
+      runPythonWithProgress("test.py", [], { signal: preAbortedAc.signal }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(mockIdle.process.kill).not.toHaveBeenCalled();
+    expect(getDispatcherStatus().running).toBe(true);
+    expect(getDispatcherStatus().ready).toBe(true);
+    expect(getDispatcherStatus().consecutiveCrashes).toBe(0);
+
+    // 3. Worker deadline abort (ac.abort("timeout")) on that ready dispatcher MUST count
+    // as a crash when the child closes, even if a sibling request is user-canceled
+    // before the SIGTERMed process finishes closing.
+    const timeoutAc = new AbortController();
+    const siblingCancelAc = new AbortController();
+    const timeoutRun = runPythonWithProgress("test.py", [], { signal: timeoutAc.signal });
+    const siblingCancelRun = runPythonWithProgress("sibling.py", [], {
+      signal: siblingCancelAc.signal,
+    });
+
+    timeoutAc.abort("timeout");
+    await expect(timeoutRun).rejects.toMatchObject({ name: "AbortError" });
+    expect(mockIdle.process.kill).toHaveBeenCalledWith("SIGTERM");
+    expect(getDispatcherStatus().running).toBe(false);
+    expect(getDispatcherStatus().ready).toBe(false);
+
+    // Sibling request aborts with a non-timeout user cancel before close fires
+    siblingCancelAc.abort("job canceled");
+    await expect(siblingCancelRun).rejects.toMatchObject({ name: "AbortError" });
+
+    mockIdle.emitEvent("close", null, "SIGTERM");
+    expect(getDispatcherStatus().consecutiveCrashes).toBe(1);
+
+    // 4. TimeoutError reason (e.g. AbortSignal.timeout / DOMException TimeoutError) on docsDispatcher also counts as a crash
+    const mockDocsTimeout = createMockProcess();
+    vi.mocked(spawn).mockReturnValueOnce(mockDocsTimeout.process);
+    const readyDocs = getDocsDispatcher().init();
+    mockDocsTimeout.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+    await readyDocs;
+
+    const docsTimeoutAc = new AbortController();
+    const docsTimeoutRun = runDocsScript(
+      "doc_pagecount",
+      { path: "/tmp/in.pdf" },
+      { signal: docsTimeoutAc.signal },
+    );
+
+    docsTimeoutAc.abort(
+      new DOMException("The operation was aborted due to timeout", "TimeoutError"),
+    );
+    await expect(docsTimeoutRun).rejects.toMatchObject({ name: "AbortError" });
+    expect(mockDocsTimeout.process.kill).toHaveBeenCalledWith("SIGTERM");
+
+    mockDocsTimeout.emitEvent("close", null, "SIGTERM");
+    expect(getDocsDispatcher().getStatus().consecutiveCrashes).toBe(1);
+  });
+
+  it("arms crash backoff and retries sibling pending requests when a deadline abort kills the dispatcher", async () => {
+    vi.useFakeTimers();
+    const { getDispatcherStatus, initDispatcher, runPythonWithProgress, shutdownDispatcher } =
+      await import("../../../packages/ai/src/bridge.js");
+    onTestFinished(() => {
+      shutdownDispatcher();
+      vi.useRealTimers();
+    });
+
+    const mockDisp = createMockProcess();
+    const mockSiblingFallback = createMockProcess();
+    const mockBackoffFallback = createMockProcess();
+    vi.mocked(spawn)
+      .mockReturnValueOnce(mockDisp.process)
+      .mockReturnValueOnce(mockSiblingFallback.process)
+      .mockReturnValueOnce(mockBackoffFallback.process);
+
+    const ready = initDispatcher();
+    mockDisp.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+    await vi.advanceTimersByTimeAsync(60);
+    await ready;
+
+    const ac = new AbortController();
+    const timedOutRun = runPythonWithProgress("hung.py", [], { signal: ac.signal });
+    const siblingRun = runPythonWithProgress("sibling.py", []);
+    const settledTimedOut = timedOutRun.catch((e: unknown) => e);
+    await vi.advanceTimersByTimeAsync(10);
+
+    ac.abort("timeout");
+    await expect(settledTimedOut).resolves.toMatchObject({ name: "AbortError" });
+    mockDisp.emitEvent("close", null, "SIGTERM");
+
+    expect(getDispatcherStatus().consecutiveCrashes).toBe(1);
+
+    // Sibling request in the same generation retries via runPerRequest
+    await vi.advanceTimersByTimeAsync(10);
+    mockSiblingFallback.stdout.emit("data", Buffer.from('{"sibling": true}\n'));
+    mockSiblingFallback.emitEvent("close", 0, null);
+    await expect(siblingRun).resolves.toMatchObject({ stdout: '{"sibling": true}' });
+
+    // During the 1000ms crash backoff window, a subsequent request skips spawning
+    // a new dispatcher and goes straight to runPerRequest (only 1 new spawn).
+    vi.advanceTimersByTime(500);
+    const spawnCallsBefore = vi.mocked(spawn).mock.calls.length;
+    const duringBackoffRun = runPythonWithProgress("fast.py", []);
+    await vi.advanceTimersByTimeAsync(10);
+    mockBackoffFallback.stdout.emit("data", Buffer.from('{"ok": true}\n'));
+    mockBackoffFallback.emitEvent("close", 0, null);
+    await expect(duringBackoffRun).resolves.toMatchObject({ stdout: '{"ok": true}' });
+    expect(vi.mocked(spawn).mock.calls.length - spawnCallsBefore).toBe(1);
+  });
+});
