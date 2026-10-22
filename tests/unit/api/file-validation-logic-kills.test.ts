@@ -31,6 +31,10 @@ describe("file-validation megapixel limit (L277/L279/L282)", () => {
     expect((res as { reason: string }).reason).toBe(
       "Image exceeds maximum size: 4.0MP (limit: 3MP)",
     );
+    await expect(validateImageBuffer(buf, "big.tga")).resolves.toEqual({
+      valid: false,
+      reason: "Image exceeds maximum size: 4.0MP (limit: 3MP)",
+    });
   });
 
   it("accepts the same image when the limit is above its size (kills the > comparison)", async () => {

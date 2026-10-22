@@ -267,11 +267,13 @@ export async function validateImageBuffer(
     detectedFormat = "raw";
   }
 
-  // TGA has no magic bytes, and an uncompressed true-colour header starts
-  // like CUR's signature, so the .tga name picks the reading. A .tga is
-  // accepted either way; only a header that holds together counts as proof.
+  // TGA has no magic bytes: an uncompressed true-colour header starts with
+  // CUR's signature (00 00 02 00) and a colour-mapped header missing its
+  // colour-map flag starts with ICO's (00 00 01 00), so the .tga name picks
+  // the reading. A .tga without another format's signature is accepted either
+  // way; only a header that holds together counts as proof.
   let nameOnly = false;
-  if (ext === "tga") {
+  if ((!detectedFormat || detectedFormat === "cur" || detectedFormat === "ico") && ext === "tga") {
     detectedFormat = "tga";
     nameOnly = !isTgaBuffer(buffer);
   }

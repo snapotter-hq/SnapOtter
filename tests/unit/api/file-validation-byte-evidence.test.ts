@@ -333,6 +333,35 @@ describe("TGA header and pixel data (#1782)", () => {
   it("still reads a real TGA's bytes as CUR when the name isn't .tga", async () => {
     expect(await validateImageBuffer(TGA, "art.cur")).toMatchObject({ valid: true, format: "cur" });
   });
+
+  it("retains magic-byte format and dimensions when a non-CUR image is named .tga (#3260)", async () => {
+    const pngBytes = readFixture(fixtures.image.base.png200);
+    const jpgBytes = readFixture(fixtures.image.base.jpg100);
+    const svgBytes = readFixture(fixtures.image.base.svg100);
+    const hdrBytes = Buffer.from("#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y 1 +X 1\n\0\0\0\0");
+    expect(await validateImageBuffer(pngBytes, "photo.tga")).toEqual({
+      valid: true,
+      format: "png",
+      width: 200,
+      height: 150,
+    });
+    expect(await mimeFor(pngBytes, "photo.tga")).toBe("image/png");
+    expect(await validateImageBuffer(jpgBytes, "photo.tga")).toEqual({
+      valid: true,
+      format: "jpeg",
+      width: 100,
+      height: 100,
+    });
+    expect(await mimeFor(jpgBytes, "photo.tga")).toBe("image/jpeg");
+    expect(await validateImageBuffer(svgBytes, "drawing.tga")).toEqual({
+      valid: true,
+      format: "svg",
+      width: 100,
+      height: 100,
+    });
+    expect(await mimeFor(svgBytes, "drawing.tga")).toBe("image/svg+xml");
+    byBytes(await validateImageBuffer(hdrBytes, "scene.tga"), "hdr");
+  });
 });
 
 describe("SVGZ contents (#1782)", () => {

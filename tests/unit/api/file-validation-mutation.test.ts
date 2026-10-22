@@ -677,13 +677,23 @@ describe("validateImageBuffer - extension-driven detection", () => {
     expectRejected(await validateImageBuffer(buf, "photo.bin"), "Unrecognized image format");
   });
 
-  it("forces tga for a .tga file even when the bytes match another format", async () => {
-    // CUR magic (0x00 0x00 0x02 0x00) but a .tga extension: the tga override
-    // (L228-230) wins over magic detection -> format is tga (CLI-decoded).
+  it("forces tga for a .tga file when the bytes match CUR or ICO magic", async () => {
+    // True-colour TGA headers start with 00 00 02 00 (CUR) and type-1 TGA headers
+    // with colorMapType=0 start with 00 00 01 00 (ICO), so .tga reclassifies both.
     expectValidByName(
       await validateImageBuffer(withLeadingBytes([0x00, 0x00, 0x02, 0x00]), "sprite.tga"),
       "tga",
     );
+    expectValidByName(
+      await validateImageBuffer(withLeadingBytes([0x00, 0x00, 0x01, 0x00]), "sprite.tga"),
+      "tga",
+    );
+  });
+
+  it("does NOT overwrite a non-CUR/ICO magic-byte format when the filename ends in .tga (#3260)", async () => {
+    // BMP magic + .tga extension: detectedFormat is "bmp" (not null, "cur", or "ico"),
+    // so the .tga override must not overwrite it.
+    expectValid(await validateImageBuffer(withLeadingBytes(BMP_HEAD), "photo.tga"), "bmp", 0, 0);
   });
 
   it("forces tga for a .tga file with no recognizable magic at all", async () => {
