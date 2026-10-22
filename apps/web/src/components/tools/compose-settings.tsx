@@ -159,7 +159,7 @@ export function ComposeSettings() {
       if (controller.signal.aborted || storeReset) return;
       const result = resolveServerUrls(raw);
       if (!isComposeResponse(result)) {
-        throw new Error(t.errors.invalidServerResponse);
+        throw new FeedbackCategoryError(t.errors.invalidServerResponse, "processing_error");
       }
       if (typeof result.jobId === "string" && result.jobId) {
         setJobId(result.jobId);

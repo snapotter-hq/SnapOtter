@@ -235,7 +235,7 @@ export function WatermarkImageSettings() {
         if (controller.signal.aborted || storeReset) return;
         const result = resolveServerUrls(raw);
         if (!isWatermarkImageResponse(result)) {
-          throw new Error(t.errors.invalidServerResponse);
+          throw new FeedbackCategoryError(t.errors.invalidServerResponse, "processing_error");
         }
         if (typeof result.jobId === "string" && result.jobId) {
           setJobId(result.jobId);
@@ -358,7 +358,7 @@ export function WatermarkImageSettings() {
             if (entryController.signal.aborted || !isEntryPresent(entryId, file)) continue;
             const result = resolveServerUrls(raw);
             if (!isWatermarkImageResponse(result)) {
-              throw new Error(t.errors.invalidServerResponse);
+              throw new FeedbackCategoryError(t.errors.invalidServerResponse, "processing_error");
             }
             store.updateEntryById(entryId, {
               processedUrl: result.downloadUrl,

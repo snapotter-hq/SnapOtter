@@ -356,6 +356,13 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       expect(useFileStore.getState().entries[0].status).toBe("pending");
       expect(useFileStore.getState().entries[1].status).toBe("failed");
       expect(useFileStore.getState().entries[1].error).toBe(en.errors.invalidResponse);
+      expect(useFileStore.getState().entries[1].errorCategory).toBe("processing_error");
+      expect(
+        classifyFeedbackError(
+          useFileStore.getState().entries[1].error,
+          useFileStore.getState().entries[1].errorCategory,
+        ),
+      ).toBe("processing_error");
       expect(screen.queryByText(en.errors.invalidResponse)).not.toBeInTheDocument();
       act(() => {
         useFileStore.getState().setSelectedIndex(1);
@@ -508,6 +515,8 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       expect(entry.status).toBe("failed");
       expect(entry.processedUrl).toBeNull();
       expect(entry.error).toBe(en.errors.invalidServerResponse);
+      expect(entry.errorCategory).toBe("processing_error");
+      expect(classifyFeedbackError(entry.error, entry.errorCategory)).toBe("processing_error");
       expect(URL.createObjectURL).not.toHaveBeenCalled();
       expect(screen.getByText(en.errors.invalidServerResponse)).toBeInTheDocument();
       expect(screen.queryByTestId("compare-download")).not.toBeInTheDocument();
@@ -538,6 +547,8 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       expect(entry.status).toBe("failed");
       expect(entry.processedUrl).toBeNull();
       expect(entry.error).toBe(en.errors.invalidServerResponse);
+      expect(entry.errorCategory).toBe("processing_error");
+      expect(classifyFeedbackError(entry.error, entry.errorCategory)).toBe("processing_error");
       expect(screen.getByText(en.errors.invalidServerResponse)).toBeInTheDocument();
       expect(screen.queryByTestId("compose-download")).not.toBeInTheDocument();
       unmount();
@@ -606,6 +617,8 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       expect(entry.status).toBe("failed");
       expect(entry.processedUrl).toBeNull();
       expect(entry.error).toBe(en.errors.invalidServerResponse);
+      expect(entry.errorCategory).toBe("processing_error");
+      expect(classifyFeedbackError(entry.error, entry.errorCategory)).toBe("processing_error");
       expect(screen.getByText(en.errors.invalidServerResponse)).toBeInTheDocument();
       expect(screen.queryByTestId("watermark-image-download")).not.toBeInTheDocument();
       unmount();
@@ -643,6 +656,10 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       expect(entries[0].status).toBe("failed");
       expect(entries[0].processedUrl).toBeNull();
       expect(entries[0].error).toBe(en.errors.invalidServerResponse);
+      expect(entries[0].errorCategory).toBe("processing_error");
+      expect(classifyFeedbackError(entries[0].error, entries[0].errorCategory)).toBe(
+        "processing_error",
+      );
       expect(entries[1].status).toBe("completed");
       expect(entries[1].processedUrl).toBe("/api/v1/download/j/b.png");
       expect(entries[1].processedSize).toBeNull();
@@ -650,6 +667,10 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       expect(entries[2].status).toBe("failed");
       expect(entries[2].processedUrl).toBeNull();
       expect(entries[2].error).toBe(en.errors.invalidServerResponse);
+      expect(entries[2].errorCategory).toBe("processing_error");
+      expect(classifyFeedbackError(entries[2].error, entries[2].errorCategory)).toBe(
+        "processing_error",
+      );
       unmount();
     }
   });
@@ -683,6 +704,8 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       expect(entry.status).toBe("failed");
       expect(entry.processedUrl).toBeNull();
       expect(entry.error).toBe(en.errors.invalidServerResponse);
+      expect(entry.errorCategory).toBe("processing_error");
+      expect(classifyFeedbackError(entry.error, entry.errorCategory)).toBe("processing_error");
       expect(screen.getByText(en.errors.invalidServerResponse)).toBeInTheDocument();
       expect(screen.queryByTestId("beautify-download")).not.toBeInTheDocument();
       unmount();

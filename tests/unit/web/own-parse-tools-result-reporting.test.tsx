@@ -206,6 +206,7 @@ describe("stitch: a malformed sync answer apart from our own store write", () =>
     (await submit("stitch-submit")).respondRaw(200, text);
 
     await waitFor(() => expect(screen.getByText(en.errors.invalidResponse)).toBeInTheDocument());
+    expect(useFileStore.getState().entries[0].errorCategory).toBe("processing_error");
     expect(screen.queryByTestId("stitch-download")).not.toBeInTheDocument();
     expect(useFileStore.getState().processing).toBe(false);
     expectReported(message, "stitch");
@@ -221,6 +222,7 @@ describe("stitch: a malformed sync answer apart from our own store write", () =>
       await waitFor(() => expect(screen.getByText(en.errors.invalidResponse)).toBeInTheDocument());
       expect(screen.queryByTestId("stitch-download")).not.toBeInTheDocument();
       expect(useFileStore.getState().entries[0].processedUrl).toBeNull();
+      expect(useFileStore.getState().entries[0].errorCategory).toBe("processing_error");
       expect(useFileStore.getState().processing).toBe(false);
       expectReported(MISSING_FIELD, "stitch");
     },
@@ -268,6 +270,7 @@ describe("stitch: a malformed sync answer apart from our own store write", () =>
       );
       expect(useFileStore.getState().entries[0].status).toBe("failed");
       expect(useFileStore.getState().entries[0].error).toBe(en.errors.invalidResponse);
+      expect(useFileStore.getState().entries[0].errorCategory).toBe("processing_error");
       expect(useFileStore.getState().processing).toBe(false);
       expect(screen.getByTestId("stitch-submit")).toBeEnabled();
       expectReported(NO_DOWNLOAD_URL, "stitch");
@@ -295,6 +298,7 @@ describe("stitch: a malformed sync answer apart from our own store write", () =>
       await waitFor(() =>
         expect(screen.getByText(en.errors.jobTrackingFailed)).toBeInTheDocument(),
       );
+      expect(useFileStore.getState().entries[0].errorCategory).toBe("processing_error");
       expect(screen.queryByText(en.errors.invalidResponse)).not.toBeInTheDocument();
       expect(useFileStore.getState().processing).toBe(false);
       expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
@@ -329,6 +333,7 @@ describe("stitch: a malformed sync answer apart from our own store write", () =>
       expect(useFileStore.getState().entries[0].status).toBe("failed");
       expect(useFileStore.getState().entries[0].processedUrl).toBeNull();
       expect(useFileStore.getState().entries[0].error).toBe(en.errors.jobTrackingFailed);
+      expect(useFileStore.getState().entries[0].errorCategory).toBe("processing_error");
       expect(useFileStore.getState().processing).toBe(false);
       expect(screen.getByTestId("stitch-submit")).toBeEnabled();
       expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);

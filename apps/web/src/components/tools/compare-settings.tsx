@@ -131,7 +131,7 @@ export function CompareSettings() {
       if (controller.signal.aborted || storeReset) return;
       const result = resolveServerUrls(raw);
       if (!isCompareResponse(result)) {
-        throw new Error(t.errors.invalidServerResponse);
+        throw new FeedbackCategoryError(t.errors.invalidServerResponse, "processing_error");
       }
       // Show the second image in the slider (not the diff) so the user can
       // visually compare their two originals. The diff is still downloadable.

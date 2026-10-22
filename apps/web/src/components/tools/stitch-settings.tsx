@@ -186,7 +186,7 @@ export function StitchSettings() {
             result = parseResultBody<StitchResult>(xhr.responseText, RESULT_FIELDS);
           } catch (err) {
             reportMalformedResult(err, { status: xhr.status, toolId: "stitch" });
-            const teardownError = failEntry(t.errors.invalidResponse);
+            const teardownError = failEntry(t.errors.invalidResponse, "processing_error");
             if (teardownError) throw teardownError.cause;
             return;
           }
@@ -207,6 +207,7 @@ export function StitchSettings() {
           } catch (err) {
             const teardownError = failEntry(
               jobFailureMessage({ reason: "trackingFailed" }, t.errors),
+              "processing_error",
             );
             if (teardownError) {
               reportRunEndFailure(
