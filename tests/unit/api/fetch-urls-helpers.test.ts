@@ -16,6 +16,7 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
 }));
 
 const putObjectMock = vi.hoisted(() => vi.fn(async () => {}));
+const reportErrorMock = vi.hoisted(() => vi.fn(async () => {}));
 vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>();
@@ -24,8 +25,16 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
     putObject: putObjectMock,
   };
 });
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
+  return {
+    ...actual,
+    reportError: reportErrorMock,
+  };
+});
 
 import * as formatDecoders from "../../../apps/api/src/lib/format-decoders.js";
+import * as svgSanitize from "../../../apps/api/src/lib/svg-sanitize.js";
 import {
   filenameFromUrl,
   getUniqueName,
@@ -452,10 +461,10 @@ describe("registerFetchUrlsRoute nameOnly image validations (#3263)", () => {
       expect(body.results).toHaveLength(4);
       expect(body.results[0]).toMatchObject({
         success: true,
-        filename: "icon.svgz",
+        filename: "icon.svg",
         contentType: "image/svg+xml",
-        width: 0,
-        height: 0,
+        width: 10,
+        height: 10,
       });
       expect(body.results[1]).toMatchObject({
         success: true,
@@ -481,6 +490,259 @@ describe("registerFetchUrlsRoute nameOnly image validations (#3263)", () => {
       expect(decodeSpy).toHaveBeenCalledTimes(3);
     } finally {
       decodeSpy.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("decompresses .svgz, sanitizes SVG payloads before validation, and rejects client SVG/SVGZ errors (#3543)", async () => {
+    const handler = await getFetchUrlsHandler();
+    const dirtySvgz = gzipSync(
+      Buffer.from(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><script>alert(1)</script><rect width="40" height="30"/></svg>',
+      ),
+    );
+    const doctypeSvg = Buffer.from(
+      '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" width="60" height="50"><script>alert(2)</script><rect width="60" height="50"/></svg>',
+    );
+    const xxeSvg = Buffer.from(
+      '<?xml version="1.0"?><!DOCTYPE svg [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>' +
+        '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><text>&xxe;</text></svg>',
+    );
+    const corruptSvgz = Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0xff, 0xff, 0xff]);
+    const overCapSvg = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg">${"<rect/>".repeat(5001)}</svg>`,
+    );
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string | URL | Request) => {
+        const href = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+        if (href.endsWith("/corrupt/icon.svgz")) {
+          return new Response(new Uint8Array(corruptSvgz), {
+            status: 200,
+            headers: { "Content-Type": "image/svg+xml" },
+          });
+        }
+        if (href.endsWith("/over-cap.svg")) {
+          return new Response(new Uint8Array(overCapSvg), {
+            status: 200,
+            headers: { "Content-Type": "image/svg+xml" },
+          });
+        }
+        if (href.toLowerCase().endsWith(".svgz")) {
+          return new Response(new Uint8Array(dirtySvgz), {
+            status: 200,
+            headers: { "Content-Type": "application/gzip" },
+          });
+        }
+        if (href.endsWith("/doctype.svg")) {
+          return new Response(new Uint8Array(doctypeSvg), {
+            status: 200,
+            headers: { "Content-Type": "image/svg+xml" },
+          });
+        }
+        if (href.endsWith("/xxe.svg")) {
+          return new Response(new Uint8Array(xxeSvg), {
+            status: 200,
+            headers: { "Content-Type": "image/svg+xml" },
+          });
+        }
+        return new Response(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="14"><rect width="12" height="14"/></svg>',
+          {
+            status: 200,
+            headers: { "Content-Type": "image/svg+xml" },
+          },
+        );
+      }),
+    );
+
+    try {
+      putObjectMock.mockClear();
+      reportErrorMock.mockClear();
+      const warnMock = vi.fn();
+      const reply = makeReply();
+      await handler(
+        {
+          body: {
+            urls: [
+              "http://1.2.3.4:9999/corrupt/icon.svgz",
+              "http://1.2.3.4:9999/a/icon.svgz",
+              "http://1.2.3.4:9999/b/icon.svg",
+              "http://1.2.3.4:9999/c/BADGE.SVGZ",
+              "http://1.2.3.4:9999/doctype.svg",
+              "http://1.2.3.4:9999/xxe.svg",
+              "http://1.2.3.4:9999/over-cap.svg",
+            ],
+          },
+          log: { warn: warnMock },
+        },
+        reply,
+      );
+
+      expect(reply.statusCode).toBe(200);
+      const body = reply.payload as {
+        results: Array<{
+          success: boolean;
+          url: string;
+          filename?: string;
+          contentType?: string;
+          size?: number;
+          width?: number;
+          height?: number;
+          downloadUrl?: string;
+          error?: string;
+        }>;
+      };
+      expect(body.results).toHaveLength(7);
+
+      // 0: corrupt .svgz fails without reserving "icon.svg" in usedFilenames
+      expect(body.results[0]).toMatchObject({
+        success: false,
+        url: "http://1.2.3.4:9999/corrupt/icon.svgz",
+      });
+      expect(body.results[0]?.error).toBeTruthy();
+
+      // 1: valid .svgz decompresses, rewrites to icon.svg, and gets real Sharp dimensions
+      expect(body.results[1]).toMatchObject({
+        success: true,
+        filename: "icon.svg",
+        contentType: "image/svg+xml",
+        width: 40,
+        height: 30,
+      });
+
+      // 2: plain icon.svg collides with the rewritten icon.svg and deduplicates to icon_1.svg
+      expect(body.results[2]).toMatchObject({
+        success: true,
+        filename: "icon_1.svg",
+        contentType: "image/svg+xml",
+        width: 12,
+        height: 14,
+      });
+
+      // 3: uppercase .SVGZ rewrites to .svg
+      expect(body.results[3]).toMatchObject({
+        success: true,
+        filename: "BADGE.svg",
+        contentType: "image/svg+xml",
+        width: 40,
+        height: 30,
+      });
+
+      // 4: DOCTYPE is stripped before validateImageBuffer, so Sharp validates dimensions
+      expect(body.results[4]).toMatchObject({
+        success: true,
+        filename: "doctype.svg",
+        contentType: "image/svg+xml",
+        width: 60,
+        height: 50,
+      });
+
+      // 5: XXE SVG with undeclared entity after DOCTYPE removal still stores sanitized bytes
+      expect(body.results[5]).toMatchObject({
+        success: true,
+        filename: "xxe.svg",
+      });
+
+      // 6: over-cap SVG fails with element count message and is not stored
+      expect(body.results[6]).toMatchObject({
+        success: false,
+        url: "http://1.2.3.4:9999/over-cap.svg",
+        error: expect.stringMatching(/element count/i),
+      });
+
+      expect(reportErrorMock).not.toHaveBeenCalled();
+      expect(putObjectMock).toHaveBeenCalledTimes(5);
+
+      const storedBySuffix = new Map<string, Buffer>();
+      for (const call of putObjectMock.mock.calls as unknown as Array<[string, Buffer]>) {
+        const [key, data] = call;
+        storedBySuffix.set(key.split("/").pop() ?? key, data);
+      }
+
+      const iconSvg = storedBySuffix.get("icon.svg")?.toString("utf-8") ?? "";
+      expect(iconSvg).toContain("<svg");
+      expect(iconSvg).not.toContain("<script");
+      expect(iconSvg).not.toContain("alert");
+      expect(body.results[1]?.size).toBe(storedBySuffix.get("icon.svg")?.length);
+
+      const doctypeStored = storedBySuffix.get("doctype.svg")?.toString("utf-8") ?? "";
+      expect(doctypeStored).toContain("<svg");
+      expect(doctypeStored).not.toContain("DOCTYPE");
+      expect(doctypeStored).not.toContain("<script");
+
+      const xxeStored = storedBySuffix.get("xxe.svg")?.toString("utf-8") ?? "";
+      expect(xxeStored).toContain("<svg");
+      expect(xxeStored).not.toContain("DOCTYPE");
+      expect(xxeStored).not.toContain("ENTITY");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("reports unexpected non-client sanitizeSvg faults via reportError and hides internal error text (#3543)", async () => {
+    const handler = await getFetchUrlsHandler();
+    const sanitizeSpy = vi.spyOn(svgSanitize, "sanitizeSvg").mockImplementation(() => {
+      throw new TypeError("unexpected internal regex fault");
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response('<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>', {
+            status: 200,
+            headers: { "Content-Type": "image/svg+xml" },
+          }),
+      ),
+    );
+
+    try {
+      putObjectMock.mockClear();
+      reportErrorMock.mockClear();
+      const errorLogMock = vi.fn();
+      const warnLogMock = vi.fn();
+      const reply = makeReply();
+      await handler(
+        {
+          body: { urls: ["http://1.2.3.4:9999/icon.svg"] },
+          log: { warn: warnLogMock, error: errorLogMock },
+        },
+        reply,
+      );
+
+      expect(reply.statusCode).toBe(200);
+      const body = reply.payload as {
+        results: Array<{ success: boolean; url: string; error?: string }>;
+      };
+      expect(body.results).toEqual([
+        {
+          success: false,
+          url: "http://1.2.3.4:9999/icon.svg",
+          error: "Internal server error",
+        },
+      ]);
+      expect(putObjectMock).not.toHaveBeenCalled();
+      expect(errorLogMock).toHaveBeenCalledOnce();
+      expect(warnLogMock).not.toHaveBeenCalled();
+      expect(reportErrorMock).toHaveBeenCalledOnce();
+
+      // Also exercise the log.warn fallback when a minimal logger omits .error
+      const fallbackWarnMock = vi.fn();
+      const fallbackReply = makeReply();
+      await handler(
+        {
+          body: { urls: ["http://1.2.3.4:9999/icon.svg"] },
+          log: { warn: fallbackWarnMock },
+        },
+        fallbackReply,
+      );
+      expect(fallbackWarnMock).toHaveBeenCalledOnce();
+      expect(reportErrorMock).toHaveBeenCalledTimes(2);
+    } finally {
+      sanitizeSpy.mockRestore();
       vi.unstubAllGlobals();
     }
   });
