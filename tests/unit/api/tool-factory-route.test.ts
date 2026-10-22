@@ -1440,6 +1440,106 @@ describe("createToolRoute", () => {
       expect(reply.status).toHaveBeenCalledWith(422);
     });
 
+    it("prefers settled failure.message over raw waitForJob error on 422 fallback (#3667)", async () => {
+      vi.mocked(waitForJob).mockRejectedValueOnce(new Error("raw handler error after timeout"));
+      jobRows.rows = [{ error: { message: "Processing timed out after 30s" } }];
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const reply = createMockReply();
+      const req = createMockRequest({ fileBuffer: Buffer.from("png-data"), settings: "{}" });
+
+      try {
+        await app.routes[apiToolPath(id)](req, reply);
+      } finally {
+        jobRows.rows = [];
+      }
+
+      expect(reply.status).toHaveBeenCalledWith(422);
+      expect(reply.send).toHaveBeenCalledWith({
+        error: "Processing failed",
+        details: "Processing timed out after 30s",
+      });
+
+      // Empty failure.message falls back to err.message / String(err)
+      vi.mocked(waitForJob).mockRejectedValueOnce("non-error string failure");
+      jobRows.rows = [{ error: { message: "" } }];
+      const fallbackReply = createMockReply();
+      const fallbackReq = createMockRequest({
+        fileBuffer: Buffer.from("png-data"),
+        settings: "{}",
+      });
+      try {
+        await app.routes[apiToolPath(id)](fallbackReq, fallbackReply);
+      } finally {
+        jobRows.rows = [];
+      }
+      expect(fallbackReply.status).toHaveBeenCalledWith(422);
+      expect(fallbackReply.send).toHaveBeenCalledWith({
+        error: "Processing failed",
+        details: "non-error string failure",
+      });
+    });
+
+    it("rethrows Redis connectivity and ReplyError faults from waitForJob when failure is null (#3667)", async () => {
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+
+      for (const redisFault of [
+        Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:6379"), { code: "ECONNREFUSED" }),
+        Object.assign(new Error("connect ETIMEDOUT 127.0.0.1:6379"), { code: "ETIMEDOUT" }),
+        Object.assign(new Error("Reached the max retries per request limit"), {
+          name: "MaxRetriesPerRequestError",
+        }),
+        Object.assign(new Error("OOM command not allowed when used memory > 'maxmemory'."), {
+          name: "ReplyError",
+        }),
+      ]) {
+        vi.mocked(deletePrefix).mockClear();
+        jobRows.rows = [{ error: null }];
+        vi.mocked(waitForJob).mockRejectedValueOnce(redisFault);
+        const reply = createMockReply();
+        const req = createMockRequest({ fileBuffer: Buffer.from("png-data"), settings: "{}" });
+
+        try {
+          await expect(handler(req, reply)).rejects.toBe(redisFault);
+        } finally {
+          jobRows.rows = [];
+        }
+        expect(classifyError(redisFault, "http")).toBe("operational");
+        expect(reply.status).not.toHaveBeenCalled();
+        expect(req.log.error).not.toHaveBeenCalled();
+        expect(deletePrefix).not.toHaveBeenCalled();
+      }
+
+      // Also rethrows Redis fault when reading schema.jobs.error itself rejects
+      const errorReadErr = new Error("db error read timeout");
+      const redisDownErr = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:6379"), {
+        code: "ECONNREFUSED",
+      });
+      vi.mocked(waitForJob).mockRejectedValueOnce(redisDownErr);
+      const select = vi.mocked(db.select);
+      const original = select.getMockImplementation();
+      select.mockImplementation(((fields?: Record<string, unknown>) =>
+        fields && "error" in fields
+          ? { from: () => ({ where: () => Promise.reject(errorReadErr) }) }
+          : original?.(fields as never)) as never);
+      const dbReply = createMockReply();
+      const dbReq = createMockRequest({ fileBuffer: Buffer.from("png-data"), settings: "{}" });
+      try {
+        await expect(handler(dbReq, dbReply)).rejects.toBe(redisDownErr);
+      } finally {
+        select.mockImplementation(original as never);
+      }
+      expect(dbReq.log.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ err: errorReadErr }),
+        "failed job row read failed",
+      );
+      expect(dbReq.log.error).not.toHaveBeenCalled();
+    });
+
     it("uses empty settings when none are provided", async () => {
       const app = createMockApp();
       const id = "resize";

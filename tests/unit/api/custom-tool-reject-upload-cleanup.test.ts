@@ -914,5 +914,93 @@ describe("pre-enqueue S3 getObjectBuffer fault normalization and sign-pdf waitFo
       expect.objectContaining({ err: jobRows.error }),
       "failed job row read failed",
     );
+
+    // 6. Sanitizes Python traceback via friendlyError and prefers failure.message when present (#3667)
+    jobRows.error = null;
+    const rawTraceback = new Error(
+      'Traceback (most recent call last):\n  File "/opt/app/doc_sign.py", line 42\nRuntimeError: fitz internal error',
+    );
+    jobRows.rows = [
+      {
+        error: {
+          message: "Processing failed. Check that the input file is valid and not corrupted.",
+        },
+      },
+    ];
+    mocks.waitForJob.mockRejectedValueOnce(rawTraceback);
+    const reqRowMsg = makeRequest(validPartsFor("sign-pdf"));
+    const replyRowMsg = makeReply();
+    await handlers["/api/v1/tools/pdf/sign-pdf"](reqRowMsg, replyRowMsg);
+    expect(replyRowMsg.statusCode).toBe(422);
+    expect(replyRowMsg.payload).toEqual({
+      error: "Processing failed",
+      details: "Processing failed. Check that the input file is valid and not corrupted.",
+    });
+
+    // Empty failure.message falls back to err.message (or String(err)) and runs friendlyError
+    jobRows.rows = [{ error: { message: "" } }];
+    mocks.waitForJob.mockRejectedValueOnce(rawTraceback);
+    const reqEmptyMsg = makeRequest(validPartsFor("sign-pdf"));
+    const replyEmptyMsg = makeReply();
+    await handlers["/api/v1/tools/pdf/sign-pdf"](reqEmptyMsg, replyEmptyMsg);
+    expect(replyEmptyMsg.statusCode).toBe(422);
+    expect(replyEmptyMsg.payload).toEqual({
+      error: "Processing failed",
+      details: "Processing failed. The file may be in an unsupported or corrupted format.",
+    });
+
+    jobRows.rows = [];
+    mocks.waitForJob.mockRejectedValueOnce("non-error string failure");
+    const reqStringErr = makeRequest(validPartsFor("sign-pdf"));
+    const replyStringErr = makeReply();
+    await handlers["/api/v1/tools/pdf/sign-pdf"](reqStringErr, replyStringErr);
+    expect(replyStringErr.statusCode).toBe(422);
+    expect(replyStringErr.payload).toEqual({
+      error: "Processing failed",
+      details: "non-error string failure",
+    });
+
+    // 7. Rethrows Redis connectivity and ReplyError faults when failure === null (#3667)
+    for (const redisFault of [
+      Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:6379"), { code: "ECONNREFUSED" }),
+      Object.assign(new Error("connect ETIMEDOUT 127.0.0.1:6379"), { code: "ETIMEDOUT" }),
+      Object.assign(new Error("Reached the max retries per request limit"), {
+        name: "MaxRetriesPerRequestError",
+      }),
+      Object.assign(new Error("OOM command not allowed when used memory > 'maxmemory'."), {
+        name: "ReplyError",
+      }),
+    ]) {
+      mocks.deletePrefix.mockClear();
+      jobRows.rows = [{ error: null }];
+      mocks.waitForJob.mockRejectedValueOnce(redisFault);
+      const reqRedis = makeRequest(validPartsFor("sign-pdf"));
+      const replyRedis = makeReply();
+      await expect(handlers["/api/v1/tools/pdf/sign-pdf"](reqRedis, replyRedis)).rejects.toBe(
+        redisFault,
+      );
+      expect(classifyError(redisFault, "http")).toBe("operational");
+      expect(replyRedis.payload).toBeUndefined();
+      expect(reqRedis.log.error).not.toHaveBeenCalled();
+      expect(mocks.deletePrefix).not.toHaveBeenCalled();
+    }
+
+    // Also rethrows Redis fault when reading schema.jobs.error itself rejects
+    jobRows.error = new Error("db error read timeout");
+    const redisAndDbFault = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:6379"), {
+      code: "ECONNREFUSED",
+    });
+    mocks.waitForJob.mockRejectedValueOnce(redisAndDbFault);
+    const reqRedisDb = makeRequest(validPartsFor("sign-pdf"));
+    const replyRedisDb = makeReply();
+    await expect(handlers["/api/v1/tools/pdf/sign-pdf"](reqRedisDb, replyRedisDb)).rejects.toBe(
+      redisAndDbFault,
+    );
+    expect(reqRedisDb.log.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ err: jobRows.error }),
+      "failed job row read failed",
+    );
+    expect(reqRedisDb.log.error).not.toHaveBeenCalled();
+    jobRows.error = null;
   });
 });

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import {
   apiToolPath,
+  connectivityClass,
   FEATURE_BUNDLES,
   isToolInputError,
   type Section,
@@ -750,12 +751,26 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
             if (failure.code) body.code = failure.code;
             return reply.status(failure.httpStatus).send(body);
           }
+          if (
+            failure === null &&
+            (connectivityClass(err) !== null ||
+              (err as { name?: string })?.name === "ReplyError" ||
+              (err as { name?: string })?.name === "MaxRetriesPerRequestError")
+          ) {
+            throw err;
+          }
           // Keep the full error (incl. raw ffmpeg/tool stderr) in server logs,
           // but return only a user-safe detail to the client.
           request.log.error({ err, toolId: config.toolId }, "tool processing failed");
+          const rawDetail =
+            typeof failure?.message === "string" && failure.message.length > 0
+              ? failure.message
+              : err instanceof Error
+                ? err.message
+                : String(err);
           return reply.status(422).send({
             error: "Processing failed",
-            details: friendlyError(err instanceof Error ? err.message : String(err)),
+            details: friendlyError(rawDetail),
           });
         }
       } finally {

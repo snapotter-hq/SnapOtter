@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pdfSignPy } from "@snapotter/doc-engine";
-import type { SignPlacement } from "@snapotter/shared";
+import { connectivityClass, type SignPlacement } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -18,7 +18,7 @@ import {
   type ToolJobData,
 } from "../../jobs/types.js";
 import { reportEngineUnavailable } from "../../lib/engine-unavailable.js";
-import { stripInternalPaths } from "../../lib/errors.js";
+import { friendlyError, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { createUniqueNamer } from "../../lib/filename.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
@@ -287,10 +287,24 @@ export function registerSignPdf(app: FastifyInstance) {
         if (failure.code) body.code = failure.code;
         return reply.status(failure.httpStatus).send(body);
       }
+      if (
+        failure === null &&
+        (connectivityClass(err) !== null ||
+          (err as { name?: string })?.name === "ReplyError" ||
+          (err as { name?: string })?.name === "MaxRetriesPerRequestError")
+      ) {
+        throw err;
+      }
       request.log.error({ err, toolId: TOOL_ID }, "sign-pdf processing failed");
+      const rawDetail =
+        typeof failure?.message === "string" && failure.message.length > 0
+          ? failure.message
+          : err instanceof Error
+            ? err.message
+            : String(err);
       return reply.status(422).send({
         error: "Processing failed",
-        details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+        details: friendlyError(rawDetail),
       });
     }
   });
