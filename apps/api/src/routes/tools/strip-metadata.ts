@@ -6,6 +6,7 @@ import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
+import { decompressSvgz, isSvgBuffer, sanitizeSvg } from "../../lib/svg-sanitize.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -125,8 +126,22 @@ export function registerStripMetadata(app: FastifyInstance) {
         return reply.status(400).send({ error: "No image file provided" });
       }
 
+      let inspectBuffer = fileBuffer;
+      if (filename.toLowerCase().endsWith(".svgz") || isSvgBuffer(fileBuffer)) {
+        try {
+          inspectBuffer = decompressSvgz(fileBuffer);
+          if (isSvgBuffer(inspectBuffer)) {
+            inspectBuffer = sanitizeSvg(inspectBuffer);
+          }
+        } catch (err) {
+          return reply.status(400).send({
+            error: err instanceof Error ? err.message : "Invalid SVG",
+          });
+        }
+      }
+
       try {
-        const metadata = await sharp(fileBuffer).metadata();
+        const metadata = await sharp(inspectBuffer).metadata();
 
         const result: Record<string, unknown> = {
           filename,

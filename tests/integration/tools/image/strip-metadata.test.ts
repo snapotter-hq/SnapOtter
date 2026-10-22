@@ -6,6 +6,7 @@
  * metadata is actually removed from the output.
  */
 
+import { gzipSync } from "node:zlib";
 import { isSafeMessageError, type SafeError } from "@snapotter/shared";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -760,5 +761,74 @@ describe("Opaque failure classification", () => {
     expect(isSafeMessageError(rejection)).toBe(true);
     expect((rejection as SafeError).message).toBe("Metadata strip failed");
     expect((rejection as SafeError).kind).toBe("bug");
+  });
+});
+
+// ── Inspect SVG and SVGZ sanitization (#3095) ────────────────────
+describe("Inspect SVG and SVGZ sanitization (#3095)", () => {
+  it("decompresses and sanitizes .svgz and .svg on inspect, and rejects invalid SVGZ or over-cap SVG with 400", async () => {
+    const rawSvg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="80"><script>if (1 < 2) alert(1);</script><rect width="100" height="80" fill="red"/></svg>',
+      "utf-8",
+    );
+    const svgz = gzipSync(rawSvg);
+    const { body: okBody, contentType: okCt } = createMultipartPayload([
+      { name: "file", filename: "icon.svgz", contentType: "image/svg+xml", content: svgz },
+    ]);
+    const okRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/strip-metadata/inspect",
+      payload: okBody,
+      headers: { "content-type": okCt, authorization: `Bearer ${adminToken}` },
+    });
+    expect(okRes.statusCode).toBe(200);
+    expect(JSON.parse(okRes.body)).toEqual({
+      filename: "icon.svgz",
+      fileSize: svgz.length,
+    });
+
+    const { body: svgBody, contentType: svgCt } = createMultipartPayload([
+      { name: "file", filename: "icon.svg", contentType: "image/svg+xml", content: rawSvg },
+    ]);
+    const svgRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/strip-metadata/inspect",
+      payload: svgBody,
+      headers: { "content-type": svgCt, authorization: `Bearer ${adminToken}` },
+    });
+    expect(svgRes.statusCode).toBe(200);
+    expect(JSON.parse(svgRes.body)).toEqual({
+      filename: "icon.svg",
+      fileSize: rawSvg.length,
+    });
+
+    const badSvgz = gzipSync(Buffer.from("not an svg", "utf-8"));
+    const { body: badBody, contentType: badCt } = createMultipartPayload([
+      { name: "file", filename: "bad.svgz", contentType: "image/svg+xml", content: badSvgz },
+    ]);
+    const badRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/strip-metadata/inspect",
+      payload: badBody,
+      headers: { "content-type": badCt, authorization: `Bearer ${adminToken}` },
+    });
+    expect(badRes.statusCode).toBe(400);
+    expect(JSON.parse(badRes.body).error).toContain("valid SVG content");
+
+    const overCapSvg = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">${"<rect/>".repeat(5001)}</svg>`,
+      "utf-8",
+    );
+    const { body: capBody, contentType: capCt } = createMultipartPayload([
+      { name: "file", filename: "too-many.svg", contentType: "image/svg+xml", content: overCapSvg },
+    ]);
+    const capRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/strip-metadata/inspect",
+      payload: capBody,
+      headers: { "content-type": capCt, authorization: `Bearer ${adminToken}` },
+    });
+    expect(capRes.statusCode).toBe(400);
+    expect(JSON.parse(capRes.body).error).toContain("maximum element count");
   });
 });

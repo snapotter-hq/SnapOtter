@@ -9,6 +9,7 @@
  * the tests gracefully handle the 422 response.
  */
 
+import { gzipSync } from "node:zlib";
 import AdmZip from "adm-zip";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -868,5 +869,53 @@ describe("Author field", () => {
     const res = await postTool({ author: "Author Name Test" });
     if (res.statusCode === 422) return;
     expect(res.statusCode).toBe(200);
+  });
+});
+
+// ── SVG and SVGZ sanitization (#3095) ────────────────────────────
+describe("SVG and SVGZ sanitization (#3095)", () => {
+  it("sanitizes .svg and decompresses .svgz outputs, and rejects invalid SVGZ or over-cap SVG with 400", async () => {
+    const dirtySvg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><script>alert(1)</script><rect width="100" height="100" fill="red"/></svg>',
+      "utf-8",
+    );
+    const svgRes = await postTool({}, dirtySvg, "dirty.svg", "image/svg+xml");
+    expect(svgRes.statusCode).toBe(200);
+    const svgBody = JSON.parse(svgRes.body);
+    const svgDl = await app.inject({
+      method: "GET",
+      url: svgBody.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(svgDl.statusCode).toBe(200);
+    expect(svgDl.body).toContain("<svg");
+    expect(svgDl.body).not.toContain("<script");
+    expect(svgDl.body).not.toContain("alert(1)");
+
+    const dirtySvgz = gzipSync(dirtySvg);
+    const svgzRes = await postTool({}, dirtySvgz, "icon.svgz", "image/svg+xml");
+    expect(svgzRes.statusCode).toBe(200);
+    const svgzBody = JSON.parse(svgzRes.body);
+    const svgzDl = await app.inject({
+      method: "GET",
+      url: svgzBody.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(svgzDl.statusCode).toBe(200);
+    expect(svgzDl.body).toContain("<svg");
+    expect(svgzDl.body).not.toContain("<script");
+
+    const badSvgz = gzipSync(Buffer.from("not an svg", "utf-8"));
+    const badSvgzRes = await postTool({}, badSvgz, "bad.svgz", "image/svg+xml");
+    expect(badSvgzRes.statusCode).toBe(400);
+    expect(JSON.parse(badSvgzRes.body).error).toContain("valid SVG content");
+
+    const overCapSvg = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">${"<rect/>".repeat(5001)}</svg>`,
+      "utf-8",
+    );
+    const overCapRes = await postTool({}, overCapSvg, "too-many.svg", "image/svg+xml");
+    expect(overCapRes.statusCode).toBe(400);
+    expect(JSON.parse(overCapRes.body).error).toContain("maximum element count");
   });
 });

@@ -18,6 +18,7 @@ import {
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
+import { decompressSvgz, isSvgBuffer, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -62,7 +63,16 @@ export function registerInfo(app: FastifyInstance) {
       let metaBuffer = fileBuffer;
       const ext = filename.split(".").pop()?.toLowerCase();
 
-      if (detectedFormat === "heif") {
+      if (detectedFormat === "svg" || isSvgBuffer(fileBuffer)) {
+        try {
+          metaBuffer = decompressSvgz(fileBuffer);
+          metaBuffer = sanitizeSvg(metaBuffer);
+        } catch (err) {
+          return reply.status(400).send({
+            error: err instanceof Error ? err.message : "Invalid SVG",
+          });
+        }
+      } else if (detectedFormat === "heif") {
         metaBuffer = await decodeHeic(fileBuffer);
       } else if (detectedFormat && needsCliDecode(detectedFormat)) {
         try {

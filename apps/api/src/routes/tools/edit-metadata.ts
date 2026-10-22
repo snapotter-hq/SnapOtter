@@ -22,6 +22,7 @@ import {
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
+import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
 import { engineUnavailable } from "../../modality/image-input.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
@@ -201,9 +202,21 @@ export function registerEditMetadata(app: FastifyInstance) {
         return reply.status(400).send({ error: "No image file provided" });
       }
 
+      const originalSize = fileBuffer.length;
       const validation = await validateImageBuffer(fileBuffer, filename);
       if (!validation.valid) {
         return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
+      }
+
+      if (validation.format === "svg") {
+        try {
+          fileBuffer = decompressSvgz(fileBuffer);
+          fileBuffer = sanitizeSvg(fileBuffer);
+        } catch (err) {
+          return reply.status(400).send({
+            error: err instanceof Error ? err.message : "Invalid SVG",
+          });
+        }
       }
 
       // Parse and validate settings
@@ -302,7 +315,7 @@ export function registerEditMetadata(app: FastifyInstance) {
           jobId,
           downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(filename)}`,
           previewUrl,
-          originalSize: fileBuffer.length,
+          originalSize,
           processedSize: outputBuffer.length,
         });
       } catch (err) {

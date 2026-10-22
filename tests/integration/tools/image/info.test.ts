@@ -5,6 +5,7 @@
  * histogram, EXIF presence, and input validation.
  */
 
+import { gzipSync } from "node:zlib";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
@@ -1099,5 +1100,75 @@ describe("Info", () => {
     expect(result.fileSize).toBe(SVG_LOGO.length);
     expect(result.width).toBeGreaterThan(0);
     expect(result.height).toBeGreaterThan(0);
+  });
+
+  it("decompresses and sanitizes .svgz and .svg inputs and rejects invalid SVGZ or over-cap SVG with 400 (#3095)", async () => {
+    const rawSvg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="80"><script>if (1 < 2) alert(1);</script><rect width="100" height="80" fill="red"/></svg>',
+      "utf-8",
+    );
+    const svgz = gzipSync(rawSvg);
+    const { body: okBody, contentType: okCt } = createMultipartPayload([
+      { name: "file", filename: "icon.svgz", contentType: "image/svg+xml", content: svgz },
+    ]);
+    const okRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/info",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": okCt },
+      body: okBody,
+    });
+    expect(okRes.statusCode).toBe(200);
+    const okResult = JSON.parse(okRes.body);
+    expect(okResult.filename).toBe("icon.svgz");
+    expect(okResult.fileSize).toBe(svgz.length);
+    expect(okResult.width).toBe(100);
+    expect(okResult.height).toBe(80);
+    expect(okResult.format).toBe("svg");
+
+    const { body: svgBody, contentType: svgCt } = createMultipartPayload([
+      { name: "file", filename: "icon.svg", contentType: "image/svg+xml", content: rawSvg },
+    ]);
+    const svgRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/info",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": svgCt },
+      body: svgBody,
+    });
+    expect(svgRes.statusCode).toBe(200);
+    const svgResult = JSON.parse(svgRes.body);
+    expect(svgResult.filename).toBe("icon.svg");
+    expect(svgResult.fileSize).toBe(rawSvg.length);
+    expect(svgResult.width).toBe(100);
+    expect(svgResult.height).toBe(80);
+    expect(svgResult.format).toBe("svg");
+
+    const badSvgz = gzipSync(Buffer.from("not an svg", "utf-8"));
+    const { body: badBody, contentType: badCt } = createMultipartPayload([
+      { name: "file", filename: "bad.svgz", contentType: "image/svg+xml", content: badSvgz },
+    ]);
+    const badRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/info",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": badCt },
+      body: badBody,
+    });
+    expect(badRes.statusCode).toBe(400);
+    expect(JSON.parse(badRes.body).error).toContain("valid SVG content");
+
+    const overCapSvg = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">${"<rect/>".repeat(5001)}</svg>`,
+      "utf-8",
+    );
+    const { body: capBody, contentType: capCt } = createMultipartPayload([
+      { name: "file", filename: "too-many.svg", contentType: "image/svg+xml", content: overCapSvg },
+    ]);
+    const capRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/info",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": capCt },
+      body: capBody,
+    });
+    expect(capRes.statusCode).toBe(400);
+    expect(JSON.parse(capRes.body).error).toContain("maximum element count");
   });
 });
