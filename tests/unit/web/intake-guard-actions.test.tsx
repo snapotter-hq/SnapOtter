@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { en } from "@snapotter/shared";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -450,7 +450,7 @@ describe("ToolPage handleAddMore, handleFiles, and handleUrlImport intake guard 
     expect(showIgnored).toHaveBeenCalledTimes(2);
     expect(useFileStore.getState().entries).toHaveLength(0);
 
-    // In-flight URL import started while idle is refused by handleUrlImport once busy.
+    // In-flight URL import started while idle is refused by handleUrlImport once busy, preserving urlInput (#3212).
     await act(async () => {
       resolveUrlFetch?.(
         new Response(
@@ -470,12 +470,12 @@ describe("ToolPage handleAddMore, handleFiles, and handleUrlImport intake guard 
     });
     await waitFor(() => expect(showIgnored).toHaveBeenCalledTimes(3));
     expect(useFileStore.getState().entries).toHaveLength(0);
+    expect((urlInput as HTMLInputElement).value).toBe("https://example.com/photo.png");
 
-    // Once idle again, URL import and Dropzone drop are accepted by handleUrlImport and handleFiles.
+    // Once idle again, clicking Add retries the preserved urlInput, imports it, and clears urlInput.
     act(() => {
       useFileStore.getState().setProcessing(false);
     });
-    fireEvent.change(urlInput, { target: { value: "https://example.com/accepted-url.png" } });
     fireEvent.click(screen.getByRole("button", { name: en.dropzone.addUrlButton }));
     await act(async () => {
       resolveUrlFetch?.(
@@ -484,9 +484,9 @@ describe("ToolPage handleAddMore, handleFiles, and handleUrlImport intake guard 
             results: [
               {
                 success: true,
-                url: "https://example.com/accepted-url.png",
-                filename: "accepted-url.png",
-                downloadUrl: "/api/v1/fetch-urls/download/accepted-url.png",
+                url: "https://example.com/photo.png",
+                filename: "photo.png",
+                downloadUrl: "/api/v1/fetch-urls/download/photo.png",
               },
             ],
           }),
@@ -495,7 +495,7 @@ describe("ToolPage handleAddMore, handleFiles, and handleUrlImport intake guard 
       );
     });
     await waitFor(() =>
-      expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual(["accepted-url.png"]),
+      expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual(["photo.png"]),
     );
 
     act(() => {
@@ -506,6 +506,108 @@ describe("ToolPage handleAddMore, handleFiles, and handleUrlImport intake guard 
     });
     expect(showIgnored).toHaveBeenCalledTimes(3);
     expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual(["accepted.png"]);
+  });
+
+  it("keeps UrlImportModal open with ready entries on ToolPage when a run starts while addReadyFiles is in flight (#3212)", async () => {
+    const { URL: NativeURL } = await import("node:url");
+    let urlImportBlobCounter = 0;
+    vi.stubGlobal(
+      "URL",
+      Object.assign(class extends NativeURL {}, {
+        createObjectURL: () => `blob:url-import-test-${++urlImportBlobCounter}`,
+        revokeObjectURL: () => {},
+      }),
+    );
+    const modalDownloadResolvers: Array<(res: Response) => void> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/api/v1/fetch-urls/download")) {
+          return new Promise<Response>((resolve) => {
+            modalDownloadResolvers.push(resolve);
+          });
+        }
+        if (url.includes("/api/v1/fetch-urls")) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                results: [
+                  {
+                    success: true,
+                    url: "https://example.com/a.png",
+                    filename: "a.png",
+                    size: 12,
+                    downloadUrl: "/api/v1/fetch-urls/download/a.png",
+                  },
+                  {
+                    success: true,
+                    url: "https://example.com/b.png",
+                    filename: "b.png",
+                    size: 12,
+                    downloadUrl: "/api/v1/fetch-urls/download/b.png",
+                  },
+                ],
+              }),
+              { status: 200, headers: { "Content-Type": "application/json" } },
+            ),
+          );
+        }
+        return Promise.resolve(
+          new Response(JSON.stringify({ authEnabled: false, bundles: [], settings: {} }), {
+            status: 200,
+          }),
+        );
+      }),
+    );
+
+    renderToolPage("/image/resize");
+
+    fireEvent.click(screen.getByRole("button", { name: en.dropzone.importMultipleUrls }));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.change(within(dialog).getByRole("textbox"), {
+      target: { value: "https://example.com/a.png\nhttps://example.com/b.png" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: en.urlImport.importButton }));
+
+    const addBtn = await within(dialog).findByRole("button", { name: "Add 2 Files" });
+    fireEvent.click(addBtn);
+    expect(modalDownloadResolvers).toHaveLength(2);
+
+    // Start a run before addReadyFiles finishes downloading.
+    act(() => {
+      useFileStore.getState().setProcessing(true);
+    });
+    await act(async () => {
+      for (const resolve of modalDownloadResolvers) {
+        resolve(new Response("img", { status: 200, headers: { "Content-Type": "image/png" } }));
+      }
+    });
+
+    await waitFor(() => expect(showIgnored).toHaveBeenCalledTimes(1));
+    expect(showIgnored).toHaveBeenCalledWith(en.dropzone.ignoredWhileRunning);
+    expect(useFileStore.getState().entries).toHaveLength(0);
+    expect(screen.getByRole("dialog")).toBe(dialog);
+    expect(within(dialog).getByRole("button", { name: "Add 2 Files" })).toBeEnabled();
+
+    // Once the run finishes, clicking Add 2 Files in the still-open modal imports both files and closes the dialog.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response("img", { status: 200, headers: { "Content-Type": "image/png" } }),
+        ),
+      ),
+    );
+    act(() => {
+      useFileStore.getState().setProcessing(false);
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add 2 Files" }));
+
+    await waitFor(() =>
+      expect(useFileStore.getState().entries.map((e) => e.file.name)).toEqual(["a.png", "b.png"]),
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });
 

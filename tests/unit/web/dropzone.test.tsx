@@ -4,6 +4,7 @@ import { en } from "@snapotter/shared";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Dropzone, isImageFile } from "@/components/common/dropzone";
+import { UrlImportModal } from "@/components/common/url-import-modal";
 import { toolAcceptsCameraPhotos } from "@/lib/camera-capture";
 
 afterEach(() => {
@@ -1069,6 +1070,282 @@ describe("Dropzone", () => {
         expect(screen.getByText(en.dropzone.unsupportedFileType)).toBeDefined();
       });
       expect(onUrlImport).not.toHaveBeenCalled();
+    });
+
+    it("preserves urlInput when onUrlImport returns false, including when onUrlImport updates while importSingleUrl is in flight (#3212)", async () => {
+      let resolveFetchUrl: ((res: Response) => void) | undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.endsWith("/api/v1/fetch-urls")) {
+            return new Promise<Response>((resolve) => {
+              resolveFetchUrl = resolve;
+            });
+          }
+          return Promise.resolve(
+            new Response("png-data", {
+              status: 200,
+              headers: { "Content-Type": "image/png" },
+            }),
+          );
+        }),
+      );
+
+      const initialOnUrlImport = vi.fn<(_file: File) => boolean | undefined>(() => undefined);
+      const refusingOnUrlImport = vi.fn<(_file: File) => boolean | undefined>(() => false);
+      const acceptingOnUrlImport = vi.fn<(_file: File) => boolean | undefined>(() => undefined);
+
+      const { rerender } = render(
+        <Dropzone onUrlImport={initialOnUrlImport} fileFilter={isImageFile} />,
+      );
+
+      const urlInput = screen.getByPlaceholderText(en.dropzone.urlPlaceholder) as HTMLInputElement;
+      fireEvent.change(urlInput, { target: { value: "https://example.com/photo.png" } });
+      fireEvent.click(screen.getByRole("button", { name: en.dropzone.addUrlButton }));
+      expect(resolveFetchUrl).toBeTypeOf("function");
+
+      // Parent updates onUrlImport to refuse intake while importSingleUrl is in flight.
+      rerender(<Dropzone onUrlImport={refusingOnUrlImport} fileFilter={isImageFile} />);
+      await act(async () => {
+        resolveFetchUrl?.(
+          new Response(
+            JSON.stringify({
+              results: [
+                {
+                  success: true,
+                  url: "https://example.com/photo.png",
+                  filename: "photo.png",
+                  size: 8,
+                  downloadUrl: "https://example.com/dl/photo.png",
+                },
+              ],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      });
+
+      await waitFor(() => {
+        expect(refusingOnUrlImport).toHaveBeenCalledTimes(1);
+      });
+      expect(initialOnUrlImport).not.toHaveBeenCalled();
+      expect(urlInput.value).toBe("https://example.com/photo.png");
+
+      // Once intake is accepted again, clicking Add with the preserved urlInput imports and clears it.
+      rerender(<Dropzone onUrlImport={acceptingOnUrlImport} fileFilter={isImageFile} />);
+      fireEvent.click(screen.getByRole("button", { name: en.dropzone.addUrlButton }));
+      await act(async () => {
+        resolveFetchUrl?.(
+          new Response(
+            JSON.stringify({
+              results: [
+                {
+                  success: true,
+                  url: "https://example.com/photo.png",
+                  filename: "photo.png",
+                  size: 8,
+                  downloadUrl: "https://example.com/dl/photo.png",
+                },
+              ],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      });
+
+      await waitFor(() => {
+        expect(acceptingOnUrlImport).toHaveBeenCalledTimes(1);
+      });
+      expect(urlInput.value).toBe("");
+    });
+
+    it("keeps UrlImportModal open, stops looping on first false, and preserves ready entries when onUrlImport returns false (#3212)", async () => {
+      let resolveDownloads: (() => void) | undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.endsWith("/api/v1/fetch-urls")) {
+            return Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  results: [
+                    {
+                      success: true,
+                      url: "https://example.com/one.png",
+                      filename: "one.png",
+                      size: 8,
+                      downloadUrl: "https://example.com/dl/one.png",
+                    },
+                    {
+                      success: true,
+                      url: "https://example.com/two.png",
+                      filename: "two.png",
+                      size: 8,
+                      downloadUrl: "https://example.com/dl/two.png",
+                    },
+                  ],
+                }),
+                { status: 200, headers: { "Content-Type": "application/json" } },
+              ),
+            );
+          }
+          return new Promise<Response>((resolve) => {
+            const prev = resolveDownloads;
+            resolveDownloads = () => {
+              prev?.();
+              resolve(
+                new Response("png-data", {
+                  status: 200,
+                  headers: { "Content-Type": "image/png" },
+                }),
+              );
+            };
+          });
+        }),
+      );
+
+      const initialOnUrlImport = vi.fn<(_file: File) => boolean | undefined>(() => undefined);
+      const refusingOnUrlImport = vi.fn<(_file: File) => boolean | undefined>(() => false);
+      const acceptingOnUrlImport = vi.fn<(_file: File) => boolean | undefined>(() => undefined);
+
+      const { rerender } = render(
+        <Dropzone onUrlImport={initialOnUrlImport} fileFilter={isImageFile} />,
+      );
+
+      pasteViaFiles([makeFile("bad.pdf", "application/pdf")]);
+      expect(screen.getByText(en.dropzone.unsupportedFileType)).toBeDefined();
+
+      fireEvent.click(screen.getByRole("button", { name: en.dropzone.importMultipleUrls }));
+      const dialog = screen.getByRole("dialog");
+      fireEvent.change(within(dialog).getByRole("textbox"), {
+        target: { value: "https://example.com/one.png\nhttps://example.com/two.png" },
+      });
+      fireEvent.click(within(dialog).getByRole("button", { name: en.urlImport.importButton }));
+
+      const addBtn = await within(dialog).findByRole("button", { name: "Add 2 Files" });
+      fireEvent.click(addBtn);
+
+      // Update onUrlImport to refuse intake while addReadyFiles downloads are in flight.
+      rerender(<Dropzone onUrlImport={refusingOnUrlImport} fileFilter={isImageFile} />);
+      await act(async () => {
+        resolveDownloads?.();
+      });
+
+      await waitFor(() => {
+        expect(refusingOnUrlImport).toHaveBeenCalledTimes(1);
+      });
+      expect(initialOnUrlImport).not.toHaveBeenCalled();
+      expect(screen.getByRole("dialog")).toBeDefined();
+      expect(within(dialog).getByText("one.png")).toBeDefined();
+      expect(within(dialog).getByText("two.png")).toBeDefined();
+      expect(within(dialog).getByRole("button", { name: "Add 2 Files" })).toBeDefined();
+      // Prior unsupported error is not cleared when intake was refused.
+      expect(screen.getByText(en.dropzone.unsupportedFileType)).toBeDefined();
+
+      // Once intake is accepted again, clicking Add 2 Files imports both, clears error, and closes modal.
+      resolveDownloads = undefined;
+      rerender(<Dropzone onUrlImport={acceptingOnUrlImport} fileFilter={isImageFile} />);
+      fireEvent.click(within(dialog).getByRole("button", { name: "Add 2 Files" }));
+      await act(async () => {
+        resolveDownloads?.();
+      });
+
+      await waitFor(() => {
+        expect(acceptingOnUrlImport).toHaveBeenCalledTimes(2);
+      });
+      expect(acceptingOnUrlImport.mock.calls.map((c) => c[0].name)).toEqual(["one.png", "two.png"]);
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(screen.queryByText(en.dropzone.unsupportedFileType)).toBeNull();
+    });
+
+    it("calls the latest onImport and onClose props in UrlImportModal when updated while addReadyFiles is in flight (#3212)", async () => {
+      let resolveDownload: ((res: Response) => void) | undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.endsWith("/api/v1/fetch-urls")) {
+            return Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  results: [
+                    {
+                      success: true,
+                      url: "https://example.com/one.png",
+                      filename: "one.png",
+                      size: 8,
+                      downloadUrl: "https://example.com/dl/one.png",
+                    },
+                  ],
+                }),
+                { status: 200, headers: { "Content-Type": "application/json" } },
+              ),
+            );
+          }
+          return new Promise<Response>((resolve) => {
+            resolveDownload = resolve;
+          });
+        }),
+      );
+
+      const initialOnImport = vi.fn<(_files: File[]) => boolean | undefined>(() => undefined);
+      const refusingOnImport = vi.fn<(_files: File[]) => boolean | undefined>(() => false);
+      const acceptingOnImport = vi.fn<(_files: File[]) => boolean | undefined>(() => undefined);
+      const initialOnClose = vi.fn();
+      const updatedOnClose = vi.fn();
+
+      const { rerender } = render(
+        <UrlImportModal onClose={initialOnClose} onImport={initialOnImport} />,
+      );
+
+      const dialog = screen.getByRole("dialog");
+      fireEvent.change(within(dialog).getByRole("textbox"), {
+        target: { value: "https://example.com/one.png" },
+      });
+      fireEvent.click(within(dialog).getByRole("button", { name: en.urlImport.importButton }));
+
+      const addBtn = await within(dialog).findByRole("button", { name: "Add 1 Files" });
+      fireEvent.click(addBtn);
+      expect(resolveDownload).toBeTypeOf("function");
+
+      // Update both onImport (to refuse) and onClose while addReadyFiles is in flight.
+      rerender(<UrlImportModal onClose={updatedOnClose} onImport={refusingOnImport} />);
+      await act(async () => {
+        resolveDownload?.(
+          new Response("png-data", {
+            status: 200,
+            headers: { "Content-Type": "image/png" },
+          }),
+        );
+      });
+
+      await waitFor(() => {
+        expect(refusingOnImport).toHaveBeenCalledTimes(1);
+      });
+      expect(initialOnImport).not.toHaveBeenCalled();
+      expect(initialOnClose).not.toHaveBeenCalled();
+      expect(updatedOnClose).not.toHaveBeenCalled();
+
+      // Retry and update both callbacks while in flight to verify onCloseRef is called on acceptance.
+      const finalOnClose = vi.fn();
+      fireEvent.click(within(dialog).getByRole("button", { name: "Add 1 Files" }));
+      rerender(<UrlImportModal onClose={finalOnClose} onImport={acceptingOnImport} />);
+      await act(async () => {
+        resolveDownload?.(
+          new Response("png-data", {
+            status: 200,
+            headers: { "Content-Type": "image/png" },
+          }),
+        );
+      });
+
+      await waitFor(() => {
+        expect(acceptingOnImport).toHaveBeenCalledTimes(1);
+      });
+      expect(updatedOnClose).not.toHaveBeenCalled();
+      expect(finalOnClose).toHaveBeenCalledTimes(1);
     });
   });
 });

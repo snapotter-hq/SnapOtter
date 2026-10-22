@@ -17,7 +17,7 @@ interface ToolDropzoneProps {
   multiple?: boolean;
   enablePaste?: boolean;
   onFiles: (files: File[]) => void;
-  onUrlImport?: (file: File) => void;
+  onUrlImport?: (file: File) => boolean | undefined;
 }
 
 const FORMATS_LIMIT = 8;

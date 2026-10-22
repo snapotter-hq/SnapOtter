@@ -671,7 +671,7 @@ function ToolPageContent({
 
   const handleUrlImport = useCallback(
     (file: File) => {
-      if (!allowIntakeRef.current()) return;
+      if (!allowIntakeRef.current()) return false;
       addFiles([file]);
     },
     [addFiles],

@@ -10,7 +10,7 @@ import { extractUrls } from "@/lib/url-parser";
 
 interface UrlImportModalProps {
   onClose: () => void;
-  onImport: (files: File[]) => void;
+  onImport: (files: File[]) => boolean | undefined;
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -48,6 +48,10 @@ export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDivElement>(null);
   useFocusTrap(dialogRef, true);
+  const onImportRef = useRef(onImport);
+  onImportRef.current = onImport;
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const [text, setText] = useState("");
   const [adding, setAdding] = useState(false);
 
@@ -67,14 +71,13 @@ export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
     setAdding(true);
     try {
       const files = await addReadyFiles();
-      if (files.length > 0) {
-        onImport(files);
-        onClose();
+      if (files.length > 0 && onImportRef.current(files) !== false) {
+        onCloseRef.current();
       }
     } finally {
       setAdding(false);
     }
-  }, [readyCount, addReadyFiles, onImport, onClose]);
+  }, [readyCount, addReadyFiles]);
 
   const handleBack = useCallback(() => {
     reset();

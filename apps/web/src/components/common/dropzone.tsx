@@ -1,5 +1,5 @@
 import { AlertCircle, Camera, FileImage, FileUp, Upload } from "lucide-react";
-import { type DragEvent, useCallback, useEffect, useState } from "react";
+import { type DragEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useTouchDevice } from "@/hooks/use-mobile";
 import { useUrlImport } from "@/hooks/use-url-import";
@@ -84,7 +84,7 @@ export function isImageFile(file: File): boolean {
 
 interface DropzoneProps {
   onFiles?: (files: File[]) => void;
-  onUrlImport?: (file: File) => void;
+  onUrlImport?: (file: File) => boolean | undefined;
   accept?: string;
   multiple?: boolean;
   /** Files that have already been dropped (for showing count & list). */
@@ -134,6 +134,8 @@ export function Dropzone({
   const [urlLoading, setUrlLoading] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const onUrlImportRef = useRef(onUrlImport);
+  onUrlImportRef.current = onUrlImport;
 
   useEffect(() => {
     if (error) {
@@ -153,15 +155,14 @@ export function Dropzone({
     if (file) {
       if (!checkFile(file)) {
         setUrlError(unsupportedMessage);
-      } else {
+      } else if (onUrlImportRef.current?.(file) !== false) {
         setUrlInput("");
-        onUrlImport?.(file);
       }
     } else {
       setUrlError(t.dropzone.urlFetchFailed);
     }
     setUrlLoading(false);
-  }, [urlInput, importSingleUrl, onUrlImport, checkFile, unsupportedMessage, t]);
+  }, [urlInput, importSingleUrl, checkFile, unsupportedMessage, t]);
 
   const handleDrag = useCallback((e: DragEvent) => {
     e.preventDefault();
@@ -421,10 +422,12 @@ export function Dropzone({
           onImport={(files) => {
             const validFiles = files.filter(checkFile);
             if (validFiles.length > 0) {
-              setError(null);
               for (const file of validFiles) {
-                onUrlImport?.(file);
+                if (onUrlImportRef.current?.(file) === false) {
+                  return false;
+                }
               }
+              setError(null);
             } else if (files.length > 0) {
               setError(unsupportedMessage);
             }
