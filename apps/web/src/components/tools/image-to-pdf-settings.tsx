@@ -380,15 +380,21 @@ export function ImageToPdfSettings() {
       xhr.onerror = () => {
         endSubscription();
         if (xhrRef.current !== xhr || storeReset) return;
-        setError(t.toolSettings["image-to-pdf"].networkErrorCreation);
-        cleanup();
+        const teardownError = runEndWrites([
+          () => setError(t.toolSettings["image-to-pdf"].networkErrorCreation),
+          cleanup,
+        ]);
+        if (teardownError) throw teardownError.cause;
       };
 
       xhr.ontimeout = () => {
         endSubscription();
         if (xhrRef.current !== xhr || storeReset) return;
-        setError(t.toolSettings["image-to-pdf"].requestTimedOut);
-        cleanup();
+        const teardownError = runEndWrites([
+          () => setError(t.toolSettings["image-to-pdf"].requestTimedOut),
+          cleanup,
+        ]);
+        if (teardownError) throw teardownError.cause;
       };
 
       xhr.open("POST", appUrl("/api/v1/tools/image/image-to-pdf"));
@@ -398,12 +404,19 @@ export function ImageToPdfSettings() {
       xhr.send(formData);
     } catch (err) {
       endSubscription();
-      if (!storeReset) {
-        setError(
-          err instanceof Error ? err.message : t.toolSettings["image-to-pdf"].networkErrorCreation,
-        );
-      }
-      cleanup();
+      const teardownError = runEndWrites([
+        () => {
+          if (!storeReset) {
+            setError(
+              err instanceof Error
+                ? err.message
+                : t.toolSettings["image-to-pdf"].networkErrorCreation,
+            );
+          }
+        },
+        cleanup,
+      ]);
+      if (teardownError) throw teardownError.cause;
     }
   }, [
     files,

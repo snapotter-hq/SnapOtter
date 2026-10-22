@@ -263,44 +263,44 @@ export function FaviconSettings() {
         }
 
         void (async () => {
+          let body: unknown = null;
           try {
-            let body: unknown = null;
-            try {
-              const text = xhr.response instanceof Blob ? await xhr.response.text() : "";
-              body = JSON.parse(text);
-            } catch {
-              body = null;
-            }
-            endSubscription();
-            if (xhrRef.current !== xhr || storeReset) return;
-            setError(
-              failedAnswerMessage(
-                t,
-                body,
-                xhr.status,
-                format(t.toolSettings.favicon.generationFailed, { status: xhr.status }),
-              ),
-            );
-          } finally {
-            if (xhrRef.current === xhr && !storeReset) {
-              cleanup();
-            }
+            const text = xhr.response instanceof Blob ? await xhr.response.text() : "";
+            body = JSON.parse(text);
+          } catch {
+            body = null;
           }
+          endSubscription();
+          if (xhrRef.current !== xhr || storeReset) return;
+          const message = failedAnswerMessage(
+            t,
+            body,
+            xhr.status,
+            format(t.toolSettings.favicon.generationFailed, { status: xhr.status }),
+          );
+          const teardownError = runEndWrites([() => setError(message), cleanup]);
+          if (teardownError) throw teardownError.cause;
         })();
       };
 
       xhr.onerror = () => {
         endSubscription();
         if (xhrRef.current !== xhr || storeReset) return;
-        setError(t.toolSettings.favicon.networkError);
-        cleanup();
+        const teardownError = runEndWrites([
+          () => setError(t.toolSettings.favicon.networkError),
+          cleanup,
+        ]);
+        if (teardownError) throw teardownError.cause;
       };
 
       xhr.ontimeout = () => {
         endSubscription();
         if (xhrRef.current !== xhr || storeReset) return;
-        setError(t.toolSettings.favicon.timeout);
-        cleanup();
+        const teardownError = runEndWrites([
+          () => setError(t.toolSettings.favicon.timeout),
+          cleanup,
+        ]);
+        if (teardownError) throw teardownError.cause;
       };
 
       xhr.open("POST", appUrl("/api/v1/tools/image/favicon"));
@@ -310,10 +310,15 @@ export function FaviconSettings() {
       xhr.send(formData);
     } catch (err) {
       endSubscription();
-      if (!storeReset) {
-        setError(err instanceof Error ? err.message : t.toolSettings.favicon.networkError);
-      }
-      cleanup();
+      const teardownError = runEndWrites([
+        () => {
+          if (!storeReset) {
+            setError(err instanceof Error ? err.message : t.toolSettings.favicon.networkError);
+          }
+        },
+        cleanup,
+      ]);
+      if (teardownError) throw teardownError.cause;
     }
   }, [
     files,

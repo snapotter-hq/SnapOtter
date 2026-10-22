@@ -975,6 +975,14 @@ describe("image-to-pdf: a malformed sync answer apart from our own store write (
       expect(() => xhr.respondRaw(200, "{}")).toThrow("teardown broke");
       await act(async () => {});
 
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run failed",
+        expect.objectContaining({ message: "teardown broke" }),
+      );
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run failed",
+        expect.objectContaining({ message: "later teardown broke" }),
+      );
       expect(useFileStore.getState().error).toBe(
         en.toolSettings["image-to-pdf"].parseResponseFailed,
       );
@@ -1051,6 +1059,140 @@ describe("image-to-pdf: a malformed sync answer apart from our own store write (
       unsubscribe();
       consoleError.mockRestore();
     }
+  });
+
+  it("keeps the server's error text and rethrows the first teardown error when failing a non-2xx request throws", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { unmount } = render(<ImageToPdfSettings />);
+    const xhr = await submit("image-to-pdf-submit");
+    let writes = 0;
+    const unsubscribe = useFileStore.subscribe(() => {
+      writes++;
+      throw new Error(writes === 1 ? "teardown broke" : "later teardown broke");
+    });
+
+    try {
+      expect(() => xhr.respond(422, { error: "PDF creation failed" })).toThrow(/^teardown broke$/);
+      await act(async () => {});
+
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run failed",
+        expect.objectContaining({ message: "teardown broke" }),
+      );
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run failed",
+        expect.objectContaining({ message: "later teardown broke" }),
+      );
+      expect(useFileStore.getState().error).toBe("PDF creation failed");
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByTestId("image-to-pdf-submit")).toBeEnabled();
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+      consoleError.mockRestore();
+    }
+    unmount();
+    expect(useFileStore.getState().error).toBe("PDF creation failed");
+  });
+
+  it("keeps the error and settles processing and busy when onerror or ontimeout teardown writes throw (#3472)", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const cases: Array<["onerror" | "ontimeout", string]> = [
+      ["onerror", en.toolSettings["image-to-pdf"].networkErrorCreation],
+      ["ontimeout", en.toolSettings["image-to-pdf"].requestTimedOut],
+    ];
+
+    try {
+      for (const [handler, expectedError] of cases) {
+        cleanup();
+        FakeXhr.instances = [];
+        consoleError.mockClear();
+        useFileStore.getState().reset();
+        useFileStore.getState().setFiles([image("page1.png")]);
+
+        const { unmount } = render(<ImageToPdfSettings />);
+        const xhr = await submit("image-to-pdf-submit");
+        let writes = 0;
+        const unsubscribe = useFileStore.subscribe(() => {
+          writes++;
+          throw new Error(writes === 1 ? "teardown broke" : "later teardown broke");
+        });
+
+        try {
+          expect(() =>
+            act(() => {
+              xhr[handler]?.();
+            }),
+          ).toThrow(/^teardown broke$/);
+          await act(async () => {});
+
+          expect(consoleError).toHaveBeenCalledWith(
+            "Ending the run failed",
+            expect.objectContaining({ message: "teardown broke" }),
+          );
+          expect(consoleError).toHaveBeenCalledWith(
+            "Ending the run failed",
+            expect.objectContaining({ message: "later teardown broke" }),
+          );
+          expect(useFileStore.getState().error).toBe(expectedError);
+          expect(useFileStore.getState().processing).toBe(false);
+          expect(screen.getByTestId("image-to-pdf-submit")).toBeEnabled();
+          expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+        } finally {
+          unsubscribe();
+        }
+        unmount();
+        expect(useFileStore.getState().error).toBe(expectedError);
+      }
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("keeps the error and settles processing and busy when synchronous xhr.send and teardown writes throw (#3472)", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const windowErrors: unknown[] = [];
+    const onWindowError = (event: ErrorEvent) => {
+      event.preventDefault();
+      windowErrors.push(event.error);
+    };
+    window.addEventListener("error", onWindowError);
+    let unsubscribe = () => {};
+    const sendSpy = vi.spyOn(FakeXhr.prototype, "send").mockImplementationOnce(() => {
+      let writes = 0;
+      unsubscribe = useFileStore.subscribe(() => {
+        writes++;
+        throw new Error(writes === 1 ? "teardown broke" : "later teardown broke");
+      });
+      throw new Error("send boom");
+    });
+    const { unmount } = render(<ImageToPdfSettings />);
+
+    try {
+      fireEvent.click(screen.getByTestId("image-to-pdf-submit"));
+      await act(async () => {});
+
+      expect(windowErrors).toEqual([expect.objectContaining({ message: "teardown broke" })]);
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run failed",
+        expect.objectContaining({ message: "teardown broke" }),
+      );
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run failed",
+        expect.objectContaining({ message: "later teardown broke" }),
+      );
+      expect(useFileStore.getState().error).toBe("send boom");
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByTestId("image-to-pdf-submit")).toBeEnabled();
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+      window.removeEventListener("error", onWindowError);
+      sendSpy.mockRestore();
+      consoleError.mockRestore();
+    }
+    unmount();
+    expect(useFileStore.getState().error).toBe("send boom");
   });
 });
 
@@ -1157,5 +1299,148 @@ describe("favicon: our own store write failure when landing a sync 2xx answer (#
     } finally {
       useFileStore.setState({ updateEntryById: realUpdateEntryById });
     }
+  });
+
+  it("keeps the server's error text and rethrows the first teardown error when a non-2xx onload teardown throws (#3472)", async () => {
+    const { rejections, restore } = takeOverUnhandledRejections();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    let unsubscribe = () => {};
+    let unmount = () => {};
+    try {
+      ({ unmount } = render(<FaviconSettings />));
+      const xhr = await submit("favicon-submit");
+      let writes = 0;
+      unsubscribe = useFileStore.subscribe(() => {
+        writes++;
+        throw new Error(writes === 1 ? "teardown broke" : "later teardown broke");
+      });
+
+      xhr.respondBlob(
+        422,
+        new Blob([JSON.stringify({ error: "Favicon failed" })], { type: "application/json" }),
+      );
+
+      await waitFor(() =>
+        expect(rejections).toEqual([expect.objectContaining({ message: "teardown broke" })]),
+      );
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run failed",
+        expect.objectContaining({ message: "teardown broke" }),
+      );
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run failed",
+        expect.objectContaining({ message: "later teardown broke" }),
+      );
+      expect(useFileStore.getState().error).toBe("Favicon failed");
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByTestId("favicon-submit")).toBeEnabled();
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+      consoleError.mockRestore();
+      restore();
+    }
+    unmount();
+    expect(useFileStore.getState().error).toBe("Favicon failed");
+  });
+
+  it("keeps the error and settles processing and busy when onerror or ontimeout teardown writes throw (#3472)", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const cases: Array<["onerror" | "ontimeout", string]> = [
+      ["onerror", en.toolSettings.favicon.networkError],
+      ["ontimeout", en.toolSettings.favicon.timeout],
+    ];
+
+    try {
+      for (const [handler, expectedError] of cases) {
+        cleanup();
+        FakeXhr.instances = [];
+        consoleError.mockClear();
+        useFileStore.getState().reset();
+        useFileStore.getState().setFiles([image("logo.png")]);
+
+        const { unmount } = render(<FaviconSettings />);
+        const xhr = await submit("favicon-submit");
+        let writes = 0;
+        const unsubscribe = useFileStore.subscribe(() => {
+          writes++;
+          throw new Error(writes === 1 ? "teardown broke" : "later teardown broke");
+        });
+
+        try {
+          expect(() =>
+            act(() => {
+              xhr[handler]?.();
+            }),
+          ).toThrow(/^teardown broke$/);
+          await act(async () => {});
+
+          expect(consoleError).toHaveBeenCalledWith(
+            "Ending the run failed",
+            expect.objectContaining({ message: "teardown broke" }),
+          );
+          expect(consoleError).toHaveBeenCalledWith(
+            "Ending the run failed",
+            expect.objectContaining({ message: "later teardown broke" }),
+          );
+          expect(useFileStore.getState().error).toBe(expectedError);
+          expect(useFileStore.getState().processing).toBe(false);
+          expect(screen.getByTestId("favicon-submit")).toBeEnabled();
+          expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+        } finally {
+          unsubscribe();
+        }
+        unmount();
+        expect(useFileStore.getState().error).toBe(expectedError);
+      }
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("keeps the error and settles processing and busy when synchronous xhr.send and teardown writes throw (#3472)", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const windowErrors: unknown[] = [];
+    const onWindowError = (event: ErrorEvent) => {
+      event.preventDefault();
+      windowErrors.push(event.error);
+    };
+    window.addEventListener("error", onWindowError);
+    let unsubscribe = () => {};
+    const sendSpy = vi.spyOn(FakeXhr.prototype, "send").mockImplementationOnce(() => {
+      let writes = 0;
+      unsubscribe = useFileStore.subscribe(() => {
+        writes++;
+        throw new Error(writes === 1 ? "teardown broke" : "later teardown broke");
+      });
+      throw new Error("send boom");
+    });
+    const { unmount } = render(<FaviconSettings />);
+
+    try {
+      fireEvent.click(screen.getByTestId("favicon-submit"));
+      await act(async () => {});
+
+      expect(windowErrors).toEqual([expect.objectContaining({ message: "teardown broke" })]);
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run failed",
+        expect.objectContaining({ message: "teardown broke" }),
+      );
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run failed",
+        expect.objectContaining({ message: "later teardown broke" }),
+      );
+      expect(useFileStore.getState().error).toBe("send boom");
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByTestId("favicon-submit")).toBeEnabled();
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+      window.removeEventListener("error", onWindowError);
+      sendSpy.mockRestore();
+      consoleError.mockRestore();
+    }
+    unmount();
+    expect(useFileStore.getState().error).toBe("send boom");
   });
 });
