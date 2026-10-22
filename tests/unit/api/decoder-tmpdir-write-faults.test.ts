@@ -18,7 +18,23 @@ const getObjectBuffer = vi.fn();
 const deletePrefix = vi.fn();
 const decodeHeic = vi.fn();
 const decodeToSharpCompat = vi.fn();
+const writeFileFailure = { next: null as Error | null };
 const uploadedBuffers = new Map<string, Buffer>();
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return {
+    ...actual,
+    writeFile: (async (path: unknown, ...rest: unknown[]) => {
+      if (writeFileFailure.next && /info-exif-/.test(String(path))) {
+        const err = writeFileFailure.next;
+        writeFileFailure.next = null;
+        throw err;
+      }
+      return (actual.writeFile as (...args: unknown[]) => unknown)(path, ...rest);
+    }) as typeof actual.writeFile,
+  };
+});
 
 vi.mock("../../../apps/api/src/permissions.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../apps/api/src/permissions.js")>();
@@ -64,6 +80,10 @@ vi.mock("../../../apps/api/src/lib/format-decoders.js", async (importOriginal) =
   };
 });
 
+import {
+  DecoderOutOfMemoryError,
+  DecoderUnavailableError,
+} from "../../../apps/api/src/lib/format-decoders.js";
 import { normalizeOperationalWriteError } from "../../../apps/api/src/lib/object-storage.js";
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
@@ -75,6 +95,7 @@ import { registerFavicon } from "../../../apps/api/src/routes/tools/favicon.js";
 import { registerFindDuplicates } from "../../../apps/api/src/routes/tools/find-duplicates.js";
 import { registerImageEnhancement } from "../../../apps/api/src/routes/tools/image-enhancement.js";
 import { registerImageToBase64 } from "../../../apps/api/src/routes/tools/image-to-base64.js";
+import { registerInfo } from "../../../apps/api/src/routes/tools/info.js";
 import { registerMemeGenerator } from "../../../apps/api/src/routes/tools/meme-generator.js";
 import { registerOptimizeForWeb } from "../../../apps/api/src/routes/tools/optimize-for-web.js";
 import { registerResize } from "../../../apps/api/src/routes/tools/resize.js";
@@ -140,6 +161,7 @@ async function buildApp() {
   registerFavicon(app);
   registerImageToBase64(app);
   registerBeautify(app);
+  registerInfo(app);
   await app.ready();
   return app;
 }
@@ -212,6 +234,13 @@ const ROUTES: RouteSpec[] = [
   {
     name: "color-palette",
     url: apiToolPath("color-palette"),
+    heicFiles: [{ filename: "photo.heic", contentType: "image/heic", content: HEIC }],
+    psdFiles: [{ filename: "layer.psd", contentType: "image/vnd.adobe.photoshop", content: PSD }],
+    dngFiles: [{ filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG }],
+  },
+  {
+    name: "info",
+    url: apiToolPath("info"),
     heicFiles: [{ filename: "photo.heic", contentType: "image/heic", content: HEIC }],
     psdFiles: [{ filename: "layer.psd", contentType: "image/vnd.adobe.photoshop", content: PSD }],
     dngFiles: [{ filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG }],
@@ -354,6 +383,7 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
     deletePrefix.mockReset().mockResolvedValue(undefined);
     decodeHeic.mockReset().mockResolvedValue(PNG);
     decodeToSharpCompat.mockReset().mockResolvedValue(PNG);
+    writeFileFailure.next = null;
   });
 
   describe.each(ROUTES)("$name", (route) => {
@@ -429,5 +459,110 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
         });
       },
     );
+  });
+
+  describe("info HEIC fallback guess and readExifToolMeta (#3451)", () => {
+    const UNREADABLE = Buffer.from("not an image header at all, forces HEIC fallback guess");
+
+    it.each(WRITE_ERRNOS)(
+      "answers 503 %s (%s) when the fallback HEIC guess fails writing to tmpdir",
+      async (errno, expectedCode) => {
+        for (const err of [errnoError(errno), normalizeOperationalWriteError(errnoError(errno))]) {
+          decodeHeic.mockRejectedValue(err);
+          const res = await app.inject({
+            method: "POST",
+            url: apiToolPath("info"),
+            ...multipartBody([
+              { filename: "mystery.jpg", contentType: "image/jpeg", content: UNREADABLE },
+            ]),
+          });
+          expect(res.statusCode, res.body).toBe(503);
+          expect(res.json()).toMatchObject({ code: expectedCode });
+        }
+      },
+    );
+
+    it.each(WRITE_ERRNOS)(
+      "answers 503 %s (%s) when readExifToolMeta fails writing its temp file",
+      async (errno, expectedCode) => {
+        writeFileFailure.next = errnoError(errno);
+        const res = await app.inject({
+          method: "POST",
+          url: apiToolPath("info"),
+          ...multipartBody([
+            { filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG },
+          ]),
+        });
+        expect(res.statusCode, res.body).toBe(503);
+        expect(res.json()).toMatchObject({ code: expectedCode });
+      },
+    );
+
+    it("falls back to Sharp on a TIFF-headed DNG when decodeToSharpCompat throws DecoderUnavailableError, but surfaces 503 on DecoderOutOfMemoryError", async () => {
+      decodeToSharpCompat.mockRejectedValueOnce(
+        new DecoderUnavailableError("No RAW decoder found."),
+      );
+      const okRes = await app.inject({
+        method: "POST",
+        url: apiToolPath("info"),
+        ...multipartBody([
+          { filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG },
+        ]),
+      });
+      expect(okRes.statusCode, okRes.body).toBe(200);
+      expect(okRes.json()).toMatchObject({ filename: "photo.dng" });
+
+      decodeToSharpCompat.mockRejectedValueOnce(
+        new DecoderOutOfMemoryError("The RAW decoder ran out of memory."),
+      );
+      const oomRes = await app.inject({
+        method: "POST",
+        url: apiToolPath("info"),
+        ...multipartBody([
+          { filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG },
+        ]),
+      });
+      expect(oomRes.statusCode, oomRes.body).toBe(503);
+      expect(oomRes.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+    });
+
+    it("surfaces 503 ENGINE_UNAVAILABLE on PSD when decodeToSharpCompat throws DecoderUnavailableError and 422 on corrupt PSD", async () => {
+      decodeToSharpCompat.mockRejectedValueOnce(
+        new DecoderUnavailableError("No PSD decoder found."),
+      );
+      const unavailableRes = await app.inject({
+        method: "POST",
+        url: apiToolPath("info"),
+        ...multipartBody([
+          { filename: "layer.psd", contentType: "image/vnd.adobe.photoshop", content: PSD },
+        ]),
+      });
+      expect(unavailableRes.statusCode, unavailableRes.body).toBe(503);
+      expect(unavailableRes.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+
+      decodeToSharpCompat.mockRejectedValueOnce(new Error("corrupt PSD layer"));
+      const corruptRes = await app.inject({
+        method: "POST",
+        url: apiToolPath("info"),
+        ...multipartBody([
+          { filename: "layer.psd", contentType: "image/vnd.adobe.photoshop", content: PSD },
+        ]),
+      });
+      expect(corruptRes.statusCode, corruptRes.body).toBe(422);
+      expect(corruptRes.json()).toMatchObject({ error: "Failed to read image metadata" });
+    });
+
+    it("falls back to Sharp metadata on DNG when readExifToolMeta encounters a non-operational error", async () => {
+      writeFileFailure.next = errnoError("ENOENT");
+      const res = await app.inject({
+        method: "POST",
+        url: apiToolPath("info"),
+        ...multipartBody([
+          { filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG },
+        ]),
+      });
+      expect(res.statusCode, res.body).toBe(200);
+      expect(res.json()).toMatchObject({ filename: "photo.dng" });
+    });
   });
 });

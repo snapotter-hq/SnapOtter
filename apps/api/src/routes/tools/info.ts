@@ -3,6 +3,7 @@ import { rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import { hasServerErrorStatus } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { stripInternalPaths } from "../../lib/errors.js";
@@ -16,6 +17,7 @@ import {
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
+import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -63,7 +65,24 @@ export function registerInfo(app: FastifyInstance) {
       if (detectedFormat === "heif") {
         metaBuffer = await decodeHeic(fileBuffer);
       } else if (detectedFormat && needsCliDecode(detectedFormat)) {
-        metaBuffer = await decodeToSharpCompat(fileBuffer, detectedFormat, ext);
+        try {
+          metaBuffer = await decodeToSharpCompat(fileBuffer, detectedFormat, ext);
+        } catch (rawDecodeErr) {
+          const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+          if (
+            decodeErr instanceof DecoderOutOfMemoryError ||
+            (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+          ) {
+            throw decodeErr;
+          }
+          try {
+            await sharp(fileBuffer).metadata();
+            await sharp(fileBuffer).resize(1).raw().toBuffer();
+          } catch (err) {
+            if (isDecoderUnavailable(decodeErr)) throw decodeErr;
+            throw err;
+          }
+        }
       } else {
         let sharpDirectFailed = false;
         try {
@@ -74,9 +93,11 @@ export function registerInfo(app: FastifyInstance) {
         if (sharpDirectFailed) {
           // A guess: the upload wasn't detected as HEIF, so a missing HEIF
           // decoder says nothing about this server's ability to read it. The
-          // decoder running out of memory does: it was decoding the file, so
-          // that stays the server's 503 (#1628).
-          metaBuffer = await decodeHeic(fileBuffer).catch((err: unknown) => {
+          // decoder running out of memory or failing to write its temp file
+          // does: it was decoding the file, so that stays the server's 503
+          // (#1628, #3451).
+          metaBuffer = await decodeHeic(fileBuffer).catch((rawErr: unknown) => {
+            const err = normalizeOperationalWriteError(rawErr);
             if (!isDecoderUnavailable(err) || err instanceof DecoderOutOfMemoryError) throw err;
             throw new Error("Unrecognized image format", { cause: err });
           });
@@ -119,8 +140,9 @@ export function registerInfo(app: FastifyInstance) {
         pages: metadata.pages ?? 1,
         histogram,
       });
-    } catch (err) {
-      if (isDecoderUnavailable(err)) throw err;
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(rawErr);
+      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
       return reply.status(422).send({
         error: "Failed to read image metadata",
         details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
@@ -145,7 +167,9 @@ async function readExifToolMeta(buffer: Buffer, ext?: string): Promise<ExifMeta 
   const suffix = ext ? `.${ext}` : ".dng";
   const tmpPath = join(tmpdir(), `info-exif-${Date.now()}${suffix}`);
   try {
-    await writeFile(tmpPath, buffer);
+    await writeFile(tmpPath, buffer).catch((writeErr: unknown) => {
+      throw normalizeOperationalWriteError(writeErr);
+    });
     const { stdout } = await execFileAsync(
       "exiftool",
       [
@@ -177,7 +201,8 @@ async function readExifToolMeta(buffer: Buffer, ext?: string): Promise<ExifMeta 
       hasIcc: !!data.ICCProfileName,
       hasXmp: !!data.XMPToolkit,
     };
-  } catch {
+  } catch (err) {
+    if (hasServerErrorStatus(err)) throw err;
     return null;
   } finally {
     await rm(tmpPath, { force: true }).catch(() => {});
