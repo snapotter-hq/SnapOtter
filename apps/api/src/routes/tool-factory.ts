@@ -28,7 +28,13 @@ import { formatZodErrors, friendlyError } from "../lib/errors.js";
 import { getFirstMissingBundleForTool, isToolInstalled } from "../lib/feature-status.js";
 import { createUniqueNamer } from "../lib/filename.js";
 import { multipartFailure } from "../lib/multipart-parts.js";
-import { deletePrefix, getObjectBuffer, putObject } from "../lib/object-storage.js";
+import {
+  deletePrefix,
+  getObjectBuffer,
+  isStorageServiceFault,
+  normalizeS3ReadFault,
+  putObject,
+} from "../lib/object-storage.js";
 import { resolveToolPool, shouldSkipSyncWindow } from "../lib/pool.js";
 import { getSettingStrict, parseNumericSettingValue } from "../lib/settings-helpers.js";
 import { hasPersistedJobRow, settleUnenqueuedAlias } from "../lib/upload-cleanup.js";
@@ -464,7 +470,13 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         const preparedInputs: { filename: string; buffer: Buffer }[] = [];
         for (let i = 0; i < received.length; i++) {
           const upload = received[i];
-          let fileBuffer = await getObjectBuffer(upload.key);
+          let fileBuffer: Buffer;
+          try {
+            fileBuffer = await getObjectBuffer(upload.key);
+          } catch (err) {
+            if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+            throw err;
+          }
           const originalBuffer = fileBuffer;
           let fname = upload.filename;
 

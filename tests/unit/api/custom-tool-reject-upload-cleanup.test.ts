@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   getObjectBuffer: vi.fn(),
   insertToolJobAlias: vi.fn(),
   isFeatureInstalled: vi.fn(),
+  isStorageServiceFault: vi.fn(() => false),
   isToolInstalled: vi.fn(),
   putObject: vi.fn(),
   receiveUpload: vi.fn(),
@@ -34,7 +35,7 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
       }),
     })),
   },
-  schema: { jobs: { id: {} } },
+  schema: { jobs: { id: {}, status: {}, error: {} } },
 }));
 
 vi.mock("../../../apps/api/src/jobs/enqueue.js", () => ({
@@ -62,6 +63,7 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
   deleteObject: mocks.deleteObject,
   deletePrefix: mocks.deletePrefix,
   getObjectBuffer: mocks.getObjectBuffer,
+  isStorageServiceFault: mocks.isStorageServiceFault,
   putObject: mocks.putObject,
 }));
 
@@ -72,6 +74,7 @@ vi.mock("../../../apps/api/src/plugins/auth.js", () => ({
   ),
 }));
 
+import { classifyError } from "../../../apps/api/src/lib/error-report.js";
 import { settleUnenqueuedAlias } from "../../../apps/api/src/lib/upload-cleanup.js";
 import { registerAiCanvasExpand } from "../../../apps/api/src/routes/tools/ai-canvas-expand.js";
 import { registerAutoSubtitles } from "../../../apps/api/src/routes/tools/auto-subtitles.js";
@@ -131,6 +134,7 @@ beforeEach(() => {
   jobRows.error = null;
   mocks.isToolInstalled.mockReturnValue(true);
   mocks.isFeatureInstalled.mockReturnValue(true);
+  mocks.isStorageServiceFault.mockReturnValue(false);
   mocks.cancelSingleJobGuarded.mockResolvedValue(undefined);
   mocks.deleteObject.mockResolvedValue(undefined);
   mocks.deletePrefix.mockResolvedValue(undefined);
@@ -705,6 +709,210 @@ describe("custom tool routes discard uploads when rejecting before enqueue (#259
     expect(mocks.deletePrefix).toHaveBeenCalledWith(`uploads/${uploadedJobId}/`);
     expect(mocks.deletePrefix.mock.invocationCallOrder[0]).toBeLessThan(
       sendSpy.mock.invocationCallOrder[0],
+    );
+  });
+});
+
+const PRE_ENQUEUE_READ_ROUTES = ROUTES.filter(
+  ([toolId]) => toolId !== "transcribe-audio" && toolId !== "auto-subtitles",
+);
+
+describe("pre-enqueue S3 getObjectBuffer fault normalization and sign-pdf waitForJob settlement (#3481)", () => {
+  it.each(PRE_ENQUEUE_READ_ROUTES)(
+    "%s normalizes pre-enqueue S3 getObjectBuffer faults into a 503 storage-unavailable SafeError and discards uploads",
+    async (toolId, path) => {
+      mocks.isStorageServiceFault.mockReturnValue(true);
+      const slowDown = Object.assign(new Error("Please reduce your request rate."), {
+        name: "SlowDown",
+        $metadata: { httpStatusCode: 503 },
+      });
+      mocks.getObjectBuffer.mockRejectedValueOnce(slowDown);
+
+      const req = makeRequest(validPartsFor(toolId));
+      const reply = makeReply();
+      let caught: unknown;
+      try {
+        await handlers[path](req, reply);
+      } catch (err) {
+        caught = err;
+      }
+
+      expect(caught).toMatchObject({
+        name: "SafeError",
+        statusCode: 503,
+        code: "storage-unavailable",
+        message: "The server's storage service is unavailable.",
+      });
+      expect(classifyError(caught, "http")).toBe("operational");
+      expect(mocks.enqueueToolJob).not.toHaveBeenCalled();
+      const uploadedJobId = mocks.receiveUpload.mock.calls[0][1] as string;
+      expect(mocks.deletePrefix).toHaveBeenCalledWith(`uploads/${uploadedJobId}/`);
+
+      // Unexpected non-S3 defect passes through untouched and classifies as bug
+      mocks.deletePrefix.mockClear();
+      mocks.receiveUpload.mockClear();
+      const defect = new TypeError("unexpected S3 client defect");
+      mocks.getObjectBuffer.mockRejectedValueOnce(defect);
+      const bugReq = makeRequest(validPartsFor(toolId));
+      let caughtDefect: unknown;
+      try {
+        await handlers[path](bugReq, makeReply());
+      } catch (err) {
+        caughtDefect = err;
+      }
+      expect(caughtDefect).toBe(defect);
+      expect(classifyError(caughtDefect, "http")).toBe("bug");
+      const bugJobId = mocks.receiveUpload.mock.calls[0][1] as string;
+      expect(mocks.deletePrefix).toHaveBeenCalledWith(`uploads/${bugJobId}/`);
+
+      // When isStorageServiceFault returns false, an EIO error passes through untouched
+      mocks.isStorageServiceFault.mockReturnValue(false);
+      mocks.deletePrefix.mockClear();
+      mocks.receiveUpload.mockClear();
+      const localEio = Object.assign(new Error("EIO: i/o error, read"), { code: "EIO" });
+      mocks.getObjectBuffer.mockRejectedValueOnce(localEio);
+      const localReq = makeRequest(validPartsFor(toolId));
+      let caughtLocal: unknown;
+      try {
+        await handlers[path](localReq, makeReply());
+      } catch (err) {
+        caughtLocal = err;
+      }
+      expect(caughtLocal).toBe(localEio);
+      const localJobId = mocks.receiveUpload.mock.calls[0][1] as string;
+      expect(mocks.deletePrefix).toHaveBeenCalledWith(`uploads/${localJobId}/`);
+    },
+  );
+
+  it.each([
+    ["erase-object", "/api/v1/tools/image/erase-object", PNG],
+    ["sign-pdf", "/api/v1/tools/pdf/sign-pdf", PDF],
+  ] as const)(
+    "%s normalizes S3 getObjectBuffer faults on the secondary file part (mask/sig0) into a 503 storage-unavailable SafeError",
+    async (toolId, path, firstBuffer) => {
+      mocks.isStorageServiceFault.mockReturnValue(true);
+      const eioFault = Object.assign(new Error("EIO: i/o error, read"), { code: "EIO" });
+      mocks.getObjectBuffer.mockResolvedValueOnce(firstBuffer).mockRejectedValueOnce(eioFault);
+
+      const req = makeRequest(validPartsFor(toolId));
+      const reply = makeReply();
+      let caught: unknown;
+      try {
+        await handlers[path](req, reply);
+      } catch (err) {
+        caught = err;
+      }
+
+      expect(caught).toMatchObject({
+        name: "SafeError",
+        statusCode: 503,
+        code: "storage-unavailable",
+        message: "The server's storage service is unavailable.",
+      });
+      expect(classifyError(caught, "http")).toBe("operational");
+      expect(mocks.enqueueToolJob).not.toHaveBeenCalled();
+      const uploadedJobId = mocks.receiveUpload.mock.calls[0][1] as string;
+      expect(mocks.deletePrefix).toHaveBeenCalledWith(`uploads/${uploadedJobId}/`);
+    },
+  );
+
+  it("sign-pdf propagates settled httpStatus, code, details, and canceled state from schema.jobs when waitForJob rejects", async () => {
+    setupValidBuffersFor("sign-pdf");
+
+    // 1. Worker 503 storage-unavailable fault
+    jobRows.rows = [
+      {
+        error: {
+          message: "The server's storage service is unavailable.",
+          code: "storage-unavailable",
+          httpStatus: 503,
+        },
+      },
+    ];
+    mocks.waitForJob.mockRejectedValueOnce(
+      new Error("The server's storage service is unavailable."),
+    );
+    const req503 = makeRequest(validPartsFor("sign-pdf"));
+    const reply503 = makeReply();
+    await handlers["/api/v1/tools/pdf/sign-pdf"](req503, reply503);
+    expect(reply503.statusCode).toBe(503);
+    expect(reply503.payload).toEqual({
+      error: "The server's storage service is unavailable.",
+      code: "storage-unavailable",
+    });
+    expect(req503.log.error).toHaveBeenCalledWith(
+      expect.objectContaining({ toolId: "sign-pdf" }),
+      "sign-pdf processing failed",
+    );
+
+    // 2. Worker 400 input rejection with details and code
+    jobRows.rows = [
+      {
+        error: {
+          message: "Placement page out of range",
+          details: "PDF has 2 pages",
+          code: "INVALID_PAGE",
+          httpStatus: 400,
+        },
+      },
+    ];
+    mocks.waitForJob.mockRejectedValueOnce(new Error("Placement page out of range"));
+    const req400 = makeRequest(validPartsFor("sign-pdf"));
+    const reply400 = makeReply();
+    await handlers["/api/v1/tools/pdf/sign-pdf"](req400, reply400);
+    expect(reply400.statusCode).toBe(400);
+    expect(reply400.payload).toEqual({
+      error: "Placement page out of range",
+      details: "PDF has 2 pages",
+      code: "INVALID_PAGE",
+    });
+    expect(req400.log.info).toHaveBeenCalledWith(
+      expect.objectContaining({ toolId: "sign-pdf" }),
+      "sign-pdf rejected input",
+    );
+
+    // 3. Canceled job inside sync window
+    jobRows.rows = [{ status: "canceled" }];
+    mocks.waitForJob.mockRejectedValueOnce(new Error("Canceled"));
+    const reqCancel = makeRequest(validPartsFor("sign-pdf"));
+    const replyCancel = makeReply();
+    await handlers["/api/v1/tools/pdf/sign-pdf"](reqCancel, replyCancel);
+    expect(replyCancel.statusCode).toBe(422);
+    expect(replyCancel.payload).toEqual({
+      error: "Canceled",
+      canceled: true,
+    });
+
+    // 4. Forged "Canceled" message when job row status is not "canceled" falls through to 422
+    jobRows.rows = [{ status: "failed", error: { message: "Canceled" } }];
+    mocks.waitForJob.mockRejectedValueOnce(new Error("Canceled"));
+    const reqForged = makeRequest(validPartsFor("sign-pdf"));
+    const replyForged = makeReply();
+    await handlers["/api/v1/tools/pdf/sign-pdf"](reqForged, replyForged);
+    expect(replyForged.statusCode).toBe(422);
+    expect(replyForged.payload).toEqual({
+      error: "Processing failed",
+      details: "Canceled",
+    });
+
+    // 5. DB read failure when checking canceled and failed job row falls back to 422 with warnings
+    jobRows.error = new Error("db read timeout");
+    mocks.waitForJob.mockRejectedValueOnce(new Error("Canceled"));
+    const reqDbErr = makeRequest(validPartsFor("sign-pdf"));
+    const replyDbErr = makeReply();
+    await handlers["/api/v1/tools/pdf/sign-pdf"](reqDbErr, replyDbErr);
+    expect(replyDbErr.statusCode).toBe(422);
+    expect(replyDbErr.payload).toEqual({
+      error: "Processing failed",
+      details: "Canceled",
+    });
+    expect(reqDbErr.log.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ err: jobRows.error }),
+      "canceled job status read failed",
+    );
+    expect(reqDbErr.log.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ err: jobRows.error }),
+      "failed job row read failed",
     );
   });
 });

@@ -62,9 +62,11 @@ vi.mock("../../../apps/api/src/jobs/enqueue.js", () => ({
   }),
 }));
 
-vi.mock("../../../apps/api/src/lib/object-storage.js", () => ({
+vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>()),
   deletePrefix: vi.fn(() => Promise.resolve()),
   getObjectBuffer: vi.fn(() => Promise.resolve(Buffer.from("png-data"))),
+  isStorageServiceFault: vi.fn(() => false),
   putObject: vi.fn(() => Promise.resolve()),
 }));
 
@@ -172,12 +174,17 @@ import {
 } from "../../../apps/api/src/jobs/enqueue.js";
 import { auditFromRequest, isToolAuditEnabled } from "../../../apps/api/src/lib/audit.js";
 import { autoOrient } from "../../../apps/api/src/lib/auto-orient.js";
+import { classifyError } from "../../../apps/api/src/lib/error-report.js";
 import {
   getFirstMissingBundleForTool,
   isToolInstalled,
 } from "../../../apps/api/src/lib/feature-status.js";
 import { validateImageBuffer } from "../../../apps/api/src/lib/file-validation.js";
-import { deletePrefix } from "../../../apps/api/src/lib/object-storage.js";
+import {
+  deletePrefix,
+  getObjectBuffer,
+  isStorageServiceFault,
+} from "../../../apps/api/src/lib/object-storage.js";
 import { receiveUpload } from "../../../apps/api/src/lib/upload-stream.js";
 import { cancelSingleJobGuarded } from "../../../apps/api/src/routes/progress.js";
 import type { AnyToolRouteConfig } from "../../../apps/api/src/routes/tool-factory.js";
@@ -1383,6 +1390,111 @@ describe("createToolRoute", () => {
         expect.objectContaining({ jobId: job.jobId, pool: "docs" }),
       );
       expect(waitForJob).toHaveBeenCalledWith("docs", job.jobId);
+    });
+
+    it("normalizes pre-enqueue S3 getObjectBuffer faults into a 503 storage-unavailable SafeError and passes non-S3 defects through (#3481)", async () => {
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+
+      vi.mocked(isStorageServiceFault).mockReturnValue(true);
+      try {
+        for (const rawFault of [
+          Object.assign(new Error("Please reduce your request rate."), {
+            name: "SlowDown",
+            $metadata: { httpStatusCode: 503 },
+          }),
+          Object.assign(new Error("Access Denied"), {
+            name: "AccessDenied",
+            $metadata: { httpStatusCode: 403 },
+          }),
+          Object.assign(new Error("The specified bucket does not exist"), {
+            name: "NoSuchBucket",
+            $metadata: { httpStatusCode: 404 },
+          }),
+          Object.assign(new Error("EIO: i/o error, read"), {
+            code: "EIO",
+          }),
+        ]) {
+          vi.mocked(deletePrefix).mockClear();
+          vi.mocked(getObjectBuffer).mockRejectedValueOnce(rawFault);
+          const req = createMockRequest({ fileBuffer: Buffer.from("png-data") });
+          let caught: unknown;
+          try {
+            await handler(req, createMockReply());
+          } catch (err) {
+            caught = err;
+          }
+          expect(caught).toMatchObject({
+            name: "SafeError",
+            statusCode: 503,
+            code: "storage-unavailable",
+            message: "The server's storage service is unavailable.",
+          });
+          expect(classifyError(caught, "http")).toBe("operational");
+          expect(enqueueToolJob).not.toHaveBeenCalled();
+          expect(deletePrefix).toHaveBeenCalledWith(expect.stringMatching(/^uploads\/[^/]+\/$/));
+        }
+
+        // Multi-file route failing on the second input (i === 1) normalizes S3 fault and cleans up
+        const multiApp = createMockApp();
+        createToolRoute(multiApp as never, { ...makeMockConfig(id), maxInputs: 2 });
+        const multiHandler = multiApp.routes[apiToolPath(id)];
+        vi.mocked(deletePrefix).mockClear();
+        vi.mocked(getObjectBuffer)
+          .mockResolvedValueOnce(Buffer.from("png-data"))
+          .mockRejectedValueOnce(
+            Object.assign(new Error("Please reduce your request rate."), {
+              name: "SlowDown",
+              $metadata: { httpStatusCode: 503 },
+            }),
+          );
+        const multiReq = createMockRequest({ fileBuffer: Buffer.from("png-data"), fileCount: 2 });
+        let caughtSecond: unknown;
+        try {
+          await multiHandler(multiReq, createMockReply());
+        } catch (err) {
+          caughtSecond = err;
+        }
+        expect(caughtSecond).toMatchObject({
+          name: "SafeError",
+          statusCode: 503,
+          code: "storage-unavailable",
+          message: "The server's storage service is unavailable.",
+        });
+        expect(enqueueToolJob).not.toHaveBeenCalled();
+        expect(deletePrefix).toHaveBeenCalledWith(expect.stringMatching(/^uploads\/[^/]+\/$/));
+
+        // Unexpected non-S3 defect passes through untouched and classifies as bug
+        const defect = new TypeError("unexpected S3 client defect");
+        vi.mocked(getObjectBuffer).mockRejectedValueOnce(defect);
+        const bugReq = createMockRequest({ fileBuffer: Buffer.from("png-data") });
+        let caughtDefect: unknown;
+        try {
+          await handler(bugReq, createMockReply());
+        } catch (err) {
+          caughtDefect = err;
+        }
+        expect(caughtDefect).toBe(defect);
+        expect(classifyError(caughtDefect, "http")).toBe("bug");
+
+        // When isStorageServiceFault returns false (e.g. local mode or NoSuchKey),
+        // an error that normalizeS3ReadFault would rewrite passes through untouched
+        vi.mocked(isStorageServiceFault).mockReturnValue(false);
+        const localEio = Object.assign(new Error("EIO: i/o error, read"), { code: "EIO" });
+        vi.mocked(getObjectBuffer).mockRejectedValueOnce(localEio);
+        const localReq = createMockRequest({ fileBuffer: Buffer.from("png-data") });
+        let caughtLocal: unknown;
+        try {
+          await handler(localReq, createMockReply());
+        } catch (err) {
+          caughtLocal = err;
+        }
+        expect(caughtLocal).toBe(localEio);
+      } finally {
+        vi.mocked(isStorageServiceFault).mockReturnValue(false);
+      }
     });
   });
 

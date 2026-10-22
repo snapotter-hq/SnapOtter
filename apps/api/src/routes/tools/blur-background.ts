@@ -26,7 +26,13 @@ import { isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { prepareRouteImage } from "../../lib/image-input-prep.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
-import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
+import {
+  getObjectBuffer,
+  isStorageServiceFault,
+  normalizeOperationalWriteError,
+  normalizeS3ReadFault,
+  putObject,
+} from "../../lib/object-storage.js";
 import {
   discardUnenqueuedUploads,
   hasPersistedJobRow,
@@ -196,8 +202,12 @@ export function registerBlurBackground(app: FastifyInstance) {
           return reply.status(400).send({ error: "No image file provided" });
         }
 
-        const { getObjectBuffer, putObject } = await import("../../lib/object-storage.js");
-        fileBuffer = await getObjectBuffer(inputKey);
+        try {
+          fileBuffer = await getObjectBuffer(inputKey);
+        } catch (err) {
+          if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+          throw err;
+        }
 
         if (!fileBuffer || fileBuffer.length === 0) {
           return reply.status(400).send({ error: "No image file provided" });

@@ -360,7 +360,12 @@ export function registerRemoveBackground(app: FastifyInstance) {
           return reply.status(400).send({ error: "No image file provided" });
         }
 
-        fileBuffer = await getObjectBuffer(inputKey);
+        try {
+          fileBuffer = await getObjectBuffer(inputKey);
+        } catch (err) {
+          if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+          throw err;
+        }
 
         if (!fileBuffer || fileBuffer.length === 0) {
           return reply.status(400).send({ error: "No image file provided" });

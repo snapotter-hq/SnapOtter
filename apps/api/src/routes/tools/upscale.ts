@@ -38,7 +38,9 @@ import { logger } from "../../lib/logger.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import {
   getObjectBuffer,
+  isStorageServiceFault,
   normalizeOperationalWriteError,
+  normalizeS3ReadFault,
   putObject,
 } from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
@@ -251,7 +253,12 @@ export function registerUpscale(app: FastifyInstance) {
         return reply.status(400).send({ error: "No image file provided" });
       }
 
-      fileBuffer = await getObjectBuffer(inputKey);
+      try {
+        fileBuffer = await getObjectBuffer(inputKey);
+      } catch (err) {
+        if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+        throw err;
+      }
 
       const validation = await validateImageBuffer(fileBuffer, filename);
       if (!validation.valid) {

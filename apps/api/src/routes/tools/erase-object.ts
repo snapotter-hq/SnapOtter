@@ -180,8 +180,13 @@ export function registerEraseObject(app: FastifyInstance) {
           return;
         }
 
-        imageBuffer = await getObjectBuffer(imageKey);
-        maskBuffer = await getObjectBuffer(maskKey);
+        try {
+          imageBuffer = await getObjectBuffer(imageKey);
+          maskBuffer = await getObjectBuffer(maskKey);
+        } catch (err) {
+          if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+          throw err;
+        }
 
         const imageValidation = await validateImageBuffer(imageBuffer, filename);
         if (!imageValidation.valid) {

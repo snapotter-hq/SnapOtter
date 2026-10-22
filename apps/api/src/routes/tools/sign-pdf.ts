@@ -4,8 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pdfSignPy } from "@snapotter/doc-engine";
 import type { SignPlacement } from "@snapotter/shared";
+import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
+import { db, schema } from "../../db/index.js";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob, insertToolJobAlias, waitForJob } from "../../jobs/enqueue.js";
 import {
@@ -157,7 +159,13 @@ export function registerSignPdf(app: FastifyInstance) {
         }
       }
 
-      const pdfBuffer = await getObjectBuffer(pdfKey);
+      let pdfBuffer: Buffer;
+      try {
+        pdfBuffer = await getObjectBuffer(pdfKey);
+      } catch (err) {
+        if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+        throw err;
+      }
       try {
         // Signing needs a readable PDF; reject encrypted ones up front (the
         // "unlock first" guidance rides in details) with the same policy the
@@ -185,7 +193,13 @@ export function registerSignPdf(app: FastifyInstance) {
 
       const orderedSigKeys: string[] = [];
       for (const s of [...sigParts].sort((a, b) => a.index - b.index)) {
-        const buf = await getObjectBuffer(s.key);
+        let buf: Buffer;
+        try {
+          buf = await getObjectBuffer(s.key);
+        } catch (err) {
+          if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+          throw err;
+        }
         const v = await validateImageBuffer(buf, `sig${s.index}.png`);
         if (!v.valid) {
           return reply.status(400).send({ error: `Invalid signature image: ${v.reason}` });
@@ -239,6 +253,40 @@ export function registerSignPdf(app: FastifyInstance) {
       }
       return reply.status(202).send(buildAsyncAcceptedPayload(jobId, clientJobId));
     } catch (err) {
+      if (err instanceof Error && err.message === "Canceled") {
+        const wasCanceled = await db
+          .select({ status: schema.jobs.status })
+          .from(schema.jobs)
+          .where(eq(schema.jobs.id, jobId))
+          .then((rows) => rows[0]?.status === "canceled")
+          .catch((readErr) => {
+            request.log.warn({ err: readErr, jobId }, "canceled job status read failed");
+            return false;
+          });
+        if (wasCanceled) {
+          return reply.status(422).send({ error: "Canceled", canceled: true });
+        }
+      }
+      const failure = await db
+        .select({ error: schema.jobs.error })
+        .from(schema.jobs)
+        .where(eq(schema.jobs.id, jobId))
+        .then((rows) => rows[0]?.error ?? null)
+        .catch((readErr) => {
+          request.log.warn({ err: readErr, jobId }, "failed job row read failed");
+          return null;
+        });
+      if (typeof failure?.httpStatus === "number") {
+        if (failure.httpStatus >= 500) {
+          request.log.error({ err, toolId: TOOL_ID }, "sign-pdf processing failed");
+        } else {
+          request.log.info({ err, toolId: TOOL_ID }, "sign-pdf rejected input");
+        }
+        const body: Record<string, unknown> = { error: failure.message };
+        if (failure.details !== undefined) body.details = failure.details;
+        if (failure.code) body.code = failure.code;
+        return reply.status(failure.httpStatus).send(body);
+      }
       request.log.error({ err, toolId: TOOL_ID }, "sign-pdf processing failed");
       return reply.status(422).send({
         error: "Processing failed",

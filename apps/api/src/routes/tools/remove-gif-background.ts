@@ -326,7 +326,13 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
           return reply.status(400).send({ error: "No image file provided" });
         }
 
-        const fileBuffer = await getObjectBuffer(inputKey);
+        let fileBuffer: Buffer;
+        try {
+          fileBuffer = await getObjectBuffer(inputKey);
+        } catch (err) {
+          if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+          throw err;
+        }
         if (!fileBuffer || fileBuffer.length === 0) {
           return reply.status(400).send({ error: "No image file provided" });
         }
