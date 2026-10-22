@@ -127,6 +127,8 @@ import { registerFlattenPdf } from "../../../apps/api/src/routes/tools/flatten-p
 import { registerGrayscalePdf } from "../../../apps/api/src/routes/tools/grayscale-pdf.js";
 import { registerHtmlToPdf } from "../../../apps/api/src/routes/tools/html-to-pdf.js";
 import { registerLinearizePdf } from "../../../apps/api/src/routes/tools/linearize-pdf.js";
+import { registerMarkdownToDocx } from "../../../apps/api/src/routes/tools/markdown-to-docx.js";
+import { registerMarkdownToHtml } from "../../../apps/api/src/routes/tools/markdown-to-html.js";
 import { registerMarkdownToPdf } from "../../../apps/api/src/routes/tools/markdown-to-pdf.js";
 import { registerMergePdf } from "../../../apps/api/src/routes/tools/merge-pdf.js";
 import { registerMultiToolPdf } from "../../../apps/api/src/routes/tools/multi-tool-pdf.js";
@@ -380,6 +382,91 @@ describe("document route processors", () => {
         },
       );
     });
+  });
+
+  it("markdown-to-docx and markdown-to-html forward ctx.signal to runPandoc (#3560)", async () => {
+    registerMarkdownToDocx(createMockApp());
+    registerMarkdownToHtml(createMockApp());
+    const docxConfig = getToolConfig("markdown-to-docx");
+    const htmlConfig = getToolConfig("markdown-to-html");
+
+    await withScratch(async (scratchDir) => {
+      const docxCtx = createCtx(scratchDir, "Release Notes.md");
+      const docxResult = await docxConfig?.processV2?.(docxCtx);
+      expect(runPandoc).toHaveBeenLastCalledWith(
+        join(scratchDir, "in-Release_Notes.md"),
+        join(scratchDir, "Release Notes.docx"),
+        { signal: docxCtx.signal },
+      );
+      expect(await readFile(join(scratchDir, "in-Release_Notes.md"))).toEqual(Buffer.from("input"));
+      expect(docxCtx.report).toHaveBeenNthCalledWith(1, 10, "Converting");
+      expect(docxCtx.report).toHaveBeenNthCalledWith(2, 90, "Done");
+      expect(docxResult).toEqual({
+        scratchPath: join(scratchDir, "Release Notes.docx"),
+        filename: "Release Notes.docx",
+        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      });
+
+      const htmlCtx = createCtx(scratchDir, "Release Notes.md");
+      const htmlResult = await htmlConfig?.processV2?.(htmlCtx);
+      expect(runPandoc).toHaveBeenLastCalledWith(
+        join(scratchDir, "in-Release_Notes.md"),
+        join(scratchDir, "Release Notes.html"),
+        { extraArgs: ["--standalone"], signal: htmlCtx.signal },
+      );
+      expect(htmlCtx.report).toHaveBeenNthCalledWith(1, 10, "Converting");
+      expect(htmlCtx.report).toHaveBeenNthCalledWith(2, 90, "Done");
+      expect(htmlResult).toEqual({
+        scratchPath: join(scratchDir, "Release Notes.html"),
+        filename: "Release Notes.html",
+        contentType: "text/html",
+      });
+
+      vi.mocked(runPandoc).mockImplementationOnce(
+        async (_in: string, _out: string, opts?: { signal?: AbortSignal }) => {
+          if (opts?.signal?.aborted) throw new Error("Canceled");
+        },
+      );
+      const abortedDocxAc = new AbortController();
+      abortedDocxAc.abort();
+      const abortedDocxCtx = {
+        ...createCtx(scratchDir, "Canceled.md"),
+        signal: abortedDocxAc.signal,
+      };
+      await expect(docxConfig?.processV2?.(abortedDocxCtx)).rejects.toThrow("Canceled");
+      expect(abortedDocxCtx.report).toHaveBeenCalledWith(10, "Converting");
+      expect(abortedDocxCtx.report).not.toHaveBeenCalledWith(90, "Done");
+
+      vi.mocked(runPandoc).mockImplementationOnce(
+        async (_in: string, _out: string, opts?: { signal?: AbortSignal }) => {
+          if (opts?.signal?.aborted) throw new Error("Canceled");
+        },
+      );
+      const abortedHtmlAc = new AbortController();
+      abortedHtmlAc.abort();
+      const abortedHtmlCtx = {
+        ...createCtx(scratchDir, "Canceled.md"),
+        signal: abortedHtmlAc.signal,
+      };
+      await expect(htmlConfig?.processV2?.(abortedHtmlCtx)).rejects.toThrow("Canceled");
+      expect(abortedHtmlCtx.report).toHaveBeenCalledWith(10, "Converting");
+      expect(abortedHtmlCtx.report).not.toHaveBeenCalledWith(90, "Done");
+    });
+
+    await expect(
+      docxConfig?.process?.(Buffer.from("x"), {}, "doc.md", {
+        signal: new AbortController().signal,
+        scratchDir: "/tmp",
+        report: vi.fn(),
+      }),
+    ).rejects.toThrow("markdown-to-docx is v2-only");
+    await expect(
+      htmlConfig?.process?.(Buffer.from("x"), {}, "doc.md", {
+        signal: new AbortController().signal,
+        scratchDir: "/tmp",
+        report: vi.fn(),
+      }),
+    ).rejects.toThrow("markdown-to-html is v2-only");
   });
 
   it("converts PDFs to Word through pdfToWordPy with ctx.signal", async () => {

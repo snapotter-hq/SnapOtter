@@ -22,7 +22,7 @@ export function registerMarkdownToDocx(app: FastifyInstance) {
 
       const outPath = join(ctx.scratchDir, `${base}.docx`);
       ctx.report(10, "Converting");
-      await runPandoc(inPath, outPath);
+      await runPandoc(inPath, outPath, { signal: ctx.signal });
       ctx.report(90, "Done");
 
       return {
