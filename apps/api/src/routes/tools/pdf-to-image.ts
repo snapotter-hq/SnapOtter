@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { PassThrough } from "node:stream";
 import { apiToolPath, hasServerErrorStatus, isSafeMessageError } from "@snapotter/shared";
 import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
@@ -18,7 +19,9 @@ import {
   deletePrefix,
   getObjectBuffer,
   getObjectStream,
+  isStorageServiceFault,
   normalizeOperationalWriteError,
+  normalizeS3ReadFault,
   putObject,
 } from "../../lib/object-storage.js";
 import { isUniqueViolation } from "../../lib/pg-errors.js";
@@ -743,24 +746,41 @@ export function registerPdfToImageRoute(
         onReplyClose();
       }
 
+      const normalizeSourceError = (err: unknown) =>
+        isStorageServiceFault(err) ? normalizeS3ReadFault(err) : err;
+
       try {
         try {
           for (const entry of results) {
             if (!entry) continue;
             if (streamError) break;
-            const stream = await getObjectStream(entry.key);
+            let stream: Awaited<ReturnType<typeof getObjectStream>>;
+            try {
+              stream = await getObjectStream(entry.key);
+            } catch (err) {
+              throw normalizeSourceError(err);
+            }
+            const entryStream = new PassThrough();
             // The local backend resolves the stream and only then emits ENOENT,
             // so the catch below never sees it. Without this listener the error
-            // is unhandled and the request hangs instead of terminating.
-            stream.on("error", (err: Error) =>
-              failStream(err, "Object stream error during PDF batch processing"),
-            );
+            // is unhandled and the request hangs instead of terminating. Never
+            // hand archiver a stream that can emit 'error' directly: end the
+            // PassThrough wrapper quietly after failStream aborts the archive.
+            stream.on("error", (err: Error) => {
+              failStream(
+                normalizeSourceError(err),
+                "Object stream error during PDF batch processing",
+              );
+              entryStream.end();
+            });
             if (streamError) {
               (stream as { destroy?: () => void }).destroy?.();
+              entryStream.destroy();
               break;
             }
             openedStreams.push(stream as { destroy?: (err?: Error) => void });
-            archive.append(stream, { name: entry.filename });
+            stream.pipe(entryStream);
+            archive.append(entryStream, { name: entry.filename });
           }
           if (!streamError) {
             void archive

@@ -52,6 +52,8 @@ vi.mock("../../../apps/api/src/permissions.js", async (importOriginal) => {
   return { ...actual, requireToolAccess: async () => ({ id: "user-1" }) };
 });
 
+import { Readable } from "node:stream";
+import { env } from "../../../apps/api/src/config.js";
 import * as engineUnavailableMod from "../../../apps/api/src/lib/engine-unavailable.js";
 import {
   DecoderOutOfMemoryError,
@@ -428,6 +430,131 @@ describe("pdf-to-image batch route (#1552)", () => {
       }),
     );
     await app.close();
+  });
+
+  it("normalizes S3 mid-stream read faults and open-time stream faults during final ZIP streaming (#3651)", async () => {
+    const originalMode = env.STORAGE_MODE;
+    (env as { STORAGE_MODE: string }).STORAGE_MODE = "s3";
+    const app = await buildApp(registerPdfToImage);
+    try {
+      const midStreamFaults = [
+        Object.assign(new Error("Premature close"), {
+          code: "ERR_STREAM_PREMATURE_CLOSE",
+        }),
+        Object.assign(new Error("S3 stream reset"), {
+          code: "EIO",
+          syscall: "read",
+        }),
+      ];
+      for (const fault of midStreamFaults) {
+        failBatchJob.mockClear();
+        getObjectStream.mockResolvedValueOnce(
+          Readable.from(
+            (async function* () {
+              yield Buffer.from("partial-zip-bytes");
+              throw fault;
+            })(),
+          ),
+        );
+        await sendBatch(app).then(
+          (res: unknown) => res,
+          () => null,
+        );
+        expect(failBatchJob).toHaveBeenCalledWith({
+          jobId: expect.any(String),
+          totalFiles: 2,
+          completedFiles: 2,
+          failedFiles: 0,
+          errors: [{ filename: "", error: "The server's storage service is unavailable." }],
+          message: "The server's storage service is unavailable.",
+          code: "storage-unavailable",
+        });
+      }
+
+      const openFaults = [
+        Object.assign(new Error("Premature close"), { code: "ERR_STREAM_PREMATURE_CLOSE" }),
+        Object.assign(new Error("S3 stream reset"), { code: "EIO", syscall: "read" }),
+        Object.assign(new Error("Please reduce your request rate."), {
+          name: "SlowDown",
+          $metadata: { httpStatusCode: 503 },
+        }),
+        Object.assign(new Error("Access Denied"), {
+          name: "AccessDenied",
+          $metadata: { httpStatusCode: 403 },
+        }),
+        Object.assign(new Error("The specified bucket does not exist"), {
+          name: "NoSuchBucket",
+          $metadata: { httpStatusCode: 404 },
+        }),
+      ];
+      for (const fault of openFaults) {
+        failBatchJob.mockClear();
+        getObjectStream.mockRejectedValueOnce(fault);
+        await sendBatch(app).then(
+          (res: unknown) => res,
+          () => null,
+        );
+        expect(failBatchJob).toHaveBeenCalledWith({
+          jobId: expect.any(String),
+          totalFiles: 2,
+          completedFiles: 2,
+          failedFiles: 0,
+          errors: [{ filename: "", error: "The server's storage service is unavailable." }],
+          message: "The server's storage service is unavailable.",
+          code: "storage-unavailable",
+        });
+      }
+
+      // Missing object (NoSuchKey) and unexpected non-S3 defects still settle as generic packaging failure
+      const nonServiceFaults = [
+        Object.assign(new Error("The specified key does not exist."), {
+          name: "NoSuchKey",
+          $metadata: { httpStatusCode: 404 },
+        }),
+        new TypeError("unexpected stream defect"),
+      ];
+      for (const defect of nonServiceFaults) {
+        failBatchJob.mockClear();
+        getObjectStream.mockRejectedValueOnce(defect);
+        await sendBatch(app).then(
+          (res: unknown) => res,
+          () => null,
+        );
+        expect(failBatchJob).toHaveBeenCalledWith({
+          jobId: expect.any(String),
+          totalFiles: 2,
+          completedFiles: 2,
+          failedFiles: 0,
+          errors: [{ filename: "", error: "Failed to package batch results" }],
+          message: "Failed to package batch results",
+        });
+
+        failBatchJob.mockClear();
+        getObjectStream.mockResolvedValueOnce(
+          Readable.from(
+            (async function* () {
+              yield Buffer.from("partial-zip-bytes");
+              throw defect;
+            })(),
+          ),
+        );
+        await sendBatch(app).then(
+          (res: unknown) => res,
+          () => null,
+        );
+        expect(failBatchJob).toHaveBeenCalledWith({
+          jobId: expect.any(String),
+          totalFiles: 2,
+          completedFiles: 2,
+          failedFiles: 0,
+          errors: [{ filename: "", error: "Failed to package batch results" }],
+          message: "Failed to package batch results",
+        });
+      }
+    } finally {
+      (env as { STORAGE_MODE: string }).STORAGE_MODE = originalMode;
+      await app.close();
+    }
   });
 
   it("masks non-SafeError 500 messages as 'Internal server error' when readOwnOutput fails mid-batch (#2786)", async () => {

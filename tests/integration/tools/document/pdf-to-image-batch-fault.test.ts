@@ -10,6 +10,7 @@
  */
 import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { env } from "../../../../apps/api/src/config.js";
 import { db, schema } from "../../../../apps/api/src/db/index.js";
 import { sharedRedis } from "../../../../apps/api/src/jobs/connection.js";
 import { bullPrefix } from "../../../../apps/api/src/jobs/types.js";
@@ -29,6 +30,8 @@ const faults = vi.hoisted(() => ({
   poisonError: null as (() => unknown) | null,
   /** Object keys (or key prefixes) whose getObjectStream fails on read. */
   streamPoison: new Set<string>(),
+  /** Optional custom S3 mid-stream error factory for poisoned getObjectStream calls (#3651). */
+  s3StreamPoisonError: null as (() => Error) | null,
   /** When set, the route's failBatchJob call rejects. */
   settleFails: false,
   /** Job id whose row is marked terminal right before a fault, so failBatchJob returns false. */
@@ -115,6 +118,16 @@ vi.mock("../../../../apps/api/src/lib/object-storage.js", async (importOriginal)
               .set({ status: "canceled", completedAt: new Date() })
               .where(eq(schema.jobs.id, faults.retireRowBeforeFault));
           }
+          if (faults.s3StreamPoisonError) {
+            const makeErr = faults.s3StreamPoisonError;
+            return Readable.from(
+              (async function* () {
+                yield Buffer.from("partial-zip-bytes");
+                (env as { STORAGE_MODE: string }).STORAGE_MODE = "s3";
+                throw makeErr();
+              })(),
+            );
+          }
           return new Readable({
             read() {
               this.destroy(new Error(`test poison: stream error for ${key}`));
@@ -125,6 +138,7 @@ vi.mock("../../../../apps/api/src/lib/object-storage.js", async (importOriginal)
       return actual.getObjectStream(key);
     },
     deletePrefix: async (prefix: string) => {
+      (env as { STORAGE_MODE: string }).STORAGE_MODE = "local";
       if (faults.replyErrorDuringCleanup) {
         faults.replyErrorDuringCleanup = false;
         await new Promise<void>((resolve) => {
@@ -187,9 +201,11 @@ beforeAll(async () => {
 }, 30_000);
 
 afterEach(() => {
+  (env as { STORAGE_MODE: string }).STORAGE_MODE = "local";
   faults.poison.clear();
   faults.poisonError = null;
   faults.streamPoison.clear();
+  faults.s3StreamPoisonError = null;
   faults.settleFails = false;
   faults.retireRowBeforeFault = null;
   faults.replyErrorOnStream.clear();
@@ -321,6 +337,63 @@ describe("pdf-to-image batch storage fault (#1443)", () => {
 
     expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
     expect(await objectsUnder(`outputs/${clientJobId}-f1/`)).toEqual([]);
+  });
+
+  it("normalizes S3 mid-stream ERR_STREAM_PREMATURE_CLOSE and EIO during ZIP streaming into storage-unavailable (#3651)", async () => {
+    const cases = [
+      {
+        clientJobId: "batch-3651-s3-premature-close",
+        makeErr: () =>
+          Object.assign(new Error("Premature close"), {
+            code: "ERR_STREAM_PREMATURE_CLOSE",
+          }),
+      },
+      {
+        clientJobId: "batch-3651-s3-midstream-eio",
+        makeErr: () =>
+          Object.assign(new Error("S3 stream reset"), {
+            code: "EIO",
+            syscall: "read",
+          }),
+      },
+    ];
+
+    for (const { clientJobId, makeErr } of cases) {
+      faults.streamPoison.clear();
+      faults.streamPoison.add(`outputs/${clientJobId}-f1/`);
+      faults.s3StreamPoisonError = makeErr;
+
+      const outcome = await postBatch(clientJobId).then(
+        (res: { statusCode: number }) => res,
+        () => null,
+      );
+      expect(outcome === null || outcome.statusCode === 200).toBe(true);
+
+      const row = await readRow(clientJobId);
+      expect(row?.status).toBe("failed");
+      expect(row?.completedAt).not.toBeNull();
+      expect(row?.error).toEqual({
+        message: "The server's storage service is unavailable.",
+        code: "storage-unavailable",
+        details: [{ filename: "", error: "The server's storage service is unavailable." }],
+      });
+
+      const cached = await sharedRedis().get(`${bullPrefix()}:terminal:${clientJobId}`);
+      expect(cached).not.toBeNull();
+      expect(JSON.parse(cached as string)).toMatchObject({
+        jobId: clientJobId,
+        type: "batch",
+        status: "failed",
+        totalFiles: 2,
+        completedFiles: 2,
+        failedFiles: 0,
+        code: "storage-unavailable",
+        errors: [{ filename: "", error: "The server's storage service is unavailable." }],
+      });
+
+      expect(await objectsUnder(`outputs/${clientJobId}-f0/`)).toEqual([]);
+      expect(await objectsUnder(`outputs/${clientJobId}-f1/`)).toEqual([]);
+    }
   });
 
   it("preserves per-file errors on the failed row when the ZIP stream fails on a partial batch (#1555)", async () => {
