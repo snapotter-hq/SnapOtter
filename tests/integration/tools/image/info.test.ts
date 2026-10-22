@@ -5,6 +5,9 @@
  * histogram, EXIF presence, and input validation.
  */
 
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
@@ -1171,4 +1174,52 @@ describe("Info", () => {
     expect(capRes.statusCode).toBe(400);
     expect(JSON.parse(capRes.body).error).toContain("maximum element count");
   });
+
+  it.each([
+    ["missing ImageWidth/ImageHeight", '[{"FileType":"DNG"}]'],
+    ["zero ImageWidth/ImageHeight", '[{"FileType":"DNG","ImageWidth":0,"ImageHeight":0}]'],
+    [
+      "negative and non-numeric ImageWidth/ImageHeight",
+      '[{"FileType":"DNG","ImageWidth":-10,"ImageHeight":"100x200"}]',
+    ],
+  ] as const)(
+    "falls back to Sharp decoded dimensions when exiftool emits %s on a DNG upload (#3600)",
+    async (_label, jsonOutput) => {
+      const DNG = readFixture(fixtures.image.formats("dng"));
+      const originalPath = process.env.PATH;
+      const shimDir = mkdtempSync(join(tmpdir(), "info-exiftool-shim-"));
+      try {
+        const shimPath = join(shimDir, "exiftool");
+        writeFileSync(shimPath, `#!/bin/sh\nprintf '%s\\n' '${jsonOutput}'\n`);
+        chmodSync(shimPath, 0o755);
+        process.env.PATH = `${shimDir}:${originalPath ?? ""}`;
+
+        const { body, contentType } = createMultipartPayload([
+          { name: "file", filename: "sample.dng", contentType: "image/x-adobe-dng", content: DNG },
+        ]);
+
+        const res = await app.inject({
+          method: "POST",
+          url: "/api/v1/tools/image/info",
+          headers: {
+            authorization: `Bearer ${adminToken}`,
+            "content-type": contentType,
+          },
+          body,
+        });
+
+        expect(res.statusCode).toBe(200);
+        const result = JSON.parse(res.body);
+        expect(result.filename).toBe("sample.dng");
+        expect(result.format).toBe("dng");
+        expect(typeof result.width).toBe("number");
+        expect(typeof result.height).toBe("number");
+        expect(result.width).toBeGreaterThan(0);
+        expect(result.height).toBeGreaterThan(0);
+      } finally {
+        process.env.PATH = originalPath;
+        rmSync(shimDir, { recursive: true, force: true });
+      }
+    },
+  );
 });

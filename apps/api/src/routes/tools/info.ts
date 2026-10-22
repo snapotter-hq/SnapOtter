@@ -178,8 +178,8 @@ export function registerInfo(app: FastifyInstance) {
 }
 
 interface ExifMeta {
-  width: number;
-  height: number;
+  width: number | null;
+  height: number | null;
   format: string;
   colorSpace: string | null;
   density: number | null;
@@ -187,6 +187,10 @@ interface ExifMeta {
   hasExif: boolean;
   hasIcc: boolean;
   hasXmp: boolean;
+}
+
+function positiveDimension(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
 }
 
 async function readExifToolMeta(buffer: Buffer, ext?: string): Promise<ExifMeta | null> {
@@ -218,8 +222,8 @@ async function readExifToolMeta(buffer: Buffer, ext?: string): Promise<ExifMeta 
     if (!data) return null;
 
     return {
-      width: data.ImageWidth ?? 0,
-      height: data.ImageHeight ?? 0,
+      width: positiveDimension(data.ImageWidth),
+      height: positiveDimension(data.ImageHeight),
       format: (data.FileType ?? "raw").toLowerCase(),
       colorSpace: data.ColorSpace ?? null,
       density: data.XResolution ?? null,

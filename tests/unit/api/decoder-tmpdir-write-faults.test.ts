@@ -6,7 +6,8 @@
  * Sharp's native TIFF header read on DNG inputs.
  */
 
-import { readFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import multipart from "@fastify/multipart";
 import { apiToolPath } from "@snapotter/shared";
@@ -610,6 +611,73 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
         expect(decodeToSharpCompat).toHaveBeenCalledWith(rafMagic, "raw", expectedExt);
         expect(infoExifPaths).toHaveLength(1);
         expect(infoExifPaths[0]).toMatch(new RegExp(`info-exif-\\d+\\${expectedSuffix}$`));
+      },
+    );
+
+    it.each([
+      ["missing dimensions", '[{"FileType":"DNG"}]', 200, 150],
+      ["zero dimensions", '[{"FileType":"DNG","ImageWidth":0,"ImageHeight":0}]', 200, 150],
+      [
+        "negative and non-numeric dimensions",
+        '[{"FileType":"DNG","ImageWidth":-10,"ImageHeight":"100x200"}]',
+        200,
+        150,
+      ],
+      [
+        "Infinity and string-zero dimensions",
+        '[{"FileType":"DNG","ImageWidth":1e309,"ImageHeight":"0"}]',
+        200,
+        150,
+      ],
+      [
+        "valid ImageWidth with invalid ImageHeight",
+        '[{"FileType":"DNG","ImageWidth":4032,"ImageHeight":-1}]',
+        4032,
+        150,
+      ],
+      [
+        "invalid ImageWidth with valid ImageHeight",
+        '[{"FileType":"DNG","ImageWidth":"bad","ImageHeight":3024}]',
+        200,
+        3024,
+      ],
+      ["1x1 boundary dimensions", '[{"FileType":"DNG","ImageWidth":1,"ImageHeight":1}]', 1, 1],
+      [
+        "valid positive finite dimensions",
+        '[{"FileType":"DNG","ImageWidth":4032,"ImageHeight":3024}]',
+        4032,
+        3024,
+      ],
+    ] as const)(
+      "falls back to Sharp dimensions when exiftool emits %s (#3600)",
+      async (_label, jsonOutput, expectedWidth, expectedHeight) => {
+        const originalPath = process.env.PATH;
+        const shimDir = mkdtempSync(join(tmpdir(), "info-exiftool-shim-"));
+        try {
+          const shimPath = join(shimDir, "exiftool");
+          writeFileSync(shimPath, `#!/bin/sh\nprintf '%s\\n' '${jsonOutput}'\n`);
+          chmodSync(shimPath, 0o755);
+          process.env.PATH = `${shimDir}:${originalPath ?? ""}`;
+
+          const res = await app.inject({
+            method: "POST",
+            url: apiToolPath("info"),
+            ...multipartBody([
+              { filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG },
+            ]),
+          });
+
+          expect(res.statusCode, res.body).toBe(200);
+          expect(res.json()).toMatchObject({
+            filename: "photo.dng",
+            format: "dng",
+            width: expectedWidth,
+            height: expectedHeight,
+          });
+        } finally {
+          process.env.PATH = originalPath;
+          rmSync(shimDir, { recursive: true, force: true });
+        }
       },
     );
   });
