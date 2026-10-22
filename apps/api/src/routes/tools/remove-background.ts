@@ -31,6 +31,7 @@ import {
   BG_FORMAT_CONTENT_TYPES,
   type BgOutputFormat,
 } from "../../lib/bg-effects.js";
+import { recordCompletedToolJob } from "../../lib/completed-job.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
@@ -641,19 +642,13 @@ export function registerRemoveBackground(app: FastifyInstance) {
         const outputJobId = randomUUID();
         const outputFilename = `${baseName}_nobg.${fmt}`;
         const outputKey = `outputs/${outputJobId}/${outputFilename}`;
-        await putObject(outputKey, resultBuffer);
-        // The row gives the output an owner and lets the storage TTL sweep
-        // expire it on S3, which skips rowless prefixes.
-        await db.insert(schema.jobs).values({
-          id: outputJobId,
-          userId: getAuthUser(request)?.id ?? null,
+        await recordCompletedToolJob({
+          jobId: outputJobId,
+          userId: user?.id ?? null,
           toolId: "remove-background",
-          type: "single",
-          status: "completed",
-          inputRefs: [],
           outputRefs: [outputKey],
-          completedAt: new Date(),
         });
+        await putObject(outputKey, resultBuffer);
 
         // Auto-save the composited result (not the Phase 1 transparent
         // intermediate) to the library when the run referenced a library file.

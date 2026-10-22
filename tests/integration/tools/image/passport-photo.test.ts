@@ -547,6 +547,14 @@ describe("passport-photo/generate Phase 1 ownership", () => {
     expect(res.statusCode).toBe(404);
   });
 
+  it("lets a files:all holder work on another user's analysis", async () => {
+    const jobId = await seedAnalysis(owner.userId);
+
+    const res = await generateAs(adminToken, jobId);
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+  });
+
   it("serves the owner and stores the photo under a fresh job they own", async () => {
     const jobId = await seedAnalysis(owner.userId);
 

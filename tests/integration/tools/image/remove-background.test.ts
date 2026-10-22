@@ -959,7 +959,12 @@ describe("Remove Background effects route: Phase 1 ownership", () => {
     const { body, contentType } = effectsPayload([
       {
         name: "settings",
-        content: JSON.stringify({ jobId, filename: "test.png", backgroundType: "color" }),
+        content: JSON.stringify({
+          jobId,
+          filename: "test.png",
+          backgroundType: "color",
+          backgroundColor: "#ff0000",
+        }),
       },
     ]);
     return app.inject({
@@ -991,6 +996,14 @@ describe("Remove Background effects route: Phase 1 ownership", () => {
     const res = await effectsAs(intruder.token, jobId);
 
     expect(res.statusCode).toBe(404);
+  });
+
+  it("lets a files:all holder work on another user's job", async () => {
+    const jobId = await seedOwnedPhase1();
+
+    const res = await effectsAs(adminToken, jobId);
+
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
   });
 
   it("serves the owner and stores the result under a fresh job they own", async () => {

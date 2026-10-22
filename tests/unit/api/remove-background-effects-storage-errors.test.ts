@@ -132,6 +132,7 @@ describe("remove-background effects: reading the stored mask and original", () =
     isStorageServiceFault.mockReset();
     isStorageServiceFault.mockReturnValue(false);
     requestLogError.mockReset();
+    dbInsertValues.mockReset().mockResolvedValue(undefined);
   });
 
   afterEach(async () => {
@@ -313,6 +314,25 @@ describe("remove-background effects: reading the stored mask and original", () =
         outputRefs: [`outputs/${body.jobId}/cat_nobg.png`],
       }),
     );
+  });
+
+  it("answers 500 and writes nothing when the result's job row can't be recorded", async () => {
+    getObjectBuffer.mockImplementation(async (key: string) =>
+      key.endsWith("_mask.png")
+        ? sharp(await png(3))
+            .ensureAlpha()
+            .png()
+            .toBuffer()
+        : png(3),
+    );
+    dbInsertValues.mockRejectedValue(new Error('Failed query: insert into "jobs" params: secret'));
+    app = await buildApp();
+    const res = await app.inject(
+      effectsRequest({ ...settings, backgroundType: "color", backgroundColor: "#ff0000" }),
+    );
+    expect(res.statusCode).toBe(500);
+    expect(res.body).not.toMatch(/insert into|secret/);
+    expect(putObject).not.toHaveBeenCalled();
   });
 
   it("answers 400 Invalid background image when backgroundImage fails validateImageBuffer (#2827)", async () => {

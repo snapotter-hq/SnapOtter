@@ -21,6 +21,7 @@ import { z } from "zod";
 import { db, schema } from "../../db/index.js";
 import { INVALID_CLIENT_JOB_ID_ERROR, parseClientJobIdField } from "../../jobs/types.js";
 import { autoOrient } from "../../lib/auto-orient.js";
+import { recordCompletedToolJob } from "../../lib/completed-job.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { getFirstMissingBundleForTool } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
@@ -328,21 +329,17 @@ export function registerPassportPhoto(app: FastifyInstance) {
 
         const preview = previewBuffer.data.toString("base64");
 
-        // Save bg-removed image to object storage for generate phase and record
-        // job ownership so Phase 2 can verify the caller owns this analysis.
+        // Save bg-removed image to object storage for generate phase. The row
+        // records who ran the analysis, which generate checks before reading it.
         const bgRemovedFilename = `${filename.replace(/\.[^.]+$/, "")}_nobg.png`;
         const bgRemovedKey = `outputs/${jobId}/${bgRemovedFilename}`;
-        await putObject(bgRemovedKey, bgRemovedBuffer);
-        await db.insert(schema.jobs).values({
-          id: jobId,
+        await recordCompletedToolJob({
+          jobId,
           userId: getAuthUser(request)?.id ?? null,
           toolId: "passport-photo",
-          type: "single",
-          status: "completed",
-          inputRefs: [],
           outputRefs: [bgRemovedKey],
-          completedAt: new Date(),
         });
+        await putObject(bgRemovedKey, bgRemovedBuffer);
 
         if (clientJobId) {
           await updateSingleFileProgress({
@@ -636,12 +633,12 @@ export function registerPassportPhoto(app: FastifyInstance) {
           }
         }
 
-        // Save output under a fresh server-generated jobId so Phase 2 never
-        // writes into a client-selected prefix or exposes the Phase 1 jobId.
+        // Store under a fresh server-generated jobId so Phase 2 never writes
+        // into a client-selected prefix or exposes the Phase 1 jobId.
         const outputJobId = randomUUID();
-        const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_passport.jpg`;
-        const outputRefs = [`outputs/${outputJobId}/${outputFilename}`];
-        await putObject(outputRefs[0], cropped);
+        const stem = filename.replace(/\.[^.]+$/, "");
+        const outputFilename = `${stem}_passport.jpg`;
+        const outputs = [{ key: `outputs/${outputJobId}/${outputFilename}`, buffer: cropped }];
 
         const response: Record<string, unknown> = {
           jobId: outputJobId,
@@ -671,26 +668,21 @@ export function registerPassportPhoto(app: FastifyInstance) {
           );
 
           if (printBuffer) {
-            const printFilename = `${filename.replace(/\.[^.]+$/, "")}_passport_print_${printLayout}.jpg`;
-            const printKey = `outputs/${outputJobId}/${printFilename}`;
-            await putObject(printKey, printBuffer);
-            outputRefs.push(printKey);
+            const printFilename = `${stem}_passport_print_${printLayout}.jpg`;
+            outputs.push({ key: `outputs/${outputJobId}/${printFilename}`, buffer: printBuffer });
             response.printDownloadUrl = `/api/v1/download/${outputJobId}/${encodeURIComponent(printFilename)}`;
           }
         }
 
-        // The row gives the output an owner and lets the storage TTL sweep
-        // expire it on S3, which skips rowless prefixes.
-        await db.insert(schema.jobs).values({
-          id: outputJobId,
-          userId: getAuthUser(request)?.id ?? null,
+        await recordCompletedToolJob({
+          jobId: outputJobId,
+          userId: user?.id ?? null,
           toolId: "passport-photo",
-          type: "single",
-          status: "completed",
-          inputRefs: [],
-          outputRefs,
-          completedAt: new Date(),
+          outputRefs: outputs.map((o) => o.key),
         });
+        for (const { key, buffer } of outputs) {
+          await putObject(key, buffer);
+        }
 
         return reply.send(response);
       } catch (err) {
