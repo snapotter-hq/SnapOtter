@@ -9,7 +9,12 @@ import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
 import { INVALID_CLIENT_JOB_ID_ERROR, parseClientJobIdField } from "../../jobs/types.js";
 import { getSecurityHeaders } from "../../lib/csp.js";
-import { reportEngineUnavailable } from "../../lib/engine-unavailable.js";
+import {
+  allFailedFault,
+  type BatchFault,
+  preFailureFaultFields,
+  reportEngineUnavailable,
+} from "../../lib/engine-unavailable.js";
 import { resolveConcurrency } from "../../lib/env.js";
 import { formatZodErrors, friendlyError } from "../../lib/errors.js";
 import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
@@ -243,7 +248,8 @@ export function registerSvgToRasterRoute(
     const results: ({ buffer: Buffer; filename: string } | null)[] = new Array(files.length).fill(
       null,
     );
-    const errors: { filename: string; error: string }[] = [];
+    const errors: { filename: string; error: string; code?: string }[] = [];
+    const faults: BatchFault[] = [];
     let completedFiles = 0;
 
     updateJobProgress({
@@ -324,11 +330,29 @@ export function registerSvgToRasterRoute(
         try {
           const result = await convertSvg(sanitized, file.filename, settings);
           results[index] = { buffer: result.buffer, filename: result.filename };
-        } catch (err) {
-          errors.push({
-            filename: file.filename,
-            error: err instanceof Error ? err.message : "Conversion failed",
-          });
+        } catch (rawErr) {
+          const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+            const unavailable = engineUnavailable(err);
+            reportEngineUnavailable(unavailable, opts.toolId, request.log);
+            faults.push({
+              filename: file.filename,
+              error: unavailable.message,
+              ...preFailureFaultFields(unavailable),
+            });
+            errors.push({
+              filename: file.filename,
+              error: unavailable.message,
+              ...(unavailable.code && { code: unavailable.code }),
+            });
+          } else {
+            const error = err instanceof Error ? err.message : "Conversion failed";
+            faults.push({ filename: file.filename, error });
+            errors.push({
+              filename: file.filename,
+              error,
+            });
+          }
         }
         completedFiles++;
         updateJobProgress({
@@ -345,6 +369,7 @@ export function registerSvgToRasterRoute(
     await Promise.all(tasks);
 
     if (errors.length === files.length) {
+      const fault = allFailedFault([], 0, faults, files.length);
       // Awaited: this route owns the row, and until it is terminal it counts
       // against the user's concurrent-job limit (#1688, #2765). A failed write
       // still sends the result, but is logged; nothing else will settle the row
@@ -354,8 +379,18 @@ export function registerSvgToRasterRoute(
         totalFiles: files.length,
         completedFiles,
         failedFiles: errors.length,
-        errors,
-        message: "All files failed processing",
+        errors: fault
+          ? [
+              ...errors,
+              {
+                filename: "",
+                error: fault.details ? `${fault.error}: ${fault.details}` : fault.error,
+              },
+            ]
+          : errors,
+        message: fault?.error ?? "All files failed processing",
+        ...(fault && { code: fault.code }),
+        ...(fault?.details && { details: fault.details }),
       }).catch((settleErr) => {
         request.log.error({ err: settleErr, jobId }, "failed to settle a faulted SVG batch");
         return null;
@@ -366,7 +401,12 @@ export function registerSvgToRasterRoute(
           "faulted SVG batch progress row was missing or already terminal; no terminal frame announced",
         );
       }
-      return reply.status(422).send({ error: "All files failed processing", errors });
+      return reply.status(fault?.statusCode ?? 422).send({
+        error: fault?.error ?? "All files failed processing",
+        ...(fault && { code: fault.code }),
+        ...(fault?.details && { details: fault.details }),
+        errors,
+      });
     }
 
     // Deduplicate filenames and build X-File-Results header
@@ -654,8 +694,9 @@ export function registerSvgToRasterRoute(
         originalSize: fileBuffer.length,
         processedSize: buffer.length,
       });
-    } catch (err) {
-      if (hasServerErrorStatus(err)) throw err;
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
       return reply.status(422).send({
         error: "SVG conversion failed",
         details: err instanceof Error ? err.message : "Unknown error",

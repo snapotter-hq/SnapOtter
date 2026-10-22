@@ -52,6 +52,13 @@ vi.mock("../../../apps/api/src/permissions.js", async (importOriginal) => {
   return { ...actual, requireToolAccess: async () => ({ id: "user-1" }) };
 });
 
+import * as engineUnavailableMod from "../../../apps/api/src/lib/engine-unavailable.js";
+import {
+  DecoderOutOfMemoryError,
+  DecoderUnavailableError,
+} from "../../../apps/api/src/lib/format-decoders.js";
+import * as formatEncoders from "../../../apps/api/src/lib/format-encoders.js";
+import * as heicConverter from "../../../apps/api/src/lib/heic-converter.js";
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
 import { registerImageToPdf } from "../../../apps/api/src/routes/tools/image-to-pdf.js";
 import { registerPdfToImage } from "../../../apps/api/src/routes/tools/pdf-to-image.js";
@@ -697,5 +704,229 @@ describe("svg-to-raster batch route all-failed settlement (#2765)", () => {
     );
     expect(logLines.some((line) => line.includes("no terminal frame announced"))).toBe(false);
     await app.close();
+  });
+
+  it("reports ENGINE_UNAVAILABLE once and answers 503 when every file in an SVG batch hits the same encoder or OOM fault (#3620)", async () => {
+    const validSvg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16" fill="#2266aa"/></svg>',
+    );
+    const reportSpy = vi.spyOn(engineUnavailableMod, "reportEngineUnavailable");
+    const jxlSpy = vi
+      .spyOn(formatEncoders, "encodeJxl")
+      .mockRejectedValue(new DecoderUnavailableError("No cjxl found."));
+    const app = await buildApp(registerSvg);
+    try {
+      const res = await app.inject({
+        method: "POST",
+        url: `${apiToolPath("svg-to-raster")}/batch`,
+        ...multipartBody(
+          [
+            { name: "a.svg", type: "image/svg+xml", data: validSvg },
+            { name: "b.svg", type: "image/svg+xml", data: validSvg },
+          ],
+          { outputFormat: "jxl" },
+        ),
+      });
+
+      expect(res.statusCode).toBe(503);
+      expect(res.json()).toMatchObject({
+        error: "No cjxl found.",
+        code: "ENGINE_UNAVAILABLE",
+      });
+      expect(res.json().errors).toHaveLength(2);
+      expect(res.json().errors).toEqual(
+        expect.arrayContaining([
+          { filename: "a.svg", error: "No cjxl found.", code: "ENGINE_UNAVAILABLE" },
+          { filename: "b.svg", error: "No cjxl found.", code: "ENGINE_UNAVAILABLE" },
+        ]),
+      );
+      expect(reportSpy).toHaveBeenCalledTimes(2);
+      expect(
+        logLines.filter((line) =>
+          line.includes("Tool engine unavailable during input preparation"),
+        ),
+      ).toHaveLength(1);
+      expect(failBatchJob).toHaveBeenCalledWith({
+        jobId: expect.any(String),
+        totalFiles: 2,
+        completedFiles: 2,
+        failedFiles: 2,
+        errors: expect.arrayContaining([
+          { filename: "a.svg", error: "No cjxl found.", code: "ENGINE_UNAVAILABLE" },
+          { filename: "b.svg", error: "No cjxl found.", code: "ENGINE_UNAVAILABLE" },
+          { filename: "", error: "No cjxl found." },
+        ]),
+        message: "No cjxl found.",
+        code: "ENGINE_UNAVAILABLE",
+      });
+      const settledErrors = failBatchJob.mock.calls[0]?.[0]?.errors as Array<{
+        filename: string;
+        error: string;
+      }>;
+      expect(settledErrors).toHaveLength(3);
+      expect(settledErrors.at(-1)).toEqual({ filename: "", error: "No cjxl found." });
+    } finally {
+      jxlSpy.mockRestore();
+      reportSpy.mockRestore();
+      await app.close();
+    }
+  });
+
+  it("answers 503 on V8 buffer allocation OOM and raw filesystem write faults across an SVG batch, and keeps 422 on mixed failures (#3620)", async () => {
+    const validSvg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16" fill="#2266aa"/></svg>',
+    );
+    const app = await buildApp(registerSvg);
+    const pngSpy = vi
+      .spyOn(sharp.prototype, "png")
+      .mockImplementationOnce(function (this: sharp.Sharp) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Array buffer allocation failed");
+          },
+        } as unknown as sharp.Sharp;
+      })
+      .mockImplementationOnce(function (this: sharp.Sharp) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Array buffer allocation failed");
+          },
+        } as unknown as sharp.Sharp;
+      });
+    const enospc = () =>
+      Object.assign(new Error("ENOSPC: no space left on device"), {
+        code: "ENOSPC",
+        syscall: "open",
+      });
+    const heicSpy = vi
+      .spyOn(heicConverter, "encodeHeic")
+      .mockRejectedValueOnce(enospc())
+      .mockRejectedValueOnce(enospc())
+      .mockRejectedValueOnce(enospc())
+      .mockRejectedValueOnce(new DecoderOutOfMemoryError("heif-enc killed"))
+      .mockRejectedValueOnce(new Error("corrupt SVG"))
+      .mockRejectedValueOnce(new DecoderOutOfMemoryError("heif-enc killed"))
+      .mockRejectedValueOnce(new DecoderOutOfMemoryError("heif-enc killed"));
+    try {
+      const oomRes = await app.inject({
+        method: "POST",
+        url: `${apiToolPath("svg-to-raster")}/batch`,
+        ...multipartBody(
+          [
+            { name: "a.svg", type: "image/svg+xml", data: validSvg },
+            { name: "b.svg", type: "image/svg+xml", data: validSvg },
+          ],
+          { outputFormat: "png" },
+        ),
+      });
+      expect(oomRes.statusCode).toBe(503);
+      expect(oomRes.json()).toMatchObject({
+        code: "ENGINE_UNAVAILABLE",
+      });
+      expect(oomRes.json().errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ filename: "a.svg", code: "ENGINE_UNAVAILABLE" }),
+          expect.objectContaining({ filename: "b.svg", code: "ENGINE_UNAVAILABLE" }),
+        ]),
+      );
+
+      failBatchJob.mockClear();
+      const enospcRes = await app.inject({
+        method: "POST",
+        url: `${apiToolPath("svg-to-raster")}/batch`,
+        ...multipartBody(
+          [
+            { name: "a.svg", type: "image/svg+xml", data: validSvg },
+            { name: "b.svg", type: "image/svg+xml", data: validSvg },
+          ],
+          { outputFormat: "heif" },
+        ),
+      });
+      expect(enospcRes.statusCode).toBe(503);
+      expect(enospcRes.json()).toMatchObject({
+        code: "storage-full",
+      });
+      expect(enospcRes.json().errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ filename: "a.svg", code: "storage-full" }),
+          expect.objectContaining({ filename: "b.svg", code: "storage-full" }),
+        ]),
+      );
+      expect(failBatchJob).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: "storage-full",
+        }),
+      );
+
+      const mixedRes = await app.inject({
+        method: "POST",
+        url: `${apiToolPath("svg-to-raster")}/batch`,
+        ...multipartBody(
+          [
+            { name: "a.svg", type: "image/svg+xml", data: validSvg },
+            { name: "b.svg", type: "image/svg+xml", data: validSvg },
+          ],
+          { outputFormat: "heif" },
+        ),
+      });
+      expect(mixedRes.statusCode).toBe(422);
+      expect(mixedRes.json()).toMatchObject({
+        error: "All files failed processing",
+      });
+      expect(mixedRes.json().errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: "storage-full" }),
+          expect.objectContaining({ code: "ENGINE_UNAVAILABLE" }),
+        ]),
+      );
+
+      const mixedNon5xxRes = await app.inject({
+        method: "POST",
+        url: `${apiToolPath("svg-to-raster")}/batch`,
+        ...multipartBody(
+          [
+            { name: "a.svg", type: "image/svg+xml", data: validSvg },
+            { name: "b.svg", type: "image/svg+xml", data: validSvg },
+          ],
+          { outputFormat: "heif" },
+        ),
+      });
+      expect(mixedNon5xxRes.statusCode).toBe(422);
+      expect(mixedNon5xxRes.json()).toMatchObject({
+        error: "All files failed processing",
+      });
+      expect(mixedNon5xxRes.json().errors).toEqual(
+        expect.arrayContaining([
+          { filename: expect.any(String), error: "corrupt SVG" },
+          expect.objectContaining({ error: "heif-enc killed", code: "ENGINE_UNAVAILABLE" }),
+        ]),
+      );
+
+      const mixedPreFailRes = await app.inject({
+        method: "POST",
+        url: `${apiToolPath("svg-to-raster")}/batch`,
+        ...multipartBody(
+          [
+            { name: "bad.svg", type: "image/svg+xml", data: Buffer.from("not an svg") },
+            { name: "b.svg", type: "image/svg+xml", data: validSvg },
+          ],
+          { outputFormat: "heif" },
+        ),
+      });
+      expect(mixedPreFailRes.statusCode).toBe(422);
+      expect(mixedPreFailRes.json()).toMatchObject({
+        error: "All files failed processing",
+      });
+      expect(mixedPreFailRes.json().errors).toEqual(
+        expect.arrayContaining([
+          { filename: "bad.svg", error: "Not a valid SVG file" },
+          { filename: "b.svg", error: "heif-enc killed", code: "ENGINE_UNAVAILABLE" },
+        ]),
+      );
+    } finally {
+      pngSpy.mockRestore();
+      heicSpy.mockRestore();
+      await app.close();
+    }
   });
 });

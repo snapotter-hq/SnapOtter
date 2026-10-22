@@ -23,6 +23,7 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
   const actual =
     await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>();
   return {
+    ...actual,
     putObject: (...args: unknown[]) => putObject(...args),
     getObjectBuffer: (...args: unknown[]) => getObjectBuffer(...args),
     isMissingObjectError: (err: unknown) => isMissingObjectError(err),
@@ -38,6 +39,12 @@ vi.mock("../../../apps/api/src/lib/browser-service.js", () => ({
   capturePage: async () => Buffer.from("png"),
 }));
 
+import {
+  DecoderOutOfMemoryError,
+  DecoderUnavailableError,
+} from "../../../apps/api/src/lib/format-decoders.js";
+import * as formatEncoders from "../../../apps/api/src/lib/format-encoders.js";
+import * as heicConverter from "../../../apps/api/src/lib/heic-converter.js";
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
 import { registerCompare } from "../../../apps/api/src/routes/tools/compare.js";
 import { registerHtmlToImage } from "../../../apps/api/src/routes/tools/html-to-image.js";
@@ -58,7 +65,10 @@ async function buildApp(register: (app: ReturnType<typeof Fastify>) => void) {
   return app;
 }
 
-function multipartBody(files: { name: string; type: string; data: Buffer }[]) {
+function multipartBody(
+  files: { name: string; type: string; data: Buffer }[],
+  settings?: Record<string, unknown>,
+) {
   const boundary = "----unit";
   const chunks: Buffer[] = [];
   for (const f of files) {
@@ -68,6 +78,13 @@ function multipartBody(files: { name: string; type: string; data: Buffer }[]) {
       ),
       f.data,
       Buffer.from("\r\n"),
+    );
+  }
+  if (settings) {
+    chunks.push(
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="settings"\r\n\r\n${JSON.stringify(settings)}\r\n`,
+      ),
     );
   }
   chunks.push(Buffer.from(`--${boundary}--\r\n`));
@@ -134,6 +151,99 @@ describe("svg-to-raster", () => {
     expect(res.statusCode).toBe(422);
     expect(res.json().error).toBe("SVG conversion failed");
     await app.close();
+  });
+
+  it("surfaces a 503 ENGINE_UNAVAILABLE when Sharp conversion hits a V8 buffer allocation RangeError (#3620)", async () => {
+    const pngSpy = vi.spyOn(sharp.prototype, "png").mockImplementationOnce(function (
+      this: sharp.Sharp,
+    ) {
+      return {
+        toBuffer: async () => {
+          throw new RangeError("Array buffer allocation failed");
+        },
+      } as unknown as sharp.Sharp;
+    });
+    const app = await buildApp(registerSvgToRaster);
+    try {
+      const res = await send(app);
+      expect(res.statusCode).toBe(503);
+      expect(res.json()).toMatchObject({
+        code: "ENGINE_UNAVAILABLE",
+      });
+    } finally {
+      pngSpy.mockRestore();
+      await app.close();
+    }
+  });
+
+  it.each([
+    ["ENOSPC", "storage-full"],
+    ["EACCES", "storage-not-writable"],
+    ["EROFS", "storage-not-writable"],
+  ] as const)(
+    "normalizes a raw %s write fault from putObject to 503 %s (#3620)",
+    async (errno, expectedCode) => {
+      putObject.mockRejectedValueOnce(
+        Object.assign(new Error(`${errno}: write failed`), { code: errno, syscall: "open" }),
+      );
+      const app = await buildApp(registerSvgToRaster);
+      try {
+        const res = await send(app);
+        expect(res.statusCode).toBe(503);
+        expect(res.json()).toMatchObject({ code: expectedCode });
+      } finally {
+        await app.close();
+      }
+    },
+  );
+
+  it("surfaces 503 ENGINE_UNAVAILABLE when encodeJxl or encodeHeic rejects with a raw SIGKILL or decoder fault (#3620)", async () => {
+    const oomMessage =
+      "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+    const app = await buildApp(registerSvgToRaster);
+    const jxlSpy = vi
+      .spyOn(formatEncoders, "encodeJxl")
+      .mockRejectedValueOnce(Object.assign(new Error("cjxl exited SIGKILL"), { signal: "SIGKILL" }))
+      .mockRejectedValueOnce(new DecoderUnavailableError("No cjxl found."));
+    const heicSpy = vi
+      .spyOn(heicConverter, "encodeHeic")
+      .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"))
+      .mockRejectedValueOnce(new DecoderOutOfMemoryError("heif-enc killed"));
+    try {
+      for (const expectedError of [oomMessage, "No cjxl found."]) {
+        const jxlRes = await app.inject({
+          method: "POST",
+          url: apiToolPath("svg-to-raster"),
+          ...multipartBody([{ name: "a.svg", type: "image/svg+xml", data: SVG }], {
+            outputFormat: "jxl",
+          }),
+        });
+        expect(jxlRes.statusCode).toBe(503);
+        expect(jxlRes.json()).toMatchObject({
+          error: expectedError,
+          code: "ENGINE_UNAVAILABLE",
+        });
+      }
+
+      for (const expectedError of [oomMessage, "heif-enc killed"]) {
+        const heifRes = await app.inject({
+          method: "POST",
+          url: apiToolPath("svg-to-raster"),
+          ...multipartBody([{ name: "a.svg", type: "image/svg+xml", data: SVG }], {
+            outputFormat: "heif",
+          }),
+        });
+        expect(heifRes.statusCode).toBe(503);
+        expect(heifRes.json()).toMatchObject({
+          error: expectedError,
+          code: "ENGINE_UNAVAILABLE",
+        });
+      }
+    } finally {
+      jxlSpy.mockRestore();
+      heicSpy.mockRestore();
+      await app.close();
+    }
   });
 });
 

@@ -1144,6 +1144,79 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
       }
     });
 
+    it("svg-to-raster single-file and batch conversion surface 503 ENGINE_UNAVAILABLE on V8 buffer allocation OOM and encoder faults (#3620)", async () => {
+      const sharpMod = (await import("sharp")).default;
+      const formatEncoders = await import("../../../apps/api/src/lib/format-encoders.js");
+      const expiredNow = Date.now() + 25 * 60_000;
+      const nowSpy = vi.spyOn(Date, "now").mockReturnValue(expiredNow);
+      const pngSpy = vi.spyOn(sharpMod.prototype, "png").mockImplementationOnce(function (
+        this: InstanceType<typeof sharpMod>,
+      ) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Array buffer allocation failed");
+          },
+        } as unknown as InstanceType<typeof sharpMod>;
+      });
+      const encJxlSpy = vi
+        .spyOn(formatEncoders, "encodeJxl")
+        .mockRejectedValue(new DecoderUnavailableError("No cjxl found."));
+
+      try {
+        const singleRes = await post("/api/v1/tools/image/svg-to-raster", [
+          { name: "file", filename: "icon.svg", contentType: "image/svg+xml", content: SVG },
+          { name: "settings", content: JSON.stringify({ outputFormat: "png" }) },
+        ]);
+        expect(singleRes.statusCode, singleRes.body).toBe(503);
+        expect(singleRes.json()).toMatchObject({
+          code: "ENGINE_UNAVAILABLE",
+        });
+
+        const clientJobId = randomUUID();
+        const batchRes = await post("/api/v1/tools/image/svg-to-raster/batch", [
+          { name: "file", filename: "a.svg", contentType: "image/svg+xml", content: SVG },
+          { name: "file", filename: "b.svg", contentType: "image/svg+xml", content: SVG },
+          { name: "settings", content: JSON.stringify({ outputFormat: "jxl" }) },
+          { name: "clientJobId", content: clientJobId },
+        ]);
+        expect(batchRes.statusCode, batchRes.body).toBe(503);
+        expect(batchRes.json()).toMatchObject({
+          error: "No cjxl found.",
+          code: "ENGINE_UNAVAILABLE",
+        });
+        expect(batchRes.json().errors).toEqual(
+          expect.arrayContaining([
+            { filename: "a.svg", error: "No cjxl found.", code: "ENGINE_UNAVAILABLE" },
+            { filename: "b.svg", error: "No cjxl found.", code: "ENGINE_UNAVAILABLE" },
+          ]),
+        );
+        expect(helperSawEngineDown("svg-to-raster")).toBe(true);
+        expect(engineReports("svg-to-raster")).toHaveLength(1);
+
+        const row = await parentRow(clientJobId);
+        expect(row?.status).toBe("failed");
+        expect(row?.error).toMatchObject({
+          message: "No cjxl found.",
+          code: "ENGINE_UNAVAILABLE",
+        });
+        expect(
+          buildBatchReplayEvent({
+            jobId: clientJobId,
+            status: row.status,
+            progress: row.progress,
+            error: row.error,
+          }),
+        ).toMatchObject({
+          status: "failed",
+          code: "ENGINE_UNAVAILABLE",
+        });
+      } finally {
+        encJxlSpy.mockRestore();
+        pngSpy.mockRestore();
+        nowSpy.mockRestore();
+      }
+    });
+
     it("worker process functions propagate a CLI decoder fault even on a DNG Sharp can read, and do not retry ENGINE_UNAVAILABLE", async () => {
       for (const toolId of ["blur-faces", "meme-generator", "red-eye-removal", "beautify"]) {
         const config = getToolConfig(toolId);
