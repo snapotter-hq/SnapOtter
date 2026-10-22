@@ -286,6 +286,9 @@ export function EditMetadataSettings() {
       setInspecting(true);
       setInspectError(null);
       setInspectData(null);
+      setForm(EMPTY_FORM);
+      setInitialForm(EMPTY_FORM);
+      setFieldsToRemove(new Set());
       try {
         const formData = new FormData();
         formData.append("file", currentFile);
@@ -325,6 +328,7 @@ export function EditMetadataSettings() {
         );
         setForm(EMPTY_FORM);
         setInitialForm(EMPTY_FORM);
+        setFieldsToRemove(new Set());
       } finally {
         if (!controller.signal.aborted) {
           setInspecting(false);

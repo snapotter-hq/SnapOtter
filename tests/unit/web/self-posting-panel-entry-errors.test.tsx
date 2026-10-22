@@ -54,7 +54,10 @@ class FakeXhr {
 
   open() {}
   setRequestHeader() {}
-  send() {}
+  sentBody: unknown = null;
+  send(body?: unknown) {
+    this.sentBody = body;
+  }
   abort() {}
 
   respond(status: number, body: unknown) {
@@ -68,6 +71,16 @@ class FakeXhr {
 
 function image(name: string, bytes = "png"): File {
   return new File([bytes], name, { type: "image/png" });
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
 }
 
 function chooseSecondaryFile(container: HTMLElement, file: File) {
@@ -1288,16 +1301,6 @@ describe("self-posting tool panels: failed entry status and scoped error banners
   });
 
   it("ignores aborted inspect completions and does not re-trigger inspect effects on cache updates in StripMetadataSettings and EditMetadataSettings (#3507)", async () => {
-    function deferred<T>() {
-      let resolve!: (value: T) => void;
-      let reject!: (reason?: unknown) => void;
-      const promise = new Promise<T>((res, rej) => {
-        resolve = res;
-        reject = rej;
-      });
-      return { promise, resolve, reject };
-    }
-
     // 1. StripMetadataSettings: switching files while an inspect request is in flight does not clear inspecting, overwrite metadata/error, or re-run the effect when the aborted request resolves.
     {
       useFileStore.getState().reset();
@@ -1696,5 +1699,123 @@ describe("self-posting tool panels: failed entry status and scoped error banners
 
       unmount();
     }
+  });
+
+  it("resets form, initialForm, and fieldsToRemove when starting an uncached inspect or catching an inspect failure in EditMetadataSettings (#3677)", async () => {
+    useFileStore.getState().reset();
+    useFileStore.getState().setFiles([image("a.png"), image("b.png")]);
+
+    const pending: Array<{
+      signal: AbortSignal | null | undefined;
+      res: ReturnType<typeof deferred<Response>>;
+    }> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+        const res = deferred<Response>();
+        pending.push({ signal: init?.signal, res });
+        return res.promise;
+      }),
+    );
+
+    const { unmount } = render(<EditMetadataSettings />);
+    expect(pending).toHaveLength(1);
+
+    // 1. Resolve a.png with EXIF metadata and mark "Make" for removal.
+    await act(async () => {
+      pending[0].res.resolve(
+        new Response(
+          JSON.stringify({
+            filename: "a.png",
+            fileSize: 100,
+            exif: { Artist: "Ada", Make: "Canon" },
+            iptc: null,
+            xmp: null,
+            gps: null,
+            keywords: ["portrait"],
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+
+    expect(screen.getByLabelText(en.toolSettings["edit-metadata"].artist)).toHaveValue("Ada");
+
+    // Open All Metadata -> EXIF and mark "Make" for removal.
+    fireEvent.click(
+      screen.getByRole("button", { name: en.toolSettings["edit-metadata"].allMetadata }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^EXIF\d/ }));
+    fireEvent.click(
+      screen.getByTitle(en.commonUi.metadataGrid.removeField.replace("{field}", "Camera Make")),
+    );
+    expect(screen.getByText(/1 removed/i)).toBeInTheDocument();
+
+    // 2. Switch to uncached b.png while its inspect request is pending.
+    act(() => {
+      useFileStore.getState().setSelectedIndex(1);
+    });
+    expect(pending).toHaveLength(2);
+    expect(screen.getByText(en.toolSettings["edit-metadata"].readingMetadata)).toBeInTheDocument();
+
+    // Form inputs and fieldsToRemove summary must reset immediately when the uncached inspect starts.
+    expect(screen.getByLabelText(en.toolSettings["edit-metadata"].artist)).toHaveValue("");
+    expect(screen.queryByText(/removed/i)).not.toBeInTheDocument();
+
+    // Typing "Ada" (which happened to be a.png's initialForm.artist) and submitting while b.png's inspect is in flight
+    // must diff against EMPTY_FORM (sending artist: "Ada") and must not send a.png's fieldsToRemove.
+    fireEvent.change(screen.getByLabelText(en.toolSettings["edit-metadata"].artist), {
+      target: { value: "Ada" },
+    });
+    fireEvent.click(screen.getByTestId("edit-metadata-submit"));
+    expect(FakeXhr.instances).toHaveLength(1);
+    const inFlightFormData = FakeXhr.instances[0].sentBody as FormData;
+    expect(JSON.parse(String(inFlightFormData.get("settings")))).toEqual({
+      artist: "Ada",
+    });
+    act(() => {
+      FakeXhr.instances[0].onerror?.();
+    });
+
+    // 3. Switch back to cached a.png, re-mark "Make" for removal, then switch to b.png and let b.png's inspect fail.
+    act(() => {
+      useFileStore.getState().setSelectedIndex(0);
+    });
+    expect(screen.getByLabelText(en.toolSettings["edit-metadata"].artist)).toHaveValue("Ada");
+    fireEvent.click(
+      screen.getByRole("button", { name: en.toolSettings["edit-metadata"].allMetadata }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^EXIF\d/ }));
+    fireEvent.click(
+      screen.getByTitle(en.commonUi.metadataGrid.removeField.replace("{field}", "Camera Make")),
+    );
+    expect(screen.getByText(/1 removed/i)).toBeInTheDocument();
+
+    act(() => {
+      useFileStore.getState().setSelectedIndex(1);
+    });
+    expect(pending).toHaveLength(3);
+    expect(screen.queryByText(/removed/i)).not.toBeInTheDocument();
+
+    // Edit a field while b.png's inspect is in flight, then let b.png's inspect fail and confirm catch resets the form and keeps fieldsToRemove empty.
+    fireEvent.change(screen.getByLabelText(en.toolSettings["edit-metadata"].artist), {
+      target: { value: "InFlightEdit" },
+    });
+    expect(screen.getByLabelText(en.toolSettings["edit-metadata"].artist)).toHaveValue(
+      "InFlightEdit",
+    );
+
+    await act(async () => {
+      pending[2].res.resolve(
+        new Response(JSON.stringify({ error: "Inspect failed" }), { status: 500 }),
+      );
+    });
+    expect(
+      screen.getByText(en.toolSettings["edit-metadata"].couldNotReadMetadata),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(en.toolSettings["edit-metadata"].artist)).toHaveValue("");
+    expect(screen.queryByText(/removed/i)).not.toBeInTheDocument();
+
+    unmount();
   });
 });
