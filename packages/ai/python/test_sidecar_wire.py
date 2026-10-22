@@ -87,8 +87,10 @@ for script_file in AI_ENTRYPOINT_SCRIPTS:
 
 import gif_remove_bg  # noqa: E402
 import remove_bg  # noqa: E402
+import restore  # noqa: E402
 assert remove_bg._OOM_MARKERS == gif_remove_bg._OOM_MARKERS
-for oom_mod in (gif_remove_bg, remove_bg):
+assert restore._OOM_MARKERS == gif_remove_bg._OOM_MARKERS
+for oom_mod in (gif_remove_bg, remove_bg, restore):
     assert oom_mod._is_oom(MemoryError()) is True, (
         f"{oom_mod.__name__}._is_oom must recognize bare MemoryError()"
     )

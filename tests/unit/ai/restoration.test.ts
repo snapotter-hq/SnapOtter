@@ -988,26 +988,35 @@ events_not_avail = parse_stderr_events(err_buf.getvalue())
 assert {"warning": "[restore] Colorization skipped: Colorization model not available"} in events_not_avail, events_not_avail
 assert {"progress": 92, "stage": "Colorization model not available"} in events_not_avail, events_not_avail
 
-# 8. MemoryError from enhance_faces or colorize_bw propagates to the outer handler instead of being swallowed
+# 8. MemoryError, RuntimeError OOMs, and OSError OOMs from enhance_faces or colorize_bw propagate to the outer handler instead of being swallowed (#3078, #3391)
 for step_kind in ("faces", "colorize"):
-    if step_kind == "faces":
-        mod.enhance_faces = lambda _img, _fidelity=0.7: (_ for _ in ()).throw(MemoryError("ONNX arena OOM"))
-        mod.colorize_bw = ok_colorize_bw
-    else:
-        mod.enhance_faces = lambda img, _fidelity=0.7: (img, 0)
-        mod.colorize_bw = lambda _img, intensity=0.85: (_ for _ in ()).throw(MemoryError())
-    out_buf, err_buf = io.StringIO(), io.StringIO()
-    try:
-        with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
-            mod.main()
-    except SystemExit as exc:
-        assert exc.code == 1, exc.code
-        payload_oom = json.loads(out_buf.getvalue().strip())
-        assert payload_oom["success"] is False, payload_oom
-        expected_err = "ONNX arena OOM" if step_kind == "faces" else "MemoryError"
-        assert payload_oom["error"] == expected_err, payload_oom
-    else:
-        raise AssertionError(f"Expected SystemExit(1) for MemoryError in {step_kind}")
+    for oom_exc, expected_err in (
+        (MemoryError("ONNX arena OOM") if step_kind == "faces" else MemoryError(), "ONNX arena OOM" if step_kind == "faces" else "MemoryError"),
+        (RuntimeError("CUDA out of memory"), "CUDA out of memory"),
+        (RuntimeError("Failed to allocate memory for requested buffer"), "Failed to allocate memory for requested buffer"),
+        (RuntimeError("[enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes."), "[enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes."),
+        (RuntimeError("Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 3)"), "Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 3)"),
+        (OSError(12, "Cannot allocate memory"), "[Errno 12] Cannot allocate memory"),
+    ):
+        if step_kind == "faces":
+            mod.enhance_faces = lambda _img, _fidelity=0.7, _e=oom_exc: (_ for _ in ()).throw(_e)
+            mod.colorize_bw = ok_colorize_bw
+        else:
+            mod.enhance_faces = lambda img, _fidelity=0.7: (img, 0)
+            mod.colorize_bw = lambda _img, intensity=0.85, _e=oom_exc: (_ for _ in ()).throw(_e)
+        out_buf, err_buf = io.StringIO(), io.StringIO()
+        try:
+            with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+                mod.main()
+        except SystemExit as exc:
+            assert exc.code == 1, exc.code
+            payload_oom = json.loads(out_buf.getvalue().strip())
+            assert payload_oom["success"] is False, payload_oom
+            assert payload_oom["error"] == expected_err, payload_oom
+            events_oom = parse_stderr_events(err_buf.getvalue())
+            assert not any("skipped" in e.get("warning", "").lower() for e in events_oom), events_oom
+        else:
+            raise AssertionError(f"Expected SystemExit(1) for {oom_exc!r} in {step_kind}")
 
 print("RESTORE_3078_OK")
 `);
@@ -1216,24 +1225,34 @@ assert session_calls == [], session_calls
 assert {"progress": 65, "stage": "No faces detected"} in events_small_only, events_small_only
 assert not any("warning" in e for e in events_small_only), events_small_only
 
-# 4. Per-face MemoryError re-raises immediately without attempting second face
+# 4. Per-face MemoryError, RuntimeError OOMs, and OSError OOMs re-raise immediately without attempting second face (#3086, #3391)
 active_boxes[:] = [
     {"xmin": 0.0, "ymin": 0.0, "w": 0.5, "h": 0.5},
     {"xmin": 0.4, "ymin": 0.4, "w": 0.5, "h": 0.5},
 ]
-session_calls.clear()
-session_behaviors[:] = [MemoryError("CodeFormer arena OOM"), "ok"]
-out_buf, err_buf = io.StringIO(), io.StringIO()
-try:
-    with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
-        mod.main()
-except SystemExit as exc:
-    assert exc.code == 1, exc.code
-    assert len(session_calls) == 1, session_calls
-    payload_oom = json.loads(out_buf.getvalue().strip())
-    assert payload_oom == {"success": False, "error": "CodeFormer arena OOM"}, payload_oom
-else:
-    raise AssertionError("Expected SystemExit(1) for per-face MemoryError")
+for oom_exc, expected_err in (
+    (MemoryError("CodeFormer arena OOM"), "CodeFormer arena OOM"),
+    (RuntimeError("CUDA out of memory"), "CUDA out of memory"),
+    (RuntimeError("Failed to allocate memory for requested buffer"), "Failed to allocate memory for requested buffer"),
+    (RuntimeError("DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes."), "DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes."),
+    (RuntimeError("Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 3)"), "Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 3)"),
+    (OSError(12, "Cannot allocate memory"), "[Errno 12] Cannot allocate memory"),
+):
+    session_calls.clear()
+    session_behaviors[:] = [oom_exc, "ok"]
+    out_buf, err_buf = io.StringIO(), io.StringIO()
+    try:
+        with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+            mod.main()
+    except SystemExit as exc:
+        assert exc.code == 1, exc.code
+        assert len(session_calls) == 1, session_calls
+        payload_oom = json.loads(out_buf.getvalue().strip())
+        assert payload_oom == {"success": False, "error": expected_err}, payload_oom
+        events_oom = parse_stderr_events(err_buf.getvalue())
+        assert not any("warning" in e for e in events_oom), events_oom
+    else:
+        raise AssertionError(f"Expected SystemExit(1) for per-face {oom_exc!r}")
 
 # 5. mp.tasks.vision.FaceDetector fallback (AttributeError on mp.solutions) + longest > 1920 downscale
 mod._ensure_face_detect_model = lambda: "/tmp/fake-blaze-face.tflite"
