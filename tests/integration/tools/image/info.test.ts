@@ -9,7 +9,7 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { fixtures, readFixture } from "../../../fixtures/index.js";
 import {
   buildTestApp,
@@ -1307,6 +1307,74 @@ describe("Info", () => {
     } finally {
       process.env.PATH = originalPath;
       rmSync(shimDir, { recursive: true, force: true });
+    }
+  });
+
+  it("answers 503 ENGINE_UNAVAILABLE with DecoderOutOfMemoryError message when Sharp stats or the DNG fallback probe hits V8 buffer allocation OOM (#3633)", async () => {
+    const sharpMod = (await import("sharp")).default;
+    const DNG = readFixture(fixtures.image.formats("dng"));
+    const oomMessage =
+      "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+
+    const statsSpy = vi
+      .spyOn(sharpMod.prototype, "stats")
+      .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"));
+    try {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+      ]);
+      const statsRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/info",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      });
+      expect(statsRes.statusCode, statsRes.body).toBe(503);
+      expect(JSON.parse(statsRes.body)).toMatchObject({
+        code: "ENGINE_UNAVAILABLE",
+        message: oomMessage,
+      });
+    } finally {
+      statsSpy.mockRestore();
+    }
+
+    const originalPath = process.env.PATH;
+    const emptyBinDir = mkdtempSync(join(tmpdir(), "info-no-decoders-"));
+    const rawSpy = vi.spyOn(sharpMod.prototype, "raw").mockImplementationOnce(function (
+      this: InstanceType<typeof sharpMod>,
+    ) {
+      return {
+        toBuffer: async () => {
+          throw new RangeError("Array buffer allocation failed");
+        },
+      } as unknown as InstanceType<typeof sharpMod>;
+    });
+    try {
+      process.env.PATH = emptyBinDir;
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "sample.dng", contentType: "image/x-adobe-dng", content: DNG },
+      ]);
+      const dngRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/info",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      });
+      expect(dngRes.statusCode, dngRes.body).toBe(503);
+      expect(JSON.parse(dngRes.body)).toMatchObject({
+        code: "ENGINE_UNAVAILABLE",
+        message: oomMessage,
+      });
+    } finally {
+      process.env.PATH = originalPath;
+      rawSpy.mockRestore();
+      rmSync(emptyBinDir, { recursive: true, force: true });
     }
   });
 });

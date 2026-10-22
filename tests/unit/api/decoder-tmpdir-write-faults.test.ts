@@ -1065,6 +1065,154 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
         rmSync(shimDir, { recursive: true, force: true });
       }
     });
+
+    it("surfaces 503 DecoderOutOfMemoryError when Sharp stats/metadata, the DNG fallback probe, or CLI/HEIC decode hits V8 buffer allocation OOM or SIGKILL (#3633)", async () => {
+      const sharpMod = (await import("sharp")).default;
+      const oomMessage =
+        "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+
+      // 1. sharp(metaBuffer).stats() rejects with V8 RangeError("Array buffer allocation failed") vs non-OOM RangeError
+      const statsSpy = vi
+        .spyOn(sharpMod.prototype, "stats")
+        .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"))
+        .mockRejectedValueOnce(new RangeError("Invalid stats parameter"));
+      try {
+        const statsOomRes = await app.inject({
+          method: "POST",
+          url: apiToolPath("info"),
+          ...multipartBody([{ filename: "photo.png", contentType: "image/png", content: PNG }]),
+        });
+        expect(statsOomRes.statusCode, statsOomRes.body).toBe(503);
+        expect(statsOomRes.json()).toEqual({
+          error: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+        });
+
+        const statsNonOomRes = await app.inject({
+          method: "POST",
+          url: apiToolPath("info"),
+          ...multipartBody([{ filename: "photo.png", contentType: "image/png", content: PNG }]),
+        });
+        expect(statsNonOomRes.statusCode, statsNonOomRes.body).toBe(422);
+        expect(statsNonOomRes.json()).toMatchObject({
+          error: "Failed to read image metadata",
+        });
+      } finally {
+        statsSpy.mockRestore();
+      }
+
+      // 2. sharp.prototype.metadata rejecting with V8 RangeError on call 1+ (validateImageBuffer + direct probe), call 2 (direct probe), or call 3 (final metadata read)
+      for (const failOnCall of [1, 2, 3] as const) {
+        const origMetadata = sharpMod.prototype.metadata;
+        let callCount = 0;
+        const metaSpy = vi.spyOn(sharpMod.prototype, "metadata").mockImplementation(function (
+          this: InstanceType<typeof sharpMod>,
+        ) {
+          callCount += 1;
+          if (failOnCall === 1 || callCount === failOnCall) {
+            return Promise.reject(new RangeError("Array buffer allocation failed"));
+          }
+          return origMetadata.call(this);
+        });
+        decodeHeic.mockClear();
+        decodeHeic.mockRejectedValueOnce(new DecoderUnavailableError("No HEIF decoder found."));
+        try {
+          const metaOomRes = await app.inject({
+            method: "POST",
+            url: apiToolPath("info"),
+            ...multipartBody([{ filename: "photo.png", contentType: "image/png", content: PNG }]),
+          });
+          expect(metaOomRes.statusCode, metaOomRes.body).toBe(503);
+          expect(metaOomRes.json()).toEqual({
+            error: oomMessage,
+            code: "ENGINE_UNAVAILABLE",
+          });
+          expect(decodeHeic).not.toHaveBeenCalled();
+        } finally {
+          metaSpy.mockRestore();
+          decodeHeic.mockReset().mockResolvedValue(PNG);
+        }
+      }
+
+      // 3. DNG Sharp fallback probe rejecting with V8 RangeError surfaces DecoderOutOfMemoryError over DecoderUnavailableError or a plain decode Error
+      for (const initialDecodeErr of [
+        new DecoderUnavailableError("No dcraw_emu found."),
+        new Error("corrupt dng"),
+      ]) {
+        decodeToSharpCompat.mockRejectedValueOnce(initialDecodeErr);
+        const rawSpy = vi.spyOn(sharpMod.prototype, "raw").mockImplementationOnce(function (
+          this: InstanceType<typeof sharpMod>,
+        ) {
+          return {
+            toBuffer: async () => {
+              throw new RangeError("Array buffer allocation failed");
+            },
+          } as unknown as InstanceType<typeof sharpMod>;
+        });
+        try {
+          const dngProbeRes = await app.inject({
+            method: "POST",
+            url: apiToolPath("info"),
+            ...multipartBody([
+              { filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG },
+            ]),
+          });
+          expect(dngProbeRes.statusCode, dngProbeRes.body).toBe(503);
+          expect(dngProbeRes.json()).toEqual({
+            error: oomMessage,
+            code: "ENGINE_UNAVAILABLE",
+          });
+        } finally {
+          rawSpy.mockRestore();
+        }
+      }
+
+      // 4. Raw SIGKILL and V8 RangeError at decodeToSharpCompat, decodeHeic, and speculative decodeHeic fallback
+      for (const makeRawOom of [
+        () => Object.assign(new Error("decoder exited SIGKILL"), { signal: "SIGKILL" }),
+        () => new RangeError("Array buffer allocation failed"),
+      ]) {
+        decodeToSharpCompat.mockRejectedValueOnce(makeRawOom());
+        const dngRawOomRes = await app.inject({
+          method: "POST",
+          url: apiToolPath("info"),
+          ...multipartBody([
+            { filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG },
+          ]),
+        });
+        expect(dngRawOomRes.statusCode, dngRawOomRes.body).toBe(503);
+        expect(dngRawOomRes.json()).toEqual({
+          error: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+        });
+
+        decodeHeic.mockRejectedValueOnce(makeRawOom());
+        const heicRawOomRes = await app.inject({
+          method: "POST",
+          url: apiToolPath("info"),
+          ...multipartBody([{ filename: "photo.heic", contentType: "image/heic", content: HEIC }]),
+        });
+        expect(heicRawOomRes.statusCode, heicRawOomRes.body).toBe(503);
+        expect(heicRawOomRes.json()).toEqual({
+          error: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+        });
+
+        decodeHeic.mockRejectedValueOnce(makeRawOom());
+        const fallbackHeicOomRes = await app.inject({
+          method: "POST",
+          url: apiToolPath("info"),
+          ...multipartBody([
+            { filename: "mystery.jpg", contentType: "image/jpeg", content: UNREADABLE },
+          ]),
+        });
+        expect(fallbackHeicOomRes.statusCode, fallbackHeicOomRes.body).toBe(503);
+        expect(fallbackHeicOomRes.json()).toEqual({
+          error: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+        });
+      }
+    });
   });
 
   describe("edit-metadata and edit-metadata/inspect exiftool tmpdir faults (#3548, #3630)", () => {

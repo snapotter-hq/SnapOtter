@@ -97,7 +97,7 @@ export function registerInfo(app: FastifyInstance) {
         try {
           metaBuffer = await decodeToSharpCompat(fileBuffer, detectedFormat, ext);
         } catch (rawDecodeErr) {
-          const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+          const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
           if (
             decodeErr instanceof DecoderOutOfMemoryError ||
             (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
@@ -107,16 +107,24 @@ export function registerInfo(app: FastifyInstance) {
           try {
             await sharp(fileBuffer).metadata();
             await sharp(fileBuffer).resize(1).raw().toBuffer();
-          } catch (err) {
+          } catch (rawProbeErr) {
+            const probeErr = asDecoderOutOfMemory(rawProbeErr);
+            if (probeErr instanceof DecoderOutOfMemoryError) {
+              throw probeErr;
+            }
             if (isDecoderUnavailable(decodeErr)) throw decodeErr;
-            throw err;
+            throw rawProbeErr;
           }
         }
       } else {
         let sharpDirectFailed = false;
         try {
           await sharp(fileBuffer).metadata();
-        } catch {
+        } catch (rawSharpErr) {
+          const sharpErr = asDecoderOutOfMemory(rawSharpErr);
+          if (sharpErr instanceof DecoderOutOfMemoryError) {
+            throw sharpErr;
+          }
           sharpDirectFailed = true;
         }
         if (sharpDirectFailed) {
@@ -126,7 +134,7 @@ export function registerInfo(app: FastifyInstance) {
           // does: it was decoding the file, so that stays the server's 503
           // (#1628, #3451).
           metaBuffer = await decodeHeic(fileBuffer).catch((rawErr: unknown) => {
-            const err = normalizeOperationalWriteError(rawErr);
+            const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
             if (!isDecoderUnavailable(err) || err instanceof DecoderOutOfMemoryError) throw err;
             throw new Error("Unrecognized image format", { cause: err });
           });
@@ -170,7 +178,7 @@ export function registerInfo(app: FastifyInstance) {
         histogram,
       });
     } catch (rawErr) {
-      const err = normalizeOperationalWriteError(rawErr);
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
       return reply.status(422).send({
         error: "Failed to read image metadata",
