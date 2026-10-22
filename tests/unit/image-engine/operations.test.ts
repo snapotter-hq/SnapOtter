@@ -1432,8 +1432,8 @@ describe("invert", () => {
       }),
     );
     const gaRaw = await gaResult.raw().toBuffer({ resolveWithObject: true });
-    expect(gaRaw.info.channels).toBe(2);
-    expect([...gaRaw.data]).toEqual([155, 200]);
+    expect(gaRaw.info.channels).toBe(4);
+    expect([...gaRaw.data]).toEqual([155, 155, 155, 200]);
   });
 });
 
