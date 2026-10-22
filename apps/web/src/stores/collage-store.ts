@@ -189,10 +189,14 @@ export const useCollageStore = create<CollageState>((set, get) => ({
     for (const img of newImages) {
       if (img.previewLoading) {
         const imgId = img.id;
-        fetchDecodedPreview(img.file).then((result) => {
+        const file = img.file;
+        fetchDecodedPreview(file).then((result) => {
           const current = get();
-          const idx = current.images.findIndex((i) => i.id === imgId);
-          if (idx === -1) return;
+          const idx = current.images.findIndex((i) => i.id === imgId && i.file === file);
+          if (idx === -1) {
+            if (result?.url) revokePreviewUrl(result.url);
+            return;
+          }
           const updated = [...current.images];
           updated[idx] = {
             ...updated[idx],
@@ -335,7 +339,6 @@ export const useCollageStore = create<CollageState>((set, get) => ({
       URL.revokeObjectURL(img.blobUrl);
       if (img.previewBlobUrl) revokePreviewUrl(img.previewBlobUrl);
     }
-    nextImageId = 0;
     set({
       images: [],
       templateId: "2-h-equal",
