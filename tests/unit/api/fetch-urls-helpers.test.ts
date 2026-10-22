@@ -6,6 +6,7 @@
  * - getContentType: extension to MIME mapping (apps/api/src/routes/meme-templates.ts)
  */
 import { gzipSync } from "node:zlib";
+import Fastify, { type FastifyRequest } from "fastify";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../apps/api/src/db/index.js", () => ({
@@ -34,7 +35,14 @@ vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
 });
 
 import * as formatDecoders from "../../../apps/api/src/lib/format-decoders.js";
+import {
+  normalizeOperationalWriteError,
+  STORAGE_FULL_MESSAGE,
+  STORAGE_NOT_WRITABLE_MESSAGE,
+  STORAGE_UNAVAILABLE_MESSAGE,
+} from "../../../apps/api/src/lib/object-storage.js";
 import * as svgSanitize from "../../../apps/api/src/lib/svg-sanitize.js";
+import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
 import {
   filenameFromUrl,
   getUniqueName,
@@ -743,6 +751,191 @@ describe("registerFetchUrlsRoute nameOnly image validations (#3263)", () => {
       expect(reportErrorMock).toHaveBeenCalledTimes(2);
     } finally {
       sanitizeSpy.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("propagates 5xx putObject storage faults to the Fastify error handler and strips internal paths (#3545)", async () => {
+    const requestLogError = vi.fn();
+    const app = Fastify();
+    app.addHook("onRequest", async (req: FastifyRequest) => {
+      if (vi.isMockFunction(req.log.error)) return;
+      const origError = req.log.error.bind(req.log);
+      vi.spyOn(req.log, "error").mockImplementation(((...args: unknown[]) => {
+        requestLogError(...args);
+        return (origError as (...a: unknown[]) => unknown)(...args);
+      }) as typeof req.log.error);
+    });
+    registerErrorHandler(app);
+    await registerFetchUrlsRoute(app);
+    await app.ready();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>', {
+            status: 200,
+            headers: { "Content-Type": "image/svg+xml" },
+          }),
+      ),
+    );
+
+    const enospcRaw = Object.assign(
+      new Error("ENOSPC: no space left on device, open '/data/uploads/job/.snapotter-staging-1'"),
+      { code: "ENOSPC", syscall: "open" },
+    );
+    const eaccesRaw = Object.assign(
+      new Error("EACCES: permission denied, open '/data/uploads/job/.snapotter-staging-2'"),
+      { code: "EACCES", syscall: "open" },
+    );
+    const erofsRaw = Object.assign(
+      new Error("EROFS: read-only file system, open '/data/uploads/job/.snapotter-staging-3'"),
+      { code: "EROFS", syscall: "open" },
+    );
+    const s3ServiceRaw = Object.assign(
+      new Error("SlowDown: reduce your request rate for /data/uploads/job/icon.svg"),
+      { name: "SlowDown", $metadata: { httpStatusCode: 503 } },
+    );
+    const server500Fault = Object.assign(
+      new Error("unexpected write failure at /data/uploads/job/.snapotter-staging-4"),
+      { statusCode: 500 },
+    );
+
+    const cases = [
+      {
+        err: normalizeOperationalWriteError(enospcRaw),
+        expectedStatus: 503,
+        expectedError: STORAGE_FULL_MESSAGE,
+        expectedCode: "storage-full",
+      },
+      {
+        err: enospcRaw,
+        expectedStatus: 503,
+        expectedError: STORAGE_FULL_MESSAGE,
+        expectedCode: "storage-full",
+      },
+      {
+        err: eaccesRaw,
+        expectedStatus: 503,
+        expectedError: STORAGE_NOT_WRITABLE_MESSAGE,
+        expectedCode: "storage-not-writable",
+      },
+      {
+        err: erofsRaw,
+        expectedStatus: 503,
+        expectedError: STORAGE_NOT_WRITABLE_MESSAGE,
+        expectedCode: "storage-not-writable",
+      },
+      {
+        err: s3ServiceRaw,
+        expectedStatus: 503,
+        expectedError: STORAGE_UNAVAILABLE_MESSAGE,
+        expectedCode: "storage-unavailable",
+      },
+      {
+        err: normalizeOperationalWriteError(s3ServiceRaw),
+        expectedStatus: 503,
+        expectedError: STORAGE_UNAVAILABLE_MESSAGE,
+        expectedCode: "storage-unavailable",
+      },
+      {
+        err: server500Fault,
+        expectedStatus: 500,
+        expectedError: "Internal server error",
+        expectedCode: undefined,
+      },
+      {
+        err: new Error("unclassified storage failure at /data/uploads/job/.snapotter-staging-5"),
+        expectedStatus: 500,
+        expectedError: "Internal server error",
+        expectedCode: undefined,
+      },
+    ];
+
+    try {
+      for (const { err, expectedStatus, expectedError, expectedCode } of cases) {
+        putObjectMock.mockReset();
+        putObjectMock.mockRejectedValueOnce(err);
+        reportErrorMock.mockClear();
+        requestLogError.mockClear();
+
+        const res = await app.inject({
+          method: "POST",
+          url: "/api/v1/fetch-urls",
+          payload: { urls: ["http://1.2.3.4:9999/icon.svg"] },
+        });
+
+        expect(res.statusCode).toBe(expectedStatus);
+        const body = JSON.parse(res.body) as { error: string; code?: string };
+        expect(body.error).toBe(expectedError);
+        expect(body.code).toBe(expectedCode);
+        expect(res.body).not.toContain("/data/uploads");
+        expect(res.body).not.toContain(".snapotter-staging");
+        expect(requestLogError).toHaveBeenCalledOnce();
+        expect(reportErrorMock).toHaveBeenCalledOnce();
+        expect(reportErrorMock).toHaveBeenCalledWith(
+          expect.objectContaining({ statusCode: expectedStatus }),
+          expect.objectContaining({
+            source: "http",
+            route: "/api/v1/fetch-urls",
+            method: "POST",
+            statusCode: expectedStatus,
+          }),
+        );
+      }
+    } finally {
+      putObjectMock.mockReset();
+      putObjectMock.mockResolvedValue(undefined);
+      await app.close();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("strips internal filesystem paths from per-URL fetch failure messages (#3545)", async () => {
+    const handler = await getFetchUrlsHandler();
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockRejectedValueOnce(
+          new Error("TLS CA read failed at /data/certs/ca.pem and /tmp/snapotter-scratch/ca.crt"),
+        )
+        .mockRejectedValueOnce("non-Error rejection"),
+    );
+
+    try {
+      putObjectMock.mockClear();
+      reportErrorMock.mockClear();
+      const reply = makeReply();
+      await handler(
+        {
+          body: {
+            urls: ["http://1.2.3.4:9999/one.jpg", "http://1.2.3.4:9999/two.jpg"],
+          },
+          log: { warn: vi.fn() },
+        },
+        reply,
+      );
+
+      expect(reply.statusCode).toBe(200);
+      const body = reply.payload as {
+        results: Array<{ success: boolean; url: string; error?: string }>;
+      };
+      expect(body.results).toEqual([
+        {
+          success: false,
+          url: "http://1.2.3.4:9999/one.jpg",
+          error: "TLS CA read failed at [internal] and [internal]",
+        },
+        {
+          success: false,
+          url: "http://1.2.3.4:9999/two.jpg",
+          error: "Unknown error",
+        },
+      ]);
+      expect(reportErrorMock).not.toHaveBeenCalled();
+    } finally {
       vi.unstubAllGlobals();
     }
   });

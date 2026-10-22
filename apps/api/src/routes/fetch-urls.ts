@@ -17,6 +17,7 @@ import sharp from "sharp";
 import { z } from "zod";
 import { reportEngineUnavailable } from "../lib/engine-unavailable.js";
 import { reportError } from "../lib/error-report.js";
+import { stripInternalPaths } from "../lib/errors.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import {
@@ -311,7 +312,17 @@ async function fetchSingleUrl(
     const isValidImage = validation?.valid === true && !validation.nameOnly;
 
     // Save to object storage uploads prefix (raw fetched files)
-    await putObject(`uploads/${jobId}/${filename}`, safeBuffer);
+    try {
+      await putObject(`uploads/${jobId}/${filename}`, safeBuffer);
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(rawErr);
+      if (hasServerErrorStatus(err)) {
+        throw err;
+      }
+      throw Object.assign(err instanceof Error ? err : new Error(String(err)), {
+        statusCode: 500,
+      });
+    }
 
     const responseContentType = response.headers.get("content-type")?.split(";")[0]?.trim();
     const contentType = isValidImage
@@ -394,7 +405,10 @@ async function fetchSingleUrl(
       previewUrl,
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
+    if (hasServerErrorStatus(err)) {
+      throw err;
+    }
+    const message = stripInternalPaths(err instanceof Error ? err.message : "Unknown error");
     return { success: false, url, error: message };
   }
 }
