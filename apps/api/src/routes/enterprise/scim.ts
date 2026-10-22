@@ -93,12 +93,19 @@ function groupWriteConflict(err: unknown, log: FastifyBaseLogger, teamId: string
 // Keys go with the sessions for the same reason DELETE removes them: a key
 // that outlives the disable works again the moment the user is reactivated
 // (#2233).
+type UpdateScimUserOutcome =
+  | "not-found"
+  | {
+      updatedUser: typeof schema.users.$inferSelect;
+      teamName: string | undefined;
+    };
+
 async function updateScimUser(
   id: string,
   updates: Record<string, unknown>,
   active?: boolean,
-): Promise<void> {
-  await db.transaction(async (tx) => {
+): Promise<UpdateScimUserOutcome> {
+  return db.transaction(async (tx) => {
     // If active is explicitly false, we might be disabling an admin,
     // so we must take the last-admin lock first.
     if (active === false) {
@@ -106,12 +113,12 @@ async function updateScimUser(
     }
 
     const [currentUser] = await tx
-      .select({ role: schema.users.role })
+      .select()
       .from(schema.users)
       .where(eq(schema.users.id, id))
       .for("update");
 
-    if (!currentUser) return;
+    if (!currentUser) return "not-found" as const;
 
     let revokeCredentials = false;
 
@@ -122,12 +129,23 @@ async function updateScimUser(
       revokeCredentials = !isDisabledRole(currentUser.role);
     }
 
-    await tx.update(schema.users).set(updates).where(eq(schema.users.id, id));
+    const [updatedUser] = await tx
+      .update(schema.users)
+      .set(updates)
+      .where(eq(schema.users.id, id))
+      .returning();
 
     if (revokeCredentials) {
       await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
       await tx.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, id));
     }
+
+    const [team] = await tx
+      .select({ name: schema.teams.name })
+      .from(schema.teams)
+      .where(eq(schema.teams.id, updatedUser.team));
+
+    return { updatedUser, teamName: team?.name };
   });
 }
 
@@ -882,8 +900,9 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
       // onto the same userName both pass it before either UPDATE commits
       // (issue #968), so the loser's 23505 maps to the pre-check's 409.
       // externalId has no pre-check; its collisions always land here.
+      let outcome: UpdateScimUserOutcome;
       try {
-        await updateScimUser(id, updates, active);
+        outcome = await updateScimUser(id, updates, active);
       } catch (err) {
         if (err instanceof LastAdminError) {
           request.log.warn(
@@ -900,11 +919,11 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
         throw err;
       }
 
-      const [updated] = await db.select().from(schema.users).where(eq(schema.users.id, id));
-      const [team] = await db
-        .select({ name: schema.teams.name })
-        .from(schema.teams)
-        .where(eq(schema.teams.id, updated.team));
+      if (outcome === "not-found") {
+        return reply.status(404).send(scimError(404, "User not found"));
+      }
+
+      const { updatedUser: updated, teamName } = outcome;
 
       await auditLog(
         request.log,
@@ -922,7 +941,7 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
         request.id,
       );
 
-      return reply.send(toScimUser(updated, team?.name));
+      return reply.send(toScimUser(updated, teamName));
     },
   );
 
@@ -1031,8 +1050,9 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
       // PATCH has no userName conflict pre-check at all, so before issue
       // #968 even a sequential rename onto a taken name surfaced the 23505
       // as a 500. The 409 aborts the whole patch, nothing was applied.
+      let outcome: UpdateScimUserOutcome;
       try {
-        await updateScimUser(id, updates, finalActive);
+        outcome = await updateScimUser(id, updates, finalActive);
       } catch (err) {
         if (err instanceof LastAdminError) {
           request.log.warn(
@@ -1049,11 +1069,11 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
         throw err;
       }
 
-      const [updated] = await db.select().from(schema.users).where(eq(schema.users.id, id));
-      const [team] = await db
-        .select({ name: schema.teams.name })
-        .from(schema.teams)
-        .where(eq(schema.teams.id, updated.team));
+      if (outcome === "not-found") {
+        return reply.status(404).send(scimError(404, "User not found"));
+      }
+
+      const { updatedUser: updated, teamName } = outcome;
 
       await auditLog(
         request.log,
@@ -1067,7 +1087,7 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
         request.id,
       );
 
-      return reply.send(toScimUser(updated, team?.name));
+      return reply.send(toScimUser(updated, teamName));
     },
   );
 
@@ -1088,19 +1108,21 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
 
       // One transaction: a deprovision whose revoke failed would leave a
       // disabled user with live sessions or API keys (#2126).
+      type DeleteOutcome = "not-found" | { username: string };
+      let outcome: DeleteOutcome;
       try {
-        await db.transaction(async (tx) => {
+        outcome = await db.transaction(async (tx) => {
           // Not the last admin, under the lock every admin removal shares (#2231).
           await assertNotLastAdmin(tx, id);
 
           // Soft-delete: preserve original role so reactivation can restore it
           const [currentUser] = await tx
-            .select({ role: schema.users.role })
+            .select({ role: schema.users.role, username: schema.users.username })
             .from(schema.users)
             .where(eq(schema.users.id, id))
             .for("update");
 
-          if (!currentUser) return;
+          if (!currentUser) return "not-found" as const;
 
           // Soft-delete: preserve original role so reactivation can restore it
           await tx
@@ -1117,6 +1139,8 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
 
           // Revoke all API keys
           await tx.delete(schema.apiKeys).where(eq(schema.apiKeys.userId, id));
+
+          return { username: currentUser.username };
         });
       } catch (err) {
         if (err instanceof LastAdminError) {
@@ -1131,12 +1155,16 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
         throw err;
       }
 
+      if (outcome === "not-found") {
+        return reply.status(404).send(scimError(404, "User not found"));
+      }
+
       await auditLog(
         request.log,
         "SCIM_USER_DEPROVISIONED",
         {
           userId: id,
-          username: user.username,
+          username: outcome.username,
         },
         request.ip,
         request.id,

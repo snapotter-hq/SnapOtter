@@ -2447,6 +2447,160 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(row?.username).toBe(userName);
       expect(row?.role).toBe("user");
     });
+
+    it("returns SCIM 404 and skips SCIM_USER_UPDATED when a user is deleted before PUT locks the user row (#3317)", async () => {
+      const user = await createScimUser({ userName: uniqueName("scim-put-user-del-race") });
+
+      const res = await raceRowLocks(
+        "users",
+        1,
+        () =>
+          crudApp.app.inject({
+            method: "PUT",
+            url: `/api/v1/scim/v2/Users/${user.id}`,
+            headers: authHeaders(),
+            payload: {
+              userName: uniqueName("scim-put-user-del-renamed"),
+              active: false,
+            },
+          }),
+        (tx) => tx.delete(schema.users).where(eq(schema.users.id, user.id)),
+      );
+
+      expect(res.statusCode, res.body).toBe(404);
+      expect(JSON.parse(res.body)).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 404,
+        detail: "User not found",
+      });
+
+      const updatedAuditRows = await db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.action, "SCIM_USER_UPDATED"),
+            sql`${schema.auditLog.details}->>'userId' = ${user.id}`,
+          ),
+        );
+      expect(updatedAuditRows).toHaveLength(0);
+    });
+
+    it("returns SCIM 404 and skips SCIM_USER_UPDATED when a user is deleted before PATCH locks the user row (#3317)", async () => {
+      const user = await createScimUser({ userName: uniqueName("scim-patch-user-del-race") });
+
+      const res = await raceRowLocks(
+        "users",
+        1,
+        () =>
+          crudApp.app.inject({
+            method: "PATCH",
+            url: `/api/v1/scim/v2/Users/${user.id}`,
+            headers: authHeaders(),
+            payload: {
+              schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+              Operations: [
+                {
+                  op: "replace",
+                  path: "userName",
+                  value: uniqueName("scim-patch-user-del-renamed"),
+                },
+                { op: "replace", path: "active", value: false },
+              ],
+            },
+          }),
+        (tx) => tx.delete(schema.users).where(eq(schema.users.id, user.id)),
+      );
+
+      expect(res.statusCode, res.body).toBe(404);
+      expect(JSON.parse(res.body)).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 404,
+        detail: "User not found",
+      });
+
+      const updatedAuditRows = await db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.action, "SCIM_USER_UPDATED"),
+            sql`${schema.auditLog.details}->>'userId' = ${user.id}`,
+          ),
+        );
+      expect(updatedAuditRows).toHaveLength(0);
+    });
+
+    it("returns SCIM 404 and skips SCIM_USER_DEPROVISIONED when a user is deleted before DELETE locks the user row (#3317)", async () => {
+      const user = await createScimUser({ userName: uniqueName("scim-del-user-del-race") });
+
+      const res = await raceRowLocks(
+        "users",
+        1,
+        () =>
+          crudApp.app.inject({
+            method: "DELETE",
+            url: `/api/v1/scim/v2/Users/${user.id}`,
+            headers: authHeaders(),
+          }),
+        (tx) => tx.delete(schema.users).where(eq(schema.users.id, user.id)),
+      );
+
+      expect(res.statusCode, res.body).toBe(404);
+      expect(JSON.parse(res.body)).toEqual({
+        schemas: [SCIM_ERROR_SCHEMA],
+        status: 404,
+        detail: "User not found",
+      });
+
+      const deprovisionedAuditRows = await db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.action, "SCIM_USER_DEPROVISIONED"),
+            sql`${schema.auditLog.details}->>'userId' = ${user.id}`,
+          ),
+        );
+      expect(deprovisionedAuditRows).toHaveLength(0);
+    });
+
+    it("logs the locked user's current username in SCIM_USER_DEPROVISIONED when renamed before DELETE locks the row (#3317)", async () => {
+      const user = await createScimUser({ userName: uniqueName("scim-del-user-rename-old") });
+      const renamedUsername = uniqueName("scim-del-user-rename-new");
+
+      const res = await raceRowLocks(
+        "users",
+        1,
+        () =>
+          crudApp.app.inject({
+            method: "DELETE",
+            url: `/api/v1/scim/v2/Users/${user.id}`,
+            headers: authHeaders(),
+          }),
+        (tx) =>
+          tx
+            .update(schema.users)
+            .set({ username: renamedUsername })
+            .where(eq(schema.users.id, user.id)),
+      );
+
+      expect(res.statusCode, res.body).toBe(204);
+
+      const deprovisionedAuditRows = await db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.action, "SCIM_USER_DEPROVISIONED"),
+            sql`${schema.auditLog.details}->>'userId' = ${user.id}`,
+          ),
+        );
+      expect(deprovisionedAuditRows).toHaveLength(1);
+      expect((deprovisionedAuditRows[0]?.details as { username?: string })?.username).toBe(
+        renamedUsername,
+      );
+    });
   });
 
   // A deprovision through DELETE removed the user's API keys; a deactivation
