@@ -1348,6 +1348,297 @@ describe("worker result payload behavior", () => {
       });
       expect(classifyError(gifBugErr, "worker")).toBe("bug");
     });
+
+    it("normalizes S3 getObjectStream rejections and mid-stream read faults in buildBatchZip before putObjectStream routes them through localWriteFault (#3480)", async () => {
+      const { Readable } = await import("node:stream");
+      const getGenericObjectStream = vi.fn();
+      const putGenericObject = vi.fn().mockResolvedValue(undefined);
+      const putGenericObjectStream = vi.fn(async (_key: string, source: AsyncIterable<Buffer>) => {
+        for await (const _chunk of source) {
+          // drain passthrough so sourceError surfaces in putObjectStream
+        }
+      });
+      const deleteGenericObject = vi.fn().mockResolvedValue(undefined);
+      const failBatchJobMock = vi.fn().mockResolvedValue(true);
+      const completeBatchJobMock = vi.fn().mockResolvedValue(undefined);
+      const childRow = {
+        id: "batch-s3-1-f0",
+        status: "completed",
+        inputRefs: ["uploads/batch-s3-1-f0/in.png"],
+        outputRefs: ["outputs/batch-s3-1-f0/out.png"],
+      };
+      const dbSelectMock = vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(async () => [childRow]),
+        })),
+      }));
+      const { isMissingObjectError: s3IsMissingObjectError } = await vi.importActual<
+        typeof import("../../../../packages/enterprise/src/storage-s3.js")
+      >("../../../../packages/enterprise/src/storage-s3.js");
+      const actualShared = await vi.importActual<
+        typeof import("../../../../packages/shared/src/index.js")
+      >("../../../../packages/shared/src/index.js");
+
+      const workerMod = await loadWorker("", () => {
+        vi.doMock("@snapotter/shared", () => ({
+          ...actualShared,
+          ANALYTICS_EVENTS: {},
+          TOOLS: [],
+          COMPRESS_PRESETS: [],
+          CAMERA_RAW_INPUTS: [],
+          getBundleForTool: vi.fn(() => null),
+          getOptionalBundleForTool: vi.fn(() => null),
+        }));
+        vi.doMock("../../../../apps/api/src/config.js", () => ({
+          env: {
+            BASE_PATH: "",
+            SCRATCH_PATH: "",
+            STORAGE_MODE: "s3",
+            WORKSPACE_PATH: "/unused",
+            S3_BUCKET: "snap-bucket",
+            S3_REGION: "us-east-1",
+            S3_ENDPOINT: "https://s3.example.test",
+            S3_ACCESS_KEY_ID: "AKIA-TEST",
+            S3_SECRET_ACCESS_KEY: "secret",
+            S3_FORCE_PATH_STYLE: true,
+            S3_PREFIX: "",
+            JOB_TIMEOUT_LONG_S: 60,
+            JOB_TIMEOUT_FAST_S: 15,
+          },
+        }));
+        vi.doMock("../../../../apps/api/src/db/index.js", () => ({
+          db: { select: dbSelectMock },
+          schema: { jobs: { id: "jobs.id" } },
+        }));
+        vi.doMock("../../../../apps/api/src/jobs/batch-progress.js", () => ({
+          isBatchCanceled: vi.fn(async () => false),
+          readBatchCounters: vi.fn(async () => ({ done: 1, failed: 0, errors: [] })),
+          recordChildOutcome: vi.fn(),
+        }));
+        vi.doMock("../../../../apps/api/src/routes/progress.js", () => ({
+          cancelBatchJob: vi.fn(),
+          cancelSingleJobGuarded: vi.fn(),
+          completeBatchJob: completeBatchJobMock,
+          failBatchJob: failBatchJobMock,
+          failSingleJobGuarded: vi.fn(),
+          publishEphemeral: vi.fn(),
+          updateSingleFileProgress: vi.fn(),
+          updateSingleFileProgressAtomically: vi.fn(),
+        }));
+        vi.doMock("@snapotter/media-engine", () => ({
+          HW_ACCEL_FAMILIES: [],
+          hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+          softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+        }));
+        vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+          binaryOverrideWarning: vi.fn(),
+          checkBinaryOverrides: vi.fn(() => []),
+          isBinarySpawnFailure,
+          probeFailureLevel: vi.fn(() => "warn"),
+        }));
+        vi.doMock("@snapotter/enterprise", () => ({
+          loadS3Storage: vi.fn(async () => ({
+            isMissingObjectError: s3IsMissingObjectError,
+            configureS3: vi.fn(),
+            checkConnection: vi.fn(),
+            deleteGenericObject,
+            deleteGenericPrefix: vi.fn().mockResolvedValue(undefined),
+            getGenericObjectSize: vi.fn(),
+            getGenericObjectStream,
+            putGenericObject,
+            putGenericObjectStream,
+          })),
+        }));
+        vi.doUnmock("../../../../apps/api/src/lib/object-storage.js");
+      });
+      const { classifyError } = await vi.importActual<
+        typeof import("../../../../apps/api/src/lib/error-report.js")
+      >("../../../../apps/api/src/lib/error-report.js");
+
+      const { Worker } = await import("bullmq");
+      workerMod.startWorkers();
+      const workerCalls = (Worker as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+      const systemCall = workerCalls.find(([queue]) => String(queue).endsWith("system"));
+      if (!systemCall) throw new Error("system pool worker not registered");
+      const processor = systemCall[1] as (job: unknown) => Promise<unknown>;
+
+      const batchJob = {
+        id: "batch-s3-1",
+        name: "batch-finalize",
+        attemptsMade: 0,
+        opts: { attempts: 1 },
+        updateProgress: vi.fn(),
+        data: {
+          kind: "batch-finalize",
+          jobId: "batch-s3-1",
+          toolId: "resize",
+          userId: null,
+          pool: "system",
+          totalFiles: 1,
+          inputRefs: [],
+          filename: "",
+          settings: { flowChildCount: 1, fileIndexMap: [0] },
+        },
+      };
+
+      // 1. Mid-stream S3 ERR_STREAM_PREMATURE_CLOSE on source.on("error")
+      const prematureClose = Object.assign(new Error("Premature close"), {
+        code: "ERR_STREAM_PREMATURE_CLOSE",
+      });
+      getGenericObjectStream.mockResolvedValueOnce(
+        Readable.from(
+          (async function* () {
+            yield Buffer.from("partial-child-bytes");
+            throw prematureClose;
+          })(),
+        ),
+      );
+      failBatchJobMock.mockClear();
+      deleteGenericObject.mockClear();
+      const caughtPremature = await processor(batchJob).catch((err: unknown) => err);
+      expect(caughtPremature).toMatchObject({
+        name: "SafeError",
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        message: "The server's storage service is unavailable.",
+        cause: prematureClose,
+      });
+      expect(classifyError(caughtPremature, "worker")).toBe("operational");
+      expect(failBatchJobMock).toHaveBeenCalledWith({
+        jobId: "batch-s3-1",
+        totalFiles: 1,
+        completedFiles: 1,
+        failedFiles: 0,
+        message: "The server's storage service is unavailable.",
+        code: "storage-unavailable",
+        errors: [{ filename: "", error: "The server's storage service is unavailable." }],
+      });
+      expect(deleteGenericObject).toHaveBeenCalledWith(
+        "outputs/batch-s3-1/batch-resize-batch-s3.zip",
+      );
+
+      // 2. Mid-stream S3 { code: "EIO", syscall: "read" } on source.on("error")
+      const midStreamEio = Object.assign(new Error("S3 stream reset"), {
+        code: "EIO",
+        syscall: "read",
+      });
+      getGenericObjectStream.mockResolvedValueOnce(
+        Readable.from(
+          (async function* () {
+            yield Buffer.from("partial-child-bytes");
+            throw midStreamEio;
+          })(),
+        ),
+      );
+      failBatchJobMock.mockClear();
+      const caughtMidEio = await processor(batchJob).catch((err: unknown) => err);
+      expect(caughtMidEio).toMatchObject({
+        name: "SafeError",
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        message: "The server's storage service is unavailable.",
+        cause: midStreamEio,
+      });
+      expect(classifyError(caughtMidEio, "worker")).toBe("operational");
+      expect(failBatchJobMock).toHaveBeenCalledWith({
+        jobId: "batch-s3-1",
+        totalFiles: 1,
+        completedFiles: 1,
+        failedFiles: 0,
+        message: "The server's storage service is unavailable.",
+        code: "storage-unavailable",
+        errors: [{ filename: "", error: "The server's storage service is unavailable." }],
+      });
+
+      // 3. Open-time getObjectStream rejections across S3 service and stream faults
+      const openFaults = [
+        Object.assign(new Error("Please reduce your request rate."), {
+          name: "SlowDown",
+          $metadata: { httpStatusCode: 503 },
+        }),
+        Object.assign(new Error("Access Denied"), {
+          name: "AccessDenied",
+          $metadata: { httpStatusCode: 403 },
+        }),
+        Object.assign(new Error("The specified bucket does not exist"), {
+          name: "NoSuchBucket",
+          $metadata: { httpStatusCode: 404 },
+        }),
+        Object.assign(new Error("Premature close"), { code: "ERR_STREAM_PREMATURE_CLOSE" }),
+        Object.assign(new Error("S3 stream reset"), { code: "EIO", syscall: "read" }),
+      ];
+      for (const fault of openFaults) {
+        getGenericObjectStream.mockRejectedValueOnce(fault);
+        failBatchJobMock.mockClear();
+        const caughtOpen = await processor(batchJob).catch((err: unknown) => err);
+        expect(caughtOpen).toMatchObject({
+          name: "SafeError",
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-unavailable",
+          statusCode: 503,
+          message: "The server's storage service is unavailable.",
+          cause: fault,
+        });
+        expect(classifyError(caughtOpen, "worker")).toBe("operational");
+        expect(failBatchJobMock).toHaveBeenCalledWith({
+          jobId: "batch-s3-1",
+          totalFiles: 1,
+          completedFiles: 1,
+          failedFiles: 0,
+          message: "The server's storage service is unavailable.",
+          code: "storage-unavailable",
+          errors: [{ filename: "", error: "The server's storage service is unavailable." }],
+        });
+      }
+
+      // 4. Unexpected non-S3 defect and missing-object (NoSuchKey) still classify as "bug"
+      const unexpectedBug = new TypeError("unexpected S3 stream defect");
+      getGenericObjectStream.mockRejectedValueOnce(unexpectedBug);
+      failBatchJobMock.mockClear();
+      const caughtBug = await processor(batchJob).catch((err: unknown) => err);
+      expect(caughtBug).toBe(unexpectedBug);
+      expect(classifyError(caughtBug, "worker")).toBe("bug");
+      expect(failBatchJobMock).toHaveBeenCalledWith({
+        jobId: "batch-s3-1",
+        totalFiles: 1,
+        completedFiles: 1,
+        failedFiles: 0,
+        message: "Failed to package batch results",
+        code: undefined,
+        errors: [{ filename: "", error: "Failed to package batch results" }],
+      });
+
+      const noSuchKey = Object.assign(new Error("The specified key does not exist."), {
+        name: "NoSuchKey",
+        $metadata: { httpStatusCode: 404 },
+      });
+      getGenericObjectStream.mockRejectedValueOnce(noSuchKey);
+      failBatchJobMock.mockClear();
+      const caughtMissing = await processor(batchJob).catch((err: unknown) => err);
+      expect(caughtMissing).toBe(noSuchKey);
+      expect(classifyError(caughtMissing, "worker")).toBe("bug");
+      expect(failBatchJobMock).toHaveBeenCalledWith({
+        jobId: "batch-s3-1",
+        totalFiles: 1,
+        completedFiles: 1,
+        failedFiles: 0,
+        message: "Failed to package batch results",
+        code: undefined,
+        errors: [{ filename: "", error: "Failed to package batch results" }],
+      });
+
+      getGenericObjectStream.mockRejectedValueOnce("raw-string-stream-fault");
+      failBatchJobMock.mockClear();
+      const caughtString = await processor(batchJob).catch((err: unknown) => err);
+      expect(caughtString).toBeInstanceOf(Error);
+      expect((caughtString as Error).message).toBe("raw-string-stream-fault");
+      expect(classifyError(caughtString, "worker")).toBe("bug");
+    });
   });
 
   // Result URLs are persisted with the job, so they must not depend on the

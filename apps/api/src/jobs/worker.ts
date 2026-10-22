@@ -2036,10 +2036,19 @@ async function buildBatchZip(
   archive.on("error", fail);
   archive.pipe(passthrough);
   const upload = putObjectStream(zipKey, passthrough);
+  const normalizeSourceError = (err: unknown): Error => {
+    const normalized = isStorageServiceFault(err) ? normalizeS3ReadFault(err) : err;
+    return normalized instanceof Error ? normalized : new Error(String(normalized));
+  };
   const feed = (async () => {
     for (const entry of entries) {
       if (failed) break;
-      const source = await getObjectStream(entry.outputRef);
+      let source: NodeJS.ReadableStream;
+      try {
+        source = await getObjectStream(entry.outputRef);
+      } catch (err) {
+        throw normalizeSourceError(err);
+      }
       if (failed) {
         // fail() ran while this open was in flight; its cleanup loop cannot
         // have seen this stream.
@@ -2054,7 +2063,7 @@ async function buildBatchZip(
       // for a complete archive.
       const entryStream = new PassThrough();
       source.on("error", (err: Error) => {
-        fail(err);
+        fail(normalizeSourceError(err));
         entryStream.end();
       });
       source.pipe(entryStream);
