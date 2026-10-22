@@ -46,7 +46,7 @@ export function isValidObjectKey(key: string): boolean {
     VALID_KEY.test(key) &&
     !key.includes("..") &&
     !key.endsWith("/.") &&
-    !key.endsWith("/.snapotter-staging")
+    !key.toLowerCase().endsWith("/.snapotter-staging")
   );
 }
 

@@ -1618,11 +1618,22 @@ describe("object-storage missing-key + robustness paths", () => {
     expect(isValidObjectKey("uploads/job-1/.")).toBe(false);
     expect(isValidObjectKey("outputs/job-1/.snapotter-staging")).toBe(false);
     expect(isValidObjectKey("uploads/job-1/.snapotter-staging")).toBe(false);
+    expect(isValidObjectKey("outputs/job-1/.SNAPOTTER-STAGING")).toBe(false);
+    expect(isValidObjectKey("uploads/job-1/.SNAPOTTER-STAGING")).toBe(false);
+    expect(isValidObjectKey("outputs/job-1/.SnapOtter-Staging")).toBe(false);
+    expect(isValidObjectKey("outputs/job-1/.SNAPOTTER-STAGING.png")).toBe(true);
+    expect(isValidObjectKey("outputs/job-1/foo.snapotter-staging")).toBe(true);
     expect(isValidObjectKey("outputs/job-1/.hidden")).toBe(true);
     expect(isValidObjectKey("outputs/job-1/file.")).toBe(true);
     await expect(getObjectSize("outputs/job-1/.")).rejects.toThrow(/invalid object key/i);
     await expect(getObjectStream("outputs/job-1/.")).rejects.toThrow(/invalid object key/i);
     await expect(getObjectStream("outputs/job-1/.snapotter-staging")).rejects.toThrow(
+      /invalid object key/i,
+    );
+    await expect(getObjectStream("outputs/job-1/.SNAPOTTER-STAGING")).rejects.toThrow(
+      /invalid object key/i,
+    );
+    await expect(putObject("uploads/job-1/.SNAPOTTER-STAGING", Buffer.from("x"))).rejects.toThrow(
       /invalid object key/i,
     );
   });
