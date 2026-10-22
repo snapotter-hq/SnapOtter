@@ -91,6 +91,7 @@ import remove_bg  # noqa: E402
 import restore  # noqa: E402
 assert remove_bg._OOM_MARKERS == gif_remove_bg._OOM_MARKERS
 assert restore._OOM_MARKERS == gif_remove_bg._OOM_MARKERS
+assert remove_bg._HOST_OOM_MARKERS == gif_remove_bg._HOST_OOM_MARKERS
 for oom_mod in (gif_remove_bg, remove_bg, restore):
     assert oom_mod._is_oom(MemoryError()) is True, (
         f"{oom_mod.__name__}._is_oom must recognize bare MemoryError()"
@@ -123,6 +124,47 @@ for oom_mod in (gif_remove_bg, remove_bg, restore):
         oom_mod._is_oom(RuntimeError("RuntimeError: DefaultCPUAllocator: invalid alignment"))
         is False
     )
+for host_oom_mod in (gif_remove_bg, remove_bg):
+    assert host_oom_mod._is_host_oom(MemoryError()) is True, (
+        f"{host_oom_mod.__name__}._is_host_oom must recognize bare MemoryError()"
+    )
+    assert host_oom_mod._is_host_oom(RuntimeError("MemoryError")) is True
+    assert host_oom_mod._is_oom(OSError(12, "Nicht genügend Hauptspeicher verfügbar")) is True
+    assert host_oom_mod._is_oom(OSError(13, "Permission denied")) is False
+    for host_oom_err in (
+        RuntimeError("std::bad_alloc"),
+        RuntimeError(
+            "RuntimeError: [enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes."
+        ),
+        RuntimeError(
+            "DefaultCPUAllocator: can't allocate memory: you tried to allocate 104857600 bytes."
+        ),
+        RuntimeError("DefaultCPUAllocator: out of memory"),
+        RuntimeError("DefaultCPUAllocator: failed to allocate memory"),
+        RuntimeError("OSError: [Errno 12] Cannot allocate memory"),
+        OSError(12, "Cannot allocate memory"),
+        OSError(12, "Nicht genügend Hauptspeicher verfügbar"),
+        RuntimeError("DefaultCPUAllocator: NOT ENOUGH MEMORY"),
+        RuntimeError("DefaultCPUAllocator: CAN'T ALLOCATE MEMORY"),
+        RuntimeError(
+            "Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 30) and data type float32"
+        ),
+    ):
+        assert host_oom_mod._is_host_oom(host_oom_err) is True, (
+            f"{host_oom_mod.__name__}._is_host_oom must recognize host OOM: {host_oom_err!r}"
+        )
+    for non_host_oom_err in (
+        RuntimeError("CUDA out of memory"),
+        RuntimeError("Failed to allocate memory for requested buffer"),
+        RuntimeError("cudaErrorMemoryAllocation: out of memory"),
+        RuntimeError("CUBLAS_STATUS_ALLOC_FAILED"),
+        RuntimeError("RuntimeError: DefaultCPUAllocator: invalid alignment"),
+        RuntimeError("CUDA driver version is insufficient for CUDA runtime version"),
+        OSError(13, "Permission denied"),
+    ):
+        assert host_oom_mod._is_host_oom(non_host_oom_err) is False, (
+            f"{host_oom_mod.__name__}._is_host_oom must not match non-host-OOM: {non_host_oom_err!r}"
+        )
 
 # Verify _remove_one does not retry with alpha_matting=False when a CPU allocator OOM occurs,
 # and verify main()'s frame-0 probe falls back from non-u2net models to u2net on CPU allocator OOM.
@@ -630,15 +672,247 @@ def _verify_gif_cpu_oom_handling():
 _verify_gif_cpu_oom_handling()
 
 
+def _verify_gif_cuda_session_host_oom():
+    session_calls = []
+    session_err = [None]
+    stderr_lines = []
+
+    class _FakeFrame:
+        size = (16, 16)
+
+        def resize(self, *_a):
+            return self
+
+        def save(self, buf, format=None):  # noqa: A002
+            buf.write(b"png")
+
+    def _fake_new_session(model, providers=None):
+        session_calls.append((model, list(providers) if providers is not None else None))
+        if (
+            session_err[0] is not None
+            and model in session_err[0][0]
+            and providers is not None
+            and "CUDAExecutionProvider" in providers
+        ):
+            raise session_err[0][1]
+        return f"session:{model}:{providers[0] if providers else 'default'}"
+
+    fake_rembg = types.ModuleType("rembg")
+    fake_rembg.new_session = _fake_new_session
+    fake_rembg.remove = lambda *_a, **_k: b"png-out"
+    fake_sessions = types.ModuleType("rembg.sessions")
+    fake_sessions.sessions_class = []
+    fake_gpu = types.ModuleType("gpu")
+    fake_gpu.onnx_providers = lambda: (
+        ["CUDAExecutionProvider", "CPUExecutionProvider"],
+        "cuda",
+    )
+    fake_model_paths = types.ModuleType("model_paths")
+    fake_model_paths.ensure_rembg_model_home = lambda: None
+
+    fake_pil = types.ModuleType("PIL")
+    fake_pil.Image = types.SimpleNamespace(LANCZOS=1, open=lambda _b: _FakeFrame())
+
+    prev_mods = {
+        k: sys.modules.get(k) for k in ("rembg", "rembg.sessions", "gpu", "model_paths", "PIL")
+    }
+    orig_matting_reg = remove_bg._matting_registered
+    orig_hr_matting_reg = remove_bg._hr_matting_registered
+    orig_read_frames = gif_remove_bg._read_frames
+    orig_remove_one = gif_remove_bg._remove_one
+    orig_apply_effect = gif_remove_bg._apply_effect
+    orig_encode = gif_remove_bg._encode
+    orig_argv = sys.argv
+    orig_u2net_home = os.environ.get("U2NET_HOME")
+
+    sys.modules["rembg"] = fake_rembg
+    sys.modules["rembg.sessions"] = fake_sessions
+    sys.modules["gpu"] = fake_gpu
+    sys.modules["model_paths"] = fake_model_paths
+    sys.modules["PIL"] = fake_pil
+    remove_bg._matting_registered = True
+    remove_bg._hr_matting_registered = True
+
+    try:
+        cuda_providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+
+        # 1) _create_session re-raises host-memory OOMs immediately without retrying CPUExecutionProvider (#3393).
+        for host_oom_exc in (
+            MemoryError(),
+            RuntimeError(
+                "[enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes."
+            ),
+            RuntimeError(
+                "DefaultCPUAllocator: can't allocate memory: you tried to allocate 104857600 bytes."
+            ),
+            RuntimeError("DefaultCPUAllocator: failed to allocate memory"),
+            RuntimeError("DefaultCPUAllocator: out of memory"),
+            OSError(12, "Cannot allocate memory"),
+            OSError(12, "Nicht genügend Hauptspeicher verfügbar"),
+            RuntimeError(
+                "Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 30) and data type float32"
+            ),
+            RuntimeError("std::bad_alloc"),
+        ):
+            session_calls.clear()
+            session_err[0] = ({"birefnet-general"}, host_oom_exc)
+            err_buf = io.StringIO()
+            saved_stderr = sys.stderr
+            sys.stderr = err_buf
+            try:
+                gif_remove_bg._create_session("birefnet-general", cuda_providers, "cuda")
+                raise AssertionError(
+                    f"gif_remove_bg._create_session did not re-raise {host_oom_exc!r}"
+                )
+            except Exception as caught:
+                assert caught is host_oom_exc, (caught, host_oom_exc)
+            finally:
+                sys.stderr = saved_stderr
+            assert session_calls == [("birefnet-general", cuda_providers)], (
+                f"gif_remove_bg._create_session must not retry on CPU for host OOM {host_oom_exc!r}, got {session_calls!r}"
+            )
+            assert "falling back to CPU" not in err_buf.getvalue(), err_buf.getvalue()
+
+        # 2) _create_session still falls back to CPUExecutionProvider on CUDA VRAM / driver errors (#3393).
+        for cuda_exc in (
+            RuntimeError("CUDA out of memory"),
+            RuntimeError("cudaErrorMemoryAllocation: out of memory"),
+            RuntimeError("CUBLAS_STATUS_ALLOC_FAILED"),
+            RuntimeError("CUDA driver version is insufficient"),
+        ):
+            session_calls.clear()
+            session_err[0] = ({"birefnet-general"}, cuda_exc)
+            err_buf = io.StringIO()
+            saved_stderr = sys.stderr
+            sys.stderr = err_buf
+            try:
+                sess, dev = gif_remove_bg._create_session(
+                    "birefnet-general", cuda_providers, "cuda"
+                )
+            finally:
+                sys.stderr = saved_stderr
+            assert sess == "session:birefnet-general:CPUExecutionProvider", sess
+            assert dev == "cpu", dev
+            assert session_calls == [
+                ("birefnet-general", cuda_providers),
+                ("birefnet-general", ["CPUExecutionProvider"]),
+            ], session_calls
+            assert "falling back to CPU" in err_buf.getvalue(), err_buf.getvalue()
+
+        # 3) End-to-end gif_remove_bg.main() on CUDA host with real _create_session switches
+        # directly from birefnet-general to u2net on host OOM without a CPU retry of birefnet-general.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            for m_name in ("birefnet-general", "u2net"):
+                open(os.path.join(tmpdir, f"{m_name}.onnx"), "wb").close()
+            os.environ["U2NET_HOME"] = tmpdir
+            gif_remove_bg._read_frames = lambda _p: ([_FakeFrame(), _FakeFrame()], [100, 100], 0)
+            gif_remove_bg._remove_one = lambda frame, *_a: frame
+            gif_remove_bg._apply_effect = lambda cut, *_a: cut
+            gif_remove_bg._encode = lambda *_a: None
+
+            for host_oom_exc in (
+                MemoryError(),
+                RuntimeError("DefaultCPUAllocator: not enough memory"),
+                RuntimeError("DefaultCPUAllocator: failed to allocate memory"),
+                OSError(12, "Nicht genügend Hauptspeicher verfügbar"),
+            ):
+                session_calls.clear()
+                stderr_lines.clear()
+                session_err[0] = ({"birefnet-general"}, host_oom_exc)
+                sys.argv = [
+                    "gif_remove_bg.py",
+                    "in.gif",
+                    "out.webp",
+                    json.dumps({"model": "birefnet-general", "outputFormat": "webp"}),
+                ]
+                r_fd, w_fd = os.pipe()
+                err_buf = io.StringIO()
+                saved_stderr = sys.stderr
+                try:
+                    saved_stdout_fd = os.dup(1)
+                    os.dup2(w_fd, 1)
+                    os.close(w_fd)
+                    sys.stderr = err_buf
+                    try:
+                        gif_remove_bg.main()
+                    finally:
+                        sys.stderr = saved_stderr
+                        os.dup2(saved_stdout_fd, 1)
+                        os.close(saved_stdout_fd)
+                    captured = os.read(r_fd, 4096).decode("utf-8")
+                finally:
+                    os.close(r_fd)
+                stderr_lines.extend(
+                    line.strip() for line in err_buf.getvalue().splitlines() if line.strip()
+                )
+                payload = json.loads(captured.strip())
+                assert payload == {
+                    "success": True,
+                    "model": "u2net",
+                    "device": "cuda",
+                    "frames": 2,
+                    "format": "webp",
+                }, payload
+                assert session_calls == [
+                    ("birefnet-general", cuda_providers),
+                    ("u2net", cuda_providers),
+                ], (
+                    f"gif_remove_bg.main must switch directly to u2net on host OOM without retrying birefnet-general on CPU: {session_calls!r}"
+                )
+                assert not any("falling back to CPU" in line for line in stderr_lines), stderr_lines
+                assert any(
+                    "birefnet-general ran out of memory" in line and "retrying with u2net" in line
+                    for line in stderr_lines
+                ), stderr_lines
+                assert any(
+                    "[gif-remove-bg] session device=cuda model=u2net" in line
+                    for line in stderr_lines
+                ), stderr_lines
+    finally:
+        remove_bg._matting_registered = orig_matting_reg
+        remove_bg._hr_matting_registered = orig_hr_matting_reg
+        gif_remove_bg._read_frames = orig_read_frames
+        gif_remove_bg._remove_one = orig_remove_one
+        gif_remove_bg._apply_effect = orig_apply_effect
+        gif_remove_bg._encode = orig_encode
+        sys.argv = orig_argv
+        if orig_u2net_home is None:
+            os.environ.pop("U2NET_HOME", None)
+        else:
+            os.environ["U2NET_HOME"] = orig_u2net_home
+        for k, v in prev_mods.items():
+            if v is None:
+                sys.modules.pop(k, None)
+            else:
+                sys.modules[k] = v
+
+
+_verify_gif_cuda_session_host_oom()
+
+
 def _verify_remove_bg_oom_handling():
     rembg_calls = []
+    session_calls = []
+    session_err = [None]
     active_err = [None]
     retry_err = [None]
     active_device = ["cuda"]
     stderr_lines = []
+    info_msgs = []
 
     fake_rembg = types.ModuleType("rembg")
-    fake_rembg.new_session = lambda model, providers=None: f"session:{model}"
+
+    def _fake_new_session(model, providers=None):
+        session_calls.append((model, list(providers) if providers is not None else None))
+        if (
+            session_err[0] is not None
+            and providers is not None
+            and "CUDAExecutionProvider" in providers
+        ):
+            raise session_err[0]
+        return f"session:{model}"
+
+    fake_rembg.new_session = _fake_new_session
 
     def _fake_remove(_data, session=None, alpha_matting=False, **_kwargs):
         rembg_calls.append((session, alpha_matting))
@@ -657,6 +931,7 @@ def _verify_remove_bg_oom_handling():
         if active_device[0] == "cuda"
         else (["CPUExecutionProvider"], "cpu")
     )
+    fake_gpu.emit_info = lambda msg: info_msgs.append(msg)
     fake_model_paths = types.ModuleType("model_paths")
     fake_model_paths.ensure_rembg_model_home = lambda: None
 
@@ -687,6 +962,8 @@ def _verify_remove_bg_oom_handling():
 
             def _run_remove_bg_main(settings_dict):
                 rembg_calls.clear()
+                session_calls.clear()
+                info_msgs.clear()
                 stderr_lines.clear()
                 sys.argv = ["remove_bg.py", in_path, out_path, json.dumps(settings_dict)]
                 r_fd, w_fd = os.pipe()
@@ -710,6 +987,78 @@ def _verify_remove_bg_oom_handling():
                     line.strip() for line in err_buf.getvalue().splitlines() if line.strip()
                 )
                 return json.loads(captured.strip())
+
+            # Host-memory OOMs during CUDA new_session must re-raise immediately without
+            # retrying new_session(model, providers=["CPUExecutionProvider"]) (#3393).
+            active_device[0] = "cuda"
+            active_err[0] = None
+            retry_err[0] = None
+            cuda_providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+            for host_oom_exc, expected_msg in (
+                (MemoryError(), "MemoryError"),
+                (
+                    RuntimeError(
+                        "[enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes."
+                    ),
+                    "[enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes.",
+                ),
+                (
+                    RuntimeError(
+                        "DefaultCPUAllocator: can't allocate memory: you tried to allocate 104857600 bytes."
+                    ),
+                    "DefaultCPUAllocator: can't allocate memory: you tried to allocate 104857600 bytes.",
+                ),
+                (
+                    RuntimeError("DefaultCPUAllocator: failed to allocate memory"),
+                    "DefaultCPUAllocator: failed to allocate memory",
+                ),
+                (
+                    RuntimeError("DefaultCPUAllocator: out of memory"),
+                    "DefaultCPUAllocator: out of memory",
+                ),
+                (OSError(12, "Cannot allocate memory"), "[Errno 12] Cannot allocate memory"),
+                (
+                    OSError(12, "Nicht genügend Hauptspeicher verfügbar"),
+                    "[Errno 12] Nicht genügend Hauptspeicher verfügbar",
+                ),
+                (
+                    RuntimeError(
+                        "Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 30) and data type float32"
+                    ),
+                    "Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 30) and data type float32",
+                ),
+                (RuntimeError("std::bad_alloc"), "std::bad_alloc"),
+            ):
+                session_err[0] = host_oom_exc
+                payload = _run_remove_bg_main({"model": "birefnet-general"})
+                assert payload == {"success": False, "error": expected_msg}, payload
+                assert session_calls == [("birefnet-general", cuda_providers)], (
+                    f"remove_bg.main must not retry new_session on CPU for host OOM {host_oom_exc!r}, got {session_calls!r}"
+                )
+                assert rembg_calls == [], rembg_calls
+                assert info_msgs == [], info_msgs
+
+            # CUDA VRAM / driver errors during CUDA new_session still fall back to CPUExecutionProvider (#3393).
+            for cuda_exc in (
+                RuntimeError("CUDA out of memory"),
+                RuntimeError("cudaErrorMemoryAllocation: out of memory"),
+                RuntimeError("CUBLAS_STATUS_ALLOC_FAILED"),
+                RuntimeError("CUDA driver version is insufficient"),
+            ):
+                session_err[0] = cuda_exc
+                payload = _run_remove_bg_main({"model": "birefnet-general"})
+                assert payload == {
+                    "success": True,
+                    "model": "birefnet-general",
+                    "device": "cpu",
+                }, payload
+                assert session_calls == [
+                    ("birefnet-general", cuda_providers),
+                    ("birefnet-general", ["CPUExecutionProvider"]),
+                ], session_calls
+                assert rembg_calls == [("session:birefnet-general", False)], rembg_calls
+                assert any("falling back to CPU" in m for m in info_msgs), info_msgs
+            session_err[0] = None
 
             # On GPU (use_alpha_matting=True), RuntimeError / OSError / MemoryError OOMs must re-raise
             # immediately without retrying remove(..., alpha_matting=False) on the same session (#3045).

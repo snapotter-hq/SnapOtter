@@ -6,6 +6,7 @@ transparent (or composited) output via Pillow. Reuses remove_bg.py's model
 registration and edge-refinement helpers so the still and animated paths share
 the same matte behaviour.
 """
+import errno
 import io
 import json
 import os
@@ -27,6 +28,14 @@ _OOM_MARKERS = (
     "bad_alloc",
     "memoryerror",
 )
+_HOST_OOM_MARKERS = (
+    "not enough memory",
+    "can't allocate memory",
+    "cannot allocate memory",
+    "unable to allocate",
+    "bad_alloc",
+    "memoryerror",
+)
 
 
 def emit_progress(percent, stage):
@@ -36,8 +45,21 @@ def emit_progress(percent, stage):
 def _is_oom(err):
     if isinstance(err, MemoryError):
         return True
+    if isinstance(err, OSError) and err.errno == errno.ENOMEM:
+        return True
     m = str(err).lower()
     return any(s in m for s in _OOM_MARKERS)
+
+
+def _is_host_oom(err):
+    if isinstance(err, MemoryError):
+        return True
+    if isinstance(err, OSError) and err.errno == errno.ENOMEM:
+        return True
+    m = str(err).lower()
+    if any(s in m for s in _HOST_OOM_MARKERS):
+        return True
+    return "defaultcpuallocator" in m and _is_oom(err)
 
 
 def _read_frames(path):
@@ -240,7 +262,7 @@ def _create_session(model, providers, device):
     try:
         return new_session(model, providers=providers), device
     except Exception as e:
-        if "CUDAExecutionProvider" in providers:
+        if "CUDAExecutionProvider" in providers and not _is_host_oom(e):
             print(
                 f"[gif-remove-bg] CUDA session for '{model}' failed ({e}); falling back to CPU",
                 file=sys.stderr,

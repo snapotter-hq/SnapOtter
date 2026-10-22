@@ -1,4 +1,5 @@
 """Background removal using rembg with state-of-the-art BiRefNet models."""
+import errno
 import sys
 import json
 import os
@@ -16,6 +17,14 @@ _OOM_MARKERS = (
     "bad_alloc",
     "memoryerror",
 )
+_HOST_OOM_MARKERS = (
+    "not enough memory",
+    "can't allocate memory",
+    "cannot allocate memory",
+    "unable to allocate",
+    "bad_alloc",
+    "memoryerror",
+)
 
 
 def emit_progress(percent, stage):
@@ -25,8 +34,21 @@ def emit_progress(percent, stage):
 def _is_oom(err):
     if isinstance(err, MemoryError):
         return True
+    if isinstance(err, OSError) and err.errno == errno.ENOMEM:
+        return True
     m = str(err).lower()
     return any(s in m for s in _OOM_MARKERS)
+
+
+def _is_host_oom(err):
+    if isinstance(err, MemoryError):
+        return True
+    if isinstance(err, OSError) and err.errno == errno.ENOMEM:
+        return True
+    m = str(err).lower()
+    if any(s in m for s in _HOST_OOM_MARKERS):
+        return True
+    return "defaultcpuallocator" in m and _is_oom(err)
 
 
 def _refine_edges(image_bytes, level):
@@ -239,7 +261,7 @@ def main():
         try:
             session = new_session(model, providers=providers)
         except Exception as e:
-            if "CUDAExecutionProvider" in providers:
+            if "CUDAExecutionProvider" in providers and not _is_host_oom(e):
                 from gpu import emit_info
                 emit_info(f"GPU session failed ({e}), falling back to CPU")
                 session = new_session(model, providers=["CPUExecutionProvider"])

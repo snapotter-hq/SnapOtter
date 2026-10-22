@@ -75,3 +75,30 @@ def test_successful_cuda_session_keeps_device_and_stays_quiet(capsys):
     assert session == "gpu-session"
     assert device == "cuda"
     assert "falling back" not in capsys.readouterr().err
+
+
+def test_cuda_session_host_oom_reraises_without_cpu_retry(capsys):
+    for host_oom in (
+        MemoryError(),
+        RuntimeError("DefaultCPUAllocator: not enough memory"),
+        RuntimeError("DefaultCPUAllocator: failed to allocate memory"),
+        OSError(12, "Cannot allocate memory"),
+        OSError(12, "Nicht genügend Hauptspeicher verfügbar"),
+    ):
+        calls = []
+
+        def new_session(model, providers=None, _exc=host_oom):
+            calls.append(providers)
+            raise _exc
+
+        mod = load_gif_module(new_session)
+        try:
+            mod._create_session(
+                "birefnet-general", ["CUDAExecutionProvider", "CPUExecutionProvider"], "cuda"
+            )
+            raise AssertionError(f"Expected {host_oom!r} to be re-raised")
+        except Exception as exc:
+            assert exc is host_oom
+
+        assert calls == [["CUDAExecutionProvider", "CPUExecutionProvider"]]
+        assert "falling back" not in capsys.readouterr().err
