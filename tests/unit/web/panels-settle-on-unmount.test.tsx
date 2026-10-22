@@ -1548,3 +1548,287 @@ describe("own-store tool handlers abort and ignore late completions on store res
     expect(useMemeStore.getState().phase).toBe("gallery");
   });
 });
+
+describe("self-posting panels clear processing and abort on removeFile mid-run (#3091)", () => {
+  it("stitch: aborts XHR and clears processing when removeFile empties entries or removes capturedEntry with other entries remaining", () => {
+    // 1. Removing the non-selected entry first, then the last entry via removeFile mid-run.
+    useFileStore.getState().reset();
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    const { unmount } = render(<StitchSettings />);
+    fireEvent.click(screen.getByTestId("stitch-submit"));
+    const xhr1 = FakeXhr.instances[0];
+    expect(useFileStore.getState().processing).toBe(true);
+
+    act(() => {
+      useFileStore.getState().removeFile(1);
+      useFileStore.getState().removeFile(0);
+    });
+
+    expect(xhr1.aborted).toBe(true);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(screen.getByTestId("stitch-submit")).toBeDisabled();
+
+    // 2. Removing only capturedEntry while two other entries remain.
+    FakeXhr.instances = [];
+    act(() => {
+      useFileStore.getState().setFiles([image("a.png"), image("b.png"), image("c.png")]);
+      useFileStore.getState().setSelectedIndex(1);
+    });
+    fireEvent.click(screen.getByTestId("stitch-submit"));
+    const xhr2 = FakeXhr.instances[0];
+    expect(useFileStore.getState().processing).toBe(true);
+
+    act(() => {
+      useFileStore.getState().removeFile(1);
+    });
+
+    expect(useFileStore.getState().entries).toHaveLength(2);
+    expect(xhr2.aborted).toBe(true);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(screen.getByTestId("stitch-submit")).toBeEnabled();
+
+    // Late 200 and 500 on the aborted XHR are ignored, and unmount does not set runInterrupted.
+    act(() => {
+      xhr2.status = 200;
+      xhr2.responseText = JSON.stringify({
+        jobId: "job-late",
+        downloadUrl: "/api/v1/download/job-late/stitched.png",
+        originalSize: 100,
+        processedSize: 80,
+      });
+      xhr2.onload?.();
+      xhr2.status = 500;
+      xhr2.responseText = JSON.stringify({ error: "Late stitch failure" });
+      xhr2.onload?.();
+    });
+    unmount();
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().entries.every((e) => e.status === "pending")).toBe(true);
+  });
+
+  it("fetch panels: abort and clear processing when removeFile empties entries or removes all batch startEntries mid-run", async () => {
+    const cases: Array<{
+      name: string;
+      Panel: ComponentType;
+      submitId: string;
+      needsSecondaryFile: boolean;
+      initialFiles: File[];
+      isMultiFileBatch?: boolean;
+    }> = [
+      {
+        name: "compare",
+        Panel: CompareSettings,
+        submitId: "compare-submit",
+        needsSecondaryFile: true,
+        initialFiles: [image("only.png")],
+      },
+      {
+        name: "compose",
+        Panel: ComposeSettings,
+        submitId: "compose-submit",
+        needsSecondaryFile: true,
+        initialFiles: [image("only.png")],
+      },
+      {
+        name: "bulk-rename",
+        Panel: BulkRenameSettings,
+        submitId: "bulk-rename-submit",
+        needsSecondaryFile: false,
+        initialFiles: [image("only.png")],
+        isMultiFileBatch: true,
+      },
+      {
+        name: "color-palette",
+        Panel: ColorPaletteSettings,
+        submitId: "color-palette-submit",
+        needsSecondaryFile: false,
+        initialFiles: [image("only.png")],
+      },
+      {
+        name: "watermark-image (single file)",
+        Panel: WatermarkImageSettings,
+        submitId: "watermark-image-submit",
+        needsSecondaryFile: true,
+        initialFiles: [image("only.png")],
+      },
+      {
+        name: "watermark-image (multi-file batch)",
+        Panel: WatermarkImageSettings,
+        submitId: "watermark-image-submit",
+        needsSecondaryFile: true,
+        initialFiles: [image("one.png"), image("two.png")],
+        isMultiFileBatch: true,
+      },
+    ];
+
+    for (const { Panel, submitId, needsSecondaryFile, initialFiles, isMultiFileBatch } of cases) {
+      fetchSignals.length = 0;
+      pendingFetches.length = 0;
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles(initialFiles);
+
+      const { container, unmount } = render(<Panel />);
+      if (needsSecondaryFile) chooseSecondaryFile(container, image("secondary.png"));
+      fireEvent.click(screen.getByTestId(submitId));
+      expect(useFileStore.getState().processing).toBe(true);
+      expect(fetchSignals[0]?.aborted).toBe(false);
+
+      act(() => {
+        while (useFileStore.getState().entries.length > 0) {
+          useFileStore.getState().removeFile(0);
+        }
+      });
+      await act(async () => {});
+
+      expect(fetchSignals[0]?.aborted).toBe(true);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByTestId(submitId)).toBeDisabled();
+
+      if (isMultiFileBatch) {
+        // Removing all startEntries after adding a new file mid-run also aborts and clears processing.
+        act(() => {
+          useFileStore.getState().setFiles(initialFiles);
+        });
+        fireEvent.click(screen.getByTestId(submitId));
+        expect(useFileStore.getState().processing).toBe(true);
+        expect(fetchSignals[1]?.aborted).toBe(false);
+
+        act(() => {
+          useFileStore.getState().addFiles([image("replacement.png")]);
+          for (let i = 0; i < initialFiles.length; i++) {
+            useFileStore.getState().removeFile(0);
+          }
+        });
+        await act(async () => {});
+
+        expect(useFileStore.getState().entries).toHaveLength(1);
+        expect(useFileStore.getState().entries[0].file.name).toBe("replacement.png");
+        expect(fetchSignals[1]?.aborted).toBe(true);
+        expect(useFileStore.getState().processing).toBe(false);
+        expect(screen.getByTestId(submitId)).toBeEnabled();
+      }
+
+      unmount();
+      expect(useFileStore.getState().error).toBeNull();
+    }
+  });
+
+  it("single-entry fetch panels: abort and clear processing when removeFile removes capturedEntry while another entry remains, and keep running when an unrelated entry is removed", async () => {
+    const cases: Array<{
+      name: string;
+      Panel: ComponentType;
+      submitId: string;
+      needsSecondaryFile: boolean;
+      addSecondMidFlight?: boolean;
+      goodBody: unknown;
+    }> = [
+      {
+        name: "compare",
+        Panel: CompareSettings,
+        submitId: "compare-submit",
+        needsSecondaryFile: true,
+        goodBody: { similarity: 95.2, downloadUrl: "/api/v1/download/j/diff.png" },
+      },
+      {
+        name: "compose",
+        Panel: ComposeSettings,
+        submitId: "compose-submit",
+        needsSecondaryFile: true,
+        goodBody: {
+          jobId: "j-comp",
+          downloadUrl: "/api/v1/download/j-comp/out.png",
+          originalSize: 100,
+          processedSize: 90,
+        },
+      },
+      {
+        name: "color-palette",
+        Panel: ColorPaletteSettings,
+        submitId: "color-palette-submit",
+        needsSecondaryFile: false,
+        goodBody: { colors: ["#112233"], hex: ["#112233"] },
+      },
+      {
+        name: "watermark-image (single file)",
+        Panel: WatermarkImageSettings,
+        submitId: "watermark-image-submit",
+        needsSecondaryFile: true,
+        addSecondMidFlight: true,
+        goodBody: {
+          jobId: "j-wm",
+          downloadUrl: "/api/v1/download/j-wm/out.png",
+          originalSize: 100,
+          processedSize: 90,
+        },
+      },
+    ];
+
+    for (const { Panel, submitId, needsSecondaryFile, addSecondMidFlight, goodBody } of cases) {
+      fetchSignals.length = 0;
+      pendingFetches.length = 0;
+      useFileStore.getState().reset();
+      if (addSecondMidFlight) {
+        useFileStore.getState().setFiles([image("a.png")]);
+      } else {
+        useFileStore.getState().setFiles([image("a.png"), image("b.png")]);
+        useFileStore.getState().setSelectedIndex(0);
+      }
+
+      const { container, unmount } = render(<Panel />);
+      if (needsSecondaryFile) chooseSecondaryFile(container, image("secondary.png"));
+      fireEvent.click(screen.getByTestId(submitId));
+      expect(useFileStore.getState().processing).toBe(true);
+      expect(fetchSignals[0]?.aborted).toBe(false);
+
+      if (addSecondMidFlight) {
+        act(() => {
+          useFileStore.getState().addFiles([image("b.png")]);
+        });
+      }
+
+      // Removing capturedEntry (index 0) while b.png remains aborts and clears processing.
+      act(() => {
+        useFileStore.getState().removeFile(0);
+      });
+
+      expect(useFileStore.getState().entries).toHaveLength(1);
+      expect(useFileStore.getState().entries[0].file.name).toBe("b.png");
+      expect(fetchSignals[0]?.aborted).toBe(true);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByTestId(submitId)).toBeEnabled();
+
+      // Removing an unrelated entry while capturedEntry remains keeps the run in flight.
+      act(() => {
+        if (addSecondMidFlight) {
+          useFileStore.getState().setFiles([image("keep.png")]);
+        } else {
+          useFileStore.getState().setFiles([image("keep.png"), image("drop.png")]);
+          useFileStore.getState().setSelectedIndex(0);
+        }
+      });
+      fireEvent.click(screen.getByTestId(submitId));
+      expect(useFileStore.getState().processing).toBe(true);
+      expect(fetchSignals[1]?.aborted).toBe(false);
+
+      if (addSecondMidFlight) {
+        act(() => {
+          useFileStore.getState().addFiles([image("drop.png")]);
+        });
+      }
+      act(() => {
+        useFileStore.getState().removeFile(1);
+      });
+
+      expect(fetchSignals[1]?.aborted).toBe(false);
+      expect(useFileStore.getState().processing).toBe(true);
+
+      await act(async () => {
+        pendingFetches[1].resolve(new Response(JSON.stringify(goodBody), { status: 200 }));
+      });
+
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().error).toBeNull();
+      unmount();
+    }
+  });
+});

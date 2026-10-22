@@ -63,10 +63,16 @@ export function ColorPaletteSettings() {
 
     let storeReset = false;
     const unsubscribe = useFileStore.subscribe((state) => {
-      if (!state.processing || state.entries.length === 0) {
+      const hasCapturedEntry = capturedEntry
+        ? state.entries.some((e) => e.id === capturedEntry.id && e.file === capturedEntry.file)
+        : state.files.includes(targetFile);
+      if (!state.processing || !hasCapturedEntry) {
         storeReset = true;
         if (abortRef.current === controller) abortRef.current = null;
         unsubscribe();
+        if (state.processing) {
+          setProcessing(false);
+        }
         controller.abort();
       }
     });

@@ -95,11 +95,17 @@ export function StitchSettings() {
 
     let storeReset = false;
     const unsubscribe = useFileStore.subscribe((state) => {
-      if (!state.processing || state.entries.length === 0) {
+      if (
+        !state.processing ||
+        !state.entries.some((e) => e.id === capturedEntry.id && e.file === capturedEntry.file)
+      ) {
         storeReset = true;
         if (xhrRef.current === xhr) xhrRef.current = null;
         if (unsubscribeRef.current === unsubscribe) unsubscribeRef.current = null;
         unsubscribe();
+        if (state.processing) {
+          setProcessing(false);
+        }
         xhr.abort();
       }
     });

@@ -58,6 +58,10 @@ export function WatermarkImageSettings() {
 
   const handleProcess = async () => {
     if (files.length === 0 || !watermarkFile) return;
+    const { entries: startEntries, selectedIndex } = useFileStore.getState();
+    const capturedEntry =
+      files.length === 1 ? (startEntries[selectedIndex] ?? startEntries[0]) : undefined;
+    if (files.length === 1 && !capturedEntry) return;
 
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -68,25 +72,25 @@ export function WatermarkImageSettings() {
 
     let storeReset = false;
     const unsubscribe = useFileStore.subscribe((state) => {
-      if (!state.processing || state.entries.length === 0) {
+      const hasRunEntry = capturedEntry
+        ? state.entries.some((e) => e.id === capturedEntry.id && e.file === capturedEntry.file)
+        : startEntries.length > 0
+          ? state.entries.some((e) => startEntries.some((b) => b.id === e.id && b.file === e.file))
+          : state.entries.length > 0;
+      if (!state.processing || !hasRunEntry) {
         storeReset = true;
         if (abortRef.current === controller) abortRef.current = null;
         unsubscribe();
+        if (state.processing) {
+          setProcessing(false);
+        }
         controller.abort();
       }
     });
 
     const settingsJson = JSON.stringify({ position, opacity, scale });
 
-    if (files.length === 1) {
-      const { entries, selectedIndex } = useFileStore.getState();
-      const capturedEntry = entries[selectedIndex] ?? entries[0];
-      if (!capturedEntry) {
-        unsubscribe();
-        if (abortRef.current === controller) abortRef.current = null;
-        setProcessing(false);
-        return;
-      }
+    if (capturedEntry) {
       const entryId = capturedEntry.id;
       setResultsByEntry((prev) => {
         if (!(entryId in prev)) return prev;

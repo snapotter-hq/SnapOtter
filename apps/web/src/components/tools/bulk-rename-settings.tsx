@@ -41,6 +41,7 @@ export function BulkRenameSettings() {
 
   const handleProcess = async () => {
     if (files.length === 0) return;
+    const startEntries = useFileStore.getState().entries;
 
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -52,10 +53,17 @@ export function BulkRenameSettings() {
 
     let storeReset = false;
     const unsubscribe = useFileStore.subscribe((state) => {
-      if (!state.processing || state.entries.length === 0) {
+      const hasRunEntry =
+        startEntries.length > 0
+          ? state.entries.some((e) => startEntries.some((b) => b.id === e.id && b.file === e.file))
+          : state.entries.length > 0;
+      if (!state.processing || !hasRunEntry) {
         storeReset = true;
         if (abortRef.current === controller) abortRef.current = null;
         unsubscribe();
+        if (state.processing) {
+          setProcessing(false);
+        }
         controller.abort();
       }
     });

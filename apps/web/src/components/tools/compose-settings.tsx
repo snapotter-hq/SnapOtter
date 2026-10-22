@@ -73,10 +73,16 @@ export function ComposeSettings() {
 
     let storeReset = false;
     const unsubscribe = useFileStore.subscribe((state) => {
-      if (!state.processing || state.entries.length === 0) {
+      if (
+        !state.processing ||
+        !state.entries.some((e) => e.id === capturedEntry.id && e.file === capturedEntry.file)
+      ) {
         storeReset = true;
         if (abortRef.current === controller) abortRef.current = null;
         unsubscribe();
+        if (state.processing) {
+          setProcessing(false);
+        }
         controller.abort();
       }
     });
