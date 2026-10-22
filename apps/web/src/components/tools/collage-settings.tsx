@@ -12,6 +12,7 @@ import {
   getTemplatesForCount,
 } from "@/lib/collage-templates";
 import { format, plural } from "@/lib/format";
+import { showIntakeIgnored } from "@/lib/intake-notice";
 import { jobFailureMessage, parseResultBody, reportMalformedResult } from "@/lib/progress-frames";
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { cn } from "@/lib/utils";
@@ -285,7 +286,13 @@ export function CollageSettings() {
           </span>
           <button
             type="button"
-            onClick={() => store.clearImages()}
+            onClick={() => {
+              if (useCollageStore.getState().phase === "processing") {
+                showIntakeIgnored(t.dropzone.ignoredWhileRunning);
+                return;
+              }
+              store.clearImages();
+            }}
             className="text-xs text-muted-foreground hover:text-foreground"
           >
             {t.toolPage.clearAll}

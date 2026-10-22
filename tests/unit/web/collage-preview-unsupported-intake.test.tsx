@@ -19,6 +19,7 @@ vi.mock("@/lib/image-preview", () => ({
 }));
 
 import { CollagePreview } from "@/components/tools/collage-preview";
+import { CollageSettings } from "@/components/tools/collage-settings";
 import { I18nProvider } from "@/contexts/i18n-context";
 import { beginCollageRun, useCollageStore } from "@/stores/collage-store";
 
@@ -62,6 +63,13 @@ describe("CollagePreview rejects non-image files (#2863)", () => {
     render(
       <I18nProvider>
         <CollagePreview />
+      </I18nProvider>,
+    );
+
+  const renderSettings = () =>
+    render(
+      <I18nProvider>
+        <CollageSettings />
       </I18nProvider>,
     );
 
@@ -289,5 +297,98 @@ describe("CollagePreview rejects non-image files (#2863)", () => {
 
     clickSpy.mockRestore();
     run.end();
+  });
+
+  it("labels ImageStrip thumbnail remove buttons with t.common.delete (#3275)", () => {
+    act(() => {
+      useCollageStore.getState().addImages([png("a.png"), png("b.png")]);
+    });
+    renderPreview();
+
+    const deleteButtons = screen.getAllByRole("button", { name: en.common.delete });
+    expect(deleteButtons).toHaveLength(2);
+    for (const btn of deleteButtons) {
+      expect(btn).toHaveAttribute("aria-label", en.common.delete);
+    }
+  });
+
+  it("refuses ImageStrip thumbnail remove clicks while a collage run is processing without aborting the active run (#3275)", () => {
+    act(() => {
+      useCollageStore.getState().addImages([png("a.png"), png("b.png")]);
+    });
+    const { container } = renderPreview();
+
+    const deleteButton =
+      screen.queryAllByRole("button", { name: en.common.delete })[0] ??
+      (container.querySelector("button:has(svg.lucide-x)") as HTMLElement);
+    expect(deleteButton).toBeTruthy();
+
+    const abortSpy = vi.fn();
+    const run = beginCollageRun(abortSpy);
+    // Simulate a click reaching the remove button right after processing starts before ProcessingView commits.
+    useCollageStore.getState().setPhase("processing");
+    vi.mocked(URL.revokeObjectURL).mockClear();
+
+    fireEvent.click(deleteButton);
+    expect(toastInfoSpy).toHaveBeenCalledTimes(1);
+    expect(toastInfoSpy).toHaveBeenCalledWith(en.dropzone.ignoredWhileRunning, {
+      id: "intake-ignored-while-running",
+    });
+    expect(abortSpy).not.toHaveBeenCalled();
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+    expect(run.isCurrent()).toBe(true);
+    expect(useCollageStore.getState().phase).toBe("processing");
+    expect(useCollageStore.getState().images.map((i) => i.file.name)).toEqual(["a.png", "b.png"]);
+
+    // Once the run finishes and returns to editing, clicking delete removes the image.
+    run.end();
+    act(() => {
+      useCollageStore.getState().setPhase("editing");
+    });
+    const activeDeleteButton =
+      screen.queryAllByRole("button", { name: en.common.delete })[0] ??
+      (container.querySelector("button:has(svg.lucide-x)") as HTMLElement);
+    fireEvent.click(activeDeleteButton);
+    expect(toastInfoSpy).toHaveBeenCalledTimes(1);
+    expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1);
+    expect(useCollageStore.getState().images.map((i) => i.file.name)).toEqual(["b.png"]);
+  });
+
+  it("refuses CollageSettings Clear all while a collage run is processing without aborting the active run (#3275)", () => {
+    act(() => {
+      useCollageStore.getState().addImages([png("a.png"), png("b.png")]);
+    });
+    renderSettings();
+
+    const clearAllButton = screen.getByRole("button", { name: en.toolPage.clearAll });
+    const abortSpy = vi.fn();
+    const run = beginCollageRun(abortSpy);
+    act(() => {
+      useCollageStore.getState().setPhase("processing");
+    });
+    vi.mocked(URL.revokeObjectURL).mockClear();
+
+    fireEvent.click(clearAllButton);
+    expect(toastInfoSpy).toHaveBeenCalledTimes(1);
+    expect(toastInfoSpy).toHaveBeenCalledWith(en.dropzone.ignoredWhileRunning, {
+      id: "intake-ignored-while-running",
+    });
+    expect(abortSpy).not.toHaveBeenCalled();
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+    expect(run.isCurrent()).toBe(true);
+    expect(useCollageStore.getState().phase).toBe("processing");
+    expect(useCollageStore.getState().images.map((i) => i.file.name)).toEqual(["a.png", "b.png"]);
+
+    // Once the run finishes (phase === "result"), clicking Clear all clears the loaded images and resets to upload.
+    run.end();
+    act(() => {
+      useCollageStore.getState().setResult("/api/v1/jobs/j1/download", 2048, 4096, "j1");
+    });
+    expect(useCollageStore.getState().phase).toBe("result");
+    fireEvent.click(clearAllButton);
+    expect(toastInfoSpy).toHaveBeenCalledTimes(1);
+    expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2);
+    expect(useCollageStore.getState().images).toHaveLength(0);
+    expect(useCollageStore.getState().phase).toBe("upload");
   });
 });
