@@ -1054,4 +1054,117 @@ describe("registerFetchUrlsRoute nameOnly image validations (#3263)", () => {
       vi.unstubAllGlobals();
     }
   });
+
+  it("sanitizes rawFilename before .svgz detection so double-extension URLs stay consistent (#3592)", async () => {
+    const handler = await getFetchUrlsHandler();
+    const rawSvgWithScript = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="12"><script>alert(1)</script><rect width="16" height="12"/></svg>',
+    );
+    const compressedSvg = gzipSync(rawSvgWithScript);
+    const nonSvgGzip = gzipSync(Buffer.from("not-an-svg"));
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string | URL | Request) => {
+        const href = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+        if (href.endsWith("/archive.svgz.php")) {
+          return new Response(new Uint8Array(nonSvgGzip), {
+            status: 200,
+            headers: { "Content-Type": "application/gzip" },
+          });
+        }
+        return new Response(new Uint8Array(compressedSvg), {
+          status: 200,
+          headers: { "Content-Type": "application/gzip" },
+        });
+      }),
+    );
+
+    try {
+      putObjectMock.mockClear();
+      const warnMock = vi.fn();
+      const reply = makeReply();
+      await handler(
+        {
+          body: {
+            urls: [
+              "http://1.2.3.4:9999/diagram.svgz.php",
+              "http://1.2.3.4:9999/diagram.png.svgz",
+              "http://1.2.3.4:9999/archive.svgz.php",
+            ],
+          },
+          log: { warn: warnMock },
+        },
+        reply,
+      );
+
+      expect(reply.statusCode).toBe(200);
+      const body = reply.payload as {
+        results: Array<{
+          success: boolean;
+          filename?: string;
+          contentType?: string;
+          size?: number;
+          width?: number;
+          height?: number;
+          previewUrl?: string | null;
+        }>;
+      };
+      expect(body.results).toHaveLength(3);
+
+      // 1: diagram.svgz.php -> safeName "diagram.svgz" -> decompresses + sanitizes -> "diagram.svg"
+      expect(body.results[0]).toMatchObject({
+        success: true,
+        filename: "diagram.svg",
+        contentType: "image/svg+xml",
+        width: 16,
+        height: 12,
+        previewUrl: null,
+      });
+
+      // 2: diagram.png.svgz -> safeName "diagram.png" -> not treated as .svgz, stored untouched
+      expect(body.results[1]).toMatchObject({
+        success: true,
+        filename: "diagram.png",
+        contentType: "application/gzip",
+        size: compressedSvg.length,
+        width: undefined,
+        height: undefined,
+        previewUrl: null,
+      });
+
+      // 3: archive.svgz.php -> safeName "archive.svgz" -> non-SVG gzip falls back to opaque .svgz
+      expect(body.results[2]).toMatchObject({
+        success: true,
+        filename: "archive.svgz",
+        contentType: "application/gzip",
+        size: nonSvgGzip.length,
+        width: undefined,
+        height: undefined,
+        previewUrl: null,
+      });
+
+      expect(putObjectMock).toHaveBeenCalledTimes(3);
+      const storedBySuffix = new Map<string, Buffer>();
+      for (const call of putObjectMock.mock.calls as unknown as Array<[string, Buffer]>) {
+        const [key, data] = call;
+        storedBySuffix.set(key.split("/").pop() ?? key, data);
+      }
+
+      const storedSvg = storedBySuffix.get("diagram.svg")?.toString("utf-8") ?? "";
+      expect(storedSvg).toContain("<svg");
+      expect(storedSvg).not.toContain("<script");
+      expect(body.results[0]?.size).toBe(storedBySuffix.get("diagram.svg")?.length);
+
+      expect(storedBySuffix.get("diagram.png")?.equals(compressedSvg)).toBe(true);
+      expect(storedBySuffix.get("archive.svgz")?.equals(nonSvgGzip)).toBe(true);
+      expect(warnMock).toHaveBeenCalledOnce();
+      expect(warnMock).toHaveBeenCalledWith(
+        expect.objectContaining({ filename: "archive.svgz.php" }),
+        expect.stringContaining("does not contain SVG"),
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

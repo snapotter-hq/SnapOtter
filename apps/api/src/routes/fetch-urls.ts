@@ -267,8 +267,9 @@ async function fetchSingleUrl(
     // before validation and storage so hostile DOCTYPE/script payloads are
     // stripped even when Sharp rejects the post-sanitized SVG.
     const rawFilename = filenameFromUrl(url);
+    let safeName = sanitizeFilename(rawFilename);
     let safeBuffer: Buffer = buffer;
-    const uploadExt = extname(rawFilename).toLowerCase();
+    const uploadExt = extname(safeName).toLowerCase();
     let isDecompressedSvg = false;
     if (uploadExt === ".svgz" || isSvgBuffer(buffer)) {
       try {
@@ -304,7 +305,6 @@ async function fetchSingleUrl(
       }
     }
 
-    let safeName = sanitizeFilename(rawFilename);
     if (isDecompressedSvg && safeName.toLowerCase().endsWith(".svgz")) {
       safeName = safeName.replace(/\.svgz$/i, ".svg");
     }
