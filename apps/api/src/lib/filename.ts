@@ -15,6 +15,7 @@ const SAFE_EXTENSIONS = new Set([
   ".tif",
   ".avif",
   ".svg",
+  ".svgz",
   ".heic",
   ".heif",
   ".jxl",

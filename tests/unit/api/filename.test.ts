@@ -172,12 +172,19 @@ describe("sanitizeFilename", () => {
       "tif",
       "avif",
       "svg",
+      "svgz",
       "pdf",
     ];
     for (const ext of extensions) {
       const result = sanitizeFilename(`file.${ext}.evil`);
       expect(result).toBe(`file.${ext}`);
     }
+  });
+
+  it("truncates double extensions on .svgz and keeps repeated .svgz stems (#3531)", () => {
+    expect(sanitizeFilename("diagram.svgz.php")).toBe("diagram.svgz");
+    expect(sanitizeFilename("logo.svgz.backup.svgz")).toBe("logo.svgz.backup.svgz");
+    expect(sanitizeFilename("diagram.png.svgz")).toBe("diagram.png");
   });
 
   it("recognizes safe extensions across all modalities", () => {

@@ -361,8 +361,9 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           // sanitizer's reason for a size/element-cap rejection (400), and a
           // reported 500 for anything unexpected. Either way the batch so far
           // is discarded first.
+          let safeName = sanitizeFilename(part.filename ?? "upload");
           let safeBuffer: Buffer = buffer;
-          const ext = extname(part.filename ?? "").toLowerCase();
+          const ext = extname(safeName).toLowerCase();
           let isDecompressedSvg = false;
           if (ext === ".svgz" || isSvgBuffer(buffer)) {
             try {
@@ -410,17 +411,16 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
             return sendOverQuota(reply, batchOverQuota);
           }
 
+          if (isDecompressedSvg && safeName.toLowerCase().endsWith(".svgz")) {
+            safeName = safeName.replace(/\.svgz$/i, ".svg");
+          }
+
           // Validated after sanitizing, so the type describes the bytes that
           // are stored: a hostile SVG that only decodes once it's clean is an
           // SVG (#1550). Non-images fail here and keep a type from
           // unverifiedMime().
-          const validation = await validateImageBuffer(safeBuffer, part.filename).catch(() => null);
-          const isValidImage = validation?.valid === true;
-
-          let safeName = sanitizeFilename(part.filename ?? "upload");
-          if (isDecompressedSvg && safeName.toLowerCase().endsWith(".svgz")) {
-            safeName = safeName.replace(/\.svgz$/i, ".svg");
-          }
+          const validation = await validateImageBuffer(safeBuffer, safeName).catch(() => null);
+          const isValidImage = validation?.valid === true && !validation.nameOnly;
           const mimeType =
             (isValidImage && validatedImageMime(validation, safeName)) ||
             unverifiedMime(part.mimetype || "application/octet-stream");
@@ -1056,7 +1056,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     // Try image validation on the bytes that will be stored; non-image outputs
     // from trusted tools are accepted
     const validation = await validateImageBuffer(safeResultBuffer, resultName).catch(() => null);
-    const isValidImage = validation?.valid === true;
+    const isValidImage = validation?.valid === true && !validation.nameOnly;
 
     const nextVersion = parent.version + 1;
 

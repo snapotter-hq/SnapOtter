@@ -157,8 +157,10 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
           // the stream teardown, so handle it here like the quota check below:
           // return the sanitizer's reason for a size/element-cap rejection, and
           // report + 500 for anything unexpected rather than storing the file.
+          // Sanitize filename (canonical; do NOT re-sanitize downstream)
+          let safeName = sanitizeFilename(part.filename ?? "upload");
           let safeBuffer: Buffer = buffer;
-          const uploadExt = extname(part.filename ?? "").toLowerCase();
+          const uploadExt = extname(safeName).toLowerCase();
           let isDecompressedSvg = false;
           if (uploadExt === ".svgz" || isSvgBuffer(buffer)) {
             try {
@@ -196,8 +198,6 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
             }
           }
 
-          // Sanitize filename (canonical; do NOT re-sanitize downstream)
-          let safeName = sanitizeFilename(part.filename ?? "upload");
           if (isDecompressedSvg && safeName.toLowerCase().endsWith(".svgz")) {
             safeName = safeName.replace(/\.svgz$/i, ".svg");
           }

@@ -1236,6 +1236,53 @@ describe("files route logic", () => {
         expect(storedSvg).toContain("<svg");
       }
     });
+
+    it("sanitizes the upload filename before .svgz detection so double-extension uploads stay consistent (#3531)", async () => {
+      const rawSvgWithScript = Buffer.from(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><script>alert(1)</script><rect width="10" height="10"/></svg>',
+      );
+      const compressedSvg = gzipSync(rawSvgWithScript);
+      const nonSvgGzip = gzipSync(Buffer.from("not-an-svg"));
+      const req = makeRequest([
+        filePart("diagram.svgz.php", compressedSvg),
+        filePart("diagram.png.svgz", compressedSvg),
+        filePart("archive.svgz.php", nonSvgGzip),
+      ]);
+      const reply = makeReply();
+
+      await uploadHandler(req, reply);
+
+      expect(reply.statusCode).toBe(200);
+      expect(reply.payload).toEqual({
+        jobId: expect.any(String),
+        files: [
+          {
+            name: "diagram.svg",
+            size: expect.any(Number),
+            format: "svg",
+          },
+          {
+            name: "diagram.png",
+            size: compressedSvg.length,
+            format: "png",
+          },
+          {
+            name: "archive.svgz",
+            size: nonSvgGzip.length,
+            format: "svgz",
+          },
+        ],
+      });
+      const firstStored = (
+        mocks.putObject.mock.calls[0] as unknown as [string, Buffer]
+      )[1].toString("utf-8");
+      expect(firstStored).toContain("<svg");
+      expect(firstStored).not.toContain("<script");
+      const secondStored = (mocks.putObject.mock.calls[1] as unknown as [string, Buffer])[1];
+      expect(secondStored.equals(compressedSvg)).toBe(true);
+      const thirdStored = (mocks.putObject.mock.calls[2] as unknown as [string, Buffer])[1];
+      expect(thirdStored.equals(nonSvgGzip)).toBe(true);
+    });
   });
 
   describe("POST /api/v1/preview RAW extension extraction (#3246)", () => {

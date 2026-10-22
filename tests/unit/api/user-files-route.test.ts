@@ -31,7 +31,9 @@ const mocks = vi.hoisted(() => ({
   deleteStoredFile: vi.fn<(_name: string) => Promise<void>>(() => Promise.resolve()),
   getCachedThumbnail: vi.fn<() => Promise<Buffer | null>>(() => Promise.resolve(null)),
   isStorageServiceFault: vi.fn<(_e: unknown) => boolean>(() => false),
-  saveFile: vi.fn(() => Promise.resolve("stored-result.png")),
+  saveFile: vi.fn<(_buf: Buffer, _name: string) => Promise<string>>(() =>
+    Promise.resolve("stored-result.png"),
+  ),
   saveThumbnail: vi.fn<() => Promise<void>>(() => Promise.resolve()),
   readStoredFile: vi.fn<() => Promise<Buffer>>(() => Promise.resolve(Buffer.alloc(0))),
   streamStoredFile: vi.fn<() => Promise<Readable>>(() =>
@@ -46,9 +48,18 @@ const mocks = vi.hoisted(() => ({
   quotaRefusal: vi.fn(() => Promise.resolve(null)),
   requireFileAccess: vi.fn(() => Promise.resolve({ id: "user-1", role: "admin" })),
   hasEffectivePermission: vi.fn(() => Promise.resolve(true)),
-  validateImageBuffer: vi.fn(() =>
-    Promise.resolve({ valid: true as const, format: "png", width: 800, height: 600 }),
-  ),
+  validateImageBuffer: vi.fn<
+    (
+      _buf: Buffer,
+      _filename?: string,
+    ) => Promise<{
+      valid: true;
+      format: string;
+      width: number;
+      height: number;
+      nameOnly?: true;
+    }>
+  >(() => Promise.resolve({ valid: true as const, format: "png", width: 800, height: 600 })),
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -1055,6 +1066,163 @@ describe("user files route logic", () => {
           originalName: ".svgz",
           mimeType: "application/octet-stream",
           size: corruptGzipDotfile.length,
+        });
+      });
+
+      it("sanitizes POST /api/v1/files/upload filenames before .svgz detection and passes safeName with !nameOnly to validateImageBuffer (#3531)", async () => {
+        const { validateImageBuffer: realValidateImageBuffer } = await vi.importActual<
+          typeof import("../../../apps/api/src/lib/file-validation.js")
+        >("../../../apps/api/src/lib/file-validation.js");
+        mocks.validateImageBuffer.mockImplementation(realValidateImageBuffer as never);
+
+        const rawSvgWithScript = Buffer.from(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="8"><script>alert(1)</script><rect width="12" height="8"/></svg>',
+        );
+        const compressedSvg = gzipSync(rawSvgWithScript);
+        const nonSvgGzip = gzipSync(Buffer.from("not-an-svg"));
+        const savedCalls: Array<[Buffer, string]> = [];
+        mocks.saveFile.mockImplementation(async (buf: Buffer, name: string) => {
+          savedCalls.push([buf, name]);
+          return `stored-${name}`;
+        });
+
+        const uploadReply = makeReply();
+        await uploadHandler(
+          {
+            log: { warn: vi.fn(), error: vi.fn() },
+            parts: async function* () {
+              yield {
+                type: "file" as const,
+                fieldname: "file",
+                filename: "diagram.svgz.php",
+                mimetype: "image/svg+xml",
+                file: Readable.from([compressedSvg]),
+              };
+              yield {
+                type: "file" as const,
+                fieldname: "file",
+                filename: "diagram.png.svgz",
+                mimetype: "image/svg+xml",
+                file: Readable.from([compressedSvg]),
+              };
+              yield {
+                type: "file" as const,
+                fieldname: "file",
+                filename: "archive.svgz.php",
+                mimetype: "image/svg+xml",
+                file: Readable.from([nonSvgGzip]),
+              };
+            },
+          },
+          uploadReply,
+        );
+
+        expect(uploadReply.statusCode).toBe(201);
+        const createdFiles = (uploadReply.payload as { files: Array<Record<string, unknown>> })
+          .files;
+        expect(createdFiles).toHaveLength(3);
+
+        // 1. "diagram.svgz.php" -> safeName "diagram.svgz" -> decompressed + sanitized -> "diagram.svg"
+        expect(savedCalls[0]?.[1]).toBe("diagram.svg");
+        expect(savedCalls[0]?.[0].toString("utf-8")).toContain("<svg");
+        expect(savedCalls[0]?.[0].toString("utf-8")).not.toContain("<script");
+        expect(mocks.validateImageBuffer).toHaveBeenNthCalledWith(
+          1,
+          savedCalls[0]?.[0],
+          "diagram.svg",
+        );
+        expect(createdFiles[0]).toMatchObject({
+          originalName: "diagram.svg",
+          mimeType: "image/svg+xml",
+          width: 12,
+          height: 8,
+        });
+
+        // 2. "diagram.png.svgz" -> safeName "diagram.png" -> not treated as .svgz, stored as raw bytes with unverifiedMime
+        expect(savedCalls[1]?.[1]).toBe("diagram.png");
+        expect(savedCalls[1]?.[0].equals(compressedSvg)).toBe(true);
+        expect(mocks.validateImageBuffer).toHaveBeenNthCalledWith(2, compressedSvg, "diagram.png");
+        expect(createdFiles[1]).toMatchObject({
+          originalName: "diagram.png",
+          mimeType: "application/octet-stream",
+          size: compressedSvg.length,
+          width: null,
+          height: null,
+        });
+
+        // 3. "archive.svgz.php" -> safeName "archive.svgz" -> non-SVG gzip falls through as opaque .svgz with nameOnly: true
+        expect(savedCalls[2]?.[1]).toBe("archive.svgz");
+        expect(savedCalls[2]?.[0].equals(nonSvgGzip)).toBe(true);
+        expect(mocks.validateImageBuffer).toHaveBeenNthCalledWith(3, nonSvgGzip, "archive.svgz");
+        expect(createdFiles[2]).toMatchObject({
+          originalName: "archive.svgz",
+          mimeType: "application/octet-stream",
+          size: nonSvgGzip.length,
+          width: null,
+          height: null,
+        });
+
+        // 4. Direct check that !validation.nameOnly gates isValidImage (including measuredDimensions) on upload and save-result
+        mocks.validateImageBuffer.mockResolvedValueOnce({
+          valid: true,
+          format: "png",
+          width: 320,
+          height: 240,
+          nameOnly: true,
+        });
+        const nameOnlyUploadReply = makeReply();
+        await uploadHandler(
+          {
+            log: { warn: vi.fn(), error: vi.fn() },
+            parts: async function* () {
+              yield {
+                type: "file" as const,
+                fieldname: "file",
+                filename: "unverified.tga",
+                mimetype: "image/x-tga",
+                file: Readable.from([Buffer.from("not-a-tga")]),
+              };
+            },
+          },
+          nameOnlyUploadReply,
+        );
+        expect(nameOnlyUploadReply.statusCode).toBe(201);
+        const [nameOnlyFile] = (
+          nameOnlyUploadReply.payload as { files: Array<Record<string, unknown>> }
+        ).files;
+        expect(nameOnlyFile).toMatchObject({
+          originalName: "unverified.tga",
+          mimeType: "application/octet-stream",
+          width: null,
+          height: null,
+        });
+
+        mocks.parentRows = [
+          makeParent({ originalName: "unverified.tga", mimeType: "image/x-tga" }),
+        ];
+        mocks.validateImageBuffer.mockResolvedValueOnce({
+          valid: true,
+          format: "png",
+          width: 320,
+          height: 240,
+          nameOnly: true,
+        });
+        const nameOnlySaveReply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "result.tga",
+            parentId: "parent-1",
+            toolId: "resize",
+            buffer: Buffer.from("not-a-tga"),
+          }),
+          nameOnlySaveReply,
+        );
+        expect(nameOnlySaveReply.statusCode).toBe(201);
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: "unverified.tga",
+          mimeType: "application/octet-stream",
+          width: null,
+          height: null,
         });
       });
 
