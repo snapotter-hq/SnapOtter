@@ -36,6 +36,26 @@ describe("isMissingObjectError", () => {
 
   it("recognizes an unmodeled 404 from an S3-compatible store", () => {
     expect(s3.isMissingObjectError(sdkError("NotFound", 404))).toBe(true);
+    expect(
+      s3.isMissingObjectError(
+        Object.assign(new Error("UnknownError"), {
+          name: "NotFound",
+          $metadata: { httpStatusCode: 404 },
+          $response: { headers: { "content-type": "application/xml" } },
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      s3.isMissingObjectError(
+        Object.assign(new Error("The specified key does not exist."), {
+          name: "NotFound",
+          Code: "NotFound",
+          RequestId: "req-1",
+          $metadata: { httpStatusCode: 404 },
+          $response: { headers: { "content-type": "application/xml" } },
+        }),
+      ),
+    ).toBe(true);
   });
 
   it("treats a vanished bucket as a fault, not a missing object", () => {
@@ -103,6 +123,71 @@ describe("isMissingObjectError", () => {
     });
     expect(s3.isMissingObjectError(xmlParseErr)).toBe(false);
     expect(s3.isMissingObjectError(sdkError("Error", 404))).toBe(false);
+  });
+
+  it("rejects non-NoSuchKey S3 404 XML error codes and void-tag-free HTML 404 responses (#3533)", () => {
+    expect(s3.isMissingObjectError(sdkError("NoSuchVersion", 404))).toBe(false);
+    expect(s3.isMissingObjectError(sdkError("NoSuchUpload", 404))).toBe(false);
+    expect(s3.isMissingObjectError(sdkError("RouteNotFound", 404))).toBe(false);
+    expect(s3.isMissingObjectError(sdkError("NotFound", 500))).toBe(false);
+    expect(s3.isMissingObjectError(sdkError("NotFound", undefined))).toBe(false);
+
+    const htmlContentType404 = Object.assign(new Error("UnknownError"), {
+      name: "NotFound",
+      $metadata: { httpStatusCode: 404 },
+      $response: { headers: { "content-type": "text/html; charset=utf-8" } },
+    });
+    expect(s3.isMissingObjectError(htmlContentType404)).toBe(false);
+
+    const mixedCaseHtmlHeader404 = Object.assign(new Error("UnknownError"), {
+      name: "NotFound",
+      $metadata: { httpStatusCode: 404 },
+      $response: { headers: { "Content-Type": "  TEXT/HTML; charset=utf-8" } },
+    });
+    expect(s3.isMissingObjectError(mixedCaseHtmlHeader404)).toBe(false);
+
+    const xhtmlContentType404 = Object.assign(new Error("UnknownError"), {
+      name: "NotFound",
+      $metadata: { httpStatusCode: 404 },
+      $response: { headers: { "content-type": "application/xhtml+xml" } },
+    });
+    expect(s3.isMissingObjectError(xhtmlContentType404)).toBe(false);
+
+    const htmlShape404 = Object.assign(new Error("UnknownError"), {
+      name: "NotFound",
+      head: { title: "404 Not Found" },
+      body: { h1: "404 Not Found" },
+      $metadata: { httpStatusCode: 404 },
+    });
+    expect(s3.isMissingObjectError(htmlShape404)).toBe(false);
+
+    const headlessHtml404 = Object.assign(new Error("UnknownError"), {
+      name: "NotFound",
+      h1: "404 Not Found",
+      $metadata: { httpStatusCode: 404 },
+    });
+    expect(s3.isMissingObjectError(headlessHtml404)).toBe(false);
+
+    const uppercaseHtml404 = Object.assign(new Error("UnknownError"), {
+      name: "NotFound",
+      HEAD: { TITLE: "404 Not Found" },
+      BODY: { H1: "404 Not Found" },
+      $metadata: { httpStatusCode: 404 },
+    });
+    expect(s3.isMissingObjectError(uppercaseHtml404)).toBe(false);
+
+    const singleTagHtml404 = Object.assign(new Error("UnknownError"), {
+      name: "NotFound",
+      0: "4",
+      $metadata: { httpStatusCode: 404 },
+    });
+    expect(s3.isMissingObjectError(singleTagHtml404)).toBe(false);
+
+    const keylessXmlError404 = Object.assign(new Error("Backend unavailable"), {
+      name: "NotFound",
+      $metadata: { httpStatusCode: 404 },
+    });
+    expect(s3.isMissingObjectError(keylessXmlError404)).toBe(false);
   });
 
   it("rejects non-SDK errors", () => {
@@ -418,7 +503,12 @@ describe("S3Client stalled endpoint timeout (#2755)", () => {
 
   it("propagates HTTP 404 body stream resets and XML parse failures instead of treating them as missing objects (#3265)", async () => {
     const sockets = new Set<net.Socket>();
-    let responseMode: "reset-404" | "truncated-xml-404" | "html-404" = "reset-404";
+    let responseMode:
+      | "reset-404"
+      | "truncated-xml-404"
+      | "html-404"
+      | "html-no-void-tags-404"
+      | "xml-no-such-version-404" = "reset-404";
 
     const server = http.createServer((_req, res) => {
       if (responseMode === "reset-404") {
@@ -439,6 +529,26 @@ describe("S3Client stalled endpoint timeout (#2755)", () => {
           "Content-Type": "application/xml",
         });
         res.end(body);
+        return;
+      }
+      if (responseMode === "html-no-void-tags-404") {
+        const html =
+          "<html><head><title>404 Not Found</title></head><body><h1>404 Not Found</h1><p>nginx</p></body></html>";
+        res.writeHead(404, {
+          "Content-Length": String(Buffer.byteLength(html)),
+          "Content-Type": "text/html; charset=utf-8",
+        });
+        res.end(html);
+        return;
+      }
+      if (responseMode === "xml-no-such-version-404") {
+        const xml =
+          '<?xml version="1.0"?><Error><Code>NoSuchVersion</Code><Message>The specified version does not exist.</Message></Error>';
+        res.writeHead(404, {
+          "Content-Length": String(Buffer.byteLength(xml)),
+          "Content-Type": "application/xml",
+        });
+        res.end(xml);
         return;
       }
       const html = "<html><body><h1>404 Not Found</h1><hr>nginx</body></html>";
@@ -508,7 +618,7 @@ describe("S3Client stalled endpoint timeout (#2755)", () => {
         $metadata: { httpStatusCode: 404 },
       });
 
-      // 3. Reverse-proxy HTML 404 error page.
+      // 3. Reverse-proxy HTML 404 error page (with void tags).
       responseMode = "html-404";
       const htmlDeleteGenericErr = await s3.deleteGenericObject("uploads/job-1/a.png").then(
         () => null,
@@ -520,6 +630,48 @@ describe("S3Client stalled endpoint timeout (#2755)", () => {
       });
       expect(htmlDeleteGenericErr).toHaveProperty("$responseBodyText");
       expect(s3.isMissingObjectError(htmlDeleteGenericErr)).toBe(false);
+
+      // 4. Reverse-proxy void-tag-free HTML 404 error page (#3533).
+      responseMode = "html-no-void-tags-404";
+      const wellFormedHtmlThumbErr = await s3.getThumbnail("a.png").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(wellFormedHtmlThumbErr).toMatchObject({
+        name: "NotFound",
+        $metadata: { httpStatusCode: 404 },
+      });
+      expect(s3.isMissingObjectError(wellFormedHtmlThumbErr)).toBe(false);
+
+      const wellFormedHtmlDeleteErr = await s3.deleteObject("a.png").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(wellFormedHtmlDeleteErr).toMatchObject({
+        name: "NotFound",
+        $metadata: { httpStatusCode: 404 },
+      });
+
+      // 5. Non-NoSuchKey S3 404 XML error code (#3533).
+      responseMode = "xml-no-such-version-404";
+      const noSuchVersionThumbErr = await s3.getThumbnail("a.png").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(noSuchVersionThumbErr).toMatchObject({
+        name: "NoSuchVersion",
+        $metadata: { httpStatusCode: 404 },
+      });
+      expect(s3.isMissingObjectError(noSuchVersionThumbErr)).toBe(false);
+
+      const noSuchVersionDeleteErr = await s3.deleteObject("a.png").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(noSuchVersionDeleteErr).toMatchObject({
+        name: "NoSuchVersion",
+        $metadata: { httpStatusCode: 404 },
+      });
     } finally {
       for (const socket of sockets) socket.destroy();
       await new Promise<void>((resolve) => server.close(() => resolve()));

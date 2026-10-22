@@ -1293,6 +1293,94 @@ describe("isMissingObjectError with the S3 module loaded (#901)", () => {
     expect(isS3MissingShape(genericErrOn404)).toBe(false);
     expect(isMissingObjectError(genericErrOn404)).toBe(false);
   });
+
+  it("rejects non-NoSuchKey S3 404 XML error codes and void-tag-free HTML 404 responses in isS3MissingShape and isMissingObjectError (#3533)", async () => {
+    await getObjectSize("uploads/j/a.png");
+
+    const xmlNotFound404 = Object.assign(new Error("The specified key does not exist."), {
+      name: "NotFound",
+      Code: "NotFound",
+      RequestId: "req-1",
+      $metadata: { httpStatusCode: 404 },
+      $response: { headers: { "content-type": "application/xml" } },
+    });
+    expect(isS3MissingShape(xmlNotFound404)).toBe(true);
+    expect(isMissingObjectError(xmlNotFound404)).toBe(true);
+
+    for (const name of ["NoSuchVersion", "NoSuchUpload", "RouteNotFound"]) {
+      const err = Object.assign(new Error(name), {
+        name,
+        $metadata: { httpStatusCode: 404 },
+      });
+      expect(isS3MissingShape(err)).toBe(false);
+      expect(isMissingObjectError(err)).toBe(false);
+    }
+
+    const htmlContentType404 = Object.assign(new Error("UnknownError"), {
+      name: "NotFound",
+      $metadata: { httpStatusCode: 404 },
+      $response: { headers: { "content-type": "text/html; charset=utf-8" } },
+    });
+    expect(isS3MissingShape(htmlContentType404)).toBe(false);
+    expect(isMissingObjectError(htmlContentType404)).toBe(false);
+
+    const mixedCaseHtmlHeader404 = Object.assign(new Error("UnknownError"), {
+      name: "NotFound",
+      $metadata: { httpStatusCode: 404 },
+      $response: { headers: { "Content-Type": "  TEXT/HTML; charset=utf-8" } },
+    });
+    expect(isS3MissingShape(mixedCaseHtmlHeader404)).toBe(false);
+    expect(isMissingObjectError(mixedCaseHtmlHeader404)).toBe(false);
+
+    const xhtmlContentType404 = Object.assign(new Error("UnknownError"), {
+      name: "NotFound",
+      $metadata: { httpStatusCode: 404 },
+      $response: { headers: { "content-type": "application/xhtml+xml" } },
+    });
+    expect(isS3MissingShape(xhtmlContentType404)).toBe(false);
+    expect(isMissingObjectError(xhtmlContentType404)).toBe(false);
+
+    const htmlShape404 = Object.assign(new Error("UnknownError"), {
+      name: "NotFound",
+      head: { title: "404 Not Found" },
+      body: { h1: "404 Not Found" },
+      $metadata: { httpStatusCode: 404 },
+    });
+    expect(isS3MissingShape(htmlShape404)).toBe(false);
+    expect(isMissingObjectError(htmlShape404)).toBe(false);
+
+    const headlessHtml404 = Object.assign(new Error("UnknownError"), {
+      name: "NotFound",
+      h1: "404 Not Found",
+      $metadata: { httpStatusCode: 404 },
+    });
+    expect(isS3MissingShape(headlessHtml404)).toBe(false);
+    expect(isMissingObjectError(headlessHtml404)).toBe(false);
+
+    const uppercaseHtml404 = Object.assign(new Error("UnknownError"), {
+      name: "NotFound",
+      HEAD: { TITLE: "404 Not Found" },
+      BODY: { H1: "404 Not Found" },
+      $metadata: { httpStatusCode: 404 },
+    });
+    expect(isS3MissingShape(uppercaseHtml404)).toBe(false);
+    expect(isMissingObjectError(uppercaseHtml404)).toBe(false);
+
+    const singleTagHtml404 = Object.assign(new Error("UnknownError"), {
+      name: "NotFound",
+      0: "4",
+      $metadata: { httpStatusCode: 404 },
+    });
+    expect(isS3MissingShape(singleTagHtml404)).toBe(false);
+    expect(isMissingObjectError(singleTagHtml404)).toBe(false);
+
+    const keylessXmlError404 = Object.assign(new Error("Backend unavailable"), {
+      name: "NotFound",
+      $metadata: { httpStatusCode: 404 },
+    });
+    expect(isS3MissingShape(keylessXmlError404)).toBe(false);
+    expect(isMissingObjectError(keylessXmlError404)).toBe(false);
+  });
 });
 
 describe("normalizeS3ReadFault (#2808)", () => {
@@ -1382,6 +1470,31 @@ describe("normalizeS3ReadFault (#2808)", () => {
       }),
     ],
     [
+      "non-NoSuchKey S3 404 XML error code (#3533)",
+      Object.assign(new Error("The specified version does not exist."), {
+        name: "NoSuchVersion",
+        $metadata: { httpStatusCode: 404 },
+      }),
+    ],
+    [
+      "void-tag-free HTML 404 response with head/body fields (#3533)",
+      Object.assign(new Error("UnknownError"), {
+        name: "NotFound",
+        head: { title: "404 Not Found" },
+        body: { h1: "404 Not Found" },
+        $metadata: { httpStatusCode: 404 },
+        $response: { headers: { "content-type": "text/html" } },
+      }),
+    ],
+    [
+      "HTML 404 response on HEAD with text/html Content-Type (#3533)",
+      Object.assign(new Error("UnknownError"), {
+        name: "NotFound",
+        $metadata: { httpStatusCode: 404 },
+        $response: { headers: { "content-type": "text/html; charset=utf-8" } },
+      }),
+    ],
+    [
       "network connectivity error (ECONNREFUSED)",
       Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), {
         code: "ECONNREFUSED",
@@ -1452,6 +1565,35 @@ describe("normalizeS3ReadFault (#2808)", () => {
       code: "storage-unavailable",
       statusCode: 503,
       cause: xmlParseOn404,
+    });
+
+    const noSuchVersionOn404 = Object.assign(new Error("The specified version does not exist."), {
+      name: "NoSuchVersion",
+      $metadata: { httpStatusCode: 404 },
+    });
+    expect(normalizeOperationalWriteError(noSuchVersionOn404)).toMatchObject({
+      message: STORAGE_UNAVAILABLE_MESSAGE,
+      isSafeMessage: true,
+      kind: "operational",
+      code: "storage-unavailable",
+      statusCode: 503,
+      cause: noSuchVersionOn404,
+    });
+
+    const html404 = Object.assign(new Error("UnknownError"), {
+      name: "NotFound",
+      head: { title: "404 Not Found" },
+      body: { h1: "404 Not Found" },
+      $metadata: { httpStatusCode: 404 },
+      $response: { headers: { "content-type": "text/html" } },
+    });
+    expect(normalizeOperationalWriteError(html404)).toMatchObject({
+      message: STORAGE_UNAVAILABLE_MESSAGE,
+      isSafeMessage: true,
+      kind: "operational",
+      code: "storage-unavailable",
+      statusCode: 503,
+      cause: html404,
     });
   });
 
@@ -1596,6 +1738,14 @@ describe("objectExists S3 fault classification (#2924)", () => {
         name: "Error",
         code: "ECONNRESET",
         $metadata: { httpStatusCode: 404 },
+      }),
+    ],
+    [
+      "a reverse-proxy text/html 404 on HeadObject (#3533)",
+      Object.assign(new Error("UnknownError"), {
+        name: "NotFound",
+        $metadata: { httpStatusCode: 404 },
+        $response: { headers: { "content-type": "text/html; charset=utf-8" } },
       }),
     ],
     [

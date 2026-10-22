@@ -157,23 +157,54 @@ export async function checkConnection(): Promise<void> {
  * Service faults (AccessDenied, credential rejection, 5xx) and errors that
  * did not come from the SDK return false.
  */
+const ALLOWED_NOT_FOUND_KEYS: ReadonlySet<string> = new Set([
+  "name",
+  "message",
+  "stack",
+  "cause",
+  "$fault",
+  "$retryable",
+  "$metadata",
+  "$response",
+]);
+
 export function isMissingObjectError(error: unknown): boolean {
   if (typeof error !== "object" || error === null || !("$metadata" in error)) return false;
   const e = error as {
     name?: string;
+    message?: unknown;
     code?: unknown;
+    Code?: unknown;
     $metadata?: { httpStatusCode?: number };
+    $response?: { headers?: Record<string, unknown> };
   };
+  if (typeof e.code === "string" || "$responseBodyText" in error) {
+    return false;
+  }
+  if (e.name === "NoSuchKey") return true;
+  if (e.name !== "NotFound" || e.$metadata?.httpStatusCode !== 404) return false;
+  const headers = e.$response?.headers;
+  if (headers && typeof headers === "object") {
+    for (const [k, v] of Object.entries(headers)) {
+      if (
+        k.toLowerCase() === "content-type" &&
+        typeof v === "string" &&
+        /^\s*(?:text\/html|application\/xhtml\+xml)\b/i.test(v)
+      ) {
+        return false;
+      }
+    }
+  }
+  if (e.Code === "NotFound") return true;
   if (
-    e.name === "NoSuchBucket" ||
-    e.name === "TimeoutError" ||
-    e.name === "Error" ||
-    typeof e.code === "string" ||
-    "$responseBodyText" in error
+    typeof e.message === "string" &&
+    e.message !== "" &&
+    e.message !== "UnknownError" &&
+    e.message !== "NotFound"
   ) {
     return false;
   }
-  return e.name === "NoSuchKey" || e.$metadata?.httpStatusCode === 404;
+  return Object.keys(error).every((k) => ALLOWED_NOT_FOUND_KEYS.has(k));
 }
 
 export async function putObject(storedName: string, buffer: Buffer): Promise<void> {
