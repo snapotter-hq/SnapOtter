@@ -5,6 +5,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
+import { type FeedbackErrorCategory, feedbackCategoryOf } from "@/lib/feedback";
 import { format as formatMessage } from "@/lib/format";
 import { jobFailureMessage, parseResultBody, reportMalformedResult } from "@/lib/progress-frames";
 import { reportRunEndFailure } from "@/lib/run-end-report";
@@ -121,7 +122,7 @@ export function StitchSettings() {
       unsubscribe();
     };
 
-    const failEntry = (message: string) =>
+    const failEntry = (message: string, category?: FeedbackErrorCategory) =>
       runEndWrites([
         () =>
           useFileStore.getState().updateEntryById(entryId, {
@@ -131,6 +132,7 @@ export function StitchSettings() {
             processedSize: null,
             status: "failed",
             error: message,
+            errorCategory: category ?? null,
           }),
         () => setProcessing(false),
       ]);
@@ -234,7 +236,7 @@ export function StitchSettings() {
               formatMessage(t.errors.failedWithStatus, { status: xhr.status }),
             );
           }
-          const teardownError = failEntry(message);
+          const teardownError = failEntry(message, xhr.status === 413 ? "upload_error" : undefined);
           if (teardownError) throw teardownError.cause;
         }
       };
@@ -243,7 +245,7 @@ export function StitchSettings() {
         endSubscription();
         if (xhrRef.current !== xhr || storeReset) return;
         xhrRef.current = null;
-        const teardownError = failEntry(t.errors.network);
+        const teardownError = failEntry(t.errors.network, "upload_error");
         if (teardownError) throw teardownError.cause;
       };
 
@@ -254,6 +256,7 @@ export function StitchSettings() {
       if (!storeReset) {
         const teardownError = failEntry(
           err instanceof Error ? err.message : t.toolSettings.stitch.stitchFailed,
+          feedbackCategoryOf(err) ?? undefined,
         );
         if (teardownError) throw teardownError.cause;
       }

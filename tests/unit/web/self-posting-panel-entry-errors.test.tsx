@@ -34,6 +34,7 @@ import { InfoSettings } from "@/components/tools/info-settings";
 import { StitchSettings } from "@/components/tools/stitch-settings";
 import { StripMetadataSettings } from "@/components/tools/strip-metadata-settings";
 import { WatermarkImageSettings } from "@/components/tools/watermark-image-settings";
+import { classifyFeedbackError, FeedbackCategoryError } from "@/lib/feedback";
 import { useFileStore } from "@/stores/file-store";
 
 class FakeXhr {
@@ -976,6 +977,289 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       expect(screen.queryByText("EXIF/IPTC")).not.toBeInTheDocument();
       expect(screen.getByLabelText(en.toolSettings["edit-metadata"].artist)).toHaveValue("");
       expect(editInspectCalls).toBe(3);
+      unmount();
+    }
+  });
+
+  it("sets errorCategory to upload_error on 413 and network failures across compose, compare, watermark-image, beautify, and stitch (#3250)", async () => {
+    // 1. Fetch-based single-entry panels: ComposeSettings, CompareSettings, WatermarkImageSettings (single-file), BeautifySettings (image background).
+    const fetchPanels: Array<{
+      Panel: typeof ComposeSettings;
+      submitId: string;
+      prepare?: () => void;
+    }> = [
+      { Panel: ComposeSettings, submitId: "compose-submit" },
+      { Panel: CompareSettings, submitId: "compare-submit" },
+      { Panel: WatermarkImageSettings, submitId: "watermark-image-submit" },
+      {
+        Panel: BeautifySettings,
+        submitId: "beautify-submit",
+        prepare: () => {
+          fireEvent.click(screen.getByRole("button", { name: en.toolSettings.beautify.bgImage }));
+        },
+      },
+    ];
+
+    for (const { Panel, submitId, prepare } of fetchPanels) {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("a.png")]);
+
+      let call = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          call++;
+          if (call === 1) {
+            return new Response(JSON.stringify({ error: "Payload too large" }), { status: 413 });
+          }
+          if (call === 2) {
+            throw new TypeError("Failed to fetch");
+          }
+          if (call === 3) {
+            throw "non-error network rejection";
+          }
+          if (call === 4) {
+            return new Response(JSON.stringify({ error: "Server processing failed" }), {
+              status: 422,
+            });
+          }
+          throw new DOMException("The operation was aborted.", "AbortError");
+        }),
+      );
+
+      const { container, unmount } = render(<Panel />);
+      prepare?.();
+      chooseSecondaryFile(container, image("second.png"));
+
+      // 1a. HTTP 413 -> errorCategory: "upload_error"
+      fireEvent.click(screen.getByTestId(submitId));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+      let entry = useFileStore.getState().entries[0];
+      expect(entry.status).toBe("failed");
+      expect(entry.error).toBe(en.errors.fileTooLarge);
+      expect(entry.errorCategory).toBe("upload_error");
+      expect(classifyFeedbackError(entry.error, entry.errorCategory)).toBe("upload_error");
+
+      // 1b. Fetch network error (TypeError) -> errorCategory: "upload_error"
+      fireEvent.click(screen.getByTestId(submitId));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+      entry = useFileStore.getState().entries[0];
+      expect(entry.status).toBe("failed");
+      expect(entry.error).toBe("Failed to fetch");
+      expect(entry.errorCategory).toBe("upload_error");
+      expect(classifyFeedbackError(entry.error, entry.errorCategory)).toBe("upload_error");
+
+      // 1c. Fetch non-Error rejection -> fallback message with errorCategory: "upload_error"
+      fireEvent.click(screen.getByTestId(submitId));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+      entry = useFileStore.getState().entries[0];
+      expect(entry.status).toBe("failed");
+      expect(entry.error).toBe(en.errors.network);
+      expect(entry.errorCategory).toBe("upload_error");
+      expect(classifyFeedbackError(entry.error, entry.errorCategory)).toBe("upload_error");
+
+      // 1d. Non-413 HTTP failure -> errorCategory cleared to null
+      fireEvent.click(screen.getByTestId(submitId));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+      entry = useFileStore.getState().entries[0];
+      expect(entry.status).toBe("failed");
+      expect(entry.error).toBe("Server processing failed");
+      expect(entry.errorCategory).toBeNull();
+      expect(classifyFeedbackError(entry.error, entry.errorCategory)).toBe("processing_error");
+
+      // 1e. AbortError pass-through does not wrap into FeedbackCategoryError or mark entry failed
+      fireEvent.click(screen.getByTestId(submitId));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+      entry = useFileStore.getState().entries[0];
+      expect(entry.status).toBe("pending");
+      expect(entry.error).toBeNull();
+      expect(entry.errorCategory).toBeNull();
+
+      unmount();
+    }
+
+    // 2. WatermarkImageSettings multi-file batch branch: 413, network failure, non-Error rejection, non-413 failure, body-read error in catch, and AbortError per entry.
+    {
+      useFileStore.getState().reset();
+      useFileStore
+        .getState()
+        .setFiles([image("a.png"), image("b.png"), image("c.png"), image("d.png"), image("e.png")]);
+
+      let batchCall = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          batchCall++;
+          if (batchCall === 1) {
+            return new Response("<html>413 Entity Too Large</html>", { status: 413 });
+          }
+          if (batchCall === 2) {
+            throw new TypeError("Failed to fetch");
+          }
+          if (batchCall === 3) {
+            throw "non-error batch rejection";
+          }
+          if (batchCall === 4) {
+            return new Response(JSON.stringify({ error: "Watermark failed on D" }), {
+              status: 500,
+            });
+          }
+          if (batchCall === 5) {
+            return {
+              ok: true,
+              status: 200,
+              json: () => Promise.reject(new TypeError("Watermark body stream disconnected")),
+            } as unknown as Response;
+          }
+          throw new DOMException("The operation was aborted.", "AbortError");
+        }),
+      );
+
+      const { container, unmount } = render(<WatermarkImageSettings />);
+      chooseSecondaryFile(container, image("mark.png"));
+      fireEvent.click(screen.getByTestId("watermark-image-submit"));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+      const { entries } = useFileStore.getState();
+      expect(entries[0]).toMatchObject({
+        status: "failed",
+        error: en.errors.fileTooLarge,
+        errorCategory: "upload_error",
+      });
+      expect(classifyFeedbackError(entries[0].error, entries[0].errorCategory)).toBe(
+        "upload_error",
+      );
+      expect(entries[1]).toMatchObject({
+        status: "failed",
+        error: "Failed to fetch",
+        errorCategory: "upload_error",
+      });
+      expect(classifyFeedbackError(entries[1].error, entries[1].errorCategory)).toBe(
+        "upload_error",
+      );
+      expect(entries[2]).toMatchObject({
+        status: "failed",
+        error: en.errors.network,
+        errorCategory: "upload_error",
+      });
+      expect(classifyFeedbackError(entries[2].error, entries[2].errorCategory)).toBe(
+        "upload_error",
+      );
+      expect(entries[3]).toMatchObject({
+        status: "failed",
+        error: "Watermark failed on D",
+        errorCategory: null,
+      });
+      expect(classifyFeedbackError(entries[3].error, entries[3].errorCategory)).toBe(
+        "processing_error",
+      );
+      expect(entries[4]).toMatchObject({
+        status: "failed",
+        error: "Watermark body stream disconnected",
+        errorCategory: null,
+      });
+
+      // Re-running when fetch rejects with AbortError resets the active entry to pending with errorCategory: null
+      fireEvent.click(screen.getByTestId("watermark-image-submit"));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+      expect(useFileStore.getState().entries[0]).toMatchObject({
+        status: "pending",
+        error: null,
+        errorCategory: null,
+      });
+      unmount();
+    }
+
+    // 3. StitchSettings (XHR): 413 (JSON and non-JSON), onerror, non-413 status, and send throw.
+    {
+      FakeXhr.instances = [];
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("a.png"), image("b.png")]);
+
+      const { unmount } = render(<StitchSettings />);
+
+      // 3a. HTTP 413 (JSON body)
+      fireEvent.click(screen.getByTestId("stitch-submit"));
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(1));
+      FakeXhr.instances[0].respond(413, { error: "File too large" });
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+      expect(useFileStore.getState().entries[0]).toMatchObject({
+        status: "failed",
+        error: en.errors.fileTooLarge,
+        errorCategory: "upload_error",
+      });
+      expect(
+        classifyFeedbackError(
+          useFileStore.getState().entries[0].error,
+          useFileStore.getState().entries[0].errorCategory,
+        ),
+      ).toBe("upload_error");
+
+      // 3b. Non-413 HTTP failure clears errorCategory to null
+      fireEvent.click(screen.getByTestId("stitch-submit"));
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+      FakeXhr.instances[1].respond(422, { error: "Dimensions mismatch" });
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+      expect(useFileStore.getState().entries[0]).toMatchObject({
+        status: "failed",
+        error: "Dimensions mismatch",
+        errorCategory: null,
+      });
+
+      // 3c. HTTP 413 (non-JSON HTML proxy page)
+      fireEvent.click(screen.getByTestId("stitch-submit"));
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(3));
+      act(() => {
+        FakeXhr.instances[2].status = 413;
+        FakeXhr.instances[2].responseText = "<html>413 Request Entity Too Large</html>";
+        FakeXhr.instances[2].onload?.();
+      });
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+      expect(useFileStore.getState().entries[0]).toMatchObject({
+        status: "failed",
+        error: en.errors.fileTooLarge,
+        errorCategory: "upload_error",
+      });
+
+      // 3d. XHR network error (onerror) -> errorCategory: "upload_error"
+      fireEvent.click(screen.getByTestId("stitch-submit"));
+      await waitFor(() => expect(FakeXhr.instances).toHaveLength(4));
+      act(() => {
+        FakeXhr.instances[3].onerror?.();
+      });
+      expect(useFileStore.getState().entries[0]).toMatchObject({
+        status: "failed",
+        error: en.errors.network,
+        errorCategory: "upload_error",
+      });
+      expect(
+        classifyFeedbackError(
+          useFileStore.getState().entries[0].error,
+          useFileStore.getState().entries[0].errorCategory,
+        ),
+      ).toBe("upload_error");
+
+      // 3e. Synchronous throw from xhr.send forwards feedbackCategoryOf(err) and clears to null on plain Error
+      vi.spyOn(FakeXhr.prototype, "send").mockImplementationOnce(() => {
+        throw new Error("Stitch send threw");
+      });
+      fireEvent.click(screen.getByTestId("stitch-submit"));
+      expect(useFileStore.getState().entries[0]).toMatchObject({
+        status: "failed",
+        error: "Stitch send threw",
+        errorCategory: null,
+      });
+
+      vi.spyOn(FakeXhr.prototype, "send").mockImplementationOnce(() => {
+        throw new FeedbackCategoryError("Categorized send failure", "upload_error");
+      });
+      fireEvent.click(screen.getByTestId("stitch-submit"));
+      expect(useFileStore.getState().entries[0]).toMatchObject({
+        status: "failed",
+        error: "Categorized send failure",
+        errorCategory: "upload_error",
+      });
+
       unmount();
     }
   });

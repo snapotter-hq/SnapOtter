@@ -5,6 +5,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
+import { FeedbackCategoryError, feedbackCategoryOf } from "@/lib/feedback";
 import { format } from "@/lib/format";
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { runEndWrites } from "@/lib/run-teardown";
@@ -206,18 +207,25 @@ export function WatermarkImageSettings() {
           headers: formatHeaders(),
           body: formData,
           signal: controller.signal,
+        }).catch((err: unknown) => {
+          if (err instanceof DOMException && err.name === "AbortError") throw err;
+          throw new FeedbackCategoryError(
+            err instanceof Error ? err.message : t.errors.network,
+            "upload_error",
+          );
         });
 
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          throw new Error(
-            failedAnswerMessage(
-              t,
-              body,
-              res.status,
-              format(t.errors.processingFailedWithStatus, { status: res.status }),
-            ),
+          const message = failedAnswerMessage(
+            t,
+            body,
+            res.status,
+            format(t.errors.processingFailedWithStatus, { status: res.status }),
           );
+          throw res.status === 413
+            ? new FeedbackCategoryError(message, "upload_error")
+            : new Error(message);
         }
 
         const raw = await res.json().catch((err: unknown) => {
@@ -264,6 +272,7 @@ export function WatermarkImageSettings() {
           processedSize: null,
           status: "failed",
           error: err instanceof Error ? err.message : t.errors.processingFailedNoDetail,
+          errorCategory: feedbackCategoryOf(err),
         });
       } finally {
         if (unsubscribeRef.current === unsubscribe) unsubscribeRef.current = null;
@@ -321,6 +330,12 @@ export function WatermarkImageSettings() {
               headers: formatHeaders(),
               body: formData,
               signal: entryController.signal,
+            }).catch((err: unknown) => {
+              if (err instanceof DOMException && err.name === "AbortError") throw err;
+              throw new FeedbackCategoryError(
+                err instanceof Error ? err.message : t.errors.network,
+                "upload_error",
+              );
             });
 
             if (!res.ok) {
@@ -330,6 +345,7 @@ export function WatermarkImageSettings() {
               store.updateEntryById(entryId, {
                 status: "failed",
                 error: failedAnswerMessage(t, body, res.status, t.errors.processingFailedNoDetail),
+                errorCategory: res.status === 413 ? "upload_error" : null,
               });
               continue;
             }
@@ -377,6 +393,7 @@ export function WatermarkImageSettings() {
             store.updateEntryById(entryId, {
               status: "failed",
               error: err instanceof Error ? err.message : t.errors.processingFailedNoDetail,
+              errorCategory: feedbackCategoryOf(err),
             });
           }
         }

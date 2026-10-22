@@ -5,6 +5,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
+import { FeedbackCategoryError, feedbackCategoryOf } from "@/lib/feedback";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
@@ -102,18 +103,25 @@ export function CompareSettings() {
         headers: formatHeaders(),
         body: formData,
         signal: controller.signal,
+      }).catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === "AbortError") throw err;
+        throw new FeedbackCategoryError(
+          err instanceof Error ? err.message : t.errors.network,
+          "upload_error",
+        );
       });
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(
-          failedAnswerMessage(
-            t,
-            body,
-            res.status,
-            format(t.errors.failedWithStatus, { status: res.status }),
-          ),
+        const message = failedAnswerMessage(
+          t,
+          body,
+          res.status,
+          format(t.errors.failedWithStatus, { status: res.status }),
         );
+        throw res.status === 413
+          ? new FeedbackCategoryError(message, "upload_error")
+          : new Error(message);
       }
 
       const raw = await res.json().catch((err: unknown) => {
@@ -174,6 +182,7 @@ export function CompareSettings() {
         processedSize: null,
         status: "failed",
         error: err instanceof Error ? err.message : t.toolSettings.compare.comparisonFailed,
+        errorCategory: feedbackCategoryOf(err),
       });
     } finally {
       unsubscribe();
