@@ -229,8 +229,10 @@ export const useCollageStore = create<CollageState>((set, get) => ({
       templateId: template.id,
       cellAssignments: assignments,
       cellTransforms: {},
+      selectedCell: null,
       phase: "editing",
       ...CLEARED_RESULT,
+      error: null,
     });
   },
 

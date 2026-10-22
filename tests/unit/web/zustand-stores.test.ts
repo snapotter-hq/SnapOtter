@@ -1699,6 +1699,39 @@ describe("useCollageStore", () => {
     expect(revokePreviewMock).not.toHaveBeenCalled();
   });
 
+  it("removeImage clears error and selectedCell when removing a non-last image (#3558)", () => {
+    const file1 = new File(["a"], "a.png", { type: "image/png" });
+    const file2 = new File(["b"], "b.png", { type: "image/png" });
+    const file3 = new File(["c"], "c.png", { type: "image/png" });
+    useCollageStore.getState().addImages([file1, file2, file3]);
+    useCollageStore.getState().setSelectedCell(2);
+    useCollageStore.getState().setError("Upload failed");
+
+    useCollageStore.getState().removeImage(2);
+
+    const s = useCollageStore.getState();
+    expect(s.images).toHaveLength(2);
+    expect(s.templateId).toBe("2-h-equal");
+    expect(s.cellAssignments).toEqual([0, 1]);
+    expect({ selectedCell: s.selectedCell, error: s.error }).toEqual({
+      selectedCell: null,
+      error: null,
+    });
+
+    // Also verify the last-image removal path (newImages.length === 0) clears both
+    useCollageStore.getState().removeImage(1);
+    useCollageStore.getState().setSelectedCell(0);
+    useCollageStore.getState().setError("Second failure");
+    useCollageStore.getState().removeImage(0);
+
+    const afterLast = useCollageStore.getState();
+    expect(afterLast.images).toEqual([]);
+    expect({ selectedCell: afterLast.selectedCell, error: afterLast.error }).toEqual({
+      selectedCell: null,
+      error: null,
+    });
+  });
+
   it("removeImage resets when last image is removed without double-revoking blob or preview URLs (#3526)", async () => {
     const imagePreview = await import("@/lib/image-preview");
     const needsMock = vi.mocked(imagePreview.needsServerPreview);
