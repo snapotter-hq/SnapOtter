@@ -122,6 +122,7 @@ function clearCollageResult(state: Pick<CollageState, "images" | "phase">): {
   originalSize: null;
   jobId: null;
   phase: Phase;
+  error: null;
 } {
   cancelActiveCollageRun();
   const phase =
@@ -133,6 +134,7 @@ function clearCollageResult(state: Pick<CollageState, "images" | "phase">): {
   return {
     ...CLEARED_RESULT,
     phase,
+    error: null,
   };
 }
 

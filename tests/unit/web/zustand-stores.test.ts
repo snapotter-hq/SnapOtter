@@ -2028,12 +2028,14 @@ describe("useCollageStore", () => {
     const run = beginCollageRun(abort);
     useCollageStore.getState().setSelectedCell(1);
     useCollageStore.getState().setResult("blob:result", 5000, 10000, "job-123");
+    useCollageStore.setState({ error: "Previous failure" });
     useCollageStore.getState().setTemplateId("nonexistent");
     const s = useCollageStore.getState();
     expect(s.templateId).toBe("2-h-equal");
     expect(s.selectedCell).toBe(1);
     expect(s.phase).toBe("result");
     expect(s.resultUrl).toBe("blob:result");
+    expect(s.error).toBe("Previous failure");
     expect(abort).not.toHaveBeenCalled();
     expect(run.isCurrent()).toBe(true);
     run.end();
@@ -2111,6 +2113,7 @@ describe("useCollageStore", () => {
   it("setBgPreset with custom does not overwrite backgroundColor, clear result metadata, or cancel active runs", () => {
     useCollageStore.getState().setBackgroundColor("#123456");
     useCollageStore.getState().setResult("blob:result", 5000, 10000, "job-123");
+    useCollageStore.setState({ error: "Previous failure" });
     const abort = vi.fn();
     const run = beginCollageRun(abort);
     useCollageStore.getState().setBgPreset("custom");
@@ -2122,6 +2125,7 @@ describe("useCollageStore", () => {
     expect(s.resultSize).toBe(5000);
     expect(s.originalSize).toBe(10000);
     expect(s.jobId).toBe("job-123");
+    expect(s.error).toBe("Previous failure");
     expect(abort).not.toHaveBeenCalled();
     expect(run.isCurrent()).toBe(true);
     run.end();
@@ -2275,6 +2279,44 @@ describe("useCollageStore", () => {
         useCollageStore.getState().phase,
         `${name} without images should return to upload`,
       ).toBe("upload");
+    }
+  });
+
+  it("clears error across layout, setting, and image mutators (#3688)", () => {
+    const file1 = new File(["a"], "a.png", { type: "image/png" });
+    const file2 = new File(["b"], "b.png", { type: "image/png" });
+    const file3 = new File(["c"], "c.png", { type: "image/png" });
+    useCollageStore.getState().addImages([file1, file2]);
+
+    const mutators: Array<[string, () => void]> = [
+      ["addImages", () => useCollageStore.getState().addImages([file3])],
+      ["removeImage", () => useCollageStore.getState().removeImage(0)],
+      ["clearImages", () => useCollageStore.getState().clearImages()],
+      ["setTemplateId", () => useCollageStore.getState().setTemplateId("3-h-equal")],
+      ["setCellAssignment", () => useCollageStore.getState().setCellAssignment(0, 1)],
+      ["swapCells", () => useCollageStore.getState().swapCells(0, 1)],
+      ["setCellTransform", () => useCollageStore.getState().setCellTransform(0, { zoom: 1.5 })],
+      ["resetCellTransform", () => useCollageStore.getState().resetCellTransform(0)],
+      ["setGap", () => useCollageStore.getState().setGap(16)],
+      ["setCornerRadius", () => useCollageStore.getState().setCornerRadius(8)],
+      ["setBackgroundColor", () => useCollageStore.getState().setBackgroundColor("#123456")],
+      ["setBgPreset(black)", () => useCollageStore.getState().setBgPreset("black")],
+      ["setAspectRatio", () => useCollageStore.getState().setAspectRatio("16:9")],
+      ["setOutputFormat", () => useCollageStore.getState().setOutputFormat("webp")],
+      ["setQuality", () => useCollageStore.getState().setQuality(80)],
+      ["reset", () => useCollageStore.getState().reset()],
+    ];
+
+    for (const [name, mutate] of mutators) {
+      if (useCollageStore.getState().images.length < 2) {
+        useCollageStore.getState().addImages([file1, file2]);
+      }
+      useCollageStore.getState().setError("Collage failed");
+      expect(useCollageStore.getState().error).toBe("Collage failed");
+
+      mutate();
+
+      expect(useCollageStore.getState().error, `${name} should clear error`).toBeNull();
     }
   });
 
