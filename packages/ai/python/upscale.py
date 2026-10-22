@@ -1,4 +1,5 @@
 """Image upscaling with Real-ESRGAN."""
+import errno
 import sys
 import json
 import os
@@ -50,6 +51,10 @@ OOM_ERROR_PATTERNS = (
     "cannot allocate memory",
     "unable to allocate",
     "failed to allocate",
+    "cudaerrormemoryallocation",
+    "cublas_status_alloc_failed",
+    "bad_alloc",
+    "memoryerror",
 )
 
 
@@ -64,13 +69,15 @@ def default_tile_size(use_gpu: bool) -> int:
 
 
 def fallback_tile_size(current_tile: int) -> int:
-    """Return a smaller tile size when an OOM RuntimeError is caught."""
+    """Return a smaller tile size when an OOM error is caught."""
     return FALLBACK_CPU_TILE_SIZE if current_tile <= CPU_TILE_SIZE else CPU_TILE_SIZE
 
 
 def is_oom_error(error: BaseException) -> bool:
     """Return True for CUDA or CPU memory allocation failures."""
     if isinstance(error, MemoryError):
+        return True
+    if isinstance(error, OSError) and error.errno == errno.ENOMEM:
         return True
     msg = str(error).lower()
     return any(pattern in msg for pattern in OOM_ERROR_PATTERNS)
@@ -216,7 +223,7 @@ def main():
                     def _enhance():
                         try:
                             return upsampler.enhance(img_array, outscale=scale)
-                        except (RuntimeError, MemoryError) as oom_err:
+                        except (RuntimeError, MemoryError, OSError) as oom_err:
                             if not is_oom_error(oom_err):
                                 raise
                             retry_tile = fallback_tile_size(upsampler.tile)
@@ -270,7 +277,7 @@ def main():
                                 only_center_face=False,
                                 paste_back=True,
                             )
-                        except (RuntimeError, MemoryError) as oom_err:
+                        except (RuntimeError, MemoryError, OSError) as oom_err:
                             if not is_oom_error(oom_err):
                                 raise
                             retry_tile = fallback_tile_size(upsampler.tile)

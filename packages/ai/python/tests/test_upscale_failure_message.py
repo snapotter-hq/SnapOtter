@@ -11,6 +11,7 @@ already done. The advice has to follow the shape of the failure, not the fact
 that one occurred.
 """
 
+import errno
 import importlib.util
 import os
 
@@ -88,7 +89,21 @@ def test_oom_errors_report_memory_remedy_rather_than_reinstall():
     )
     assert upscale.is_oom_error(numpy_oom) is True
     assert "out of memory" in upscale.realesrgan_failure_message(numpy_oom).lower()
+    for alloc_oom in (
+        RuntimeError("CUDA error: CUBLAS_STATUS_ALLOC_FAILED"),
+        RuntimeError("cudaErrorMemoryAllocation"),
+        RuntimeError("std::bad_alloc"),
+        RuntimeError("MemoryError: allocation failed"),
+        OSError(errno.ENOMEM, "Cannot allocate memory"),
+        OSError(errno.ENOMEM, "Nicht genügend Hauptspeicher verfügbar"),
+    ):
+        assert upscale.is_oom_error(alloc_oom) is True, alloc_oom
+        msg = upscale.realesrgan_failure_message(alloc_oom)
+        assert "out of memory" in msg.lower(), msg
+        assert "Reinstall" not in msg, msg
+        assert "Reset AI Environment" not in msg, msg
     assert upscale.is_oom_error(RuntimeError("CUDA error: no kernel image")) is False
+    assert upscale.is_oom_error(OSError(errno.EACCES, "Permission denied")) is False
 
     message = upscale.realesrgan_failure_message(cpu_oom)
     assert "out of memory" in message.lower()

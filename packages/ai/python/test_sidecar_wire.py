@@ -89,14 +89,21 @@ for script_file in AI_ENTRYPOINT_SCRIPTS:
 import gif_remove_bg  # noqa: E402
 import remove_bg  # noqa: E402
 import restore  # noqa: E402
+import upscale  # noqa: E402
 assert remove_bg._OOM_MARKERS == gif_remove_bg._OOM_MARKERS
 assert restore._OOM_MARKERS == gif_remove_bg._OOM_MARKERS
+assert upscale.OOM_ERROR_PATTERNS == gif_remove_bg._OOM_MARKERS
 assert remove_bg._HOST_OOM_MARKERS == gif_remove_bg._HOST_OOM_MARKERS
-for oom_mod in (gif_remove_bg, remove_bg, restore):
-    assert oom_mod._is_oom(MemoryError()) is True, (
-        f"{oom_mod.__name__}._is_oom must recognize bare MemoryError()"
+for oom_mod, oom_fn in (
+    (gif_remove_bg, gif_remove_bg._is_oom),
+    (remove_bg, remove_bg._is_oom),
+    (restore, restore._is_oom),
+    (upscale, upscale.is_oom_error),
+):
+    assert oom_fn(MemoryError()) is True, (
+        f"{oom_mod.__name__} must recognize bare MemoryError()"
     )
-    assert oom_mod._is_oom(RuntimeError("MemoryError")) is True
+    assert oom_fn(RuntimeError("MemoryError")) is True
     for oom_err in (
         RuntimeError("CUDA out of memory"),
         RuntimeError("Failed to allocate memory for requested buffer"),
@@ -118,15 +125,15 @@ for oom_mod in (gif_remove_bg, remove_bg, restore):
             "Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 30) and data type float32"
         ),
     ):
-        assert oom_mod._is_oom(oom_err) is True, (
-            f"{oom_mod.__name__}._is_oom must recognize OOM: {oom_err!r}"
+        assert oom_fn(oom_err) is True, (
+            f"{oom_mod.__name__} must recognize OOM: {oom_err!r}"
         )
     assert (
-        oom_mod._is_oom(RuntimeError("RuntimeError: DefaultCPUAllocator: invalid alignment"))
+        oom_fn(RuntimeError("RuntimeError: DefaultCPUAllocator: invalid alignment"))
         is False
     )
-    assert oom_mod._is_oom(OSError(13, "Permission denied")) is False
-    assert oom_mod._is_oom(OSError("disk read failed")) is False
+    assert oom_fn(OSError(13, "Permission denied")) is False
+    assert oom_fn(OSError("disk read failed")) is False
 for host_oom_mod in (gif_remove_bg, remove_bg):
     assert host_oom_mod._is_host_oom(MemoryError()) is True, (
         f"{host_oom_mod.__name__}._is_host_oom must recognize bare MemoryError()"

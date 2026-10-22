@@ -765,6 +765,20 @@ assert mod.is_oom_error(RuntimeError("DefaultCPUAllocator: not enough memory: yo
 assert mod.is_oom_error(MemoryError("unable to allocate array")) is True
 assert mod.is_oom_error(RuntimeError("Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 30) and data type float32")) is True
 assert "out of memory" in mod.realesrgan_failure_message(RuntimeError("Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 30) and data type float32")).lower()
+for oom_err in (
+    RuntimeError("CUDA error: CUBLAS_STATUS_ALLOC_FAILED"),
+    RuntimeError("cudaErrorMemoryAllocation"),
+    RuntimeError("std::bad_alloc"),
+    RuntimeError("MemoryError: allocation failed"),
+    OSError(12, "Cannot allocate memory"),
+    OSError(12, "Nicht genügend Hauptspeicher verfügbar"),
+):
+    assert mod.is_oom_error(oom_err) is True, f"expected is_oom_error({oom_err!r}) to be True"
+    oom_msg = mod.realesrgan_failure_message(oom_err)
+    assert "out of memory" in oom_msg.lower(), oom_msg
+    assert "Reinstall" not in oom_msg, oom_msg
+    assert "Reset AI Environment" not in oom_msg, oom_msg
+assert mod.is_oom_error(OSError(13, "Permission denied")) is False
 
 with tempfile.TemporaryDirectory() as tmp:
     weights_path = os.path.join(tmp, "RealESRGAN_x4plus.pth")
@@ -822,7 +836,7 @@ with tempfile.TemporaryDirectory() as tmp:
     gpu_mod.torch_gpu_available = lambda: gpu_state["avail"]
     sys.modules["gpu"] = gpu_mod
 
-    fail_first = {"active": True, "face_oom": False}
+    fail_first = {"active": True, "face_oom": False, "exc": RuntimeError("DefaultCPUAllocator: not enough memory: tried to allocate 600MB"), "face_exc": RuntimeError("DefaultCPUAllocator: not enough memory")}
     class FakeRealESRGANer:
         def __init__(self, **kw):
             self.tile = kw["tile"]
@@ -832,7 +846,7 @@ with tempfile.TemporaryDirectory() as tmp:
         def enhance(self, img_array, outscale=2):
             recorded[-1]["enhance_tiles"].append(self.tile)
             if fail_first["active"] and len(recorded[-1]["enhance_tiles"]) == 1:
-                raise RuntimeError("DefaultCPUAllocator: not enough memory: tried to allocate 600MB")
+                raise fail_first["exc"]
             return ("out_arr", None)
 
     realesrgan_mod = types.ModuleType("realesrgan")
@@ -846,7 +860,7 @@ with tempfile.TemporaryDirectory() as tmp:
         def enhance(self, img_array, **kw):
             face_recorded[-1]["enhance_tiles"].append(self.bg_upsampler.tile)
             if fail_first["face_oom"] and len(face_recorded[-1]["enhance_tiles"]) == 1:
-                raise RuntimeError("DefaultCPUAllocator: not enough memory")
+                raise fail_first["face_exc"]
             return (None, None, "face_out_arr")
 
     gfpgan_mod = types.ModuleType("gfpgan")
@@ -895,6 +909,96 @@ with tempfile.TemporaryDirectory() as tmp:
     assert recorded[2]["device"] == "device:cuda"
     assert recorded[2]["enhance_tiles"] == [512, 256], recorded[2]
     assert len(empty_cache_calls) == 1, f"expected 1 empty_cache call on GPU, got {len(empty_cache_calls)}"
+
+    # 4) OSError(12, "Cannot allocate memory") and CUDA/C++ markers in _enhance and face_enhancer.enhance step down tiles (#3058)
+    gpu_state["avail"] = False
+    fail_first["active"] = True
+    fail_first["face_oom"] = False
+    fail_first["exc"] = OSError(12, "Cannot allocate memory")
+    sys.argv = ["upscale.py", in_path, out_path, json.dumps({"scale": 2, "model": "realesrgan"})]
+    mod.main()
+    assert recorded[-1]["enhance_tiles"] == [256, 128], recorded[-1]
+
+    fail_first["active"] = False
+    fail_first["face_oom"] = True
+    fail_first["face_exc"] = OSError(12, "Cannot allocate memory")
+    sys.argv = ["upscale.py", in_path, out_path, json.dumps({"scale": 2, "model": "realesrgan", "faceEnhance": True})]
+    mod.main()
+    assert recorded[-1]["enhance_tiles"] == [256], recorded[-1]
+    assert face_recorded[-1]["enhance_tiles"] == [256, 128], face_recorded[-1]
+
+    gpu_state["avail"] = True
+    for cuda_err in (
+        RuntimeError("CUDA error: CUBLAS_STATUS_ALLOC_FAILED"),
+        RuntimeError("cudaErrorMemoryAllocation"),
+        RuntimeError("std::bad_alloc"),
+        RuntimeError("MemoryError: allocation failed"),
+    ):
+        before_cache = len(empty_cache_calls)
+        fail_first["active"] = True
+        fail_first["face_oom"] = False
+        fail_first["exc"] = cuda_err
+        sys.argv = ["upscale.py", in_path, out_path, json.dumps({"scale": 2, "model": "realesrgan"})]
+        mod.main()
+        assert recorded[-1]["enhance_tiles"] == [512, 256], (cuda_err, recorded[-1])
+        assert len(empty_cache_calls) == before_cache + 1, (cuda_err, len(empty_cache_calls))
+
+        before_cache = len(empty_cache_calls)
+        fail_first["active"] = False
+        fail_first["face_oom"] = True
+        fail_first["face_exc"] = cuda_err
+        sys.argv = ["upscale.py", in_path, out_path, json.dumps({"scale": 2, "model": "realesrgan", "faceEnhance": True})]
+        mod.main()
+        assert recorded[-1]["enhance_tiles"] == [512], (cuda_err, recorded[-1])
+        assert face_recorded[-1]["enhance_tiles"] == [512, 256], (cuda_err, face_recorded[-1])
+        assert len(empty_cache_calls) == before_cache + 1, (cuda_err, len(empty_cache_calls))
+
+    import io
+    def run_expecting_exit1():
+        buf = io.StringIO()
+        orig_stdout, orig_dunder = sys.stdout, sys.__stdout__
+        sys.stdout = sys.__stdout__ = buf
+        try:
+            try:
+                mod.main()
+            except SystemExit as exc:
+                assert exc.code == 1, exc.code
+            else:
+                raise AssertionError("Expected SystemExit(1)")
+        finally:
+            sys.stdout, sys.__stdout__ = orig_stdout, orig_dunder
+        return json.loads(buf.getvalue().strip())
+
+    # Unrecoverable OOM when _enhance already stepped down to 128 on CPU and faceEnhance also hits OOM at 128 (retry_tile >= upsampler.tile)
+    gpu_state["avail"] = False
+    fail_first["active"] = True
+    fail_first["exc"] = OSError(12, "Cannot allocate memory")
+    fail_first["face_oom"] = True
+    fail_first["face_exc"] = RuntimeError("CUDA error: CUBLAS_STATUS_ALLOC_FAILED")
+    sys.argv = ["upscale.py", in_path, out_path, json.dumps({"scale": 2, "model": "realesrgan", "faceEnhance": True})]
+    oom_payload = run_expecting_exit1()
+    assert recorded[-1]["enhance_tiles"] == [256, 128], recorded[-1]
+    assert face_recorded[-1]["enhance_tiles"] == [128], face_recorded[-1]
+    assert oom_payload["success"] is False
+    assert "out of memory" in oom_payload["error"].lower(), oom_payload
+
+    # Non-OOM OSError (e.g. EACCES) in _enhance or faceEnhance must NOT retry tiles and must exit 1 with repair message
+    gpu_state["avail"] = False
+    for is_face in (False, True):
+        fail_first["active"] = not is_face
+        fail_first["face_oom"] = is_face
+        fail_first["exc"] = OSError(13, "Permission denied")
+        fail_first["face_exc"] = OSError(13, "Permission denied")
+        sys.argv = ["upscale.py", in_path, out_path, json.dumps({"scale": 2, "model": "realesrgan", "faceEnhance": is_face})]
+        err_payload = run_expecting_exit1()
+        assert err_payload["success"] is False
+        assert "Permission denied" in err_payload["error"], err_payload
+        assert "out of memory" not in err_payload["error"].lower(), err_payload
+        assert "Reinstall" in err_payload["error"], err_payload
+        if not is_face:
+            assert recorded[-1]["enhance_tiles"] == [256], recorded[-1]
+        else:
+            assert face_recorded[-1]["enhance_tiles"] == [256], face_recorded[-1]
 
 print("TILE_OK")
 `;
