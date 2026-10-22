@@ -240,9 +240,15 @@ export function registerEditMetadata(app: FastifyInstance) {
           fileBuffer = decompressSvgz(fileBuffer);
           fileBuffer = sanitizeSvg(fileBuffer);
         } catch (err) {
-          return reply.status(400).send({
-            error: err instanceof Error ? err.message : "Invalid SVG",
-          });
+          if (
+            isSvgzClientError(err) ||
+            (err instanceof Error && err.message.includes("SVGZ file does not contain"))
+          ) {
+            return reply.status(400).send({
+              error: err instanceof Error ? err.message : "Invalid SVG",
+            });
+          }
+          throw err;
         }
       }
 

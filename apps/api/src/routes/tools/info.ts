@@ -18,7 +18,12 @@ import {
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
-import { decompressSvgz, isSvgBuffer, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import {
+  decompressSvgz,
+  isSvgBuffer,
+  isSvgzClientError,
+  sanitizeSvg,
+} from "../../lib/svg-sanitize.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -52,26 +57,37 @@ export function registerInfo(app: FastifyInstance) {
       return reply.status(400).send({ error: "No image file provided" });
     }
 
-    try {
-      // Detect format for CLI-decoded formats (PSD, TGA, EXR, HDR, ICO, RAW)
-      const validation = await validateImageBuffer(fileBuffer, filename);
-      const detectedFormat = validation.valid ? validation.format : null;
+    // Detect format for CLI-decoded formats (PSD, TGA, EXR, HDR, ICO, RAW)
+    const validation = await validateImageBuffer(fileBuffer, filename);
+    const detectedFormat = validation.valid ? validation.format : null;
 
-      // Pre-decode formats Sharp can't fully handle (needs pixel decoding for stats).
-      // HEIC/HEIF: Sharp can read container headers but can't decode HEVC pixels,
-      // so unconditionally pre-decode to PNG (matching createToolRoute behavior).
-      let metaBuffer = fileBuffer;
-      const ext = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
+    // Pre-decode formats Sharp can't fully handle (needs pixel decoding for stats).
+    // HEIC/HEIF: Sharp can read container headers but can't decode HEVC pixels,
+    // so unconditionally pre-decode to PNG (matching createToolRoute behavior).
+    let metaBuffer = fileBuffer;
+    const ext = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
+    const isSvg = detectedFormat === "svg" || isSvgBuffer(fileBuffer);
 
-      if (detectedFormat === "svg" || isSvgBuffer(fileBuffer)) {
-        try {
-          metaBuffer = decompressSvgz(fileBuffer);
-          metaBuffer = sanitizeSvg(metaBuffer);
-        } catch (err) {
+    if (isSvg) {
+      try {
+        metaBuffer = decompressSvgz(fileBuffer);
+        metaBuffer = sanitizeSvg(metaBuffer);
+      } catch (err) {
+        if (
+          isSvgzClientError(err) ||
+          (err instanceof Error && err.message.includes("SVGZ file does not contain"))
+        ) {
           return reply.status(400).send({
             error: err instanceof Error ? err.message : "Invalid SVG",
           });
         }
+        throw err;
+      }
+    }
+
+    try {
+      if (isSvg) {
+        // Already decompressed and sanitized above.
       } else if (detectedFormat === "heif") {
         metaBuffer = await decodeHeic(fileBuffer);
       } else if (detectedFormat && needsCliDecode(detectedFormat)) {

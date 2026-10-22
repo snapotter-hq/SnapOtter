@@ -24,7 +24,24 @@ const mocks = vi.hoisted(() => ({
   writeMetadata: vi.fn<(buf: Buffer, filename: string, tags: string[]) => Promise<Buffer>>(
     async (buf: Buffer) => buf,
   ),
+  decompressSvgz: vi.fn<(buf: Buffer) => Buffer>(),
+  sanitizeSvg: vi.fn<(buf: Buffer) => Buffer>(),
 }));
+
+vi.mock("../../../apps/api/src/lib/svg-sanitize.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/svg-sanitize.js")>();
+  return {
+    ...actual,
+    decompressSvgz: (...args: Parameters<typeof actual.decompressSvgz>) =>
+      mocks.decompressSvgz.getMockImplementation()
+        ? mocks.decompressSvgz(...args)
+        : actual.decompressSvgz(...args),
+    sanitizeSvg: (...args: Parameters<typeof actual.sanitizeSvg>) =>
+      mocks.sanitizeSvg.getMockImplementation()
+        ? mocks.sanitizeSvg(...args)
+        : actual.sanitizeSvg(...args),
+  };
+});
 
 vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
   const actual =
@@ -154,6 +171,8 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
     );
     mocks.writeMetadata.mockClear();
     mocks.writeMetadata.mockImplementation(async (buf: Buffer) => buf);
+    mocks.decompressSvgz.mockReset();
+    mocks.sanitizeSvg.mockReset();
   });
 
   describe("POST /api/v1/tools/image/edit-metadata/inspect (#3505)", () => {
@@ -248,6 +267,26 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
 
       expect(mocks.inspectMetadata).not.toHaveBeenCalled();
     });
+
+    it("rethrows unexpected faults from decompressSvgz or sanitizeSvg instead of returning 400", async () => {
+      const sanitizeFault = new TypeError("unexpected sanitizer fault");
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw sanitizeFault;
+      });
+      await expect(
+        invokeRoute(handler, [{ type: "file", filename: "icon.svg", content: XMP_SVG }]),
+      ).rejects.toThrow(sanitizeFault);
+
+      const decompressFault = new TypeError("unexpected gunzip fault");
+      mocks.decompressSvgz.mockImplementationOnce(() => {
+        throw decompressFault;
+      });
+      await expect(
+        invokeRoute(handler, [{ type: "file", filename: "icon.svgz", content: XMP_SVGZ }]),
+      ).rejects.toThrow(decompressFault);
+
+      expect(mocks.inspectMetadata).not.toHaveBeenCalled();
+    });
   });
 
   describe("POST /api/v1/tools/image/edit-metadata", () => {
@@ -339,6 +378,45 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         (env as { MAX_SVG_SIZE_MB: number }).MAX_SVG_SIZE_MB = prevMaxSvgMb;
       }
 
+      mocks.decompressSvgz.mockImplementationOnce(() => {
+        throw new RangeError("Cannot create a Buffer larger than 52428800");
+      });
+      const bombReply = await invokeRoute(handler, [
+        { type: "file", filename: "bomb.svgz", content: DIRTY_SVGZ },
+        { type: "field", fieldname: "settings", value: "{}" },
+      ]);
+      expect(bombReply.statusCode).toBe(400);
+      expect(bombReply.payload).toEqual({
+        error: "Cannot create a Buffer larger than 52428800",
+      });
+
+      expect(mocks.writeMetadata).not.toHaveBeenCalled();
+      expect(mocks.putObject).not.toHaveBeenCalled();
+    });
+
+    it("rethrows unexpected faults from decompressSvgz or sanitizeSvg instead of returning 400 (#3530)", async () => {
+      const sanitizeFault = new TypeError("unexpected sanitizer fault");
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw sanitizeFault;
+      });
+      await expect(
+        invokeRoute(handler, [
+          { type: "file", filename: "dirty.svg", content: DIRTY_SVG },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ]),
+      ).rejects.toThrow(sanitizeFault);
+
+      const decompressFault = new TypeError("unexpected gunzip fault");
+      mocks.decompressSvgz.mockImplementationOnce(() => {
+        throw decompressFault;
+      });
+      await expect(
+        invokeRoute(handler, [
+          { type: "file", filename: "icon.svgz", content: DIRTY_SVGZ },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ]),
+      ).rejects.toThrow(decompressFault);
+
       expect(mocks.writeMetadata).not.toHaveBeenCalled();
       expect(mocks.putObject).not.toHaveBeenCalled();
     });
@@ -420,6 +498,35 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
       } finally {
         (env as { MAX_SVG_SIZE_MB: number }).MAX_SVG_SIZE_MB = prevMaxSvgMb;
       }
+
+      mocks.decompressSvgz.mockImplementationOnce(() => {
+        throw new RangeError("Cannot create a Buffer larger than 52428800");
+      });
+      const bombReply = await invokeRoute(handler, [
+        { type: "file", filename: "bomb.svgz", content: SCRIPT_LT_SVGZ },
+      ]);
+      expect(bombReply.statusCode).toBe(400);
+      expect(bombReply.payload).toEqual({
+        error: "Cannot create a Buffer larger than 52428800",
+      });
+    });
+
+    it("rethrows unexpected faults from decompressSvgz or sanitizeSvg instead of returning 400 (#3530)", async () => {
+      const sanitizeFault = new TypeError("unexpected sanitizer fault");
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw sanitizeFault;
+      });
+      await expect(
+        invokeRoute(handler, [{ type: "file", filename: "icon.svg", content: SCRIPT_LT_SVG }]),
+      ).rejects.toThrow(sanitizeFault);
+
+      const decompressFault = new TypeError("unexpected gunzip fault");
+      mocks.decompressSvgz.mockImplementationOnce(() => {
+        throw decompressFault;
+      });
+      await expect(
+        invokeRoute(handler, [{ type: "file", filename: "icon.svgz", content: SCRIPT_LT_SVGZ }]),
+      ).rejects.toThrow(decompressFault);
     });
   });
 
@@ -449,6 +556,26 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         width: 100,
         height: 80,
         format: "svg",
+      });
+
+      const exifJpg = readFixture(fixtures.image.exifGps);
+      const misnamedJpgReply = await invokeRoute(handler, [
+        { type: "file", filename: "misnamed.svgz", content: exifJpg },
+      ]);
+      expect(misnamedJpgReply.statusCode).toBe(200);
+      expect(misnamedJpgReply.payload).toMatchObject({
+        filename: "misnamed.svgz",
+        fileSize: exifJpg.length,
+        format: "jpeg",
+      });
+
+      const brokenXmlSvg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><unclosed>');
+      const brokenXmlReply = await invokeRoute(handler, [
+        { type: "file", filename: "broken.svg", content: brokenXmlSvg },
+      ]);
+      expect(brokenXmlReply.statusCode).toBe(422);
+      expect(brokenXmlReply.payload).toMatchObject({
+        error: "Failed to read image metadata",
       });
     });
 
@@ -487,6 +614,35 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
       } finally {
         (env as { MAX_SVG_SIZE_MB: number }).MAX_SVG_SIZE_MB = prevMaxSvgMb;
       }
+
+      mocks.decompressSvgz.mockImplementationOnce(() => {
+        throw new RangeError("Cannot create a Buffer larger than 52428800");
+      });
+      const bombReply = await invokeRoute(handler, [
+        { type: "file", filename: "bomb.svgz", content: SCRIPT_LT_SVGZ },
+      ]);
+      expect(bombReply.statusCode).toBe(400);
+      expect(bombReply.payload).toEqual({
+        error: "Cannot create a Buffer larger than 52428800",
+      });
+    });
+
+    it("rethrows unexpected faults from decompressSvgz or sanitizeSvg instead of returning 400 or 422 (#3530)", async () => {
+      const sanitizeFault = new TypeError("unexpected sanitizer fault");
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw sanitizeFault;
+      });
+      await expect(
+        invokeRoute(handler, [{ type: "file", filename: "icon.svg", content: SCRIPT_LT_SVG }]),
+      ).rejects.toThrow(sanitizeFault);
+
+      const decompressFault = new TypeError("unexpected gunzip fault");
+      mocks.decompressSvgz.mockImplementationOnce(() => {
+        throw decompressFault;
+      });
+      await expect(
+        invokeRoute(handler, [{ type: "file", filename: "icon.svgz", content: SCRIPT_LT_SVGZ }]),
+      ).rejects.toThrow(decompressFault);
     });
   });
 });
