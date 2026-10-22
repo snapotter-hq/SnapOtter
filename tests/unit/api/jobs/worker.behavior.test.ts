@@ -17,6 +17,7 @@ const objectStorageMocks = vi.hoisted(() => ({
   deletePrefix: vi.fn(),
   getObjectBuffer: vi.fn(),
   getObjectSize: vi.fn(),
+  getObjectStream: vi.fn(),
   // Stands in for the real predicate (covered in object-storage-fault.test.ts):
   // local-backend semantics, where a missing object is a bare ENOENT.
   isMissingObjectError: vi.fn((err: unknown) => (err as { code?: string })?.code === "ENOENT"),
@@ -2725,9 +2726,9 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
 
   it("retains per-file errors on partial failure, cancel, and packaging failure when Redis counters are empty", async () => {
     const { Readable } = await import("node:stream");
-    const objectStorage = await import("../../../../apps/api/src/lib/object-storage.js");
-    (objectStorage as unknown as { getObjectStream: ReturnType<typeof vi.fn> }).getObjectStream =
-      vi.fn(async () => Readable.from(Buffer.from("ok")));
+    objectStorageMocks.getObjectStream.mockImplementation(async () =>
+      Readable.from(Buffer.from("ok")),
+    );
     objectStorageMocks.putObject.mockResolvedValue(undefined);
     objectStorageMocks.putObjectStream.mockResolvedValue(42);
 
@@ -3069,7 +3070,10 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
       ],
     });
 
-    // 3. Canceled step row and all-completed step rows when child pipeline-finalize write faulted.
+    // 3. Canceled step row and all-completed step rows when child pipeline-finalize write faulted
+    // before writing outputs/<childId>/<outFilename> (getObjectSize rejects with ENOENT).
+    objectStorageMocks.getObjectSize.mockRejectedValueOnce(gone("done-steps.pdf"));
+    objectStorageMocks.verifyS3Bucket.mockResolvedValueOnce(undefined);
     const { processor: p3, cancelBatchJobMock: cancel3 } = await setupSystemProcessor({
       rowsById: {
         "bp-cancel-f0": {
@@ -3120,6 +3124,10 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
       },
     })) as { resultPayload?: Record<string, unknown> };
 
+    expect(objectStorageMocks.getObjectSize).toHaveBeenCalledWith(
+      "outputs/bp-cancel-f1/done-steps.pdf",
+    );
+    expect(objectStorageMocks.verifyS3Bucket).toHaveBeenCalledTimes(1);
     expect(res3.resultPayload).toEqual({
       manifest: [
         { index: 0, filename: "canceled.pdf", error: "Canceled" },
@@ -3139,6 +3147,124 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
         { filename: "done-steps.pdf", error: "Processing failed" },
       ],
     });
+
+    // 4. All-completed multi-step rows where outputs/<childId>/<outFilename> was already written
+    // before the child pipeline-finalize completion DB write faulted (#3190): recovers the
+    // final step's artifact into the batch ZIP instead of dropping it as failed, and rethrows
+    // normalized storage service faults from getObjectSize instead of swallowing them.
+    const { Readable } = await import("node:stream");
+    objectStorageMocks.getObjectStream.mockImplementation(async () =>
+      Readable.from(Buffer.from("pdf-bytes")),
+    );
+    objectStorageMocks.getObjectSize.mockClear();
+    objectStorageMocks.getObjectSize.mockResolvedValueOnce(9);
+    objectStorageMocks.putObject.mockResolvedValue(undefined);
+    objectStorageMocks.putObjectStream.mockResolvedValue(123);
+
+    const {
+      processor: p4,
+      completeBatchJobMock: complete4,
+      failBatchJobMock: fail4,
+    } = await setupSystemProcessor({
+      rowsById: {
+        "bp-recovered": {
+          id: "bp-recovered",
+          type: "batch",
+          toolId: "pipeline-batch",
+          status: "queued",
+          settings: { flowChildCount: 1, fileIndexMap: [0], stepCount: 2 },
+        },
+        "bp-recovered-f0": {
+          id: "bp-recovered-f0",
+          type: "pipeline-finalize",
+          status: "queued",
+          inputRefs: ["uploads/bp-recovered-f0-s0/doc.pdf"],
+          settings: {},
+          error: null,
+        },
+        "bp-recovered-f0-s0": {
+          id: "bp-recovered-f0-s0",
+          type: "pipeline-step",
+          status: "completed",
+          inputRefs: ["uploads/bp-recovered-f0-s0/doc.pdf"],
+          outputRefs: ["outputs/bp-recovered-f0-s0/doc-step0.png"],
+        },
+        "bp-recovered-f0-s1": {
+          id: "bp-recovered-f0-s1",
+          type: "pipeline-step",
+          status: "completed",
+          inputRefs: ["outputs/bp-recovered-f0-s0/doc-step0.png"],
+          outputRefs: ["outputs/bp-recovered-f0-s1/doc-out.pdf"],
+        },
+      },
+      counterErrors: [],
+    });
+
+    const res4 = (await p4({
+      id: "bp-recovered",
+      name: "batch-finalize",
+      data: {
+        kind: "batch-finalize",
+        jobId: "bp-recovered",
+        toolId: "pipeline-batch",
+        userId: null,
+        pool: "system",
+        totalFiles: 1,
+        inputRefs: [],
+        filename: "",
+        settings: { flowChildCount: 1, fileIndexMap: [0] },
+      },
+    })) as { resultPayload?: Record<string, unknown> };
+
+    expect(objectStorageMocks.getObjectSize).toHaveBeenCalledWith(
+      "outputs/bp-recovered-f0/doc-out.pdf",
+    );
+    expect(objectStorageMocks.getObjectStream).toHaveBeenCalledWith(
+      "outputs/bp-recovered-f0/doc-out.pdf",
+    );
+    expect(fail4).not.toHaveBeenCalled();
+    expect(complete4).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobId: "bp-recovered",
+        totalFiles: 1,
+        completedFiles: 1,
+        failedFiles: 0,
+        errors: [],
+        outputRefs: ["outputs/bp-recovered/pipeline-batch-bp-recov.zip"],
+      }),
+    );
+    expect(res4.resultPayload).toMatchObject({
+      manifest: [
+        {
+          index: 0,
+          filename: "doc-out.pdf",
+          outputRef: "outputs/bp-recovered-f0/doc-out.pdf",
+        },
+      ],
+    });
+
+    const s3Outage = new Error("S3 HeadObject 503 SlowDown");
+    const normalizedOutage = new Error("The server's storage service is unavailable.");
+    objectStorageMocks.getObjectSize.mockRejectedValueOnce(s3Outage);
+    objectStorageMocks.isStorageServiceFault.mockReturnValueOnce(true);
+    objectStorageMocks.normalizeS3ReadFault.mockReturnValueOnce(normalizedOutage);
+    await expect(
+      p4({
+        id: "bp-recovered",
+        name: "batch-finalize",
+        data: {
+          kind: "batch-finalize",
+          jobId: "bp-recovered",
+          toolId: "pipeline-batch",
+          userId: null,
+          pool: "system",
+          totalFiles: 1,
+          inputRefs: [],
+          filename: "",
+          settings: { flowChildCount: 1, fileIndexMap: [0] },
+        },
+      }),
+    ).rejects.toBe(normalizedOutage);
   });
 });
 
@@ -3533,6 +3659,7 @@ describe("processPipelineFinalize (#3167, #2703)", () => {
       cancelSingleJobGuardedMock,
       failSingleJobGuardedMock,
       publishEphemeralMock,
+      reportErrorMock,
       updateSingleFileProgressAtomicallyMock,
     } = await setupPipelineFinalizeProcessor({
       "pf-done-s0": {
@@ -3686,6 +3813,138 @@ describe("processPipelineFinalize (#3167, #2703)", () => {
         message: "Pipeline processing failed",
       });
     });
+
+    // A pipeline-batch child (parentId set) does not run the single-file
+    // failed-handler safety net, while still reporting the worker error (#3190).
+    cancelSingleJobGuardedMock.mockClear();
+    failSingleJobGuardedMock.mockClear();
+    reportErrorMock.mockClear();
+    const stalledErr = new Error("stalled");
+    failedListener?.(
+      {
+        id: "pf-batch-child",
+        data: {
+          kind: "pipeline-finalize",
+          jobId: "pf-batch-child",
+          parentId: "bp-parent",
+          toolId: "pipeline",
+          pool: "image",
+          totalSteps: 1,
+        },
+      },
+      stalledErr,
+    );
+    await Promise.resolve();
+    expect(cancelSingleJobGuardedMock).not.toHaveBeenCalled();
+    expect(failSingleJobGuardedMock).not.toHaveBeenCalled();
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      stalledErr,
+      expect.objectContaining({
+        source: "worker",
+        pool: "image",
+        toolId: "pipeline",
+        jobId: "pf-batch-child",
+      }),
+    );
+  });
+
+  it("catches, logs, and reports a completion terminal write fault on a pipeline-batch child while rethrowing on a single-file pipeline (#3190)", async () => {
+    const {
+      processor,
+      updateSingleFileProgressAtomicallyMock,
+      recordChildOutcomeMock,
+      reportErrorMock,
+      trackEventMock,
+      logger,
+    } = await setupPipelineFinalizeProcessor({
+      "pf-batch-ok-s0": {
+        id: "pf-batch-ok-s0",
+        status: "completed",
+        toolId: "resize",
+        bytesIn: 200,
+        bytesOut: 120,
+        outputRefs: ["outputs/pf-batch-ok-s0/out.png"],
+        progress: { percent: 100, stage: "complete" },
+      },
+      "pf-single-ok-s0": {
+        id: "pf-single-ok-s0",
+        status: "completed",
+        toolId: "resize",
+        bytesIn: 200,
+        bytesOut: 120,
+        outputRefs: ["outputs/pf-single-ok-s0/out.png"],
+        progress: { percent: 100, stage: "complete" },
+      },
+    });
+
+    objectStorageMocks.getObjectBuffer.mockResolvedValue(Buffer.from("png-out"));
+    objectStorageMocks.putObject.mockResolvedValue(undefined);
+    const dbErr = new Error("completion write failed");
+    updateSingleFileProgressAtomicallyMock.mockRejectedValueOnce(dbErr);
+
+    const res = await processor({
+      id: "pf-batch-ok",
+      name: "pipeline-finalize",
+      data: {
+        kind: "pipeline-finalize",
+        jobId: "pf-batch-ok",
+        parentId: "bp-ok",
+        totalFiles: 2,
+        toolId: "pipeline",
+        userId: null,
+        pool: "image",
+        totalSteps: 1,
+        inputRefs: [],
+        filename: "in.png",
+        settings: {},
+      },
+    });
+
+    expect(logger.error).toHaveBeenCalledWith(
+      { err: dbErr, jobId: "pf-batch-ok", parentId: "bp-ok" },
+      "completed pipeline terminal write failed",
+    );
+    expect(reportErrorMock).toHaveBeenCalledWith(dbErr, {
+      source: "worker",
+      pool: "image",
+      jobId: "pf-batch-ok",
+    });
+    expect(recordChildOutcomeMock).toHaveBeenCalledWith("bp-ok", 2, "out.png");
+    expect(trackEventMock).toHaveBeenCalledTimes(1);
+    expect(res).toMatchObject({
+      outputRefs: ["outputs/pf-batch-ok/out.png"],
+      filename: "out.png",
+      contentType: "image/png",
+      originalSize: 200,
+      processedSize: 120,
+      resultPayload: {
+        stepsCompleted: 1,
+        steps: [{ step: 1, toolId: "resize", size: 120 }],
+      },
+    });
+
+    // Single-file pipeline still rethrows so the failed-handler safety net runs.
+    reportErrorMock.mockClear();
+    updateSingleFileProgressAtomicallyMock.mockRejectedValueOnce(dbErr);
+    await expect(
+      processor({
+        id: "pf-single-ok",
+        name: "pipeline-finalize",
+        data: {
+          kind: "pipeline-finalize",
+          jobId: "pf-single-ok",
+          clientJobId: "pfc-single-ok",
+          toolId: "pipeline",
+          userId: null,
+          pool: "image",
+          totalSteps: 1,
+          inputRefs: [],
+          filename: "in.png",
+          settings: {},
+        },
+      }),
+    ).rejects.toBe(dbErr);
+    expect(reportErrorMock).not.toHaveBeenCalled();
   });
 });
 

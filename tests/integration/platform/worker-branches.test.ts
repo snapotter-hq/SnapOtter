@@ -1659,6 +1659,112 @@ describe("pipeline finalize", () => {
       batchProgressMock.failRecordOutcomeForParentId = null;
     }
   }, 30_000);
+
+  it("survives a completion DB write fault on a pipeline-batch child without running the single-file safety net and recovers the artifact in batch-finalize (#3190)", async () => {
+    const batchParent = `bp-${randomUUID()}`;
+    const batchChildId = `${batchParent}-f0`;
+    await putObject("outputs/seed-3190/final.png", Buffer.from("final-3190"));
+    await db.insert(schema.jobs).values([
+      {
+        id: batchParent,
+        type: "batch",
+        toolId: "pipeline-batch",
+        pool: "system",
+        status: "queued",
+        inputRefs: [],
+        settings: { flowChildCount: 1, stepCount: 1 },
+      },
+      {
+        id: `${batchChildId}-s0`,
+        type: "pipeline-step",
+        status: "completed",
+        toolId: "resize",
+        pool: "image",
+        inputRefs: ["uploads/seed-3190/in.png"],
+        outputRefs: ["outputs/seed-3190/final.png"],
+        bytesIn: 10,
+        bytesOut: 10,
+      },
+      {
+        id: batchChildId,
+        type: "pipeline-finalize",
+        status: "queued",
+        toolId: "pipeline",
+        pool: "image",
+        inputRefs: ["uploads/seed-3190/in.png"],
+        settings: {},
+      },
+    ]);
+
+    progressMock.failUpdateSingleFor = batchChildId;
+    reported.errors.length = 0;
+    try {
+      await getQueue("image").add(
+        "pipeline-finalize",
+        toolJob({
+          jobId: batchChildId,
+          toolId: "pipeline",
+          kind: "pipeline-finalize",
+          totalSteps: 1,
+          filename: "in.png",
+          parentId: batchParent,
+          totalFiles: 1,
+        }),
+        { jobId: batchChildId, attempts: 1 },
+      );
+
+      const settledJob = await settledQueueJob("image", batchChildId);
+      expect(settledJob.state).toBe("completed");
+      expect(settledJob.returnvalue?.outputRefs).toEqual([`outputs/${batchChildId}/final.png`]);
+
+      const outcome = await batchOutcome(batchParent, "done");
+      expect(outcome.count).toBe("1");
+
+      const events = await emittedEvents(ANALYTICS_EVENTS.PIPELINE_EXECUTED, batchChildId);
+      expect(events[0].status).toBe("completed");
+
+      const childRow = await jobRow(batchChildId);
+      expect(childRow?.status).toBe("queued");
+      expect(childRow?.error).toBeNull();
+      expect(await sharedRedis().get(`${bullPrefix()}:terminal:${batchChildId}`)).toBeNull();
+
+      expect(
+        reported.errors.some(
+          (e) => e instanceof Error && e.message === "injected update single progress outage",
+        ),
+      ).toBe(true);
+    } finally {
+      progressMock.failUpdateSingleFor = null;
+    }
+
+    await getQueue("system").add(
+      "batch-finalize",
+      toolJob({
+        jobId: batchParent,
+        toolId: "pipeline-batch",
+        kind: "batch-finalize",
+        pool: "system",
+        totalFiles: 1,
+        settings: { flowChildCount: 1, fileIndexMap: [0] },
+        filename: "",
+      }),
+      { jobId: batchParent, attempts: 1 },
+    );
+
+    const parentFrame = await terminalFrame(batchParent);
+    expect(parentFrame.status).toBe("completed");
+    expect(parentFrame.failedFiles).toBe(0);
+    const frameResult = (parentFrame.result ?? {}) as Record<string, unknown>;
+    expect(frameResult.fileResults).toEqual({ "0": "final.png" });
+
+    const parentRow = await terminalRow(batchParent);
+    expect(parentRow.status).toBe("completed");
+    const zipKey = (parentRow.outputRefs ?? [])[0];
+    const zipBytes = await getObjectBuffer(zipKey);
+    const entries = new AdmZip(zipBytes).getEntries();
+    expect(entries.map((e) => e.entryName)).toEqual(["final.png"]);
+    expect(entries[0].getData().toString("utf8")).toBe("final-3190");
+  }, 30_000);
 });
 
 describe("batch children and finalize", () => {

@@ -1746,29 +1746,38 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
   };
   const legacyResult = buildLegacyResultPayload(result, data.jobId);
 
-  await updateSingleFileProgressAtomically(
-    {
-      jobId: progressJobId,
-      phase: "complete",
-      percent: 100,
-      stage: "complete",
-      result: legacyResult,
-      ...(progressJobId !== data.jobId && { expectedPipelineFlowId: data.jobId }),
-    },
-    async (tx) => {
-      await tx
-        .update(schema.jobs)
-        .set({
-          status: "completed",
-          completedAt: new Date(),
-          outputRefs: [parentKey],
-          bytesIn: firstBytesIn,
-          bytesOut: lastBytesOut,
-          progress: { percent: 100, stage: "complete", result: legacyResult },
-        })
-        .where(eq(schema.jobs.id, data.jobId));
-    },
-  );
+  try {
+    await updateSingleFileProgressAtomically(
+      {
+        jobId: progressJobId,
+        phase: "complete",
+        percent: 100,
+        stage: "complete",
+        result: legacyResult,
+        ...(progressJobId !== data.jobId && { expectedPipelineFlowId: data.jobId }),
+      },
+      async (tx) => {
+        await tx
+          .update(schema.jobs)
+          .set({
+            status: "completed",
+            completedAt: new Date(),
+            outputRefs: [parentKey],
+            bytesIn: firstBytesIn,
+            bytesOut: lastBytesOut,
+            progress: { percent: 100, stage: "complete", result: legacyResult },
+          })
+          .where(eq(schema.jobs.id, data.jobId));
+      },
+    );
+  } catch (err) {
+    if (!data.parentId) throw err;
+    logger.error(
+      { err, jobId: data.jobId, parentId: data.parentId },
+      "completed pipeline terminal write failed",
+    );
+    void reportError(err, { source: "worker", pool: data.pool, jobId: data.jobId });
+  }
 
   // Batch progress (pipeline-batch only): guarded (#2620) so a Redis counter
   // blip after the atomic completion write does not fail the finalize job or
@@ -2025,6 +2034,7 @@ async function fallbackPipelineChildError(
   error: JobErrorPayload | null;
   canceled: boolean;
   step0InputRef?: string;
+  completedOutputRef?: string;
 }> {
   const maxSteps =
     typeof stepCount === "number" && stepCount > 0
@@ -2033,6 +2043,7 @@ async function fallbackPipelineChildError(
         ? env.MAX_PIPELINE_STEPS
         : 20;
   let step0InputRef: string | undefined;
+  let lastStepOutputRef: string | undefined;
   for (let s = 0; s < maxSteps; s++) {
     const [stepRow] = await db
       .select()
@@ -2072,8 +2083,27 @@ async function fallbackPipelineChildError(
         step0InputRef,
       };
     }
+    lastStepOutputRef = stepRow.outputRefs?.[0];
   }
-  return { error: null, canceled: false, step0InputRef };
+  let completedOutputRef: string | undefined;
+  if (lastStepOutputRef) {
+    const outFilename = lastStepOutputRef.split("/").pop() ?? "output";
+    const parentKey = `outputs/${childId}/${outFilename}`;
+    try {
+      const size = await getObjectSize(parentKey);
+      if (typeof size === "number" && size > 0) {
+        completedOutputRef = parentKey;
+      }
+    } catch (err) {
+      if (!isMissingObjectError(err)) {
+        if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+        throw err;
+      }
+      await verifyS3Bucket();
+      // Child finalize did not finish writing its output artifact before failing.
+    }
+  }
+  return { error: null, canceled: false, step0InputRef, completedOutputRef };
 }
 
 /**
@@ -2158,6 +2188,15 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
           childStepCount = parentStepCount;
         }
         stepFallback = await fallbackPipelineChildError(childId, childStepCount);
+        if (stepFallback.completedOutputRef) {
+          const outFilename = stepFallback.completedOutputRef.split("/").pop() ?? "output";
+          manifest.push({
+            index: i,
+            filename: outFilename,
+            outputRef: stepFallback.completedOutputRef,
+          });
+          continue;
+        }
         rowError = stepFallback.error;
       }
       if (row.status === "canceled" || stepFallback?.canceled) canceledChildren++;
@@ -2665,8 +2704,9 @@ export function startWorkers(): void {
       // call owned. Step rows decide the label (#836): if the first
       // non-completed step is canceled, both ids settle through
       // cancelSingleJobGuarded rather than failSingleJobGuarded, matching the
-      // finalize's own too-late rule.
-      if (data?.kind === "pipeline-finalize") {
+      // finalize's own too-late rule. Pipeline-batch children (parentId set)
+      // report through batch-finalize instead of single-file progress (#3190).
+      if (data?.kind === "pipeline-finalize" && !data.parentId) {
         void isCanceledPipelineFlow(data.jobId, data.totalSteps ?? 0)
           .catch((probeErr) => {
             logger.error(
