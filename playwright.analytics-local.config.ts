@@ -15,6 +15,7 @@ function resolveRunId(): string {
 }
 
 type E2eEndpoint = {
+  host: string;
   port: number;
   url: string;
 };
@@ -68,7 +69,7 @@ function resolveEndpoint(kind: "API" | "WEB", defaultPortFloor: number): E2eEndp
   const url = parsedUrl.origin;
   process.env[portEnvName] = String(port);
   process.env[urlEnvName] = url;
-  return { port, url };
+  return { host: parsedUrl.hostname, port, url };
 }
 
 const runId = resolveRunId();
@@ -149,7 +150,7 @@ export default defineConfig({
       timeout: 30_000,
     },
     {
-      command: "pnpm --filter @snapotter/web dev",
+      command: `pnpm --filter @snapotter/web exec vite --host ${webEndpoint.host} --port ${webEndpoint.port} --strictPort`,
       url: webEndpoint.url,
       reuseExistingServer: false,
       env: {

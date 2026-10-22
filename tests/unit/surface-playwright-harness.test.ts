@@ -148,6 +148,7 @@ describe("surface Playwright harness isolation", () => {
     });
     expect(landing.webServer).not.toHaveProperty("port");
     expect(landing.webServer.command).toContain("&& exec pnpm exec astro preview");
+    expect(landing.webServer.command).toContain("--host 127.0.0.1 --port 44351 --strictPort");
 
     const docs = await loadConfig("../../playwright.docs.config.js", {
       PLAYWRIGHT_DOCS_PORT: "44173",
@@ -161,6 +162,7 @@ describe("surface Playwright harness isolation", () => {
     });
     expect(docs.webServer).not.toHaveProperty("port");
     expect(docs.webServer.command).toContain("&& exec pnpm exec vitepress preview");
+    expect(docs.webServer.command).toContain("--host 127.0.0.1 --port 44173 --strictPort");
   });
 
   test("demo builds and previews on an owned dynamic endpoint", async () => {

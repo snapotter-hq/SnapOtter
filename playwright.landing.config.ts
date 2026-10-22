@@ -34,7 +34,7 @@ export default defineConfig({
     // the emitted-output spec can check it landed in every head. The host is
     // an unroutable loopback port: the SDK fetch fails instantly and nothing
     // leaves the machine.
-    command: `cd apps/landing && PLAYWRIGHT=1 PUBLIC_POSTHOG_KEY=phc_playwright_placeholder PUBLIC_POSTHOG_HOST=http://127.0.0.1:1 pnpm build && exec pnpm exec astro preview --host ${endpoint.host} --port ${endpoint.port}`,
+    command: `cd apps/landing && PLAYWRIGHT=1 PUBLIC_POSTHOG_KEY=phc_playwright_placeholder PUBLIC_POSTHOG_HOST=http://127.0.0.1:1 pnpm build && exec pnpm exec astro preview --host ${endpoint.host} --port ${endpoint.port} --strictPort`,
     url: endpoint.url,
     reuseExistingServer: false,
     timeout: 120_000,

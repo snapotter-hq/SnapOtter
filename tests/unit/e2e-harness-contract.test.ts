@@ -669,6 +669,7 @@ describe("local analytics Playwright isolation", () => {
       PLAYWRIGHT_WEB_URL: "http://127.0.0.1:28494",
     });
     const [apiServer, webServer] = config.webServer as Array<{
+      command: string;
       env: Record<string, string>;
       reuseExistingServer: boolean;
       url?: string;
@@ -695,6 +696,9 @@ describe("local analytics Playwright isolation", () => {
     expect(webServer.env.PORT).toBe("28494");
     expect(webServer.env.VITE_API_URL).toBe("http://127.0.0.1:18494");
     expect(webServer.reuseExistingServer).toBe(false);
+    expect(webServer.command).toBe(
+      "pnpm --filter @snapotter/web exec vite --host 127.0.0.1 --port 28494 --strictPort",
+    );
   });
 
   test("generates unique endpoints, rejects unsafe IDs, and keeps auth setup run-scoped", async () => {
@@ -770,10 +774,14 @@ describe("local analytics Playwright isolation", () => {
       API_URL: "http://localhost:19490",
       PLAYWRIGHT_WEB_URL: "http://localhost:29490",
     });
+    const [, webServer] = config.webServer as Array<{ command: string }>;
     expect(process.env.PLAYWRIGHT_API_PORT).toBe("19490");
     expect(process.env.PLAYWRIGHT_API_URL).toBe("http://localhost:19490");
     expect(process.env.PLAYWRIGHT_WEB_PORT).toBe("29490");
     expect(config.use?.baseURL).toBe("http://localhost:29490");
+    expect(webServer.command).toBe(
+      "pnpm --filter @snapotter/web exec vite --host localhost --port 29490 --strictPort",
+    );
 
     await expect(loadAnalyticsLocalConfig({ PLAYWRIGHT_API_PORT: "invalid" })).rejects.toThrow(
       /PLAYWRIGHT_API_PORT must be an integer port/,

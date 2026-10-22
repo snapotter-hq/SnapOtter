@@ -26,7 +26,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `cd apps/docs && pnpm docs:build && exec pnpm exec vitepress preview . --host ${endpoint.host} --port ${endpoint.port}`,
+    command: `cd apps/docs && pnpm docs:build && exec pnpm exec vitepress preview . --host ${endpoint.host} --port ${endpoint.port} --strictPort`,
     url: endpoint.url,
     reuseExistingServer: false,
     // `vitepress build` renders ~3,800 pages and then runs Pagefind over them,
