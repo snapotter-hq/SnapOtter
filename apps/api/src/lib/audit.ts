@@ -6,6 +6,7 @@ import { db, schema } from "../db/index.js";
 import { computeHmac } from "./audit-integrity.js";
 import { deriveAuditHmacKey } from "./encryption.js";
 import { isEnterpriseFeatureEnabled } from "./enterprise-feature.js";
+import { logger } from "./logger.js";
 import { getSettingStrict } from "./settings-helpers.js";
 
 const MAX_AUDIT_INPUT_LENGTH = 200;
@@ -21,14 +22,9 @@ const MAX_AUDIT_INPUT_LENGTH = 200;
  */
 export async function isToolAuditEnabled(): Promise<boolean> {
   try {
-    const result = await db
-      .select({ value: schema.settings.value })
-      .from(schema.settings)
-      .where(eq(schema.settings.key, "auditToolOperations"))
-      .limit(1);
-    if (result.length > 0 && result[0].value === "true") return true;
-  } catch {
-    // fall through to enterprise check
+    if ((await getSettingStrict("auditToolOperations")) === "true") return true;
+  } catch (err) {
+    logger.warn({ err, key: "auditToolOperations" }, "Failed to read auditToolOperations setting");
   }
 
   return isEnterpriseFeatureEnabled("audit_export");

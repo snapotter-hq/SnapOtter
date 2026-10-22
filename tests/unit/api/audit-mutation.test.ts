@@ -36,12 +36,28 @@ const state = vi.hoisted(() => ({
   enterpriseThrows: false,
 }));
 
+const loggerMock = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  fatal: vi.fn(),
+  trace: vi.fn(),
+  child: vi.fn(),
+  level: "info",
+  silent: vi.fn(),
+}));
+
 vi.mock("../../../apps/api/src/config.js", () => ({
   env: {
     get DATA_ENCRYPTION_KEY() {
       return state.encryptionKey;
     },
   },
+}));
+
+vi.mock("../../../apps/api/src/lib/logger.js", () => ({
+  logger: loggerMock,
 }));
 
 vi.mock("../../../apps/api/src/db/index.js", () => ({
@@ -184,6 +200,8 @@ describe("isToolAuditEnabled", () => {
   it("returns true when the setting value is exactly the string 'true'", async () => {
     state.selectRows = [[{ value: "true" }]];
     await expect(isToolAuditEnabled()).resolves.toBe(true);
+    expect(getSettingStrict).toHaveBeenCalledWith("auditToolOperations");
+    expect(loggerMock.warn).not.toHaveBeenCalled();
   });
 
   it("does not treat a non-'true' setting value as enabled", async () => {
@@ -191,12 +209,16 @@ describe("isToolAuditEnabled", () => {
     state.selectRows = [[{ value: "1" }]];
     state.auditExportEnabled = false;
     await expect(isToolAuditEnabled()).resolves.toBe(false);
+    expect(getSettingStrict).toHaveBeenCalledWith("auditToolOperations");
+    expect(loggerMock.warn).not.toHaveBeenCalled();
   });
 
   it("falls back to the enterprise audit_export feature when the setting is absent", async () => {
     state.selectRows = [[]];
     state.auditExportEnabled = true;
     await expect(isToolAuditEnabled()).resolves.toBe(true);
+    expect(getSettingStrict).toHaveBeenCalledWith("auditToolOperations");
+    expect(loggerMock.warn).not.toHaveBeenCalled();
   });
 
   it("checks the audit_export feature specifically, not some other feature", async () => {
@@ -206,27 +228,49 @@ describe("isToolAuditEnabled", () => {
     state.selectRows = [[]];
     state.auditExportEnabled = true;
     await expect(isToolAuditEnabled()).resolves.toBe(true);
+    expect(getSettingStrict).toHaveBeenCalledWith("auditToolOperations");
+    expect(loggerMock.warn).not.toHaveBeenCalled();
   });
 
   it("returns false when neither the setting nor the enterprise feature enable it", async () => {
     state.selectRows = [[]];
     state.auditExportEnabled = false;
     await expect(isToolAuditEnabled()).resolves.toBe(false);
+    expect(getSettingStrict).toHaveBeenCalledWith("auditToolOperations");
+    expect(loggerMock.warn).not.toHaveBeenCalled();
   });
 
-  it("falls through to the enterprise check when the settings query throws", async () => {
-    // The first try/catch swallows the DB error and reaches the enterprise path,
+  it("logs a warning and falls through to the enterprise check when the settings query throws (#3238)", async () => {
+    // The first try/catch logs the DB error and reaches the enterprise path,
     // which here enables audit_export -> true. Pins that the catch does not
     // short-circuit to false.
     state.selectThrows = true;
     state.auditExportEnabled = true;
     await expect(isToolAuditEnabled()).resolves.toBe(true);
+    expect(getSettingStrict).toHaveBeenCalledWith("auditToolOperations");
+    expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      {
+        err: expect.objectContaining({ message: "settings query failed" }),
+        key: "auditToolOperations",
+      },
+      "Failed to read auditToolOperations setting",
+    );
   });
 
-  it("returns false when the settings query throws and enterprise is unavailable", async () => {
+  it("logs a warning and returns false when the settings query throws and enterprise is unavailable (#3238)", async () => {
     state.selectThrows = true;
     state.enterpriseThrows = true;
     await expect(isToolAuditEnabled()).resolves.toBe(false);
+    expect(getSettingStrict).toHaveBeenCalledWith("auditToolOperations");
+    expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+    expect(loggerMock.warn).toHaveBeenCalledWith(
+      {
+        err: expect.objectContaining({ message: "settings query failed" }),
+        key: "auditToolOperations",
+      },
+      "Failed to read auditToolOperations setting",
+    );
   });
 });
 

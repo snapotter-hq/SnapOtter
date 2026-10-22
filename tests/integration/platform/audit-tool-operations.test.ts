@@ -5,7 +5,10 @@
  * `auditToolOperations` admin setting is enabled and stays silent when it
  * is disabled (the default).
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { db } from "../../../apps/api/src/db/index.js";
+import { isToolAuditEnabled } from "../../../apps/api/src/lib/audit.js";
+import { logger } from "../../../apps/api/src/lib/logger.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
   buildTestApp,
@@ -108,5 +111,23 @@ describe("tool operation audit logging", () => {
     expect(entry.details.inputFileCount).toBe(1);
     expect(typeof entry.details.totalInputSize).toBe("number");
     expect(entry.details.totalInputSize).toBeGreaterThan(0);
+  });
+
+  it("logs a warning and falls back to false when reading auditToolOperations fails (#3238)", async () => {
+    const dbError = new Error("connection terminated unexpectedly");
+    const selectSpy = vi.spyOn(db, "select").mockImplementationOnce(() => {
+      throw dbError;
+    });
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      await expect(isToolAuditEnabled()).resolves.toBe(false);
+      expect(warnSpy).toHaveBeenCalledWith(
+        { err: dbError, key: "auditToolOperations" },
+        "Failed to read auditToolOperations setting",
+      );
+    } finally {
+      selectSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
   });
 });
