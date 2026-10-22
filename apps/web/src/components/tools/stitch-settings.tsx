@@ -7,6 +7,8 @@ import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format as formatMessage } from "@/lib/format";
 import { jobFailureMessage, parseResultBody, reportMalformedResult } from "@/lib/progress-frames";
+import { reportRunEndFailure } from "@/lib/run-end-report";
+import { runEndWrites } from "@/lib/run-teardown";
 import { useFileStore } from "@/stores/file-store";
 
 type Direction = "horizontal" | "vertical" | "grid";
@@ -119,20 +121,19 @@ export function StitchSettings() {
       unsubscribe();
     };
 
-    const failEntry = (message: string) => {
-      try {
-        useFileStore.getState().updateEntryById(entryId, {
-          processedUrl: null,
-          processedPreviewUrl: null,
-          processedFilename: null,
-          processedSize: null,
-          status: "failed",
-          error: message,
-        });
-      } finally {
-        setProcessing(false);
-      }
-    };
+    const failEntry = (message: string) =>
+      runEndWrites([
+        () =>
+          useFileStore.getState().updateEntryById(entryId, {
+            processedUrl: null,
+            processedPreviewUrl: null,
+            processedFilename: null,
+            processedSize: null,
+            status: "failed",
+            error: message,
+          }),
+        () => setProcessing(false),
+      ]);
 
     try {
       const formData = new FormData();
@@ -182,8 +183,9 @@ export function StitchSettings() {
           try {
             result = parseResultBody<StitchResult>(xhr.responseText, RESULT_FIELDS);
           } catch (err) {
-            failEntry(t.errors.invalidResponse);
             reportMalformedResult(err, { status: xhr.status, toolId: "stitch" });
+            const teardownError = failEntry(t.errors.invalidResponse);
+            if (teardownError) throw teardownError.cause;
             return;
           }
           try {
@@ -200,15 +202,20 @@ export function StitchSettings() {
               ...prev,
               [entryId]: result.downloadUrl,
             }));
-            setProcessing(false);
           } catch (err) {
-            try {
-              failEntry(jobFailureMessage({ reason: "trackingFailed" }, t.errors));
-            } catch (teardownErr) {
-              console.error("Ending the run after a result handling error failed", teardownErr);
+            const teardownError = failEntry(
+              jobFailureMessage({ reason: "trackingFailed" }, t.errors),
+            );
+            if (teardownError) {
+              reportRunEndFailure(
+                "Ending a sync tool run after a result handling error failed",
+                teardownError.cause,
+                "stitch",
+              );
             }
             throw err;
           }
+          setProcessing(false);
         } else {
           let message: string;
           try {
@@ -227,7 +234,8 @@ export function StitchSettings() {
               formatMessage(t.errors.failedWithStatus, { status: xhr.status }),
             );
           }
-          failEntry(message);
+          const teardownError = failEntry(message);
+          if (teardownError) throw teardownError.cause;
         }
       };
 
@@ -235,7 +243,8 @@ export function StitchSettings() {
         endSubscription();
         if (xhrRef.current !== xhr || storeReset) return;
         xhrRef.current = null;
-        failEntry(t.errors.network);
+        const teardownError = failEntry(t.errors.network);
+        if (teardownError) throw teardownError.cause;
       };
 
       xhr.send(formData);
@@ -243,7 +252,10 @@ export function StitchSettings() {
       endSubscription();
       if (xhrRef.current === xhr) xhrRef.current = null;
       if (!storeReset) {
-        failEntry(err instanceof Error ? err.message : t.toolSettings.stitch.stitchFailed);
+        const teardownError = failEntry(
+          err instanceof Error ? err.message : t.toolSettings.stitch.stitchFailed,
+        );
+        if (teardownError) throw teardownError.cause;
       }
     }
   };

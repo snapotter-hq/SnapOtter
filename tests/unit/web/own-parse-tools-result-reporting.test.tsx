@@ -244,6 +244,39 @@ describe("stitch: a malformed sync answer apart from our own store write", () =>
     expectReported(NO_DOWNLOAD_URL, "stitch", 201);
   });
 
+  it("reports a malformed body and rethrows the first teardown error when showing the error throws", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(<StitchSettings />);
+    const xhr = await submit("stitch-submit");
+    let writes = 0;
+    const unsubscribe = useFileStore.subscribe(() => {
+      writes++;
+      throw new Error(writes === 1 ? "teardown broke" : "later teardown broke");
+    });
+
+    try {
+      expect(() => xhr.respondRaw(200, "{}")).toThrow(/^teardown broke$/);
+      await act(async () => {});
+
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run failed",
+        expect.objectContaining({ message: "teardown broke" }),
+      );
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run failed",
+        expect.objectContaining({ message: "later teardown broke" }),
+      );
+      expect(useFileStore.getState().entries[0].status).toBe("failed");
+      expect(useFileStore.getState().entries[0].error).toBe(en.errors.invalidResponse);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByTestId("stitch-submit")).toBeEnabled();
+      expectReported(NO_DOWNLOAD_URL, "stitch");
+    } finally {
+      unsubscribe();
+      consoleError.mockRestore();
+    }
+  });
+
   it("ends the run with the tracking message when landing the result throws", async () => {
     render(<StitchSettings />);
     const xhr = await submit("stitch-submit");
@@ -270,6 +303,71 @@ describe("stitch: a malformed sync answer apart from our own store write", () =>
     }
   });
 
+  it("rethrows the root cause and reports the teardown failure when ending the run throws too", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(<StitchSettings />);
+    const xhr = await submit("stitch-submit");
+    let writes = 0;
+    const unsubscribe = useFileStore.subscribe(() => {
+      writes++;
+      if (writes === 1) throw new Error("root cause");
+      throw new Error(writes === 2 ? "teardown broke" : "later teardown broke");
+    });
+
+    try {
+      expect(() => xhr.respond(200, GOOD_BODY)).toThrow(/^root cause$/);
+      await act(async () => {});
+
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run failed",
+        expect.objectContaining({ message: "teardown broke" }),
+      );
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run failed",
+        expect.objectContaining({ message: "later teardown broke" }),
+      );
+      expect(useFileStore.getState().entries[0].status).toBe("failed");
+      expect(useFileStore.getState().entries[0].processedUrl).toBeNull();
+      expect(useFileStore.getState().entries[0].error).toBe(en.errors.jobTrackingFailed);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByTestId("stitch-submit")).toBeEnabled();
+      expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+      const [error, tags] = vi.mocked(captureHandledError).mock.calls[0];
+      expect(error.message).toBe("Ending a sync tool run after a result handling error failed");
+      expect(error.cause).toMatchObject({ message: "teardown broke" });
+      expect(tags).toEqual({ error_class: "bug", tool_id: "stitch" });
+    } finally {
+      unsubscribe();
+      consoleError.mockRestore();
+    }
+  });
+
+  it("keeps the landed result when clearing processing after a good answer throws", async () => {
+    render(<StitchSettings />);
+    const xhr = await submit("stitch-submit");
+    let thrown = false;
+    const unsubscribe = useFileStore.subscribe((s) => {
+      if (!s.processing && !thrown) {
+        thrown = true;
+        throw new Error("settle boom");
+      }
+    });
+
+    try {
+      expect(() => xhr.respond(200, GOOD_BODY)).toThrow(/^settle boom$/);
+      await act(async () => {});
+
+      expect(useFileStore.getState().entries[0].status).toBe("completed");
+      expect(useFileStore.getState().entries[0].processedUrl).toBe(DOWNLOAD_URL);
+      expect(useFileStore.getState().entries[0].error).toBeNull();
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByTestId("stitch-download")).toHaveAttribute("href", DOWNLOAD_URL);
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+    }
+  });
+
   it("shows the server's error text for a failed request without reporting it", async () => {
     render(<StitchSettings />);
 
@@ -277,6 +375,39 @@ describe("stitch: a malformed sync answer apart from our own store write", () =>
 
     await waitFor(() => expect(screen.getByText("Stitching failed")).toBeInTheDocument());
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+
+  it("keeps the server's error text and rethrows the first teardown error when failing a non-2xx request throws", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(<StitchSettings />);
+    const xhr = await submit("stitch-submit");
+    let writes = 0;
+    const unsubscribe = useFileStore.subscribe(() => {
+      writes++;
+      throw new Error(writes === 1 ? "teardown broke" : "later teardown broke");
+    });
+
+    try {
+      expect(() => xhr.respond(422, { error: "Stitching failed" })).toThrow(/^teardown broke$/);
+      await act(async () => {});
+
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run failed",
+        expect.objectContaining({ message: "teardown broke" }),
+      );
+      expect(consoleError).toHaveBeenCalledWith(
+        "Ending the run failed",
+        expect.objectContaining({ message: "later teardown broke" }),
+      );
+      expect(useFileStore.getState().entries[0].status).toBe("failed");
+      expect(useFileStore.getState().entries[0].error).toBe("Stitching failed");
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(screen.getByTestId("stitch-submit")).toBeEnabled();
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+      consoleError.mockRestore();
+    }
   });
 });
 
