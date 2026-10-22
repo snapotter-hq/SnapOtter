@@ -182,7 +182,7 @@ async function processTransparencyFix(
       resultBuffer = await removeBackground(
         workingBuffer,
         outputDir,
-        { model: DEFAULT_MODEL, toolId: TOOL_ID },
+        { model: DEFAULT_MODEL, oomFallbackModel: false, toolId: TOOL_ID },
         onProgress,
       );
     } catch (err) {

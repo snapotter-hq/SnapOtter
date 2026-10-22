@@ -1,4 +1,8 @@
-export { isMemoryAllocError, removeBackground } from "./background-removal.js";
+export {
+  isMemoryAllocError,
+  type RemoveBackgroundOptions,
+  removeBackground,
+} from "./background-removal.js";
 export {
   AnimatedRemovalCanceledError,
   animatedTimeoutMs,

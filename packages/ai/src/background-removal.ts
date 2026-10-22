@@ -13,6 +13,7 @@ import {
 
 export interface RemoveBackgroundOptions {
   model?: string;
+  oomFallbackModel?: string | false;
   backgroundColor?: string;
   edgeRefine?: number;
   decontaminate?: boolean;
@@ -48,7 +49,7 @@ export async function removeBackground(
   options: RemoveBackgroundOptions = {},
   onProgress?: ProgressCallback,
 ): Promise<Buffer> {
-  const { signal, toolId, ...sidecarOptions } = options;
+  const { oomFallbackModel, signal, toolId, ...sidecarOptions } = options;
   const id = randomUUID();
   const inputPath = join(tmpdir(), `rembg_in_${id}.png`);
   const outputPath = join(outputDir, `rembg_out_${id}.png`);
@@ -89,6 +90,7 @@ export async function removeBackground(
       timeout,
       signal,
       toolId,
+      oomFallbackModel,
     );
 
     if (needsDownscale) {
@@ -105,11 +107,12 @@ export async function removeBackground(
 async function runAndParse(
   inputPath: string,
   outputPath: string,
-  options: RemoveBackgroundOptions,
+  options: Omit<RemoveBackgroundOptions, "oomFallbackModel" | "signal" | "toolId">,
   onProgress: ProgressCallback | undefined,
   timeout: number,
   signal: AbortSignal | undefined,
   toolId?: string,
+  oomFallbackModel?: string | false,
 ): Promise<Buffer> {
   const runOptions = {
     onProgress,
@@ -130,12 +133,13 @@ async function runAndParse(
     return readFile(outputPath);
   } catch (err) {
     const isOom = isMemoryAllocError(err);
-    const canFallback = isOom && options.model !== OOM_FALLBACK_MODEL;
+    const fallbackModel = oomFallbackModel === undefined ? OOM_FALLBACK_MODEL : oomFallbackModel;
+    if (!isOom || !fallbackModel || options.model === fallbackModel) {
+      throw toBgRemovalError(err);
+    }
 
-    if (!canFallback) throw toBgRemovalError(err);
-
-    onProgress?.(5, `Retrying with lighter model (${OOM_FALLBACK_MODEL})`);
-    const fallbackOpts = { ...options, model: OOM_FALLBACK_MODEL };
+    onProgress?.(5, `Retrying with lighter model (${fallbackModel})`);
+    const fallbackOpts = { ...options, model: fallbackModel };
     const { stdout } = await runPythonWithProgress(
       "remove_bg.py",
       [inputPath, outputPath, JSON.stringify(fallbackOpts)],

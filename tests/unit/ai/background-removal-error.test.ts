@@ -1,4 +1,6 @@
+import { writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -16,6 +18,10 @@ vi.mock("../../../packages/ai/src/bridge.js", async (importOriginal) => {
 });
 
 import { isSafeMessageError, SafeError } from "@snapotter/shared";
+import { runAiToolJob } from "../../../apps/api/src/jobs/ai-handlers.js";
+import type { ToolJobData } from "../../../apps/api/src/jobs/types.js";
+import { getToolConfig, type ToolProcessCtx } from "../../../apps/api/src/routes/tool-factory.js";
+import { registerTransparencyFixer } from "../../../apps/api/src/routes/tools/transparency-fixer.js";
 import {
   isMemoryAllocError,
   removeBackground,
@@ -150,5 +156,121 @@ describe("removeBackground error surfacing", () => {
     runPythonWithProgress.mockRejectedValue(timeout);
 
     await expect(removeBackground(png, tmpdir(), { model: "u2net" })).rejects.toBe(timeout);
+  });
+});
+
+describe("transparency-fixer three-rung OOM fallback chain (#3059)", () => {
+  const fakeApp = { post: vi.fn() } as unknown as FastifyInstance;
+
+  function transparencyJob(): ToolJobData {
+    return {
+      jobId: "job-transparency-fixer-oom",
+      toolId: "transparency-fixer",
+      userId: null,
+      pool: "ai",
+      inputRefs: ["uploads/job-transparency-fixer-oom/photo.png"],
+      filename: "photo.png",
+      settings: { defringe: 0, outputFormat: "png", removeWatermark: false },
+      kind: "ai-tool",
+    };
+  }
+
+  function makeCtx(): ToolProcessCtx {
+    return {
+      signal: new AbortController().signal,
+      scratchDir: tmpdir(),
+      report: vi.fn(),
+    };
+  }
+
+  function sidecarAttemptModels(): string[] {
+    return runPythonWithProgress.mock.calls.map((call) => {
+      const args = call[1] as string[];
+      return (JSON.parse(args[2]) as { model?: string }).model ?? "";
+    });
+  }
+
+  beforeAll(() => {
+    registerTransparencyFixer(fakeApp);
+  });
+
+  it("steps from birefnet-hr-matting to birefnet-general without jumping straight to u2net", async () => {
+    runPythonWithProgress.mockImplementation(async (_script: string, args: string[]) => {
+      const { model } = JSON.parse(args[2]) as { model?: string };
+      if (model === "birefnet-hr-matting") {
+        throw new Error("CUDA out of memory");
+      }
+      await writeFile(args[1], png);
+      return { stdout: '{"success": true}', stderr: "" };
+    });
+    parseStdoutJson.mockReturnValue({ success: true });
+
+    const ctx = makeCtx();
+    const result = await runAiToolJob(transparencyJob(), png, ctx);
+
+    expect(sidecarAttemptModels()).toEqual(["birefnet-hr-matting", "birefnet-general"]);
+    expect(ctx.report).toHaveBeenCalledWith(5, "Retrying with fallback model (birefnet-general)");
+    expect(result.filename).toBe("photo_fixed.png");
+  });
+
+  it("steps birefnet-hr-matting -> birefnet-general -> u2net when the first two OOM", async () => {
+    runPythonWithProgress.mockImplementation(async (_script: string, args: string[]) => {
+      const { model } = JSON.parse(args[2]) as { model?: string };
+      if (model === "birefnet-hr-matting" || model === "birefnet-general") {
+        throw new Error("Unable to allocate 1.86 GiB for an array");
+      }
+      await writeFile(args[1], png);
+      return { stdout: '{"success": true}', stderr: "" };
+    });
+    parseStdoutJson.mockReturnValue({ success: true });
+
+    const ctx = makeCtx();
+    const result = await runAiToolJob(transparencyJob(), png, ctx);
+
+    expect(sidecarAttemptModels()).toEqual(["birefnet-hr-matting", "birefnet-general", "u2net"]);
+    expect(ctx.report).toHaveBeenCalledWith(5, "Retrying with fallback model (birefnet-general)");
+    expect(ctx.report).toHaveBeenCalledWith(5, "Retrying with lighter model (u2net)");
+    expect(result.filename).toBe("photo_fixed.png");
+  });
+
+  it("stops after 3 sidecar calls (birefnet-hr-matting -> birefnet-general -> u2net) when all three OOM, including via pipeline processor", async () => {
+    runPythonWithProgress.mockResolvedValue({ stdout: "{}" });
+    parseStdoutJson.mockReturnValue({ success: false, error: "CUDA out of memory" });
+
+    const ctx = makeCtx();
+    let caught: unknown;
+    try {
+      await runAiToolJob(transparencyJob(), png, ctx);
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(sidecarAttemptModels()).toEqual(["birefnet-hr-matting", "birefnet-general", "u2net"]);
+    expect(isSafeMessageError(caught)).toBe(true);
+    expect((caught as SafeError).kind).toBe("operational");
+    expect((caught as SafeError).message).toBe("CUDA out of memory");
+
+    runPythonWithProgress.mockClear();
+    const config = getToolConfig("transparency-fixer");
+    expect(config).toBeDefined();
+    await expect(
+      config?.process(
+        png,
+        { defringe: 0, outputFormat: "png", removeWatermark: false },
+        "photo.png",
+        makeCtx(),
+      ),
+    ).rejects.toThrow("CUDA out of memory");
+    expect(sidecarAttemptModels()).toEqual(["birefnet-hr-matting", "birefnet-general", "u2net"]);
+  });
+
+  it("stops after 1 sidecar call when birefnet-hr-matting fails with a non-OOM error", async () => {
+    runPythonWithProgress.mockResolvedValue({ stdout: "{}" });
+    parseStdoutJson.mockReturnValue({ success: false, error: "rembg model load failed" });
+
+    await expect(runAiToolJob(transparencyJob(), png, makeCtx())).rejects.toThrow(
+      "rembg model load failed",
+    );
+    expect(sidecarAttemptModels()).toEqual(["birefnet-hr-matting"]);
   });
 });

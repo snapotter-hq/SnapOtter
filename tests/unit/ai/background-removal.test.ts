@@ -632,6 +632,72 @@ describe("removeBackground", () => {
       const fallbackArgs = vi.mocked(runPythonWithProgress).mock.calls[1][1];
       expect(JSON.parse(fallbackArgs[2]).model).toBe("u2net");
     });
+
+    it("does not retry on OOM when oomFallbackModel is false, and omits oomFallbackModel from Python args (#3059)", async () => {
+      vi.mocked(runPythonWithProgress).mockRejectedValueOnce(
+        new Error("Process killed (out of memory)"),
+      );
+
+      await expect(
+        removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, {
+          model: "birefnet-hr-matting",
+          oomFallbackModel: false,
+        }),
+      ).rejects.toThrow("out of memory");
+
+      expect(runPythonWithProgress).toHaveBeenCalledTimes(1);
+      const primaryArgs = vi.mocked(runPythonWithProgress).mock.calls[0][1];
+      expect(JSON.parse(primaryArgs[2])).toEqual({ model: "birefnet-hr-matting" });
+    });
+
+    it("retries with a custom oomFallbackModel when specified (#3059)", async () => {
+      const onProgress = vi.fn();
+      vi.mocked(runPythonWithProgress)
+        .mockRejectedValueOnce(new Error("Process killed (out of memory)"))
+        .mockResolvedValueOnce({ stdout: '{"success": true}', stderr: "" });
+
+      await removeBackground(
+        FAKE_INPUT,
+        FAKE_OUTPUT_DIR,
+        {
+          model: "birefnet-hr-matting",
+          oomFallbackModel: "birefnet-general",
+          edgeRefine: 2,
+          decontaminate: true,
+        },
+        onProgress,
+      );
+
+      expect(runPythonWithProgress).toHaveBeenCalledTimes(2);
+      const primaryArgs = vi.mocked(runPythonWithProgress).mock.calls[0][1];
+      const fallbackArgs = vi.mocked(runPythonWithProgress).mock.calls[1][1];
+      expect(JSON.parse(primaryArgs[2])).toEqual({
+        model: "birefnet-hr-matting",
+        edgeRefine: 2,
+        decontaminate: true,
+      });
+      expect(JSON.parse(fallbackArgs[2])).toEqual({
+        model: "birefnet-general",
+        edgeRefine: 2,
+        decontaminate: true,
+      });
+      expect(onProgress).toHaveBeenCalledWith(5, "Retrying with lighter model (birefnet-general)");
+    });
+
+    it("does not retry on OOM when model already matches custom oomFallbackModel (#3059)", async () => {
+      vi.mocked(runPythonWithProgress).mockRejectedValueOnce(
+        new Error("Process killed (out of memory)"),
+      );
+
+      await expect(
+        removeBackground(FAKE_INPUT, FAKE_OUTPUT_DIR, {
+          model: "birefnet-general",
+          oomFallbackModel: "birefnet-general",
+        }),
+      ).rejects.toThrow("out of memory");
+
+      expect(runPythonWithProgress).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("edge cases", () => {

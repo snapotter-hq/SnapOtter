@@ -291,7 +291,7 @@ describe("AI image job handlers", () => {
       1,
       PNG,
       SCRATCH_DIR,
-      { model: "birefnet-hr-matting", toolId: "transparency-fixer" },
+      { model: "birefnet-hr-matting", oomFallbackModel: false, toolId: "transparency-fixer" },
       expect.any(Function),
     );
     expect(removeBackground).toHaveBeenNthCalledWith(
