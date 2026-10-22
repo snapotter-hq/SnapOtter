@@ -120,7 +120,10 @@ def detect_faces_mediapipe(img_array, sensitivity):
 
     try:
         mp_face = mp.solutions.face_detection
+    except AttributeError:
+        mp_face = None
 
+    if mp_face is not None:
         all_detections = []
         for model_sel in [0, 1]:
             detector = mp_face.FaceDetection(
@@ -147,28 +150,27 @@ def detect_faces_mediapipe(img_array, sensitivity):
             })
         return faces
 
-    except AttributeError:
-        model_path = _ensure_face_detect_model()
-        options = mp.tasks.vision.FaceDetectorOptions(
-            base_options=mp.tasks.BaseOptions(model_asset_path=model_path),
-            running_mode=mp.tasks.vision.RunningMode.IMAGE,
-            min_detection_confidence=min_confidence,
-        )
-        detector = mp.tasks.vision.FaceDetector.create_from_options(options)
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=scaled)
-        result = detector.detect(mp_image)
-        detector.close()
+    model_path = _ensure_face_detect_model()
+    options = mp.tasks.vision.FaceDetectorOptions(
+        base_options=mp.tasks.BaseOptions(model_asset_path=model_path),
+        running_mode=mp.tasks.vision.RunningMode.IMAGE,
+        min_detection_confidence=min_confidence,
+    )
+    detector = mp.tasks.vision.FaceDetector.create_from_options(options)
+    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=scaled)
+    result = detector.detect(mp_image)
+    detector.close()
 
-        faces = []
-        for detection in result.detections:
-            bbox = detection.bounding_box
-            faces.append({
-                "x": int(bbox.origin_x * inv_scale),
-                "y": int(bbox.origin_y * inv_scale),
-                "w": int(bbox.width * inv_scale),
-                "h": int(bbox.height * inv_scale),
-            })
-        return faces
+    faces = []
+    for detection in result.detections:
+        bbox = detection.bounding_box
+        faces.append({
+            "x": int(bbox.origin_x * inv_scale),
+            "y": int(bbox.origin_y * inv_scale),
+            "w": int(bbox.width * inv_scale),
+            "h": int(bbox.height * inv_scale),
+        })
+    return faces
 
 
 def enhance_with_gfpgan(img_array, only_center_face):

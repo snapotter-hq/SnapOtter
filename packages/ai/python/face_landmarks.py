@@ -157,13 +157,16 @@ def main():
 
             emit_progress(20, "Initializing face mesh")
 
-            landmarks_list = None
+            img_array = np.array(img)
+            emit_progress(30, "Detecting face landmarks")
             try:
-                img_array = np.array(img)
-                emit_progress(30, "Detecting face landmarks")
-                landmarks_list = detect_with_solutions(img_array, max_faces)
+                mp_face_mesh = mp.solutions.face_mesh
             except AttributeError:
-                emit_progress(30, "Detecting face landmarks")
+                mp_face_mesh = None
+
+            if mp_face_mesh is not None:
+                landmarks_list = detect_with_solutions(img_array, max_faces)
+            else:
                 landmarks_list = detect_with_tasks(input_path, max_faces)
 
             if landmarks_list is None:

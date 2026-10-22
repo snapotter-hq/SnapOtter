@@ -511,6 +511,10 @@ def enhance_faces(img_bgr, fidelity=0.7):
 
     try:
         mp_face = mp.solutions.face_detection
+    except AttributeError:
+        mp_face = None
+
+    if mp_face is not None:
         all_detections = []
         for model_sel in [0, 1]:
             detector = mp_face.FaceDetection(
@@ -534,8 +538,7 @@ def enhance_faces(img_bgr, fidelity=0.7):
                 "w": int(bbox.width * dw * inv_scale),
                 "h": int(bbox.height * dh * inv_scale),
             })
-
-    except AttributeError:
+    else:
         model_path = _ensure_face_detect_model()
         options = mp.tasks.vision.FaceDetectorOptions(
             base_options=mp.tasks.BaseOptions(model_asset_path=model_path),

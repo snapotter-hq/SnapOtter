@@ -1373,6 +1373,160 @@ print("RESTORE_3087_OK")
         expect(res.status, res.stderr).toBe(0);
         expect(res.stdout).toContain("RESTORE_3087_OK");
       });
+
+      it("scopes except AttributeError in enhance_faces to mp.solutions.face_detection lookup (issue #3626)", () => {
+        const res = runPy(`
+import contextlib, importlib.util, io, json, os, sys, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+import gpu
+os.environ["SNAPOTTER_ALLOW_MODEL_DOWNLOAD"] = "0"
+os.environ["MODELS_PATH"] = "/tmp/nonexistent-models-3626"
+
+spec = importlib.util.spec_from_file_location("restore_mod_3626", os.path.join(py_dir, "restore.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+mod._IMPORT_ERROR = None
+mod._FACE_DETECT_DOCKER_PATH = "/tmp/nonexistent-docker-3626.tflite"
+mod._FACE_DETECT_LOCAL_PATH = "/tmp/nonexistent-local-3626.tflite"
+
+class FakeArr:
+    shape = (200, 200, 3)
+    def copy(self):
+        return self
+
+mod.cv2 = types.SimpleNamespace(
+    IMREAD_COLOR=1,
+    COLOR_BGR2RGB=1,
+    imread=lambda _p, _f: FakeArr(),
+    imwrite=lambda _p, _img: True,
+    cvtColor=lambda img, _c: img,
+)
+mod.is_grayscale = lambda _img: False
+gpu.onnx_gpu_available = lambda: False
+
+ensure_model_calls = []
+orig_ensure_model = mod._ensure_face_detect_model
+def tracked_ensure_model():
+    ensure_model_calls.append(True)
+    return orig_ensure_model()
+mod._ensure_face_detect_model = tracked_ensure_model
+
+# 1. AttributeError inside FaceDetection() init or detector.process() when mp.solutions.face_detection exists must propagate directly
+class InitAttrErrorDetector:
+    def __init__(self, **_kwargs):
+        raise AttributeError("unexpected NoneType attribute in init")
+
+class ProcessAttrErrorDetector:
+    def __init__(self, **_kwargs):
+        pass
+    def process(self, _img):
+        raise AttributeError("unexpected NoneType attribute in process")
+    def close(self):
+        pass
+
+fake_mp = types.ModuleType("mediapipe")
+fake_mp.solutions = types.SimpleNamespace(
+    face_detection=types.SimpleNamespace(FaceDetection=InitAttrErrorDetector)
+)
+sys.modules["mediapipe"] = fake_mp
+
+for det_cls, expected_msg in (
+    (InitAttrErrorDetector, "unexpected NoneType attribute in init"),
+    (ProcessAttrErrorDetector, "unexpected NoneType attribute in process"),
+):
+    fake_mp.solutions.face_detection.FaceDetection = det_cls
+    try:
+        mod.enhance_faces(FakeArr(), 0.7)
+    except AttributeError as exc:
+        assert str(exc) == expected_msg, exc
+        assert ensure_model_calls == [], f"_ensure_face_detect_model must not be called: {ensure_model_calls}"
+    else:
+        raise AssertionError(f"Expected AttributeError from {det_cls.__name__} to propagate")
+
+# 1b. Through main(), AttributeError in detector.process() emits the AttributeError warning, not the offline model download error
+settings_faces_only = json.dumps({
+    "scratchRemoval": False,
+    "faceEnhancement": True,
+    "denoise": False,
+    "colorize": False,
+})
+sys.argv = ["restore.py", "/tmp/in.png", "/tmp/out.png", settings_faces_only]
+out_buf, err_buf = io.StringIO(), io.StringIO()
+with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+    mod.main()
+events = [json.loads(line) for line in err_buf.getvalue().strip().splitlines() if line.strip()]
+assert {"warning": "[restore] Face enhancement skipped: unexpected NoneType attribute in process"} in events, events
+assert ensure_model_calls == [], ensure_model_calls
+
+# 2. AttributeError during bbox extraction (location_data is None) must propagate directly
+class BadResultDetector:
+    def __init__(self, **_kwargs):
+        pass
+    def process(self, _img):
+        return types.SimpleNamespace(detections=[types.SimpleNamespace(location_data=None)])
+    def close(self):
+        pass
+
+fake_mp.solutions.face_detection.FaceDetection = BadResultDetector
+try:
+    mod.enhance_faces(FakeArr(), 0.7)
+except AttributeError as exc:
+    assert "relative_bounding_box" in str(exc), exc
+    assert ensure_model_calls == [], ensure_model_calls
+else:
+    raise AssertionError("Expected AttributeError from bbox parsing to propagate")
+
+# 2b. Positive mp.solutions path with empty detections returns (img_bgr, 0) without calling _ensure_face_detect_model
+class EmptySolutionsDetector:
+    def __init__(self, **_kwargs):
+        pass
+    def process(self, _img):
+        return types.SimpleNamespace(detections=None)
+    def close(self):
+        pass
+
+fake_mp.solutions.face_detection.FaceDetection = EmptySolutionsDetector
+_, count_empty = mod.enhance_faces(FakeArr(), 0.7)
+assert count_empty == 0, count_empty
+assert ensure_model_calls == [], ensure_model_calls
+
+# 3. When mp.solutions is missing (or face_detection is missing/None), falls back to mp.tasks
+mod._ensure_face_detect_model = lambda: "/tmp/fake-blaze-3626.tflite"
+tasks_calls = []
+class EmptyTasksDetector:
+    def detect(self, _mp_image):
+        tasks_calls.append(True)
+        return types.SimpleNamespace(detections=[])
+    def close(self):
+        pass
+
+for missing_solutions in ("no_attr", None, types.SimpleNamespace(), types.SimpleNamespace(face_detection=None)):
+    tasks_calls.clear()
+    mp_tasks_mod = types.ModuleType("mediapipe")
+    if missing_solutions != "no_attr":
+        mp_tasks_mod.solutions = missing_solutions
+    mp_tasks_mod.ImageFormat = types.SimpleNamespace(SRGB=1)
+    mp_tasks_mod.Image = lambda image_format, data: data
+    mp_tasks_mod.tasks = types.SimpleNamespace(
+        BaseOptions=lambda model_asset_path: model_asset_path,
+        vision=types.SimpleNamespace(
+            RunningMode=types.SimpleNamespace(IMAGE=1),
+            FaceDetectorOptions=lambda **kw: kw,
+            FaceDetector=types.SimpleNamespace(create_from_options=lambda _opts: EmptyTasksDetector()),
+        ),
+    )
+    sys.modules["mediapipe"] = mp_tasks_mod
+    out_img, count = mod.enhance_faces(FakeArr(), 0.7)
+    assert count == 0, (missing_solutions, count)
+    assert len(tasks_calls) == 1, (missing_solutions, tasks_calls)
+
+print("RESTORE_3626_OK")
+`);
+        expect(res.status, res.stderr).toBe(0);
+        expect(res.stdout).toContain("RESTORE_3626_OK");
+      });
     },
   );
 });

@@ -477,6 +477,173 @@ print("DETECT_FACES_3625_OK")
         expect(res.status, res.stderr).toBe(0);
         expect(res.stdout).toContain("DETECT_FACES_3625_OK");
       });
+
+      it("scopes except AttributeError in _detect_single_orientation to mp.solutions.face_detection lookup (issue #3626)", () => {
+        const res = spawnSync(
+          pythonBin as string,
+          [
+            "-c",
+            `
+import contextlib, importlib.util, io, json, os, sys, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+os.environ["SNAPOTTER_ALLOW_MODEL_DOWNLOAD"] = "0"
+os.environ["MODELS_PATH"] = "/tmp/nonexistent-models-3626"
+
+class FakeArr:
+    shape = (100, 200, 3)
+
+spec = importlib.util.spec_from_file_location("detect_faces_mod_3626", os.path.join(py_dir, "detect_faces.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+mod._DOCKER_MODEL_PATH = "/tmp/nonexistent-docker-3626.tflite"
+mod._LOCAL_MODEL_PATH = "/tmp/nonexistent-local-3626.tflite"
+
+ensure_model_calls = []
+orig_ensure_model = mod._ensure_face_detect_model
+def tracked_ensure_model():
+    ensure_model_calls.append(True)
+    return orig_ensure_model()
+mod._ensure_face_detect_model = tracked_ensure_model
+
+# 1. AttributeError inside FaceDetection() init or detector.process() when mp.solutions.face_detection exists must propagate directly
+class InitAttrErrorDetector:
+    def __init__(self, **_kwargs):
+        raise AttributeError("unexpected NoneType attribute in init")
+
+class ProcessAttrErrorDetector:
+    def __init__(self, **_kwargs):
+        pass
+    def process(self, _img):
+        raise AttributeError("unexpected NoneType attribute in process")
+    def close(self):
+        pass
+
+fake_mp = types.ModuleType("mediapipe")
+fake_mp.solutions = types.SimpleNamespace(
+    face_detection=types.SimpleNamespace(FaceDetection=InitAttrErrorDetector)
+)
+sys.modules["mediapipe"] = fake_mp
+
+for det_cls, expected_msg in (
+    (InitAttrErrorDetector, "unexpected NoneType attribute in init"),
+    (ProcessAttrErrorDetector, "unexpected NoneType attribute in process"),
+):
+    fake_mp.solutions.face_detection.FaceDetection = det_cls
+    try:
+        mod._detect_single_orientation(FakeArr(), 0.5)
+    except AttributeError as exc:
+        assert str(exc) == expected_msg, exc
+        assert ensure_model_calls == [], f"_ensure_face_detect_model must not be called: {ensure_model_calls}"
+    else:
+        raise AssertionError(f"Expected AttributeError from {det_cls.__name__} to propagate")
+
+# 1b. Through main(), AttributeError in detector.process() reports the AttributeError, not the offline model download error
+fake_pil = types.ModuleType("PIL")
+fake_pil.Image = types.SimpleNamespace(
+    open=lambda _p: types.SimpleNamespace(convert=lambda _m: FakeArr(), width=200, height=100),
+)
+fake_pil.ImageFilter = types.SimpleNamespace(GaussianBlur=lambda _r: None)
+sys.modules["PIL"] = fake_pil
+fake_np = types.ModuleType("numpy")
+fake_np.array = lambda _img: FakeArr()
+sys.modules["numpy"] = fake_np
+fake_cv2 = types.ModuleType("cv2")
+fake_cv2.ROTATE_90_CLOCKWISE = 0
+fake_cv2.ROTATE_180 = 1
+fake_cv2.ROTATE_90_COUNTERCLOCKWISE = 2
+fake_cv2.rotate = lambda arr, _flag: arr
+sys.modules["cv2"] = fake_cv2
+
+sys.argv = ["detect_faces.py", "/tmp/in.png", "unused", json.dumps({"detectOnly": True})]
+out_buf, err_buf = io.StringIO(), io.StringIO()
+try:
+    with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+        mod.main()
+except SystemExit as exc:
+    assert exc.code == 1, exc.code
+    payload = json.loads(out_buf.getvalue().strip())
+    assert payload == {"success": False, "error": "unexpected NoneType attribute in process"}, payload
+    assert ensure_model_calls == [], ensure_model_calls
+else:
+    raise AssertionError("Expected SystemExit(1) from main()")
+
+# 2. AttributeError during bbox parsing in _detect_with_solutions must propagate directly
+class BadResultDetector:
+    def __init__(self, **_kwargs):
+        pass
+    def process(self, _img):
+        return types.SimpleNamespace(detections=[types.SimpleNamespace(location_data=None)])
+    def close(self):
+        pass
+
+fake_mp.solutions.face_detection.FaceDetection = BadResultDetector
+try:
+    mod._detect_single_orientation(FakeArr(), 0.5)
+except AttributeError as exc:
+    assert "relative_bounding_box" in str(exc), exc
+    assert ensure_model_calls == [], ensure_model_calls
+else:
+    raise AssertionError("Expected AttributeError from bbox parsing to propagate")
+
+# 3. Positive mp.solutions path returns deduplicated faces without touching mp.tasks
+class OkSolutionsDetector:
+    def __init__(self, model_selection=0, min_detection_confidence=0.5):
+        self.ms = model_selection
+    def process(self, _img):
+        if self.ms == 0:
+            bbox = types.SimpleNamespace(xmin=0.1, ymin=0.2, width=0.3, height=0.4)
+            det = types.SimpleNamespace(location_data=types.SimpleNamespace(relative_bounding_box=bbox))
+            return types.SimpleNamespace(detections=[det])
+        return types.SimpleNamespace(detections=None)
+    def close(self):
+        pass
+
+fake_mp.solutions.face_detection.FaceDetection = OkSolutionsDetector
+faces_sol = mod._detect_single_orientation(FakeArr(), 0.5)
+assert faces_sol == [{"x": 20, "y": 20, "w": 60, "h": 40}], faces_sol
+assert ensure_model_calls == [], ensure_model_calls
+
+# 4. When mp.solutions is missing (or face_detection is missing/None), falls back to _detect_with_tasks
+mod._ensure_face_detect_model = lambda: "/tmp/fake-blaze-3626.tflite"
+tasks_calls = []
+class FakeTasksDetector:
+    def detect(self, _mp_image):
+        tasks_calls.append(True)
+        bbox = types.SimpleNamespace(origin_x=12, origin_y=34, width=56, height=78)
+        return types.SimpleNamespace(detections=[types.SimpleNamespace(bounding_box=bbox)])
+    def close(self):
+        pass
+
+for missing_solutions in ("no_attr", None, types.SimpleNamespace(), types.SimpleNamespace(face_detection=None)):
+    tasks_calls.clear()
+    mp_tasks_mod = types.ModuleType("mediapipe")
+    if missing_solutions != "no_attr":
+        mp_tasks_mod.solutions = missing_solutions
+    mp_tasks_mod.ImageFormat = types.SimpleNamespace(SRGB=1)
+    mp_tasks_mod.Image = lambda image_format, data: data
+    mp_tasks_mod.tasks = types.SimpleNamespace(
+        BaseOptions=lambda model_asset_path: model_asset_path,
+        vision=types.SimpleNamespace(
+            RunningMode=types.SimpleNamespace(IMAGE=1),
+            FaceDetectorOptions=lambda **kw: kw,
+            FaceDetector=types.SimpleNamespace(create_from_options=lambda _opts: FakeTasksDetector()),
+        ),
+    )
+    sys.modules["mediapipe"] = mp_tasks_mod
+    faces_tasks = mod._detect_single_orientation(FakeArr(), 0.5)
+    assert faces_tasks == [{"x": 12, "y": 34, "w": 56, "h": 78}], (missing_solutions, faces_tasks)
+    assert len(tasks_calls) == 1, (missing_solutions, tasks_calls)
+
+print("DETECT_FACES_3626_OK")
+`,
+          ],
+          { encoding: "utf8", timeout: 30_000 },
+        );
+        expect(res.status, res.stderr).toBe(0);
+        expect(res.stdout).toContain("DETECT_FACES_3626_OK");
+      });
     },
   );
 });

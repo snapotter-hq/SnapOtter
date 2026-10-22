@@ -147,10 +147,16 @@ def _downscale_for_detection(img_array):
 
 def _detect_single_orientation(img_array, min_confidence):
     """Run face detection on a single image orientation."""
+    import mediapipe as mp
+
     try:
-        return _detect_with_solutions(img_array, min_confidence)
+        mp_face = mp.solutions.face_detection
     except AttributeError:
-        return _detect_with_tasks(img_array, min_confidence)
+        mp_face = None
+
+    if mp_face is not None:
+        return _detect_with_solutions(img_array, min_confidence)
+    return _detect_with_tasks(img_array, min_confidence)
 
 
 def _remap_faces_from_rotation(faces, rotation, orig_h, orig_w):

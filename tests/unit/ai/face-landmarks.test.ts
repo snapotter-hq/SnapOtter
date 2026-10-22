@@ -381,6 +381,7 @@ assert payload == {
 fake_pil.Image.open = lambda _p: types.SimpleNamespace(convert=lambda _m: types.SimpleNamespace(size=(64, 64)))
 
 fake_mp = types.ModuleType("mediapipe")
+fake_mp.solutions = types.SimpleNamespace(face_mesh=object())
 sys.modules["mediapipe"] = fake_mp
 
 # 2c. Missing numpy when mediapipe is present reports numpy ImportError with detail
@@ -430,6 +431,181 @@ print("FACE_LANDMARKS_3625_OK")
         );
         expect(res.status, res.stderr).toBe(0);
         expect(res.stdout).toContain("FACE_LANDMARKS_3625_OK");
+      });
+
+      it("scopes except AttributeError in main() to mp.solutions.face_mesh lookup (issue #3626)", () => {
+        const res = spawnSync(
+          pythonBin as string,
+          [
+            "-c",
+            `
+import contextlib, importlib.util, io, json, os, sys, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+os.environ["SNAPOTTER_ALLOW_MODEL_DOWNLOAD"] = "0"
+os.environ["MODELS_PATH"] = "/tmp/nonexistent-models-3626"
+
+class FakeArr:
+    shape = (64, 64, 3)
+
+fake_pil = types.ModuleType("PIL")
+fake_pil.Image = types.SimpleNamespace(
+    open=lambda _p: types.SimpleNamespace(convert=lambda _m: types.SimpleNamespace(size=(64, 64))),
+)
+sys.modules["PIL"] = fake_pil
+
+fake_np = types.ModuleType("numpy")
+fake_np.array = lambda _img: FakeArr()
+sys.modules["numpy"] = fake_np
+
+spec = importlib.util.spec_from_file_location("face_landmarks_mod_3626", os.path.join(py_dir, "face_landmarks.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+mod._DOCKER_MODEL_PATH = "/tmp/nonexistent-docker-3626.task"
+mod.MODEL_PATH = "/tmp/nonexistent-local-3626.task"
+
+ensure_model_calls = []
+orig_ensure_model = mod.ensure_model
+def tracked_ensure_model():
+    ensure_model_calls.append(True)
+    return orig_ensure_model()
+mod.ensure_model = tracked_ensure_model
+
+def run_main_expect_error():
+    sys.argv = ["face_landmarks.py", "/tmp/in.png", "unused", "{}"]
+    out_buf, err_buf = io.StringIO(), io.StringIO()
+    try:
+        with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+            mod.main()
+    except SystemExit as exc:
+        assert exc.code == 1, exc.code
+    else:
+        raise AssertionError(f"Expected SystemExit(1), got stdout={out_buf.getvalue()!r}")
+    return json.loads(out_buf.getvalue().strip())
+
+# 1. AttributeError inside FaceMesh() init or face_mesh.process() when mp.solutions.face_mesh exists must report the AttributeError, not enter detect_with_tasks
+class InitAttrErrorMesh:
+    def __init__(self, **_kwargs):
+        raise AttributeError("unexpected NoneType attribute in init")
+
+class ProcessAttrErrorMesh:
+    def __init__(self, **_kwargs):
+        pass
+    def process(self, _img):
+        raise AttributeError("unexpected NoneType attribute in process")
+    def close(self):
+        pass
+
+fake_mp = types.ModuleType("mediapipe")
+fake_mp.solutions = types.SimpleNamespace(
+    face_mesh=types.SimpleNamespace(FaceMesh=InitAttrErrorMesh)
+)
+sys.modules["mediapipe"] = fake_mp
+
+for mesh_cls, expected_msg in (
+    (InitAttrErrorMesh, "unexpected NoneType attribute in init"),
+    (ProcessAttrErrorMesh, "unexpected NoneType attribute in process"),
+):
+    fake_mp.solutions.face_mesh.FaceMesh = mesh_cls
+    payload = run_main_expect_error()
+    assert payload == {
+        "success": False,
+        "error": expected_msg,
+    }, payload
+    assert ensure_model_calls == [], f"ensure_model must not be called when mp.solutions.face_mesh exists: {ensure_model_calls}"
+
+# 2. AttributeError during landmark coordinate extraction in detect_with_solutions must propagate directly
+class BadLandmarkMesh:
+    def __init__(self, **_kwargs):
+        pass
+    def process(self, _img):
+        return types.SimpleNamespace(multi_face_landmarks=[types.SimpleNamespace(landmark=[None])])
+    def close(self):
+        pass
+
+fake_mp.solutions.face_mesh.FaceMesh = BadLandmarkMesh
+payload_lm = run_main_expect_error()
+assert "has no attribute 'x'" in payload_lm["error"], payload_lm
+assert ensure_model_calls == [], ensure_model_calls
+
+# 2b. Positive mp.solutions paths (no face found and face found) never touch detect_with_tasks
+class EmptySolutionsMesh:
+    def __init__(self, **_kwargs):
+        pass
+    def process(self, _img):
+        return types.SimpleNamespace(multi_face_landmarks=None)
+    def close(self):
+        pass
+
+fake_mp.solutions.face_mesh.FaceMesh = EmptySolutionsMesh
+sys.argv = ["face_landmarks.py", "/tmp/in.png", "unused", "{}"]
+out_buf, err_buf = io.StringIO(), io.StringIO()
+with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+    mod.main()
+assert json.loads(out_buf.getvalue().strip()) == {"success": True, "faceDetected": False, "landmarks": None}
+assert ensure_model_calls == [], ensure_model_calls
+
+class OkSolutionsMesh:
+    def __init__(self, **_kwargs):
+        pass
+    def process(self, _img):
+        pts = [types.SimpleNamespace(x=0.5, y=0.5) for _ in range(400)]
+        return types.SimpleNamespace(multi_face_landmarks=[types.SimpleNamespace(landmark=pts)])
+    def close(self):
+        pass
+
+fake_mp.solutions.face_mesh.FaceMesh = OkSolutionsMesh
+out_buf, err_buf = io.StringIO(), io.StringIO()
+with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+    mod.main()
+payload_sol_ok = json.loads(out_buf.getvalue().strip())
+assert payload_sol_ok["success"] is True and payload_sol_ok["faceDetected"] is True, payload_sol_ok
+assert ensure_model_calls == [], ensure_model_calls
+
+# 3. When mp.solutions is missing (or face_mesh is missing/None), falls back to detect_with_tasks
+mod.ensure_model = lambda: "/tmp/fake-landmarker-3626.task"
+tasks_calls = []
+class FakeLandmarker:
+    def detect(self, _mp_image):
+        tasks_calls.append(True)
+        pts = [types.SimpleNamespace(x=0.5, y=0.5) for _ in range(400)]
+        return types.SimpleNamespace(face_landmarks=[pts])
+    def close(self):
+        pass
+
+for missing_solutions in ("no_attr", None, types.SimpleNamespace(), types.SimpleNamespace(face_mesh=None)):
+    tasks_calls.clear()
+    mp_tasks_mod = types.ModuleType("mediapipe")
+    if missing_solutions != "no_attr":
+        mp_tasks_mod.solutions = missing_solutions
+    mp_tasks_mod.Image = types.SimpleNamespace(create_from_file=lambda p: p)
+    mp_tasks_mod.tasks = types.SimpleNamespace(
+        BaseOptions=lambda model_asset_path: model_asset_path,
+        vision=types.SimpleNamespace(
+            RunningMode=types.SimpleNamespace(IMAGE=1),
+            FaceLandmarkerOptions=lambda **kw: kw,
+            FaceLandmarker=types.SimpleNamespace(create_from_options=lambda _opts: FakeLandmarker()),
+        ),
+    )
+    sys.modules["mediapipe"] = mp_tasks_mod
+    sys.argv = ["face_landmarks.py", "/tmp/in.png", "unused", "{}"]
+    out_buf, err_buf = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+        mod.main()
+    payload_ok = json.loads(out_buf.getvalue().strip())
+    assert payload_ok["success"] is True and payload_ok["faceDetected"] is True, (missing_solutions, payload_ok)
+    assert len(tasks_calls) == 1, (missing_solutions, tasks_calls)
+    progress_events = [json.loads(line) for line in err_buf.getvalue().strip().splitlines() if line.strip()]
+    assert progress_events.count({"progress": 30, "stage": "Detecting face landmarks"}) == 1, progress_events
+
+print("FACE_LANDMARKS_3626_OK")
+`,
+          ],
+          { encoding: "utf8", timeout: 30_000 },
+        );
+        expect(res.status, res.stderr).toBe(0);
+        expect(res.stdout).toContain("FACE_LANDMARKS_3626_OK");
       });
     },
   );
