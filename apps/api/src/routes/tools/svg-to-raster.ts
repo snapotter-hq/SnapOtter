@@ -13,7 +13,11 @@ import { reportEngineUnavailable } from "../../lib/engine-unavailable.js";
 import { resolveConcurrency } from "../../lib/env.js";
 import { formatZodErrors, friendlyError } from "../../lib/errors.js";
 import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
-import { decodeToSharpCompat, isDecoderUnavailable } from "../../lib/format-decoders.js";
+import {
+  asDecoderOutOfMemory,
+  decodeToSharpCompat,
+  isDecoderUnavailable,
+} from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
@@ -613,7 +617,7 @@ export function registerSvgToRasterRoute(
               previewInput = await decodeToSharpCompat(buffer, "jxl");
             }
           } catch (rawDecodeErr) {
-            const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+            const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
             if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
               reportEngineUnavailable(engineUnavailable(decodeErr), opts.toolId, request.log);
               previewInput = null;
@@ -630,8 +634,9 @@ export function registerSvgToRasterRoute(
             previewUrl = `/api/v1/download/${jobId}/preview.webp`;
           }
         } catch (err) {
-          if (isDecoderUnavailable(err)) {
-            reportEngineUnavailable(engineUnavailable(err), opts.toolId, request.log);
+          const decoderErr = asDecoderOutOfMemory(err);
+          if (isDecoderUnavailable(decoderErr)) {
+            reportEngineUnavailable(engineUnavailable(decoderErr), opts.toolId, request.log);
           } else {
             request.log.warn(
               { err, jobId, ext },

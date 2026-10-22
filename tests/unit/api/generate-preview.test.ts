@@ -374,6 +374,47 @@ describe("generatePreview honesty (#746)", () => {
     } finally {
       enospcSpy.mockRestore();
     }
+
+    putObjectMock.mockReset();
+    reportEngineUnavailableMock.mockReset();
+    loggerMock.warn.mockReset();
+    const webpSpy = vi
+      .spyOn(sharp.prototype, "webp")
+      .mockImplementationOnce(function (this: sharp.Sharp) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Array buffer allocation failed");
+          },
+        } as unknown as sharp.Sharp;
+      })
+      .mockImplementationOnce(function (this: sharp.Sharp) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Invalid WebP parameter");
+          },
+        } as unknown as sharp.Sharp;
+      });
+    try {
+      const webpOomKey = await generatePreview(tiffHeadedDng, "image/tiff", JOB_ID, "convert");
+      expect(webpOomKey).toBeUndefined();
+      expect(putObjectMock).not.toHaveBeenCalled();
+      expect(reportEngineUnavailableMock).toHaveBeenCalledOnce();
+      expect(reportEngineUnavailableMock.mock.calls[0]?.[0]).toMatchObject({
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: expect.objectContaining({ name: "DecoderOutOfMemoryError" }),
+      });
+      expect(reportEngineUnavailableMock.mock.calls[0]?.[1]).toBe("convert");
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+
+      reportEngineUnavailableMock.mockReset();
+      const nonOomRangeKey = await generatePreview(tiffHeadedDng, "image/tiff", JOB_ID, "convert");
+      expect(nonOomRangeKey).toBeUndefined();
+      expect(reportEngineUnavailableMock).not.toHaveBeenCalled();
+      expect(loggerMock.warn).toHaveBeenCalledOnce();
+    } finally {
+      webpSpy.mockRestore();
+    }
   });
 
   it("reports a missing CLI decoder through reportEngineUnavailable and stays non-fatal (#2704)", async () => {
@@ -939,6 +980,175 @@ describe("registerEditMetadata CLI-decoded preview generation (#2704)", () => {
       "preview generation failed; result has no renderable preview",
     );
   });
+
+  it("routes preview WebP V8 buffer allocation OOM and raw decode SIGKILL/OOM through reportEngineUnavailable (#3383)", async () => {
+    const handler = getEditMetadataHandler();
+    const heicBuffer = readFixture(fixtures.image.base.heic200);
+    const pngBuffer = await sharp({
+      create: {
+        width: 8,
+        height: 8,
+        channels: 4,
+        background: { r: 10, g: 20, b: 30, alpha: 1 },
+      },
+    })
+      .png()
+      .toBuffer();
+    const qoiBuffer = await encodeQoi(pngBuffer);
+    const tiffBuffer = await sharp({
+      create: { width: 12, height: 12, channels: 3, background: { r: 40, g: 80, b: 120 } },
+    })
+      .tiff()
+      .toBuffer();
+
+    // 1. Inline preview sharp(previewInput).webp({ quality: 80 }).toBuffer() rejects with V8 RangeError
+    const webpSpy = vi
+      .spyOn(sharp.prototype, "webp")
+      .mockImplementationOnce(function (this: sharp.Sharp) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Array buffer allocation failed");
+          },
+        } as unknown as sharp.Sharp;
+      })
+      .mockImplementationOnce(function (this: sharp.Sharp) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Invalid WebP parameter");
+          },
+        } as unknown as sharp.Sharp;
+      });
+    try {
+      const tiffReply = makeReply();
+      await handler(makeMultipartRequest(tiffBuffer, "photo.tiff"), tiffReply);
+      expect(tiffReply.statusCode).toBe(200);
+      expect((tiffReply.payload as { previewUrl?: string }).previewUrl).toBeUndefined();
+      expect(putObjectMock).toHaveBeenCalledTimes(1);
+      expect(reportEngineUnavailableMock).toHaveBeenCalledOnce();
+      expect(reportEngineUnavailableMock.mock.calls[0]?.[0]).toMatchObject({
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: expect.objectContaining({ name: "DecoderOutOfMemoryError" }),
+      });
+      expect(reportEngineUnavailableMock.mock.calls[0]?.[1]).toBe("edit-metadata");
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+
+      reportEngineUnavailableMock.mockReset();
+      loggerMock.warn.mockReset();
+      putObjectMock.mockReset();
+      const nonOomReply = makeReply();
+      await handler(makeMultipartRequest(tiffBuffer, "photo.tiff"), nonOomReply);
+      expect(nonOomReply.statusCode).toBe(200);
+      expect((nonOomReply.payload as { previewUrl?: string }).previewUrl).toBeUndefined();
+      expect(reportEngineUnavailableMock).not.toHaveBeenCalled();
+      expect(loggerMock.warn).toHaveBeenCalledOnce();
+    } finally {
+      webpSpy.mockRestore();
+    }
+
+    // 1b. DNG Sharp fallback probe throwing V8 RangeError preserves DecoderOutOfMemoryError over DecoderUnavailableError
+    reportEngineUnavailableMock.mockReset();
+    loggerMock.warn.mockReset();
+    putObjectMock.mockReset();
+    const dngUnavailableSpy = vi
+      .spyOn(formatDecoders, "decodeToSharpCompat")
+      .mockRejectedValueOnce(new DecoderUnavailableError("No dcraw_emu found."));
+    const rawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
+      this: sharp.Sharp,
+    ) {
+      return {
+        toBuffer: async () => {
+          throw new RangeError("Array buffer allocation failed");
+        },
+      } as unknown as sharp.Sharp;
+    });
+    try {
+      const dngProbeOomReply = makeReply();
+      await handler(makeMultipartRequest(tiffBuffer, "photo.dng"), dngProbeOomReply);
+      expect(dngProbeOomReply.statusCode).toBe(200);
+      expect((dngProbeOomReply.payload as { previewUrl?: string }).previewUrl).toBeUndefined();
+      expect(reportEngineUnavailableMock).toHaveBeenCalledOnce();
+      expect(reportEngineUnavailableMock.mock.calls[0]?.[0]).toMatchObject({
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: expect.objectContaining({ name: "DecoderOutOfMemoryError" }),
+      });
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+    } finally {
+      rawSpy.mockRestore();
+      dngUnavailableSpy.mockRestore();
+    }
+
+    // 2. Raw SIGKILL and V8 RangeError at decodeHeic / decodeToSharpCompat (including TIFF-headed DNG)
+    for (const makeRawOom of [
+      () => Object.assign(new Error("decoder exited SIGKILL"), { signal: "SIGKILL" }),
+      () => new RangeError("Array buffer allocation failed"),
+    ]) {
+      reportEngineUnavailableMock.mockReset();
+      loggerMock.warn.mockReset();
+      putObjectMock.mockReset();
+      decodeHeicMock.mockRejectedValueOnce(makeRawOom());
+      const heicReply = makeReply();
+      await handler(makeMultipartRequest(heicBuffer, "photo.heic"), heicReply);
+      expect(heicReply.statusCode).toBe(200);
+      expect((heicReply.payload as { previewUrl?: string }).previewUrl).toBeUndefined();
+      expect(reportEngineUnavailableMock).toHaveBeenCalledOnce();
+      expect(reportEngineUnavailableMock.mock.calls[0]?.[0]).toMatchObject({
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: expect.objectContaining({ name: "DecoderOutOfMemoryError" }),
+      });
+      expect(reportEngineUnavailableMock.mock.calls[0]?.[1]).toBe("edit-metadata");
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+
+      reportEngineUnavailableMock.mockReset();
+      loggerMock.warn.mockReset();
+      putObjectMock.mockReset();
+      const qoiDecodeSpy = vi
+        .spyOn(formatDecoders, "decodeToSharpCompat")
+        .mockRejectedValueOnce(makeRawOom());
+      try {
+        const qoiReply = makeReply();
+        await handler(makeMultipartRequest(qoiBuffer, "sample.qoi"), qoiReply);
+        expect(qoiReply.statusCode).toBe(200);
+        expect((qoiReply.payload as { previewUrl?: string }).previewUrl).toBeUndefined();
+        expect(reportEngineUnavailableMock).toHaveBeenCalledOnce();
+        expect(reportEngineUnavailableMock.mock.calls[0]?.[0]).toMatchObject({
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          cause: expect.objectContaining({ name: "DecoderOutOfMemoryError" }),
+        });
+        expect(reportEngineUnavailableMock.mock.calls[0]?.[1]).toBe("edit-metadata");
+        expect(loggerMock.warn).not.toHaveBeenCalled();
+      } finally {
+        qoiDecodeSpy.mockRestore();
+      }
+
+      reportEngineUnavailableMock.mockReset();
+      loggerMock.warn.mockReset();
+      putObjectMock.mockReset();
+      const dngDecodeSpy = vi
+        .spyOn(formatDecoders, "decodeToSharpCompat")
+        .mockRejectedValueOnce(makeRawOom());
+      try {
+        const dngReply = makeReply();
+        await handler(makeMultipartRequest(tiffBuffer, "photo.dng"), dngReply);
+        expect(dngReply.statusCode).toBe(200);
+        expect((dngReply.payload as { previewUrl?: string }).previewUrl).toBeUndefined();
+        expect(putObjectMock).toHaveBeenCalledTimes(1);
+        expect(reportEngineUnavailableMock).toHaveBeenCalledOnce();
+        expect(reportEngineUnavailableMock.mock.calls[0]?.[0]).toMatchObject({
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          cause: expect.objectContaining({ name: "DecoderOutOfMemoryError" }),
+        });
+        expect(reportEngineUnavailableMock.mock.calls[0]?.[1]).toBe("edit-metadata");
+        expect(loggerMock.warn).not.toHaveBeenCalled();
+      } finally {
+        dngDecodeSpy.mockRestore();
+      }
+    }
+  });
 });
 
 describe("registerSvgToRaster JXL preview generation (#3179)", () => {
@@ -1203,6 +1413,116 @@ describe("registerSvgToRaster JXL preview generation (#3179)", () => {
       "preview generation failed; result has no renderable preview",
     );
   });
+
+  it("routes preview WebP V8 buffer allocation OOM and raw decode SIGKILL/OOM through reportEngineUnavailable (#3383)", async () => {
+    const handler = getSvgToRasterHandler();
+    encodeHeicMock.mockResolvedValue(Buffer.from("heic-bytes"));
+
+    // 1. Inline preview sharp(previewInput).resize(...).webp({ quality: 80 }).toBuffer() rejects with V8 RangeError
+    const webpSpy = vi
+      .spyOn(sharp.prototype, "webp")
+      .mockImplementationOnce(function (this: sharp.Sharp) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Array buffer allocation failed");
+          },
+        } as unknown as sharp.Sharp;
+      })
+      .mockImplementationOnce(function (this: sharp.Sharp) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Invalid WebP parameter");
+          },
+        } as unknown as sharp.Sharp;
+      });
+    try {
+      const tiffReply = makeReply();
+      await handler(
+        makeSvgRequest(SVG_BUF, "icon.svg", JSON.stringify({ outputFormat: "tiff", dpi: 72 })),
+        tiffReply,
+      );
+      expect(tiffReply.statusCode).toBe(200);
+      expect((tiffReply.payload as { previewUrl?: string }).previewUrl).toBeUndefined();
+      expect(putObjectMock).toHaveBeenCalledTimes(1);
+      expect(reportEngineUnavailableMock).toHaveBeenCalledOnce();
+      expect(reportEngineUnavailableMock.mock.calls[0]?.[0]).toMatchObject({
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: expect.objectContaining({ name: "DecoderOutOfMemoryError" }),
+      });
+      expect(reportEngineUnavailableMock.mock.calls[0]?.[1]).toBe("svg-to-raster");
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+
+      reportEngineUnavailableMock.mockReset();
+      loggerMock.warn.mockReset();
+      putObjectMock.mockReset();
+      const nonOomReply = makeReply();
+      await handler(
+        makeSvgRequest(SVG_BUF, "icon.svg", JSON.stringify({ outputFormat: "tiff", dpi: 72 })),
+        nonOomReply,
+      );
+      expect(nonOomReply.statusCode).toBe(200);
+      expect((nonOomReply.payload as { previewUrl?: string }).previewUrl).toBeUndefined();
+      expect(reportEngineUnavailableMock).not.toHaveBeenCalled();
+      expect(loggerMock.warn).toHaveBeenCalledOnce();
+    } finally {
+      webpSpy.mockRestore();
+    }
+
+    // 2. Raw SIGKILL and V8 RangeError at decodeHeic (heif) / decodeToSharpCompat (jxl)
+    for (const makeRawOom of [
+      () => Object.assign(new Error("decoder exited SIGKILL"), { signal: "SIGKILL" }),
+      () => new RangeError("Array buffer allocation failed"),
+    ]) {
+      reportEngineUnavailableMock.mockReset();
+      loggerMock.warn.mockReset();
+      decodeHeicMock.mockRejectedValueOnce(makeRawOom());
+      const heifReply = makeReply();
+      await handler(
+        makeSvgRequest(SVG_BUF, "icon.svg", JSON.stringify({ outputFormat: "heif", dpi: 72 })),
+        heifReply,
+      );
+      expect(heifReply.statusCode).toBe(200);
+      expect((heifReply.payload as { previewUrl?: string }).previewUrl).toBeUndefined();
+      expect(reportEngineUnavailableMock).toHaveBeenCalledOnce();
+      expect(reportEngineUnavailableMock.mock.calls[0]?.[0]).toMatchObject({
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: expect.objectContaining({ name: "DecoderOutOfMemoryError" }),
+      });
+      expect(reportEngineUnavailableMock.mock.calls[0]?.[1]).toBe("svg-to-raster");
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+
+      reportEngineUnavailableMock.mockReset();
+      loggerMock.warn.mockReset();
+      const encodeJxlSpy = vi
+        .spyOn(formatEncoders, "encodeJxl")
+        .mockResolvedValueOnce(Buffer.from("jxl-bytes"));
+      const decodeSpy = vi
+        .spyOn(formatDecoders, "decodeToSharpCompat")
+        .mockRejectedValueOnce(makeRawOom());
+      try {
+        const jxlReply = makeReply();
+        await handler(
+          makeSvgRequest(SVG_BUF, "icon.svg", JSON.stringify({ outputFormat: "jxl", dpi: 72 })),
+          jxlReply,
+        );
+        expect(jxlReply.statusCode).toBe(200);
+        expect((jxlReply.payload as { previewUrl?: string }).previewUrl).toBeUndefined();
+        expect(reportEngineUnavailableMock).toHaveBeenCalledOnce();
+        expect(reportEngineUnavailableMock.mock.calls[0]?.[0]).toMatchObject({
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          cause: expect.objectContaining({ name: "DecoderOutOfMemoryError" }),
+        });
+        expect(reportEngineUnavailableMock.mock.calls[0]?.[1]).toBe("svg-to-raster");
+        expect(loggerMock.warn).not.toHaveBeenCalled();
+      } finally {
+        encodeJxlSpy.mockRestore();
+        decodeSpy.mockRestore();
+      }
+    }
+  });
 });
 
 describe("registerFetchUrlsRoute preview decode tmpdir write faults (#3452)", () => {
@@ -1372,6 +1692,174 @@ describe("registerFetchUrlsRoute preview decode tmpdir write faults (#3452)", ()
       expect(reportEngineUnavailableMock).not.toHaveBeenCalled();
     } finally {
       decodeSpy.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("routes preview WebP V8 buffer allocation OOM and raw decode SIGKILL/OOM through reportEngineUnavailable (#3383)", async () => {
+    const handler = await getFetchUrlsHandler();
+    const heicBytes = readFixture(fixtures.image.base.heic200);
+    const psdBytes = readFixture(fixtures.image.formats("psd"));
+    const tiffBytes = await sharp({
+      create: { width: 12, height: 12, channels: 3, background: { r: 40, g: 80, b: 120 } },
+    })
+      .tiff()
+      .toBuffer();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string | URL | Request) => {
+        const href = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+        if (href.endsWith(".tiff")) {
+          return new Response(new Uint8Array(tiffBytes), {
+            status: 200,
+            headers: { "Content-Type": "image/tiff" },
+          });
+        }
+        if (href.endsWith(".psd")) {
+          return new Response(new Uint8Array(psdBytes), {
+            status: 200,
+            headers: { "Content-Type": "image/vnd.adobe.photoshop" },
+          });
+        }
+        return new Response(new Uint8Array(heicBytes), {
+          status: 200,
+          headers: { "Content-Type": "image/heic" },
+        });
+      }),
+    );
+
+    try {
+      // 1. Inline preview sharp(decodedBuffer).webp({ quality: 80 }).toBuffer() rejects with V8 RangeError
+      const webpSpy = vi
+        .spyOn(sharp.prototype, "webp")
+        .mockImplementationOnce(function (this: sharp.Sharp) {
+          return {
+            toBuffer: async () => {
+              throw new RangeError("Array buffer allocation failed");
+            },
+          } as unknown as sharp.Sharp;
+        })
+        .mockImplementationOnce(function (this: sharp.Sharp) {
+          return {
+            toBuffer: async () => {
+              throw new RangeError("Invalid WebP parameter");
+            },
+          } as unknown as sharp.Sharp;
+        });
+      try {
+        const tiffReply = makeReply();
+        await handler(
+          {
+            body: { urls: ["http://1.2.3.4:9999/photo.tiff"] },
+            log: loggerMock,
+          },
+          tiffReply,
+        );
+        expect(tiffReply.statusCode).toBe(200);
+        const body = tiffReply.payload as {
+          results: Array<{ success: boolean; filename?: string; previewUrl?: string | null }>;
+        };
+        expect(body.results).toEqual([
+          expect.objectContaining({
+            success: true,
+            filename: "photo.tiff",
+            previewUrl: null,
+          }),
+        ]);
+        expect(reportEngineUnavailableMock).toHaveBeenCalledOnce();
+        expect(reportEngineUnavailableMock.mock.calls[0]?.[0]).toMatchObject({
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          cause: expect.objectContaining({ name: "DecoderOutOfMemoryError" }),
+        });
+        expect(reportEngineUnavailableMock.mock.calls[0]?.[1]).toBe("fetch-urls");
+
+        reportEngineUnavailableMock.mockReset();
+        const nonOomReply = makeReply();
+        await handler(
+          {
+            body: { urls: ["http://1.2.3.4:9999/photo.tiff"] },
+            log: loggerMock,
+          },
+          nonOomReply,
+        );
+        expect(nonOomReply.statusCode).toBe(200);
+        expect(reportEngineUnavailableMock).not.toHaveBeenCalled();
+      } finally {
+        webpSpy.mockRestore();
+      }
+
+      // 1b. 503 preview putObject error does not trigger reportEngineUnavailable
+      reportEngineUnavailableMock.mockReset();
+      putObjectMock
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(
+          Object.assign(new Error("storage write failed"), { statusCode: 503 }),
+        );
+      const putErrReply = makeReply();
+      await handler(
+        {
+          body: { urls: ["http://1.2.3.4:9999/photo.tiff"] },
+          log: loggerMock,
+        },
+        putErrReply,
+      );
+      expect(putErrReply.statusCode).toBe(200);
+      expect(reportEngineUnavailableMock).not.toHaveBeenCalled();
+
+      // 2. Raw SIGKILL and V8 RangeError at decodeHeic / decodeToSharpCompat
+      for (const makeRawOom of [
+        () => Object.assign(new Error("decoder exited SIGKILL"), { signal: "SIGKILL" }),
+        () => new RangeError("Array buffer allocation failed"),
+      ]) {
+        reportEngineUnavailableMock.mockReset();
+        decodeHeicMock.mockRejectedValueOnce(makeRawOom());
+        const decodeSpy = vi
+          .spyOn(formatDecoders, "decodeToSharpCompat")
+          .mockRejectedValueOnce(makeRawOom());
+
+        try {
+          const reply = makeReply();
+          await handler(
+            {
+              body: {
+                urls: ["http://1.2.3.4:9999/photo.heic", "http://1.2.3.4:9999/layers.psd"],
+              },
+              log: loggerMock,
+            },
+            reply,
+          );
+          expect(reply.statusCode).toBe(200);
+          const body = reply.payload as {
+            results: Array<{ success: boolean; filename?: string; previewUrl?: string | null }>;
+          };
+          expect(body.results).toEqual([
+            expect.objectContaining({
+              success: true,
+              filename: "photo.heic",
+              previewUrl: null,
+            }),
+            expect.objectContaining({
+              success: true,
+              filename: "layers.psd",
+              previewUrl: null,
+            }),
+          ]);
+          expect(reportEngineUnavailableMock).toHaveBeenCalledTimes(2);
+          for (const call of reportEngineUnavailableMock.mock.calls) {
+            expect(call[0]).toMatchObject({
+              statusCode: 503,
+              code: "ENGINE_UNAVAILABLE",
+              cause: expect.objectContaining({ name: "DecoderOutOfMemoryError" }),
+            });
+            expect(call[1]).toBe("fetch-urls");
+          }
+        } finally {
+          decodeSpy.mockRestore();
+        }
+      }
+    } finally {
       vi.unstubAllGlobals();
     }
   });

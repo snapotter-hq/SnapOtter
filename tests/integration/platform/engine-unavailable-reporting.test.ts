@@ -1040,6 +1040,99 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
       }
     });
 
+    it("inline preview WebP encode V8 RangeError in edit-metadata, svg-to-raster, and fetch-urls routes through reportEngineUnavailable as DecoderOutOfMemoryError (#3383)", async () => {
+      const sharpMod = (await import("sharp")).default;
+      const tiffBytes = await sharpMod({
+        create: { width: 12, height: 12, channels: 3, background: { r: 40, g: 80, b: 120 } },
+      })
+        .tiff()
+        .toBuffer();
+      const expiredNow = Date.now() + 11 * 60_000;
+      const nowSpy = vi.spyOn(Date, "now").mockReturnValue(expiredNow);
+      const webpSpy = vi.spyOn(sharpMod.prototype, "webp").mockImplementation(function (
+        this: InstanceType<typeof sharpMod>,
+      ) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Array buffer allocation failed");
+          },
+        } as unknown as InstanceType<typeof sharpMod>;
+      });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          return new Response(new Uint8Array(tiffBytes), {
+            status: 200,
+            headers: { "Content-Type": "image/tiff" },
+          });
+        }),
+      );
+
+      try {
+        const editTiff = await post("/api/v1/tools/image/edit-metadata", [
+          { name: "file", filename: "photo.tiff", contentType: "image/tiff", content: tiffBytes },
+          { name: "settings", content: "{}" },
+        ]);
+        expect(editTiff.statusCode, editTiff.body).toBe(200);
+        expect(editTiff.json().previewUrl).toBeUndefined();
+        expect(helperSawEngineDown("edit-metadata")).toBe(true);
+        expect(engineReports("edit-metadata")).toHaveLength(1);
+        expect(
+          mocks.reportEngineUnavailable.mock.calls.filter(
+            ([err, id]) =>
+              (err as { code?: string; cause?: { name?: string } }).code === "ENGINE_UNAVAILABLE" &&
+              (err as { cause?: { name?: string } }).cause?.name === "DecoderOutOfMemoryError" &&
+              id === "edit-metadata",
+          ),
+        ).toHaveLength(1);
+
+        const svgTiff = await post("/api/v1/tools/image/svg-to-raster", [
+          { name: "file", filename: "icon.svg", contentType: "image/svg+xml", content: SVG },
+          { name: "settings", content: JSON.stringify({ outputFormat: "tiff" }) },
+        ]);
+        expect(svgTiff.statusCode, svgTiff.body).toBe(200);
+        expect(svgTiff.json().previewUrl).toBeUndefined();
+        expect(helperSawEngineDown("svg-to-raster")).toBe(true);
+        expect(engineReports("svg-to-raster")).toHaveLength(1);
+        expect(
+          mocks.reportEngineUnavailable.mock.calls.filter(
+            ([err, id]) =>
+              (err as { code?: string; cause?: { name?: string } }).code === "ENGINE_UNAVAILABLE" &&
+              (err as { cause?: { name?: string } }).cause?.name === "DecoderOutOfMemoryError" &&
+              id === "svg-to-raster",
+          ),
+        ).toHaveLength(1);
+
+        const fetchRes = await app.inject({
+          method: "POST",
+          url: "/api/v1/fetch-urls",
+          headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+          payload: {
+            urls: ["http://1.2.3.4:9999/scan-1.tiff", "http://1.2.3.4:9999/scan-2.tiff"],
+          },
+        });
+        expect(fetchRes.statusCode, fetchRes.body).toBe(200);
+        expect(fetchRes.json().results).toEqual([
+          expect.objectContaining({ success: true, filename: "scan-1.tiff", previewUrl: null }),
+          expect.objectContaining({ success: true, filename: "scan-2.tiff", previewUrl: null }),
+        ]);
+        expect(helperSawEngineDown("fetch-urls")).toBe(true);
+        expect(engineReports("fetch-urls")).toHaveLength(1);
+        expect(
+          mocks.reportEngineUnavailable.mock.calls.filter(
+            ([err, id]) =>
+              (err as { code?: string; cause?: { name?: string } }).code === "ENGINE_UNAVAILABLE" &&
+              (err as { cause?: { name?: string } }).cause?.name === "DecoderOutOfMemoryError" &&
+              id === "fetch-urls",
+          ),
+        ).toHaveLength(2);
+      } finally {
+        vi.unstubAllGlobals();
+        webpSpy.mockRestore();
+        nowSpy.mockRestore();
+      }
+    });
+
     it("worker process functions propagate a CLI decoder fault even on a DNG Sharp can read, and do not retry ENGINE_UNAVAILABLE", async () => {
       for (const toolId of ["blur-faces", "meme-generator", "red-eye-removal", "beautify"]) {
         const config = getToolConfig(toolId);

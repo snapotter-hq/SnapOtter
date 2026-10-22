@@ -21,6 +21,7 @@ import { stripInternalPaths } from "../lib/errors.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import {
+  asDecoderOutOfMemory,
   decodeToSharpCompat,
   isDecoderUnavailable,
   needsCliDecode,
@@ -356,7 +357,7 @@ async function fetchSingleUrl(
           didDecode = true;
         }
       } catch (rawErr) {
-        const err = normalizeOperationalWriteError(rawErr);
+        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
         if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
           reportEngineUnavailable(engineUnavailable(err), "fetch-urls", log);
         }
@@ -392,7 +393,11 @@ async function fetchSingleUrl(
         const previewFilename = `preview-${filename.replace(/\.[^.]+$/, "")}.webp`;
         await putObject(`uploads/${jobId}/${previewFilename}`, previewBuffer);
         previewUrl = `/api/v1/download/${jobId}/${encodeURIComponent(previewFilename)}`;
-      } catch {
+      } catch (err) {
+        const decoderErr = asDecoderOutOfMemory(err);
+        if (isDecoderUnavailable(decoderErr)) {
+          reportEngineUnavailable(engineUnavailable(decoderErr), "fetch-urls", log);
+        }
         // Preview generation failed: non-fatal, skip preview
       }
     }

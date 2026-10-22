@@ -15,6 +15,7 @@ import {
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import {
+  asDecoderOutOfMemory,
   DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
@@ -301,7 +302,9 @@ export function registerEditMetadata(app: FastifyInstance) {
                 try {
                   previewInput = await decodeToSharpCompat(outputBuffer, cliFormat, fileExt);
                 } catch (rawDecodeErr) {
-                  const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+                  const decodeErr = normalizeOperationalWriteError(
+                    asDecoderOutOfMemory(rawDecodeErr),
+                  );
                   if (
                     decodeErr instanceof DecoderOutOfMemoryError ||
                     (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
@@ -313,13 +316,17 @@ export function registerEditMetadata(app: FastifyInstance) {
                   try {
                     await sharp(outputBuffer).metadata();
                     await sharp(outputBuffer).resize(1).raw().toBuffer();
-                  } catch {
+                  } catch (rawProbeErr) {
+                    const probeErr = asDecoderOutOfMemory(rawProbeErr);
+                    if (probeErr instanceof DecoderOutOfMemoryError) {
+                      throw probeErr;
+                    }
                     throw decodeErr;
                   }
                 }
               }
             } catch (rawDecodeErr) {
-              const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+              const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
               if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
                 reportEngineUnavailable(engineUnavailable(decodeErr), "edit-metadata", request.log);
                 previewInput = null;
@@ -333,8 +340,9 @@ export function registerEditMetadata(app: FastifyInstance) {
               previewUrl = `/api/v1/download/${jobId}/preview.webp`;
             }
           } catch (err) {
-            if (isDecoderUnavailable(err)) {
-              reportEngineUnavailable(engineUnavailable(err), "edit-metadata", request.log);
+            const decoderErr = asDecoderOutOfMemory(err);
+            if (isDecoderUnavailable(decoderErr)) {
+              reportEngineUnavailable(engineUnavailable(decoderErr), "edit-metadata", request.log);
             } else {
               request.log.warn(
                 { err, jobId, contentType },
