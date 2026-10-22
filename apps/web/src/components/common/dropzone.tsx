@@ -132,6 +132,7 @@ export function Dropzone({
   const [error, setError] = useState<string | null>(null);
   const [urlInput, setUrlInput] = useState("");
   const [urlLoading, setUrlLoading] = useState(false);
+  const urlLoadingRef = useRef(false);
   const [urlError, setUrlError] = useState<string | null>(null);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const onUrlImportRef = useRef(onUrlImport);
@@ -148,21 +149,28 @@ export function Dropzone({
 
   const handleUrlSubmit = useCallback(async () => {
     const url = urlInput.trim();
-    if (!url) return;
+    if (!url || urlLoadingRef.current) return;
+    urlLoadingRef.current = true;
     setUrlLoading(true);
     setUrlError(null);
-    const file = await importSingleUrl(url);
+    let file: File | null;
+    try {
+      file = await importSingleUrl(url);
+    } catch (err) {
+      setUrlError(err instanceof Error && err.message ? err.message : t.dropzone.urlFetchFailed);
+      return;
+    } finally {
+      urlLoadingRef.current = false;
+      setUrlLoading(false);
+    }
     if (file) {
       if (!checkFile(file)) {
         setUrlError(unsupportedMessage);
       } else if (onUrlImportRef.current?.(file) !== false) {
         setUrlInput("");
       }
-    } else {
-      setUrlError(t.dropzone.urlFetchFailed);
     }
-    setUrlLoading(false);
-  }, [urlInput, importSingleUrl, checkFile, unsupportedMessage, t]);
+  }, [urlInput, importSingleUrl, checkFile, unsupportedMessage, t.dropzone.urlFetchFailed]);
 
   const handleDrag = useCallback((e: DragEvent) => {
     e.preventDefault();

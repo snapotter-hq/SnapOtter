@@ -27,6 +27,7 @@ vi.mock("@/lib/image-preview", () => ({
   revokePreviewUrl: vi.fn(),
 }));
 
+import { Dropzone } from "@/components/common/dropzone";
 import { PdfToImageSettings } from "@/components/tools/pdf-to-image-settings";
 import { I18nProvider, useTranslation } from "@/contexts/i18n-context";
 import { useUrlImport } from "@/hooks/use-url-import";
@@ -294,6 +295,55 @@ describe("url import: FEATURE_NOT_INSTALLED", () => {
     await act(() => result.current.hook.importUrls(["https://example.com/a.png"]));
     await act(() => result.current.hook.addReadyFiles());
     expect(result.current.hook.entries[0]?.error).toBe(GERMAN_INSTALL_MESSAGE);
+  });
+
+  it("shows the install message in the viewer's locale on Dropzone single-URL submit (#3703)", async () => {
+    storageMap.set("snapotter-locale", "de");
+    answer = { status: 501, body: FEATURE_NOT_INSTALLED };
+    render(<Dropzone onUrlImport={vi.fn()} />, { wrapper: inGerman });
+    await waitFor(() => expect(document.documentElement.lang).toBe("de"));
+
+    fireEvent.change(screen.getByPlaceholderText(de.dropzone.urlPlaceholder), {
+      target: { value: "https://example.com/a.png" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: de.dropzone.addUrlButton }));
+
+    expect(await screen.findByText(GERMAN_INSTALL_MESSAGE)).toBeInTheDocument();
+  });
+
+  it("shows the install message in the viewer's locale on Dropzone single-URL download failure (#3703)", async () => {
+    storageMap.set("snapotter-locale", "de");
+    answer = { status: 501, body: FEATURE_NOT_INSTALLED };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) =>
+        String(input).endsWith("/api/v1/fetch-urls")
+          ? new Response(
+              JSON.stringify({
+                results: [
+                  {
+                    success: true,
+                    url: "https://example.com/a.png",
+                    filename: "a.png",
+                    size: 8,
+                    downloadUrl: "https://example.com/dl/a.png",
+                  },
+                ],
+              }),
+              { status: 200, headers: { "Content-Type": "application/json" } },
+            )
+          : failedResponse(),
+      ),
+    );
+    render(<Dropzone onUrlImport={vi.fn()} />, { wrapper: inGerman });
+    await waitFor(() => expect(document.documentElement.lang).toBe("de"));
+
+    fireEvent.change(screen.getByPlaceholderText(de.dropzone.urlPlaceholder), {
+      target: { value: "https://example.com/a.png" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: de.dropzone.addUrlButton }));
+
+    expect(await screen.findByText(GERMAN_INSTALL_MESSAGE)).toBeInTheDocument();
   });
 });
 

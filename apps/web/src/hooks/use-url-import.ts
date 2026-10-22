@@ -47,6 +47,7 @@ export function useUrlImport() {
   const entriesRef = useRef<UrlImportEntry[]>(entries);
   entriesRef.current = entries;
   const abortRef = useRef<AbortController | null>(null);
+  const singleAbortRef = useRef<AbortController | null>(null);
   const downloadAbortRef = useRef<AbortController | null>(null);
   const retryAbortRef = useRef<Map<string, AbortController>>(new Map());
   const { t } = useTranslation();
@@ -155,18 +156,31 @@ export function useUrlImport() {
 
   const importSingleUrl = useCallback(
     async (url: string): Promise<File | null> => {
+      singleAbortRef.current?.abort();
       const controller = new AbortController();
-      abortRef.current = controller;
+      singleAbortRef.current = controller;
       try {
         const { results } = await fetchUrls([url], controller.signal);
+        if (controller.signal.aborted) return null;
         const result = results[0];
-        if (!result?.success || !result.downloadUrl || !result.filename) return null;
-        return await downloadAsFile(result.downloadUrl, result.filename, controller.signal);
-      } catch {
-        return null;
+        if (!result?.success || !result.downloadUrl || !result.filename) {
+          throw new Error(result?.error ? result.error : t.dropzone.urlFetchFailed);
+        }
+        const file = await downloadAsFile(result.downloadUrl, result.filename, controller.signal);
+        if (controller.signal.aborted) return null;
+        return file;
+      } catch (err) {
+        if (controller.signal.aborted || (err instanceof Error && err.name === "AbortError")) {
+          return null;
+        }
+        throw err;
+      } finally {
+        if (singleAbortRef.current === controller) {
+          singleAbortRef.current = null;
+        }
       }
     },
-    [fetchUrls, downloadAsFile],
+    [fetchUrls, downloadAsFile, t.dropzone.urlFetchFailed],
   );
 
   const addReadyFiles = useCallback(async (): Promise<AddReadyFilesResult> => {
@@ -289,6 +303,8 @@ export function useUrlImport() {
   const cancel = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
+    singleAbortRef.current?.abort();
+    singleAbortRef.current = null;
     downloadAbortRef.current?.abort();
     downloadAbortRef.current = null;
     abortRetries();
@@ -299,6 +315,8 @@ export function useUrlImport() {
   const reset = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
+    singleAbortRef.current?.abort();
+    singleAbortRef.current = null;
     downloadAbortRef.current?.abort();
     downloadAbortRef.current = null;
     abortRetries();

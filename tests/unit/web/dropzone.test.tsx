@@ -2615,5 +2615,328 @@ describe("Dropzone", () => {
 
       expect(await within(dialog).findByText("Expired download token: TTL exceeded")).toBeDefined();
     });
+
+    it("surfaces server error and failedAnswerMessage on Dropzone single-URL submit and falls back to t.dropzone.urlFetchFailed when no message is available (#3703)", async () => {
+      let step:
+        | "per-url-error"
+        | "missing-error"
+        | "empty-results"
+        | "missing-download-url"
+        | "fetch-422"
+        | "download-410"
+        | "empty-error" = "per-url-error";
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.endsWith("/api/v1/fetch-urls")) {
+            if (step === "per-url-error") {
+              return Promise.resolve(
+                new Response(
+                  JSON.stringify({
+                    results: [
+                      {
+                        success: false,
+                        url: "https://example.com/missing.png",
+                        error: "HTTP 404 Not Found",
+                      },
+                    ],
+                  }),
+                  { status: 200, headers: { "Content-Type": "application/json" } },
+                ),
+              );
+            }
+            if (step === "missing-error") {
+              return Promise.resolve(
+                new Response(
+                  JSON.stringify({
+                    results: [
+                      {
+                        success: false,
+                        url: "https://example.com/missing.png",
+                      },
+                    ],
+                  }),
+                  { status: 200, headers: { "Content-Type": "application/json" } },
+                ),
+              );
+            }
+            if (step === "empty-results") {
+              return Promise.resolve(
+                new Response(JSON.stringify({ results: [] }), {
+                  status: 200,
+                  headers: { "Content-Type": "application/json" },
+                }),
+              );
+            }
+            if (step === "missing-download-url") {
+              return Promise.resolve(
+                new Response(
+                  JSON.stringify({
+                    results: [
+                      {
+                        success: true,
+                        url: "https://example.com/incomplete.png",
+                        filename: "incomplete.png",
+                      },
+                    ],
+                  }),
+                  { status: 200, headers: { "Content-Type": "application/json" } },
+                ),
+              );
+            }
+            if (step === "fetch-422") {
+              return Promise.resolve(
+                new Response(
+                  JSON.stringify({
+                    error: "File exceeds maximum size of 100MB",
+                    details: "Limit is 100MB",
+                  }),
+                  { status: 422, headers: { "Content-Type": "application/json" } },
+                ),
+              );
+            }
+            if (step === "empty-error") {
+              return Promise.reject(new Error(""));
+            }
+            return Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  results: [
+                    {
+                      success: true,
+                      url: "https://example.com/dl-fail.png",
+                      filename: "dl-fail.png",
+                      size: 16,
+                      downloadUrl: "https://example.com/dl/dl-fail.png",
+                    },
+                  ],
+                }),
+                { status: 200, headers: { "Content-Type": "application/json" } },
+              ),
+            );
+          }
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({ error: "Expired download token", details: "TTL exceeded" }),
+              { status: 410, headers: { "Content-Type": "application/json" } },
+            ),
+          );
+        }),
+      );
+
+      const onUrlImport = vi.fn();
+      render(<Dropzone onUrlImport={onUrlImport} fileFilter={isImageFile} />);
+
+      const input = screen.getByPlaceholderText(en.dropzone.urlPlaceholder) as HTMLInputElement;
+      const addButton = screen.getByRole("button", { name: en.dropzone.addUrlButton });
+
+      // 1. Per-URL error string from results[0].error
+      fireEvent.change(input, { target: { value: "https://example.com/missing.png" } });
+      fireEvent.click(addButton);
+      expect(await screen.findByText("HTTP 404 Not Found")).toBeDefined();
+      expect(screen.queryByText(en.dropzone.urlFetchFailed)).toBeNull();
+      expect(input.value).toBe("https://example.com/missing.png");
+      expect(onUrlImport).not.toHaveBeenCalled();
+
+      // 2. Missing error field on results[0] falls back to t.dropzone.urlFetchFailed
+      step = "missing-error";
+      fireEvent.click(addButton);
+      expect(await screen.findByText(en.dropzone.urlFetchFailed)).toBeDefined();
+
+      // 3. Empty results array falls back to t.dropzone.urlFetchFailed
+      fireEvent.change(input, { target: { value: "https://example.com/empty.png" } });
+      step = "empty-results";
+      fireEvent.click(addButton);
+      expect(await screen.findByText(en.dropzone.urlFetchFailed)).toBeDefined();
+
+      // 4. Incomplete result (success: true without downloadUrl) falls back to t.dropzone.urlFetchFailed
+      fireEvent.change(input, { target: { value: "https://example.com/incomplete.png" } });
+      step = "missing-download-url";
+      fireEvent.click(addButton);
+      expect(await screen.findByText(en.dropzone.urlFetchFailed)).toBeDefined();
+
+      // 5. Non-2xx response from fetch-urls formatted via failedAnswerMessage
+      step = "fetch-422";
+      fireEvent.click(addButton);
+      expect(
+        await screen.findByText("File exceeds maximum size of 100MB: Limit is 100MB"),
+      ).toBeDefined();
+
+      // 6. Non-2xx response from downloadAsFile formatted via failedAnswerMessage
+      step = "download-410";
+      fireEvent.click(addButton);
+      expect(await screen.findByText("Expired download token: TTL exceeded")).toBeDefined();
+
+      // 7. Rejected Error with empty message falls back to t.dropzone.urlFetchFailed
+      step = "empty-error";
+      fireEvent.click(addButton);
+      expect(await screen.findByText(en.dropzone.urlFetchFailed)).toBeDefined();
+    });
+
+    it("returns null without throwing when importSingleUrl is aborted or superseded and does not strand importUrls (#3703)", async () => {
+      const fetchUrlsSignals: Array<AbortSignal | null | undefined> = [];
+      const fetchUrlsResolvers: Array<{
+        resolve: (res: Response) => void;
+        reject: (err: Error) => void;
+      }> = [];
+      let downloadSignal: AbortSignal | null | undefined;
+      let resolveDownload: ((res: Response) => void) | undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+          const url = String(input);
+          if (url.endsWith("/api/v1/fetch-urls")) {
+            fetchUrlsSignals.push(init?.signal);
+            return new Promise<Response>((resolve, reject) => {
+              fetchUrlsResolvers.push({ resolve, reject });
+            });
+          }
+          downloadSignal = init?.signal;
+          return new Promise<Response>((resolve) => {
+            resolveDownload = resolve;
+          });
+        }),
+      );
+
+      const { result } = renderHook(() => useUrlImport());
+
+      // 1. Calling importSingleUrl while importUrls is in flight does not abort importUrls or strand importing
+      let bulkPromise!: Promise<void>;
+      act(() => {
+        bulkPromise = result.current.importUrls(["https://example.com/bulk.png"]);
+      });
+      expect(result.current.importing).toBe(true);
+      expect(fetchUrlsSignals[0]?.aborted).toBe(false);
+
+      let firstSinglePromise!: Promise<File | null>;
+      act(() => {
+        firstSinglePromise = result.current.importSingleUrl("https://example.com/first.png");
+      });
+      expect(fetchUrlsSignals[0]?.aborted).toBe(false);
+      expect(fetchUrlsSignals[1]?.aborted).toBe(false);
+
+      // 2. Calling importSingleUrl a second time aborts the first importSingleUrl
+      let secondSinglePromise!: Promise<File | null>;
+      act(() => {
+        secondSinglePromise = result.current.importSingleUrl("https://example.com/second.png");
+      });
+      expect(fetchUrlsSignals[1]?.aborted).toBe(true);
+      expect(fetchUrlsSignals[2]?.aborted).toBe(false);
+
+      // First importSingleUrl resolves after being aborted (post-resolve abort guard on fetchUrls)
+      let firstFile: File | null = undefined as unknown as File | null;
+      await act(async () => {
+        fetchUrlsResolvers[1]?.resolve(
+          new Response(
+            JSON.stringify({
+              results: [{ success: false, url: "https://example.com/first.png", error: "Stale" }],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+        firstFile = await firstSinglePromise;
+      });
+      expect(firstFile).toBeNull();
+
+      // Bulk importUrls completes normally and clears importing
+      await act(async () => {
+        fetchUrlsResolvers[0]?.resolve(
+          new Response(
+            JSON.stringify({
+              results: [
+                {
+                  success: true,
+                  url: "https://example.com/bulk.png",
+                  filename: "bulk.png",
+                  size: 8,
+                  downloadUrl: "https://example.com/dl/bulk.png",
+                },
+              ],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+        await bulkPromise;
+      });
+      expect(result.current.importing).toBe(false);
+
+      // 3. Second importSingleUrl advances to downloadAsFile, then cancel() aborts it before download resolves
+      await act(async () => {
+        fetchUrlsResolvers[2]?.resolve(
+          new Response(
+            JSON.stringify({
+              results: [
+                {
+                  success: true,
+                  url: "https://example.com/second.png",
+                  filename: "second.png",
+                  size: 8,
+                  downloadUrl: "https://example.com/dl/second.png",
+                },
+              ],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      });
+      expect(downloadSignal?.aborted).toBe(false);
+
+      act(() => {
+        result.current.cancel();
+      });
+      expect(downloadSignal?.aborted).toBe(true);
+
+      let secondFile: File | null = undefined as unknown as File | null;
+      await act(async () => {
+        resolveDownload?.(
+          new Response("png-data", { status: 200, headers: { "Content-Type": "image/png" } }),
+        );
+        secondFile = await secondSinglePromise;
+      });
+      expect(secondFile).toBeNull();
+
+      // 4. Rejecting with AbortError also resolves to null
+      let thirdSinglePromise!: Promise<File | null>;
+      act(() => {
+        thirdSinglePromise = result.current.importSingleUrl("https://example.com/third.png");
+      });
+      let thirdFile: File | null = undefined as unknown as File | null;
+      await act(async () => {
+        fetchUrlsResolvers[3]?.reject(Object.assign(new Error("Aborted"), { name: "AbortError" }));
+        thirdFile = await thirdSinglePromise;
+      });
+      expect(thirdFile).toBeNull();
+    });
+
+    it("ignores duplicate single-URL submit while in flight and does not show urlFetchFailed when importSingleUrl resolves to null (#3703)", async () => {
+      let fetchCalls = 0;
+      let rejectFetch: ((err: Error) => void) | undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() => {
+          fetchCalls += 1;
+          return new Promise<Response>((_resolve, reject) => {
+            rejectFetch = reject;
+          });
+        }),
+      );
+
+      const onUrlImport = vi.fn();
+      render(<Dropzone onUrlImport={onUrlImport} fileFilter={isImageFile} />);
+
+      const input = screen.getByPlaceholderText(en.dropzone.urlPlaceholder) as HTMLInputElement;
+      fireEvent.change(input, { target: { value: "https://example.com/a.png" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      fireEvent.keyDown(input, { key: "Enter" });
+      expect(fetchCalls).toBe(1);
+
+      await act(async () => {
+        rejectFetch?.(Object.assign(new Error("Aborted"), { name: "AbortError" }));
+      });
+
+      expect(screen.queryByText(en.dropzone.urlFetchFailed)).toBeNull();
+      expect(onUrlImport).not.toHaveBeenCalled();
+    });
   });
 });
