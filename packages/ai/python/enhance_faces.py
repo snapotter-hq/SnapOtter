@@ -1,4 +1,5 @@
 """Face enhancement using GFPGAN or CodeFormer with MediaPipe detection."""
+import errno
 import sys
 import json
 import os
@@ -23,9 +24,32 @@ except (ImportError, ModuleNotFoundError):
         pass
 
 
+_OOM_MARKERS = (
+    "out of memory",
+    "not enough memory",
+    "can't allocate memory",
+    "cannot allocate memory",
+    "unable to allocate",
+    "failed to allocate",
+    "cudaerrormemoryallocation",
+    "cublas_status_alloc_failed",
+    "bad_alloc",
+    "memoryerror",
+)
+
+
 def emit_progress(percent, stage):
     """Emit structured progress to stderr for bridge.ts to capture."""
     print(json.dumps({"progress": percent, "stage": stage}), file=sys.stderr, flush=True)
+
+
+def _is_oom(err):
+    if isinstance(err, MemoryError):
+        return True
+    if isinstance(err, OSError) and err.errno == errno.ENOMEM:
+        return True
+    m = str(err).lower()
+    return any(s in m for s in _OOM_MARKERS)
 
 
 _MODELS_BASE = os.environ.get("MODELS_PATH", "/opt/models")
@@ -337,8 +361,11 @@ def main():
                     enhanced = enhance_with_codeformer(img_array, fidelity_weight)
                     model_used = "codeformer"
                 except Exception as e:
+                    if _is_oom(e):
+                        raise
                     import traceback
-                    print(f"[enhance-faces] CodeFormer failed, falling back to GFPGAN: {e}", file=sys.stderr, flush=True)
+                    detail = str(e).strip() or type(e).__name__
+                    print(f"[enhance-faces] CodeFormer failed, falling back to GFPGAN: {detail}", file=sys.stderr, flush=True)
                     traceback.print_exc(file=sys.stderr)
                     emit_progress(50, "Falling back to GFPGAN")
                     enhanced = enhance_with_gfpgan(img_array, only_center_face)
