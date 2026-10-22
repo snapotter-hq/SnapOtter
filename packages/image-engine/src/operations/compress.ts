@@ -70,12 +70,19 @@ export async function compressDetailed(
   const outputFormat = explicitFormat ?? detectedFormat;
 
   if (targetSizeBytes !== undefined) {
-    const inputBuffer = await (detectedFormat === "gif"
+    const needsLosslessIntermediate =
+      (formatOut !== undefined && formatOut !== "input") ||
+      detectedFormat === "gif" ||
+      detectedFormat === "tiff" ||
+      (outputFormat === "tiff" && hasFloatPipelineStage(image));
+    const inputBuffer = await (outputFormat === "gif"
       ? image.gif({ reuse: false })
-      : (outputFormat === "tiff" || detectedFormat === "tiff") && hasFloatPipelineStage(image)
-        ? image.png()
-        : detectedFormat === "tiff"
-          ? image.tiff({ compression: "lzw" })
+      : outputFormat === "tiff" && !hasFloatPipelineStage(image)
+        ? image.tiff({ compression: "lzw" })
+        : needsLosslessIntermediate
+          ? animated
+            ? image.webp({ lossless: true })
+            : image.png({ palette: false })
           : image
     ).toBuffer();
     return compressToTargetSize(inputBuffer, outputFormat, targetSizeBytes, animated);

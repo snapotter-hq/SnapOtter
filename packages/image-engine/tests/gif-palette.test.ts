@@ -229,6 +229,61 @@ describe("GIF Palette Reuse", () => {
     });
     expect(gifSpy).not.toHaveBeenCalled();
     expect((await sharp(gifToWebpTarget.buffer as Buffer).metadata()).format).toBe("webp");
+
+    // Converting GIF -> JPG -> colorChannels -> compressDetailed({ format: "gif", targetSizeBytes })
+    // materializes inputBuffer via .gif({ reuse: false }) rather than JPEG (#3476).
+    const gifToJpgThenGifPipeline = await colorChannels(
+      await convert(sharp(redGif), { format: "jpg" }),
+      { red: 0, green: 200, blue: 100 },
+    );
+    const gifOverrideSpy = vi.spyOn(gifToJpgThenGifPipeline, "gif");
+    const gifOverrideTarget = await compressDetailed(gifToJpgThenGifPipeline, {
+      format: "gif",
+      targetSizeBytes: redGif.length * 4,
+    });
+    expect(gifOverrideSpy).toHaveBeenCalledWith({ reuse: false });
+    expect((await sharp(gifOverrideTarget.buffer as Buffer).metadata()).format).toBe("gif");
+    expect(await pixelAt(gifOverrideTarget.buffer as Buffer, 5, 5)).toEqual([0, 80, 40, 255]);
+
+    // Animated GIF -> convert("webp", { quality: 20 }) -> compressDetailed({ targetSizeBytes, animated: true })
+    // and animated GIF -> convert("jpg") -> compressDetailed({ format: "webp", targetSizeBytes, animated: true })
+    // preserve all frames via lossless WebP intermediate materialization (#3476).
+    const animGifToWebpPipeline = await convert(sharp(animGif, { animated: true }), {
+      format: "webp",
+      quality: 20,
+    });
+    const animWebpSpy = vi.spyOn(animGifToWebpPipeline, "webp");
+    const animWebpTarget = await compressDetailed(animGifToWebpPipeline, {
+      targetSizeBytes: animGif.length * 4,
+      animated: true,
+    });
+    expect(animWebpSpy).toHaveBeenCalledWith({ lossless: true });
+    const animWebpMeta = await sharp(animWebpTarget.buffer as Buffer, {
+      animated: true,
+    }).metadata();
+    expect(animWebpMeta.format).toBe("webp");
+    expect(animWebpMeta.pages).toBe(2);
+    expect(animWebpMeta.pageHeight).toBe(10);
+
+    const animGifToJpgThenWebp = await compressDetailed(
+      await convert(sharp(animGif, { animated: true }), { format: "jpg" }),
+      { format: "webp", targetSizeBytes: animGif.length * 4, animated: true },
+    );
+    const animJpgOverrideMeta = await sharp(animGifToJpgThenWebp.buffer as Buffer, {
+      animated: true,
+    }).metadata();
+    expect(animJpgOverrideMeta.format).toBe("webp");
+    expect(animJpgOverrideMeta.pages).toBe(2);
+    expect(animJpgOverrideMeta.pageHeight).toBe(10);
+
+    // Unconverted GIF + colorChannels + explicit non-GIF format in targetSizeBytes mode
+    // materializes losslessly rather than reusing the original GIF palette (#3476).
+    const gifColorToPngTarget = await compressDetailed(
+      await colorChannels(sharp(redGif), { red: 0, green: 200, blue: 100 }),
+      { format: "png", targetSizeBytes: redGif.length * 4 },
+    );
+    expect((await sharp(gifColorToPngTarget.buffer as Buffer).metadata()).format).toBe("png");
+    expect(await pixelAt(gifColorToPngTarget.buffer as Buffer, 5, 5)).toEqual([0, 80, 40, 255]);
   });
 });
 
@@ -627,5 +682,34 @@ describe("TIFF LZW alpha preservation (#2607)", () => {
     });
     expect(tiffSpy).not.toHaveBeenCalled();
     expect((await sharp(tiffToWebpTarget.buffer as Buffer).metadata()).format).toBe("webp");
+
+    // Converting PNG -> JPG -> compressDetailed({ format: "tiff", targetSizeBytes })
+    // materializes inputBuffer via .tiff({ compression: "lzw" }) rather than JPEG,
+    // preserving the 4-channel RGBA alpha channel (#3476).
+    const pngToJpgThenTiffPipeline = await convert(sharp(png), { format: "jpg" });
+    const tiffOverrideSpy = vi.spyOn(pngToJpgThenTiffPipeline, "tiff");
+    const pngToJpgThenTiffTarget = await compressDetailed(pngToJpgThenTiffPipeline, {
+      format: "tiff",
+      targetSizeBytes: rgbaTiff.length * 4,
+    });
+    expect(tiffOverrideSpy).toHaveBeenCalledWith({ compression: "lzw" });
+    const pngToJpgThenTiffMeta = await sharp(pngToJpgThenTiffTarget.buffer as Buffer).metadata();
+    expect(pngToJpgThenTiffMeta.format).toBe("tiff");
+    expect(pngToJpgThenTiffMeta.channels).toBe(4);
+    expect(pngToJpgThenTiffMeta.hasAlpha).toBe(true);
+    expect((await pixelAt(pngToJpgThenTiffTarget.buffer as Buffer, 2, 2))[3]).toBe(0);
+
+    // Unconverted 4-channel RGBA TIFF compressed to an explicit non-TIFF format
+    // in targetSizeBytes mode preserves alpha rather than encoding intermediate
+    // JPEG-in-TIFF (#3476).
+    const directTiffToWebpTarget = await compressDetailed(sharp(rgbaTiff), {
+      format: "webp",
+      targetSizeBytes: rgbaTiff.length * 4,
+    });
+    const directTiffToWebpMeta = await sharp(directTiffToWebpTarget.buffer as Buffer).metadata();
+    expect(directTiffToWebpMeta.format).toBe("webp");
+    expect(directTiffToWebpMeta.channels).toBe(4);
+    expect(directTiffToWebpMeta.hasAlpha).toBe(true);
+    expect((await pixelAt(directTiffToWebpTarget.buffer as Buffer, 2, 2))[3]).toBe(0);
   });
 });

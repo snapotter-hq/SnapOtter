@@ -154,6 +154,47 @@ describe("compress: format selection", () => {
       })
     ).toBuffer();
     expect(await outputFormat(webpThenJpg)).toBe("jpeg");
+
+    // In targetSizeBytes mode, an explicit format override after convert("jpg")
+    // materializes inputBuffer losslessly rather than through the prior JPEG
+    // encoder, preserving the alpha channel (#3476).
+    const rgbaRaw = Buffer.alloc(20 * 20 * 4);
+    for (let i = 0; i < rgbaRaw.length; i += 4) {
+      rgbaRaw[i] = 200;
+      rgbaRaw[i + 1] = 40;
+      rgbaRaw[i + 2] = 40;
+      rgbaRaw[i + 3] = i < 20 * 4 * 4 ? 0 : 255;
+    }
+    const rgbaPng = await sharp(rgbaRaw, { raw: { width: 20, height: 20, channels: 4 } })
+      .png()
+      .toBuffer();
+    const jpgThenWebpTarget = await compressDetailed(
+      await convert(sharp(rgbaPng), { format: "jpg" }),
+      { format: "webp", targetSizeBytes: 50_000 },
+    );
+    const jpgThenWebpMeta = await sharp(jpgThenWebpTarget.buffer as Buffer).metadata();
+    expect(jpgThenWebpMeta.format).toBe("webp");
+    expect(jpgThenWebpMeta.channels).toBe(4);
+    expect(jpgThenWebpMeta.hasAlpha).toBe(true);
+    const jpgThenWebpRaw = await sharp(jpgThenWebpTarget.buffer as Buffer)
+      .ensureAlpha()
+      .raw()
+      .toBuffer();
+    expect(jpgThenWebpRaw[3]).toBe(0);
+
+    // Converting at low quality (quality: 20) before targetSizeBytes compression
+    // must not pre-encode inputBuffer at quality 20 before the binary search (#3476).
+    const directJpgTarget = await compressDetailed(sharp(photoPng), {
+      format: "jpg",
+      targetSizeBytes: 500_000,
+    });
+    const convertLowThenTarget = await compressDetailed(
+      await convert(sharp(photoPng), { format: "jpg", quality: 20 }),
+      { targetSizeBytes: 500_000 },
+    );
+    expect(
+      Buffer.compare(convertLowThenTarget.buffer as Buffer, directJpgTarget.buffer as Buffer),
+    ).toBe(0);
   });
 
   it("falls back to PNG for inputs Sharp cannot encode (SVG)", async () => {
