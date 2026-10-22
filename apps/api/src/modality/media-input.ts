@@ -37,8 +37,9 @@ export class MediaInputHandler implements InputHandler {
   async prepare(
     raw: Buffer,
     filename: string,
-    opts: { scratchDir: string },
+    opts: { scratchDir: string; signal?: AbortSignal },
   ): Promise<PreparedInput> {
+    opts.signal?.throwIfAborted();
     if (this.kind === "subtitle") {
       return this.prepareSubtitle(raw, filename);
     }
@@ -47,11 +48,16 @@ export class MediaInputHandler implements InputHandler {
     await mkdir(probeDir, { recursive: true });
     const probePath = join(probeDir, "input");
     try {
-      await writeFile(probePath, raw);
+      opts.signal?.throwIfAborted();
+      await writeFile(probePath, raw, { signal: opts.signal });
       let info: Awaited<ReturnType<typeof probeMedia>>;
       try {
-        info = await probeMedia(probePath);
+        info = await probeMedia(probePath, { signal: opts.signal });
       } catch (err) {
+        opts.signal?.throwIfAborted();
+        if (err instanceof Error && err.name === "AbortError") {
+          throw err;
+        }
         // An absent engine is the operator's container, not the caller's file.
         // Reporting it as a corrupt upload sends them to inspect a file that is
         // perfectly fine, and hides the one fact that would fix it.
@@ -70,6 +76,7 @@ export class MediaInputHandler implements InputHandler {
           `Unrecognized ${this.kind} file. It may be corrupt or in an unsupported format.`,
         );
       }
+      opts.signal?.throwIfAborted();
       const hasVideo = info.streams.some((s) => s.type === "video");
       const hasAudio = info.streams.some((s) => s.type === "audio");
 
@@ -117,6 +124,9 @@ export class MediaInputHandler implements InputHandler {
         );
       }
       return { buffer: raw, filename };
+    } catch (err) {
+      opts.signal?.throwIfAborted();
+      throw err;
     } finally {
       await rm(probeDir, { recursive: true, force: true }).catch(() => {});
     }
