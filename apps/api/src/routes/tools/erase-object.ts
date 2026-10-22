@@ -32,7 +32,9 @@ import { trackClientDisconnect } from "../../lib/ingress-disconnect.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import {
   getObjectBuffer,
+  isStorageServiceFault,
   normalizeOperationalWriteError,
+  normalizeS3ReadFault,
   putObject,
 } from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
@@ -365,7 +367,13 @@ registerAiJobHandler(
     (s) => s?.format ?? "auto",
     async (input, data, ctx) => {
       // Second inputRef is the mask
-      const maskBuffer = await getObjectBuffer(data.inputRefs[1]);
+      let maskBuffer: Buffer;
+      try {
+        maskBuffer = await getObjectBuffer(data.inputRefs[1]);
+      } catch (err) {
+        if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+        throw err;
+      }
       const settings = settingsSchema.parse(data.settings);
       const format = settings.format;
       const quality = settings.quality;

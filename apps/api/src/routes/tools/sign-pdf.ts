@@ -20,7 +20,11 @@ import { stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { createUniqueNamer } from "../../lib/filename.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
-import { getObjectBuffer } from "../../lib/object-storage.js";
+import {
+  getObjectBuffer,
+  isStorageServiceFault,
+  normalizeS3ReadFault,
+} from "../../lib/object-storage.js";
 import {
   discardUnenqueuedUploads,
   hasPersistedJobRow,
@@ -254,7 +258,13 @@ registerAiJobHandler(TOOL_ID, async (input, data, ctx) => {
     const sigPaths: string[] = [];
     for (let i = 1; i < data.inputRefs.length; i++) {
       ctx.signal.throwIfAborted();
-      const buf = await getObjectBuffer(data.inputRefs[i]);
+      let buf: Buffer;
+      try {
+        buf = await getObjectBuffer(data.inputRefs[i]);
+      } catch (err) {
+        if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+        throw err;
+      }
       const p = join(dir, `sig${i - 1}.png`);
       await writeFile(p, buf);
       sigPaths.push(p);

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -29,8 +29,12 @@ vi.mock("../../../apps/api/src/config.js", () => ({
   },
 }));
 
-vi.mock("../../../apps/api/src/lib/object-storage.js", () => ({
+const isStorageServiceFaultMock = vi.hoisted(() => vi.fn<(_err: unknown) => boolean>(() => false));
+
+vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>()),
   getObjectBuffer: vi.fn(),
+  isStorageServiceFault: isStorageServiceFaultMock,
 }));
 
 vi.mock("@snapotter/doc-engine", () => ({
@@ -115,6 +119,7 @@ function createCtx(scratchDir: string, filename: string) {
 
 afterEach(() => {
   vi.clearAllMocks();
+  isStorageServiceFaultMock.mockReturnValue(false);
 });
 
 describe("document route processors", () => {
@@ -463,6 +468,55 @@ describe("sign-pdf AI job handler", () => {
       expect(getObjectBuffer).toHaveBeenCalledTimes(2);
       expect(pdfSignPy).not.toHaveBeenCalled();
       expect(ctx.report).not.toHaveBeenCalled();
+    });
+  });
+
+  it("normalizes S3 GetObject faults on signature part reads into a 503 storage-unavailable SafeError (#3467)", async () => {
+    const slowDown = Object.assign(new Error("Please reduce your request rate."), {
+      name: "SlowDown",
+      $metadata: { httpStatusCode: 503 },
+    });
+    isStorageServiceFaultMock.mockReturnValue(true);
+    vi.mocked(getObjectBuffer)
+      .mockResolvedValueOnce(Buffer.from("sig-zero"))
+      .mockRejectedValueOnce(slowDown);
+
+    await withScratch(async (scratchDir) => {
+      const ctx = createCtx(scratchDir, "agreement.pdf");
+      const err = await runAiToolJob(createSignJobData(), Buffer.from("pdf-bytes"), ctx).catch(
+        (e: unknown) => e,
+      );
+      expect(err).toMatchObject({
+        name: "SafeError",
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        message: "The server's storage service is unavailable.",
+        cause: slowDown,
+      });
+      expect(pdfSignPy).not.toHaveBeenCalled();
+      expect(await readdir(scratchDir)).toEqual([]);
+
+      // Unexpected non-S3 defect passes through normalizeS3ReadFault untouched
+      const unexpectedBug = new TypeError("unexpected S3 client defect");
+      vi.mocked(getObjectBuffer).mockRejectedValueOnce(unexpectedBug);
+      const bugErr = await runAiToolJob(createSignJobData(), Buffer.from("pdf-bytes"), ctx).catch(
+        (e: unknown) => e,
+      );
+      expect(bugErr).toBe(unexpectedBug);
+
+      // Local-mode EIO (isStorageServiceFault === false) bypasses normalizeS3ReadFault
+      isStorageServiceFaultMock.mockReturnValue(false);
+      const localEio = Object.assign(new Error("local disk read error"), {
+        code: "EIO",
+        syscall: "read",
+      });
+      vi.mocked(getObjectBuffer).mockRejectedValueOnce(localEio);
+      const localErr = await runAiToolJob(createSignJobData(), Buffer.from("pdf-bytes"), ctx).catch(
+        (e: unknown) => e,
+      );
+      expect(localErr).toBe(localEio);
     });
   });
 });

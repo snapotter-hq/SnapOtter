@@ -1706,7 +1706,13 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
 
   // Copy last step's output to outputs/<pipelineJobId>/<filename> so
   // the legacy download URL /api/v1/download/<pipelineJobId>/... works.
-  const lastOutputBuffer = await getObjectBuffer(lastOutputRef);
+  let lastOutputBuffer: Buffer;
+  try {
+    lastOutputBuffer = await getObjectBuffer(lastOutputRef);
+  } catch (err) {
+    if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+    throw err;
+  }
   const outFilename = lastOutputRef.split("/").pop() ?? "output";
   const parentKey = `outputs/${data.jobId}/${outFilename}`;
   await putObject(

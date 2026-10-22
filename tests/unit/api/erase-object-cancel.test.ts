@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   inpaint: vi.fn(),
   insertToolJobAlias: vi.fn(),
   isGpuAvailable: vi.fn<(framework?: string) => boolean>(() => false),
+  isStorageServiceFault: vi.fn<(_err: unknown) => boolean>(() => false),
   isToolInstalled: vi.fn(),
   putObject: vi.fn(),
   receiveUpload: vi.fn(),
@@ -59,6 +60,7 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
   ...(await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>()),
   deleteObject: mocks.deleteObject,
   getObjectBuffer: mocks.getObjectBuffer,
+  isStorageServiceFault: mocks.isStorageServiceFault,
   putObject: mocks.putObject,
 }));
 
@@ -93,6 +95,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.containerMemoryLimitBytes.mockReturnValue(null);
   mocks.isGpuAvailable.mockImplementation(() => false);
+  mocks.isStorageServiceFault.mockReturnValue(false);
   mocks.isToolInstalled.mockReturnValue(true);
   mocks.getObjectBuffer.mockResolvedValue(MASK);
   mocks.inpaint.mockResolvedValue(PNG);
@@ -124,6 +127,62 @@ describe("erase-object honors a job cancel (#2092)", () => {
       "fast",
       { signal: ctx.signal },
     );
+  });
+
+  it("normalizes S3 GetObject faults on the mask read into a 503 storage-unavailable SafeError (#3467)", async () => {
+    const ctx: ToolProcessCtx = {
+      signal: new AbortController().signal,
+      scratchDir: SCRATCH_DIR,
+      report: vi.fn(),
+    };
+    const slowDown = Object.assign(new Error("Please reduce your request rate."), {
+      name: "SlowDown",
+      $metadata: { httpStatusCode: 503 },
+    });
+    mocks.isStorageServiceFault.mockReturnValue(true);
+    mocks.getObjectBuffer.mockRejectedValueOnce(slowDown);
+
+    const err = await runAiToolJob(job, PNG, ctx).catch((e: unknown) => e);
+    expect(err).toMatchObject({
+      name: "SafeError",
+      isSafeMessage: true,
+      kind: "operational",
+      code: "storage-unavailable",
+      statusCode: 503,
+      message: "The server's storage service is unavailable.",
+      cause: slowDown,
+    });
+    expect(mocks.inpaint).not.toHaveBeenCalled();
+
+    // Unexpected non-S3 defect passes through normalizeS3ReadFault and wraps as a bug SafeError
+    const unexpectedBug = new TypeError("unexpected S3 client defect");
+    mocks.getObjectBuffer.mockRejectedValueOnce(unexpectedBug);
+    const bugErr = await runAiToolJob(job, PNG, ctx).catch((e: unknown) => e);
+    expect(bugErr).toMatchObject({
+      name: "SafeError",
+      isSafeMessage: true,
+      kind: "bug",
+      code: "png",
+      message: "Object erasing failed",
+      cause: unexpectedBug,
+    });
+
+    // Local-mode EIO (isStorageServiceFault === false) bypasses normalizeS3ReadFault
+    mocks.isStorageServiceFault.mockReturnValue(false);
+    const localEio = Object.assign(new Error("local disk read error"), {
+      code: "EIO",
+      syscall: "read",
+    });
+    mocks.getObjectBuffer.mockRejectedValueOnce(localEio);
+    const localErr = await runAiToolJob(job, PNG, ctx).catch((e: unknown) => e);
+    expect(localErr).toMatchObject({
+      name: "SafeError",
+      isSafeMessage: true,
+      kind: "bug",
+      code: "png",
+      message: "Object erasing failed",
+      cause: localEio,
+    });
   });
 });
 

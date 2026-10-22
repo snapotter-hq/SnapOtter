@@ -848,6 +848,289 @@ describe("worker result payload behavior", () => {
         }),
       );
     });
+
+    it("normalizes non-missing S3 GetObject faults in processPipelineFinalize and secondary AI handler reads into a 503 storage-unavailable SafeError (#3467)", async () => {
+      const { Readable } = await import("node:stream");
+      const getGenericObjectSize = vi.fn();
+      const getGenericObjectStream = vi.fn();
+      const checkConnection = vi.fn();
+      const dbSetMock = vi.fn(() => ({ where: vi.fn().mockResolvedValue(undefined) }));
+      const dbUpdateMock = vi.fn(() => ({ set: dbSetMock }));
+      const stepRow = {
+        id: "pf-s3-1-s0",
+        status: "completed",
+        toolId: "compress",
+        bytesIn: 512,
+        bytesOut: 256,
+        outputRefs: ["outputs/pf-s3-1-s0/out.jpg"],
+        progress: { percent: 100, stage: "complete" },
+      };
+      const dbSelectMock = vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(async () => [stepRow]),
+        })),
+      }));
+      const { isMissingObjectError: s3IsMissingObjectError } = await vi.importActual<
+        typeof import("../../../../packages/enterprise/src/storage-s3.js")
+      >("../../../../packages/enterprise/src/storage-s3.js");
+      const actualShared = await vi.importActual<
+        typeof import("../../../../packages/shared/src/index.js")
+      >("../../../../packages/shared/src/index.js");
+
+      const workerMod = await loadWorker("", () => {
+        vi.doMock("@snapotter/shared", () => ({
+          ...actualShared,
+          ANALYTICS_EVENTS: {},
+          TOOLS: [],
+          COMPRESS_PRESETS: [],
+          CAMERA_RAW_INPUTS: [],
+          getBundleForTool: vi.fn(() => null),
+          getOptionalBundleForTool: vi.fn(() => null),
+        }));
+        vi.doMock("../../../../apps/api/src/config.js", () => ({
+          env: {
+            BASE_PATH: "",
+            SCRATCH_PATH: "",
+            STORAGE_MODE: "s3",
+            WORKSPACE_PATH: "/unused",
+            S3_BUCKET: "snap-bucket",
+            S3_REGION: "us-east-1",
+            S3_ENDPOINT: "https://s3.example.test",
+            S3_ACCESS_KEY_ID: "AKIA-TEST",
+            S3_SECRET_ACCESS_KEY: "secret",
+            S3_FORCE_PATH_STYLE: true,
+            S3_PREFIX: "",
+            JOB_TIMEOUT_LONG_S: 60,
+            JOB_TIMEOUT_FAST_S: 15,
+          },
+        }));
+        vi.doMock("../../../../apps/api/src/db/index.js", () => ({
+          db: { select: dbSelectMock, update: dbUpdateMock },
+          schema: { jobs: { id: "jobs.id" } },
+        }));
+        vi.doMock("@snapotter/media-engine", () => ({
+          HW_ACCEL_FAMILIES: [],
+          hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+          softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+        }));
+        vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+          binaryOverrideWarning: vi.fn(),
+          checkBinaryOverrides: vi.fn(() => []),
+          isBinarySpawnFailure,
+          probeFailureLevel: vi.fn(() => "warn"),
+        }));
+        vi.doMock("node:fs/promises", () => ({
+          mkdir: vi.fn().mockResolvedValue(undefined),
+          mkdtemp: vi.fn().mockResolvedValue("/tmp/sign-test"),
+          readFile: vi.fn(),
+          rm: vi.fn().mockResolvedValue(undefined),
+          writeFile: vi.fn().mockResolvedValue(undefined),
+        }));
+        vi.doMock("@snapotter/enterprise", () => ({
+          loadS3Storage: vi.fn(async () => ({
+            isMissingObjectError: s3IsMissingObjectError,
+            configureS3: vi.fn(),
+            checkConnection,
+            deleteGenericPrefix: vi.fn().mockResolvedValue(undefined),
+            getGenericObjectSize,
+            getGenericObjectStream,
+          })),
+        }));
+        vi.doUnmock("../../../../apps/api/src/jobs/ai-handlers.js");
+        vi.doUnmock("../../../../apps/api/src/lib/object-storage.js");
+      });
+      const { classifyError } = await vi.importActual<
+        typeof import("../../../../apps/api/src/lib/error-report.js")
+      >("../../../../apps/api/src/lib/error-report.js");
+      await import("../../../../apps/api/src/routes/tools/erase-object.js");
+      await import("../../../../apps/api/src/routes/tools/sign-pdf.js");
+
+      const { Worker } = await import("bullmq");
+      workerMod.startWorkers();
+      const workerCalls = (Worker as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+      const imageCall = workerCalls.find(([queue]) => String(queue).endsWith("image"));
+      if (!imageCall) throw new Error("image pool worker not registered");
+      const processor = imageCall[1] as (job: unknown) => Promise<unknown>;
+
+      const s3Faults = [
+        Object.assign(new Error("Please reduce your request rate."), {
+          name: "SlowDown",
+          $metadata: { httpStatusCode: 503 },
+        }),
+        Object.assign(new Error("Access Denied"), {
+          name: "AccessDenied",
+          $metadata: { httpStatusCode: 403 },
+        }),
+        Object.assign(new Error("The specified bucket does not exist"), {
+          name: "NoSuchBucket",
+          $metadata: { httpStatusCode: 404 },
+        }),
+        Object.assign(new Error("Premature close"), { code: "ERR_STREAM_PREMATURE_CLOSE" }),
+        Object.assign(new Error("S3 stream reset"), { code: "EIO", syscall: "read" }),
+      ];
+
+      const finalizeJob = {
+        id: "pf-s3-1",
+        name: "pipeline-finalize",
+        attemptsMade: 0,
+        opts: { attempts: 1 },
+        updateProgress: vi.fn(),
+        data: {
+          kind: "pipeline-finalize",
+          jobId: "pf-s3-1",
+          toolId: "pipeline",
+          userId: null,
+          pool: "image",
+          totalSteps: 1,
+          inputRefs: [],
+          filename: "out.jpg",
+          settings: {},
+        },
+      };
+
+      for (const fault of s3Faults) {
+        getGenericObjectStream.mockRejectedValueOnce(fault);
+        const caughtFinalize = await processor(finalizeJob).catch((err: unknown) => err);
+        expect(caughtFinalize).toMatchObject({
+          name: "SafeError",
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-unavailable",
+          statusCode: 503,
+          message: "The server's storage service is unavailable.",
+          cause: fault,
+        });
+        expect(classifyError(caughtFinalize, "worker")).toBe("operational");
+      }
+
+      // Mid-stream S3 error in processPipelineFinalize
+      const midStreamFault = Object.assign(new Error("Premature close"), {
+        code: "ERR_STREAM_PREMATURE_CLOSE",
+      });
+      getGenericObjectStream.mockResolvedValueOnce(
+        Readable.from(
+          (async function* () {
+            yield Buffer.from("partial");
+            throw midStreamFault;
+          })(),
+        ),
+      );
+      const caughtMid = await processor(finalizeJob).catch((err: unknown) => err);
+      expect(caughtMid).toMatchObject({
+        name: "SafeError",
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause: midStreamFault,
+      });
+      expect(classifyError(caughtMid, "worker")).toBe("operational");
+
+      // Unexpected non-S3 defect in processPipelineFinalize still classifies as "bug"
+      const unexpectedBug = new TypeError("unexpected S3 client defect");
+      getGenericObjectStream.mockRejectedValueOnce(unexpectedBug);
+      const caughtBug = await processor(finalizeJob).catch((err: unknown) => err);
+      expect(caughtBug).toBe(unexpectedBug);
+      expect(classifyError(caughtBug, "worker")).toBe("bug");
+
+      // Missing-object rejection (isStorageServiceFault === false) rethrows untouched
+      const noSuchKey = Object.assign(new Error("The specified key does not exist."), {
+        name: "NoSuchKey",
+        $metadata: { httpStatusCode: 404 },
+      });
+      getGenericObjectStream.mockRejectedValueOnce(noSuchKey);
+      const caughtMissing = await processor(finalizeJob).catch((err: unknown) => err);
+      expect(caughtMissing).toBe(noSuchKey);
+
+      // Secondary getObjectBuffer(data.inputRefs[1]) in erase-object AI job handler
+      const slowDown = s3Faults[0];
+      getGenericObjectStream
+        .mockResolvedValueOnce(Readable.from([Buffer.from("image-bytes")]))
+        .mockResolvedValueOnce(Readable.from([Buffer.from("mask-bytes")]))
+        .mockRejectedValueOnce(slowDown);
+      dbSetMock.mockClear();
+      const eraseErr = await processor({
+        id: "job-erase-s3",
+        attemptsMade: 0,
+        opts: { attempts: 1 },
+        updateProgress: vi.fn(),
+        data: {
+          jobId: "job-erase-s3",
+          toolId: "erase-object",
+          userId: null,
+          pool: "ai",
+          inputRefs: ["uploads/job-erase-s3/in.png", "uploads/job-erase-s3/mask.png"],
+          filename: "in.png",
+          settings: { format: "png", qualityMode: "fast" },
+          kind: "ai-tool",
+        },
+      }).catch((err: unknown) => err);
+      expect(eraseErr).toMatchObject({
+        name: "SafeError",
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        message: "The server's storage service is unavailable.",
+        cause: slowDown,
+      });
+      expect(classifyError(eraseErr, "worker")).toBe("operational");
+      expect(dbSetMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          status: "failed",
+          error: {
+            code: "storage-unavailable",
+            httpStatus: 503,
+            message: "The server's storage service is unavailable.",
+          },
+        }),
+      );
+
+      // Secondary getObjectBuffer(data.inputRefs[1]) in sign-pdf AI job handler
+      getGenericObjectStream
+        .mockResolvedValueOnce(Readable.from([Buffer.from("pdf-bytes")]))
+        .mockResolvedValueOnce(Readable.from([Buffer.from("sig-bytes")]))
+        .mockRejectedValueOnce(slowDown);
+      dbSetMock.mockClear();
+      const signErr = await processor({
+        id: "job-sign-s3",
+        attemptsMade: 0,
+        opts: { attempts: 1 },
+        updateProgress: vi.fn(),
+        data: {
+          jobId: "job-sign-s3",
+          toolId: "sign-pdf",
+          userId: null,
+          pool: "docs",
+          inputRefs: ["uploads/job-sign-s3/in.pdf", "uploads/job-sign-s3/sig0.png"],
+          filename: "in.pdf",
+          settings: {
+            placements: [{ sig: 0, page: 0, x: 0.1, y: 0.2, w: 0.3, h: 0.1 }],
+          },
+          kind: "ai-tool",
+        },
+      }).catch((err: unknown) => err);
+      expect(signErr).toMatchObject({
+        name: "SafeError",
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        message: "The server's storage service is unavailable.",
+        cause: slowDown,
+      });
+      expect(classifyError(signErr, "worker")).toBe("operational");
+      expect(dbSetMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          status: "failed",
+          error: {
+            code: "storage-unavailable",
+            httpStatus: 503,
+            message: "The server's storage service is unavailable.",
+          },
+        }),
+      );
+    });
   });
 
   // Result URLs are persisted with the job, so they must not depend on the
