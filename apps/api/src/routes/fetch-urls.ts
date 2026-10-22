@@ -9,7 +9,7 @@
  * returns results with download URLs.
  */
 import { randomUUID } from "node:crypto";
-import { basename } from "node:path";
+import { basename, extname } from "node:path";
 import { hasServerErrorStatus } from "@snapotter/shared";
 import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 import PQueue from "p-queue";
@@ -113,8 +113,12 @@ export function filenameFromUrl(url: string): string {
     const base = basename(pathname);
     // Decode percent-encoded characters
     const decoded = decodeURIComponent(base);
-    // Only use it if it looks like a file with an extension
-    if (decoded?.includes(".") && decoded.length <= 255) {
+    // Only use it if it looks like a file with an extension before and after sanitizing
+    if (
+      extname(decoded).replace(/^\./, "") !== "" &&
+      extname(sanitizeFilename(decoded)).replace(/^\./, "") !== "" &&
+      decoded.length <= 255
+    ) {
       return decoded;
     }
   } catch {
@@ -255,12 +259,13 @@ async function fetchSingleUrl(
     // modality. The consuming tool runs modality-specific validation at
     // process time, and SSRF + size limits still bound what can be fetched.
     const validation = await validateImageBuffer(buffer, filename).catch(() => null);
+    const isValidImage = validation?.valid === true && !validation.nameOnly;
 
     // Save to object storage uploads prefix (raw fetched files)
     await putObject(`uploads/${jobId}/${filename}`, buffer);
 
     const responseContentType = response.headers.get("content-type")?.split(";")[0]?.trim();
-    const contentType = validation?.valid
+    const contentType = isValidImage
       ? (FORMAT_TO_MIME[validation.format] ?? "application/octet-stream")
       : responseContentType || "application/octet-stream";
     const downloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(filename)}`;
@@ -277,7 +282,7 @@ async function fetchSingleUrl(
     // dimensions) for whatever edge case failed to decode.
     let decodedBuffer: Buffer<ArrayBuffer> = buffer;
     let didDecode = false;
-    if (validation?.valid) {
+    if (isValidImage) {
       try {
         if (validation.format === "heif") {
           decodedBuffer = Buffer.from(await decodeHeic(buffer));
@@ -299,8 +304,8 @@ async function fetchSingleUrl(
 
     // Real dimensions for formats that just got decoded above; every other
     // valid format already has real width/height from validateImageBuffer.
-    let width = validation?.valid ? validation.width : undefined;
-    let height = validation?.valid ? validation.height : undefined;
+    let width = isValidImage ? validation.width : undefined;
+    let height = isValidImage ? validation.height : undefined;
     if (didDecode) {
       try {
         const metadata = await sharp(decodedBuffer).metadata();
@@ -317,7 +322,7 @@ async function fetchSingleUrl(
     // ...) produce a real preview instead of failing on the raw, undecoded
     // buffer.
     let previewUrl: string | null = null;
-    if (validation?.valid && !BROWSER_PREVIEWABLE.has(contentType)) {
+    if (isValidImage && !BROWSER_PREVIEWABLE.has(contentType)) {
       try {
         const previewBuffer = await sharp(decodedBuffer).webp({ quality: 80 }).toBuffer();
         const previewFilename = `preview-${filename.replace(/\.[^.]+$/, "")}.webp`;

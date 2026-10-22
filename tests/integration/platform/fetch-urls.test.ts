@@ -114,6 +114,12 @@ function createMockFetch() {
         return mockResponse("PLAIN NON IMAGE PAYLOAD", {
           headers: { "Content-Type": "application/pdf; charset=binary" },
         });
+      case "/notes.dng":
+      case "/notes.tga":
+      case "/.gitignore":
+        return mockResponse("hello", {
+          headers: { "Content-Type": "text/plain" },
+        });
       // 3xx redirect that omits the Location header -> safeFetch throws and the
       // route surfaces it as a failure result.
       case "/redirect-no-location":
@@ -762,5 +768,47 @@ describe("POST /api/v1/fetch-urls", () => {
     expect(body.results[4].error).toContain("500");
     expect(body.results[5].success).toBe(false);
     expect(body.results[5].error).toContain("Empty");
+  });
+
+  it("preserves non-image contentType and undefined dimensions for nameOnly image extensions and dotfile URLs (#3263)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/fetch-urls",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        urls: [`${MOCK_ORIGIN}/notes.dng`, `${MOCK_ORIGIN}/notes.tga`, `${MOCK_ORIGIN}/.gitignore`],
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.results).toHaveLength(3);
+
+    expect(body.results[0]).toMatchObject({
+      success: true,
+      filename: "notes.dng",
+      contentType: "text/plain",
+      previewUrl: null,
+    });
+    expect(body.results[0].width).toBeUndefined();
+    expect(body.results[0].height).toBeUndefined();
+
+    expect(body.results[1]).toMatchObject({
+      success: true,
+      filename: "notes.tga",
+      contentType: "text/plain",
+      previewUrl: null,
+    });
+    expect(body.results[1].width).toBeUndefined();
+    expect(body.results[1].height).toBeUndefined();
+
+    expect(body.results[2]).toMatchObject({
+      success: true,
+      contentType: "text/plain",
+      previewUrl: null,
+    });
+    expect(body.results[2].filename).toMatch(/^file-[0-9a-f]{8}$/);
+    expect(body.results[2].width).toBeUndefined();
+    expect(body.results[2].height).toBeUndefined();
   });
 });
