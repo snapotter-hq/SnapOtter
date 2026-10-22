@@ -1254,4 +1254,59 @@ describe("Info", () => {
       rmSync(shimDir, { recursive: true, force: true });
     }
   });
+
+  it("passes -G to exiftool and preserves RAW metadata when -EXIF:all JSON exceeds 1 MiB without ExifVersion (#3634)", async () => {
+    const DNG = readFixture(fixtures.image.formats("dng"));
+    const originalPath = process.env.PATH;
+    const shimDir = mkdtempSync(join(tmpdir(), "info-exiftool-grouped-large-"));
+    try {
+      const shimPath = join(shimDir, "exiftool");
+      writeFileSync(
+        shimPath,
+        [
+          "#!/bin/sh",
+          'has_g=0; for arg in "$@"; do if [ "$arg" = "-G" ]; then has_g=1; fi; done',
+          'if [ "$has_g" = "1" ]; then',
+          '  pad=$(head -c 1500000 /dev/zero | tr "\\0" "A")',
+          '  printf \'[{"File:FileType":"DNG","EXIF:ImageWidth":5472,"EXIF:ImageHeight":3648,"EXIF:BitsPerSample":16,"EXIF:ColorSpace":"Adobe RGB","EXIF:XResolution":300,"ICC_Profile:ICCProfileName":"Display P3","XMP:XMPToolkit":"Adobe XMP","EXIF:Make":"Canon","EXIF:Padding":"%s"}]\\n\' "$pad"',
+          "else",
+          '  printf \'[{"FileType":"DNG","ImageWidth":5472,"ImageHeight":3648,"Make":"Canon"}]\\n\'',
+          "fi",
+          "",
+        ].join("\n"),
+      );
+      chmodSync(shimPath, 0o755);
+      process.env.PATH = `${shimDir}:${originalPath ?? ""}`;
+
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "sample.dng", contentType: "image/x-adobe-dng", content: DNG },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/info",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      });
+
+      expect(res.statusCode, res.body).toBe(200);
+      expect(JSON.parse(res.body)).toMatchObject({
+        filename: "sample.dng",
+        format: "dng",
+        width: 5472,
+        height: 3648,
+        bitDepth: "16",
+        colorSpace: "Adobe RGB",
+        hasExif: true,
+        hasIcc: true,
+        hasXmp: true,
+      });
+    } finally {
+      process.env.PATH = originalPath;
+      rmSync(shimDir, { recursive: true, force: true });
+    }
+  });
 });

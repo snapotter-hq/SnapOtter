@@ -879,6 +879,18 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
         4032,
         3024,
       ],
+      [
+        "grouped invalid dimensions across Composite, EXIF, and File",
+        '[{"File:FileType":"DNG","Composite:ImageWidth":0,"EXIF:ImageWidth":-1,"File:ImageHeight":"bad"}]',
+        200,
+        150,
+      ],
+      [
+        "File:ImageWidth and File:ImageHeight fallback when Composite is zero",
+        '[{"File:FileType":"DNG","Composite:ImageWidth":0,"File:ImageWidth":1920,"File:ImageHeight":1280}]',
+        1920,
+        1280,
+      ],
     ] as const)(
       "falls back to Sharp dimensions when exiftool emits %s (#3600)",
       async (_label, jsonOutput, expectedWidth, expectedHeight) => {
@@ -911,6 +923,148 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
         }
       },
     );
+
+    it("passes -G to exiftool and detects EXIF tags without ExifVersion on RAW uploads (#3634)", async () => {
+      const originalPath = process.env.PATH;
+      const shimDir = mkdtempSync(join(tmpdir(), "info-exiftool-grouped-"));
+      try {
+        const shimPath = join(shimDir, "exiftool");
+        writeFileSync(
+          shimPath,
+          [
+            "#!/bin/sh",
+            'has_g=0; for arg in "$@"; do if [ "$arg" = "-G" ]; then has_g=1; fi; done',
+            'if [ "$has_g" = "1" ]; then',
+            '  printf \'[{"File:FileType":"RAF","Composite:ImageWidth":0,"SubIFD:ImageWidth":6000,"File:ImageWidth":1920,"Composite:ImageHeight":4000,"File:ImageHeight":1280,"EXIF:BitsPerSample":14,"File:BitsPerSample":8,"EXIF:ColorSpace":"sRGB","EXIF:XResolution":300,"ICC_Profile:ICCProfileName":"Display P3","XMP:XMPToolkit":"Adobe XMP","EXIF:Make":"FUJIFILM","EXIF:Model":"X-T5"}]\\n\'',
+            "else",
+            '  printf \'[{"FileType":"RAF","ImageWidth":6000,"ImageHeight":4000,"BitsPerSample":14,"ColorSpace":"sRGB","XResolution":300,"ICCProfileName":"Display P3","XMPToolkit":"Adobe XMP","Make":"FUJIFILM","Model":"X-T5"}]\\n\'',
+            "fi",
+            "",
+          ].join("\n"),
+        );
+        chmodSync(shimPath, 0o755);
+        process.env.PATH = `${shimDir}:${originalPath ?? ""}`;
+
+        const rafBytes = Buffer.from("FUJIFILMCCD-RAW 0201", "ascii");
+        const res = await app.inject({
+          method: "POST",
+          url: apiToolPath("info"),
+          ...multipartBody([
+            { filename: "shoot.raf", contentType: "application/octet-stream", content: rafBytes },
+          ]),
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.json()).toMatchObject({
+          filename: "shoot.raf",
+          format: "raf",
+          width: 6000,
+          height: 4000,
+          bitDepth: "14",
+          colorSpace: "sRGB",
+          density: 300,
+          hasExif: true,
+          hasIcc: true,
+          hasXmp: true,
+        });
+      } finally {
+        process.env.PATH = originalPath;
+        rmSync(shimDir, { recursive: true, force: true });
+      }
+    });
+
+    it("skips empty or zero grouped values in higher-priority groups and reports false flags when EXIF/ICC/XMP tags are absent (#3634)", async () => {
+      const originalPath = process.env.PATH;
+      const shimDir = mkdtempSync(join(tmpdir(), "info-exiftool-stripped-"));
+      try {
+        const shimPath = join(shimDir, "exiftool");
+        writeFileSync(
+          shimPath,
+          [
+            "#!/bin/sh",
+            'printf \'[{"File:FileType":"RAF","RAF:ImageWidth":4896,"RAF:ImageHeight":3264,"Composite:ColorSpace":"","MakerNotes:ColorSpace":"Adobe RGB","Composite:BitsPerSample":0,"File:BitsPerSample":"12 12 12","Composite:XResolution":0,"File:XResolution":240}]\\n\'',
+            "",
+          ].join("\n"),
+        );
+        chmodSync(shimPath, 0o755);
+        process.env.PATH = `${shimDir}:${originalPath ?? ""}`;
+
+        const rafBytes = Buffer.from("FUJIFILMCCD-RAW 0201", "ascii");
+        const res = await app.inject({
+          method: "POST",
+          url: apiToolPath("info"),
+          ...multipartBody([
+            {
+              filename: "stripped.raf",
+              contentType: "application/octet-stream",
+              content: rafBytes,
+            },
+          ]),
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.json()).toMatchObject({
+          filename: "stripped.raf",
+          format: "raf",
+          width: 4896,
+          height: 3264,
+          bitDepth: "12 12 12",
+          colorSpace: "Adobe RGB",
+          hasExif: false,
+          hasIcc: false,
+          hasXmp: false,
+        });
+      } finally {
+        process.env.PATH = originalPath;
+        rmSync(shimDir, { recursive: true, force: true });
+      }
+    });
+
+    it("reads RAW metadata when exiftool -EXIF:all JSON exceeds 1 MiB default maxBuffer (#3634)", async () => {
+      const originalPath = process.env.PATH;
+      const shimDir = mkdtempSync(join(tmpdir(), "info-exiftool-large-"));
+      try {
+        const shimPath = join(shimDir, "exiftool");
+        writeFileSync(
+          shimPath,
+          [
+            "#!/bin/sh",
+            'has_g=0; for arg in "$@"; do if [ "$arg" = "-G" ]; then has_g=1; fi; done',
+            'if [ "$has_g" = "1" ]; then',
+            '  pad=$(head -c 1500000 /dev/zero | tr "\\0" "A")',
+            '  printf \'[{"File:FileType":"DNG","EXIF:ImageWidth":5472,"EXIF:ImageHeight":3648,"EXIF:BitsPerSample":16,"EXIF:ColorSpace":"Adobe RGB","EXIF:Make":"Canon","EXIF:Padding":"%s"}]\\n\' "$pad"',
+            "else",
+            '  printf \'[{"FileType":"DNG"}]\'',
+            "fi",
+            "",
+          ].join("\n"),
+        );
+        chmodSync(shimPath, 0o755);
+        process.env.PATH = `${shimDir}:${originalPath ?? ""}`;
+
+        const res = await app.inject({
+          method: "POST",
+          url: apiToolPath("info"),
+          ...multipartBody([
+            { filename: "large-exif.dng", contentType: "image/x-adobe-dng", content: DNG },
+          ]),
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.json()).toMatchObject({
+          filename: "large-exif.dng",
+          format: "dng",
+          width: 5472,
+          height: 3648,
+          bitDepth: "16",
+          colorSpace: "Adobe RGB",
+          hasExif: true,
+        });
+      } finally {
+        process.env.PATH = originalPath;
+        rmSync(shimDir, { recursive: true, force: true });
+      }
+    });
   });
 
   describe("edit-metadata and edit-metadata/inspect exiftool tmpdir faults (#3548, #3630)", () => {

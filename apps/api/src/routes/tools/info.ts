@@ -192,8 +192,46 @@ interface ExifMeta {
   hasXmp: boolean;
 }
 
+const EXIFTOOL_GROUP_PRIORITY = ["Composite", "EXIF", "XMP", "ICC_Profile", "MakerNotes"] as const;
+
 function positiveDimension(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function nonEmptyString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function validBitDepth(value: unknown): string | null {
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value > 0 ? String(value) : null;
+  }
+  if (typeof value === "string" && value.trim().length > 0 && value.trim() !== "0") {
+    return value;
+  }
+  return null;
+}
+
+function findExifValue<T>(
+  data: Record<string, unknown>,
+  tag: string,
+  parse: (value: unknown) => T | null,
+): T | null {
+  for (const group of EXIFTOOL_GROUP_PRIORITY) {
+    const parsed = parse(data[`${group}:${tag}`]);
+    if (parsed !== null) return parsed;
+  }
+  const ungrouped = parse(data[tag]);
+  if (ungrouped !== null) return ungrouped;
+  const fileKey = `File:${tag}`;
+  const suffix = `:${tag}`;
+  for (const [key, val] of Object.entries(data)) {
+    if (key !== fileKey && key.endsWith(suffix)) {
+      const parsed = parse(val);
+      if (parsed !== null) return parsed;
+    }
+  }
+  return parse(data[fileKey]);
 }
 
 async function readExifToolMeta(buffer: Buffer, ext?: string): Promise<ExifMeta | null> {
@@ -221,6 +259,7 @@ async function readExifToolMeta(buffer: Buffer, ext?: string): Promise<ExifMeta 
       "exiftool",
       [
         "-j",
+        "-G",
         "-ImageWidth",
         "-ImageHeight",
         "-FileType",
@@ -232,21 +271,23 @@ async function readExifToolMeta(buffer: Buffer, ext?: string): Promise<ExifMeta 
         "-XMP:XMPToolkit",
         tmpPath,
       ],
-      { timeout: 10_000 },
+      { timeout: 10_000, maxBuffer: 10 * 1024 * 1024 },
     );
-    const [data] = JSON.parse(stdout);
+    const [data] = JSON.parse(stdout) as Array<Record<string, unknown> | undefined>;
     if (!data) return null;
 
+    const fileType = findExifValue(data, "FileType", nonEmptyString);
+
     return {
-      width: positiveDimension(data.ImageWidth),
-      height: positiveDimension(data.ImageHeight),
-      format: (data.FileType ?? "raw").toLowerCase(),
-      colorSpace: data.ColorSpace ?? null,
-      density: data.XResolution ?? null,
-      bitDepth: data.BitsPerSample ? String(data.BitsPerSample) : null,
+      width: findExifValue(data, "ImageWidth", positiveDimension),
+      height: findExifValue(data, "ImageHeight", positiveDimension),
+      format: (fileType ?? "raw").toLowerCase(),
+      colorSpace: findExifValue(data, "ColorSpace", nonEmptyString),
+      density: findExifValue(data, "XResolution", positiveDimension),
+      bitDepth: findExifValue(data, "BitsPerSample", validBitDepth),
       hasExif: Object.keys(data).some((k) => k.startsWith("EXIF:") || k === "ExifVersion"),
-      hasIcc: !!data.ICCProfileName,
-      hasXmp: !!data.XMPToolkit,
+      hasIcc: findExifValue(data, "ICCProfileName", nonEmptyString) !== null,
+      hasXmp: findExifValue(data, "XMPToolkit", nonEmptyString) !== null,
     };
   } catch (rawErr) {
     const err = asDecoderOutOfMemory(rawErr);
