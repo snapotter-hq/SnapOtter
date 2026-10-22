@@ -104,6 +104,7 @@ async function updateScimUser(
   id: string,
   updates: Record<string, unknown>,
   active?: boolean,
+  userName?: string,
 ): Promise<UpdateScimUserOutcome> {
   return db.transaction(async (tx) => {
     // If active is explicitly false, we might be disabling an admin,
@@ -119,6 +120,10 @@ async function updateScimUser(
       .for("update");
 
     if (!currentUser) return "not-found" as const;
+
+    if (userName !== undefined && userName !== currentUser.username) {
+      updates.username = userName;
+    }
 
     let revokeCredentials = false;
 
@@ -885,7 +890,6 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
         if (conflict && conflict.id !== id) {
           return reply.status(409).send(scimError(409, "userName already taken", "uniqueness"));
         }
-        updates.username = userName;
       }
 
       if (body.externalId !== undefined) {
@@ -902,7 +906,7 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
       // externalId has no pre-check; its collisions always land here.
       let outcome: UpdateScimUserOutcome;
       try {
-        outcome = await updateScimUser(id, updates, active);
+        outcome = await updateScimUser(id, updates, active, userName);
       } catch (err) {
         if (err instanceof LastAdminError) {
           request.log.warn(

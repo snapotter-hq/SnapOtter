@@ -1821,6 +1821,93 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect.soft(again.statusCode, again.body).toBe(200);
       expect(rowAgain?.role).toBe("disabled:user");
     });
+
+    it("compares userName against the locked row so a concurrent rename before the row lock is overwritten and audited accurately (#3576)", async () => {
+      // 1. User is renamed away from originalName after the pre-transaction SELECT
+      //    and before updateScimUser locks the row; PUT sending originalName must
+      //    still set username back to originalName and log "username" in changes.
+      const originalName = uniqueName("scim-put-lock-orig");
+      const concurrentName = uniqueName("scim-put-lock-concurrent");
+      const user = await createScimUser({ userName: originalName });
+
+      const restoreRes = await raceRowLocks(
+        "users",
+        1,
+        () =>
+          crudApp.app.inject({
+            method: "PUT",
+            url: `/api/v1/scim/v2/Users/${user.id}`,
+            headers: authHeaders(),
+            payload: { userName: originalName, active: true },
+          }),
+        (tx) =>
+          tx
+            .update(schema.users)
+            .set({ username: concurrentName })
+            .where(eq(schema.users.id, user.id)),
+      );
+
+      expect(restoreRes.statusCode, restoreRes.body).toBe(200);
+      expect(JSON.parse(restoreRes.body).userName).toBe(originalName);
+      expect((await userRow(user.id))?.username).toBe(originalName);
+
+      const restoreAudits = await db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.action, "SCIM_USER_UPDATED"),
+            sql`${schema.auditLog.details}->>'userId' = ${user.id}`,
+          ),
+        );
+      expect(restoreAudits).toHaveLength(1);
+      expect(restoreAudits[0]?.details).toEqual({
+        userId: user.id,
+        username: originalName,
+        changes: ["username"],
+      });
+
+      // 2. User is concurrently renamed to targetName after the pre-transaction
+      //    SELECT and before updateScimUser locks the row; PUT sending targetName
+      //    sees the locked row already holds targetName and omits "username" from changes.
+      const targetName = uniqueName("scim-put-lock-target");
+      const sameRes = await raceRowLocks(
+        "users",
+        1,
+        () =>
+          crudApp.app.inject({
+            method: "PUT",
+            url: `/api/v1/scim/v2/Users/${user.id}`,
+            headers: authHeaders(),
+            payload: { userName: targetName, externalId: "ext-3576", active: true },
+          }),
+        (tx) =>
+          tx.update(schema.users).set({ username: targetName }).where(eq(schema.users.id, user.id)),
+      );
+
+      expect(sameRes.statusCode, sameRes.body).toBe(200);
+      expect(JSON.parse(sameRes.body).userName).toBe(targetName);
+      expect((await userRow(user.id))?.username).toBe(targetName);
+
+      const allAudits = await db
+        .select()
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.action, "SCIM_USER_UPDATED"),
+            sql`${schema.auditLog.details}->>'userId' = ${user.id}`,
+          ),
+        );
+      expect(allAudits).toHaveLength(2);
+      const secondAudit = allAudits.find(
+        (row) => (row.details as { username?: string })?.username === targetName,
+      );
+      expect(secondAudit?.details).toEqual({
+        userId: user.id,
+        username: targetName,
+        changes: ["externalId"],
+      });
+    });
   });
 
   describe("Users PATCH", () => {
