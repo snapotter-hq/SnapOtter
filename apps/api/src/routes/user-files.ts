@@ -988,9 +988,29 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(400).send({ error: "parentId is required" });
     }
 
+    // Look up the parent to compute the next version and carry forward the tool chain
+    const [parent] = await db
+      .select()
+      .from(schema.userFiles)
+      .where(eq(schema.userFiles.id, parentId));
+
+    if (!parent) {
+      return reply.status(404).send({ error: "Parent file not found" });
+    }
+    if (
+      parent.userId &&
+      parent.userId !== user.id &&
+      !(await hasEffectivePermission(user, "files:all"))
+    ) {
+      return reply.status(404).send({ error: "Parent file not found" });
+    }
+
+    const parentExt = extname(parent.originalName);
+    let ext = extname(filename) || parentExt;
+
     // Sanitize SVG results to prevent XXE, SSRF, and script injection
     let safeResultBuffer = fileBuffer;
-    const resultExt = extname(filename).toLowerCase();
+    const resultExt = ext.toLowerCase();
     let isDecompressedSvg = false;
     if (resultExt === ".svgz" || isSvgBuffer(fileBuffer)) {
       try {
@@ -1026,39 +1046,23 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
+    // Determine the original filename (preserve parent's name, update extension)
+    if (isDecompressedSvg && resultExt === ".svgz") ext = ".svg";
+    const baseName = parentExt
+      ? parent.originalName.slice(0, -parentExt.length)
+      : parent.originalName;
+    const resultName = `${baseName}${ext}`;
+
     // Try image validation on the bytes that will be stored; non-image outputs
     // from trusted tools are accepted
-    const validation = await validateImageBuffer(safeResultBuffer, filename).catch(() => null);
+    const validation = await validateImageBuffer(safeResultBuffer, resultName).catch(() => null);
     const isValidImage = validation?.valid === true;
-
-    // Look up the parent to compute the next version and carry forward the tool chain
-    const [parent] = await db
-      .select()
-      .from(schema.userFiles)
-      .where(eq(schema.userFiles.id, parentId));
-
-    if (!parent) {
-      return reply.status(404).send({ error: "Parent file not found" });
-    }
-    if (
-      parent.userId &&
-      parent.userId !== user.id &&
-      !(await hasEffectivePermission(user, "files:all"))
-    ) {
-      return reply.status(404).send({ error: "Parent file not found" });
-    }
 
     const nextVersion = parent.version + 1;
 
     // Build the tool chain: append the new toolId to the parent's chain
     const existingChain: string[] = parent.toolChain ?? [];
     const newChain = toolId ? [...existingChain, toolId] : existingChain;
-
-    // Determine the original filename (preserve parent's name, update extension)
-    let ext = extname(filename) || extname(parent.originalName);
-    if (isDecompressedSvg && ext.toLowerCase() === ".svgz") ext = ".svg";
-    const baseName = parent.originalName.replace(/\.[^.]+$/, "");
-    const resultName = `${baseName}${ext}`;
 
     const mimeType =
       (isValidImage && validatedImageMime(validation, resultName)) ||

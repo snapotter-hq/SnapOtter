@@ -6,6 +6,7 @@
  * and POST /api/v1/files/save-result handlers from user-files.ts.
  */
 import { Readable } from "node:stream";
+import { gzipSync } from "node:zlib";
 import { IMAGE_EXT_TO_MIME } from "@snapotter/shared";
 import sharp from "sharp";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -1079,6 +1080,299 @@ describe("user files route logic", () => {
           mimeType: "text/plain",
           size: corruptGzipDotfile.length,
         });
+      });
+
+      it("preserves dotfile parent stems when saving extensionless or extensioned results (#3529)", async () => {
+        mocks.parentRows = [
+          makeParent({ originalName: ".gitignore", mimeType: "application/octet-stream" }),
+        ];
+        mocks.validateImageBuffer.mockResolvedValueOnce({
+          valid: false,
+          reason: "Unrecognized image format",
+        } as never);
+        const extlessReply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "result",
+            parentId: "parent-1",
+            toolId: "convert",
+            buffer: Buffer.from("node_modules/\n"),
+          }),
+          extlessReply,
+        );
+        expect(extlessReply.statusCode).toBe(201);
+        expect(mocks.saveFile).toHaveBeenLastCalledWith(expect.any(Buffer), ".gitignore");
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: ".gitignore",
+          mimeType: "application/octet-stream",
+        });
+
+        mocks.parentRows = [
+          makeParent({ originalName: ".gitignore", mimeType: "application/octet-stream" }),
+        ];
+        const withExtReply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "output.png",
+            parentId: "parent-1",
+            toolId: "convert",
+          }),
+          withExtReply,
+        );
+        expect(withExtReply.statusCode).toBe(201);
+        expect(mocks.saveFile).toHaveBeenLastCalledWith(expect.any(Buffer), ".gitignore.png");
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: ".gitignore.png",
+          mimeType: "image/png",
+        });
+
+        const corruptGzipDotfile = Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0xff, 0xff]);
+        mocks.parentRows = [
+          makeParent({ originalName: ".svgz", mimeType: "application/octet-stream" }),
+        ];
+        mocks.validateImageBuffer.mockResolvedValueOnce({
+          valid: false,
+          reason: "Unrecognized image format",
+        } as never);
+        const dotfileSvgzReq = makeSaveResultRequest({
+          filename: "result",
+          parentId: "parent-1",
+          toolId: "convert",
+          buffer: corruptGzipDotfile,
+        });
+        const dotfileSvgzReply = makeReply();
+        await saveResultHandler(dotfileSvgzReq, dotfileSvgzReply);
+        expect(dotfileSvgzReply.statusCode).toBe(201);
+        expect(dotfileSvgzReq.log.warn).not.toHaveBeenCalled();
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: ".svgz",
+          mimeType: "application/octet-stream",
+          size: corruptGzipDotfile.length,
+        });
+
+        mocks.parentRows = [makeParent({ originalName: ".hidden.jpg", mimeType: "image/jpeg" })];
+        const dotfileWithExtReply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "output.png",
+            parentId: "parent-1",
+            toolId: "convert",
+          }),
+          dotfileWithExtReply,
+        );
+        expect(dotfileWithExtReply.statusCode).toBe(201);
+        expect(mocks.insertedValues?.originalName).toBe(".hidden.png");
+
+        mocks.parentRows = [makeParent({ originalName: ".hidden.jpg", mimeType: "image/jpeg" })];
+        mocks.validateImageBuffer.mockResolvedValueOnce({
+          valid: true,
+          format: "jpeg",
+          width: 800,
+          height: 600,
+        });
+        const dotfileExtlessFallbackReply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "result",
+            parentId: "parent-1",
+            toolId: "resize",
+          }),
+          dotfileExtlessFallbackReply,
+        );
+        expect(dotfileExtlessFallbackReply.statusCode).toBe(201);
+        expect(mocks.insertedValues?.originalName).toBe(".hidden.jpg");
+      });
+
+      it("decompresses and sanitizes an extensionless result when the parent originalName ends in .svgz (#3529)", async () => {
+        const rawSvgWithScript =
+          '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><script>alert(1)</script><rect width="10" height="10"/></svg>';
+        const compressedSvg = gzipSync(Buffer.from(rawSvgWithScript));
+        mocks.parentRows = [
+          makeParent({ originalName: "diagram.svgz", mimeType: "application/octet-stream" }),
+        ];
+        mocks.validateImageBuffer.mockResolvedValueOnce({
+          valid: true,
+          format: "svg",
+          width: 10,
+          height: 10,
+        });
+        const saveReq = makeSaveResultRequest({
+          filename: "result",
+          parentId: "parent-1",
+          toolId: "compress",
+          buffer: compressedSvg,
+        });
+        const saveReply = makeReply();
+        await saveResultHandler(saveReq, saveReply);
+
+        expect(saveReply.statusCode).toBe(201);
+        const [savedBuffer, savedName] = mocks.saveFile.mock.lastCall as unknown as [
+          Buffer,
+          string,
+        ];
+        expect(savedName).toBe("diagram.svg");
+        expect(savedBuffer.toString("utf-8")).toContain("<svg");
+        expect(savedBuffer.toString("utf-8")).not.toContain("<script");
+        expect(mocks.validateImageBuffer).toHaveBeenLastCalledWith(savedBuffer, "diagram.svg");
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: "diagram.svg",
+          mimeType: "image/svg+xml",
+          size: savedBuffer.length,
+        });
+
+        // Uppercase .SVGZ parent extension with extensionless filename decompresses to .svg
+        mocks.parentRows = [
+          makeParent({ originalName: "diagram.SVGZ", mimeType: "application/octet-stream" }),
+        ];
+        mocks.validateImageBuffer.mockResolvedValueOnce({
+          valid: true,
+          format: "svg",
+          width: 10,
+          height: 10,
+        });
+        const upperReply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "result",
+            parentId: "parent-1",
+            toolId: "compress",
+            buffer: compressedSvg,
+          }),
+          upperReply,
+        );
+        expect(upperReply.statusCode).toBe(201);
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: "diagram.svg",
+          mimeType: "image/svg+xml",
+        });
+
+        // Explicit non-.svgz result filename ("output.png") against .svgz parent skips decompressSvgz
+        mocks.parentRows = [
+          makeParent({ originalName: "diagram.svgz", mimeType: "application/octet-stream" }),
+        ];
+        const pngAgainstSvgzReply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "output.png",
+            parentId: "parent-1",
+            toolId: "convert",
+          }),
+          pngAgainstSvgzReply,
+        );
+        expect(pngAgainstSvgzReply.statusCode).toBe(201);
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: "diagram.png",
+          mimeType: "image/png",
+        });
+
+        // Non-SVG gzip with extensionless filename against .svgz parent stays opaque .svgz
+        const opaqueGzip = gzipSync(Buffer.from("not an svg payload"));
+        mocks.parentRows = [
+          makeParent({ originalName: "diagram.svgz", mimeType: "application/octet-stream" }),
+        ];
+        mocks.validateImageBuffer.mockResolvedValueOnce({
+          valid: false,
+          reason: "Unrecognized image format",
+        } as never);
+        const opaqueReq = makeSaveResultRequest({
+          filename: "result",
+          parentId: "parent-1",
+          toolId: "compress",
+          buffer: opaqueGzip,
+        });
+        const opaqueReply = makeReply();
+        await saveResultHandler(opaqueReq, opaqueReply);
+        expect(opaqueReply.statusCode).toBe(201);
+        expect(opaqueReq.log.warn).toHaveBeenCalledWith(
+          expect.objectContaining({ filename: "result" }),
+          "Result .svgz file does not contain SVG, storing as opaque file",
+        );
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: "diagram.svgz",
+          mimeType: "application/octet-stream",
+          size: opaqueGzip.length,
+        });
+
+        // Corrupt gzip with extensionless filename against .svgz parent rejects with 400
+        mocks.saveFile.mockClear();
+        mocks.insertedValues = undefined;
+        const corruptSvgz = Buffer.from(compressedSvg);
+        corruptSvgz[corruptSvgz.length - 8] ^= 0xff;
+        mocks.parentRows = [
+          makeParent({ originalName: "diagram.svgz", mimeType: "application/octet-stream" }),
+        ];
+        const corruptReq = makeSaveResultRequest({
+          filename: "result",
+          parentId: "parent-1",
+          toolId: "compress",
+          buffer: corruptSvgz,
+        });
+        const corruptReply = makeReply();
+        await saveResultHandler(corruptReq, corruptReply);
+        expect(corruptReply.statusCode).toBe(400);
+        expect(mocks.saveFile).not.toHaveBeenCalled();
+        expect(mocks.insertedValues).toBeUndefined();
+      });
+
+      it("passes resolved resultName to validateImageBuffer and checks parent access before SVGZ decompression (#3529)", async () => {
+        const { validateImageBuffer: realValidateImageBuffer } = await vi.importActual<
+          typeof import("../../../apps/api/src/lib/file-validation.js")
+        >("../../../apps/api/src/lib/file-validation.js");
+        const tgaBuffer = readFixture(fixtures.image.formats("tga"));
+        mocks.parentRows = [makeParent({ originalName: "texture.tga", mimeType: "image/x-tga" })];
+        mocks.validateImageBuffer.mockImplementationOnce(realValidateImageBuffer as never);
+
+        const tgaReply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "result",
+            parentId: "parent-1",
+            toolId: "resize",
+            buffer: tgaBuffer,
+          }),
+          tgaReply,
+        );
+        expect(tgaReply.statusCode).toBe(201);
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: "texture.tga",
+          mimeType: "image/x-tga",
+        });
+
+        // Missing or unauthorized parent returns 404 before decompressSvgz or validateImageBuffer
+        const corruptGzip = Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0xff, 0xff]);
+        mocks.validateImageBuffer.mockClear();
+        mocks.saveFile.mockClear();
+        mocks.insertedValues = undefined;
+        mocks.parentRows = [];
+        const missingReply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "corrupt.svgz",
+            parentId: "missing-parent",
+            toolId: "compress",
+            buffer: corruptGzip,
+          }),
+          missingReply,
+        );
+        expect(missingReply.statusCode).toBe(404);
+        expect(mocks.validateImageBuffer).not.toHaveBeenCalled();
+        expect(mocks.saveFile).not.toHaveBeenCalled();
+
+        mocks.parentRows = [makeParent({ userId: "other-user" })];
+        mocks.hasEffectivePermission.mockResolvedValueOnce(false);
+        const unauthReply = makeReply();
+        await saveResultHandler(
+          makeSaveResultRequest({
+            filename: "corrupt.svgz",
+            parentId: "parent-1",
+            toolId: "compress",
+            buffer: corruptGzip,
+          }),
+          unauthReply,
+        );
+        expect(unauthReply.statusCode).toBe(404);
+        expect(mocks.validateImageBuffer).not.toHaveBeenCalled();
+        expect(mocks.saveFile).not.toHaveBeenCalled();
       });
     });
 

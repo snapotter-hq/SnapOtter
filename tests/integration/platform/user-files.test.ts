@@ -1404,6 +1404,81 @@ describe("Save result", () => {
     expect(v3Res.statusCode).toBe(201);
     const v3 = JSON.parse(v3Res.body).file;
     expect(v3.originalName).toBe("vector-parent.svgz");
+
+    // Saving an extensionless result against the .svgz parent falls back to the
+    // parent's .svgz extension, decompressing and rewriting to .svg (#3529).
+    const { body: v4Body, contentType: v4Ct } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "result",
+        contentType: "application/octet-stream",
+        content: validSvgz,
+      },
+      { name: "parentId", content: v3.id },
+      { name: "toolId", content: "compress" },
+    ]);
+
+    const v4Res = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/save-result",
+      headers: { "content-type": v4Ct, authorization: `Bearer ${adminToken}` },
+      body: v4Body,
+    });
+    expect(v4Res.statusCode).toBe(201);
+    const v4 = JSON.parse(v4Res.body).file;
+    expect(v4.originalName).toBe("vector-parent.svg");
+    expect(v4.mimeType).toBe("image/svg+xml");
+
+    // Dotfile parent stems stay intact on extensionless and extensioned results (#3529).
+    const { body: dotUploadBody, contentType: dotUploadCt } = createMultipartPayload([
+      {
+        name: "file",
+        filename: ".gitignore",
+        contentType: "text/plain",
+        content: Buffer.from("dist/\n"),
+      },
+    ]);
+    const dotUploadRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: { "content-type": dotUploadCt, authorization: `Bearer ${adminToken}` },
+      body: dotUploadBody,
+    });
+    expect(dotUploadRes.statusCode).toBe(201);
+    const dotParentId = JSON.parse(dotUploadRes.body).files[0].id as string;
+
+    const { body: dotExtlessBody, contentType: dotExtlessCt } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "result",
+        contentType: "text/plain",
+        content: Buffer.from("dist/\nnode_modules/\n"),
+      },
+      { name: "parentId", content: dotParentId },
+      { name: "toolId", content: "convert" },
+    ]);
+    const dotExtlessRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/save-result",
+      headers: { "content-type": dotExtlessCt, authorization: `Bearer ${adminToken}` },
+      body: dotExtlessBody,
+    });
+    expect(dotExtlessRes.statusCode).toBe(201);
+    expect(JSON.parse(dotExtlessRes.body).file.originalName).toBe(".gitignore");
+
+    const { body: dotExtBody, contentType: dotExtCt } = createMultipartPayload([
+      { name: "file", filename: "result.png", contentType: "image/png", content: TINY_PNG },
+      { name: "parentId", content: dotParentId },
+      { name: "toolId", content: "convert" },
+    ]);
+    const dotExtRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/files/save-result",
+      headers: { "content-type": dotExtCt, authorization: `Bearer ${adminToken}` },
+      body: dotExtBody,
+    });
+    expect(dotExtRes.statusCode).toBe(201);
+    expect(JSON.parse(dotExtRes.body).file.originalName).toBe(".gitignore.png");
   });
 
   it("discards the staged blob and returns 404 when the parent file is deleted while save-result is staging (#2939)", async () => {
