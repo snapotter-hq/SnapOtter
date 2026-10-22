@@ -113,12 +113,18 @@ export function sanitizeFilename(raw: string): string {
   const enc = new TextEncoder();
   if (enc.encode(name).length > MAX_NAME_BYTES) {
     const dotIdx = name.lastIndexOf(".");
-    const ext = dotIdx > 0 ? name.slice(dotIdx) : "";
-    let base = dotIdx > 0 ? name.slice(0, dotIdx) : name;
-    while (enc.encode(base + ext).length > MAX_NAME_BYTES) {
+    const candidateExt = dotIdx > 0 ? name.slice(dotIdx) : "";
+    const keepExt = candidateExt !== "" && enc.encode(candidateExt).length < MAX_NAME_BYTES;
+    const ext = keepExt ? candidateExt : "";
+    let base = keepExt ? name.slice(0, dotIdx) : name;
+    while (base.length > 0 && enc.encode(base + ext).length > MAX_NAME_BYTES) {
       base = base.slice(0, -1);
     }
+    base = base.replace(/\.+$/, "");
     name = base + ext;
+    if (!name || name === "." || name === ".." || name.toLowerCase() === ".snapotter-staging") {
+      name = "upload";
+    }
   }
 
   return name;

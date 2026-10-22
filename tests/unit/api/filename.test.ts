@@ -241,4 +241,38 @@ describe("sanitizeFilename", () => {
     expect(withExt).toBe(".snapotter-staging.png");
     expect(isValidObjectKey(`uploads/job/${withExt}`)).toBe(true);
   });
+
+  it("strips trailing dots from the truncated stem before reattaching the extension (#3691)", () => {
+    const dotAtCut = sanitizeFilename(`${"a".repeat(195)}.b.png`);
+    expect(dotAtCut).toBe(`${"a".repeat(195)}.png`);
+    expect(new TextEncoder().encode(dotAtCut).length).toBe(199);
+    expect(isValidObjectKey(`uploads/job/${dotAtCut}`)).toBe(true);
+
+    const leadingDotMultibyte = sanitizeFilename(`.\u00e9.${"b".repeat(198)}`);
+    expect(leadingDotMultibyte).toBe(`.${"b".repeat(198)}`);
+    expect(new TextEncoder().encode(leadingDotMultibyte).length).toBe(199);
+    expect(isValidObjectKey(`uploads/job/${leadingDotMultibyte}`)).toBe(true);
+  });
+
+  it("truncates the whole filename when the extension alone reaches or exceeds 200 bytes (#3691)", () => {
+    const ext199WithStem = sanitizeFilename(`aa.${"b".repeat(198)}`);
+    expect(ext199WithStem).toBe(`a.${"b".repeat(198)}`);
+    expect(new TextEncoder().encode(ext199WithStem).length).toBe(200);
+    expect(isValidObjectKey(`uploads/job/${ext199WithStem}`)).toBe(true);
+
+    const exact200Ext = sanitizeFilename(`a.${"b".repeat(199)}`);
+    expect(exact200Ext).toBe(`a.${"b".repeat(198)}`);
+    expect(new TextEncoder().encode(exact200Ext).length).toBe(200);
+    expect(isValidObjectKey(`uploads/job/${exact200Ext}`)).toBe(true);
+
+    const over200Ext = sanitizeFilename(`a.${"b".repeat(200)}`);
+    expect(over200Ext).toBe(`a.${"b".repeat(198)}`);
+    expect(new TextEncoder().encode(over200Ext).length).toBe(200);
+    expect(isValidObjectKey(`uploads/job/${over200Ext}`)).toBe(true);
+
+    const trailingDotAfterDrop = sanitizeFilename(`${"a".repeat(199)}.${"b".repeat(200)}`);
+    expect(trailingDotAfterDrop).toBe("a".repeat(199));
+    expect(new TextEncoder().encode(trailingDotAfterDrop).length).toBe(199);
+    expect(isValidObjectKey(`uploads/job/${trailingDotAfterDrop}`)).toBe(true);
+  });
 });
