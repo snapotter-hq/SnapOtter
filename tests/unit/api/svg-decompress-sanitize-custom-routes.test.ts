@@ -2,8 +2,25 @@ import { Readable } from "node:stream";
 import { gzipSync } from "node:zlib";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { InspectResult } from "../../../apps/api/src/lib/exiftool.js";
+
+function defaultInspectMetadata(buf: Buffer, filename: string): InspectResult {
+  const text = buf.toString("utf-8");
+  const hasXmp = text.trimStart().startsWith("<svg") && text.includes("Test Icon Title");
+  return {
+    filename,
+    fileSize: buf.length,
+    exif: null,
+    iptc: null,
+    xmp: hasXmp ? { Title: "Test Icon Title", Subject: ["vector", "icon"] } : null,
+    gps: null,
+    keywords: hasXmp ? ["vector", "icon"] : [],
+  };
+}
+
 const mocks = vi.hoisted(() => ({
   putObject: vi.fn<(key: string, data: Buffer | string) => Promise<void>>(async () => {}),
+  inspectMetadata: vi.fn<(buf: Buffer, filename: string) => Promise<InspectResult>>(),
   writeMetadata: vi.fn<(buf: Buffer, filename: string, tags: string[]) => Promise<Buffer>>(
     async (buf: Buffer) => buf,
   ),
@@ -22,6 +39,8 @@ vi.mock("../../../apps/api/src/lib/exiftool.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../apps/api/src/lib/exiftool.js")>();
   return {
     ...actual,
+    inspectMetadata: (...args: Parameters<typeof actual.inspectMetadata>) =>
+      mocks.inspectMetadata(...args),
     writeMetadata: (...args: Parameters<typeof actual.writeMetadata>) =>
       mocks.writeMetadata(...args),
   };
@@ -105,6 +124,11 @@ const SCRIPT_LT_SVG = Buffer.from(
   "utf-8",
 );
 const SCRIPT_LT_SVGZ = gzipSync(SCRIPT_LT_SVG);
+const XMP_SVG = Buffer.from(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="80"><metadata><x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title><rdf:Alt><rdf:li xml:lang="x-default">Test Icon Title</rdf:li></rdf:Alt></dc:title><dc:subject><rdf:Bag><rdf:li>vector</rdf:li><rdf:li>icon</rdf:li></rdf:Bag></dc:subject></rdf:Description></rdf:RDF></x:xmpmeta></metadata><script>alert(1)</script><rect width="100" height="80" fill="red"/></svg>',
+  "utf-8",
+);
+const XMP_SVGZ = gzipSync(XMP_SVG);
 const NOT_SVG_SVGZ = gzipSync(Buffer.from("not an svg document", "utf-8"));
 const CORRUPT_SVGZ = Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0xff, 0xff]);
 const OVER_ELEMENT_SVG = Buffer.from(
@@ -124,8 +148,106 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
 
   beforeEach(() => {
     mocks.putObject.mockClear();
+    mocks.inspectMetadata.mockClear();
+    mocks.inspectMetadata.mockImplementation(async (buf: Buffer, filename: string) =>
+      defaultInspectMetadata(buf, filename),
+    );
     mocks.writeMetadata.mockClear();
     mocks.writeMetadata.mockImplementation(async (buf: Buffer) => buf);
+  });
+
+  describe("POST /api/v1/tools/image/edit-metadata/inspect (#3505)", () => {
+    const handler = routes.get("/api/v1/tools/image/edit-metadata/inspect");
+
+    it("decompresses and sanitizes .svgz and .svg inputs before calling inspectMetadata while preserving uploaded fileSize and misnamed raster files", async () => {
+      const svgzReply = await invokeRoute(handler, [
+        { type: "file", filename: "icon.svgz", content: XMP_SVGZ },
+      ]);
+      expect(svgzReply.statusCode).toBe(200);
+      expect(mocks.inspectMetadata).toHaveBeenCalledTimes(1);
+      const [passedSvgzBuf] = mocks.inspectMetadata.mock.calls[0] as [Buffer, string];
+      const passedSvgzXml = passedSvgzBuf.toString("utf-8");
+      expect(passedSvgzXml.trimStart().startsWith("<svg")).toBe(true);
+      expect(passedSvgzXml).not.toContain("<script");
+      expect(svgzReply.payload).toMatchObject({
+        filename: "icon.svgz",
+        fileSize: XMP_SVGZ.length,
+        xmp: expect.objectContaining({
+          Title: "Test Icon Title",
+        }),
+        keywords: ["vector", "icon"],
+      });
+
+      mocks.inspectMetadata.mockClear();
+      const svgReply = await invokeRoute(handler, [
+        { type: "file", filename: "icon.svg", content: XMP_SVG },
+      ]);
+      expect(svgReply.statusCode).toBe(200);
+      expect(mocks.inspectMetadata).toHaveBeenCalledTimes(1);
+      const [passedSvgBuf] = mocks.inspectMetadata.mock.calls[0] as [Buffer, string];
+      expect(passedSvgBuf.toString("utf-8")).not.toContain("<script");
+      expect(svgReply.payload).toMatchObject({
+        filename: "icon.svg",
+        fileSize: XMP_SVG.length,
+        xmp: expect.objectContaining({
+          Title: "Test Icon Title",
+        }),
+        keywords: ["vector", "icon"],
+      });
+
+      mocks.inspectMetadata.mockClear();
+      const exifJpg = readFixture(fixtures.image.exifGps);
+      const misnamedJpgReply = await invokeRoute(handler, [
+        { type: "file", filename: "misnamed.svgz", content: exifJpg },
+      ]);
+      expect(misnamedJpgReply.statusCode).toBe(200);
+      expect(mocks.inspectMetadata).toHaveBeenCalledTimes(1);
+      const [passedJpgBuf] = mocks.inspectMetadata.mock.calls[0] as [Buffer, string];
+      expect(Buffer.compare(passedJpgBuf, exifJpg)).toBe(0);
+      expect(misnamedJpgReply.payload).toMatchObject({
+        filename: "misnamed.svgz",
+        fileSize: exifJpg.length,
+      });
+    });
+
+    it("returns 400 without calling inspectMetadata when .svgz decompression or SVG sanitization rejects", async () => {
+      const badSvgzReply = await invokeRoute(handler, [
+        { type: "file", filename: "bad.svgz", content: NOT_SVG_SVGZ },
+      ]);
+      expect(badSvgzReply.statusCode).toBe(400);
+      expect(badSvgzReply.payload).toEqual({
+        error: "SVGZ file does not contain valid SVG content after decompression",
+      });
+
+      const corruptSvgzReply = await invokeRoute(handler, [
+        { type: "file", filename: "corrupt.svgz", content: CORRUPT_SVGZ },
+      ]);
+      expect(corruptSvgzReply.statusCode).toBe(400);
+
+      const overCapReply = await invokeRoute(handler, [
+        { type: "file", filename: "too-many.svg", content: OVER_ELEMENT_SVG },
+      ]);
+      expect(overCapReply.statusCode).toBe(400);
+      expect(overCapReply.payload).toEqual({
+        error: "SVG exceeds maximum element count of 5000",
+      });
+
+      const prevMaxSvgMb = env.MAX_SVG_SIZE_MB;
+      (env as { MAX_SVG_SIZE_MB: number }).MAX_SVG_SIZE_MB = 1;
+      try {
+        const overSizeReply = await invokeRoute(handler, [
+          { type: "file", filename: "too-large.svgz", content: OVER_SIZE_SVGZ },
+        ]);
+        expect(overSizeReply.statusCode).toBe(400);
+        expect(overSizeReply.payload).toEqual({
+          error: "SVG exceeds maximum size of 1MB",
+        });
+      } finally {
+        (env as { MAX_SVG_SIZE_MB: number }).MAX_SVG_SIZE_MB = prevMaxSvgMb;
+      }
+
+      expect(mocks.inspectMetadata).not.toHaveBeenCalled();
+    });
   });
 
   describe("POST /api/v1/tools/image/edit-metadata", () => {

@@ -872,8 +872,8 @@ describe("Author field", () => {
   });
 });
 
-// ── SVG and SVGZ sanitization (#3095) ────────────────────────────
-describe("SVG and SVGZ sanitization (#3095)", () => {
+// ── SVG and SVGZ sanitization (#3095, #3505) ─────────────────────
+describe("SVG and SVGZ sanitization (#3095, #3505)", () => {
   it("sanitizes .svg and decompresses .svgz outputs, and rejects invalid SVGZ or over-cap SVG with 400", async () => {
     const dirtySvg = Buffer.from(
       '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><script>alert(1)</script><rect width="100" height="100" fill="red"/></svg>',
@@ -917,5 +917,77 @@ describe("SVG and SVGZ sanitization (#3095)", () => {
     const overCapRes = await postTool({}, overCapSvg, "too-many.svg", "image/svg+xml");
     expect(overCapRes.statusCode).toBe(400);
     expect(JSON.parse(overCapRes.body).error).toContain("maximum element count");
+  });
+
+  it("decompresses and sanitizes .svgz and .svg on inspect, and rejects invalid SVGZ or over-cap SVG with 400 (#3505)", async () => {
+    const xmpSvg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="80"><metadata><x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title><rdf:Alt><rdf:li xml:lang="x-default">Test Icon Title</rdf:li></rdf:Alt></dc:title><dc:subject><rdf:Bag><rdf:li>vector</rdf:li><rdf:li>icon</rdf:li></rdf:Bag></dc:subject></rdf:Description></rdf:RDF></x:xmpmeta></metadata><script>alert(1)</script><rect width="100" height="80" fill="red"/></svg>',
+      "utf-8",
+    );
+    const xmpSvgz = gzipSync(xmpSvg);
+    const { body: okBody, contentType: okCt } = createMultipartPayload([
+      { name: "file", filename: "icon.svgz", contentType: "image/svg+xml", content: xmpSvgz },
+    ]);
+    const okRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/edit-metadata/inspect",
+      payload: okBody,
+      headers: { "content-type": okCt, authorization: `Bearer ${adminToken}` },
+    });
+    const exiftoolMissing =
+      okRes.statusCode === 422 && JSON.parse(okRes.body).details?.includes("ExifTool not found");
+    if (!exiftoolMissing) {
+      expect(okRes.statusCode).toBe(200);
+      const okPayload = JSON.parse(okRes.body);
+      expect(okPayload.filename).toBe("icon.svgz");
+      expect(okPayload.fileSize).toBe(xmpSvgz.length);
+      expect(okPayload.xmp).toMatchObject({ Title: "Test Icon Title" });
+      expect(okPayload.keywords).toEqual(["vector", "icon"]);
+
+      const { body: svgBody, contentType: svgCt } = createMultipartPayload([
+        { name: "file", filename: "icon.svg", contentType: "image/svg+xml", content: xmpSvg },
+      ]);
+      const svgRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/edit-metadata/inspect",
+        payload: svgBody,
+        headers: { "content-type": svgCt, authorization: `Bearer ${adminToken}` },
+      });
+      expect(svgRes.statusCode).toBe(200);
+      const svgPayload = JSON.parse(svgRes.body);
+      expect(svgPayload.filename).toBe("icon.svg");
+      expect(svgPayload.fileSize).toBe(xmpSvg.length);
+      expect(svgPayload.xmp).toMatchObject({ Title: "Test Icon Title" });
+      expect(svgPayload.keywords).toEqual(["vector", "icon"]);
+    }
+
+    const badSvgz = gzipSync(Buffer.from("not an svg", "utf-8"));
+    const { body: badBody, contentType: badCt } = createMultipartPayload([
+      { name: "file", filename: "bad.svgz", contentType: "image/svg+xml", content: badSvgz },
+    ]);
+    const badRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/edit-metadata/inspect",
+      payload: badBody,
+      headers: { "content-type": badCt, authorization: `Bearer ${adminToken}` },
+    });
+    expect(badRes.statusCode).toBe(400);
+    expect(JSON.parse(badRes.body).error).toContain("valid SVG content");
+
+    const overCapSvg = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">${"<rect/>".repeat(5001)}</svg>`,
+      "utf-8",
+    );
+    const { body: capBody, contentType: capCt } = createMultipartPayload([
+      { name: "file", filename: "too-many.svg", contentType: "image/svg+xml", content: overCapSvg },
+    ]);
+    const capRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/edit-metadata/inspect",
+      payload: capBody,
+      headers: { "content-type": capCt, authorization: `Bearer ${adminToken}` },
+    });
+    expect(capRes.statusCode).toBe(400);
+    expect(JSON.parse(capRes.body).error).toContain("maximum element count");
   });
 });

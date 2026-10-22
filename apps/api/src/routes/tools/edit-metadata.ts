@@ -22,7 +22,12 @@ import {
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
-import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import {
+  decompressSvgz,
+  isSvgBuffer,
+  isSvgzClientError,
+  sanitizeSvg,
+} from "../../lib/svg-sanitize.js";
 import { engineUnavailable } from "../../modality/image-input.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
@@ -159,9 +164,29 @@ export function registerEditMetadata(app: FastifyInstance) {
         return reply.status(400).send({ error: "No image file provided" });
       }
 
+      let inspectBuffer = fileBuffer;
+      if (extname(filename).toLowerCase() === ".svgz" || isSvgBuffer(fileBuffer)) {
+        try {
+          inspectBuffer = decompressSvgz(fileBuffer);
+          if (isSvgBuffer(inspectBuffer)) {
+            inspectBuffer = sanitizeSvg(inspectBuffer);
+          }
+        } catch (err) {
+          if (
+            isSvgzClientError(err) ||
+            (err instanceof Error && err.message.includes("SVGZ file does not contain"))
+          ) {
+            return reply.status(400).send({
+              error: err instanceof Error ? err.message : "Invalid SVG",
+            });
+          }
+          throw err;
+        }
+      }
+
       try {
-        const result = await inspectMetadata(fileBuffer, filename);
-        return reply.send(result);
+        const result = await inspectMetadata(inspectBuffer, filename);
+        return reply.send({ ...result, fileSize: fileBuffer.length });
       } catch (err) {
         return reply.status(422).send({
           error: "Failed to read image metadata",
