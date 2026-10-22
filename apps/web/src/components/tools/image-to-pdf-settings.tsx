@@ -240,7 +240,11 @@ export function ImageToPdfSettings() {
 
     let storeReset = false;
     const unsubscribe = useFileStore.subscribe((state) => {
-      if (!state.processing || state.entries.length === 0) {
+      const hasRunEntry =
+        startEntries.length > 0
+          ? startEntries.every((b) => state.entries.some((e) => e.id === b.id && e.file === b.file))
+          : state.entries.length > 0;
+      if (!state.processing || !hasRunEntry) {
         storeReset = true;
         if (xhrRef.current === xhr) xhrRef.current = null;
         if (unsubscribeRef.current === unsubscribe) unsubscribeRef.current = null;

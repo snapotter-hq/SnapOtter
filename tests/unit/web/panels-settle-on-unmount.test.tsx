@@ -1832,3 +1832,400 @@ describe("self-posting panels clear processing and abort on removeFile mid-run (
     }
   });
 });
+
+describe("multi-file self-posting panels partial removeFile (#3446)", () => {
+  it("watermark-image: skips a queued entry removed mid-batch, aborts only the in-flight entry when removed, and resets processing status when the batch stops with entries remaining", async () => {
+    // 1. Removing a middle queued entry (removeFile(1) out of 3 files) while entry 0 is in flight keeps entry 0 running, skips entry 1, and continues to entry 2.
+    fetchSignals.length = 0;
+    pendingFetches.length = 0;
+    useFileStore.getState().reset();
+    useFileStore.getState().setFiles([image("one.png"), image("two.png"), image("three.png")]);
+    const { container, unmount } = render(<WatermarkImageSettings />);
+    chooseSecondaryFile(container, image("wm.png"));
+
+    fireEvent.click(screen.getByTestId("watermark-image-submit"));
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().entries[0].status).toBe("processing");
+    expect(pendingFetches).toHaveLength(1);
+    expect(fetchSignals[0]?.aborted).toBe(false);
+
+    act(() => {
+      useFileStore.getState().removeFile(1);
+    });
+
+    expect(useFileStore.getState().entries).toHaveLength(2);
+    expect(fetchSignals[0]?.aborted).toBe(false);
+    expect(useFileStore.getState().processing).toBe(true);
+
+    await act(async () => {
+      pendingFetches[0].resolve(
+        new Response(
+          JSON.stringify({
+            jobId: "j-wm-1",
+            downloadUrl: "/api/v1/download/j-wm-1/one.png",
+            originalSize: 100,
+            processedSize: 90,
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+
+    // two.png was skipped and three.png is now in flight.
+    expect(pendingFetches).toHaveLength(2);
+    expect(useFileStore.getState().entries[0].status).toBe("completed");
+    expect(useFileStore.getState().entries[1].file.name).toBe("three.png");
+    expect(useFileStore.getState().entries[1].status).toBe("processing");
+
+    await act(async () => {
+      pendingFetches[1].resolve(
+        new Response(
+          JSON.stringify({
+            jobId: "j-wm-3",
+            downloadUrl: "/api/v1/download/j-wm-3/three.png",
+            originalSize: 110,
+            processedSize: 85,
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+
+    expect(pendingFetches).toHaveLength(2);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().entries[0].status).toBe("completed");
+    expect(useFileStore.getState().entries[0].processedUrl).toBe("/api/v1/download/j-wm-1/one.png");
+    expect(useFileStore.getState().entries[1].status).toBe("completed");
+    expect(useFileStore.getState().entries[1].processedUrl).toBe(
+      "/api/v1/download/j-wm-3/three.png",
+    );
+    expect(screen.getByTestId("watermark-image-download")).toHaveAttribute(
+      "href",
+      "/api/v1/download/j-wm-1/one.png",
+    );
+
+    // 2. Removing the currently uploading entry (removeFile(0)) while entry 1 remains aborts entry 0 and continues to entry 1.
+    fetchSignals.length = 0;
+    pendingFetches.length = 0;
+    act(() => {
+      useFileStore.getState().setFiles([image("first.png"), image("second.png")]);
+    });
+
+    fireEvent.click(screen.getByTestId("watermark-image-submit"));
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(pendingFetches).toHaveLength(1);
+    expect(fetchSignals[0]?.aborted).toBe(false);
+
+    act(() => {
+      useFileStore.getState().removeFile(0);
+    });
+
+    expect(fetchSignals[0]?.aborted).toBe(true);
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().entries).toHaveLength(1);
+    expect(useFileStore.getState().entries[0].file.name).toBe("second.png");
+
+    await act(async () => {});
+
+    expect(pendingFetches).toHaveLength(2);
+    expect(useFileStore.getState().entries[0].status).toBe("processing");
+    expect(fetchSignals[1]?.aborted).toBe(false);
+
+    await act(async () => {
+      pendingFetches[1].resolve(
+        new Response(
+          JSON.stringify({
+            jobId: "j-wm-2",
+            downloadUrl: "/api/v1/download/j-wm-2/second.png",
+            originalSize: 120,
+            processedSize: 95,
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().entries[0].status).toBe("completed");
+    expect(useFileStore.getState().entries[0].processedUrl).toBe(
+      "/api/v1/download/j-wm-2/second.png",
+    );
+    expect(screen.getByTestId("watermark-image-download")).toHaveAttribute(
+      "href",
+      "/api/v1/download/j-wm-2/second.png",
+    );
+
+    // 3. Clearing processing while batch entries remain aborts and resets the active entry's status back to pending.
+    fetchSignals.length = 0;
+    pendingFetches.length = 0;
+    act(() => {
+      useFileStore.getState().setFiles([image("batch-a.png"), image("batch-b.png")]);
+    });
+
+    fireEvent.click(screen.getByTestId("watermark-image-submit"));
+    expect(useFileStore.getState().entries[0].status).toBe("processing");
+    expect(fetchSignals[0]?.aborted).toBe(false);
+
+    act(() => {
+      useFileStore.getState().setProcessing(false);
+    });
+
+    expect(fetchSignals[0]?.aborted).toBe(true);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().entries[0].status).toBe("pending");
+    expect(useFileStore.getState().entries[0].error).toBeNull();
+
+    // 4. Removing the active entry while response body JSON is pending (both 200 and 500) skips writing to the removed entry, and an external AbortError on entry 0 resets it to pending and breaks the batch.
+    fetchSignals.length = 0;
+    pendingFetches.length = 0;
+    act(() => {
+      useFileStore
+        .getState()
+        .setFiles([image("json200-a.png"), image("json500-b.png"), image("json-c.png")]);
+    });
+    fireEvent.click(screen.getByTestId("watermark-image-submit"));
+    let resolveJson200: (val: unknown) => void = () => {};
+    await act(async () => {
+      pendingFetches[0].resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          new Promise((resolve) => {
+            resolveJson200 = resolve;
+          }),
+      } as Response);
+    });
+    act(() => {
+      useFileStore.getState().removeFile(0);
+    });
+    await act(async () => {
+      resolveJson200({
+        jobId: "j-stale-200",
+        downloadUrl: "/api/v1/download/j-stale-200/a.png",
+        originalSize: 100,
+        processedSize: 80,
+      });
+    });
+    expect(pendingFetches).toHaveLength(2);
+    let resolveJson500: (val: unknown) => void = () => {};
+    await act(async () => {
+      pendingFetches[1].resolve({
+        ok: false,
+        status: 500,
+        json: () =>
+          new Promise((resolve) => {
+            resolveJson500 = resolve;
+          }),
+      } as Response);
+    });
+    act(() => {
+      useFileStore.getState().removeFile(0);
+    });
+    await act(async () => {
+      resolveJson500({ error: "Removed 500" });
+    });
+    // json-c.png is now in flight; add a 4th file and verify an external AbortError on json-c.png resets it to pending and breaks the batch without starting the next entry.
+    expect(pendingFetches).toHaveLength(3);
+    await act(async () => {
+      pendingFetches[2].reject(new DOMException("Stopped", "AbortError"));
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().entries[0].status).toBe("pending");
+    expect(useFileStore.getState().entries[0].error).toBeNull();
+
+    // Also verify external AbortError on entry 0 of a 2-file batch breaks without starting entry 1, and removing the last remaining entry after entry 0 completed clears processing synchronously.
+    fetchSignals.length = 0;
+    pendingFetches.length = 0;
+    act(() => {
+      useFileStore.getState().setFiles([image("stop-0.png"), image("stop-1.png")]);
+    });
+    fireEvent.click(screen.getByTestId("watermark-image-submit"));
+    await act(async () => {
+      pendingFetches[0].reject(new DOMException("Stopped", "AbortError"));
+    });
+    expect(pendingFetches).toHaveLength(1);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().entries[0].status).toBe("pending");
+    expect(useFileStore.getState().entries[1].status).toBe("pending");
+
+    fetchSignals.length = 0;
+    pendingFetches.length = 0;
+    act(() => {
+      useFileStore.getState().setFiles([image("done-0.png"), image("inflight-1.png")]);
+    });
+    fireEvent.click(screen.getByTestId("watermark-image-submit"));
+    await act(async () => {
+      pendingFetches[0].resolve(
+        new Response(
+          JSON.stringify({
+            jobId: "j-done-0",
+            downloadUrl: "/api/v1/download/j-done-0/done-0.png",
+            originalSize: 100,
+            processedSize: 80,
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+    expect(pendingFetches).toHaveLength(2);
+    expect(useFileStore.getState().entries[0].status).toBe("completed");
+    expect(useFileStore.getState().entries[1].status).toBe("processing");
+    act(() => {
+      useFileStore.getState().removeFile(1);
+    });
+    expect(fetchSignals[1]?.aborted).toBe(true);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().entries[0].status).toBe("completed");
+
+    // 5. Subscriber reports teardown error via reportRunEndFailure if updateEntryById throws when stopping a batch.
+    vi.mocked(captureHandledError).mockClear();
+    act(() => {
+      useFileStore.getState().setFiles([image("throw-a.png"), image("throw-b.png")]);
+    });
+    fireEvent.click(screen.getByTestId("watermark-image-submit"));
+    const realUpdateEntryById = useFileStore.getState().updateEntryById;
+    vi.spyOn(useFileStore.getState(), "updateEntryById").mockImplementation(() => {
+      throw new Error("subscriber entry reset boom");
+    });
+    try {
+      expect(() => {
+        act(() => {
+          useFileStore.getState().setProcessing(false);
+        });
+      }).not.toThrow();
+    } finally {
+      act(() => {
+        useFileStore.setState({ updateEntryById: realUpdateEntryById });
+      });
+    }
+    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(captureHandledError).mock.calls[0][0].message).toBe(
+      "Failing a tool run's entries failed",
+    );
+    unmount();
+  });
+
+  it("combining panels (stitch, bulk-rename, favicon, image-to-pdf): abort and clear processing when any participating input entry is removed mid-run", async () => {
+    const anchorClickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => {});
+
+    // 1. StitchSettings: removing non-selected entry (removeFile(1) when index 0 is selected) aborts XHR and clears processing.
+    FakeXhr.instances = [];
+    useFileStore.getState().reset();
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    useFileStore.getState().setSelectedIndex(0);
+    const stitchView = render(<StitchSettings />);
+    fireEvent.click(screen.getByTestId("stitch-submit"));
+    const stitchXhr = FakeXhr.instances[0];
+    expect(useFileStore.getState().processing).toBe(true);
+
+    act(() => {
+      useFileStore.getState().removeFile(1);
+    });
+
+    expect(useFileStore.getState().entries).toHaveLength(1);
+    expect(stitchXhr.aborted).toBe(true);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(screen.getByTestId("stitch-submit")).toBeDisabled();
+
+    act(() => {
+      stitchXhr.status = 200;
+      stitchXhr.responseText = JSON.stringify({
+        jobId: "job-stitch",
+        downloadUrl: "/api/v1/download/job-stitch/stitched.png",
+        originalSize: 100,
+        processedSize: 80,
+      });
+      stitchXhr.onload?.();
+    });
+    expect(useFileStore.getState().entries[0].processedUrl).toBeNull();
+    expect(screen.queryByTestId("stitch-download")).toBeNull();
+    stitchView.unmount();
+
+    // 2. BulkRenameSettings: removing one of two files (removeFile(1)) aborts fetch, clears processing, and does not download renamed.zip.
+    fetchSignals.length = 0;
+    pendingFetches.length = 0;
+    useFileStore.getState().reset();
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    const bulkView = render(<BulkRenameSettings />);
+    fireEvent.click(screen.getByTestId("bulk-rename-submit"));
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(fetchSignals[0]?.aborted).toBe(false);
+
+    act(() => {
+      useFileStore.getState().removeFile(1);
+    });
+
+    expect(useFileStore.getState().entries).toHaveLength(1);
+    expect(fetchSignals[0]?.aborted).toBe(true);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(screen.getByTestId("bulk-rename-submit")).toBeEnabled();
+
+    await act(async () => {
+      pendingFetches[0].resolve(new Response("zip", { status: 200 }));
+    });
+    expect(anchorClickSpy).not.toHaveBeenCalled();
+    expect(screen.queryByText(en.toolSettings["bulk-rename"].zipDownloaded)).toBeNull();
+    bulkView.unmount();
+
+    // 3. FaviconSettings and ImageToPdfSettings: removing either a non-selected entry (removeFile(1)) or capturedEntry (removeFile(0)) with another entry remaining aborts XHR and clears busy/processing.
+    for (const [Panel, submitId, downloadId] of [
+      [FaviconSettings, "favicon-submit", "favicon-download"],
+      [ImageToPdfSettings, "image-to-pdf-submit", "image-to-pdf-download"],
+    ] as const) {
+      for (const removedIndex of [1, 0] as const) {
+        FakeXhr.instances = [];
+        useFileStore.getState().reset();
+        useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+        useFileStore.getState().setSelectedIndex(0);
+        const view = render(<Panel />);
+        fireEvent.click(screen.getByTestId(submitId));
+        const xhr = FakeXhr.instances[0];
+        expect(useFileStore.getState().processing).toBe(true);
+        expect(screen.queryByTestId(submitId)).toBeNull();
+
+        act(() => {
+          useFileStore.getState().removeFile(removedIndex);
+        });
+
+        expect(useFileStore.getState().entries).toHaveLength(1);
+        expect(xhr.aborted).toBe(true);
+        expect(useFileStore.getState().processing).toBe(false);
+        expect(screen.getByTestId(submitId)).toBeEnabled();
+
+        act(() => {
+          xhr.status = 200;
+          xhr.response = new Blob(["zip"]);
+          xhr.responseText = JSON.stringify({
+            downloadUrl: "/api/v1/download/job-1/document.pdf",
+          });
+          xhr.onload?.();
+        });
+        expect(useFileStore.getState().entries[0].processedUrl).toBeNull();
+        expect(screen.queryByTestId(downloadId)).toBeNull();
+        view.unmount();
+      }
+    }
+
+    // 4. Adding an extra file mid-run and removing that non-participating file keeps the combined request in flight.
+    FakeXhr.instances = [];
+    useFileStore.getState().reset();
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    const keepView = render(<StitchSettings />);
+    fireEvent.click(screen.getByTestId("stitch-submit"));
+    const keepXhr = FakeXhr.instances[0];
+    act(() => {
+      useFileStore.getState().addFiles([image("extra.png")]);
+      useFileStore.getState().removeFile(2);
+    });
+    expect(keepXhr.aborted).toBe(false);
+    expect(useFileStore.getState().processing).toBe(true);
+    act(() => {
+      useFileStore.getState().reset();
+    });
+    keepView.unmount();
+
+    anchorClickSpy.mockRestore();
+  });
+});

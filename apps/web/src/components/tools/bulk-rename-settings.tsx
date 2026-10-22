@@ -55,7 +55,7 @@ export function BulkRenameSettings() {
     const unsubscribe = useFileStore.subscribe((state) => {
       const hasRunEntry =
         startEntries.length > 0
-          ? state.entries.some((e) => startEntries.some((b) => b.id === e.id && b.file === e.file))
+          ? startEntries.every((b) => state.entries.some((e) => e.id === b.id && e.file === b.file))
           : state.entries.length > 0;
       if (!state.processing || !hasRunEntry) {
         storeReset = true;

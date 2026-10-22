@@ -31,11 +31,15 @@ export function WatermarkImageSettings() {
   );
   const watermarkInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
   useSettleOnUnmount(
     () => abortRef.current !== null,
     () => {
+      unsubscribeRef.current?.();
+      unsubscribeRef.current = null;
       abortRef.current?.abort();
+      abortRef.current = null;
       const store = useFileStore.getState();
       if (!store.processing) return;
       const writes: Array<() => void> = [];
@@ -63,8 +67,15 @@ export function WatermarkImageSettings() {
       files.length === 1 ? (startEntries[selectedIndex] ?? startEntries[0]) : undefined;
     if (files.length === 1 && !capturedEntry) return;
 
+    unsubscribeRef.current?.();
     abortRef.current?.abort();
     const controller = new AbortController();
+    let activeBatchIndex = 0;
+    let activeBatchEntry: { id: string; file: File } | null = null;
+    let activeEntryController: AbortController | null = null;
+    controller.signal.addEventListener("abort", () => {
+      activeEntryController?.abort();
+    });
     abortRef.current = controller;
 
     setProcessing(true);
@@ -75,18 +86,53 @@ export function WatermarkImageSettings() {
       const hasRunEntry = capturedEntry
         ? state.entries.some((e) => e.id === capturedEntry.id && e.file === capturedEntry.file)
         : startEntries.length > 0
-          ? state.entries.some((e) => startEntries.some((b) => b.id === e.id && b.file === e.file))
+          ? startEntries
+              .slice(activeBatchIndex)
+              .some((b) => state.entries.some((e) => e.id === b.id && e.file === b.file))
           : state.entries.length > 0;
       if (!state.processing || !hasRunEntry) {
         storeReset = true;
         if (abortRef.current === controller) abortRef.current = null;
+        if (unsubscribeRef.current === unsubscribe) unsubscribeRef.current = null;
         unsubscribe();
-        if (state.processing) {
-          setProcessing(false);
-        }
         controller.abort();
+        const writes: Array<() => void> = [];
+        if (state.processing) {
+          writes.push(() => setProcessing(false));
+        }
+        if (!capturedEntry) {
+          for (const b of startEntries) {
+            if (
+              useFileStore
+                .getState()
+                .entries.some(
+                  (e) => e.id === b.id && e.file === b.file && e.status === "processing",
+                )
+            ) {
+              writes.push(() =>
+                useFileStore.getState().updateEntryById(b.id, { status: "pending", error: null }),
+              );
+            }
+          }
+        }
+        const teardownError = runEndWrites(writes);
+        if (teardownError) {
+          reportRunEndFailure(
+            "Failing a tool run's entries failed",
+            teardownError.cause,
+            "watermark-image",
+          );
+        }
+      } else if (
+        activeBatchEntry &&
+        !state.entries.some(
+          (e) => e.id === activeBatchEntry?.id && e.file === activeBatchEntry?.file,
+        )
+      ) {
+        activeEntryController?.abort();
       }
     });
+    unsubscribeRef.current = unsubscribe;
 
     const settingsJson = JSON.stringify({ position, opacity, scale });
 
@@ -179,6 +225,7 @@ export function WatermarkImageSettings() {
           error: err instanceof Error ? err.message : t.errors.processingFailedNoDetail,
         });
       } finally {
+        if (unsubscribeRef.current === unsubscribe) unsubscribeRef.current = null;
         unsubscribe();
         if (abortRef.current === controller) abortRef.current = null;
         if (!controller.signal.aborted && !storeReset) {
@@ -188,9 +235,10 @@ export function WatermarkImageSettings() {
     } else {
       // Multiple files: process each one individually, writing results to each entry
       setResultsByEntry({});
+      const isEntryPresent = (id: string, file: File) =>
+        useFileStore.getState().entries.some((e) => e.id === id && e.file === file);
       try {
         const store = useFileStore.getState();
-        const entryIds = store.entries.map((e) => e.id);
         for (const entry of store.entries) {
           if (
             entry.processedUrl !== null ||
@@ -212,13 +260,18 @@ export function WatermarkImageSettings() {
             });
           }
         }
-        for (let i = 0; i < files.length; i++) {
+        for (let i = 0; i < startEntries.length; i++) {
+          activeBatchIndex = i;
           if (controller.signal.aborted || storeReset) break;
-          const entryId = entryIds[i];
-          if (entryId) store.updateEntryById(entryId, { status: "processing", error: null });
+          const { id: entryId, file } = startEntries[i];
+          if (!isEntryPresent(entryId, file)) continue;
+          const entryController = new AbortController();
+          activeBatchEntry = { id: entryId, file };
+          activeEntryController = entryController;
+          store.updateEntryById(entryId, { status: "processing", error: null });
           try {
             const formData = new FormData();
-            formData.append("file", files[i]);
+            formData.append("file", file);
             formData.append("watermark", watermarkFile);
             formData.append("settings", settingsJson);
 
@@ -226,63 +279,63 @@ export function WatermarkImageSettings() {
               method: "POST",
               headers: formatHeaders(),
               body: formData,
-              signal: controller.signal,
+              signal: entryController.signal,
             });
 
             if (!res.ok) {
               const body = await res.json().catch(() => ({}));
               if (controller.signal.aborted || storeReset) break;
-              if (entryId) {
-                store.updateEntryById(entryId, {
-                  status: "failed",
-                  error: failedAnswerMessage(
-                    t,
-                    body,
-                    res.status,
-                    t.errors.processingFailedNoDetail,
-                  ),
-                });
-              }
+              if (entryController.signal.aborted || !isEntryPresent(entryId, file)) continue;
+              store.updateEntryById(entryId, {
+                status: "failed",
+                error: failedAnswerMessage(t, body, res.status, t.errors.processingFailedNoDetail),
+              });
               continue;
             }
 
             const result = resolveServerUrls(await res.json());
             if (controller.signal.aborted || storeReset) break;
-            if (entryId) {
-              store.updateEntryById(entryId, {
-                processedUrl: result.downloadUrl,
-                processedPreviewUrl: result.previewUrl ?? null,
-                processedFilename: null,
-                status: "completed",
-                originalSize: result.originalSize,
-                processedSize: result.processedSize,
-              });
-              setResultsByEntry((prev) => ({
-                ...prev,
-                [entryId]: {
-                  downloadUrl: result.downloadUrl,
-                  originalSize: result.originalSize ?? null,
-                  processedSize: result.processedSize ?? null,
-                },
-              }));
-            }
+            if (entryController.signal.aborted || !isEntryPresent(entryId, file)) continue;
+            store.updateEntryById(entryId, {
+              processedUrl: result.downloadUrl,
+              processedPreviewUrl: result.previewUrl ?? null,
+              processedFilename: null,
+              status: "completed",
+              originalSize: result.originalSize,
+              processedSize: result.processedSize,
+            });
+            setResultsByEntry((prev) => ({
+              ...prev,
+              [entryId]: {
+                downloadUrl: result.downloadUrl,
+                originalSize: result.originalSize ?? null,
+                processedSize: result.processedSize ?? null,
+              },
+            }));
           } catch (err) {
-            if (
-              controller.signal.aborted ||
-              storeReset ||
-              (err instanceof DOMException && err.name === "AbortError")
-            ) {
+            if (controller.signal.aborted || storeReset) {
               break;
             }
-            if (entryId) {
-              store.updateEntryById(entryId, {
-                status: "failed",
-                error: err instanceof Error ? err.message : t.errors.processingFailedNoDetail,
-              });
+            if (entryController.signal.aborted || !isEntryPresent(entryId, file)) {
+              if (isEntryPresent(entryId, file)) {
+                store.updateEntryById(entryId, { status: "pending", error: null });
+              }
+              continue;
             }
+            if (err instanceof DOMException && err.name === "AbortError") {
+              store.updateEntryById(entryId, { status: "pending", error: null });
+              break;
+            }
+            store.updateEntryById(entryId, {
+              status: "failed",
+              error: err instanceof Error ? err.message : t.errors.processingFailedNoDetail,
+            });
           }
         }
       } finally {
+        activeBatchEntry = null;
+        activeEntryController = null;
+        if (unsubscribeRef.current === unsubscribe) unsubscribeRef.current = null;
         unsubscribe();
         if (abortRef.current === controller) abortRef.current = null;
         if (!controller.signal.aborted && !storeReset) {
