@@ -221,9 +221,27 @@ export async function getObject(storedName: string, signal?: AbortSignal): Promi
     Bucket: cfg().bucket,
     Key: key,
   });
-  const response = await (signal
-    ? getClient().send(command, { abortSignal: signal })
-    : getClient().send(command));
+  let response: GetObjectCommandOutput;
+  try {
+    response = await (signal
+      ? getClient().send(command, { abortSignal: signal })
+      : getClient().send(command));
+  } catch (err) {
+    const errName = (err as { name?: unknown } | null)?.name;
+    const errCode = (err as { code?: unknown } | null)?.code;
+    if (
+      signal?.aborted &&
+      (err === signal.reason ||
+        errName === "AbortError" ||
+        errName === "RequestAbortedError" ||
+        errCode === "ECONNRESET")
+    ) {
+      throw signal.reason instanceof Error
+        ? signal.reason
+        : Object.assign(new Error("The operation was aborted"), { name: "AbortError" });
+    }
+    throw err;
+  }
   const body = requireObjectBody(response, key);
   const abortBody = () => {
     const reason =

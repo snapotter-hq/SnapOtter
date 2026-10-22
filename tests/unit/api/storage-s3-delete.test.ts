@@ -390,6 +390,71 @@ describe("getObject abort signal support (#1497)", () => {
       "aborted before byte array returned",
     );
   });
+
+  it("normalizes S3Client.send AbortError, RequestAbortedError, and post-header ECONNRESET rejections to signal.reason (#3535)", async () => {
+    const abortAc = new AbortController();
+    const abortReason = Object.assign(new Error("User canceled"), { name: "AbortError" });
+    send.mockImplementationOnce(async () => {
+      abortAc.abort(abortReason);
+      throw Object.assign(new Error("aborted\n  Deserialization error: ..."), {
+        name: "Error",
+        code: "ECONNRESET",
+        $metadata: { httpStatusCode: 404 },
+      });
+    });
+    await expect(getObject("photo.png", abortAc.signal)).rejects.toBe(abortReason);
+
+    const timeoutAc = new AbortController();
+    const timeoutReason = Object.assign(new Error("Timed out"), { name: "TimeoutError" });
+    send.mockImplementationOnce(async () => {
+      timeoutAc.abort(timeoutReason);
+      throw Object.assign(new Error("Request aborted"), {
+        name: "AbortError",
+        cause: timeoutReason,
+      });
+    });
+    await expect(getObject("photo.png", timeoutAc.signal)).rejects.toBe(timeoutReason);
+
+    const reqAbortedAc = new AbortController();
+    const reqAbortedReason = Object.assign(new Error("Aborted"), { name: "AbortError" });
+    send.mockImplementationOnce(async () => {
+      reqAbortedAc.abort(reqAbortedReason);
+      throw Object.assign(new Error("Request aborted"), {
+        name: "RequestAbortedError",
+      });
+    });
+    await expect(getObject("photo.png", reqAbortedAc.signal)).rejects.toBe(reqAbortedReason);
+
+    const primitiveAc = new AbortController();
+    send.mockImplementationOnce(async () => {
+      primitiveAc.abort("canceled");
+      throw Object.assign(new Error("aborted\n  Deserialization error: ..."), {
+        name: "Error",
+        code: "ECONNRESET",
+        $metadata: { httpStatusCode: 503 },
+      });
+    });
+    await expect(getObject("photo.png", primitiveAc.signal)).rejects.toMatchObject({
+      name: "AbortError",
+      message: "The operation was aborted",
+    });
+
+    // Unaborted ECONNRESET and non-abort S3 errors still propagate as-is.
+    const rawReset = Object.assign(new Error("read ECONNRESET"), {
+      name: "Error",
+      code: "ECONNRESET",
+    });
+    send.mockRejectedValueOnce(rawReset);
+    await expect(getObject("photo.png", new AbortController().signal)).rejects.toBe(rawReset);
+
+    const nonAbortAc = new AbortController();
+    const noSuchKey = s3Error("NoSuchKey", 404);
+    send.mockImplementationOnce(async () => {
+      nonAbortAc.abort(abortReason);
+      throw noSuchKey;
+    });
+    await expect(getObject("photo.png", nonAbortAc.signal)).rejects.toBe(noSuchKey);
+  });
 });
 
 describe("S3Client requestHandler timeouts (#2755)", () => {

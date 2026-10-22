@@ -811,3 +811,78 @@ describe("putGenericObjectStream signal.reason preservation (#2881)", () => {
     }
   });
 });
+
+describe("getObject signal.reason preservation on post-header error-body abort (#3535)", () => {
+  it("rethrows signal.reason instead of ECONNRESET when signal aborts while deserializerMiddleware reads a 404 error body", async () => {
+    const sockets = new Set<net.Socket>();
+    let requestCount = 0;
+    let onFinalAttemptHeaders: (() => void) | undefined;
+
+    const server = http.createServer((_req, res) => {
+      requestCount += 1;
+      res.writeHead(404, {
+        "Content-Length": "1000",
+        "Content-Type": "application/xml",
+      });
+      res.write('<?xml version="1.0"?><Error><Code>NoSuchKey');
+      if (requestCount % 3 === 0) {
+        setTimeout(() => onFinalAttemptHeaders?.(), 20);
+      } else {
+        setTimeout(() => res.socket?.destroy(), 10);
+      }
+    });
+    server.on("connection", (socket) => sockets.add(socket));
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as net.AddressInfo;
+
+    try {
+      s3.configureS3({
+        bucket: "abort-error-body-bucket",
+        region: "us-east-1",
+        endpoint: `http://127.0.0.1:${port}`,
+        accessKeyId: "k",
+        secretAccessKey: "s",
+        forcePathStyle: true,
+        prefix: "",
+      });
+
+      const cancelController = new AbortController();
+      const cancelReason = Object.assign(new Error("The operation was aborted"), {
+        name: "AbortError",
+      });
+      onFinalAttemptHeaders = () => cancelController.abort(cancelReason);
+      const cancelErr = await s3.getObject("a.png", cancelController.signal).then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(cancelErr).toBe(cancelReason);
+      expect(cancelErr).toMatchObject({ name: "AbortError" });
+
+      const timeoutController = new AbortController();
+      const timeoutReason = Object.assign(new Error("The operation was aborted due to timeout"), {
+        name: "TimeoutError",
+      });
+      onFinalAttemptHeaders = () => timeoutController.abort(timeoutReason);
+      const timeoutErr = await s3.getObject("a.png", timeoutController.signal).then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(timeoutErr).toBe(timeoutReason);
+      expect(timeoutErr).toMatchObject({ name: "TimeoutError" });
+
+      const primitiveController = new AbortController();
+      onFinalAttemptHeaders = () => primitiveController.abort("canceled");
+      const primitiveErr = await s3.getObject("a.png", primitiveController.signal).then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(primitiveErr).toMatchObject({
+        name: "AbortError",
+        message: "The operation was aborted",
+      });
+    } finally {
+      for (const socket of sockets) socket.destroy();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+});
