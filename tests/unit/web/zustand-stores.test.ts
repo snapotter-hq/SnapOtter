@@ -1650,6 +1650,52 @@ describe("useCollageStore", () => {
     expect(s.selectedCell).toBeNull();
   });
 
+  it("addImages([]) is a no-op and does not cancel active runs or mutate state (#3689)", () => {
+    const abortUpload = vi.fn();
+    const uploadRun = beginCollageRun(abortUpload);
+
+    useCollageStore.getState().addImages([]);
+
+    const initial = useCollageStore.getState();
+    expect(initial.images).toEqual([]);
+    expect(initial.phase).toBe("upload");
+    expect(abortUpload).not.toHaveBeenCalled();
+    expect(uploadRun.isCurrent()).toBe(true);
+    uploadRun.end();
+
+    const file1 = new File(["a"], "a.png", { type: "image/png" });
+    const file2 = new File(["b"], "b.png", { type: "image/png" });
+    useCollageStore.getState().addImages([file1, file2]);
+    useCollageStore.getState().setTemplateId("3-h-equal");
+    useCollageStore.getState().setCellTransform(0, { zoom: 2 });
+    useCollageStore.getState().setSelectedCell(1);
+    useCollageStore.getState().setResult("blob:result", 5000, 10000, "job-123");
+    useCollageStore.setState({ error: "Previous warning" });
+
+    const abortActive = vi.fn();
+    const activeRun = beginCollageRun(abortActive);
+    createObjectURL.mockClear();
+
+    useCollageStore.getState().addImages([]);
+
+    const after = useCollageStore.getState();
+    expect(after.images).toHaveLength(2);
+    expect(after.templateId).toBe("3-h-equal");
+    expect(after.cellAssignments).toEqual([0, 1, -1]);
+    expect(after.cellTransforms[0]?.zoom).toBe(2);
+    expect(after.selectedCell).toBe(1);
+    expect(after.phase).toBe("result");
+    expect(after.resultUrl).toBe("blob:result");
+    expect(after.resultSize).toBe(5000);
+    expect(after.originalSize).toBe(10000);
+    expect(after.jobId).toBe("job-123");
+    expect(after.error).toBe("Previous warning");
+    expect(abortActive).not.toHaveBeenCalled();
+    expect(activeRun.isCurrent()).toBe(true);
+    expect(createObjectURL).not.toHaveBeenCalled();
+    activeRun.end();
+  });
+
   it("removeImage removes image by index and revokes blob URL and previewBlobUrl once", async () => {
     const imagePreview = await import("@/lib/image-preview");
     const needsMock = vi.mocked(imagePreview.needsServerPreview);

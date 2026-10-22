@@ -165,6 +165,7 @@ export const useCollageStore = create<CollageState>((set, get) => ({
   error: null,
 
   addImages: (files) => {
+    if (files.length === 0) return;
     cancelActiveCollageRun();
     const newImages: CollageImage[] = files.map((f) => ({
       id: `img-${++nextImageId}`,
