@@ -1010,4 +1010,69 @@ describe("Image tool registry undecodable input & encode context guards (#949)",
     expect((chartErr as SafeError).message).toBe("Chart rendering failed");
     expect((chartErr as SafeError).kind).toBe("bug");
   });
+
+  it("remove-gif-background AI job handler classifies a missing local bgImageKey as a 410 INPUT_MISSING operational SafeError (#3478)", async () => {
+    const err = await runAiToolJob(
+      {
+        jobId: "test-gif-missing-bg",
+        toolId: "remove-gif-background",
+        userId: null,
+        pool: "ai",
+        inputRefs: ["uploads/test-gif-missing-bg/in.gif"],
+        filename: "in.gif",
+        settings: {
+          backgroundType: "image",
+          bgImageKey: "uploads/test-gif-missing-bg/bg-does-not-exist.png",
+        },
+        kind: "ai-tool",
+      },
+      validPng,
+      {
+        scratchDir: tmpdir(),
+        signal: new AbortController().signal,
+        report: () => undefined,
+      },
+    ).catch((e: unknown) => e);
+
+    expect(err).toMatchObject({
+      name: "SafeError",
+      isSafeMessage: true,
+      kind: "operational",
+      code: "INPUT_MISSING",
+      statusCode: 410,
+      message: "Input file is no longer available. Upload it again.",
+    });
+    expect(classifyError(err, "worker")).toBe("operational");
+
+    const nonMissingLocalErr = await runAiToolJob(
+      {
+        jobId: "test-gif-invalid-bg",
+        toolId: "remove-gif-background",
+        userId: null,
+        pool: "ai",
+        inputRefs: ["uploads/test-gif-invalid-bg/in.gif"],
+        filename: "in.gif",
+        settings: {
+          backgroundType: "image",
+          bgImageKey: "invalid-key",
+        },
+        kind: "ai-tool",
+      },
+      validPng,
+      {
+        scratchDir: tmpdir(),
+        signal: new AbortController().signal,
+        report: () => undefined,
+      },
+    ).catch((e: unknown) => e);
+
+    expect(nonMissingLocalErr).toMatchObject({
+      name: "SafeError",
+      isSafeMessage: true,
+      kind: "bug",
+      code: "webp",
+      message: "Animated background removal failed",
+    });
+    expect(classifyError(nonMissingLocalErr, "worker")).toBe("bug");
+  });
 });

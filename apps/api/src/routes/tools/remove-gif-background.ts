@@ -11,6 +11,7 @@ import {
   hasServerErrorStatus,
   isSafeMessageError,
   isToolInputError,
+  SafeError,
   TOOL_BUNDLE_MAP,
 } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -40,8 +41,12 @@ import { prepareRouteImage } from "../../lib/image-input-prep.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import {
   getObjectBuffer,
+  isMissingObjectError,
+  isStorageServiceFault,
   normalizeOperationalWriteError,
+  normalizeS3ReadFault,
   putObject,
+  verifyS3Bucket,
 } from "../../lib/object-storage.js";
 import {
   discardUnenqueuedUploads,
@@ -171,7 +176,22 @@ registerAiJobHandler(
       let bgImagePath: string | undefined;
       let bgBuffer: Buffer | undefined;
       if (settings.bgImageKey) {
-        const bg = await getObjectBuffer(settings.bgImageKey);
+        let bg: Buffer;
+        try {
+          bg = await getObjectBuffer(settings.bgImageKey);
+        } catch (err) {
+          if (isMissingObjectError(err)) {
+            await verifyS3Bucket();
+            throw new SafeError("Input file is no longer available. Upload it again.", {
+              kind: "operational",
+              code: "INPUT_MISSING",
+              statusCode: 410,
+              cause: err,
+            });
+          }
+          if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+          throw err;
+        }
         if (bg && bg.length > 0) {
           bgBuffer = bg;
           bgImagePath = join(ctx.scratchDir, "bg-input");

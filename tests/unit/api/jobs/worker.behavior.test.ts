@@ -70,7 +70,9 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
   }));
 
   vi.doMock("bullmq", () => ({
-    UnrecoverableError: class UnrecoverableError extends Error {},
+    UnrecoverableError: class UnrecoverableError extends Error {
+      name = "UnrecoverableError";
+    },
     Worker: vi.fn(() => ({
       on: vi.fn(),
       close: vi.fn().mockResolvedValue(undefined),
@@ -944,9 +946,10 @@ describe("worker result payload behavior", () => {
         typeof import("../../../../apps/api/src/lib/error-report.js")
       >("../../../../apps/api/src/lib/error-report.js");
       await import("../../../../apps/api/src/routes/tools/erase-object.js");
+      await import("../../../../apps/api/src/routes/tools/remove-gif-background.js");
       await import("../../../../apps/api/src/routes/tools/sign-pdf.js");
 
-      const { Worker } = await import("bullmq");
+      const { Worker, UnrecoverableError } = await import("bullmq");
       workerMod.startWorkers();
       const workerCalls = (Worker as unknown as { mock: { calls: unknown[][] } }).mock.calls;
       const imageCall = workerCalls.find(([queue]) => String(queue).endsWith("image"));
@@ -1131,6 +1134,179 @@ describe("worker result payload behavior", () => {
           },
         }),
       );
+
+      // Secondary getObjectBuffer(settings.bgImageKey) in remove-gif-background AI job handler (#3478)
+      for (const fault of s3Faults) {
+        getGenericObjectStream
+          .mockResolvedValueOnce(Readable.from([Buffer.from("gif-bytes")]))
+          .mockRejectedValueOnce(fault);
+        dbSetMock.mockClear();
+        const gifErr = await processor({
+          id: "job-gif-s3",
+          attemptsMade: 0,
+          opts: { attempts: 1 },
+          updateProgress: vi.fn(),
+          data: {
+            jobId: "job-gif-s3",
+            toolId: "remove-gif-background",
+            userId: null,
+            pool: "ai",
+            inputRefs: ["uploads/job-gif-s3/in.gif"],
+            filename: "in.gif",
+            settings: {
+              backgroundType: "image",
+              bgImageKey: "uploads/job-gif-s3/bg-scene.png",
+            },
+            kind: "ai-tool",
+          },
+        }).catch((err: unknown) => err);
+        expect(gifErr).toMatchObject({
+          name: "SafeError",
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-unavailable",
+          statusCode: 503,
+          message: "The server's storage service is unavailable.",
+          cause: fault,
+        });
+        expect(classifyError(gifErr, "worker")).toBe("operational");
+        expect(dbSetMock).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            status: "failed",
+            error: {
+              code: "storage-unavailable",
+              httpStatus: 503,
+              message: "The server's storage service is unavailable.",
+            },
+          }),
+        );
+      }
+
+      // Missing bgImageKey in remove-gif-background AI job handler: verifyS3Bucket resolves -> 410 INPUT_MISSING (unrecoverable)
+      checkConnection.mockResolvedValueOnce(undefined);
+      getGenericObjectStream
+        .mockResolvedValueOnce(Readable.from([Buffer.from("gif-bytes")]))
+        .mockRejectedValueOnce(noSuchKey);
+      dbSetMock.mockClear();
+      const gifMissingErr = await processor({
+        id: "job-gif-missing-s3",
+        attemptsMade: 0,
+        opts: { attempts: 2 },
+        updateProgress: vi.fn(),
+        data: {
+          jobId: "job-gif-missing-s3",
+          toolId: "remove-gif-background",
+          userId: null,
+          pool: "ai",
+          inputRefs: ["uploads/job-gif-missing-s3/in.gif"],
+          filename: "in.gif",
+          settings: {
+            backgroundType: "image",
+            bgImageKey: "uploads/job-gif-missing-s3/bg-scene.png",
+          },
+          kind: "ai-tool",
+        },
+      }).catch((err: unknown) => err);
+      expect(checkConnection).toHaveBeenCalledTimes(1);
+      expect(gifMissingErr).toBeInstanceOf(UnrecoverableError);
+      expect((gifMissingErr as { cause?: unknown }).cause).toMatchObject({
+        name: "SafeError",
+        isSafeMessage: true,
+        kind: "operational",
+        code: "INPUT_MISSING",
+        statusCode: 410,
+        message: "Input file is no longer available. Upload it again.",
+        cause: noSuchKey,
+      });
+      expect(classifyError(gifMissingErr, "worker")).toBe("operational");
+      expect(dbSetMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          status: "failed",
+          error: {
+            message: "Input file is no longer available. Upload it again.",
+          },
+        }),
+      );
+
+      // Missing bgImageKey where verifyS3Bucket rejects -> 503 storage-unavailable
+      const bucketGone = s3Faults[2];
+      checkConnection.mockRejectedValueOnce(bucketGone);
+      getGenericObjectStream
+        .mockResolvedValueOnce(Readable.from([Buffer.from("gif-bytes")]))
+        .mockRejectedValueOnce(noSuchKey);
+      dbSetMock.mockClear();
+      const gifBucketErr = await processor({
+        id: "job-gif-bucket-s3",
+        attemptsMade: 0,
+        opts: { attempts: 1 },
+        updateProgress: vi.fn(),
+        data: {
+          jobId: "job-gif-bucket-s3",
+          toolId: "remove-gif-background",
+          userId: null,
+          pool: "ai",
+          inputRefs: ["uploads/job-gif-bucket-s3/in.gif"],
+          filename: "in.gif",
+          settings: {
+            backgroundType: "image",
+            bgImageKey: "uploads/job-gif-bucket-s3/bg-scene.png",
+          },
+          kind: "ai-tool",
+        },
+      }).catch((err: unknown) => err);
+      expect(gifBucketErr).toMatchObject({
+        name: "SafeError",
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        message: "The server's storage service is unavailable.",
+        cause: bucketGone,
+      });
+      expect(classifyError(gifBucketErr, "worker")).toBe("operational");
+      expect(dbSetMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          status: "failed",
+          error: {
+            code: "storage-unavailable",
+            httpStatus: 503,
+            message: "The server's storage service is unavailable.",
+          },
+        }),
+      );
+
+      // Unexpected non-S3 defect on bgImageKey in remove-gif-background still wraps as a bug SafeError
+      getGenericObjectStream
+        .mockResolvedValueOnce(Readable.from([Buffer.from("gif-bytes")]))
+        .mockRejectedValueOnce(unexpectedBug);
+      const gifBugErr = await processor({
+        id: "job-gif-bug-s3",
+        attemptsMade: 0,
+        opts: { attempts: 1 },
+        updateProgress: vi.fn(),
+        data: {
+          jobId: "job-gif-bug-s3",
+          toolId: "remove-gif-background",
+          userId: null,
+          pool: "ai",
+          inputRefs: ["uploads/job-gif-bug-s3/in.gif"],
+          filename: "in.gif",
+          settings: {
+            backgroundType: "image",
+            bgImageKey: "uploads/job-gif-bug-s3/bg-scene.png",
+          },
+          kind: "ai-tool",
+        },
+      }).catch((err: unknown) => err);
+      expect(gifBugErr).toMatchObject({
+        name: "SafeError",
+        isSafeMessage: true,
+        kind: "bug",
+        code: "webp",
+        message: "Animated background removal failed",
+        cause: unexpectedBug,
+      });
+      expect(classifyError(gifBugErr, "worker")).toBe("bug");
     });
   });
 
