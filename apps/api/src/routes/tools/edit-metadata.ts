@@ -171,6 +171,11 @@ export function registerEditMetadata(app: FastifyInstance) {
           inspectBuffer = decompressSvgz(fileBuffer);
           if (isSvgBuffer(inspectBuffer)) {
             inspectBuffer = sanitizeSvg(inspectBuffer);
+          } else {
+            const validation = await validateImageBuffer(inspectBuffer, filename);
+            if (!validation.valid) {
+              return reply.status(400).send({ error: "Invalid SVGZ file" });
+            }
           }
         } catch (err) {
           if (

@@ -86,6 +86,8 @@ export function registerInfo(app: FastifyInstance) {
         }
         throw err;
       }
+    } else if (ext === "svgz" && !validation.valid) {
+      return reply.status(400).send({ error: "Invalid SVGZ file" });
     }
 
     try {

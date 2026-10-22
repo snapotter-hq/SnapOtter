@@ -148,6 +148,8 @@ const XMP_SVG = Buffer.from(
 const XMP_SVGZ = gzipSync(XMP_SVG);
 const NOT_SVG_SVGZ = gzipSync(Buffer.from("not an svg document", "utf-8"));
 const CORRUPT_SVGZ = Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0xff, 0xff]);
+const NON_GZIP_SVGZ = Buffer.from("not gzip and not an image", "utf-8");
+const TRUNCATED_1B_SVGZ = Buffer.from([0x1f]);
 const OVER_ELEMENT_SVG = Buffer.from(
   `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">${"<rect/>".repeat(5001)}</svg>`,
   "utf-8",
@@ -215,6 +217,23 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
       });
 
       mocks.inspectMetadata.mockClear();
+      const plainSvgzReply = await invokeRoute(handler, [
+        { type: "file", filename: "plain.svgz", content: XMP_SVG },
+      ]);
+      expect(plainSvgzReply.statusCode).toBe(200);
+      expect(mocks.inspectMetadata).toHaveBeenCalledTimes(1);
+      const [passedPlainSvgzBuf] = mocks.inspectMetadata.mock.calls[0] as [Buffer, string];
+      expect(passedPlainSvgzBuf.toString("utf-8")).not.toContain("<script");
+      expect(plainSvgzReply.payload).toMatchObject({
+        filename: "plain.svgz",
+        fileSize: XMP_SVG.length,
+        xmp: expect.objectContaining({
+          Title: "Test Icon Title",
+        }),
+        keywords: ["vector", "icon"],
+      });
+
+      mocks.inspectMetadata.mockClear();
       const exifJpg = readFixture(fixtures.image.exifGps);
       const misnamedJpgReply = await invokeRoute(handler, [
         { type: "file", filename: "misnamed.svgz", content: exifJpg },
@@ -242,6 +261,22 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         { type: "file", filename: "corrupt.svgz", content: CORRUPT_SVGZ },
       ]);
       expect(corruptSvgzReply.statusCode).toBe(400);
+
+      const nonGzipSvgzReply = await invokeRoute(handler, [
+        { type: "file", filename: "broken.svgz", content: NON_GZIP_SVGZ },
+      ]);
+      expect(nonGzipSvgzReply.statusCode).toBe(400);
+      expect(nonGzipSvgzReply.payload).toEqual({
+        error: "Invalid SVGZ file",
+      });
+
+      const truncated1bSvgzReply = await invokeRoute(handler, [
+        { type: "file", filename: "broken.SVGZ", content: TRUNCATED_1B_SVGZ },
+      ]);
+      expect(truncated1bSvgzReply.statusCode).toBe(400);
+      expect(truncated1bSvgzReply.payload).toEqual({
+        error: "Invalid SVGZ file",
+      });
 
       const overCapReply = await invokeRoute(handler, [
         { type: "file", filename: "too-many.svg", content: OVER_ELEMENT_SVG },
@@ -354,6 +389,15 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
       ]);
       expect(corruptSvgzReply.statusCode).toBe(400);
 
+      const nonGzipSvgzReply = await invokeRoute(handler, [
+        { type: "file", filename: "broken.svgz", content: NON_GZIP_SVGZ },
+        { type: "field", fieldname: "settings", value: "{}" },
+      ]);
+      expect(nonGzipSvgzReply.statusCode).toBe(400);
+      expect(nonGzipSvgzReply.payload).toEqual({
+        error: "Invalid image: Unrecognized image format",
+      });
+
       const overCapReply = await invokeRoute(handler, [
         { type: "file", filename: "too-many.svg", content: OVER_ELEMENT_SVG },
         { type: "field", fieldname: "settings", value: "{}" },
@@ -444,6 +488,15 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         fileSize: SCRIPT_LT_SVG.length,
       });
 
+      const plainSvgzReply = await invokeRoute(handler, [
+        { type: "file", filename: "plain.svgz", content: SCRIPT_LT_SVG },
+      ]);
+      expect(plainSvgzReply.statusCode).toBe(200);
+      expect(plainSvgzReply.payload).toEqual({
+        filename: "plain.svgz",
+        fileSize: SCRIPT_LT_SVG.length,
+      });
+
       const exifJpg = readFixture(fixtures.image.exifGps);
       const misnamedJpgReply = await invokeRoute(handler, [
         { type: "file", filename: "misnamed.svgz", content: exifJpg },
@@ -476,6 +529,22 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         { type: "file", filename: "corrupt.svgz", content: CORRUPT_SVGZ },
       ]);
       expect(corruptSvgzReply.statusCode).toBe(400);
+
+      const nonGzipSvgzReply = await invokeRoute(handler, [
+        { type: "file", filename: "broken.svgz", content: NON_GZIP_SVGZ },
+      ]);
+      expect(nonGzipSvgzReply.statusCode).toBe(400);
+      expect(nonGzipSvgzReply.payload).toEqual({
+        error: "Invalid SVGZ file",
+      });
+
+      const truncated1bSvgzReply = await invokeRoute(handler, [
+        { type: "file", filename: "broken.SVGZ", content: TRUNCATED_1B_SVGZ },
+      ]);
+      expect(truncated1bSvgzReply.statusCode).toBe(400);
+      expect(truncated1bSvgzReply.payload).toEqual({
+        error: "Invalid SVGZ file",
+      });
 
       const overCapReply = await invokeRoute(handler, [
         { type: "file", filename: "too-many.svg", content: OVER_ELEMENT_SVG },
@@ -558,6 +627,18 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         format: "svg",
       });
 
+      const plainSvgzReply = await invokeRoute(handler, [
+        { type: "file", filename: "plain.svgz", content: SCRIPT_LT_SVG },
+      ]);
+      expect(plainSvgzReply.statusCode).toBe(200);
+      expect(plainSvgzReply.payload).toMatchObject({
+        filename: "plain.svgz",
+        fileSize: SCRIPT_LT_SVG.length,
+        width: 100,
+        height: 80,
+        format: "svg",
+      });
+
       const exifJpg = readFixture(fixtures.image.exifGps);
       const misnamedJpgReply = await invokeRoute(handler, [
         { type: "file", filename: "misnamed.svgz", content: exifJpg },
@@ -592,6 +673,22 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         { type: "file", filename: "corrupt.svgz", content: CORRUPT_SVGZ },
       ]);
       expect(corruptSvgzReply.statusCode).toBe(400);
+
+      const nonGzipSvgzReply = await invokeRoute(handler, [
+        { type: "file", filename: "broken.svgz", content: NON_GZIP_SVGZ },
+      ]);
+      expect(nonGzipSvgzReply.statusCode).toBe(400);
+      expect(nonGzipSvgzReply.payload).toEqual({
+        error: "Invalid SVGZ file",
+      });
+
+      const truncated1bSvgzReply = await invokeRoute(handler, [
+        { type: "file", filename: "broken.SVGZ", content: TRUNCATED_1B_SVGZ },
+      ]);
+      expect(truncated1bSvgzReply.statusCode).toBe(400);
+      expect(truncated1bSvgzReply.payload).toEqual({
+        error: "Invalid SVGZ file",
+      });
 
       const overCapReply = await invokeRoute(handler, [
         { type: "file", filename: "too-many.svg", content: OVER_ELEMENT_SVG },

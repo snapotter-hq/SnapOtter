@@ -815,6 +815,19 @@ describe("Inspect SVG and SVGZ sanitization (#3095)", () => {
     expect(badRes.statusCode).toBe(400);
     expect(JSON.parse(badRes.body).error).toContain("valid SVG content");
 
+    const nonGzipSvgz = Buffer.from("not gzip and not an image", "utf-8");
+    const { body: nonGzipBody, contentType: nonGzipCt } = createMultipartPayload([
+      { name: "file", filename: "broken.svgz", contentType: "image/svg+xml", content: nonGzipSvgz },
+    ]);
+    const nonGzipRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/strip-metadata/inspect",
+      payload: nonGzipBody,
+      headers: { "content-type": nonGzipCt, authorization: `Bearer ${adminToken}` },
+    });
+    expect(nonGzipRes.statusCode).toBe(400);
+    expect(JSON.parse(nonGzipRes.body)).toEqual({ error: "Invalid SVGZ file" });
+
     const overCapSvg = Buffer.from(
       `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">${"<rect/>".repeat(5001)}</svg>`,
       "utf-8",

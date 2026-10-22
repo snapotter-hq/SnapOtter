@@ -4,6 +4,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
+import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
@@ -138,6 +139,11 @@ export function registerStripMetadata(app: FastifyInstance) {
           inspectBuffer = decompressSvgz(fileBuffer);
           if (isSvgBuffer(inspectBuffer)) {
             inspectBuffer = sanitizeSvg(inspectBuffer);
+          } else {
+            const validation = await validateImageBuffer(inspectBuffer, filename);
+            if (!validation.valid) {
+              return reply.status(400).send({ error: "Invalid SVGZ file" });
+            }
           }
         } catch (err) {
           if (
