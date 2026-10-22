@@ -731,14 +731,14 @@ describe("pipeline step error message formatting", () => {
           value: JSON.stringify({
             steps: [
               { toolId: stepErrorTestToolId, settings: {} },
-              { toolId: stepErrorTestToolId, settings: {} },
+              { toolId: "protect-pdf", settings: { userPassword: "secret" } },
             ],
           }),
         },
       ]);
       expect(forbiddenReply.statusCode).toBe(403);
       expect(forbiddenReply.payload).toEqual({
-        error: `Step 2 (${stepErrorTestToolId}): You don't have permission to use this tool`,
+        error: "Step 2 (protect-pdf): You don't have permission to use this tool",
       });
 
       const passwordToolReply = await invokePipelineExecuteRoute([
@@ -756,7 +756,8 @@ describe("pipeline step error message formatting", () => {
       ]);
       expect(passwordToolReply.statusCode).toBe(400);
       expect(passwordToolReply.payload).toEqual({
-        error: "Step 2: This tool cannot be used in pipelines because it requires a password",
+        error:
+          "Step 2 (protect-pdf): This tool cannot be used in pipelines because it requires a password",
       });
 
       const ocrIncompatibleReply = await invokePipelineExecuteRoute([
@@ -957,7 +958,45 @@ describe("pipeline step error message formatting", () => {
       ]);
       expect(batchUnknownReply.statusCode).toBe(400);
       expect(batchUnknownReply.payload).toEqual({
-        error: 'Step 2: Tool "unknown-batch-tool" not found',
+        error: "Step 2 (unknown-batch-tool): Tool not found or not available",
+      });
+
+      vi.mocked(hasEffectiveToolAccess).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+      const batchForbiddenReply = await invokePipelineBatchRoute([
+        { type: "file", filename: "photo.png", content: Buffer.from("png-bytes") },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [
+              { toolId: stepErrorTestToolId, settings: {} },
+              { toolId: "protect-pdf", settings: { userPassword: "secret" } },
+            ],
+          }),
+        },
+      ]);
+      expect(batchForbiddenReply.statusCode).toBe(403);
+      expect(batchForbiddenReply.payload).toEqual({
+        error: "Step 2 (protect-pdf): You don't have permission to use this tool",
+      });
+
+      const batchPasswordReply = await invokePipelineBatchRoute([
+        { type: "file", filename: "photo.png", content: Buffer.from("png-bytes") },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [
+              { toolId: stepErrorTestToolId, settings: {} },
+              { toolId: "protect-pdf", settings: { userPassword: "secret" } },
+            ],
+          }),
+        },
+      ]);
+      expect(batchPasswordReply.statusCode).toBe(400);
+      expect(batchPasswordReply.payload).toEqual({
+        error:
+          "Step 2 (protect-pdf): This tool cannot be used in pipelines because it requires a password",
       });
 
       const batchInvalidSettingsReply = await invokePipelineBatchRoute([
@@ -993,7 +1032,7 @@ describe("pipeline step error message formatting", () => {
       });
       expect(saveUnknownRes.statusCode).toBe(400);
       expect(saveUnknownRes.json()).toEqual({
-        error: 'Step 2: Tool "unknown-save-tool" not found',
+        error: "Step 2 (unknown-save-tool): Tool not found or not available",
       });
 
       vi.mocked(hasEffectiveToolAccess).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
@@ -1011,7 +1050,43 @@ describe("pipeline step error message formatting", () => {
       });
       expect(saveForbiddenRes.statusCode).toBe(403);
       expect(saveForbiddenRes.json()).toEqual({
-        error: "Step 2: You don't have permission to use this tool",
+        error: `Step 2 (${stepErrorTestToolId}): You don't have permission to use this tool`,
+      });
+
+      vi.mocked(hasEffectiveToolAccess).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+      const saveForbiddenPasswordRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/pipeline/save",
+        headers: { "content-type": "application/json" },
+        payload: {
+          name: "Forbidden Password Step Pipeline",
+          steps: [
+            { toolId: stepErrorTestToolId, settings: {} },
+            { toolId: "protect-pdf", settings: { userPassword: "secret" } },
+          ],
+        },
+      });
+      expect(saveForbiddenPasswordRes.statusCode).toBe(403);
+      expect(saveForbiddenPasswordRes.json()).toEqual({
+        error: "Step 2 (protect-pdf): You don't have permission to use this tool",
+      });
+
+      const savePasswordRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/pipeline/save",
+        headers: { "content-type": "application/json" },
+        payload: {
+          name: "Password Step Pipeline",
+          steps: [
+            { toolId: stepErrorTestToolId, settings: {} },
+            { toolId: "protect-pdf", settings: { userPassword: "secret" } },
+          ],
+        },
+      });
+      expect(savePasswordRes.statusCode).toBe(400);
+      expect(savePasswordRes.json()).toEqual({
+        error:
+          "Step 2 (protect-pdf): This tool cannot be used in pipelines because it requires a password",
       });
     } finally {
       await app.close();

@@ -592,7 +592,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
             if (PASSWORD_TOOLS.has(step.toolId)) {
               return reply.status(400).send({
-                error: `Step ${i + 1}: This tool cannot be used in pipelines because it requires a password`,
+                error: `Step ${i + 1} (${step.toolId}): This tool cannot be used in pipelines because it requires a password`,
               });
             }
 
@@ -943,20 +943,21 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
       // Validate all tool IDs exist
       for (let i = 0; i < steps.length; i++) {
-        if (PASSWORD_TOOLS.has(steps[i].toolId)) {
-          return reply.status(400).send({
-            error: `This tool cannot be used in saved pipelines because it requires a password`,
-          });
-        }
-        const toolConfig = getToolConfig(steps[i].toolId);
+        const step = steps[i];
+        const toolConfig = getToolConfig(step.toolId);
         if (!toolConfig) {
           return reply.status(400).send({
-            error: `Step ${i + 1}: Tool "${steps[i].toolId}" not found`,
+            error: `Step ${i + 1} (${step.toolId}): Tool not found or not available`,
           });
         }
-        if (!(await hasEffectiveToolAccess(user, steps[i].toolId))) {
+        if (!(await hasEffectiveToolAccess(user, step.toolId))) {
           return reply.status(403).send({
-            error: `Step ${i + 1}: You don't have permission to use this tool`,
+            error: `Step ${i + 1} (${step.toolId}): You don't have permission to use this tool`,
+          });
+        }
+        if (PASSWORD_TOOLS.has(step.toolId)) {
+          return reply.status(400).send({
+            error: `Step ${i + 1} (${step.toolId}): This tool cannot be used in pipelines because it requires a password`,
           });
         }
       }
@@ -1232,7 +1233,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             const toolConfig = getToolConfig(resolvedToolId);
             if (!toolConfig) {
               return reply.status(400).send({
-                error: `Step ${i + 1}: Tool "${step.toolId}" not found`,
+                error: `Step ${i + 1} (${step.toolId}): Tool not found or not available`,
               });
             }
             if (!(await hasEffectiveToolAccess(authUser, resolvedToolId))) {
@@ -1243,7 +1244,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
 
             if (PASSWORD_TOOLS.has(step.toolId)) {
               return reply.status(400).send({
-                error: `Step ${i + 1}: This tool cannot be used in pipelines because it requires a password`,
+                error: `Step ${i + 1} (${step.toolId}): This tool cannot be used in pipelines because it requires a password`,
               });
             }
 

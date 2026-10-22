@@ -482,7 +482,9 @@ describe("Pipeline save rejects password tools", () => {
 
     expect(res.statusCode).toBe(400);
     const json = JSON.parse(res.body);
-    expect(json.error).toMatch(/password/i);
+    expect(json.error).toBe(
+      "Step 2 (protect-pdf): This tool cannot be used in pipelines because it requires a password",
+    );
   });
 
   it("rejects saving a pipeline containing unlock-pdf", async () => {
@@ -501,7 +503,9 @@ describe("Pipeline save rejects password tools", () => {
 
     expect(res.statusCode).toBe(400);
     const json = JSON.parse(res.body);
-    expect(json.error).toMatch(/password/i);
+    expect(json.error).toBe(
+      "Step 1 (unlock-pdf): This tool cannot be used in pipelines because it requires a password",
+    );
   });
 });
 
@@ -519,7 +523,9 @@ describe("Pipeline execute rejects password tools", () => {
 
     expect(res.statusCode).toBe(400);
     const json = JSON.parse(res.body);
-    expect(json.error).toMatch(/password/i);
+    expect(json.error).toBe(
+      "Step 2 (protect-pdf): This tool cannot be used in pipelines because it requires a password",
+    );
   });
 });
 
@@ -547,7 +553,9 @@ describe("Pipeline batch rejects password tools", () => {
 
     expect(res.statusCode).toBe(400);
     const json = JSON.parse(res.body);
-    expect(json.error).toMatch(/password/i);
+    expect(json.error).toBe(
+      "Step 1 (unlock-pdf): This tool cannot be used in pipelines because it requires a password",
+    );
   });
 });
 
