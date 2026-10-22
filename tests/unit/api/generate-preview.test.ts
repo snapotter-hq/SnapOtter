@@ -1601,16 +1601,27 @@ describe("registerFetchUrlsRoute preview decode tmpdir write faults (#3452)", ()
   }
 
   it.each(WRITE_FAULT_CASES)(
-    "reports 503 %s (%s) from decodeHeic and decodeToSharpCompat through reportEngineUnavailable while keeping the URL fetch non-fatal (#3452)",
+    "reports 503 %s (%s) from decodeHeic and decodeToSharpCompat (including TIFF-headed DNG) through reportEngineUnavailable while keeping the URL fetch non-fatal (#3452, #3486)",
     async (errnoCode, expectedCode) => {
       const handler = await getFetchUrlsHandler();
       const heicBytes = readFixture(fixtures.image.base.heic200);
       const psdBytes = readFixture(fixtures.image.formats("psd"));
+      const tiffHeadedDng = await sharp({
+        create: { width: 12, height: 12, channels: 3, background: { r: 40, g: 80, b: 120 } },
+      })
+        .tiff()
+        .toBuffer();
 
       vi.stubGlobal(
         "fetch",
         vi.fn(async (url: string | URL | Request) => {
           const href = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+          if (href.endsWith(".dng")) {
+            return new Response(new Uint8Array(tiffHeadedDng), {
+              status: 200,
+              headers: { "Content-Type": "image/x-adobe-dng" },
+            });
+          }
           if (href.endsWith(".psd")) {
             return new Response(new Uint8Array(psdBytes), {
               status: 200,
@@ -1630,9 +1641,12 @@ describe("registerFetchUrlsRoute preview decode tmpdir write faults (#3452)", ()
           () => writeErrnoError(errnoCode),
         ]) {
           reportEngineUnavailableMock.mockReset();
+          loggerMock.warn.mockReset();
+          putObjectMock.mockReset();
           decodeHeicMock.mockRejectedValueOnce(makeFault());
           const decodeSpy = vi
             .spyOn(formatDecoders, "decodeToSharpCompat")
+            .mockRejectedValueOnce(makeFault())
             .mockRejectedValueOnce(makeFault());
 
           try {
@@ -1640,7 +1654,11 @@ describe("registerFetchUrlsRoute preview decode tmpdir write faults (#3452)", ()
             await handler(
               {
                 body: {
-                  urls: ["http://1.2.3.4:9999/photo.heic", "http://1.2.3.4:9999/layers.psd"],
+                  urls: [
+                    "http://1.2.3.4:9999/photo.heic",
+                    "http://1.2.3.4:9999/layers.psd",
+                    "http://1.2.3.4:9999/photo.dng",
+                  ],
                 },
                 log: loggerMock,
               },
@@ -1649,7 +1667,13 @@ describe("registerFetchUrlsRoute preview decode tmpdir write faults (#3452)", ()
 
             expect(reply.statusCode).toBe(200);
             const body = reply.payload as {
-              results: Array<{ success: boolean; filename?: string; previewUrl?: string | null }>;
+              results: Array<{
+                success: boolean;
+                filename?: string;
+                width?: number;
+                height?: number;
+                previewUrl?: string | null;
+              }>;
             };
             expect(body.results).toEqual([
               expect.objectContaining({
@@ -1662,8 +1686,16 @@ describe("registerFetchUrlsRoute preview decode tmpdir write faults (#3452)", ()
                 filename: "layers.psd",
                 previewUrl: null,
               }),
+              expect.objectContaining({
+                success: true,
+                filename: "photo.dng",
+                width: 0,
+                height: 0,
+                previewUrl: null,
+              }),
             ]);
-            expect(reportEngineUnavailableMock).toHaveBeenCalledTimes(2);
+            expect(putObjectMock).toHaveBeenCalledTimes(3);
+            expect(reportEngineUnavailableMock).toHaveBeenCalledTimes(3);
             for (const call of reportEngineUnavailableMock.mock.calls) {
               expect(call[0]).toMatchObject({
                 statusCode: 503,
@@ -1671,6 +1703,7 @@ describe("registerFetchUrlsRoute preview decode tmpdir write faults (#3452)", ()
               });
               expect(call[1]).toBe("fetch-urls");
             }
+            expect(loggerMock.warn).not.toHaveBeenCalled();
           } finally {
             decodeSpy.mockRestore();
           }
@@ -1681,7 +1714,7 @@ describe("registerFetchUrlsRoute preview decode tmpdir write faults (#3452)", ()
     },
   );
 
-  it("does not call reportEngineUnavailable when decodeHeic or decodeToSharpCompat fails with a non-503 error (#3452)", async () => {
+  it("logs a warning without calling reportEngineUnavailable when decodeHeic or decodeToSharpCompat fails with a non-503 error (#3452, #3486)", async () => {
     const handler = await getFetchUrlsHandler();
     const heicBytes = readFixture(fixtures.image.base.heic200);
     const psdBytes = readFixture(fixtures.image.formats("psd"));
@@ -1703,10 +1736,10 @@ describe("registerFetchUrlsRoute preview decode tmpdir write faults (#3452)", ()
       }),
     );
 
-    decodeHeicMock.mockRejectedValueOnce(new Error("corrupt heic"));
-    const decodeSpy = vi
-      .spyOn(formatDecoders, "decodeToSharpCompat")
-      .mockRejectedValueOnce(new Error("corrupt psd"));
+    const heicErr = new Error("corrupt heic");
+    const psdErr = new Error("corrupt psd");
+    decodeHeicMock.mockRejectedValueOnce(heicErr);
+    const decodeSpy = vi.spyOn(formatDecoders, "decodeToSharpCompat").mockRejectedValueOnce(psdErr);
     try {
       const reply = makeReply();
       await handler(
@@ -1727,13 +1760,216 @@ describe("registerFetchUrlsRoute preview decode tmpdir write faults (#3452)", ()
         expect.objectContaining({ success: true, filename: "layers.psd", previewUrl: null }),
       ]);
       expect(reportEngineUnavailableMock).not.toHaveBeenCalled();
+      expect(loggerMock.warn).toHaveBeenCalledTimes(2);
+      expect(loggerMock.warn).toHaveBeenCalledWith(
+        { err: heicErr, jobId: expect.any(String), contentType: "image/heic" },
+        "preview generation failed; result has no renderable preview",
+      );
+      expect(loggerMock.warn).toHaveBeenCalledWith(
+        { err: psdErr, jobId: expect.any(String), contentType: "image/vnd.adobe.photoshop" },
+        "preview generation failed; result has no renderable preview",
+      );
     } finally {
       decodeSpy.mockRestore();
       vi.unstubAllGlobals();
     }
   });
 
-  it("routes preview WebP V8 buffer allocation OOM and raw decode SIGKILL/OOM through reportEngineUnavailable (#3383)", async () => {
+  it("forwards fileExt to decodeToSharpCompat, falls back to Sharp on a TIFF-headed DNG when the CLI decoder is missing, and skips Sharp preview when decode fails on CR2 or probe OOM (#3486)", async () => {
+    const handler = await getFetchUrlsHandler();
+    const tiffHeadedDng = await sharp({
+      create: { width: 12, height: 12, channels: 3, background: { r: 40, g: 80, b: 120 } },
+    })
+      .tiff()
+      .toBuffer();
+    const cr2Bytes = readFixture(fixtures.image.formats("cr2"));
+    const rafMagic = Buffer.from("FUJIFILMCCD-RAW 0201", "ascii");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string | URL | Request) => {
+        const href = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+        if (href.endsWith("/gallery/12345")) {
+          return new Response(new Uint8Array(rafMagic), {
+            status: 200,
+            headers: { "Content-Type": "application/octet-stream" },
+          });
+        }
+        if (href.endsWith(".cr2")) {
+          return new Response(new Uint8Array(cr2Bytes), {
+            status: 200,
+            headers: { "Content-Type": "image/x-canon-cr2" },
+          });
+        }
+        return new Response(new Uint8Array(tiffHeadedDng), {
+          status: 200,
+          headers: { "Content-Type": "image/x-adobe-dng" },
+        });
+      }),
+    );
+
+    try {
+      // 1. TIFF-headed DNG falls back to Sharp when decodeToSharpCompat rejects with DecoderUnavailableError
+      const dngDecodeSpy = vi
+        .spyOn(formatDecoders, "decodeToSharpCompat")
+        .mockRejectedValueOnce(new DecoderUnavailableError("No LibRaw found."))
+        .mockRejectedValueOnce(new DecoderUnavailableError("No LibRaw found."));
+      try {
+        const dngReply = makeReply();
+        await handler(
+          {
+            body: {
+              urls: ["http://1.2.3.4:9999/photo.dng", "http://1.2.3.4:9999/gallery/12345"],
+            },
+            log: loggerMock,
+          },
+          dngReply,
+        );
+        expect(dngDecodeSpy).toHaveBeenNthCalledWith(1, tiffHeadedDng, "raw", "dng");
+        expect(dngDecodeSpy).toHaveBeenNthCalledWith(2, rafMagic, "raw", undefined);
+        expect(dngReply.statusCode).toBe(200);
+        const body = dngReply.payload as {
+          results: Array<{
+            success: boolean;
+            filename?: string;
+            contentType?: string;
+            width?: number;
+            height?: number;
+            previewUrl?: string | null;
+          }>;
+        };
+        expect(body.results).toEqual([
+          expect.objectContaining({
+            success: true,
+            filename: "photo.dng",
+            contentType: "image/x-dcraw",
+            width: 12,
+            height: 12,
+            previewUrl: expect.stringMatching(/^\/api\/v1\/download\/.+\/preview-photo\.webp$/),
+          }),
+          expect.objectContaining({
+            success: true,
+            contentType: "image/x-dcraw",
+            width: 0,
+            height: 0,
+            previewUrl: null,
+          }),
+        ]);
+        expect(putObjectMock).toHaveBeenCalledTimes(3);
+        expect(reportEngineUnavailableMock).toHaveBeenCalledOnce();
+        expect(loggerMock.warn).not.toHaveBeenCalled();
+      } finally {
+        dngDecodeSpy.mockRestore();
+      }
+
+      // 2. CR2 (whose header Sharp reads but pixels Sharp cannot decode) reports ENGINE_UNAVAILABLE
+      putObjectMock.mockReset();
+      reportEngineUnavailableMock.mockReset();
+      loggerMock.warn.mockReset();
+      const cr2DecodeSpy = vi
+        .spyOn(formatDecoders, "decodeToSharpCompat")
+        .mockRejectedValueOnce(new DecoderUnavailableError("No LibRaw found."));
+      try {
+        const cr2Reply = makeReply();
+        await handler(
+          {
+            body: { urls: ["http://1.2.3.4:9999/photo.cr2"] },
+            log: loggerMock,
+          },
+          cr2Reply,
+        );
+        expect(cr2DecodeSpy).toHaveBeenCalledOnce();
+        expect(cr2DecodeSpy.mock.calls[0]?.[0]?.equals(cr2Bytes)).toBe(true);
+        expect(cr2DecodeSpy.mock.calls[0]?.slice(1)).toEqual(["raw", "cr2"]);
+        expect(cr2Reply.statusCode).toBe(200);
+        const body = cr2Reply.payload as {
+          results: Array<{
+            success: boolean;
+            filename?: string;
+            width?: number;
+            height?: number;
+            previewUrl?: string | null;
+          }>;
+        };
+        expect(body.results).toEqual([
+          expect.objectContaining({
+            success: true,
+            filename: "photo.cr2",
+            width: 0,
+            height: 0,
+            previewUrl: null,
+          }),
+        ]);
+        expect(putObjectMock).toHaveBeenCalledTimes(1);
+        expect(reportEngineUnavailableMock).toHaveBeenCalledOnce();
+        expect(reportEngineUnavailableMock.mock.calls[0]?.[1]).toBe("fetch-urls");
+        expect(loggerMock.warn).not.toHaveBeenCalled();
+      } finally {
+        cr2DecodeSpy.mockRestore();
+      }
+
+      // 3. DNG Sharp fallback probe throwing V8 RangeError preserves DecoderOutOfMemoryError
+      putObjectMock.mockReset();
+      reportEngineUnavailableMock.mockReset();
+      loggerMock.warn.mockReset();
+      const dngOomProbeSpy = vi
+        .spyOn(formatDecoders, "decodeToSharpCompat")
+        .mockRejectedValueOnce(new DecoderUnavailableError("No dcraw_emu found."));
+      const rawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
+        this: sharp.Sharp,
+      ) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Array buffer allocation failed");
+          },
+        } as unknown as sharp.Sharp;
+      });
+      try {
+        const probeOomReply = makeReply();
+        await handler(
+          {
+            body: { urls: ["http://1.2.3.4:9999/photo.dng"] },
+            log: loggerMock,
+          },
+          probeOomReply,
+        );
+        expect(probeOomReply.statusCode).toBe(200);
+        const body = probeOomReply.payload as {
+          results: Array<{
+            success: boolean;
+            filename?: string;
+            width?: number;
+            height?: number;
+            previewUrl?: string | null;
+          }>;
+        };
+        expect(body.results).toEqual([
+          expect.objectContaining({
+            success: true,
+            filename: "photo.dng",
+            width: 0,
+            height: 0,
+            previewUrl: null,
+          }),
+        ]);
+        expect(putObjectMock).toHaveBeenCalledTimes(1);
+        expect(reportEngineUnavailableMock).toHaveBeenCalledOnce();
+        expect(reportEngineUnavailableMock.mock.calls[0]?.[0]).toMatchObject({
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          cause: expect.objectContaining({ name: "DecoderOutOfMemoryError" }),
+        });
+        expect(loggerMock.warn).not.toHaveBeenCalled();
+      } finally {
+        rawSpy.mockRestore();
+        dngOomProbeSpy.mockRestore();
+      }
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("routes preview WebP V8 buffer allocation OOM and raw decode SIGKILL/OOM through reportEngineUnavailable (#3383, #3486)", async () => {
     const handler = await getFetchUrlsHandler();
     const heicBytes = readFixture(fixtures.image.base.heic200);
     const psdBytes = readFixture(fixtures.image.formats("psd"));
@@ -1747,10 +1983,12 @@ describe("registerFetchUrlsRoute preview decode tmpdir write faults (#3452)", ()
       "fetch",
       vi.fn(async (url: string | URL | Request) => {
         const href = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
-        if (href.endsWith(".tiff")) {
+        if (href.endsWith(".tiff") || href.endsWith(".dng")) {
           return new Response(new Uint8Array(tiffBytes), {
             status: 200,
-            headers: { "Content-Type": "image/tiff" },
+            headers: {
+              "Content-Type": href.endsWith(".dng") ? "image/x-adobe-dng" : "image/tiff",
+            },
           });
         }
         if (href.endsWith(".psd")) {
@@ -1811,8 +2049,10 @@ describe("registerFetchUrlsRoute preview decode tmpdir write faults (#3452)", ()
           cause: expect.objectContaining({ name: "DecoderOutOfMemoryError" }),
         });
         expect(reportEngineUnavailableMock.mock.calls[0]?.[1]).toBe("fetch-urls");
+        expect(loggerMock.warn).not.toHaveBeenCalled();
 
         reportEngineUnavailableMock.mockReset();
+        loggerMock.warn.mockReset();
         const nonOomReply = makeReply();
         await handler(
           {
@@ -1823,12 +2063,17 @@ describe("registerFetchUrlsRoute preview decode tmpdir write faults (#3452)", ()
         );
         expect(nonOomReply.statusCode).toBe(200);
         expect(reportEngineUnavailableMock).not.toHaveBeenCalled();
+        expect(loggerMock.warn).toHaveBeenCalledOnce();
+        expect(loggerMock.warn.mock.calls[0]?.[1]).toBe(
+          "preview generation failed; result has no renderable preview",
+        );
       } finally {
         webpSpy.mockRestore();
       }
 
       // 1b. 503 preview putObject error does not trigger reportEngineUnavailable
       reportEngineUnavailableMock.mockReset();
+      loggerMock.warn.mockReset();
       putObjectMock
         .mockResolvedValueOnce(undefined)
         .mockRejectedValueOnce(
@@ -1844,16 +2089,24 @@ describe("registerFetchUrlsRoute preview decode tmpdir write faults (#3452)", ()
       );
       expect(putErrReply.statusCode).toBe(200);
       expect(reportEngineUnavailableMock).not.toHaveBeenCalled();
+      expect(loggerMock.warn).toHaveBeenCalledOnce();
+      expect(loggerMock.warn.mock.calls[0]?.[1]).toBe(
+        "preview generation failed; result has no renderable preview",
+      );
 
-      // 2. Raw SIGKILL and V8 RangeError at decodeHeic / decodeToSharpCompat
+      // 2. Raw SIGKILL, V8 RangeError, and DecoderOutOfMemoryError at decodeHeic / decodeToSharpCompat (including TIFF-headed DNG)
       for (const makeRawOom of [
         () => Object.assign(new Error("decoder exited SIGKILL"), { signal: "SIGKILL" }),
         () => new RangeError("Array buffer allocation failed"),
+        () => new DecoderOutOfMemoryError("raw", new Error("SIGKILL")),
       ]) {
         reportEngineUnavailableMock.mockReset();
+        loggerMock.warn.mockReset();
+        putObjectMock.mockReset();
         decodeHeicMock.mockRejectedValueOnce(makeRawOom());
         const decodeSpy = vi
           .spyOn(formatDecoders, "decodeToSharpCompat")
+          .mockRejectedValueOnce(makeRawOom())
           .mockRejectedValueOnce(makeRawOom());
 
         try {
@@ -1861,7 +2114,11 @@ describe("registerFetchUrlsRoute preview decode tmpdir write faults (#3452)", ()
           await handler(
             {
               body: {
-                urls: ["http://1.2.3.4:9999/photo.heic", "http://1.2.3.4:9999/layers.psd"],
+                urls: [
+                  "http://1.2.3.4:9999/photo.heic",
+                  "http://1.2.3.4:9999/layers.psd",
+                  "http://1.2.3.4:9999/photo.dng",
+                ],
               },
               log: loggerMock,
             },
@@ -1869,7 +2126,13 @@ describe("registerFetchUrlsRoute preview decode tmpdir write faults (#3452)", ()
           );
           expect(reply.statusCode).toBe(200);
           const body = reply.payload as {
-            results: Array<{ success: boolean; filename?: string; previewUrl?: string | null }>;
+            results: Array<{
+              success: boolean;
+              filename?: string;
+              width?: number;
+              height?: number;
+              previewUrl?: string | null;
+            }>;
           };
           expect(body.results).toEqual([
             expect.objectContaining({
@@ -1882,8 +2145,16 @@ describe("registerFetchUrlsRoute preview decode tmpdir write faults (#3452)", ()
               filename: "layers.psd",
               previewUrl: null,
             }),
+            expect.objectContaining({
+              success: true,
+              filename: "photo.dng",
+              width: 0,
+              height: 0,
+              previewUrl: null,
+            }),
           ]);
-          expect(reportEngineUnavailableMock).toHaveBeenCalledTimes(2);
+          expect(putObjectMock).toHaveBeenCalledTimes(3);
+          expect(reportEngineUnavailableMock).toHaveBeenCalledTimes(3);
           for (const call of reportEngineUnavailableMock.mock.calls) {
             expect(call[0]).toMatchObject({
               statusCode: 503,
@@ -1892,6 +2163,7 @@ describe("registerFetchUrlsRoute preview decode tmpdir write faults (#3452)", ()
             });
             expect(call[1]).toBe("fetch-urls");
           }
+          expect(loggerMock.warn).not.toHaveBeenCalled();
         } finally {
           decodeSpy.mockRestore();
         }

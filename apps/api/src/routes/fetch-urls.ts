@@ -22,6 +22,7 @@ import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
 import {
   asDecoderOutOfMemory,
+  DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
   needsCliDecode,
@@ -342,10 +343,9 @@ async function fetchSingleUrl(
     // dimensions below can be computed from actual pixel data, the same
     // pre-processing every other Sharp-touching consumer of
     // validateImageBuffer() already does (image-input.ts, erase-object.ts,
-    // user-files.ts thumbnails). Decode failure is non-fatal: fall back to
-    // the raw buffer, which preserves today's behavior (skip preview, 0x0
-    // dimensions) for whatever edge case failed to decode.
-    let decodedBuffer: Buffer = safeBuffer;
+    // user-files.ts thumbnails). Decode failure is non-fatal: skip preview
+    // and keep the 0x0 dimensions for whatever edge case failed to decode.
+    let decodedBuffer: Buffer | null = safeBuffer;
     let didDecode = false;
     if (isValidImage) {
       try {
@@ -353,16 +353,46 @@ async function fetchSingleUrl(
           decodedBuffer = Buffer.from(await decodeHeic(safeBuffer));
           didDecode = true;
         } else if (needsCliDecode(validation.format)) {
-          decodedBuffer = Buffer.from(await decodeToSharpCompat(safeBuffer, validation.format));
+          const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
+          try {
+            decodedBuffer = Buffer.from(
+              await decodeToSharpCompat(safeBuffer, validation.format, fileExt),
+            );
+          } catch (rawDecodeErr) {
+            const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
+            if (
+              decodeErr instanceof DecoderOutOfMemoryError ||
+              (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+            ) {
+              throw decodeErr;
+            }
+            // Sharp reads some TIFF-headed RAW files (such as .dng) itself;
+            // only surface a CLI decode failure if Sharp cannot read it either.
+            try {
+              await sharp(safeBuffer).metadata();
+              await sharp(safeBuffer).resize(1).raw().toBuffer();
+            } catch (rawProbeErr) {
+              const probeErr = asDecoderOutOfMemory(rawProbeErr);
+              if (probeErr instanceof DecoderOutOfMemoryError) {
+                throw probeErr;
+              }
+              throw decodeErr;
+            }
+          }
           didDecode = true;
         }
       } catch (rawErr) {
         const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
         if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
           reportEngineUnavailable(engineUnavailable(err), "fetch-urls", log);
+        } else {
+          log.warn(
+            { err: rawErr, jobId, contentType },
+            "preview generation failed; result has no renderable preview",
+          );
         }
-        // Decode failed: non-fatal, fall back to the raw buffer below.
-        decodedBuffer = safeBuffer;
+        // Decode failed: non-fatal, skip preview and keep the 0x0 fallback.
+        decodedBuffer = null;
         didDecode = false;
       }
     }
@@ -371,7 +401,7 @@ async function fetchSingleUrl(
     // valid format already has real width/height from validateImageBuffer.
     let width = isValidImage ? validation.width : undefined;
     let height = isValidImage ? validation.height : undefined;
-    if (didDecode) {
+    if (didDecode && decodedBuffer) {
       try {
         const metadata = await sharp(decodedBuffer).metadata();
         width = metadata.width ?? width;
@@ -387,7 +417,7 @@ async function fetchSingleUrl(
     // ...) produce a real preview instead of failing on the raw, undecoded
     // buffer.
     let previewUrl: string | null = null;
-    if (isValidImage && !BROWSER_PREVIEWABLE.has(contentType)) {
+    if (decodedBuffer && isValidImage && !BROWSER_PREVIEWABLE.has(contentType)) {
       try {
         const previewBuffer = await sharp(decodedBuffer).webp({ quality: 80 }).toBuffer();
         const previewFilename = `preview-${filename.replace(/\.[^.]+$/, "")}.webp`;
@@ -397,6 +427,11 @@ async function fetchSingleUrl(
         const decoderErr = asDecoderOutOfMemory(err);
         if (isDecoderUnavailable(decoderErr)) {
           reportEngineUnavailable(engineUnavailable(decoderErr), "fetch-urls", log);
+        } else {
+          log.warn(
+            { err, jobId, contentType },
+            "preview generation failed; result has no renderable preview",
+          );
         }
         // Preview generation failed: non-fatal, skip preview
       }

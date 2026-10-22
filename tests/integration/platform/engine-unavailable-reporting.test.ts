@@ -934,6 +934,12 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
         "fetch",
         vi.fn(async (url: string | URL | Request) => {
           const href = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+          if (href.endsWith(".dng")) {
+            return new Response(new Uint8Array(DNG), {
+              status: 200,
+              headers: { "Content-Type": "image/x-adobe-dng" },
+            });
+          }
           if (href.endsWith(".ico")) {
             return new Response(new Uint8Array(ICO), {
               status: 200,
@@ -996,8 +1002,9 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
           ),
         ).toHaveLength(1);
 
-        // 4. fetch-urls on two HEIC URLs (ENOSPC -> storage-full, deduplicated to 1 report)
-        // and one ICO URL (EACCES -> storage-not-writable)
+        // 4. fetch-urls on two HEIC URLs (ENOSPC -> storage-full, deduplicated to 1 report),
+        // one ICO URL, and one DNG URL (EACCES -> storage-not-writable, deduplicated to 1 report,
+        // without falling back to Sharp preview on the TIFF-headed DNG, #3486)
         const fetchRes = await app.inject({
           method: "POST",
           url: "/api/v1/fetch-urls",
@@ -1007,6 +1014,7 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
               "http://1.2.3.4:9999/photo-1.heic",
               "http://1.2.3.4:9999/photo-2.heic",
               "http://1.2.3.4:9999/icon.ico",
+              "http://1.2.3.4:9999/photo.dng",
             ],
           },
         });
@@ -1015,6 +1023,13 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
           expect.objectContaining({ success: true, filename: "photo-1.heic", previewUrl: null }),
           expect.objectContaining({ success: true, filename: "photo-2.heic", previewUrl: null }),
           expect.objectContaining({ success: true, filename: "icon.ico", previewUrl: null }),
+          expect.objectContaining({
+            success: true,
+            filename: "photo.dng",
+            width: 0,
+            height: 0,
+            previewUrl: null,
+          }),
         ]);
         expect(
           mocks.reportError.mock.calls.filter(
