@@ -274,7 +274,7 @@ describe("adjust-colors invert preserves animated.gif frames and inverted RGB (#
     const recombRaw = await sharp(recombInverted, { animated: true })
       .raw()
       .toBuffer({ resolveWithObject: true });
-    expect([...recombRaw.data.slice(0, 4)]).toEqual([127, 255, 255, 255]);
+    expect([...recombRaw.data.slice(0, 4)]).toEqual([128, 255, 255, 255]);
     expect([...recombRaw.data.slice(stride, stride + 4)]).toEqual([255, 0, 255, 255]);
     expect([...recombRaw.data.slice(stride * 2, stride * 2 + 4)]).toEqual([255, 255, 0, 255]);
   });

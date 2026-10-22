@@ -1426,12 +1426,11 @@ describe("invert", () => {
     expect(info.channels).toBe(4);
     expect([...data]).toEqual([155, 205, 235, 255, 155, 205, 235, 128, 155, 205, 235, 0]);
 
-    const gaPng = await sharp(Buffer.from([100, 200]), {
-      raw: { width: 1, height: 1, channels: 2 },
-    })
-      .png()
-      .toBuffer();
-    const gaResult = await invert(sharp(gaPng));
+    const gaResult = await invert(
+      sharp(Buffer.from([100, 200]), {
+        raw: { width: 1, height: 1, channels: 2 },
+      }),
+    );
     const gaRaw = await gaResult.raw().toBuffer({ resolveWithObject: true });
     expect(gaRaw.info.channels).toBe(2);
     expect([...gaRaw.data]).toEqual([155, 200]);
