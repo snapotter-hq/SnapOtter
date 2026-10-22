@@ -12,6 +12,26 @@ const qpdf = vi.hoisted(() => ({
   requiresPassword: vi.fn(),
 }));
 
+const fsPromisesSpy = vi.hoisted(() => ({
+  mkdir: vi.fn(),
+  writeFile: vi.fn(),
+}));
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  fsPromisesSpy.mkdir.mockImplementation((...args: Parameters<typeof actual.mkdir>) =>
+    actual.mkdir(...args),
+  );
+  fsPromisesSpy.writeFile.mockImplementation((...args: Parameters<typeof actual.writeFile>) =>
+    actual.writeFile(...args),
+  );
+  return {
+    ...actual,
+    mkdir: fsPromisesSpy.mkdir,
+    writeFile: fsPromisesSpy.writeFile,
+  };
+});
+
 vi.mock("@snapotter/doc-engine", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@snapotter/doc-engine")>()),
   qpdfAvailable: qpdf.available,
@@ -567,6 +587,128 @@ describe("path-backed PDF validation", () => {
       }),
     ).rejects.toBe(abortReason);
     expect(qpdf.check).not.toHaveBeenCalled();
+    expect(readdirSync(scratchDir)).toEqual([]);
+  });
+
+  it("rejects immediately without creating a scratch file when signal is already aborted on strict PDFs (#3574)", async () => {
+    const controller = new AbortController();
+    const abortReason = new DOMException("Pre-aborted strict PDF", "AbortError");
+    controller.abort(abortReason);
+
+    await expect(
+      new DocumentInputHandler().prepare(Buffer.from("%PDF-path-backed"), "scan.pdf", {
+        scratchDir,
+        rejectPasswordProtected: true,
+        signal: controller.signal,
+      }),
+    ).rejects.toBe(abortReason);
+    expect(fsPromisesSpy.mkdir).not.toHaveBeenCalled();
+    expect(fsPromisesSpy.writeFile).not.toHaveBeenCalled();
+    expect(qpdf.requiresPassword).not.toHaveBeenCalled();
+    expect(qpdf.check).not.toHaveBeenCalled();
+    expect(readdirSync(scratchDir)).toEqual([]);
+  });
+
+  it("passes signal to writeFile and cleans up scratch dir if writeFile aborts (#3574)", async () => {
+    const controller = new AbortController();
+    const input = Buffer.from("%PDF-path-backed");
+    qpdf.requiresPassword.mockResolvedValueOnce(false);
+    qpdf.check.mockResolvedValueOnce(undefined);
+
+    await expect(
+      new DocumentInputHandler().prepare(input, "scan.pdf", {
+        scratchDir,
+        rejectPasswordProtected: true,
+        signal: controller.signal,
+      }),
+    ).resolves.toEqual({ buffer: input, filename: "scan.pdf" });
+    expect(fsPromisesSpy.writeFile).toHaveBeenCalledWith(
+      expect.stringMatching(/input\.pdf$/),
+      input,
+      {
+        signal: controller.signal,
+      },
+    );
+
+    // Simulate abort mid-writeFile via real node:fs/promises writeFile
+    vi.clearAllMocks();
+    const actualFs = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+    const writeController = new AbortController();
+    const writeAbortReason = new DOMException("Aborted during scratch write", "AbortError");
+    fsPromisesSpy.writeFile.mockImplementationOnce(
+      async (...args: Parameters<typeof actualFs.writeFile>) => {
+        const options = args[2] as { signal?: AbortSignal } | undefined;
+        expect(options?.signal).toBe(writeController.signal);
+        writeController.abort(writeAbortReason);
+        return actualFs.writeFile(...args);
+      },
+    );
+
+    await expect(
+      new DocumentInputHandler().prepare(input, "scan.pdf", {
+        scratchDir,
+        rejectPasswordProtected: true,
+        signal: writeController.signal,
+      }),
+    ).rejects.toBe(writeAbortReason);
+    expect(qpdf.requiresPassword).not.toHaveBeenCalled();
+    expect(readdirSync(scratchDir)).toEqual([]);
+  });
+
+  it("rejects when signal is already aborted on lenient PDFs, unavailable qpdf, Office/EPUB, and passthrough files (#3574)", async () => {
+    const handler = new DocumentInputHandler();
+
+    // 1. Lenient PDF
+    const lenientController = new AbortController();
+    const lenientReason = new DOMException("Pre-aborted lenient PDF", "AbortError");
+    lenientController.abort(lenientReason);
+    await expect(
+      handler.prepare(Buffer.from("%PDF-1.4 broken"), "broken.pdf", {
+        scratchDir,
+        lenient: true,
+        signal: lenientController.signal,
+      }),
+    ).rejects.toBe(lenientReason);
+
+    // 2. PDF when qpdf is unavailable
+    qpdf.available.mockReturnValue(false);
+    try {
+      const noQpdfController = new AbortController();
+      const noQpdfReason = new DOMException("Pre-aborted without qpdf", "AbortError");
+      noQpdfController.abort(noQpdfReason);
+      await expect(
+        handler.prepare(Buffer.from("%PDF-1.4 valid"), "doc.pdf", {
+          scratchDir,
+          signal: noQpdfController.signal,
+        }),
+      ).rejects.toBe(noQpdfReason);
+    } finally {
+      qpdf.available.mockReturnValue(true);
+    }
+
+    // 3. Office/EPUB container
+    const officeController = new AbortController();
+    const officeReason = new DOMException("Pre-aborted docx", "AbortError");
+    officeController.abort(officeReason);
+    await expect(
+      handler.prepare(Buffer.from("PK\x03\x04office"), "report.docx", {
+        scratchDir,
+        signal: officeController.signal,
+      }),
+    ).rejects.toBe(officeReason);
+
+    // 4. Passthrough file (e.g. CSV)
+    const passthroughController = new AbortController();
+    const passthroughReason = new DOMException("Pre-aborted csv", "AbortError");
+    passthroughController.abort(passthroughReason);
+    await expect(
+      handler.prepare(Buffer.from("a,b\n1,2\n"), "table.csv", {
+        scratchDir,
+        signal: passthroughController.signal,
+      }),
+    ).rejects.toBe(passthroughReason);
+
+    expect(qpdf.requiresPassword).not.toHaveBeenCalled();
     expect(readdirSync(scratchDir)).toEqual([]);
   });
 });

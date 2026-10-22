@@ -189,6 +189,7 @@ export class DocumentInputHandler implements InputHandler {
       log?: FastifyBaseLogger;
     },
   ): Promise<PreparedInput> {
+    opts.signal?.throwIfAborted();
     if (raw.length === 0) throw new InputValidationError("Empty file");
     const lower = filename.toLowerCase();
     // PDF-only consumers set rejectPasswordProtected. Do not let a misleading
@@ -204,8 +205,12 @@ export class DocumentInputHandler implements InputHandler {
         await mkdir(dir, { recursive: true });
         const p = join(dir, "input.pdf");
         try {
-          await writeFile(p, raw);
+          opts.signal?.throwIfAborted();
+          await writeFile(p, raw, { signal: opts.signal });
           await validatePdfPath(p, opts);
+        } catch (err) {
+          opts.signal?.throwIfAborted();
+          throw err;
         } finally {
           await rm(dir, { recursive: true, force: true }).catch(() => {});
         }
