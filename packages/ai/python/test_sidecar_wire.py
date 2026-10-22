@@ -101,6 +101,8 @@ assert gpu._OOM_MARKERS == gif_remove_bg._OOM_MARKERS
 assert upscale.OOM_ERROR_PATTERNS == gif_remove_bg._OOM_MARKERS
 assert remove_bg._HOST_OOM_MARKERS == gif_remove_bg._HOST_OOM_MARKERS
 assert gpu._HOST_OOM_MARKERS == gif_remove_bg._HOST_OOM_MARKERS
+assert remove_bg._MODEL_LOAD_ERROR_MARKERS == gif_remove_bg._MODEL_LOAD_ERROR_MARKERS
+assert gpu._MODEL_LOAD_ERROR_MARKERS == gif_remove_bg._MODEL_LOAD_ERROR_MARKERS
 for oom_mod, oom_fn in (
     (colorize, colorize.is_oom_error),
     (enhance_faces, enhance_faces._is_oom),
@@ -182,6 +184,69 @@ for host_oom_mod in (gif_remove_bg, remove_bg, gpu):
     ):
         assert host_oom_mod._is_host_oom(non_host_oom_err) is False, (
             f"{host_oom_mod.__name__}._is_host_oom must not match non-host-OOM: {non_host_oom_err!r}"
+        )
+
+
+class _FakeInvalidProtobuf(RuntimeError):
+    pass
+
+
+class _FakeInvalidGraph(RuntimeError):
+    pass
+
+
+class _FakeNoSuchFile(RuntimeError):
+    pass
+
+
+for model_err_mod in (gif_remove_bg, remove_bg, gpu):
+    for model_load_err in (
+        FileNotFoundError(2, "No such file or directory", "/tmp/model.onnx"),
+        PermissionError(13, "Permission denied", "/tmp/model.onnx"),
+        IsADirectoryError(21, "Is a directory", "/tmp/model.onnx"),
+        OSError(5, "Input/output error"),
+        ConnectionError("Connection reset by peer"),
+        EOFError("Unexpected end of file"),
+        _FakeInvalidProtobuf("Load model from /tmp/model.onnx failed"),
+        _FakeInvalidGraph("Load model from /tmp/model.onnx failed"),
+        _FakeNoSuchFile("/tmp/model.onnx"),
+        RuntimeError(
+            "[ONNXRuntimeError] : 7 : INVALID_PROTOBUF : Load model from /tmp/model.onnx failed:Protobuf parsing failed."
+        ),
+        RuntimeError(
+            "[ONNXRuntimeError] : 3 : NO_SUCHFILE : Load model from /tmp/model.onnx failed:File doesn't exist"
+        ),
+        RuntimeError(
+            "[ONNXRuntimeError] : 10 : INVALID_GRAPH : Load model from /tmp/model.onnx failed:This is an invalid model. Error: ModelProto does not have a graph."
+        ),
+        RuntimeError(
+            "[ONNXRuntimeError] : 10 : INVALID_GRAPH : Load model from /tmp/model.onnx failed:This is an invalid model. Type Error: Type 'tensor(float)' of input parameter is invalid."
+        ),
+        ValueError(
+            "SHA256 hash of downloaded file (model.onnx) does not match the known hash: expected abc"
+        ),
+        ValueError("Checksum mismatch for model.onnx"),
+        RuntimeError(
+            "Offline mode is enabled (SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0); cannot download model"
+        ),
+    ):
+        assert model_err_mod._is_model_load_error(model_load_err) is True, (
+            f"{model_err_mod.__name__}._is_model_load_error must recognize {model_load_err!r}"
+        )
+    for non_model_load_err in (
+        MemoryError(),
+        OSError(12, "Cannot allocate memory"),
+        RuntimeError("CUDA out of memory"),
+        RuntimeError("Failed to allocate memory for requested buffer"),
+        RuntimeError("cudaErrorMemoryAllocation: out of memory"),
+        RuntimeError("CUBLAS_STATUS_ALLOC_FAILED"),
+        RuntimeError("CUDA driver version is insufficient for CUDA runtime version"),
+        RuntimeError(
+            "[ONNXRuntimeError] : 1 : FAIL : Failed to load library libonnxruntime_providers_cuda.so with error: libcudnn.so.8: cannot open shared object file: No such file or directory"
+        ),
+    ):
+        assert model_err_mod._is_model_load_error(non_model_load_err) is False, (
+            f"{model_err_mod.__name__}._is_model_load_error must not match {non_model_load_err!r}"
         )
 
 # Verify _remove_one does not retry with alpha_matting=False when a CPU allocator OOM occurs,
@@ -791,12 +856,65 @@ def _verify_gif_cuda_session_host_oom():
             )
             assert "falling back to CPU" not in err_buf.getvalue(), err_buf.getvalue()
 
+        # 1b) _create_session re-raises model-load / I/O / protobuf / download errors immediately without retrying CPUExecutionProvider (#3443).
+        for model_load_exc in (
+            FileNotFoundError(2, "No such file or directory", "/tmp/birefnet-general.onnx"),
+            PermissionError(13, "Permission denied", "/tmp/birefnet-general.onnx"),
+            IsADirectoryError(21, "Is a directory", "/tmp/birefnet-general.onnx"),
+            OSError(5, "Input/output error"),
+            ConnectionError("Connection reset by peer"),
+            EOFError("Unexpected end of file"),
+            _FakeInvalidProtobuf("Load model from /tmp/birefnet-general.onnx failed"),
+            _FakeInvalidGraph("Load model from /tmp/birefnet-general.onnx failed"),
+            _FakeNoSuchFile("/tmp/birefnet-general.onnx"),
+            RuntimeError(
+                "[ONNXRuntimeError] : 7 : INVALID_PROTOBUF : Load model from /tmp/birefnet-general.onnx failed:Protobuf parsing failed."
+            ),
+            RuntimeError(
+                "[ONNXRuntimeError] : 3 : NO_SUCHFILE : Load model from /tmp/birefnet-general.onnx failed:File doesn't exist"
+            ),
+            RuntimeError(
+                "[ONNXRuntimeError] : 10 : INVALID_GRAPH : Load model from /tmp/birefnet-general.onnx failed:This is an invalid model. Error: ModelProto does not have a graph."
+            ),
+            RuntimeError(
+                "[ONNXRuntimeError] : 10 : INVALID_GRAPH : Load model from /tmp/birefnet-general.onnx failed:This is an invalid model. Type Error: Type 'tensor(float)' of input parameter is invalid."
+            ),
+            ValueError(
+                "SHA256 hash of downloaded file (birefnet-general.onnx) does not match the known hash"
+            ),
+            ValueError("Checksum mismatch"),
+            RuntimeError(
+                "Offline mode is enabled (SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0); cannot download model"
+            ),
+        ):
+            session_calls.clear()
+            session_err[0] = ({"birefnet-general"}, model_load_exc)
+            err_buf = io.StringIO()
+            saved_stderr = sys.stderr
+            sys.stderr = err_buf
+            try:
+                gif_remove_bg._create_session("birefnet-general", cuda_providers, "cuda")
+                raise AssertionError(
+                    f"gif_remove_bg._create_session did not re-raise {model_load_exc!r}"
+                )
+            except Exception as caught:
+                assert caught is model_load_exc, (caught, model_load_exc)
+            finally:
+                sys.stderr = saved_stderr
+            assert session_calls == [("birefnet-general", cuda_providers)], (
+                f"gif_remove_bg._create_session must not retry on CPU for model-load error {model_load_exc!r}, got {session_calls!r}"
+            )
+            assert "falling back to CPU" not in err_buf.getvalue(), err_buf.getvalue()
+
         # 2) _create_session still falls back to CPUExecutionProvider on CUDA VRAM / driver errors (#3393).
         for cuda_exc in (
             RuntimeError("CUDA out of memory"),
             RuntimeError("cudaErrorMemoryAllocation: out of memory"),
             RuntimeError("CUBLAS_STATUS_ALLOC_FAILED"),
             RuntimeError("CUDA driver version is insufficient"),
+            RuntimeError(
+                "[ONNXRuntimeError] : 1 : FAIL : Failed to load library libonnxruntime_providers_cuda.so with error: libcudnn.so.8: cannot open shared object file: No such file or directory"
+            ),
         ):
             session_calls.clear()
             session_err[0] = ({"birefnet-general"}, cuda_exc)
@@ -886,6 +1004,77 @@ def _verify_gif_cuda_session_host_oom():
                     "[gif-remove-bg] session device=cuda model=u2net" in line
                     for line in stderr_lines
                 ), stderr_lines
+
+            # 4) End-to-end gif_remove_bg.main() on CUDA host with a model-load / protobuf / checksum error
+            # fails immediately without retrying on CPUExecutionProvider or falling back to u2net (#3443).
+            for model_load_exc, expected_msg in (
+                (
+                    FileNotFoundError(2, "No such file or directory"),
+                    "[Errno 2] No such file or directory",
+                ),
+                (
+                    PermissionError(13, "Permission denied"),
+                    "[Errno 13] Permission denied",
+                ),
+                (
+                    EOFError("Unexpected end of file"),
+                    "Unexpected end of file",
+                ),
+                (
+                    RuntimeError(
+                        "[ONNXRuntimeError] : 7 : INVALID_PROTOBUF : Load model from /tmp/birefnet-general.onnx failed:Protobuf parsing failed."
+                    ),
+                    "[ONNXRuntimeError] : 7 : INVALID_PROTOBUF : Load model from /tmp/birefnet-general.onnx failed:Protobuf parsing failed.",
+                ),
+                (
+                    RuntimeError(
+                        "[ONNXRuntimeError] : 10 : INVALID_GRAPH : Load model from /tmp/birefnet-general.onnx failed:This is an invalid model. Error: ModelProto does not have a graph."
+                    ),
+                    "[ONNXRuntimeError] : 10 : INVALID_GRAPH : Load model from /tmp/birefnet-general.onnx failed:This is an invalid model. Error: ModelProto does not have a graph.",
+                ),
+                (
+                    ValueError(
+                        "SHA256 hash of downloaded file (birefnet-general.onnx) does not match the known hash"
+                    ),
+                    "SHA256 hash of downloaded file (birefnet-general.onnx) does not match the known hash",
+                ),
+            ):
+                session_calls.clear()
+                stderr_lines.clear()
+                session_err[0] = ({"birefnet-general"}, model_load_exc)
+                sys.argv = [
+                    "gif_remove_bg.py",
+                    "in.gif",
+                    "out.webp",
+                    json.dumps({"model": "birefnet-general", "outputFormat": "webp"}),
+                ]
+                r_fd, w_fd = os.pipe()
+                err_buf = io.StringIO()
+                saved_stderr = sys.stderr
+                try:
+                    saved_stdout_fd = os.dup(1)
+                    os.dup2(w_fd, 1)
+                    os.close(w_fd)
+                    sys.stderr = err_buf
+                    try:
+                        gif_remove_bg.main()
+                    finally:
+                        sys.stderr = saved_stderr
+                        os.dup2(saved_stdout_fd, 1)
+                        os.close(saved_stdout_fd)
+                    captured = os.read(r_fd, 4096).decode("utf-8")
+                finally:
+                    os.close(r_fd)
+                stderr_lines.extend(
+                    line.strip() for line in err_buf.getvalue().splitlines() if line.strip()
+                )
+                payload = json.loads(captured.strip())
+                assert payload == {"success": False, "error": expected_msg}, payload
+                assert session_calls == [("birefnet-general", cuda_providers)], (
+                    f"gif_remove_bg.main must not retry on CPU or u2net for {model_load_exc!r}: {session_calls!r}"
+                )
+                assert not any("falling back to CPU" in line for line in stderr_lines), stderr_lines
+                assert not any("retrying with u2net" in line for line in stderr_lines), stderr_lines
     finally:
         remove_bg._matting_registered = orig_matting_reg
         remove_bg._hr_matting_registered = orig_hr_matting_reg
@@ -974,6 +1163,58 @@ def _verify_safe_onnx_session_host_oom():
                 )
                 assert "falling back to CPU" not in err_buf.getvalue(), err_buf.getvalue()
 
+        # 1b) safe_onnx_session re-raises model-load / I/O / protobuf / download errors immediately without retrying CPUExecutionProvider (#3443).
+        for model_load_exc in (
+            FileNotFoundError(2, "No such file or directory", "/tmp/model.onnx"),
+            PermissionError(13, "Permission denied", "/tmp/model.onnx"),
+            IsADirectoryError(21, "Is a directory", "/tmp/model.onnx"),
+            OSError(5, "Input/output error"),
+            ConnectionError("Connection reset by peer"),
+            EOFError("Unexpected end of file"),
+            _FakeInvalidProtobuf("Load model from /tmp/model.onnx failed"),
+            _FakeInvalidGraph("Load model from /tmp/model.onnx failed"),
+            _FakeNoSuchFile("/tmp/model.onnx"),
+            RuntimeError(
+                "[ONNXRuntimeError] : 7 : INVALID_PROTOBUF : Load model from /tmp/model.onnx failed:Protobuf parsing failed."
+            ),
+            RuntimeError(
+                "[ONNXRuntimeError] : 3 : NO_SUCHFILE : Load model from /tmp/model.onnx failed:File doesn't exist"
+            ),
+            RuntimeError(
+                "[ONNXRuntimeError] : 10 : INVALID_GRAPH : Load model from /tmp/model.onnx failed:This is an invalid model. Error: ModelProto does not have a graph."
+            ),
+            RuntimeError(
+                "[ONNXRuntimeError] : 10 : INVALID_GRAPH : Load model from /tmp/model.onnx failed:This is an invalid model. Type Error: Type 'tensor(float)' of input parameter is invalid."
+            ),
+            ValueError(
+                "SHA256 hash of downloaded file (model.onnx) does not match the known hash"
+            ),
+            ValueError("Checksum mismatch"),
+            RuntimeError(
+                "Offline mode is enabled (SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0); cannot download model"
+            ),
+        ):
+            for explicit_providers in (cuda_providers, None):
+                calls.clear()
+                active_err[0] = model_load_exc
+                gpu.onnx_providers = lambda: (list(cuda_providers), "cuda")
+                err_buf = io.StringIO()
+                saved_stderr = sys.stderr
+                sys.stderr = err_buf
+                try:
+                    gpu.safe_onnx_session("/tmp/model.onnx", providers=explicit_providers)
+                    raise AssertionError(
+                        f"gpu.safe_onnx_session did not re-raise {model_load_exc!r}"
+                    )
+                except Exception as caught:
+                    assert caught is model_load_exc, (caught, model_load_exc)
+                finally:
+                    sys.stderr = saved_stderr
+                assert calls == [("/tmp/model.onnx", cuda_providers)], (
+                    f"gpu.safe_onnx_session must not retry on CPU for model-load error {model_load_exc!r}, got {calls!r}"
+                )
+                assert "falling back to CPU" not in err_buf.getvalue(), err_buf.getvalue()
+
         # 2) safe_onnx_session still falls back to CPUExecutionProvider on CUDA VRAM / driver errors (#3439).
         for cuda_exc in (
             RuntimeError("CUDA out of memory"),
@@ -981,6 +1222,9 @@ def _verify_safe_onnx_session_host_oom():
             RuntimeError("cudaErrorMemoryAllocation: out of memory"),
             RuntimeError("CUBLAS_STATUS_ALLOC_FAILED"),
             RuntimeError("CUDA driver version is insufficient"),
+            RuntimeError(
+                "[ONNXRuntimeError] : 1 : FAIL : Failed to load library libonnxruntime_providers_cuda.so with error: libcudnn.so.8: cannot open shared object file: No such file or directory"
+            ),
         ):
             for explicit_providers in (cuda_providers, None):
                 calls.clear()
@@ -1189,12 +1433,100 @@ def _verify_remove_bg_oom_handling():
                 assert rembg_calls == [], rembg_calls
                 assert info_msgs == [], info_msgs
 
+            # Model-load / I/O / protobuf / download errors during CUDA new_session must re-raise
+            # immediately without retrying new_session(model, providers=["CPUExecutionProvider"]) (#3443).
+            for model_load_exc, expected_msg in (
+                (
+                    FileNotFoundError(2, "No such file or directory"),
+                    "[Errno 2] No such file or directory",
+                ),
+                (
+                    PermissionError(13, "Permission denied"),
+                    "[Errno 13] Permission denied",
+                ),
+                (
+                    OSError(5, "Input/output error"),
+                    "[Errno 5] Input/output error",
+                ),
+                (
+                    EOFError("Unexpected end of file"),
+                    "Unexpected end of file",
+                ),
+                (
+                    _FakeInvalidProtobuf("Load model from /tmp/birefnet-general.onnx failed"),
+                    "Load model from /tmp/birefnet-general.onnx failed",
+                ),
+                (
+                    _FakeInvalidGraph("Load model from /tmp/birefnet-general.onnx failed"),
+                    "Load model from /tmp/birefnet-general.onnx failed",
+                ),
+                (
+                    _FakeNoSuchFile("/tmp/birefnet-general.onnx"),
+                    "/tmp/birefnet-general.onnx",
+                ),
+                (
+                    ConnectionError("Connection reset by peer"),
+                    "Connection reset by peer",
+                ),
+                (
+                    RuntimeError(
+                        "[ONNXRuntimeError] : 7 : INVALID_PROTOBUF : Load model from /tmp/birefnet-general.onnx failed:Protobuf parsing failed."
+                    ),
+                    "[ONNXRuntimeError] : 7 : INVALID_PROTOBUF : Load model from /tmp/birefnet-general.onnx failed:Protobuf parsing failed.",
+                ),
+                (
+                    RuntimeError(
+                        "[ONNXRuntimeError] : 3 : NO_SUCHFILE : Load model from /tmp/birefnet-general.onnx failed:File doesn't exist"
+                    ),
+                    "[ONNXRuntimeError] : 3 : NO_SUCHFILE : Load model from /tmp/birefnet-general.onnx failed:File doesn't exist",
+                ),
+                (
+                    RuntimeError(
+                        "[ONNXRuntimeError] : 10 : INVALID_GRAPH : Load model from /tmp/birefnet-general.onnx failed:This is an invalid model. Error: ModelProto does not have a graph."
+                    ),
+                    "[ONNXRuntimeError] : 10 : INVALID_GRAPH : Load model from /tmp/birefnet-general.onnx failed:This is an invalid model. Error: ModelProto does not have a graph.",
+                ),
+                (
+                    RuntimeError(
+                        "[ONNXRuntimeError] : 10 : INVALID_GRAPH : Load model from /tmp/birefnet-general.onnx failed:This is an invalid model. Type Error: Type 'tensor(float)' of input parameter is invalid."
+                    ),
+                    "[ONNXRuntimeError] : 10 : INVALID_GRAPH : Load model from /tmp/birefnet-general.onnx failed:This is an invalid model. Type Error: Type 'tensor(float)' of input parameter is invalid.",
+                ),
+                (
+                    ValueError(
+                        "SHA256 hash of downloaded file (birefnet-general.onnx) does not match the known hash"
+                    ),
+                    "SHA256 hash of downloaded file (birefnet-general.onnx) does not match the known hash",
+                ),
+                (
+                    ValueError("Checksum mismatch"),
+                    "Checksum mismatch",
+                ),
+                (
+                    RuntimeError(
+                        "Offline mode is enabled (SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0); cannot download model"
+                    ),
+                    "Offline mode is enabled (SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0); cannot download model",
+                ),
+            ):
+                session_err[0] = model_load_exc
+                payload = _run_remove_bg_main({"model": "birefnet-general"})
+                assert payload == {"success": False, "error": expected_msg}, payload
+                assert session_calls == [("birefnet-general", cuda_providers)], (
+                    f"remove_bg.main must not retry new_session on CPU for model-load error {model_load_exc!r}, got {session_calls!r}"
+                )
+                assert rembg_calls == [], rembg_calls
+                assert info_msgs == [], info_msgs
+
             # CUDA VRAM / driver errors during CUDA new_session still fall back to CPUExecutionProvider (#3393).
             for cuda_exc in (
                 RuntimeError("CUDA out of memory"),
                 RuntimeError("cudaErrorMemoryAllocation: out of memory"),
                 RuntimeError("CUBLAS_STATUS_ALLOC_FAILED"),
                 RuntimeError("CUDA driver version is insufficient"),
+                RuntimeError(
+                    "[ONNXRuntimeError] : 1 : FAIL : Failed to load library libonnxruntime_providers_cuda.so with error: libcudnn.so.8: cannot open shared object file: No such file or directory"
+                ),
             ):
                 session_err[0] = cuda_exc
                 payload = _run_remove_bg_main({"model": "birefnet-general"})

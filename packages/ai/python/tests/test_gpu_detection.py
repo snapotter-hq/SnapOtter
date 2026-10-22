@@ -150,6 +150,73 @@ def test_safe_onnx_session_reraises_host_oom_without_cpu_retry(monkeypatch, caps
             assert "falling back to CPU" not in capsys.readouterr().err
 
 
+def test_safe_onnx_session_reraises_model_load_io_protobuf_and_download_errors_without_cpu_retry(
+    monkeypatch, capsys
+):
+    class InvalidProtobuf(RuntimeError):
+        pass
+
+    class InvalidGraph(RuntimeError):
+        pass
+
+    class NoSuchFile(RuntimeError):
+        pass
+
+    cuda_providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+    for model_load_err in (
+        FileNotFoundError(2, "No such file or directory", "/tmp/model.onnx"),
+        PermissionError(13, "Permission denied", "/tmp/model.onnx"),
+        IsADirectoryError(21, "Is a directory", "/tmp/model.onnx"),
+        OSError(5, "Input/output error"),
+        ConnectionError("Connection reset by peer"),
+        EOFError("Unexpected end of file while reading model"),
+        InvalidProtobuf("Load model from /tmp/model.onnx failed"),
+        InvalidGraph("Load model from /tmp/model.onnx failed"),
+        NoSuchFile("/tmp/model.onnx"),
+        RuntimeError(
+            "[ONNXRuntimeError] : 7 : INVALID_PROTOBUF : Load model from /tmp/model.onnx failed:Protobuf parsing failed."
+        ),
+        RuntimeError(
+            "[ONNXRuntimeError] : 3 : NO_SUCHFILE : Load model from /tmp/model.onnx failed:File doesn't exist"
+        ),
+        RuntimeError(
+            "[ONNXRuntimeError] : 10 : INVALID_GRAPH : Load model from /tmp/model.onnx failed:This is an invalid model. Error: ModelProto does not have a graph."
+        ),
+        RuntimeError(
+            "[ONNXRuntimeError] : 10 : INVALID_GRAPH : Load model from /tmp/model.onnx failed:This is an invalid model. Type Error: Type 'tensor(float)' of input parameter is invalid."
+        ),
+        ValueError(
+            "SHA256 hash of downloaded file (model.onnx) does not match the known hash: expected deadbeef"
+        ),
+        ValueError("Checksum mismatch for downloaded model"),
+        RuntimeError(
+            "Offline mode is enabled (SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0); cannot download model"
+        ),
+    ):
+        calls = []
+
+        def fake_inference_session(model_path, providers=None, _exc=model_load_err):
+            calls.append((model_path, list(providers) if providers is not None else None))
+            if providers and "CUDAExecutionProvider" in providers:
+                raise _exc
+            return "cpu-session"
+
+        fake_ort = types.SimpleNamespace(InferenceSession=fake_inference_session)
+        monkeypatch.setitem(sys.modules, "onnxruntime", fake_ort)
+        monkeypatch.setattr(gpu, "onnx_providers", lambda: (list(cuda_providers), "cuda"))
+
+        for explicit_providers in (cuda_providers, None):
+            calls.clear()
+            try:
+                gpu.safe_onnx_session("/tmp/model.onnx", providers=explicit_providers)
+                raise AssertionError(f"Expected {model_load_err!r} to be re-raised")
+            except Exception as exc:
+                assert exc is model_load_err
+
+            assert calls == [("/tmp/model.onnx", cuda_providers)]
+            assert "falling back to CPU" not in capsys.readouterr().err
+
+
 def test_safe_onnx_session_falls_back_to_cpu_on_cuda_error(monkeypatch, capsys):
     cuda_providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
     for cuda_err in (
@@ -158,6 +225,9 @@ def test_safe_onnx_session_falls_back_to_cpu_on_cuda_error(monkeypatch, capsys):
         RuntimeError("cudaErrorMemoryAllocation: out of memory"),
         RuntimeError("CUBLAS_STATUS_ALLOC_FAILED"),
         RuntimeError("CUDA driver version is insufficient"),
+        RuntimeError(
+            "[ONNXRuntimeError] : 1 : FAIL : Failed to load library libonnxruntime_providers_cuda.so with error: libcudnn.so.8: cannot open shared object file: No such file or directory"
+        ),
     ):
         calls = []
 

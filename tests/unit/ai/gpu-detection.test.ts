@@ -299,6 +299,53 @@ for host_oom_exc in (
         )
         assert "falling back to CPU" not in err_buf.getvalue(), err_buf.getvalue()
 
+# 1b. Model-load / file I/O / protobuf / download errors must re-raise immediately without a second CPUExecutionProvider call (#3443).
+class InvalidProtobuf(RuntimeError):
+    pass
+
+class InvalidGraph(RuntimeError):
+    pass
+
+class NoSuchFile(RuntimeError):
+    pass
+
+for model_load_exc in (
+    FileNotFoundError(2, "No such file or directory", "/tmp/model.onnx"),
+    PermissionError(13, "Permission denied", "/tmp/model.onnx"),
+    IsADirectoryError(21, "Is a directory", "/tmp/model.onnx"),
+    OSError(5, "Input/output error"),
+    ConnectionError("Connection reset by peer"),
+    EOFError("Unexpected end of file"),
+    InvalidProtobuf("Load model from /tmp/model.onnx failed"),
+    InvalidGraph("Load model from /tmp/model.onnx failed"),
+    NoSuchFile("/tmp/model.onnx"),
+    RuntimeError("[ONNXRuntimeError] : 7 : INVALID_PROTOBUF : Load model from /tmp/model.onnx failed:Protobuf parsing failed."),
+    RuntimeError("[ONNXRuntimeError] : 3 : NO_SUCHFILE : Load model from /tmp/model.onnx failed:File doesn't exist"),
+    RuntimeError("[ONNXRuntimeError] : 10 : INVALID_GRAPH : Load model from /tmp/model.onnx failed:This is an invalid model. Error: ModelProto does not have a graph."),
+    RuntimeError("[ONNXRuntimeError] : 10 : INVALID_GRAPH : Load model from /tmp/model.onnx failed:This is an invalid model. Type Error: Type 'tensor(float)' of input parameter is invalid."),
+    ValueError("SHA256 hash of downloaded file (model.onnx) does not match the known hash"),
+    ValueError("Checksum mismatch for model.onnx"),
+    RuntimeError("Offline mode is enabled (SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0); cannot download model"),
+):
+    for explicit_providers in (cuda_providers, None):
+        calls.clear()
+        active_err[0] = model_load_exc
+        gpu.onnx_providers = lambda: (list(cuda_providers), "cuda")
+        err_buf = io.StringIO()
+        saved_stderr = sys.stderr
+        sys.stderr = err_buf
+        try:
+            gpu.safe_onnx_session("/tmp/model.onnx", providers=explicit_providers)
+            raise AssertionError(f"Expected safe_onnx_session to re-raise {model_load_exc!r}")
+        except Exception as caught:
+            assert caught is model_load_exc, (caught, model_load_exc)
+        finally:
+            sys.stderr = saved_stderr
+        assert calls == [("/tmp/model.onnx", cuda_providers)], (
+            f"safe_onnx_session must not retry on CPU for model-load error {model_load_exc!r}, got {calls!r}"
+        )
+        assert "falling back to CPU" not in err_buf.getvalue(), err_buf.getvalue()
+
 # 2. Non-host-OOM CUDA / VRAM / driver errors still fall back to CPUExecutionProvider.
 for cuda_exc in (
     RuntimeError("CUDA out of memory"),
@@ -306,6 +353,7 @@ for cuda_exc in (
     RuntimeError("cudaErrorMemoryAllocation: out of memory"),
     RuntimeError("CUBLAS_STATUS_ALLOC_FAILED"),
     RuntimeError("CUDA driver version is insufficient for CUDA runtime version"),
+    RuntimeError("[ONNXRuntimeError] : 1 : FAIL : Failed to load library libonnxruntime_providers_cuda.so with error: libcudnn.so.8: cannot open shared object file: No such file or directory"),
 ):
     for explicit_providers in (cuda_providers, None):
         calls.clear()

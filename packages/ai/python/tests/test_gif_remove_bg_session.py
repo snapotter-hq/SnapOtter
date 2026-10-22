@@ -43,28 +43,34 @@ def teardown_function(_fn):
 
 
 def test_cuda_session_failure_falls_back_to_cpu_and_says_so(capsys):
-    calls = []
+    for cuda_err in (
+        RuntimeError("CUDA failure for the test"),
+        RuntimeError(
+            "[ONNXRuntimeError] : 1 : FAIL : Failed to load library libonnxruntime_providers_cuda.so with error: libcudnn.so.8: cannot open shared object file: No such file or directory"
+        ),
+    ):
+        calls = []
 
-    def new_session(model, providers=None):
-        calls.append(providers)
-        if "CUDAExecutionProvider" in providers:
-            raise RuntimeError("CUDA failure for the test")
-        return "cpu-session"
+        def new_session(model, providers=None, _exc=cuda_err):
+            calls.append(providers)
+            if "CUDAExecutionProvider" in providers:
+                raise _exc
+            return "cpu-session"
 
-    mod = load_gif_module(new_session)
-    session, device = mod._create_session(
-        "u2net", ["CUDAExecutionProvider", "CPUExecutionProvider"], "cuda"
-    )
+        mod = load_gif_module(new_session)
+        session, device = mod._create_session(
+            "u2net", ["CUDAExecutionProvider", "CPUExecutionProvider"], "cuda"
+        )
 
-    assert session == "cpu-session"
-    assert device == "cpu"
-    assert calls == [
-        ["CUDAExecutionProvider", "CPUExecutionProvider"],
-        ["CPUExecutionProvider"],
-    ]
-    err = capsys.readouterr().err
-    assert "falling back to CPU" in err
-    assert "CUDA failure for the test" in err
+        assert session == "cpu-session"
+        assert device == "cpu"
+        assert calls == [
+            ["CUDAExecutionProvider", "CPUExecutionProvider"],
+            ["CPUExecutionProvider"],
+        ]
+        err = capsys.readouterr().err
+        assert "falling back to CPU" in err
+        assert str(cuda_err) in err
 
 
 def test_successful_cuda_session_keeps_device_and_stays_quiet(capsys):
@@ -102,3 +108,61 @@ def test_cuda_session_host_oom_reraises_without_cpu_retry(capsys):
 
         assert calls == [["CUDAExecutionProvider", "CPUExecutionProvider"]]
         assert "falling back" not in capsys.readouterr().err
+
+
+def test_cuda_session_model_load_error_reraises_without_cpu_retry(capsys):
+    class InvalidProtobuf(RuntimeError):
+        pass
+
+    class InvalidGraph(RuntimeError):
+        pass
+
+    class NoSuchFile(RuntimeError):
+        pass
+
+    for model_load_err in (
+        FileNotFoundError(2, "No such file or directory", "/tmp/u2net.onnx"),
+        PermissionError(13, "Permission denied", "/tmp/u2net.onnx"),
+        IsADirectoryError(21, "Is a directory", "/tmp/u2net.onnx"),
+        OSError(5, "Input/output error"),
+        ConnectionError("Connection reset by peer"),
+        EOFError("Unexpected end of file"),
+        InvalidProtobuf("Load model from /tmp/u2net.onnx failed"),
+        InvalidGraph("Load model from /tmp/u2net.onnx failed"),
+        NoSuchFile("/tmp/u2net.onnx"),
+        RuntimeError(
+            "[ONNXRuntimeError] : 7 : INVALID_PROTOBUF : Load model from /tmp/u2net.onnx failed:Protobuf parsing failed."
+        ),
+        RuntimeError(
+            "[ONNXRuntimeError] : 3 : NO_SUCHFILE : Load model from /tmp/u2net.onnx failed:File doesn't exist"
+        ),
+        RuntimeError(
+            "[ONNXRuntimeError] : 10 : INVALID_GRAPH : Load model from /tmp/u2net.onnx failed:This is an invalid model. Error: ModelProto does not have a graph."
+        ),
+        RuntimeError(
+            "[ONNXRuntimeError] : 10 : INVALID_GRAPH : Load model from /tmp/u2net.onnx failed:This is an invalid model. Type Error: Type 'tensor(float)' of input parameter is invalid."
+        ),
+        ValueError("SHA256 hash of downloaded file (u2net.onnx) does not match the known hash"),
+        ValueError("Checksum verification failed"),
+        RuntimeError(
+            "Offline mode is enabled (SNAPOTTER_ALLOW_MODEL_DOWNLOAD=0); cannot download model"
+        ),
+    ):
+        calls = []
+
+        def new_session(model, providers=None, _exc=model_load_err):
+            calls.append(providers)
+            raise _exc
+
+        mod = load_gif_module(new_session)
+        try:
+            mod._create_session(
+                "birefnet-general", ["CUDAExecutionProvider", "CPUExecutionProvider"], "cuda"
+            )
+            raise AssertionError(f"Expected {model_load_err!r} to be re-raised")
+        except Exception as exc:
+            assert exc is model_load_err
+
+        assert calls == [["CUDAExecutionProvider", "CPUExecutionProvider"]]
+        assert "falling back" not in capsys.readouterr().err
+

@@ -25,6 +25,21 @@ _HOST_OOM_MARKERS = (
     "bad_alloc",
     "memoryerror",
 )
+_MODEL_LOAD_ERROR_MARKERS = (
+    "invalidprotobuf",
+    "invalid_protobuf",
+    "protobuf parsing failed",
+    "invalidgraph",
+    "invalid_graph",
+    "no_suchfile",
+    "nosuchfile",
+    "file doesn't exist",
+    "modelproto does not have a graph",
+    "checksum",
+    "hash of downloaded file",
+    "does not match the known hash",
+    "snapotter_allow_model_download",
+)
 
 
 def emit_progress(percent, stage):
@@ -49,6 +64,15 @@ def _is_host_oom(err):
     if any(s in m for s in _HOST_OOM_MARKERS):
         return True
     return "defaultcpuallocator" in m and _is_oom(err)
+
+
+def _is_model_load_error(err):
+    if isinstance(err, EOFError):
+        return True
+    if isinstance(err, OSError):
+        return err.errno != errno.ENOMEM
+    m = f"{type(err).__name__} {err}".lower()
+    return any(s in m for s in _MODEL_LOAD_ERROR_MARKERS)
 
 
 def _refine_edges(image_bytes, level):
@@ -261,7 +285,11 @@ def main():
         try:
             session = new_session(model, providers=providers)
         except Exception as e:
-            if "CUDAExecutionProvider" in providers and not _is_host_oom(e):
+            if (
+                "CUDAExecutionProvider" in providers
+                and not _is_host_oom(e)
+                and not _is_model_load_error(e)
+            ):
                 from gpu import emit_info
                 emit_info(f"GPU session failed ({e}), falling back to CPU")
                 session = new_session(model, providers=["CPUExecutionProvider"])
