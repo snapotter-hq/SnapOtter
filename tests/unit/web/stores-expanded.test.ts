@@ -272,6 +272,7 @@ describe("useSplitStore expanded", () => {
       processing: false,
       error: null,
       tiles: [],
+      runFileCount: 0,
       zipBlobUrl: null,
     });
   });
@@ -369,6 +370,74 @@ describe("useSplitStore expanded", () => {
       .setTiles([{ row: 0, col: 0, label: "1", width: 100, height: 100, blobUrl: null }]);
     useSplitStore.getState().setTileHeight(400);
     expect(useSplitStore.getState().tiles).toEqual([]);
+  });
+
+  it.each([
+    ["setMode", () => useSplitStore.getState().setMode("tile-size")],
+    ["setColumns", () => useSplitStore.getState().setColumns(4)],
+    ["setRows", () => useSplitStore.getState().setRows(5)],
+    ["setTileWidth", () => useSplitStore.getState().setTileWidth(300)],
+    ["setTileHeight", () => useSplitStore.getState().setTileHeight(400)],
+    ["applyPreset", () => useSplitStore.getState().applyPreset(2, 2)],
+  ])("%s revokes previous tile and zip blob URLs and resets runFileCount", (_name, act) => {
+    useSplitStore.setState({
+      tiles: [
+        { row: 0, col: 0, label: "1", width: 100, height: 100, blobUrl: "blob:tile-1" },
+        { row: 0, col: 1, label: "2", width: 100, height: 100, blobUrl: "blob:tile-2" },
+        { row: 1, col: 0, label: "3", width: 100, height: 100, blobUrl: null },
+      ],
+      runFileCount: 2,
+      zipBlobUrl: "blob:zip-1",
+    });
+    revokeObjectURL.mockClear();
+
+    act();
+
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:zip-1");
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:tile-1");
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:tile-2");
+    expect(revokeObjectURL).toHaveBeenCalledTimes(3);
+    expect(useSplitStore.getState().tiles).toEqual([]);
+    expect(useSplitStore.getState().zipBlobUrl).toBeNull();
+    expect(useSplitStore.getState().runFileCount).toBe(0);
+  });
+
+  it("setTiles revokes removed tile blob URLs without revoking retained tiles or zipBlobUrl", () => {
+    useSplitStore.setState({
+      tiles: [
+        { row: 0, col: 0, label: "1", width: 100, height: 100, blobUrl: "blob:keep" },
+        { row: 0, col: 1, label: "2", width: 100, height: 100, blobUrl: "blob:drop" },
+        { row: 0, col: 2, label: "3", width: 100, height: 100, blobUrl: "blob:drop" },
+        { row: 1, col: 0, label: "4", width: 100, height: 100, blobUrl: null },
+      ],
+      runFileCount: 1,
+      zipBlobUrl: "blob:active-zip",
+    });
+    revokeObjectURL.mockClear();
+
+    useSplitStore.getState().setTiles(
+      [
+        { row: 0, col: 0, label: "1", width: 100, height: 100, blobUrl: "blob:keep" },
+        { row: 0, col: 1, label: "2", width: 100, height: 100, blobUrl: null },
+      ],
+      3,
+    );
+
+    expect(revokeObjectURL).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:drop");
+    expect(useSplitStore.getState().zipBlobUrl).toBe("blob:active-zip");
+    expect(useSplitStore.getState().runFileCount).toBe(3);
+
+    revokeObjectURL.mockClear();
+    useSplitStore.getState().setZipBlobUrl("blob:active-zip");
+    expect(revokeObjectURL).not.toHaveBeenCalled();
+
+    useSplitStore.getState().setTiles([], 3);
+
+    expect(revokeObjectURL).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:keep");
+    expect(useSplitStore.getState().tiles).toEqual([]);
+    expect(useSplitStore.getState().runFileCount).toBe(0);
   });
 });
 

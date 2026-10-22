@@ -78,6 +78,30 @@ export function beginSplitRun(abort: () => void): {
   };
 }
 
+function revokeRemovedTileUrls(prevTiles: TileInfo[], nextTiles: TileInfo[] = []): void {
+  const keep = new Set<string>();
+  for (const t of nextTiles) {
+    if (t.blobUrl) keep.add(t.blobUrl);
+  }
+  const revoked = new Set<string>();
+  for (const t of prevTiles) {
+    if (t.blobUrl && !keep.has(t.blobUrl) && !revoked.has(t.blobUrl)) {
+      URL.revokeObjectURL(t.blobUrl);
+      revoked.add(t.blobUrl);
+    }
+  }
+}
+
+function clearSplitResult(prev: Pick<SplitState, "tiles" | "zipBlobUrl">): {
+  tiles: TileInfo[];
+  runFileCount: number;
+  zipBlobUrl: null;
+} {
+  if (prev.zipBlobUrl) URL.revokeObjectURL(prev.zipBlobUrl);
+  revokeRemovedTileUrls(prev.tiles);
+  return { tiles: [], runFileCount: 0, zipBlobUrl: null };
+}
+
 export const useSplitStore = create<SplitState>((set, get) => ({
   mode: "grid",
   columns: 3,
@@ -93,43 +117,39 @@ export const useSplitStore = create<SplitState>((set, get) => ({
   runFileCount: 0,
   zipBlobUrl: null,
 
-  setMode: (mode) => set({ mode, tiles: [], zipBlobUrl: null, error: null }),
+  setMode: (mode) => set({ mode, ...clearSplitResult(get()), error: null }),
   setColumns: (columns) =>
-    set({ columns: Math.max(1, Math.min(100, columns)), tiles: [], zipBlobUrl: null }),
-  setRows: (rows) => set({ rows: Math.max(1, Math.min(100, rows)), tiles: [], zipBlobUrl: null }),
+    set({ columns: Math.max(1, Math.min(100, columns)), ...clearSplitResult(get()) }),
+  setRows: (rows) => set({ rows: Math.max(1, Math.min(100, rows)), ...clearSplitResult(get()) }),
   setTileWidth: (tileWidth) =>
-    set({ tileWidth: Math.max(10, tileWidth), tiles: [], zipBlobUrl: null }),
+    set({ tileWidth: Math.max(10, tileWidth), ...clearSplitResult(get()) }),
   setTileHeight: (tileHeight) =>
-    set({ tileHeight: Math.max(10, tileHeight), tiles: [], zipBlobUrl: null }),
+    set({ tileHeight: Math.max(10, tileHeight), ...clearSplitResult(get()) }),
   setOutputFormat: (outputFormat) => set({ outputFormat }),
   setQuality: (quality) => set({ quality }),
   setImageDimensions: (imageDimensions) => set({ imageDimensions }),
   setProcessing: (processing) => set({ processing }),
   setError: (error) => set({ error }),
-  setTiles: (tiles, runFileCount = 0) => set({ tiles, runFileCount }),
+  setTiles: (tiles, runFileCount = 0) => {
+    revokeRemovedTileUrls(get().tiles, tiles);
+    set({ tiles, runFileCount: tiles.length === 0 ? 0 : runFileCount });
+  },
   setZipBlobUrl: (url) => {
     const prev = get().zipBlobUrl;
-    if (prev) URL.revokeObjectURL(prev);
+    if (prev && prev !== url) URL.revokeObjectURL(prev);
     set({ zipBlobUrl: url });
   },
 
   applyPreset: (cols, rows) =>
-    set({ mode: "grid", columns: cols, rows, tiles: [], zipBlobUrl: null, error: null }),
+    set({ mode: "grid", columns: cols, rows, ...clearSplitResult(get()), error: null }),
 
   reset: () => {
     splitRunId++;
     const abort = activeSplitAbort;
     activeSplitAbort = null;
     abort?.();
-    const prev = get();
-    if (prev.zipBlobUrl) URL.revokeObjectURL(prev.zipBlobUrl);
-    for (const t of prev.tiles) {
-      if (t.blobUrl) URL.revokeObjectURL(t.blobUrl);
-    }
     set({
-      tiles: [],
-      runFileCount: 0,
-      zipBlobUrl: null,
+      ...clearSplitResult(get()),
       processing: false,
       error: null,
       imageDimensions: null,
