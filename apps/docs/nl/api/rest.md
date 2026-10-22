@@ -1,6 +1,6 @@
 ---
 description: "Volledige REST API-referentie. Tool-endpoints, batchverwerking, pipelines, bestandsbibliotheek, authenticatie, teams en beheerbewerkingen."
-i18n_output_hash: ca07d4ef1270
+i18n_output_hash: f8559fd2fa75
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -64,16 +64,16 @@ Sleutels krijgen het voorvoegsel `si_` en worden opgeslagen als scrypt-hashes. D
 | `GET` | `/api/auth/session` | Auth | Huidige sessie valideren |
 | `POST` | `/api/auth/change-password` | Auth | Eigen wachtwoord wijzigen (maakt alle andere sessies + API-sleutels ongeldig) |
 | `GET` | `/api/auth/users` | Admin | Alle gebruikers weergeven |
-| `POST` | `/api/auth/register` | Admin | Een nieuwe gebruiker aanmaken |
-| `PUT` | `/api/auth/users/:id` | Admin | Rol of team van gebruiker bijwerken |
-| `POST` | `/api/auth/users/:id/reset-password` | Admin | Wachtwoord van gebruiker opnieuw instellen |
-| `DELETE` | `/api/auth/users/:id` | Admin | Een gebruiker verwijderen |
+| `POST` | `/api/auth/register` | Admin (`users:manage`; bevoegdheid voor voorgestelde rol) | Een nieuwe gebruiker aanmaken |
+| `PUT` | `/api/auth/users/:id` | Admin (`users:manage`; doelbevoegdheid) | Rol of team van gebruiker bijwerken |
+| `POST` | `/api/auth/users/:id/reset-password` | Admin (`users:manage`; doelbevoegdheid) | Wachtwoord van gebruiker opnieuw instellen |
+| `DELETE` | `/api/auth/users/:id` | Admin (`users:manage`; doelbevoegdheid) | Een gebruiker verwijderen |
 | `GET` | `/api/v1/config/auth` | Publiek | Controleren of authenticatie is ingeschakeld (`{ authEnabled: bool }`) |
 | `POST` | `/api/auth/mfa/enroll` | Auth | TOTP MFA-registratie starten. Vereist de enterprise-functie `mfa` |
 | `POST` | `/api/auth/mfa/verify` | Auth | MFA-registratie bevestigen met een TOTP-code |
 | `POST` | `/api/auth/mfa/complete` | Publiek | Een openstaande MFA-inlogverificatie voltooien |
 | `POST` | `/api/auth/mfa/disable` | Auth | MFA uitschakelen voor de huidige gebruiker |
-| `POST` | `/api/auth/users/:id/mfa/reset` | Admin (`users:manage`) | MFA opnieuw instellen voor een gebruiker |
+| `POST` | `/api/auth/users/:id/mfa/reset` | Admin (`users:manage`; doelbevoegdheid) | MFA opnieuw instellen voor een gebruiker |
 | `GET` | `/api/auth/oidc/login` | Publiek | OIDC-login starten wanneer OIDC is ingeschakeld |
 | `GET` | `/api/auth/oidc/callback` | Publiek | OIDC-autorisatiecallback |
 | `GET` | `/api/auth/saml/metadata` | Publiek | SAML SP-metadata-XML wanneer SAML is ingeschakeld |
@@ -560,6 +560,8 @@ Gebruikersvoorkeuren staan los van instance-instellingen. Elke geauthenticeerde 
 
 Beheer van aangepaste rollen met gedetailleerde permissies.
 
+Het aanmaken en wijzigen van rollen wordt begrensd door bevoegdheidsinkapseling: de voorgestelde of huidige rol mag niet hoger in rang zijn dan de actor, de effectieve permissies van de actor niet overschrijden en het toolbereik van de actor niet verruimen. API-sleutelbereiken tellen mee bij deze controle. Voor het verwijderen van een aangepaste rol is ook bevoegdheid vereist om de ingebouwde terugvalrol `user` toe te wijzen aan de leden ervan.
+
 | Methode | Pad | Toegang | Beschrijving |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/roles` | Admin (`audit:read`) | Alle rollen weergeven met aantallen gebruikers |
@@ -651,8 +653,8 @@ Deze routes zijn licentiegebonden door de bijbehorende enterprise-functie. Ze ve
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | CIDR-allowlist bijwerken met bescherming tegen zelf-buitensluiting |
 | `GET` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Legal holds voor gebruikers en teams weergeven |
 | `PUT` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Een legal hold op een gebruiker of team toepassen of opheffen |
-| `POST` | `/api/v1/enterprise/scim/token` | Admin (`users:manage`) | Een SCIM-bearertoken genereren, eenmaal geretourneerd |
-| `DELETE` | `/api/v1/enterprise/scim/token` | Admin (`users:manage`) | Het huidige SCIM-bearertoken intrekken |
+| `POST` | `/api/v1/enterprise/scim/token` | Volledige ingebouwde beheerder | Een SCIM-bearertoken genereren, eenmaal geretourneerd |
+| `DELETE` | `/api/v1/enterprise/scim/token` | Volledige ingebouwde beheerder | Het huidige SCIM-bearertoken intrekken |
 | `GET` | `/api/v1/enterprise/siem/config` | Admin (`webhooks:manage`) | SIEM-forwardingconfiguratie lezen |
 | `PUT` | `/api/v1/enterprise/siem/config` | Admin (`webhooks:manage`) | SIEM-forwardingconfiguratie bijwerken |
 | `GET` | `/api/v1/enterprise/webhooks` | Admin (`webhooks:manage`) | Webhook-bestemmingen weergeven |
@@ -662,15 +664,15 @@ Deze routes zijn licentiegebonden door de bijbehorende enterprise-functie. Ze ve
 | `POST` | `/api/v1/enterprise/webhooks/:index/test` | Admin (`webhooks:manage`) | Een test-webhook-payload versturen |
 | `POST` | `/api/v1/enterprise/users/:id/export` | Admin (`compliance:manage`) | Een GDPR-gebruikersexporttaak starten |
 | `GET` | `/api/v1/enterprise/users/:id/export/:jobId` | Admin (`compliance:manage`) | GDPR-exportstatus en download-URL lezen |
-| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Admin (`compliance:manage`) | De gegevens van een gebruiker na bevestiging permanent verwijderen |
-| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Admin (`compliance:manage`) | De gegevens van een team na bevestiging permanent verwijderen |
+| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Admin (`compliance:manage`; doelbevoegdheid) | De gegevens van een gebruiker na bevestiging permanent verwijderen |
+| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Admin (`compliance:manage`; bevoegdheid over alle leden) | De gegevens van een team na bevestiging permanent verwijderen |
 | `GET` | `/api/v1/admin/version` | Admin (`system:health`) | App-, build-, Node- en schemaversiemetadata lezen |
 | `GET` | `/api/v1/admin/migrations/pending` | Admin (`system:health`) | Meegeleverde migraties vergelijken met toegepaste migraties |
 | `GET` | `/api/v1/admin/upgrade-check` | Admin (`system:health`) | Upgrade-gereedheidscontroles uitvoeren |
 
 ### SCIM 2.0 {#scim-2-0}
 
-SCIM-discovery-endpoints zijn publiek. User- en group-endpoints vereisen het hierboven gegenereerde SCIM-bearertoken.
+SCIM-discovery-endpoints zijn publiek. User- en group-endpoints vereisen het hierboven gegenereerde SCIM-bearertoken. Verouderde tokens zonder versie zijn ongeldig en moeten door een volledige ingebouwde beheerder opnieuw worden uitgegeven als `so_scim_v2_...`-tokens.
 
 | Methode | Pad | Toegang | Beschrijving |
 |--------|------|--------|-------------|

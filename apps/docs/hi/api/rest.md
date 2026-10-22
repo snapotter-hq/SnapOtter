@@ -1,6 +1,6 @@
 ---
 description: "संपूर्ण REST API संदर्भ। टूल एंडपॉइंट, बैच प्रोसेसिंग, पाइपलाइन, फ़ाइल लाइब्रेरी, प्रमाणीकरण, टीमें और एडमिन संचालन।"
-i18n_output_hash: 1e5bfc233226
+i18n_output_hash: 3aa8e2d17ee4
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -64,16 +64,16 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 | `GET` | `/api/auth/session` | प्रमाणित | वर्तमान सेशन सत्यापित करें |
 | `POST` | `/api/auth/change-password` | प्रमाणित | अपना पासवर्ड बदलें (अन्य सभी सेशन + API कीज़ अमान्य कर देता है) |
 | `GET` | `/api/auth/users` | एडमिन | सभी उपयोगकर्ताओं की सूची बनाएँ |
-| `POST` | `/api/auth/register` | एडमिन | एक नया उपयोगकर्ता बनाएँ |
-| `PUT` | `/api/auth/users/:id` | एडमिन | उपयोगकर्ता की भूमिका या टीम अपडेट करें |
-| `POST` | `/api/auth/users/:id/reset-password` | एडमिन | उपयोगकर्ता का पासवर्ड रीसेट करें |
-| `DELETE` | `/api/auth/users/:id` | एडमिन | एक उपयोगकर्ता हटाएँ |
+| `POST` | `/api/auth/register` | एडमिन (`users:manage`; प्रस्तावित-भूमिका प्राधिकार) | एक नया उपयोगकर्ता बनाएँ |
+| `PUT` | `/api/auth/users/:id` | एडमिन (`users:manage`; लक्ष्य प्राधिकार) | उपयोगकर्ता की भूमिका या टीम अपडेट करें |
+| `POST` | `/api/auth/users/:id/reset-password` | एडमिन (`users:manage`; लक्ष्य प्राधिकार) | उपयोगकर्ता का पासवर्ड रीसेट करें |
+| `DELETE` | `/api/auth/users/:id` | एडमिन (`users:manage`; लक्ष्य प्राधिकार) | एक उपयोगकर्ता हटाएँ |
 | `GET` | `/api/v1/config/auth` | सार्वजनिक | जाँचें कि प्रमाणीकरण सक्षम है या नहीं (`{ authEnabled: bool }`) |
 | `POST` | `/api/auth/mfa/enroll` | प्रमाणित | TOTP MFA नामांकन शुरू करें। एंटरप्राइज़ `mfa` फ़ीचर आवश्यक है |
 | `POST` | `/api/auth/mfa/verify` | प्रमाणित | TOTP कोड के साथ MFA नामांकन की पुष्टि करें |
 | `POST` | `/api/auth/mfa/complete` | सार्वजनिक | एक लंबित MFA लॉगिन चुनौती पूरी करें |
 | `POST` | `/api/auth/mfa/disable` | प्रमाणित | वर्तमान उपयोगकर्ता के लिए MFA अक्षम करें |
-| `POST` | `/api/auth/users/:id/mfa/reset` | एडमिन (`users:manage`) | एक उपयोगकर्ता के लिए MFA रीसेट करें |
+| `POST` | `/api/auth/users/:id/mfa/reset` | एडमिन (`users:manage`; लक्ष्य प्राधिकार) | एक उपयोगकर्ता के लिए MFA रीसेट करें |
 | `GET` | `/api/auth/oidc/login` | सार्वजनिक | OIDC सक्षम होने पर OIDC लॉगिन शुरू करें |
 | `GET` | `/api/auth/oidc/callback` | सार्वजनिक | OIDC प्राधिकरण कॉलबैक |
 | `GET` | `/api/auth/saml/metadata` | सार्वजनिक | SAML सक्षम होने पर SAML SP मेटाडेटा XML |
@@ -560,6 +560,8 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 
 विस्तृत अनुमतियों के साथ कस्टम भूमिका प्रबंधन।
 
+भूमिका का निर्माण और परिवर्तन प्राधिकार नियंत्रण द्वारा सीमित हैं: प्रस्तावित या वर्तमान भूमिका कर्ता से उच्च पद की नहीं हो सकती, कर्ता की प्रभावी अनुमतियों से अधिक नहीं हो सकती, या कर्ता के टूल दायरे को विस्तृत नहीं कर सकती। API कुंजी स्कोप इस जाँच में शामिल होते हैं। किसी कस्टम भूमिका को हटाने के लिए उसके सदस्यों हेतु प्रयुक्त अंतर्निहित `user` फ़ॉलबैक भूमिका सौंपने का प्राधिकार भी आवश्यक है।
+
 | मेथड | पथ | पहुँच | विवरण |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/roles` | एडमिन (`audit:read`) | उपयोगकर्ता गिनती के साथ सभी भूमिकाओं की सूची बनाएँ |
@@ -651,8 +653,8 @@ arm64 पर `linux-arm64-cpu-py311` संग्रह का उपयोग �
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | एडमिन (`security:manage`) | सेल्फ़-लॉकआउट रोकथाम के साथ CIDR अनुमति-सूची अपडेट करें |
 | `GET` | `/api/v1/enterprise/legal-hold` | एडमिन (`compliance:manage`) | उपयोगकर्ता और टीम लीगल होल्ड की सूची बनाएँ |
 | `PUT` | `/api/v1/enterprise/legal-hold` | एडमिन (`compliance:manage`) | किसी उपयोगकर्ता या टीम पर एक लीगल होल्ड लागू करें या जारी करें |
-| `POST` | `/api/v1/enterprise/scim/token` | एडमिन (`users:manage`) | एक SCIM बियरर टोकन जेनरेट करें, एक बार लौटाया जाता है |
-| `DELETE` | `/api/v1/enterprise/scim/token` | एडमिन (`users:manage`) | वर्तमान SCIM बियरर टोकन रद्द करें |
+| `POST` | `/api/v1/enterprise/scim/token` | पूर्ण अंतर्निहित एडमिन | एक SCIM बियरर टोकन जेनरेट करें, एक बार लौटाया जाता है |
+| `DELETE` | `/api/v1/enterprise/scim/token` | पूर्ण अंतर्निहित एडमिन | वर्तमान SCIM बियरर टोकन रद्द करें |
 | `GET` | `/api/v1/enterprise/siem/config` | एडमिन (`webhooks:manage`) | SIEM फ़ॉरवर्डिंग कॉन्फ़िग पढ़ें |
 | `PUT` | `/api/v1/enterprise/siem/config` | एडमिन (`webhooks:manage`) | SIEM फ़ॉरवर्डिंग कॉन्फ़िग अपडेट करें |
 | `GET` | `/api/v1/enterprise/webhooks` | एडमिन (`webhooks:manage`) | वेबहुक गंतव्यों की सूची बनाएँ |
@@ -662,15 +664,15 @@ arm64 पर `linux-arm64-cpu-py311` संग्रह का उपयोग �
 | `POST` | `/api/v1/enterprise/webhooks/:index/test` | एडमिन (`webhooks:manage`) | एक परीक्षण वेबहुक पेलोड भेजें |
 | `POST` | `/api/v1/enterprise/users/:id/export` | एडमिन (`compliance:manage`) | एक GDPR उपयोगकर्ता निर्यात जॉब शुरू करें |
 | `GET` | `/api/v1/enterprise/users/:id/export/:jobId` | एडमिन (`compliance:manage`) | GDPR निर्यात स्थिति और डाउनलोड URL पढ़ें |
-| `DELETE` | `/api/v1/enterprise/users/:id/purge` | एडमिन (`compliance:manage`) | पुष्टि के बाद किसी उपयोगकर्ता का डेटा स्थायी रूप से हटाएँ |
-| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | एडमिन (`compliance:manage`) | पुष्टि के बाद किसी टीम का डेटा स्थायी रूप से हटाएँ |
+| `DELETE` | `/api/v1/enterprise/users/:id/purge` | एडमिन (`compliance:manage`; लक्ष्य प्राधिकार) | पुष्टि के बाद किसी उपयोगकर्ता का डेटा स्थायी रूप से हटाएँ |
+| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | एडमिन (`compliance:manage`; सभी-सदस्य प्राधिकार) | पुष्टि के बाद किसी टीम का डेटा स्थायी रूप से हटाएँ |
 | `GET` | `/api/v1/admin/version` | एडमिन (`system:health`) | ऐप, बिल्ड, Node, और स्कीमा संस्करण मेटाडेटा पढ़ें |
 | `GET` | `/api/v1/admin/migrations/pending` | एडमिन (`system:health`) | पैकेज किए गए माइग्रेशन की लागू किए गए माइग्रेशन से तुलना करें |
 | `GET` | `/api/v1/admin/upgrade-check` | एडमिन (`system:health`) | अपग्रेड रेडीनेस जाँचें चलाएँ |
 
 ### SCIM 2.0 {#scim-2-0}
 
-SCIM डिस्कवरी एंडपॉइंट सार्वजनिक हैं। उपयोगकर्ता और समूह एंडपॉइंट के लिए ऊपर जेनरेट किया गया SCIM बियरर टोकन आवश्यक है।
+SCIM डिस्कवरी एंडपॉइंट सार्वजनिक हैं। उपयोगकर्ता और समूह एंडपॉइंट के लिए ऊपर जेनरेट किया गया SCIM बियरर टोकन आवश्यक है। पुराने बिना संस्करण वाले टोकन अमान्य हैं और उन्हें किसी पूर्ण अंतर्निहित एडमिन द्वारा `so_scim_v2_...` टोकन के रूप में फिर से जारी किया जाना चाहिए।
 
 | मेथड | पथ | पहुँच | विवरण |
 |--------|------|--------|-------------|

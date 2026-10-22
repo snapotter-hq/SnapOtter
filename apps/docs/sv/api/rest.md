@@ -1,6 +1,6 @@
 ---
 description: "Fullständig REST API-referens. Verktygsslutpunkter, batchbearbetning, pipelines, filbibliotek, autentisering, team och adminåtgärder."
-i18n_output_hash: eec3c6ab131b
+i18n_output_hash: 05bd2d5b4423
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -64,16 +64,16 @@ Nycklar har prefixet `si_` och lagras som scrypt-hashar - den råa nyckeln visas
 | `GET` | `/api/auth/session` | Auth | Validera aktuell session |
 | `POST` | `/api/auth/change-password` | Auth | Byt eget lösenord (ogiltigförklarar alla andra sessioner + API-nycklar) |
 | `GET` | `/api/auth/users` | Admin | Lista alla användare |
-| `POST` | `/api/auth/register` | Admin | Skapa en ny användare |
-| `PUT` | `/api/auth/users/:id` | Admin | Uppdatera användarroll eller team |
-| `POST` | `/api/auth/users/:id/reset-password` | Admin | Återställ användarens lösenord |
-| `DELETE` | `/api/auth/users/:id` | Admin | Ta bort en användare |
+| `POST` | `/api/auth/register` | Admin (`users:manage`; behörighet för föreslagen roll) | Skapa en ny användare |
+| `PUT` | `/api/auth/users/:id` | Admin (`users:manage`; målbehörighet) | Uppdatera användarroll eller team |
+| `POST` | `/api/auth/users/:id/reset-password` | Admin (`users:manage`; målbehörighet) | Återställ användarens lösenord |
+| `DELETE` | `/api/auth/users/:id` | Admin (`users:manage`; målbehörighet) | Ta bort en användare |
 | `GET` | `/api/v1/config/auth` | Publik | Kontrollera om autentisering är aktiverad (`{ authEnabled: bool }`) |
 | `POST` | `/api/auth/mfa/enroll` | Auth | Starta TOTP MFA-registrering. Kräver enterprise-funktionen `mfa` |
 | `POST` | `/api/auth/mfa/verify` | Auth | Bekräfta MFA-registrering med en TOTP-kod |
 | `POST` | `/api/auth/mfa/complete` | Publik | Slutför en väntande MFA-inloggningsutmaning |
 | `POST` | `/api/auth/mfa/disable` | Auth | Inaktivera MFA för aktuell användare |
-| `POST` | `/api/auth/users/:id/mfa/reset` | Admin (`users:manage`) | Återställ MFA för en användare |
+| `POST` | `/api/auth/users/:id/mfa/reset` | Admin (`users:manage`; målbehörighet) | Återställ MFA för en användare |
 | `GET` | `/api/auth/oidc/login` | Publik | Starta OIDC-inloggning när OIDC är aktiverat |
 | `GET` | `/api/auth/oidc/callback` | Publik | OIDC-auktoriseringsåterkallelse |
 | `GET` | `/api/auth/saml/metadata` | Publik | SAML SP-metadata-XML när SAML är aktiverat |
@@ -560,6 +560,8 @@ Per-användarinställningar är separata från instansinställningar. Alla auten
 
 Anpassad rollhantering med granulära behörigheter.
 
+Skapande och ändring av roller begränsas av behörighetsinneslutning: den föreslagna eller aktuella rollen får inte överordnas aktören, överskrida aktörens effektiva behörigheter eller bredda aktörens verktygsomfång. API-nyckelomfång ingår i denna kontroll. Att ta bort en anpassad roll kräver även behörighet att tilldela den inbyggda reservrollen `user` som används för dess medlemmar.
+
 | Metod | Sökväg | Åtkomst | Beskrivning |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/roles` | Admin (`audit:read`) | Lista alla roller med antal användare |
@@ -651,8 +653,8 @@ Dessa rutter är licensgrindade av sin relaterade enterprise-funktion. De kräve
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Uppdatera CIDR-tillåtningslista med förhindrande av självutlåsning |
 | `GET` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Lista rättsliga spärrar för användare och team |
 | `PUT` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Applicera eller häv en rättslig spärr på en användare eller ett team |
-| `POST` | `/api/v1/enterprise/scim/token` | Admin (`users:manage`) | Generera en SCIM-bärartoken, returneras en gång |
-| `DELETE` | `/api/v1/enterprise/scim/token` | Admin (`users:manage`) | Återkalla den aktuella SCIM-bärartoken |
+| `POST` | `/api/v1/enterprise/scim/token` | Inbyggd administratör med full behörighet | Generera en SCIM-bärartoken, returneras en gång |
+| `DELETE` | `/api/v1/enterprise/scim/token` | Inbyggd administratör med full behörighet | Återkalla den aktuella SCIM-bärartoken |
 | `GET` | `/api/v1/enterprise/siem/config` | Admin (`webhooks:manage`) | Läs SIEM-vidarebefordringskonfiguration |
 | `PUT` | `/api/v1/enterprise/siem/config` | Admin (`webhooks:manage`) | Uppdatera SIEM-vidarebefordringskonfiguration |
 | `GET` | `/api/v1/enterprise/webhooks` | Admin (`webhooks:manage`) | Lista webhook-destinationer |
@@ -662,15 +664,15 @@ Dessa rutter är licensgrindade av sin relaterade enterprise-funktion. De kräve
 | `POST` | `/api/v1/enterprise/webhooks/:index/test` | Admin (`webhooks:manage`) | Skicka en test-webhook-nyttolast |
 | `POST` | `/api/v1/enterprise/users/:id/export` | Admin (`compliance:manage`) | Starta ett GDPR-användarexportjobb |
 | `GET` | `/api/v1/enterprise/users/:id/export/:jobId` | Admin (`compliance:manage`) | Läs GDPR-exportstatus och nedladdnings-URL |
-| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Admin (`compliance:manage`) | Rensa permanent en användares data efter bekräftelse |
-| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Admin (`compliance:manage`) | Rensa permanent ett teams data efter bekräftelse |
+| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Admin (`compliance:manage`; målbehörighet) | Rensa permanent en användares data efter bekräftelse |
+| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Admin (`compliance:manage`; behörighet över alla medlemmar) | Rensa permanent ett teams data efter bekräftelse |
 | `GET` | `/api/v1/admin/version` | Admin (`system:health`) | Läs metadata för app-, build-, Node- och schemaversion |
 | `GET` | `/api/v1/admin/migrations/pending` | Admin (`system:health`) | Jämför paketerade migreringar med tillämpade migreringar |
 | `GET` | `/api/v1/admin/upgrade-check` | Admin (`system:health`) | Kör kontroller av uppgraderingsberedskap |
 
 ### SCIM 2.0 {#scim-2-0}
 
-SCIM-upptäcktsslutpunkter är publika. Användar- och gruppslutpunkter kräver SCIM-bärartoken som genererades ovan.
+SCIM-upptäcktsslutpunkter är publika. Användar- och gruppslutpunkter kräver SCIM-bärartoken som genererades ovan. Äldre oversionerade token är ogiltiga och måste utfärdas på nytt som `so_scim_v2_...`-token av en inbyggd administratör med full behörighet.
 
 | Metod | Sökväg | Åtkomst | Beskrivning |
 |--------|------|--------|-------------|

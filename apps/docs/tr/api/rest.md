@@ -1,6 +1,6 @@
 ---
 description: "Eksiksiz REST API başvurusu. Araç uç noktaları, toplu işleme, işlem hatları, dosya kitaplığı, kimlik doğrulama, ekipler ve yönetici işlemleri."
-i18n_output_hash: 7073be9e2973
+i18n_output_hash: d9b051c30682
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -64,16 +64,16 @@ Anahtarlar `si_` ön ekiyle işaretlenir ve scrypt karma değerleri olarak sakla
 | `GET` | `/api/auth/session` | Kimlik doğrulamalı | Geçerli oturumu doğrula |
 | `POST` | `/api/auth/change-password` | Kimlik doğrulamalı | Kendi parolanı değiştir (diğer tüm oturumları + API anahtarlarını geçersiz kılar) |
 | `GET` | `/api/auth/users` | Yönetici | Tüm kullanıcıları listele |
-| `POST` | `/api/auth/register` | Yönetici | Yeni bir kullanıcı oluştur |
-| `PUT` | `/api/auth/users/:id` | Yönetici | Kullanıcı rolünü veya ekibini güncelle |
-| `POST` | `/api/auth/users/:id/reset-password` | Yönetici | Kullanıcının parolasını sıfırla |
-| `DELETE` | `/api/auth/users/:id` | Yönetici | Bir kullanıcıyı sil |
+| `POST` | `/api/auth/register` | Yönetici (`users:manage`; önerilen rol yetkisi) | Yeni bir kullanıcı oluştur |
+| `PUT` | `/api/auth/users/:id` | Yönetici (`users:manage`; hedef yetkisi) | Kullanıcı rolünü veya ekibini güncelle |
+| `POST` | `/api/auth/users/:id/reset-password` | Yönetici (`users:manage`; hedef yetkisi) | Kullanıcının parolasını sıfırla |
+| `DELETE` | `/api/auth/users/:id` | Yönetici (`users:manage`; hedef yetkisi) | Bir kullanıcıyı sil |
 | `GET` | `/api/v1/config/auth` | Herkese açık | Kimlik doğrulamanın etkin olup olmadığını kontrol et (`{ authEnabled: bool }`) |
 | `POST` | `/api/auth/mfa/enroll` | Kimlik doğrulamalı | TOTP MFA kaydını başlat. Kurumsal `mfa` özelliğini gerektirir |
 | `POST` | `/api/auth/mfa/verify` | Kimlik doğrulamalı | MFA kaydını bir TOTP koduyla onayla |
 | `POST` | `/api/auth/mfa/complete` | Herkese açık | Bekleyen bir MFA oturum açma doğrulamasını tamamla |
 | `POST` | `/api/auth/mfa/disable` | Kimlik doğrulamalı | Geçerli kullanıcı için MFA'yı devre dışı bırak |
-| `POST` | `/api/auth/users/:id/mfa/reset` | Yönetici (`users:manage`) | Bir kullanıcı için MFA'yı sıfırla |
+| `POST` | `/api/auth/users/:id/mfa/reset` | Yönetici (`users:manage`; hedef yetkisi) | Bir kullanıcı için MFA'yı sıfırla |
 | `GET` | `/api/auth/oidc/login` | Herkese açık | OIDC etkinleştirildiğinde OIDC oturum açmayı başlat |
 | `GET` | `/api/auth/oidc/callback` | Herkese açık | OIDC yetkilendirme geri çağırması |
 | `GET` | `/api/auth/saml/metadata` | Herkese açık | SAML etkinleştirildiğinde SAML SP meta veri XML'i |
@@ -560,6 +560,8 @@ Kullanıcı başına tercihler, örnek ayarlarından ayrıdır. Kimliği doğrul
 
 Ayrıntılı izinlerle özel rol yönetimi.
 
+Rol oluşturma ve değiştirme işlemleri yetki kapsama kuralıyla sınırlandırılmıştır: önerilen veya mevcut rol, aktörden daha üst düzeyde olamaz, aktörün etkin izinlerini aşamaz veya aktörün araç kapsamını genişletemez. API anahtarı kapsamları bu denetime dahildir. Özel bir rolü silmek ayrıca üyeleri için kullanılan yerleşik `user` yedek rolünü atama yetkisi gerektirir.
+
 | Yöntem | Yol | Erişim | Açıklama |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/roles` | Yönetici (`audit:read`) | Kullanıcı sayılarıyla birlikte tüm rolleri listele |
@@ -651,8 +653,8 @@ Bu yollar, ilgili kurumsal özellikleri tarafından lisans kapılıdır. Yine de
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Yönetici (`security:manage`) | CIDR izin listesini kendini kilitleme önlemesiyle güncelle |
 | `GET` | `/api/v1/enterprise/legal-hold` | Yönetici (`compliance:manage`) | Kullanıcı ve ekip yasal saklamalarını listele |
 | `PUT` | `/api/v1/enterprise/legal-hold` | Yönetici (`compliance:manage`) | Bir kullanıcıya veya ekibe yasal saklama uygula veya kaldır |
-| `POST` | `/api/v1/enterprise/scim/token` | Yönetici (`users:manage`) | Bir SCIM taşıyıcı belirteci oluştur, bir kez döndürülür |
-| `DELETE` | `/api/v1/enterprise/scim/token` | Yönetici (`users:manage`) | Geçerli SCIM taşıyıcı belirtecini iptal et |
+| `POST` | `/api/v1/enterprise/scim/token` | Tam yetkili yerleşik yönetici | Bir SCIM taşıyıcı belirteci oluştur, bir kez döndürülür |
+| `DELETE` | `/api/v1/enterprise/scim/token` | Tam yetkili yerleşik yönetici | Geçerli SCIM taşıyıcı belirtecini iptal et |
 | `GET` | `/api/v1/enterprise/siem/config` | Yönetici (`webhooks:manage`) | SIEM iletme yapılandırmasını oku |
 | `PUT` | `/api/v1/enterprise/siem/config` | Yönetici (`webhooks:manage`) | SIEM iletme yapılandırmasını güncelle |
 | `GET` | `/api/v1/enterprise/webhooks` | Yönetici (`webhooks:manage`) | Webhook hedeflerini listele |
@@ -662,15 +664,15 @@ Bu yollar, ilgili kurumsal özellikleri tarafından lisans kapılıdır. Yine de
 | `POST` | `/api/v1/enterprise/webhooks/:index/test` | Yönetici (`webhooks:manage`) | Bir test webhook yükü gönder |
 | `POST` | `/api/v1/enterprise/users/:id/export` | Yönetici (`compliance:manage`) | Bir GDPR kullanıcı dışa aktarma işi başlat |
 | `GET` | `/api/v1/enterprise/users/:id/export/:jobId` | Yönetici (`compliance:manage`) | GDPR dışa aktarma durumunu ve indirme URL'sini oku |
-| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Yönetici (`compliance:manage`) | Onaydan sonra bir kullanıcının verisini kalıcı olarak temizle |
-| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Yönetici (`compliance:manage`) | Onaydan sonra bir ekibin verisini kalıcı olarak temizle |
+| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Yönetici (`compliance:manage`; hedef yetkisi) | Onaydan sonra bir kullanıcının verisini kalıcı olarak temizle |
+| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Yönetici (`compliance:manage`; tüm üyeler için yetki) | Onaydan sonra bir ekibin verisini kalıcı olarak temizle |
 | `GET` | `/api/v1/admin/version` | Yönetici (`system:health`) | Uygulama, derleme, Node ve şema sürüm meta verilerini oku |
 | `GET` | `/api/v1/admin/migrations/pending` | Yönetici (`system:health`) | Paketlenmiş geçişleri uygulanan geçişlerle karşılaştır |
 | `GET` | `/api/v1/admin/upgrade-check` | Yönetici (`system:health`) | Yükseltme hazırlık kontrollerini çalıştır |
 
 ### SCIM 2.0 {#scim-2-0}
 
-SCIM keşif uç noktaları herkese açıktır. Kullanıcı ve grup uç noktaları, yukarıda oluşturulan SCIM taşıyıcı belirtecini gerektirir.
+SCIM keşif uç noktaları herkese açıktır. Kullanıcı ve grup uç noktaları, yukarıda oluşturulan SCIM taşıyıcı belirtecini gerektirir. Sürümsüz eski belirteçler geçersizdir ve tam yetkili yerleşik bir yönetici tarafından `so_scim_v2_...` belirteci olarak yeniden oluşturulmalıdır.
 
 | Yöntem | Yol | Erişim | Açıklama |
 |--------|------|--------|-------------|

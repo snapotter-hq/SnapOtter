@@ -1,6 +1,6 @@
 ---
 description: "Referensi REST API lengkap. Endpoint tool, pemrosesan batch, pipeline, pustaka file, autentikasi, tim, dan operasi admin."
-i18n_output_hash: 13c3fb90efaa
+i18n_output_hash: 2d4f6ecb375d
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -64,16 +64,16 @@ Kunci diberi awalan `si_` dan disimpan sebagai hash scrypt - kunci mentah ditamp
 | `GET` | `/api/auth/session` | Auth | Validasi sesi saat ini |
 | `POST` | `/api/auth/change-password` | Auth | Ubah kata sandi sendiri (membatalkan semua sesi lain + kunci API) |
 | `GET` | `/api/auth/users` | Admin | Daftar semua pengguna |
-| `POST` | `/api/auth/register` | Admin | Buat pengguna baru |
-| `PUT` | `/api/auth/users/:id` | Admin | Perbarui peran atau tim pengguna |
-| `POST` | `/api/auth/users/:id/reset-password` | Admin | Atur ulang kata sandi pengguna |
-| `DELETE` | `/api/auth/users/:id` | Admin | Hapus pengguna |
+| `POST` | `/api/auth/register` | Admin (`users:manage`; otoritas peran yang diusulkan) | Buat pengguna baru |
+| `PUT` | `/api/auth/users/:id` | Admin (`users:manage`; otoritas target) | Perbarui peran atau tim pengguna |
+| `POST` | `/api/auth/users/:id/reset-password` | Admin (`users:manage`; otoritas target) | Atur ulang kata sandi pengguna |
+| `DELETE` | `/api/auth/users/:id` | Admin (`users:manage`; otoritas target) | Hapus pengguna |
 | `GET` | `/api/v1/config/auth` | Publik | Periksa apakah autentikasi diaktifkan (`{ authEnabled: bool }`) |
 | `POST` | `/api/auth/mfa/enroll` | Auth | Mulai pendaftaran TOTP MFA. Memerlukan fitur enterprise `mfa` |
 | `POST` | `/api/auth/mfa/verify` | Auth | Konfirmasi pendaftaran MFA dengan kode TOTP |
 | `POST` | `/api/auth/mfa/complete` | Publik | Selesaikan tantangan login MFA yang tertunda |
 | `POST` | `/api/auth/mfa/disable` | Auth | Nonaktifkan MFA untuk pengguna saat ini |
-| `POST` | `/api/auth/users/:id/mfa/reset` | Admin (`users:manage`) | Atur ulang MFA untuk seorang pengguna |
+| `POST` | `/api/auth/users/:id/mfa/reset` | Admin (`users:manage`; otoritas target) | Atur ulang MFA untuk seorang pengguna |
 | `GET` | `/api/auth/oidc/login` | Publik | Mulai login OIDC ketika OIDC diaktifkan |
 | `GET` | `/api/auth/oidc/callback` | Publik | Callback otorisasi OIDC |
 | `GET` | `/api/auth/saml/metadata` | Publik | XML metadata SP SAML ketika SAML diaktifkan |
@@ -560,6 +560,8 @@ Preferensi per pengguna terpisah dari pengaturan instans. Setiap pengguna teraut
 
 Manajemen peran kustom dengan izin terperinci.
 
+Pembuatan dan perubahan peran dibatasi oleh pembatasan otoritas: peran yang diusulkan atau saat ini tidak boleh melampaui peringkat aktor, melebihi izin efektif aktor, atau memperluas cakupan alat aktor. Cakupan kunci API turut diperiksa dalam validasi ini. Menghapus peran kustom juga memerlukan otoritas untuk menetapkan peran bawaan cadangan `user` yang digunakan bagi anggotanya.
+
 | Method | Path | Akses | Deskripsi |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/roles` | Admin (`audit:read`) | Daftar semua peran dengan jumlah pengguna |
@@ -651,8 +653,8 @@ Rute ini dibatasi lisensi oleh fitur enterprise terkaitnya. Rute ini tetap memer
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Perbarui allowlist CIDR dengan pencegahan penguncian diri |
 | `GET` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Daftar legal hold pengguna dan tim |
 | `PUT` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Terapkan atau lepaskan legal hold pada pengguna atau tim |
-| `POST` | `/api/v1/enterprise/scim/token` | Admin (`users:manage`) | Hasilkan token bearer SCIM, dikembalikan sekali |
-| `DELETE` | `/api/v1/enterprise/scim/token` | Admin (`users:manage`) | Cabut token bearer SCIM saat ini |
+| `POST` | `/api/v1/enterprise/scim/token` | Admin bawaan penuh | Hasilkan token bearer SCIM, dikembalikan sekali |
+| `DELETE` | `/api/v1/enterprise/scim/token` | Admin bawaan penuh | Cabut token bearer SCIM saat ini |
 | `GET` | `/api/v1/enterprise/siem/config` | Admin (`webhooks:manage`) | Baca konfigurasi penerusan SIEM |
 | `PUT` | `/api/v1/enterprise/siem/config` | Admin (`webhooks:manage`) | Perbarui konfigurasi penerusan SIEM |
 | `GET` | `/api/v1/enterprise/webhooks` | Admin (`webhooks:manage`) | Daftar tujuan webhook |
@@ -662,15 +664,15 @@ Rute ini dibatasi lisensi oleh fitur enterprise terkaitnya. Rute ini tetap memer
 | `POST` | `/api/v1/enterprise/webhooks/:index/test` | Admin (`webhooks:manage`) | Kirim payload webhook uji |
 | `POST` | `/api/v1/enterprise/users/:id/export` | Admin (`compliance:manage`) | Mulai job ekspor pengguna GDPR |
 | `GET` | `/api/v1/enterprise/users/:id/export/:jobId` | Admin (`compliance:manage`) | Baca status ekspor GDPR dan URL unduhan |
-| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Admin (`compliance:manage`) | Hapus permanen data pengguna setelah konfirmasi |
-| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Admin (`compliance:manage`) | Hapus permanen data tim setelah konfirmasi |
+| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Admin (`compliance:manage`; otoritas target) | Hapus permanen data pengguna setelah konfirmasi |
+| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Admin (`compliance:manage`; otoritas semua anggota) | Hapus permanen data tim setelah konfirmasi |
 | `GET` | `/api/v1/admin/version` | Admin (`system:health`) | Baca metadata versi app, build, Node, dan skema |
 | `GET` | `/api/v1/admin/migrations/pending` | Admin (`system:health`) | Bandingkan migrasi yang dipaketkan dengan migrasi yang diterapkan |
 | `GET` | `/api/v1/admin/upgrade-check` | Admin (`system:health`) | Jalankan pemeriksaan kesiapan pemutakhiran |
 
 ### SCIM 2.0 {#scim-2-0}
 
-Endpoint penemuan SCIM bersifat publik. Endpoint pengguna dan grup memerlukan token bearer SCIM yang dihasilkan di atas.
+Endpoint penemuan SCIM bersifat publik. Endpoint pengguna dan grup memerlukan token bearer SCIM yang dihasilkan di atas. Token lama tanpa versi tidak valid dan harus diterbitkan ulang sebagai token `so_scim_v2_...` oleh admin bawaan penuh.
 
 | Method | Path | Akses | Deskripsi |
 |--------|------|--------|-------------|

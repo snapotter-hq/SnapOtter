@@ -1,6 +1,6 @@
 ---
 description: "Référence complète de l'API REST. Points de terminaison des outils, traitement par lots, pipelines, bibliothèque de fichiers, authentification, équipes et opérations d'administration."
-i18n_output_hash: bbd256b3ed19
+i18n_output_hash: 052f0c2736c0
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -64,16 +64,16 @@ Les clés sont préfixées par `si_` et stockées sous forme de hachages scrypt 
 | `GET` | `/api/auth/session` | Auth | Valider la session actuelle |
 | `POST` | `/api/auth/change-password` | Auth | Changer son propre mot de passe (invalide toutes les autres sessions et clés d'API) |
 | `GET` | `/api/auth/users` | Admin | Lister tous les utilisateurs |
-| `POST` | `/api/auth/register` | Admin | Créer un nouvel utilisateur |
-| `PUT` | `/api/auth/users/:id` | Admin | Mettre à jour le rôle ou l'équipe d'un utilisateur |
-| `POST` | `/api/auth/users/:id/reset-password` | Admin | Réinitialiser le mot de passe d'un utilisateur |
-| `DELETE` | `/api/auth/users/:id` | Admin | Supprimer un utilisateur |
+| `POST` | `/api/auth/register` | Admin (`users:manage` ; autorité sur le rôle proposé) | Créer un nouvel utilisateur |
+| `PUT` | `/api/auth/users/:id` | Admin (`users:manage` ; autorité sur la cible) | Mettre à jour le rôle ou l'équipe d'un utilisateur |
+| `POST` | `/api/auth/users/:id/reset-password` | Admin (`users:manage` ; autorité sur la cible) | Réinitialiser le mot de passe d'un utilisateur |
+| `DELETE` | `/api/auth/users/:id` | Admin (`users:manage` ; autorité sur la cible) | Supprimer un utilisateur |
 | `GET` | `/api/v1/config/auth` | Public | Vérifier si l'authentification est activée (`{ authEnabled: bool }`) |
 | `POST` | `/api/auth/mfa/enroll` | Auth | Démarrer l'inscription à l'authentification multifacteur TOTP. Nécessite la fonctionnalité entreprise `mfa` |
 | `POST` | `/api/auth/mfa/verify` | Auth | Confirmer l'inscription à l'authentification multifacteur avec un code TOTP |
 | `POST` | `/api/auth/mfa/complete` | Public | Terminer un défi de connexion multifacteur en attente |
 | `POST` | `/api/auth/mfa/disable` | Auth | Désactiver l'authentification multifacteur pour l'utilisateur actuel |
-| `POST` | `/api/auth/users/:id/mfa/reset` | Admin (`users:manage`) | Réinitialiser l'authentification multifacteur d'un utilisateur |
+| `POST` | `/api/auth/users/:id/mfa/reset` | Admin (`users:manage` ; autorité sur la cible) | Réinitialiser l'authentification multifacteur d'un utilisateur |
 | `GET` | `/api/auth/oidc/login` | Public | Démarrer la connexion OIDC lorsque OIDC est activé |
 | `GET` | `/api/auth/oidc/callback` | Public | Rappel d'autorisation OIDC |
 | `GET` | `/api/auth/saml/metadata` | Public | XML de métadonnées SP SAML lorsque SAML est activé |
@@ -560,6 +560,8 @@ Les préférences par utilisateur sont distinctes des paramètres de l'instance.
 
 Gestion de rôles personnalisés avec des autorisations granulaires.
 
+La création et la modification de rôles sont soumises au confinement d'autorité : le rôle proposé ou actuel ne peut pas surpasser l'acteur en rang, dépasser ses permissions effectives ni élargir sa portée d'outils. Les portées de clés API participent à cette vérification. La suppression d'un rôle personnalisé nécessite également l'autorité d'attribuer le rôle intégré de repli `user` utilisé pour ses membres.
+
 | Méthode | Chemin | Accès | Description |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/roles` | Admin (`audit:read`) | Liste tous les rôles avec le nombre d'utilisateurs |
@@ -651,8 +653,8 @@ Ces routes sont verrouillées par licence selon leur fonctionnalité d'entrepris
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Met à jour la liste d'autorisation CIDR avec prévention de l'auto-verrouillage |
 | `GET` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Liste les blocages juridiques des utilisateurs et des équipes |
 | `PUT` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Applique ou lève un blocage juridique sur un utilisateur ou une équipe |
-| `POST` | `/api/v1/enterprise/scim/token` | Admin (`users:manage`) | Génère un jeton bearer SCIM, renvoyé une seule fois |
-| `DELETE` | `/api/v1/enterprise/scim/token` | Admin (`users:manage`) | Révoque le jeton bearer SCIM actuel |
+| `POST` | `/api/v1/enterprise/scim/token` | Administrateur intégré complet | Génère un jeton bearer SCIM, renvoyé une seule fois |
+| `DELETE` | `/api/v1/enterprise/scim/token` | Administrateur intégré complet | Révoque le jeton bearer SCIM actuel |
 | `GET` | `/api/v1/enterprise/siem/config` | Admin (`webhooks:manage`) | Lit la configuration de transfert SIEM |
 | `PUT` | `/api/v1/enterprise/siem/config` | Admin (`webhooks:manage`) | Met à jour la configuration de transfert SIEM |
 | `GET` | `/api/v1/enterprise/webhooks` | Admin (`webhooks:manage`) | Liste les destinations de webhook |
@@ -662,15 +664,15 @@ Ces routes sont verrouillées par licence selon leur fonctionnalité d'entrepris
 | `POST` | `/api/v1/enterprise/webhooks/:index/test` | Admin (`webhooks:manage`) | Envoie une charge utile de webhook de test |
 | `POST` | `/api/v1/enterprise/users/:id/export` | Admin (`compliance:manage`) | Démarre une tâche d'export d'utilisateur RGPD |
 | `GET` | `/api/v1/enterprise/users/:id/export/:jobId` | Admin (`compliance:manage`) | Lit l'état de l'export RGPD et l'URL de téléchargement |
-| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Admin (`compliance:manage`) | Purge définitivement les données d'un utilisateur après confirmation |
-| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Admin (`compliance:manage`) | Purge définitivement les données d'une équipe après confirmation |
+| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Admin (`compliance:manage` ; autorité sur la cible) | Purge définitivement les données d'un utilisateur après confirmation |
+| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Admin (`compliance:manage` ; autorité sur tous les membres) | Purge définitivement les données d'une équipe après confirmation |
 | `GET` | `/api/v1/admin/version` | Admin (`system:health`) | Lit les métadonnées de version de l'application, de la build, de Node et du schéma |
 | `GET` | `/api/v1/admin/migrations/pending` | Admin (`system:health`) | Compare les migrations packagées avec les migrations appliquées |
 | `GET` | `/api/v1/admin/upgrade-check` | Admin (`system:health`) | Exécute les vérifications de préparation à la mise à niveau |
 
 ### SCIM 2.0 {#scim-2-0}
 
-Les points de terminaison de découverte SCIM sont publics. Les points de terminaison d'utilisateurs et de groupes exigent le jeton bearer SCIM généré ci-dessus.
+Les points de terminaison de découverte SCIM sont publics. Les points de terminaison d'utilisateurs et de groupes exigent le jeton bearer SCIM généré ci-dessus. Les anciens jetons non versionnés sont invalides et doivent être réémis sous forme de jetons `so_scim_v2_...` par un administrateur intégré complet.
 
 | Méthode | Chemin | Accès | Description |
 |--------|------|--------|-------------|

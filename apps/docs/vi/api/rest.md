@@ -1,6 +1,6 @@
 ---
 description: "Tài liệu tham khảo REST API đầy đủ. Endpoint công cụ, xử lý hàng loạt, pipeline, thư viện tệp, xác thực, nhóm và các thao tác quản trị."
-i18n_output_hash: 305ce33bf0ed
+i18n_output_hash: 537f7dfaff89
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -64,16 +64,16 @@ Khóa có tiền tố `si_` và được lưu dưới dạng hash scrypt - khóa
 | `GET` | `/api/auth/session` | Xác thực | Xác thực phiên hiện tại |
 | `POST` | `/api/auth/change-password` | Xác thực | Đổi mật khẩu của chính mình (vô hiệu hóa mọi phiên khác + khóa API) |
 | `GET` | `/api/auth/users` | Admin | Liệt kê tất cả người dùng |
-| `POST` | `/api/auth/register` | Admin | Tạo người dùng mới |
-| `PUT` | `/api/auth/users/:id` | Admin | Cập nhật vai trò hoặc nhóm của người dùng |
-| `POST` | `/api/auth/users/:id/reset-password` | Admin | Đặt lại mật khẩu của người dùng |
-| `DELETE` | `/api/auth/users/:id` | Admin | Xóa một người dùng |
+| `POST` | `/api/auth/register` | Admin (`users:manage`; thẩm quyền với vai trò đề xuất) | Tạo người dùng mới |
+| `PUT` | `/api/auth/users/:id` | Admin (`users:manage`; thẩm quyền với mục tiêu) | Cập nhật vai trò hoặc nhóm của người dùng |
+| `POST` | `/api/auth/users/:id/reset-password` | Admin (`users:manage`; thẩm quyền với mục tiêu) | Đặt lại mật khẩu của người dùng |
+| `DELETE` | `/api/auth/users/:id` | Admin (`users:manage`; thẩm quyền với mục tiêu) | Xóa một người dùng |
 | `GET` | `/api/v1/config/auth` | Công khai | Kiểm tra xác thực có được bật hay không (`{ authEnabled: bool }`) |
 | `POST` | `/api/auth/mfa/enroll` | Xác thực | Bắt đầu đăng ký TOTP MFA. Yêu cầu tính năng enterprise `mfa` |
 | `POST` | `/api/auth/mfa/verify` | Xác thực | Xác nhận đăng ký MFA bằng mã TOTP |
 | `POST` | `/api/auth/mfa/complete` | Công khai | Hoàn tất thử thách đăng nhập MFA đang chờ |
 | `POST` | `/api/auth/mfa/disable` | Xác thực | Tắt MFA cho người dùng hiện tại |
-| `POST` | `/api/auth/users/:id/mfa/reset` | Admin (`users:manage`) | Đặt lại MFA cho một người dùng |
+| `POST` | `/api/auth/users/:id/mfa/reset` | Admin (`users:manage`; thẩm quyền với mục tiêu) | Đặt lại MFA cho một người dùng |
 | `GET` | `/api/auth/oidc/login` | Công khai | Bắt đầu đăng nhập OIDC khi OIDC được bật |
 | `GET` | `/api/auth/oidc/callback` | Công khai | Callback ủy quyền OIDC |
 | `GET` | `/api/auth/saml/metadata` | Công khai | XML metadata SAML SP khi SAML được bật |
@@ -560,6 +560,8 @@ Tùy chọn theo từng người dùng tách biệt với cài đặt instance. 
 
 Quản lý vai trò tùy chỉnh với quyền hạn chi tiết.
 
+Việc tạo và sửa đổi vai trò bị ràng buộc bởi giới hạn thẩm quyền: vai trò được đề xuất hoặc hiện tại không được vượt cấp chủ thể, vượt quá các quyền hạn có hiệu lực của chủ thể hoặc mở rộng phạm vi công cụ của chủ thể. Phạm vi khóa API cũng được tính trong bước kiểm tra này. Việc xóa vai trò tùy chỉnh cũng đòi hỏi thẩm quyền gán vai trò dự phòng tích hợp sẵn `user` dùng cho các thành viên của vai trò đó.
+
 | Phương thức | Đường dẫn | Quyền truy cập | Mô tả |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/roles` | Admin (`audit:read`) | Liệt kê tất cả vai trò kèm số người dùng |
@@ -651,8 +653,8 @@ Các route này bị khóa theo giấy phép của tính năng enterprise liên 
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Cập nhật danh sách cho phép CIDR với cơ chế ngăn tự khóa mình ra ngoài |
 | `GET` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Liệt kê các lệnh giữ pháp lý của người dùng và nhóm |
 | `PUT` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Áp dụng hoặc gỡ bỏ lệnh giữ pháp lý cho một người dùng hoặc nhóm |
-| `POST` | `/api/v1/enterprise/scim/token` | Admin (`users:manage`) | Tạo một token bearer SCIM, chỉ trả về một lần |
-| `DELETE` | `/api/v1/enterprise/scim/token` | Admin (`users:manage`) | Thu hồi token bearer SCIM hiện tại |
+| `POST` | `/api/v1/enterprise/scim/token` | Quản trị viên tích hợp sẵn có đầy đủ quyền | Tạo một token bearer SCIM, chỉ trả về một lần |
+| `DELETE` | `/api/v1/enterprise/scim/token` | Quản trị viên tích hợp sẵn có đầy đủ quyền | Thu hồi token bearer SCIM hiện tại |
 | `GET` | `/api/v1/enterprise/siem/config` | Admin (`webhooks:manage`) | Đọc cấu hình chuyển tiếp SIEM |
 | `PUT` | `/api/v1/enterprise/siem/config` | Admin (`webhooks:manage`) | Cập nhật cấu hình chuyển tiếp SIEM |
 | `GET` | `/api/v1/enterprise/webhooks` | Admin (`webhooks:manage`) | Liệt kê các đích webhook |
@@ -662,15 +664,15 @@ Các route này bị khóa theo giấy phép của tính năng enterprise liên 
 | `POST` | `/api/v1/enterprise/webhooks/:index/test` | Admin (`webhooks:manage`) | Gửi một payload webhook thử nghiệm |
 | `POST` | `/api/v1/enterprise/users/:id/export` | Admin (`compliance:manage`) | Bắt đầu một tác vụ xuất dữ liệu người dùng GDPR |
 | `GET` | `/api/v1/enterprise/users/:id/export/:jobId` | Admin (`compliance:manage`) | Đọc trạng thái xuất GDPR và URL tải xuống |
-| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Admin (`compliance:manage`) | Xóa vĩnh viễn dữ liệu của một người dùng sau khi xác nhận |
-| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Admin (`compliance:manage`) | Xóa vĩnh viễn dữ liệu của một nhóm sau khi xác nhận |
+| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Admin (`compliance:manage`; thẩm quyền với mục tiêu) | Xóa vĩnh viễn dữ liệu của một người dùng sau khi xác nhận |
+| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Admin (`compliance:manage`; thẩm quyền với tất cả thành viên) | Xóa vĩnh viễn dữ liệu của một nhóm sau khi xác nhận |
 | `GET` | `/api/v1/admin/version` | Admin (`system:health`) | Đọc metadata phiên bản của app, build, Node và schema |
 | `GET` | `/api/v1/admin/migrations/pending` | Admin (`system:health`) | So sánh các migration được đóng gói với các migration đã áp dụng |
 | `GET` | `/api/v1/admin/upgrade-check` | Admin (`system:health`) | Chạy các kiểm tra sẵn sàng nâng cấp |
 
 ### SCIM 2.0 {#scim-2-0}
 
-Các endpoint khám phá SCIM là công khai. Các endpoint người dùng và nhóm yêu cầu token bearer SCIM được tạo ở trên.
+Các endpoint khám phá SCIM là công khai. Các endpoint người dùng và nhóm yêu cầu token bearer SCIM được tạo ở trên. Các token cũ không có phiên bản không còn hợp lệ và phải được quản trị viên tích hợp sẵn có đầy đủ quyền cấp lại dưới dạng token `so_scim_v2_...`.
 
 | Phương thức | Đường dẫn | Quyền truy cập | Mô tả |
 |--------|------|--------|-------------|

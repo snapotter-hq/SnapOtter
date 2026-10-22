@@ -1,6 +1,6 @@
 ---
 description: "Referencia completa de la API REST. Endpoints de herramientas, procesamiento por lotes, pipelines, biblioteca de archivos, autenticación, equipos y operaciones de administración."
-i18n_output_hash: 05884bb22b56
+i18n_output_hash: f22f7259f0f9
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -64,16 +64,16 @@ Las claves llevan el prefijo `si_` y se almacenan como hashes scrypt; la clave e
 | `GET` | `/api/auth/session` | Auth | Validar la sesión actual |
 | `POST` | `/api/auth/change-password` | Auth | Cambiar la propia contraseña (invalida todas las demás sesiones y claves de API) |
 | `GET` | `/api/auth/users` | Admin | Listar todos los usuarios |
-| `POST` | `/api/auth/register` | Admin | Crear un nuevo usuario |
-| `PUT` | `/api/auth/users/:id` | Admin | Actualizar el rol o el equipo de un usuario |
-| `POST` | `/api/auth/users/:id/reset-password` | Admin | Restablecer la contraseña de un usuario |
-| `DELETE` | `/api/auth/users/:id` | Admin | Eliminar un usuario |
+| `POST` | `/api/auth/register` | Admin (`users:manage`; autoridad sobre el rol propuesto) | Crear un nuevo usuario |
+| `PUT` | `/api/auth/users/:id` | Admin (`users:manage`; autoridad sobre el objetivo) | Actualizar el rol o el equipo de un usuario |
+| `POST` | `/api/auth/users/:id/reset-password` | Admin (`users:manage`; autoridad sobre el objetivo) | Restablecer la contraseña de un usuario |
+| `DELETE` | `/api/auth/users/:id` | Admin (`users:manage`; autoridad sobre el objetivo) | Eliminar un usuario |
 | `GET` | `/api/v1/config/auth` | Público | Comprobar si la autenticación está habilitada (`{ authEnabled: bool }`) |
 | `POST` | `/api/auth/mfa/enroll` | Auth | Iniciar la inscripción de MFA con TOTP. Requiere la función enterprise `mfa` |
 | `POST` | `/api/auth/mfa/verify` | Auth | Confirmar la inscripción de MFA con un código TOTP |
 | `POST` | `/api/auth/mfa/complete` | Público | Completar un desafío de inicio de sesión de MFA pendiente |
 | `POST` | `/api/auth/mfa/disable` | Auth | Deshabilitar MFA para el usuario actual |
-| `POST` | `/api/auth/users/:id/mfa/reset` | Admin (`users:manage`) | Restablecer MFA para un usuario |
+| `POST` | `/api/auth/users/:id/mfa/reset` | Admin (`users:manage`; autoridad sobre el objetivo) | Restablecer MFA para un usuario |
 | `GET` | `/api/auth/oidc/login` | Público | Iniciar el inicio de sesión OIDC cuando OIDC está habilitado |
 | `GET` | `/api/auth/oidc/callback` | Público | Callback de autorización OIDC |
 | `GET` | `/api/auth/saml/metadata` | Público | XML de metadatos del SP SAML cuando SAML está habilitado |
@@ -560,6 +560,8 @@ Las preferencias por usuario están separadas de los ajustes de la instancia. Cu
 
 Gestión de roles personalizados con permisos granulares.
 
+La creación y modificación de roles están sujetas a la contención de autoridad: el rol propuesto o actual no puede superar en rango al actor, exceder sus permisos efectivos ni ampliar su alcance de herramientas. Los ámbitos de las claves de API participan en esta comprobación. Eliminar un rol personalizado también requiere autoridad para asignar el rol integrado de respaldo `user` utilizado para sus miembros.
+
 | Método | Ruta | Acceso | Descripción |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/roles` | Admin (`audit:read`) | Listar todos los roles con el número de usuarios |
@@ -651,8 +653,8 @@ Estas rutas están limitadas por licencia según su función enterprise relacion
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Actualizar la lista de permitidos CIDR con prevención de autobloqueo |
 | `GET` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Listar las retenciones legales de usuarios y equipos |
 | `PUT` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Aplicar o liberar una retención legal sobre un usuario o equipo |
-| `POST` | `/api/v1/enterprise/scim/token` | Admin (`users:manage`) | Generar un token bearer de SCIM, devuelto una vez |
-| `DELETE` | `/api/v1/enterprise/scim/token` | Admin (`users:manage`) | Revocar el token bearer de SCIM actual |
+| `POST` | `/api/v1/enterprise/scim/token` | Administrador integrado completo | Generar un token bearer de SCIM, devuelto una vez |
+| `DELETE` | `/api/v1/enterprise/scim/token` | Administrador integrado completo | Revocar el token bearer de SCIM actual |
 | `GET` | `/api/v1/enterprise/siem/config` | Admin (`webhooks:manage`) | Leer la configuración de reenvío SIEM |
 | `PUT` | `/api/v1/enterprise/siem/config` | Admin (`webhooks:manage`) | Actualizar la configuración de reenvío SIEM |
 | `GET` | `/api/v1/enterprise/webhooks` | Admin (`webhooks:manage`) | Listar los destinos de webhook |
@@ -662,15 +664,15 @@ Estas rutas están limitadas por licencia según su función enterprise relacion
 | `POST` | `/api/v1/enterprise/webhooks/:index/test` | Admin (`webhooks:manage`) | Enviar una carga útil de webhook de prueba |
 | `POST` | `/api/v1/enterprise/users/:id/export` | Admin (`compliance:manage`) | Iniciar un trabajo de exportación de usuario según el RGPD |
 | `GET` | `/api/v1/enterprise/users/:id/export/:jobId` | Admin (`compliance:manage`) | Leer el estado de la exportación RGPD y la URL de descarga |
-| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Admin (`compliance:manage`) | Purgar permanentemente los datos de un usuario tras la confirmación |
-| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Admin (`compliance:manage`) | Purgar permanentemente los datos de un equipo tras la confirmación |
+| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Admin (`compliance:manage`; autoridad sobre el objetivo) | Purgar permanentemente los datos de un usuario tras la confirmación |
+| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Admin (`compliance:manage`; autoridad sobre todos los miembros) | Purgar permanentemente los datos de un equipo tras la confirmación |
 | `GET` | `/api/v1/admin/version` | Admin (`system:health`) | Leer los metadatos de versión de la app, la compilación, Node y el esquema |
 | `GET` | `/api/v1/admin/migrations/pending` | Admin (`system:health`) | Comparar las migraciones empaquetadas con las migraciones aplicadas |
 | `GET` | `/api/v1/admin/upgrade-check` | Admin (`system:health`) | Ejecutar comprobaciones de preparación para la actualización |
 
 ### SCIM 2.0 {#scim-2-0}
 
-Los endpoints de descubrimiento de SCIM son públicos. Los endpoints de usuarios y grupos requieren el token bearer de SCIM generado anteriormente.
+Los endpoints de descubrimiento de SCIM son públicos. Los endpoints de usuarios y grupos requieren el token bearer de SCIM generado anteriormente. Los tokens heredados sin versión no son válidos y deben reemitirse como tokens `so_scim_v2_...` por un administrador integrado completo.
 
 | Método | Ruta | Acceso | Descripción |
 |--------|------|--------|-------------|

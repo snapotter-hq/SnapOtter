@@ -1,6 +1,6 @@
 ---
 description: "完整的 REST API 参考。工具端点、批处理、流水线、文件库、身份验证、团队以及管理操作。"
-i18n_output_hash: eed3bd4e7b11
+i18n_output_hash: fa33c0ccdd16
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -64,16 +64,16 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 | `GET` | `/api/auth/session` | 需身份验证 | 校验当前会话 |
 | `POST` | `/api/auth/change-password` | 需身份验证 | 修改自己的密码（会使所有其他会话和 API 密钥失效） |
 | `GET` | `/api/auth/users` | 管理员 | 列出所有用户 |
-| `POST` | `/api/auth/register` | 管理员 | 创建新用户 |
-| `PUT` | `/api/auth/users/:id` | 管理员 | 更新用户角色或团队 |
-| `POST` | `/api/auth/users/:id/reset-password` | 管理员 | 重置用户密码 |
-| `DELETE` | `/api/auth/users/:id` | 管理员 | 删除用户 |
+| `POST` | `/api/auth/register` | 管理员（`users:manage`；所提议角色权限） | 创建新用户 |
+| `PUT` | `/api/auth/users/:id` | 管理员（`users:manage`；目标权限） | 更新用户角色或团队 |
+| `POST` | `/api/auth/users/:id/reset-password` | 管理员（`users:manage`；目标权限） | 重置用户密码 |
+| `DELETE` | `/api/auth/users/:id` | 管理员（`users:manage`；目标权限） | 删除用户 |
 | `GET` | `/api/v1/config/auth` | 公开 | 检查是否启用了身份验证（`{ authEnabled: bool }`） |
 | `POST` | `/api/auth/mfa/enroll` | 需身份验证 | 开始 TOTP MFA 注册。需要企业版 `mfa` 功能 |
 | `POST` | `/api/auth/mfa/verify` | 需身份验证 | 用 TOTP 验证码确认 MFA 注册 |
 | `POST` | `/api/auth/mfa/complete` | 公开 | 完成待处理的 MFA 登录挑战 |
 | `POST` | `/api/auth/mfa/disable` | 需身份验证 | 为当前用户禁用 MFA |
-| `POST` | `/api/auth/users/:id/mfa/reset` | 管理员（`users:manage`） | 为用户重置 MFA |
+| `POST` | `/api/auth/users/:id/mfa/reset` | 管理员（`users:manage`；目标权限） | 为用户重置 MFA |
 | `GET` | `/api/auth/oidc/login` | 公开 | 启用 OIDC 时开始 OIDC 登录 |
 | `GET` | `/api/auth/oidc/callback` | 公开 | OIDC 授权回调 |
 | `GET` | `/api/auth/saml/metadata` | 公开 | 启用 SAML 时提供 SAML SP 元数据 XML |
@@ -560,6 +560,8 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 
 带细粒度权限的自定义角色管理。
 
+角色的创建和修改受权限包含规则约束：所提议或当前的角色在层级上不得高于操作者、不得超出操作者的有效权限，也不得扩大操作者的工具范围。API 密钥的权限范围也会参与此检查。删除自定义角色还需要具备为其成员分配内置回退角色 `user` 的权限。
+
 | 方法 | 路径 | 访问权限 | 说明 |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/roles` | 管理员（`audit:read`） | 列出所有角色及其用户数量 |
@@ -651,8 +653,8 @@ curl -X POST http://localhost:1349/api/v1/admin/features/import \
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | 管理员（`security:manage`） | 更新 CIDR 允许列表，并防止自我锁定 |
 | `GET` | `/api/v1/enterprise/legal-hold` | 管理员（`compliance:manage`） | 列出用户和团队的法律保留 |
 | `PUT` | `/api/v1/enterprise/legal-hold` | 管理员（`compliance:manage`） | 对用户或团队施加或解除法律保留 |
-| `POST` | `/api/v1/enterprise/scim/token` | 管理员（`users:manage`） | 生成一个 SCIM 承载令牌，仅返回一次 |
-| `DELETE` | `/api/v1/enterprise/scim/token` | 管理员（`users:manage`） | 吊销当前 SCIM 承载令牌 |
+| `POST` | `/api/v1/enterprise/scim/token` | 拥有完整权限的内置管理员 | 生成一个 SCIM 承载令牌，仅返回一次 |
+| `DELETE` | `/api/v1/enterprise/scim/token` | 拥有完整权限的内置管理员 | 吊销当前 SCIM 承载令牌 |
 | `GET` | `/api/v1/enterprise/siem/config` | 管理员（`webhooks:manage`） | 读取 SIEM 转发配置 |
 | `PUT` | `/api/v1/enterprise/siem/config` | 管理员（`webhooks:manage`） | 更新 SIEM 转发配置 |
 | `GET` | `/api/v1/enterprise/webhooks` | 管理员（`webhooks:manage`） | 列出 webhook 目标 |
@@ -662,15 +664,15 @@ curl -X POST http://localhost:1349/api/v1/admin/features/import \
 | `POST` | `/api/v1/enterprise/webhooks/:index/test` | 管理员（`webhooks:manage`） | 发送一个测试 webhook 载荷 |
 | `POST` | `/api/v1/enterprise/users/:id/export` | 管理员（`compliance:manage`） | 启动一个 GDPR 用户导出作业 |
 | `GET` | `/api/v1/enterprise/users/:id/export/:jobId` | 管理员（`compliance:manage`） | 读取 GDPR 导出状态和下载 URL |
-| `DELETE` | `/api/v1/enterprise/users/:id/purge` | 管理员（`compliance:manage`） | 确认后永久清除用户数据 |
-| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | 管理员（`compliance:manage`） | 确认后永久清除团队数据 |
+| `DELETE` | `/api/v1/enterprise/users/:id/purge` | 管理员（`compliance:manage`；目标权限） | 确认后永久清除用户数据 |
+| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | 管理员（`compliance:manage`；全部成员权限） | 确认后永久清除团队数据 |
 | `GET` | `/api/v1/admin/version` | 管理员（`system:health`） | 读取应用、构建、Node 和 schema 版本元数据 |
 | `GET` | `/api/v1/admin/migrations/pending` | 管理员（`system:health`） | 比较打包的迁移与已应用的迁移 |
 | `GET` | `/api/v1/admin/upgrade-check` | 管理员（`system:health`） | 运行升级就绪检查 |
 
 ### SCIM 2.0 {#scim-2-0}
 
-SCIM 发现端点是公开的。用户和组端点需要上面生成的 SCIM 承载令牌。
+SCIM 发现端点是公开的。用户和组端点需要上面生成的 SCIM 承载令牌。旧版无版本号的令牌无效，必须由拥有完整权限的内置管理员重新签发为 `so_scim_v2_...` 令牌。
 
 | 方法 | 路径 | 访问权限 | 说明 |
 |--------|------|--------|-------------|

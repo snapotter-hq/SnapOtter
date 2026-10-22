@@ -1,6 +1,6 @@
 ---
 description: "เอกสารอ้างอิง REST API ฉบับสมบูรณ์ เอนด์พอยต์ของเครื่องมือ การประมวลผลแบบแบตช์ ไปป์ไลน์ คลังไฟล์ การยืนยันตัวตน ทีม และการดำเนินงานของผู้ดูแลระบบ"
-i18n_output_hash: 4da135698825
+i18n_output_hash: 93d61c21a01e
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -64,16 +64,16 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 | `GET` | `/api/auth/session` | ยืนยันตัวตน | ตรวจสอบเซสชันปัจจุบัน |
 | `POST` | `/api/auth/change-password` | ยืนยันตัวตน | เปลี่ยนรหัสผ่านของตนเอง (ทำให้เซสชันอื่นทั้งหมด + API keys ใช้ไม่ได้) |
 | `GET` | `/api/auth/users` | ผู้ดูแลระบบ | แสดงรายชื่อผู้ใช้ทั้งหมด |
-| `POST` | `/api/auth/register` | ผู้ดูแลระบบ | สร้างผู้ใช้ใหม่ |
-| `PUT` | `/api/auth/users/:id` | ผู้ดูแลระบบ | อัปเดตบทบาทหรือทีมของผู้ใช้ |
-| `POST` | `/api/auth/users/:id/reset-password` | ผู้ดูแลระบบ | รีเซ็ตรหัสผ่านของผู้ใช้ |
-| `DELETE` | `/api/auth/users/:id` | ผู้ดูแลระบบ | ลบผู้ใช้ |
+| `POST` | `/api/auth/register` | ผู้ดูแลระบบ (`users:manage`; อำนาจตามบทบาทที่เสนอ) | สร้างผู้ใช้ใหม่ |
+| `PUT` | `/api/auth/users/:id` | ผู้ดูแลระบบ (`users:manage`; อำนาจเหนือเป้าหมาย) | อัปเดตบทบาทหรือทีมของผู้ใช้ |
+| `POST` | `/api/auth/users/:id/reset-password` | ผู้ดูแลระบบ (`users:manage`; อำนาจเหนือเป้าหมาย) | รีเซ็ตรหัสผ่านของผู้ใช้ |
+| `DELETE` | `/api/auth/users/:id` | ผู้ดูแลระบบ (`users:manage`; อำนาจเหนือเป้าหมาย) | ลบผู้ใช้ |
 | `GET` | `/api/v1/config/auth` | สาธารณะ | ตรวจสอบว่าเปิดใช้งานการยืนยันตัวตนอยู่หรือไม่ (`{ authEnabled: bool }`) |
 | `POST` | `/api/auth/mfa/enroll` | ยืนยันตัวตน | เริ่มการลงทะเบียน TOTP MFA ต้องใช้ฟีเจอร์ `mfa` ระดับ enterprise |
 | `POST` | `/api/auth/mfa/verify` | ยืนยันตัวตน | ยืนยันการลงทะเบียน MFA ด้วยรหัส TOTP |
 | `POST` | `/api/auth/mfa/complete` | สาธารณะ | ทำ MFA login challenge ที่ค้างอยู่ให้เสร็จสมบูรณ์ |
 | `POST` | `/api/auth/mfa/disable` | ยืนยันตัวตน | ปิดใช้งาน MFA สำหรับผู้ใช้ปัจจุบัน |
-| `POST` | `/api/auth/users/:id/mfa/reset` | ผู้ดูแลระบบ (`users:manage`) | รีเซ็ต MFA สำหรับผู้ใช้ |
+| `POST` | `/api/auth/users/:id/mfa/reset` | ผู้ดูแลระบบ (`users:manage`; อำนาจเหนือเป้าหมาย) | รีเซ็ต MFA สำหรับผู้ใช้ |
 | `GET` | `/api/auth/oidc/login` | สาธารณะ | เริ่มการลงชื่อเข้าใช้ OIDC เมื่อเปิดใช้งาน OIDC |
 | `GET` | `/api/auth/oidc/callback` | สาธารณะ | callback การอนุญาตของ OIDC |
 | `GET` | `/api/auth/saml/metadata` | สาธารณะ | XML เมทาดาทา SAML SP เมื่อเปิดใช้งาน SAML |
@@ -560,6 +560,8 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 
 การจัดการบทบาทกำหนดเองพร้อมสิทธิ์แบบละเอียด
 
+การสร้างและการแก้ไขบทบาทถูกจำกัดด้วยการควบคุมขอบเขตอำนาจ: บทบาทที่เสนอหรือบทบาทปัจจุบันต้องไม่สูงกว่าผู้ดำเนินการ ไม่เกินสิทธิ์ที่มีผลของผู้ดำเนินการ และไม่ขยายขอบเขตเครื่องมือของผู้ดำเนินการ ขอบเขตของคีย์ API จะถูกนำมาใช้ในการตรวจสอบนี้ด้วย การลบบทบาทกำหนดเองยังต้องมีอำนาจในการกำหนดบทบาทสำรองในตัว `user` ที่ใช้สำหรับสมาชิกของบทบาทนั้น
+
 | Method | Path | สิทธิ์เข้าถึง | คำอธิบาย |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/roles` | ผู้ดูแลระบบ (`audit:read`) | แสดงรายการบทบาททั้งหมดพร้อมจำนวนผู้ใช้ |
@@ -651,8 +653,8 @@ curl -X POST http://localhost:1349/api/v1/admin/features/import \
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | ผู้ดูแลระบบ (`security:manage`) | อัปเดตรายการอนุญาต CIDR พร้อมการป้องกันการล็อกตัวเองออก |
 | `GET` | `/api/v1/enterprise/legal-hold` | ผู้ดูแลระบบ (`compliance:manage`) | แสดงรายการการระงับทางกฎหมายของผู้ใช้และทีม |
 | `PUT` | `/api/v1/enterprise/legal-hold` | ผู้ดูแลระบบ (`compliance:manage`) | ใช้หรือปลดการระงับทางกฎหมายกับผู้ใช้หรือทีม |
-| `POST` | `/api/v1/enterprise/scim/token` | ผู้ดูแลระบบ (`users:manage`) | สร้าง SCIM bearer token คืนค่าเพียงครั้งเดียว |
-| `DELETE` | `/api/v1/enterprise/scim/token` | ผู้ดูแลระบบ (`users:manage`) | เพิกถอน SCIM bearer token ปัจจุบัน |
+| `POST` | `/api/v1/enterprise/scim/token` | ผู้ดูแลระบบในตัวที่มีสิทธิ์เต็มรูปแบบ | สร้าง SCIM bearer token คืนค่าเพียงครั้งเดียว |
+| `DELETE` | `/api/v1/enterprise/scim/token` | ผู้ดูแลระบบในตัวที่มีสิทธิ์เต็มรูปแบบ | เพิกถอน SCIM bearer token ปัจจุบัน |
 | `GET` | `/api/v1/enterprise/siem/config` | ผู้ดูแลระบบ (`webhooks:manage`) | อ่านการกำหนดค่าการส่งต่อ SIEM |
 | `PUT` | `/api/v1/enterprise/siem/config` | ผู้ดูแลระบบ (`webhooks:manage`) | อัปเดตการกำหนดค่าการส่งต่อ SIEM |
 | `GET` | `/api/v1/enterprise/webhooks` | ผู้ดูแลระบบ (`webhooks:manage`) | แสดงรายการปลายทาง webhook |
@@ -662,15 +664,15 @@ curl -X POST http://localhost:1349/api/v1/admin/features/import \
 | `POST` | `/api/v1/enterprise/webhooks/:index/test` | ผู้ดูแลระบบ (`webhooks:manage`) | ส่ง payload webhook ทดสอบ |
 | `POST` | `/api/v1/enterprise/users/:id/export` | ผู้ดูแลระบบ (`compliance:manage`) | เริ่มงานส่งออกข้อมูลผู้ใช้ตาม GDPR |
 | `GET` | `/api/v1/enterprise/users/:id/export/:jobId` | ผู้ดูแลระบบ (`compliance:manage`) | อ่านสถานะการส่งออก GDPR และ URL ดาวน์โหลด |
-| `DELETE` | `/api/v1/enterprise/users/:id/purge` | ผู้ดูแลระบบ (`compliance:manage`) | ล้างข้อมูลของผู้ใช้อย่างถาวรหลังการยืนยัน |
-| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | ผู้ดูแลระบบ (`compliance:manage`) | ล้างข้อมูลของทีมอย่างถาวรหลังการยืนยัน |
+| `DELETE` | `/api/v1/enterprise/users/:id/purge` | ผู้ดูแลระบบ (`compliance:manage`; อำนาจเหนือเป้าหมาย) | ล้างข้อมูลของผู้ใช้อย่างถาวรหลังการยืนยัน |
+| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | ผู้ดูแลระบบ (`compliance:manage`; อำนาจเหนือสมาชิกทั้งหมด) | ล้างข้อมูลของทีมอย่างถาวรหลังการยืนยัน |
 | `GET` | `/api/v1/admin/version` | ผู้ดูแลระบบ (`system:health`) | อ่านเมทาดาทาเวอร์ชันของแอป build, Node และ schema |
 | `GET` | `/api/v1/admin/migrations/pending` | ผู้ดูแลระบบ (`system:health`) | เปรียบเทียบ migration ที่แพ็กเกจไว้กับ migration ที่ใช้แล้ว |
 | `GET` | `/api/v1/admin/upgrade-check` | ผู้ดูแลระบบ (`system:health`) | รันการตรวจสอบความพร้อมในการอัปเกรด |
 
 ### SCIM 2.0 {#scim-2-0}
 
-เอนด์พอยต์การค้นพบ SCIM เป็นสาธารณะ เอนด์พอยต์ผู้ใช้และกลุ่มต้องใช้ SCIM bearer token ที่สร้างไว้ด้านบน
+เอนด์พอยต์การค้นพบ SCIM เป็นสาธารณะ เอนด์พอยต์ผู้ใช้และกลุ่มต้องใช้ SCIM bearer token ที่สร้างไว้ด้านบน โทเค็นรุ่นเก่าที่ไม่มีเวอร์ชันจะใช้ไม่ได้และต้องออกใหม่เป็นโทเค็น `so_scim_v2_...` โดยผู้ดูแลระบบในตัวที่มีสิทธิ์เต็มรูปแบบ
 
 | Method | Path | สิทธิ์เข้าถึง | คำอธิบาย |
 |--------|------|--------|-------------|

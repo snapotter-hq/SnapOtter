@@ -1,6 +1,6 @@
 ---
 description: "Полный справочник REST API. Эндпоинты инструментов, пакетная обработка, конвейеры, файловая библиотека, аутентификация, команды и административные операции."
-i18n_output_hash: 78d3e26dd0f9
+i18n_output_hash: 9a477e3679e9
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -64,16 +64,16 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 | `GET` | `/api/auth/session` | Auth | Проверка текущей сессии |
 | `POST` | `/api/auth/change-password` | Auth | Смена собственного пароля (аннулирует все остальные сессии и API-ключи) |
 | `GET` | `/api/auth/users` | Admin | Список всех пользователей |
-| `POST` | `/api/auth/register` | Admin | Создание нового пользователя |
-| `PUT` | `/api/auth/users/:id` | Admin | Обновление роли или команды пользователя |
-| `POST` | `/api/auth/users/:id/reset-password` | Admin | Сброс пароля пользователя |
-| `DELETE` | `/api/auth/users/:id` | Admin | Удаление пользователя |
+| `POST` | `/api/auth/register` | Admin (`users:manage`; полномочия на предлагаемую роль) | Создание нового пользователя |
+| `PUT` | `/api/auth/users/:id` | Admin (`users:manage`; полномочия в отношении цели) | Обновление роли или команды пользователя |
+| `POST` | `/api/auth/users/:id/reset-password` | Admin (`users:manage`; полномочия в отношении цели) | Сброс пароля пользователя |
+| `DELETE` | `/api/auth/users/:id` | Admin (`users:manage`; полномочия в отношении цели) | Удаление пользователя |
 | `GET` | `/api/v1/config/auth` | Публичный | Проверка, включена ли аутентификация (`{ authEnabled: bool }`) |
 | `POST` | `/api/auth/mfa/enroll` | Auth | Начало регистрации TOTP MFA. Требует enterprise-функцию `mfa` |
 | `POST` | `/api/auth/mfa/verify` | Auth | Подтверждение регистрации MFA кодом TOTP |
 | `POST` | `/api/auth/mfa/complete` | Публичный | Завершение ожидающего запроса на вход через MFA |
 | `POST` | `/api/auth/mfa/disable` | Auth | Отключение MFA для текущего пользователя |
-| `POST` | `/api/auth/users/:id/mfa/reset` | Admin (`users:manage`) | Сброс MFA для пользователя |
+| `POST` | `/api/auth/users/:id/mfa/reset` | Admin (`users:manage`; полномочия в отношении цели) | Сброс MFA для пользователя |
 | `GET` | `/api/auth/oidc/login` | Публичный | Начало входа через OIDC, когда OIDC включён |
 | `GET` | `/api/auth/oidc/callback` | Публичный | Callback авторизации OIDC |
 | `GET` | `/api/auth/saml/metadata` | Публичный | XML-метаданные SAML SP, когда SAML включён |
@@ -560,6 +560,8 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 
 Управление пользовательскими ролями с гранулярными разрешениями.
 
+Создание и изменение ролей ограничены правилом вложенности полномочий: предлагаемая или текущая роль не может быть выше субъекта по рангу, превышать его действующие разрешения или расширять его область доступа к инструментам. Области действия ключей API учитываются при этой проверке. Удаление пользовательской роли также требует полномочий на назначение встроенной резервной роли `user`, используемой для её участников.
+
 | Метод | Путь | Доступ | Описание |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/roles` | Admin (`audit:read`) | Список всех ролей с количеством пользователей |
@@ -651,8 +653,8 @@ curl -X POST http://localhost:1349/api/v1/admin/features/import \
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Admin (`security:manage`) | Обновить список разрешённых CIDR с предотвращением самоблокировки |
 | `GET` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Список правовых блокировок пользователей и команд |
 | `PUT` | `/api/v1/enterprise/legal-hold` | Admin (`compliance:manage`) | Применить или снять правовую блокировку с пользователя или команды |
-| `POST` | `/api/v1/enterprise/scim/token` | Admin (`users:manage`) | Сгенерировать bearer-токен SCIM, возвращается один раз |
-| `DELETE` | `/api/v1/enterprise/scim/token` | Admin (`users:manage`) | Отозвать текущий bearer-токен SCIM |
+| `POST` | `/api/v1/enterprise/scim/token` | Встроенный администратор с полными правами | Сгенерировать bearer-токен SCIM, возвращается один раз |
+| `DELETE` | `/api/v1/enterprise/scim/token` | Встроенный администратор с полными правами | Отозвать текущий bearer-токен SCIM |
 | `GET` | `/api/v1/enterprise/siem/config` | Admin (`webhooks:manage`) | Прочитать конфигурацию пересылки SIEM |
 | `PUT` | `/api/v1/enterprise/siem/config` | Admin (`webhooks:manage`) | Обновить конфигурацию пересылки SIEM |
 | `GET` | `/api/v1/enterprise/webhooks` | Admin (`webhooks:manage`) | Список назначений вебхуков |
@@ -662,15 +664,15 @@ curl -X POST http://localhost:1349/api/v1/admin/features/import \
 | `POST` | `/api/v1/enterprise/webhooks/:index/test` | Admin (`webhooks:manage`) | Отправить тестовую полезную нагрузку вебхука |
 | `POST` | `/api/v1/enterprise/users/:id/export` | Admin (`compliance:manage`) | Запустить задание экспорта пользователя по GDPR |
 | `GET` | `/api/v1/enterprise/users/:id/export/:jobId` | Admin (`compliance:manage`) | Прочитать статус экспорта GDPR и URL для загрузки |
-| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Admin (`compliance:manage`) | Безвозвратно очистить данные пользователя после подтверждения |
-| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Admin (`compliance:manage`) | Безвозвратно очистить данные команды после подтверждения |
+| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Admin (`compliance:manage`; полномочия в отношении цели) | Безвозвратно очистить данные пользователя после подтверждения |
+| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Admin (`compliance:manage`; полномочия в отношении всех участников) | Безвозвратно очистить данные команды после подтверждения |
 | `GET` | `/api/v1/admin/version` | Admin (`system:health`) | Прочитать метаданные версии приложения, сборки, Node и схемы |
 | `GET` | `/api/v1/admin/migrations/pending` | Admin (`system:health`) | Сравнить упакованные миграции с применёнными миграциями |
 | `GET` | `/api/v1/admin/upgrade-check` | Admin (`system:health`) | Запустить проверки готовности к обновлению |
 
 ### SCIM 2.0 {#scim-2-0}
 
-Эндпоинты обнаружения SCIM публичны. Эндпоинты пользователей и групп требуют bearer-токена SCIM, сгенерированного выше.
+Эндпоинты обнаружения SCIM публичны. Эндпоинты пользователей и групп требуют bearer-токена SCIM, сгенерированного выше. Устаревшие токены без версии недействительны и должны быть перевыпущены в виде токенов `so_scim_v2_...` встроенным администратором с полными правами.
 
 | Метод | Путь | Доступ | Описание |
 |--------|------|--------|-------------|

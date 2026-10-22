@@ -1,6 +1,6 @@
 ---
 description: "完整的 REST API 參考。工具端點、批次處理、管線、檔案庫、驗證、團隊與管理操作。"
-i18n_output_hash: 0dccf94f5eb5
+i18n_output_hash: 3d3b2271bec1
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -64,16 +64,16 @@ Key 以 `si_` 為前綴並以 scrypt 雜湊儲存，原始 key 只會顯示一�
 | `GET` | `/api/auth/session` | Auth | 驗證目前的 session |
 | `POST` | `/api/auth/change-password` | Auth | 變更自己的密碼（會使所有其他 session 與 API key 失效） |
 | `GET` | `/api/auth/users` | Admin | 列出所有使用者 |
-| `POST` | `/api/auth/register` | Admin | 建立新使用者 |
-| `PUT` | `/api/auth/users/:id` | Admin | 更新使用者角色或團隊 |
-| `POST` | `/api/auth/users/:id/reset-password` | Admin | 重設使用者密碼 |
-| `DELETE` | `/api/auth/users/:id` | Admin | 刪除使用者 |
+| `POST` | `/api/auth/register` | Admin（`users:manage`；所提議角色權限） | 建立新使用者 |
+| `PUT` | `/api/auth/users/:id` | Admin（`users:manage`；目標權限） | 更新使用者角色或團隊 |
+| `POST` | `/api/auth/users/:id/reset-password` | Admin（`users:manage`；目標權限） | 重設使用者密碼 |
+| `DELETE` | `/api/auth/users/:id` | Admin（`users:manage`；目標權限） | 刪除使用者 |
 | `GET` | `/api/v1/config/auth` | Public | 檢查是否已啟用驗證（`{ authEnabled: bool }`） |
 | `POST` | `/api/auth/mfa/enroll` | Auth | 啟動 TOTP MFA 註冊。需要企業版 `mfa` 功能 |
 | `POST` | `/api/auth/mfa/verify` | Auth | 以 TOTP 代碼確認 MFA 註冊 |
 | `POST` | `/api/auth/mfa/complete` | Public | 完成待處理的 MFA 登入挑戰 |
 | `POST` | `/api/auth/mfa/disable` | Auth | 為目前使用者停用 MFA |
-| `POST` | `/api/auth/users/:id/mfa/reset` | Admin（`users:manage`） | 重設某使用者的 MFA |
+| `POST` | `/api/auth/users/:id/mfa/reset` | Admin（`users:manage`；目標權限） | 重設某使用者的 MFA |
 | `GET` | `/api/auth/oidc/login` | Public | 啟用 OIDC 時啟動 OIDC 登入 |
 | `GET` | `/api/auth/oidc/callback` | Public | OIDC 授權回呼 |
 | `GET` | `/api/auth/saml/metadata` | Public | 啟用 SAML 時的 SAML SP metadata XML |
@@ -560,6 +560,8 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 
 具細緻權限的自訂角色管理。
 
+角色的建立與修改受權限包含規則約束：所提議或目前的角色在層級上不得高於操作者、不得超出操作者的有效權限，也不得擴大操作者的工具範圍。API 金鑰的權限範圍也會參與此檢查。刪除自訂角色還需要具備為其成員指派內建後備角色 `user` 的權限。
+
 | Method | Path | 存取權限 | 說明 |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/roles` | Admin（`audit:read`） | 列出所有角色及其使用者數 |
@@ -651,8 +653,8 @@ curl -X POST http://localhost:1349/api/v1/admin/features/import \
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | Admin（`security:manage`） | 更新 CIDR 允許清單，並防止自我鎖定 |
 | `GET` | `/api/v1/enterprise/legal-hold` | Admin（`compliance:manage`） | 列出使用者與團隊的法律保留 |
 | `PUT` | `/api/v1/enterprise/legal-hold` | Admin（`compliance:manage`） | 對使用者或團隊套用或解除法律保留 |
-| `POST` | `/api/v1/enterprise/scim/token` | Admin（`users:manage`） | 產生 SCIM bearer token，僅回傳一次 |
-| `DELETE` | `/api/v1/enterprise/scim/token` | Admin（`users:manage`） | 撤銷目前的 SCIM bearer token |
+| `POST` | `/api/v1/enterprise/scim/token` | 擁有完整權限的內建管理員 | 產生 SCIM bearer token，僅回傳一次 |
+| `DELETE` | `/api/v1/enterprise/scim/token` | 擁有完整權限的內建管理員 | 撤銷目前的 SCIM bearer token |
 | `GET` | `/api/v1/enterprise/siem/config` | Admin（`webhooks:manage`） | 讀取 SIEM 轉發設定 |
 | `PUT` | `/api/v1/enterprise/siem/config` | Admin（`webhooks:manage`） | 更新 SIEM 轉發設定 |
 | `GET` | `/api/v1/enterprise/webhooks` | Admin（`webhooks:manage`） | 列出 webhook 目的地 |
@@ -662,15 +664,15 @@ curl -X POST http://localhost:1349/api/v1/admin/features/import \
 | `POST` | `/api/v1/enterprise/webhooks/:index/test` | Admin（`webhooks:manage`） | 送出測試 webhook 酬載 |
 | `POST` | `/api/v1/enterprise/users/:id/export` | Admin（`compliance:manage`） | 啟動 GDPR 使用者匯出工作 |
 | `GET` | `/api/v1/enterprise/users/:id/export/:jobId` | Admin（`compliance:manage`） | 讀取 GDPR 匯出狀態與下載 URL |
-| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Admin（`compliance:manage`） | 確認後永久清除某使用者的資料 |
-| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Admin（`compliance:manage`） | 確認後永久清除某團隊的資料 |
+| `DELETE` | `/api/v1/enterprise/users/:id/purge` | Admin（`compliance:manage`；目標權限） | 確認後永久清除某使用者的資料 |
+| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | Admin（`compliance:manage`；所有成員權限） | 確認後永久清除某團隊的資料 |
 | `GET` | `/api/v1/admin/version` | Admin（`system:health`） | 讀取 app、build、Node 與 schema 版本中繼資料 |
 | `GET` | `/api/v1/admin/migrations/pending` | Admin（`system:health`） | 比較封裝的遷移與已套用的遷移 |
 | `GET` | `/api/v1/admin/upgrade-check` | Admin（`system:health`） | 執行升級就緒性檢查 |
 
 ### SCIM 2.0 {#scim-2-0}
 
-SCIM 探索端點為公開。使用者與群組端點需要上方產生的 SCIM bearer token。
+SCIM 探索端點為公開。使用者與群組端點需要上方產生的 SCIM bearer token。舊版無版本號的 token 無效，必須由擁有完整權限的內建管理員重新核發為 `so_scim_v2_...` token。
 
 | Method | Path | 存取權限 | 說明 |
 |--------|------|--------|-------------|

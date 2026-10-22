@@ -1,6 +1,6 @@
 ---
 description: "مرجع REST API الكامل. نقاط نهاية الأدوات، والمعالجة الدفعية، وخطوط المعالجة، ومكتبة الملفات، والمصادقة، والفرق، وعمليات الإدارة."
-i18n_output_hash: 0337915a41b5
+i18n_output_hash: 12935886232f
 i18n_source_hash: 322655170ae6
 i18n_provenance: human
 ---
@@ -64,16 +64,16 @@ curl -X POST http://localhost:1349/api/v1/tools/image/resize \
 | `GET` | `/api/auth/session` | مصادَق | التحقق من صحة الجلسة الحالية |
 | `POST` | `/api/auth/change-password` | مصادَق | تغيير كلمة المرور الخاصة (يُبطل جميع الجلسات ومفاتيح API الأخرى) |
 | `GET` | `/api/auth/users` | مسؤول | سرد جميع المستخدمين |
-| `POST` | `/api/auth/register` | مسؤول | إنشاء مستخدم جديد |
-| `PUT` | `/api/auth/users/:id` | مسؤول | تحديث دور المستخدم أو فريقه |
-| `POST` | `/api/auth/users/:id/reset-password` | مسؤول | إعادة تعيين كلمة مرور المستخدم |
-| `DELETE` | `/api/auth/users/:id` | مسؤول | حذف مستخدم |
+| `POST` | `/api/auth/register` | مسؤول (`users:manage`؛ صلاحية الدور المقترح) | إنشاء مستخدم جديد |
+| `PUT` | `/api/auth/users/:id` | مسؤول (`users:manage`؛ صلاحية الهدف) | تحديث دور المستخدم أو فريقه |
+| `POST` | `/api/auth/users/:id/reset-password` | مسؤول (`users:manage`؛ صلاحية الهدف) | إعادة تعيين كلمة مرور المستخدم |
+| `DELETE` | `/api/auth/users/:id` | مسؤول (`users:manage`؛ صلاحية الهدف) | حذف مستخدم |
 | `GET` | `/api/v1/config/auth` | عام | التحقق مما إذا كانت المصادقة مُفعَّلة (`{ authEnabled: bool }`) |
 | `POST` | `/api/auth/mfa/enroll` | مصادَق | بدء تسجيل المصادقة متعددة العوامل TOTP MFA. يتطلب ميزة `mfa` للمؤسسات |
 | `POST` | `/api/auth/mfa/verify` | مصادَق | تأكيد تسجيل MFA باستخدام رمز TOTP |
 | `POST` | `/api/auth/mfa/complete` | عام | إكمال تحدي تسجيل دخول MFA معلّق |
 | `POST` | `/api/auth/mfa/disable` | مصادَق | تعطيل MFA للمستخدم الحالي |
-| `POST` | `/api/auth/users/:id/mfa/reset` | مسؤول (`users:manage`) | إعادة تعيين MFA لمستخدم |
+| `POST` | `/api/auth/users/:id/mfa/reset` | مسؤول (`users:manage`؛ صلاحية الهدف) | إعادة تعيين MFA لمستخدم |
 | `GET` | `/api/auth/oidc/login` | عام | بدء تسجيل دخول OIDC عند تفعيل OIDC |
 | `GET` | `/api/auth/oidc/callback` | عام | استدعاء تفويض OIDC |
 | `GET` | `/api/auth/saml/metadata` | عام | XML لبيانات وصف SAML SP عند تفعيل SAML |
@@ -560,6 +560,8 @@ data: {"jobId":"...","type":"batch","status":"processing","completedFiles":2,"to
 
 إدارة أدوار مخصصة بأذونات دقيقة.
 
+تخضع عملية إنشاء الأدوار وتعديلها لتقييد الصلاحيات: لا يمكن للدور المقترح أو الحالي أن يتجاوز رتبة المنفّذ، أو يتعدى أذوناته الفعّالة، أو يوسّع نطاق أدواته. وتدخل نطاقات مفاتيح API في هذا التحقق. كما يتطلب حذف دور مخصص صلاحية تعيين الدور الاحتياطي المضمّن `user` المستخدم لأعضائه.
+
 | الطريقة | المسار | الوصول | الوصف |
 |--------|------|--------|-------------|
 | `GET` | `/api/v1/roles` | مسؤول (`audit:read`) | سرد جميع الأدوار مع أعداد المستخدمين |
@@ -651,8 +653,8 @@ curl -X POST http://localhost:1349/api/v1/admin/features/import \
 | `PUT` | `/api/v1/enterprise/ip-allowlist` | مسؤول (`security:manage`) | تحديث قائمة CIDR المسموح بها مع منع الإقفال الذاتي |
 | `GET` | `/api/v1/enterprise/legal-hold` | مسؤول (`compliance:manage`) | سرد الحجوزات القانونية للمستخدمين والفرق |
 | `PUT` | `/api/v1/enterprise/legal-hold` | مسؤول (`compliance:manage`) | تطبيق أو رفع حجز قانوني على مستخدم أو فريق |
-| `POST` | `/api/v1/enterprise/scim/token` | مسؤول (`users:manage`) | إنشاء رمز حامل SCIM، يُرجع مرة واحدة |
-| `DELETE` | `/api/v1/enterprise/scim/token` | مسؤول (`users:manage`) | إبطال رمز حامل SCIM الحالي |
+| `POST` | `/api/v1/enterprise/scim/token` | مسؤول مضمّن بكامل الصلاحيات | إنشاء رمز حامل SCIM، يُرجع مرة واحدة |
+| `DELETE` | `/api/v1/enterprise/scim/token` | مسؤول مضمّن بكامل الصلاحيات | إبطال رمز حامل SCIM الحالي |
 | `GET` | `/api/v1/enterprise/siem/config` | مسؤول (`webhooks:manage`) | قراءة تهيئة إعادة توجيه SIEM |
 | `PUT` | `/api/v1/enterprise/siem/config` | مسؤول (`webhooks:manage`) | تحديث تهيئة إعادة توجيه SIEM |
 | `GET` | `/api/v1/enterprise/webhooks` | مسؤول (`webhooks:manage`) | سرد وجهات الويب هوك |
@@ -662,15 +664,15 @@ curl -X POST http://localhost:1349/api/v1/admin/features/import \
 | `POST` | `/api/v1/enterprise/webhooks/:index/test` | مسؤول (`webhooks:manage`) | إرسال حمولة ويب هوك تجريبية |
 | `POST` | `/api/v1/enterprise/users/:id/export` | مسؤول (`compliance:manage`) | بدء مهمة تصدير مستخدم بموجب GDPR |
 | `GET` | `/api/v1/enterprise/users/:id/export/:jobId` | مسؤول (`compliance:manage`) | قراءة حالة تصدير GDPR ورابط التنزيل |
-| `DELETE` | `/api/v1/enterprise/users/:id/purge` | مسؤول (`compliance:manage`) | تطهير بيانات مستخدم نهائيًا بعد التأكيد |
-| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | مسؤول (`compliance:manage`) | تطهير بيانات فريق نهائيًا بعد التأكيد |
+| `DELETE` | `/api/v1/enterprise/users/:id/purge` | مسؤول (`compliance:manage`؛ صلاحية الهدف) | تطهير بيانات مستخدم نهائيًا بعد التأكيد |
+| `DELETE` | `/api/v1/enterprise/teams/:id/purge` | مسؤول (`compliance:manage`؛ صلاحية جميع الأعضاء) | تطهير بيانات فريق نهائيًا بعد التأكيد |
 | `GET` | `/api/v1/admin/version` | مسؤول (`system:health`) | قراءة البيانات الوصفية لإصدار التطبيق والبناء وNode والمخطط |
 | `GET` | `/api/v1/admin/migrations/pending` | مسؤول (`system:health`) | مقارنة عمليات الترحيل المُحزَّمة بعمليات الترحيل المُطبَّقة |
 | `GET` | `/api/v1/admin/upgrade-check` | مسؤول (`system:health`) | تشغيل فحوصات جاهزية الترقية |
 
 ### SCIM 2.0 {#scim-2-0}
 
-نقاط نهاية اكتشاف SCIM عامة. تتطلب نقاط نهاية المستخدمين والمجموعات رمز حامل SCIM المُنشأ أعلاه.
+نقاط نهاية اكتشاف SCIM عامة. تتطلب نقاط نهاية المستخدمين والمجموعات رمز حامل SCIM المُنشأ أعلاه. الرموز القديمة غير المُصنَّفة بإصدار غير صالحة ويجب إعادة إصدارها كرموز `so_scim_v2_...` بواسطة مسؤول مضمّن بكامل الصلاحيات.
 
 | الطريقة | المسار | الوصول | الوصف |
 |--------|------|--------|-------------|
