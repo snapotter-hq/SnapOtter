@@ -205,6 +205,8 @@ def enhance_with_gfpgan(img_array, only_center_face):
         only_center_face=only_center_face,
         paste_back=True,
     )
+    if output is None:
+        raise RuntimeError("GFPGAN returned no result (face enhancement may have failed)")
     return output
 
 
@@ -389,8 +391,21 @@ def main():
                         print(f"[enhance-faces] CodeFormer failed, falling back to GFPGAN: {detail}", file=sys.stderr, flush=True)
                         traceback.print_exc(file=sys.stderr)
                         emit_progress(50, "Falling back to GFPGAN")
-                        enhanced = enhance_with_gfpgan(img_array, only_center_face)
+                        try:
+                            enhanced = enhance_with_gfpgan(img_array, only_center_face)
+                        except Exception as gfp_err:
+                            if _is_oom(gfp_err) or (
+                                isinstance(e, ImportError) and isinstance(gfp_err, ImportError)
+                            ):
+                                raise
+                            gfp_detail = str(gfp_err).strip() or type(gfp_err).__name__
+                            raise RuntimeError(
+                                f"CodeFormer failed ({detail}); GFPGAN fallback also failed ({gfp_detail})"
+                            ) from gfp_err
                         model_used = "gfpgan"
+
+                else:
+                    raise ValueError(f"Unknown face enhancement model: {model_choice}")
 
             finally:
                 # Restore stdout after ALL AI processing

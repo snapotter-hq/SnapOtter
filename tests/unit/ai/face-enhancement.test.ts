@@ -1067,6 +1067,187 @@ print("ENHANCE_FACES_3626_OK")
         expect(res.status, res.stderr).toBe(0);
         expect(res.stdout).toContain("ENHANCE_FACES_3626_OK");
       });
+
+      it("raises RuntimeError on GFPGAN None output, rejects unknown model_choice, and preserves CodeFormer failure detail when auto fallback also fails (issue #3627)", () => {
+        const res = spawnSync(
+          pythonBin as string,
+          [
+            "-c",
+            `
+import contextlib, errno, importlib.util, io, json, os, sys, types, tempfile
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+
+class FakeArr:
+    shape = (64, 64, 3)
+    def __getitem__(self, _idx):
+        return self
+    def copy(self):
+        return self
+    def astype(self, _dt):
+        return self
+    def __mul__(self, _other):
+        return self
+    def __add__(self, _other):
+        return self
+
+spec = importlib.util.spec_from_file_location("enhance_faces_mod_3627", os.path.join(py_dir, "enhance_faces.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+orig_dunder_stdout = sys.__stdout__
+
+# 1. enhance_with_gfpgan() raises RuntimeError when GFPGANer.enhance returns None, and returns output when non-None
+with tempfile.NamedTemporaryFile(suffix=".pth", delete=False) as tmp_weights:
+    tmp_weights_path = tmp_weights.name
+
+try:
+    mod.GFPGAN_MODEL_PATH = tmp_weights_path
+
+    fake_torch = types.ModuleType("torch")
+    fake_torch.device = lambda d: f"device:{d}"
+    sys.modules["torch"] = fake_torch
+
+    fake_gpu = types.ModuleType("gpu")
+    fake_gpu.torch_gpu_available = lambda: False
+    sys.modules["gpu"] = fake_gpu
+
+    fake_offline = types.ModuleType("offline_guard")
+    fake_offline.prepare_gfpgan_helper_weights = lambda _b: None
+    sys.modules["offline_guard"] = fake_offline
+
+    enhance_return = [None]
+    gfpgan_init_kwargs = []
+    gfpgan_enhance_kwargs = []
+    class FakeGFPGANer:
+        def __init__(self, **kwargs):
+            gfpgan_init_kwargs.append(kwargs)
+        def enhance(self, img, **kwargs):
+            gfpgan_enhance_kwargs.append((img, kwargs))
+            return None, None, enhance_return[0]
+
+    fake_gfpgan_mod = types.ModuleType("gfpgan")
+    fake_gfpgan_mod.GFPGANer = FakeGFPGANer
+    sys.modules["gfpgan"] = fake_gfpgan_mod
+
+    try:
+        mod.enhance_with_gfpgan(FakeArr(), True)
+    except RuntimeError as exc:
+        assert str(exc) == "GFPGAN returned no result (face enhancement may have failed)", exc
+        assert len(gfpgan_enhance_kwargs) == 1 and gfpgan_enhance_kwargs[0][1]["only_center_face"] is True
+    else:
+        raise AssertionError("Expected RuntimeError when GFPGANer.enhance returns None output")
+
+    expected_out = FakeArr()
+    enhance_return[0] = expected_out
+    out_arr = mod.enhance_with_gfpgan(FakeArr(), False)
+    assert out_arr is expected_out
+
+    # Through main(), GFPGAN None output surfaces the specific RuntimeError rather than "no model available"
+    fake_pil = types.ModuleType("PIL")
+    fake_pil.Image = types.SimpleNamespace(
+        open=lambda _p: types.SimpleNamespace(convert=lambda _m: FakeArr()),
+        fromarray=lambda _a: types.SimpleNamespace(save=lambda _p: None),
+    )
+    sys.modules["PIL"] = fake_pil
+
+    fake_np = types.ModuleType("numpy")
+    fake_np.float32 = "float32"
+    fake_np.uint8 = "uint8"
+    fake_np.array = lambda _img: FakeArr()
+    fake_np.clip = lambda arr, _lo, _hi: arr
+    sys.modules["numpy"] = fake_np
+
+    mod.detect_faces_mediapipe = lambda _arr, _s: [{"x": 0, "y": 0, "w": 32, "h": 32}]
+
+    def run_main_expect_fail(settings):
+        sys.argv = ["enhance_faces.py", "/tmp/in.png", "/tmp/out_faces.png", json.dumps(settings)]
+        out_buf, err_buf = io.StringIO(), io.StringIO()
+        try:
+            sys.__stdout__ = out_buf
+            with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+                mod.main()
+        except SystemExit as exc:
+            assert exc.code == 1, exc.code
+        else:
+            raise AssertionError(f"Expected SystemExit(1), got stdout={out_buf.getvalue()!r}")
+        finally:
+            sys.__stdout__ = orig_dunder_stdout
+        return json.loads(out_buf.getvalue().strip()), err_buf.getvalue()
+
+    enhance_return[0] = None
+    payload, _ = run_main_expect_fail({"model": "gfpgan", "strength": 1.0})
+    assert payload == {
+        "success": False,
+        "error": "GFPGAN returned no result (face enhancement may have failed)",
+    }, payload
+
+    # In auto mode, when CodeFormer fails and unstubbed enhance_with_gfpgan returns None, both errors are surfaced
+    mod.enhance_with_codeformer = lambda _arr, _fid: (_ for _ in ()).throw(
+        RuntimeError("CodeFormer returned no result (face detection may have failed)")
+    )
+    payload_auto_none, _ = run_main_expect_fail({"model": "auto", "strength": 1.0})
+    assert payload_auto_none == {
+        "success": False,
+        "error": "CodeFormer failed (CodeFormer returned no result (face detection may have failed)); GFPGAN fallback also failed (GFPGAN returned no result (face enhancement may have failed))",
+    }, payload_auto_none
+finally:
+    try:
+        os.unlink(tmp_weights_path)
+    except OSError:
+        pass
+
+# 2. Unknown model_choice raises ValueError instead of falling through to "no model available"
+for bad_model in ("bogus", "", "realesrgan", None):
+    payload, _ = run_main_expect_fail({"model": bad_model})
+    assert payload == {
+        "success": False,
+        "error": f"Unknown face enhancement model: {bad_model}".strip(),
+    }, (bad_model, payload)
+
+# 3. In auto mode, when CodeFormer fails with non-OOM and GFPGAN fallback also fails with non-OOM, both errors are surfaced
+for cf_exc, gfp_exc, expected_msg in (
+    (
+        RuntimeError("CodeFormer weights corrupted"),
+        FileNotFoundError("GFPGAN model not found: /opt/models/gfpgan/GFPGANv1.3.pth"),
+        "CodeFormer failed (CodeFormer weights corrupted); GFPGAN fallback also failed (GFPGAN model not found: /opt/models/gfpgan/GFPGANv1.3.pth)",
+    ),
+    (
+        RuntimeError("CodeFormer weights corrupted"),
+        ModuleNotFoundError("No module named 'gfpgan'"),
+        "CodeFormer failed (CodeFormer weights corrupted); GFPGAN fallback also failed (No module named 'gfpgan')",
+    ),
+    (
+        RuntimeError(),
+        ValueError("   "),
+        "CodeFormer failed (RuntimeError); GFPGAN fallback also failed (ValueError)",
+    ),
+):
+    mod.enhance_with_codeformer = lambda _arr, _fid, _e=cf_exc: (_ for _ in ()).throw(_e)
+    mod.enhance_with_gfpgan = lambda _arr, _only, _e=gfp_exc: (_ for _ in ()).throw(_e)
+    payload, _ = run_main_expect_fail({"model": "auto", "strength": 1.0})
+    assert payload == {"success": False, "error": expected_msg}, (cf_exc, gfp_exc, payload)
+
+# 4. In auto mode, if GFPGAN fallback raises an OOM exception, the OOM exception is re-raised directly
+for gfp_oom, expected_oom_msg in (
+    (MemoryError("GFPGAN OOM"), "GFPGAN OOM"),
+    (RuntimeError("CUDA out of memory in GFPGAN"), "CUDA out of memory in GFPGAN"),
+    (OSError(errno.ENOMEM, "Cannot allocate memory"), "[Errno 12] Cannot allocate memory"),
+):
+    mod.enhance_with_codeformer = lambda _arr, _fid: (_ for _ in ()).throw(RuntimeError("CodeFormer non-OOM error"))
+    mod.enhance_with_gfpgan = lambda _arr, _only, _e=gfp_oom: (_ for _ in ()).throw(_e)
+    payload, _ = run_main_expect_fail({"model": "auto", "strength": 1.0})
+    assert payload == {"success": False, "error": expected_oom_msg}, (gfp_oom, payload)
+
+print("ENHANCE_FACES_3627_OK")
+`,
+          ],
+          { encoding: "utf8", timeout: 30_000 },
+        );
+        expect(res.status, res.stderr).toBe(0);
+        expect(res.stdout).toContain("ENHANCE_FACES_3627_OK");
+      });
     },
   );
 });
