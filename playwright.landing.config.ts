@@ -6,7 +6,7 @@ const { runRoot } = resolvePlaywrightRun(__dirname, "landing");
 const endpoint = resolvePlaywrightEndpoint(
   "PLAYWRIGHT_LANDING_PORT",
   "PLAYWRIGHT_LANDING_URL",
-  40_000,
+  23_000,
 );
 
 export default defineConfig({

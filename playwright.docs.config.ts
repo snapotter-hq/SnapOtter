@@ -3,7 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 import { resolvePlaywrightEndpoint, resolvePlaywrightRun } from "./tests/playwright-run.js";
 
 const { runRoot } = resolvePlaywrightRun(__dirname, "docs");
-const endpoint = resolvePlaywrightEndpoint("PLAYWRIGHT_DOCS_PORT", "PLAYWRIGHT_DOCS_URL", 40_000);
+const endpoint = resolvePlaywrightEndpoint("PLAYWRIGHT_DOCS_PORT", "PLAYWRIGHT_DOCS_URL", 23_000);
 
 export default defineConfig({
   testDir: "./tests/e2e-docs",

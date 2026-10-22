@@ -5,6 +5,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 
 const root = process.cwd();
 const envKeys = [
+  "API_URL",
   "EDITOR_TEST_PORT",
   "PLAYWRIGHT_DEMO_PORT",
   "PLAYWRIGHT_DEMO_URL",
@@ -16,6 +17,10 @@ const envKeys = [
   "PLAYWRIGHT_EDITOR_WEB_URL",
   "PLAYWRIGHT_LANDING_PORT",
   "PLAYWRIGHT_LANDING_URL",
+  "PLAYWRIGHT_NOAUTH_API_PORT",
+  "PLAYWRIGHT_NOAUTH_API_URL",
+  "PLAYWRIGHT_NOAUTH_WEB_PORT",
+  "PLAYWRIGHT_NOAUTH_WEB_URL",
   "PLAYWRIGHT_RUN_ID",
   "PLAYWRIGHT_RUN_ROOT",
 ] as const;
@@ -219,13 +224,217 @@ describe("surface Playwright harness isolation", () => {
     expect(web.env.VITE_API_URL).toBe("http://127.0.0.1:44191");
   });
 
-  test("rejects path-traversing run identities", async () => {
+  test("noauth owns fresh API, database, storage, and built web resources with AUTH_ENABLED=false", async () => {
+    const config = await loadConfig("../../playwright.noauth.config.js", {
+      PLAYWRIGHT_NOAUTH_API_PORT: "44192",
+      PLAYWRIGHT_NOAUTH_WEB_PORT: "45150",
+      PLAYWRIGHT_RUN_ID: "noauth_contract",
+    });
+    expectScopedArtifacts(config, "noauth_contract", "noauth");
+    expect(config.use?.baseURL).toBe("http://127.0.0.1:45150");
+    expect(process.env.API_URL).toBe("http://127.0.0.1:44192");
+
+    const [api, web] = config.webServer as Array<{
+      command: string;
+      env: Record<string, string>;
+      gracefulShutdown?: { signal: string; timeout: number };
+      reuseExistingServer: boolean;
+      url: string;
+    }>;
+    expect(api.url).toBe("http://127.0.0.1:44192/api/v1/health");
+    expect(api.reuseExistingServer).toBe(false);
+    expect(api.env.AUTH_ENABLED).toBe("false");
+    const databaseName = new URL(api.env.DATABASE_URL).pathname.slice(1);
+    expect(databaseName).toMatch(/^snapotter_e2e_noauth_[a-f0-9]{24}$/);
+    expect(api.env.BULLMQ_PREFIX).toBe(databaseName);
+    expect(api.command).toContain(
+      "node tests/playwright-api-lifecycle.mjs noauth_contract noauth -- pnpm",
+    );
+    expect(api.gracefulShutdown).toEqual({ signal: "SIGTERM", timeout: 30_000 });
+    for (const key of ["DATA_DIR", "FILES_STORAGE_PATH", "WORKSPACE_PATH"]) {
+      expect(api.env[key]).toContain(path.join("noauth_contract", "noauth"));
+    }
+    expect(web.url).toBe("http://127.0.0.1:45150");
+    expect(web.reuseExistingServer).toBe(false);
+    const webBuildAt = web.command.indexOf("vite build");
+    const webServeAt = web.command.indexOf("vite preview");
+    expect(webBuildAt).toBeGreaterThanOrEqual(0);
+    expect(webServeAt).toBeGreaterThan(webBuildAt);
+    expect(web.command).toContain("--strictPort");
+    expect(web.env.VITE_API_URL).toBe("http://127.0.0.1:44192");
+  });
+
+  test("keeps default ports disjoint and below the Linux ephemeral range (32768) across all surface configs", async () => {
+    const actualCrypto = await import("node:crypto");
+    const randomIntCalls: Array<[number, number]> = [];
+    vi.doMock("node:crypto", () => ({
+      ...actualCrypto,
+      randomInt: (min: number, max: number) => {
+        randomIntCalls.push([min, max]);
+        return max - 1;
+      },
+    }));
+    try {
+      const editorConfig = await loadConfig("../../playwright.editor.config.js", {});
+      expect(process.env.PLAYWRIGHT_EDITOR_API_PORT).toBe("21999");
+      expect(process.env.PLAYWRIGHT_EDITOR_WEB_PORT).toBe("29999");
+      expect(process.env.EDITOR_TEST_PORT).toBe("29999");
+      expect(process.env.API_URL).toBe("http://127.0.0.1:21999");
+      expect(editorConfig.use?.baseURL).toBe("http://127.0.0.1:29999");
+
+      const noauthConfig = await loadConfig("../../playwright.noauth.config.js", {});
+      expect(process.env.PLAYWRIGHT_NOAUTH_API_PORT).toBe("21999");
+      expect(process.env.PLAYWRIGHT_NOAUTH_WEB_PORT).toBe("29999");
+      expect(process.env.API_URL).toBe("http://127.0.0.1:21999");
+      expect(noauthConfig.use?.baseURL).toBe("http://127.0.0.1:29999");
+
+      const landingConfig = await loadConfig("../../playwright.landing.config.js", {});
+      expect(process.env.PLAYWRIGHT_LANDING_PORT).toBe("29999");
+      expect(landingConfig.use?.baseURL).toBe("http://127.0.0.1:29999");
+
+      const docsConfig = await loadConfig("../../playwright.docs.config.js", {});
+      expect(process.env.PLAYWRIGHT_DOCS_PORT).toBe("29999");
+      expect(docsConfig.use?.baseURL).toBe("http://127.0.0.1:29999");
+
+      const demoConfig = await loadConfig("../../playwright.demo.config.js", {});
+      expect(process.env.PLAYWRIGHT_DEMO_PORT).toBe("29999");
+      expect(demoConfig.use?.baseURL).toBe("http://127.0.0.1:29999");
+
+      expect(randomIntCalls).toEqual([
+        [15_000, 22_000],
+        [23_000, 30_000],
+        [15_000, 22_000],
+        [23_000, 30_000],
+        [23_000, 30_000],
+        [23_000, 30_000],
+        [23_000, 30_000],
+      ]);
+    } finally {
+      vi.doUnmock("node:crypto");
+    }
+
+    for (let i = 0; i < 25; i += 1) {
+      for (const [modulePath, apiPortKey, apiUrlKey, webPortKey, webUrlKey] of [
+        [
+          "../../playwright.editor.config.js",
+          "PLAYWRIGHT_EDITOR_API_PORT",
+          "PLAYWRIGHT_EDITOR_API_URL",
+          "PLAYWRIGHT_EDITOR_WEB_PORT",
+          "PLAYWRIGHT_EDITOR_WEB_URL",
+        ],
+        [
+          "../../playwright.noauth.config.js",
+          "PLAYWRIGHT_NOAUTH_API_PORT",
+          "PLAYWRIGHT_NOAUTH_API_URL",
+          "PLAYWRIGHT_NOAUTH_WEB_PORT",
+          "PLAYWRIGHT_NOAUTH_WEB_URL",
+        ],
+      ] as const) {
+        const config = await loadConfig(modulePath, {});
+        const apiPort = Number(process.env[apiPortKey]);
+        const webPort = Number(process.env[webPortKey]);
+
+        expect(apiPort).toBeGreaterThanOrEqual(15_000);
+        expect(apiPort).toBeLessThan(22_000);
+        expect(webPort).toBeGreaterThanOrEqual(23_000);
+        expect(webPort).toBeLessThan(30_000);
+        expect(webPort).toBeLessThan(32_768);
+        expect(process.env[apiUrlKey]).toBe(`http://127.0.0.1:${apiPort}`);
+        expect(process.env[webUrlKey]).toBe(`http://127.0.0.1:${webPort}`);
+        expect(config.use?.baseURL).toBe(`http://127.0.0.1:${webPort}`);
+      }
+
+      for (const [modulePath, portKey, urlKey] of [
+        ["../../playwright.landing.config.js", "PLAYWRIGHT_LANDING_PORT", "PLAYWRIGHT_LANDING_URL"],
+        ["../../playwright.docs.config.js", "PLAYWRIGHT_DOCS_PORT", "PLAYWRIGHT_DOCS_URL"],
+        ["../../playwright.demo.config.js", "PLAYWRIGHT_DEMO_PORT", "PLAYWRIGHT_DEMO_URL"],
+      ] as const) {
+        const config = await loadConfig(modulePath, {});
+        const port = Number(process.env[portKey]);
+
+        expect(port).toBeGreaterThanOrEqual(23_000);
+        expect(port).toBeLessThan(30_000);
+        expect(port).toBeLessThan(32_768);
+        expect(process.env[urlKey]).toBe(`http://127.0.0.1:${port}`);
+        expect(config.use?.baseURL).toBe(`http://127.0.0.1:${port}`);
+      }
+    }
+  });
+
+  test("derives surface endpoint ports from URL overrides and rejects malformed overrides", async () => {
+    const legacyEditorPort = await loadConfig("../../playwright.editor.config.js", {
+      EDITOR_TEST_PORT: "29150",
+      PLAYWRIGHT_EDITOR_API_PORT: "19150",
+    });
+    expect(process.env.PLAYWRIGHT_EDITOR_WEB_PORT).toBe("29150");
+    expect(legacyEditorPort.use?.baseURL).toBe("http://127.0.0.1:29150");
+
+    const urlOverrideConfig = await loadConfig("../../playwright.noauth.config.js", {
+      PLAYWRIGHT_NOAUTH_API_URL: "http://localhost:19151",
+      PLAYWRIGHT_NOAUTH_WEB_URL: "http://localhost:29151",
+    });
+    expect(process.env.PLAYWRIGHT_NOAUTH_API_PORT).toBe("19151");
+    expect(process.env.PLAYWRIGHT_NOAUTH_WEB_PORT).toBe("29151");
+    expect(urlOverrideConfig.use?.baseURL).toBe("http://localhost:29151");
+
+    const matchingPortAndUrlConfig = await loadConfig("../../playwright.landing.config.js", {
+      PLAYWRIGHT_LANDING_PORT: "28150",
+      PLAYWRIGHT_LANDING_URL: "http://localhost:28150",
+    });
+    expect(process.env.PLAYWRIGHT_LANDING_PORT).toBe("28150");
+    expect(process.env.PLAYWRIGHT_LANDING_URL).toBe("http://localhost:28150");
+    expect(matchingPortAndUrlConfig.use?.baseURL).toBe("http://localhost:28150");
+
+    await expect(
+      loadConfig("../../playwright.landing.config.js", { PLAYWRIGHT_LANDING_PORT: "not-a-port" }),
+    ).rejects.toThrow(/PLAYWRIGHT_LANDING_PORT must be an integer port/);
+    await expect(
+      loadConfig("../../playwright.docs.config.js", { PLAYWRIGHT_DOCS_PORT: "1023" }),
+    ).rejects.toThrow(/PLAYWRIGHT_DOCS_PORT must be between 1024 and 65535/);
+    await expect(
+      loadConfig("../../playwright.docs.config.js", { PLAYWRIGHT_DOCS_PORT: "65536" }),
+    ).rejects.toThrow(/PLAYWRIGHT_DOCS_PORT must be between 1024 and 65535/);
+    await expect(
+      loadConfig("../../playwright.demo.config.js", {
+        PLAYWRIGHT_DEMO_URL: "https://127.0.0.1:28150",
+      }),
+    ).rejects.toThrow(/PLAYWRIGHT_DEMO_URL must use http/);
+    await expect(
+      loadConfig("../../playwright.landing.config.js", {
+        PLAYWRIGHT_LANDING_URL: "http://192.168.1.10:28150",
+      }),
+    ).rejects.toThrow(/PLAYWRIGHT_LANDING_URL must use a loopback host/);
+    await expect(
+      loadConfig("../../playwright.docs.config.js", {
+        PLAYWRIGHT_DOCS_URL: "http://127.0.0.1:28150/subpath",
+      }),
+    ).rejects.toThrow(
+      /PLAYWRIGHT_DOCS_URL must be an origin without credentials, path, query, or hash/,
+    );
+    await expect(
+      loadConfig("../../playwright.demo.config.js", { PLAYWRIGHT_DEMO_URL: "http://localhost" }),
+    ).rejects.toThrow(/PLAYWRIGHT_DEMO_URL must be between 1024 and 65535, received "80"/);
+    await expect(
+      loadConfig("../../playwright.landing.config.js", {
+        PLAYWRIGHT_LANDING_PORT: "28150",
+        PLAYWRIGHT_LANDING_URL: "http://127.0.0.1:28151",
+      }),
+    ).rejects.toThrow(/PLAYWRIGHT_LANDING_PORT must match the port in PLAYWRIGHT_LANDING_URL/);
+  });
+
+  test("rejects path-traversing run identities and invalid scopes", async () => {
     await expect(
       loadConfig("../../playwright.landing.config.js", {
         PLAYWRIGHT_LANDING_PORT: "44352",
         PLAYWRIGHT_RUN_ID: "../shared",
       }),
     ).rejects.toThrow(/PLAYWRIGHT_RUN_ID/);
+
+    delete process.env.PLAYWRIGHT_RUN_ID;
+    const { resolvePlaywrightRun } = await import("../playwright-run.js");
+    expect(() => resolvePlaywrightRun(root, "../bad-scope")).toThrow(
+      /Playwright run scope is invalid/,
+    );
   });
 });
 

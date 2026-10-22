@@ -14,12 +14,12 @@ const { runId, runRoot } = resolvePlaywrightRun(__dirname, "noauth");
 const apiEndpoint = resolvePlaywrightEndpoint(
   "PLAYWRIGHT_NOAUTH_API_PORT",
   "PLAYWRIGHT_NOAUTH_API_URL",
-  25_000,
+  15_000,
 );
 const webEndpoint = resolvePlaywrightEndpoint(
   "PLAYWRIGHT_NOAUTH_WEB_PORT",
   "PLAYWRIGHT_NOAUTH_WEB_URL",
-  45_000,
+  23_000,
 );
 process.env.API_URL = apiEndpoint.url;
 const webDistDir = path.join(runRoot, "web-dist");

@@ -10,12 +10,12 @@ if (!process.env.PLAYWRIGHT_EDITOR_WEB_PORT && process.env.EDITOR_TEST_PORT) {
 const apiEndpoint = resolvePlaywrightEndpoint(
   "PLAYWRIGHT_EDITOR_API_PORT",
   "PLAYWRIGHT_EDITOR_API_URL",
-  30_000,
+  15_000,
 );
 const webEndpoint = resolvePlaywrightEndpoint(
   "PLAYWRIGHT_EDITOR_WEB_PORT",
   "PLAYWRIGHT_EDITOR_WEB_URL",
-  50_000,
+  23_000,
 );
 process.env.EDITOR_TEST_PORT = String(webEndpoint.port);
 process.env.API_URL = apiEndpoint.url;
