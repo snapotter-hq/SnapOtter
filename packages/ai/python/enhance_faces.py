@@ -234,7 +234,13 @@ def enhance_with_codeformer(img_array, fidelity_weight):
         if result_path is None:
             raise RuntimeError("CodeFormer returned no result (face detection may have failed)")
 
-        restored_bgr = cv2.imread(str(result_path), cv2.IMREAD_COLOR)
+        try:
+            restored_bgr = cv2.imread(str(result_path), cv2.IMREAD_COLOR)
+        finally:
+            try:
+                os.unlink(str(result_path))
+            except OSError:
+                pass
         if restored_bgr is None:
             raise RuntimeError("CodeFormer output file could not be read")
     finally:

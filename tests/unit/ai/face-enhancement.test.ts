@@ -277,16 +277,18 @@ describe("enhanceFaces", () => {
     });
   });
 
-  describe.skipIf(!hasPython)("enhance_faces.py cv2.imwrite return check (issue #3087)", () => {
-    const here = dirname(fileURLToPath(import.meta.url));
-    const pyDir = resolve(here, "../../../packages/ai/python");
+  describe.skipIf(!hasPython)(
+    "enhance_faces.py cv2.imwrite return check and result_path cleanup (issues #3087, #3419)",
+    () => {
+      const here = dirname(fileURLToPath(import.meta.url));
+      const pyDir = resolve(here, "../../../packages/ai/python");
 
-    it("raises RuntimeError and cleans up the temporary file when cv2.imwrite returns False in enhance_with_codeformer", () => {
-      const res = spawnSync(
-        pythonBin as string,
-        [
-          "-c",
-          `
+      it("raises RuntimeError on cv2.imwrite failure and cleans up both tmp_in_path and result_path in enhance_with_codeformer", () => {
+        const res = spawnSync(
+          pythonBin as string,
+          [
+            "-c",
+            `
 import contextlib, importlib.util, io, json, os, sys, types
 
 py_dir = ${JSON.stringify(pyDir)}
@@ -404,26 +406,95 @@ assert gfpgan_calls == [False], gfpgan_calls
 payload_auto = json.loads(out_auto.getvalue().strip())
 assert payload_auto["success"] is True and payload_auto["model"] == "gfpgan", payload_auto
 
-# Positive path: when cv2.imwrite returns True, enhance_with_codeformer invokes inference_app and still unlinks tmp_in_path
+# Positive path: when cv2.imwrite returns True, enhance_with_codeformer invokes inference_app and unlinks both tmp_in_path and result_path
 attempted_paths.clear()
 inference_calls.clear()
+result_paths = []
+import atexit
+def _cleanup_test_results():
+    for p in result_paths:
+        try:
+            os.unlink(p)
+        except OSError:
+            pass
+atexit.register(_cleanup_test_results)
 def ok_imwrite(path, _img):
     attempted_paths.append(path)
     return True
 fake_cv2.imwrite = ok_imwrite
+imread_existed = []
+def imread_checking_exists(path, _flags):
+    imread_existed.append((path, os.path.exists(path)))
+    return FakeArr() if os.path.exists(path) else None
+fake_cv2.imread = imread_checking_exists
+def fake_inference_app_with_temp_output(**kwargs):
+    inference_calls.append(kwargs)
+    import tempfile
+    with tempfile.NamedTemporaryFile(suffix="_cf_out.png", delete=False) as tmp_out:
+        result_paths.append(tmp_out.name)
+        return tmp_out.name
+fake_cf_app.inference_app = fake_inference_app_with_temp_output
 restored = mod.enhance_with_codeformer(FakeArr(), 0.5)
 assert restored is not None
 assert len(attempted_paths) == 1, attempted_paths
 assert len(inference_calls) == 1 and inference_calls[0]["image"] == attempted_paths[0], inference_calls
 assert not os.path.exists(attempted_paths[0]), f"temp file should be cleaned up after enhance_with_codeformer succeeds: {attempted_paths[0]}"
+assert len(result_paths) == 1, result_paths
+assert imread_existed == [(result_paths[0], True)], f"result_path should exist when cv2.imread reads it: {imread_existed}"
+assert not os.path.exists(result_paths[0]), f"result_path should be cleaned up after enhance_with_codeformer succeeds: {result_paths[0]}"
+
+# Unreadable result_path: when cv2.imread returns None, enhance_with_codeformer raises RuntimeError and still unlinks result_path
+attempted_paths.clear()
+inference_calls.clear()
+result_paths.clear()
+fake_cv2.imread = lambda _p, _f: None
+try:
+    mod.enhance_with_codeformer(FakeArr(), 0.5)
+except RuntimeError as exc:
+    assert str(exc) == "CodeFormer output file could not be read", exc
+    assert len(result_paths) == 1, result_paths
+    assert not os.path.exists(result_paths[0]), f"result_path should be cleaned up when cv2.imread returns None: {result_paths[0]}"
+else:
+    raise AssertionError("Expected RuntimeError when cv2.imread returns None")
+
+# Exception inside cv2.imread: when cv2.imread raises, finally block still unlinks result_path and propagates the exception
+attempted_paths.clear()
+inference_calls.clear()
+result_paths.clear()
+def raising_imread(_p, _f):
+    raise ValueError("corrupt png stream")
+fake_cv2.imread = raising_imread
+try:
+    mod.enhance_with_codeformer(FakeArr(), 0.5)
+except ValueError as exc:
+    assert str(exc) == "corrupt png stream", exc
+    assert len(result_paths) == 1, result_paths
+    assert not os.path.exists(result_paths[0]), f"result_path should be cleaned up when cv2.imread raises: {result_paths[0]}"
+else:
+    raise AssertionError("Expected ValueError when cv2.imread raises")
+
+# Already-unlinked result_path (str(result_path) == tmp_in_path): OSError is suppressed in finally and original error propagates
+attempted_paths.clear()
+inference_calls.clear()
+result_paths.clear()
+fake_cv2.imread = lambda _p, _f: None
+fake_cf_app.inference_app = lambda **kw: kw["image"]
+try:
+    mod.enhance_with_codeformer(FakeArr(), 0.5)
+except RuntimeError as exc:
+    assert str(exc) == "CodeFormer output file could not be read", exc
+    assert len(attempted_paths) == 1 and not os.path.exists(attempted_paths[0]), attempted_paths
+else:
+    raise AssertionError("Expected RuntimeError when already-unlinked result_path returns None from imread")
 
 print("ENHANCE_FACES_3087_OK")
 `,
-        ],
-        { encoding: "utf8", timeout: 30_000 },
-      );
-      expect(res.status, res.stderr).toBe(0);
-      expect(res.stdout).toContain("ENHANCE_FACES_3087_OK");
-    });
-  });
+          ],
+          { encoding: "utf8", timeout: 30_000 },
+        );
+        expect(res.status, res.stderr).toBe(0);
+        expect(res.stdout).toContain("ENHANCE_FACES_3087_OK");
+      });
+    },
+  );
 });
