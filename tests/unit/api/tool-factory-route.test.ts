@@ -90,6 +90,13 @@ vi.mock("../../../apps/api/src/lib/analytics.js", () => ({
   trackEvent: vi.fn(),
 }));
 
+const auditDispatch = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+
+vi.mock("../../../apps/api/src/lib/audit.js", () => ({
+  isToolAuditEnabled: vi.fn().mockResolvedValue(false),
+  auditFromRequest: vi.fn(() => auditDispatch),
+}));
+
 const childLog = { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() };
 
 vi.mock("../../../apps/api/src/lib/auto-orient.js", () => ({
@@ -163,6 +170,7 @@ import {
   insertToolJobAlias,
   waitForJob,
 } from "../../../apps/api/src/jobs/enqueue.js";
+import { auditFromRequest, isToolAuditEnabled } from "../../../apps/api/src/lib/audit.js";
 import { autoOrient } from "../../../apps/api/src/lib/auto-orient.js";
 import {
   getFirstMissingBundleForTool,
@@ -348,6 +356,12 @@ describe("createToolRoute", () => {
     vi.mocked(getFirstMissingBundleForTool).mockReturnValue(null);
     vi.mocked(isToolInstalled).mockReset();
     vi.mocked(isToolInstalled).mockReturnValue(true);
+    vi.mocked(isToolAuditEnabled).mockReset();
+    vi.mocked(isToolAuditEnabled).mockResolvedValue(false);
+    auditDispatch.mockReset();
+    auditDispatch.mockResolvedValue(undefined);
+    vi.mocked(auditFromRequest).mockReset();
+    vi.mocked(auditFromRequest).mockImplementation(() => auditDispatch);
   });
 
   describe("route registration", () => {
@@ -636,6 +650,80 @@ describe("createToolRoute", () => {
         }),
       );
       expect(deletePrefix).not.toHaveBeenCalled();
+    });
+
+    it("logs a warning on request.log without failing the 200 response when the TOOL_EXECUTED audit chain rejects (#3517)", async () => {
+      const auditErr = new Error("audit dispatch failed");
+      vi.mocked(isToolAuditEnabled).mockRejectedValueOnce(auditErr);
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+      const reply = createMockReply();
+      const req = createMockRequest({
+        fileBuffer: Buffer.from("png-data"),
+        settings: JSON.stringify({}),
+      });
+
+      await handler(req, reply);
+      await vi.waitFor(() => {
+        expect(req.log.warn).toHaveBeenCalledWith(
+          { err: auditErr, toolId: id },
+          "Failed to emit TOOL_EXECUTED audit log",
+        );
+      });
+
+      expect(reply.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jobId: expect.any(String),
+          originalSize: 100,
+          processedSize: 80,
+        }),
+      );
+    });
+
+    it("logs a warning on request.log when auditFromRequest rejects after isToolAuditEnabled resolves true (#3517)", async () => {
+      const dispatchErr = new Error("audit write failed");
+      vi.mocked(isToolAuditEnabled).mockResolvedValueOnce(true);
+      auditDispatch.mockRejectedValueOnce(dispatchErr);
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+      const reply = createMockReply();
+      const req = createMockRequest({
+        fileBuffer: Buffer.from("png-data"),
+        settings: JSON.stringify({ format: "webp" }),
+      });
+
+      await handler(req, reply);
+      await vi.waitFor(() => {
+        expect(req.log.warn).toHaveBeenCalledWith(
+          { err: dispatchErr, toolId: id },
+          "Failed to emit TOOL_EXECUTED audit log",
+        );
+      });
+
+      expect(auditDispatch).toHaveBeenCalledWith(
+        "TOOL_EXECUTED",
+        expect.objectContaining({
+          userId: "user-1",
+          username: "test",
+          toolId: id,
+          inputFileCount: 1,
+          totalInputSize: 100,
+          outputFormat: "webp",
+          status: "success",
+          durationMs: expect.any(Number),
+        }),
+      );
+      expect(reply.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jobId: expect.any(String),
+          originalSize: 100,
+          processedSize: 80,
+        }),
+      );
     });
 
     it("keeps the upload when enqueue fails after the jobs row was written", async () => {

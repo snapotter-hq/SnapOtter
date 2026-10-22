@@ -672,7 +672,12 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
                   });
                 }),
               )
-              .catch(() => {});
+              .catch((err) => {
+                request.log.warn(
+                  { err, toolId: config.toolId },
+                  "Failed to emit TOOL_EXECUTED audit log",
+                );
+              });
 
             return reply.send({
               jobId,
