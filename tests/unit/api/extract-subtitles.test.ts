@@ -94,11 +94,16 @@ describe("extract-subtitles route processor (#3361)", () => {
     });
   });
 
-  it("maps a normal non-zero ffmpeg exit to a 400 InputValidationError", async () => {
+  it.each([
+    ["FFmpeg 5/6 stream map", "ffmpeg exited 1: Stream map '0:s:0' matches no streams."],
+    [
+      "FFmpeg 7/8 empty-token stream map",
+      "ffmpeg exited 234: Stream map '' matches no streams.\nFailed to set value '0:s:0' for option 'map': Invalid argument",
+    ],
+    ["empty output stream", "ffmpeg exited 1: Output file #0 does not contain any stream"],
+  ])("maps %s stderr to a 400 InputValidationError", async (_label, message) => {
     const config = getToolConfig("extract-subtitles");
-    runFfmpegWithProgressMock.mockRejectedValueOnce(
-      new Error("ffmpeg exited 1: Stream map '0:s:0' matches no streams."),
-    );
+    runFfmpegWithProgressMock.mockRejectedValueOnce(new Error(message));
 
     await withScratch(async (scratchDir) => {
       const ctx = createCtx(scratchDir);
@@ -113,10 +118,31 @@ describe("extract-subtitles route processor (#3361)", () => {
     });
   });
 
-  it("rethrows when ctx.signal is aborted", async () => {
+  it("maps a bitmap subtitle encoding failure to a 422 InputValidationError (#3371)", async () => {
+    const config = getToolConfig("extract-subtitles");
+    runFfmpegWithProgressMock.mockRejectedValueOnce(
+      new Error(
+        "ffmpeg exited 234: [sost#0:0/srt @ 0x1] Subtitle encoding currently only possible from text to text or bitmap to bitmap",
+      ),
+    );
+
+    await withScratch(async (scratchDir) => {
+      const ctx = createCtx(scratchDir);
+      const err = await config?.processV2?.(ctx).catch((e: unknown) => e);
+
+      expect(err).toBeInstanceOf(InputValidationError);
+      expect(err).toMatchObject({
+        name: "InputValidationError",
+        statusCode: 422,
+        message: "Image-based subtitle tracks cannot be converted to SRT without OCR",
+      });
+    });
+  });
+
+  it("rethrows when ctx.signal is aborted, even if stderr matches a missing subtitle stream", async () => {
     const config = getToolConfig("extract-subtitles");
     const ac = new AbortController();
-    const cancelErr = new Error("Canceled");
+    const cancelErr = new Error("ffmpeg exited 1: Output file #0 does not contain any stream");
     runFfmpegWithProgressMock.mockImplementationOnce(async () => {
       ac.abort();
       throw cancelErr;
@@ -160,8 +186,25 @@ describe("extract-subtitles route processor (#3361)", () => {
         syscall: "write",
       }),
     ],
+    [
+      "missing ffmpeg binary (#3371)",
+      new Error("ffmpeg binary not found (set FFMPEG_PATH or install ffmpeg)"),
+    ],
+    [
+      "ffmpeg killed by SIGKILL (#3371)",
+      Object.assign(new Error("ffmpeg exited SIGKILL: Killed"), { signal: "SIGKILL" }),
+    ],
+    [
+      "memory-limit shell exit 127 (#3371)",
+      new Error("ffmpeg exited 127: /bin/sh: 1: ffmpeg: not found"),
+    ],
+    [
+      "non-stream-map ffmpeg write failure (#3371)",
+      new Error("ffmpeg exited 1: /scratch/media/clip.srt: No space left on device"),
+    ],
+    ["non-Error rejection (#3371)", "unexpected string rejection"],
   ])(
-    "rethrows %s instead of masking it as a missing subtitle track (#3361)",
+    "rethrows %s instead of masking it as a missing subtitle track (#3361, #3371)",
     async (_label, fault) => {
       const config = getToolConfig("extract-subtitles");
       runFfmpegWithProgressMock.mockRejectedValueOnce(fault);

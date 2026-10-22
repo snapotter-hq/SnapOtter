@@ -11,6 +11,11 @@ import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({});
 
+const MISSING_SUBTITLE_STREAM_RE =
+  /Stream map '(?:0:s:0)?' matches no streams|does not contain any stream/i;
+const BITMAP_SUBTITLE_STREAM_RE =
+  /Subtitle encoding currently only possible from text to text or bitmap to bitmap/i;
+
 export function registerExtractSubtitles(app: FastifyInstance) {
   createToolRoute(app, {
     toolId: "extract-subtitles",
@@ -40,7 +45,17 @@ export function registerExtractSubtitles(app: FastifyInstance) {
         ) {
           throw err;
         }
-        throw new InputValidationError("No subtitle track found in this video");
+        const message = err instanceof Error ? err.message : "";
+        if (BITMAP_SUBTITLE_STREAM_RE.test(message)) {
+          throw new InputValidationError(
+            "Image-based subtitle tracks cannot be converted to SRT without OCR",
+            422,
+          );
+        }
+        if (MISSING_SUBTITLE_STREAM_RE.test(message)) {
+          throw new InputValidationError("No subtitle track found in this video");
+        }
+        throw err;
       }
 
       return {
