@@ -21,7 +21,9 @@ import { multipartFailure } from "../../lib/multipart-parts.js";
 import {
   deletePrefix,
   getObjectBuffer,
+  isStorageServiceFault,
   normalizeOperationalWriteError,
+  normalizeS3ReadFault,
   putObject,
 } from "../../lib/object-storage.js";
 import { scrubPdfProducer } from "../../lib/pdf-producer.js";
@@ -129,7 +131,8 @@ async function readOwnOutput(key: string): Promise<Buffer> {
   try {
     return await getObjectBuffer(key);
   } catch (rawErr) {
-    const err = normalizeOperationalWriteError(rawErr);
+    const s3Normalized = isStorageServiceFault(rawErr) ? normalizeS3ReadFault(rawErr) : rawErr;
+    const err = normalizeOperationalWriteError(s3Normalized);
     if (hasServerErrorStatus(err)) throw err;
     throw Object.assign(new Error("Could not read back a stored output", { cause: rawErr }), {
       statusCode: 500,

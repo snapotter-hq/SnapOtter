@@ -182,6 +182,60 @@ describe("pdf-to-image single-file route", () => {
     await app.close();
   });
 
+  it("answers 503 storage-unavailable when read-back hits an S3 EIO or mid-stream read fault (#3665)", async () => {
+    const originalMode = env.STORAGE_MODE;
+    (env as { STORAGE_MODE: string }).STORAGE_MODE = "s3";
+    const app = await buildApp(registerPdfToImage);
+    try {
+      const readFaults = [
+        Object.assign(new Error("EIO: i/o error, read"), { code: "EIO", syscall: "read" }),
+        Object.assign(new Error("Premature close"), { code: "ERR_STREAM_PREMATURE_CLOSE" }),
+        Object.assign(new Error("Request aborted"), { name: "RequestAbortedError" }),
+      ];
+      for (const fault of readFaults) {
+        deletePrefix.mockClear();
+        getObjectBuffer.mockRejectedValueOnce(fault);
+        const res = await send(app);
+        expect(res.statusCode).toBe(503);
+        expect(res.json()).toMatchObject({
+          error: "The server's storage service is unavailable.",
+          code: "storage-unavailable",
+        });
+        expect(deletePrefix).toHaveBeenCalledTimes(1);
+      }
+
+      // Missing object (NoSuchKey) and unexpected defects in S3 mode still answer 500
+      for (const defect of [
+        Object.assign(new Error("The specified key does not exist."), {
+          name: "NoSuchKey",
+          $metadata: { httpStatusCode: 404 },
+        }),
+        new TypeError("unexpected S3 client defect"),
+      ]) {
+        deletePrefix.mockClear();
+        getObjectBuffer.mockRejectedValueOnce(defect);
+        const res = await send(app);
+        expect(res.statusCode).toBe(500);
+        expect(res.json()).toEqual({ error: "Internal server error" });
+        expect(deletePrefix).toHaveBeenCalledTimes(1);
+      }
+
+      // Local-mode EIO (STORAGE_MODE !== "s3") bypasses S3 read fault normalization and answers 500
+      (env as { STORAGE_MODE: string }).STORAGE_MODE = "local";
+      deletePrefix.mockClear();
+      getObjectBuffer.mockRejectedValueOnce(
+        Object.assign(new Error("EIO: i/o error, read"), { code: "EIO", syscall: "read" }),
+      );
+      const localRes = await send(app);
+      expect(localRes.statusCode).toBe(500);
+      expect(localRes.json()).toEqual({ error: "Internal server error" });
+      expect(deletePrefix).toHaveBeenCalledTimes(1);
+    } finally {
+      (env as { STORAGE_MODE: string }).STORAGE_MODE = originalMode;
+      await app.close();
+    }
+  });
+
   it("still answers 422 and logs it when the render itself fails", async () => {
     const app = await buildApp(registerPdfToImage);
     // Valid header, nothing mupdf can open.
@@ -285,6 +339,56 @@ describe("image-to-pdf ZIP of per-image PDFs", () => {
       code: "storage-full",
     });
     await app.close();
+  });
+
+  it("answers 503 storage-unavailable when read-back hits an S3 EIO or mid-stream read fault (#3665)", async () => {
+    const originalMode = env.STORAGE_MODE;
+    (env as { STORAGE_MODE: string }).STORAGE_MODE = "s3";
+    const app = await buildApp(registerImageToPdf);
+    try {
+      const readFaults = [
+        Object.assign(new Error("EIO: i/o error, read"), { code: "EIO", syscall: "read" }),
+        Object.assign(new Error("Premature close"), { code: "ERR_STREAM_PREMATURE_CLOSE" }),
+        Object.assign(new Error("Request aborted"), { name: "RequestAbortedError" }),
+      ];
+      for (const fault of readFaults) {
+        deletePrefix.mockClear();
+        getObjectBuffer.mockRejectedValueOnce(fault);
+        const res = await send(app);
+        expect(res.statusCode).toBe(503);
+        expect(res.json()).toMatchObject({
+          error: "The server's storage service is unavailable.",
+          code: "storage-unavailable",
+        });
+        expect(deletePrefix).toHaveBeenCalledTimes(1);
+      }
+
+      // Missing object (NoSuchKey) and unexpected defects in S3 mode still answer 500
+      for (const defect of [
+        Object.assign(new Error("The specified key does not exist."), {
+          name: "NoSuchKey",
+          $metadata: { httpStatusCode: 404 },
+        }),
+        new TypeError("unexpected S3 client defect"),
+      ]) {
+        getObjectBuffer.mockRejectedValueOnce(defect);
+        const res = await send(app);
+        expect(res.statusCode).toBe(500);
+        expect(res.json()).toEqual({ error: "Internal server error" });
+      }
+
+      // Local-mode EIO (STORAGE_MODE !== "s3") bypasses S3 read fault normalization and answers 500
+      (env as { STORAGE_MODE: string }).STORAGE_MODE = "local";
+      getObjectBuffer.mockRejectedValueOnce(
+        Object.assign(new Error("EIO: i/o error, read"), { code: "EIO", syscall: "read" }),
+      );
+      const localRes = await send(app);
+      expect(localRes.statusCode).toBe(500);
+      expect(localRes.json()).toEqual({ error: "Internal server error" });
+    } finally {
+      (env as { STORAGE_MODE: string }).STORAGE_MODE = originalMode;
+      await app.close();
+    }
   });
 });
 
@@ -410,6 +514,93 @@ describe("pdf-to-image batch route (#1552)", () => {
       }),
     );
     await app.close();
+  });
+
+  it("settles the batch and answers 503 storage-unavailable when readOwnOutput hits an S3 EIO or mid-stream read fault mid-batch (#3665)", async () => {
+    const originalMode = env.STORAGE_MODE;
+    (env as { STORAGE_MODE: string }).STORAGE_MODE = "s3";
+    const app = await buildApp(registerPdfToImage);
+    try {
+      for (const fault of [
+        Object.assign(new Error("EIO: i/o error, read"), { code: "EIO", syscall: "read" }),
+        Object.assign(new Error("Premature close"), { code: "ERR_STREAM_PREMATURE_CLOSE" }),
+        Object.assign(new Error("Request aborted"), { name: "RequestAbortedError" }),
+      ]) {
+        failBatchJob.mockClear();
+        deletePrefix.mockClear();
+        getObjectBuffer.mockImplementation(async (key: string) => {
+          if (key.includes("-f1/")) throw fault;
+          return Buffer.from("page");
+        });
+        const res = await sendBatch(app);
+        expect(res.statusCode).toBe(503);
+        expect(res.json()).toMatchObject({
+          error: "The server's storage service is unavailable.",
+          code: "storage-unavailable",
+        });
+        expect(failBatchJob).toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: "The server's storage service is unavailable.",
+            code: "storage-unavailable",
+          }),
+        );
+        expect(deletePrefix).toHaveBeenCalledTimes(2);
+      }
+
+      // Missing object (NoSuchKey) and unexpected defects in S3 mode still settle as 500 Internal server error
+      for (const defect of [
+        Object.assign(new Error("The specified key does not exist."), {
+          name: "NoSuchKey",
+          $metadata: { httpStatusCode: 404 },
+        }),
+        new TypeError("unexpected S3 client defect"),
+      ]) {
+        failBatchJob.mockClear();
+        deletePrefix.mockClear();
+        getObjectBuffer.mockImplementation(async (key: string) => {
+          if (key.includes("-f1/")) throw defect;
+          return Buffer.from("page");
+        });
+        const res = await sendBatch(app);
+        expect(res.statusCode).toBe(500);
+        expect(res.json()).toEqual({ error: "Internal server error" });
+        expect(failBatchJob).toHaveBeenCalledWith({
+          jobId: expect.any(String),
+          totalFiles: 2,
+          completedFiles: 2,
+          failedFiles: 2,
+          errors: [{ filename: "", error: "Internal server error" }],
+          message: "Internal server error",
+        });
+        expect(deletePrefix).toHaveBeenCalledTimes(2);
+      }
+
+      // Local-mode EIO (STORAGE_MODE !== "s3") bypasses S3 read fault normalization and settles as 500
+      (env as { STORAGE_MODE: string }).STORAGE_MODE = "local";
+      failBatchJob.mockClear();
+      deletePrefix.mockClear();
+      getObjectBuffer.mockImplementation(async (key: string) => {
+        if (key.includes("-f1/")) {
+          throw Object.assign(new Error("EIO: i/o error, read"), { code: "EIO", syscall: "read" });
+        }
+        return Buffer.from("page");
+      });
+      const localRes = await sendBatch(app);
+      expect(localRes.statusCode).toBe(500);
+      expect(localRes.json()).toEqual({ error: "Internal server error" });
+      expect(failBatchJob).toHaveBeenCalledWith({
+        jobId: expect.any(String),
+        totalFiles: 2,
+        completedFiles: 2,
+        failedFiles: 2,
+        errors: [{ filename: "", error: "Internal server error" }],
+        message: "Internal server error",
+      });
+      expect(deletePrefix).toHaveBeenCalledTimes(2);
+    } finally {
+      (env as { STORAGE_MODE: string }).STORAGE_MODE = originalMode;
+      await app.close();
+    }
   });
 
   it("settles the batch with storage-unavailable when getObjectStream hits an S3 fault during final ZIP streaming", async () => {
