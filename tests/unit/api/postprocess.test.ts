@@ -6,6 +6,7 @@
  * tool-factory.ts during the job-spine refactor to apps/api/src/jobs/postprocess.ts.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { IMAGE_EXT_TO_MIME } from "../../../packages/shared/src/image-mime.js";
 
 // Minimal mocks so the module loads without Postgres/Redis/sharp
 vi.mock("../../../apps/api/src/db/index.js", () => ({
@@ -94,6 +95,53 @@ describe("buildOutputName", () => {
   it("preserves extension when content-type matches", () => {
     const result = buildOutputName("output.webp", "input.png", "compress", "image/webp");
     expect(result).toBe("output.webp");
+  });
+
+  it.each([
+    ["photo.jpeg", "image/jpeg", "photo_edit-metadata.jpeg"],
+    ["PHOTO.JPEG", "image/jpeg", "PHOTO_edit-metadata.JPEG"],
+    ["scan.tif", "image/tiff", "scan_edit-metadata.tif"],
+    ["cursor.cur", "image/x-icon", "cursor_edit-metadata.cur"],
+    ["tile.j2k", "image/jp2", "tile_edit-metadata.j2k"],
+    ["tile.j2c", "image/jp2", "tile_edit-metadata.j2c"],
+    ["tile.jpc", "image/jp2", "tile_edit-metadata.jpc"],
+    ["tile.jpf", "image/jp2", "tile_edit-metadata.jpf"],
+    ["frame.fit", "image/fits", "frame_edit-metadata.fit"],
+    ["frame.fts", "image/fits", "frame_edit-metadata.fts"],
+    ["figure.epsf", "application/postscript", "figure_edit-metadata.epsf"],
+  ])(
+    "preserves alternate extension on %s when it already maps to %s (#3206)",
+    (filename, contentType, expected) => {
+      expect(buildOutputName(filename, filename, "edit-metadata", contentType)).toBe(expected);
+    },
+  );
+
+  it("preserves every non-svgz IMAGE_EXT_TO_MIME extension when contentType matches (#3206)", () => {
+    for (const [ext, contentType] of Object.entries(IMAGE_EXT_TO_MIME)) {
+      if (ext === "svgz") continue;
+      expect(buildOutputName(`sample.${ext}`, `sample.${ext}`, "edit-metadata", contentType)).toBe(
+        `sample_edit-metadata.${ext}`,
+      );
+    }
+  });
+
+  it("preserves or rewrites alternate extension when resultFilename differs from originalFilename (#3206)", () => {
+    expect(buildOutputName("custom.jpeg", "photo.jpeg", "watermark", "image/jpeg")).toBe(
+      "custom.jpeg",
+    );
+    expect(buildOutputName("custom.jpeg", "photo.jpeg", "convert", "image/png")).toBe("custom.png");
+  });
+
+  it("rewrites .svgz to .svg on image/svg+xml output since worker ingress decompresses SVGZ to plain XML (#3206)", () => {
+    expect(buildOutputName("icon.svgz", "icon.svgz", "edit-metadata", "image/svg+xml")).toBe(
+      "icon_edit-metadata.svg",
+    );
+  });
+
+  it("still rewrites an alternate extension when output content-type changes (#3206)", () => {
+    expect(buildOutputName("photo.jpeg", "photo.jpeg", "convert", "image/png")).toBe(
+      "photo_convert.png",
+    );
   });
 
   it("handles filenames without extension", () => {

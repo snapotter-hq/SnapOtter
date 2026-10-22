@@ -11,7 +11,12 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { probeMedia } from "@snapotter/media-engine";
-import { hasServerErrorStatus, type LibrarySaveMode, SafeError } from "@snapotter/shared";
+import {
+  hasServerErrorStatus,
+  IMAGE_EXT_TO_MIME,
+  type LibrarySaveMode,
+  SafeError,
+} from "@snapotter/shared";
 import { eq, sql } from "drizzle-orm";
 import sharp from "sharp";
 import { db, schema } from "../db/index.js";
@@ -94,11 +99,19 @@ export function buildOutputName(
     out = `${base}_${toolId}${ext}`;
   }
 
-  // Fix extension mismatch (e.g. SVG input -> PNG output)
+  // Fix extension mismatch (e.g. SVG input -> PNG output). Preserve alternate
+  // extensions that already map to the output MIME type (.jpeg, .tif, .cur,
+  // .j2k, .fit, .epsf, ...), except .svgz, which worker ingress decompresses
+  // to plain XML (#3206).
   const expectedExt = CONTENT_TYPE_TO_EXT[contentType];
   if (expectedExt) {
     const currentExt = extname(out).toLowerCase();
-    if (currentExt && currentExt !== expectedExt) {
+    const currentExtKey = currentExt.slice(1);
+    if (
+      currentExt &&
+      currentExt !== expectedExt &&
+      (currentExtKey === "svgz" || IMAGE_EXT_TO_MIME[currentExtKey] !== contentType)
+    ) {
       out = out.slice(0, -currentExt.length) + expectedExt;
     }
   }
