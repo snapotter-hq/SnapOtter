@@ -55,8 +55,17 @@ export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
   const [text, setText] = useState("");
   const [adding, setAdding] = useState(false);
 
-  const { entries, importing, importUrls, addReadyFiles, retryUrl, cancel, reset, readyCount } =
-    useUrlImport();
+  const {
+    entries,
+    importing,
+    importUrls,
+    addReadyFiles,
+    removeEntries,
+    retryUrl,
+    cancel,
+    reset,
+    readyCount,
+  } = useUrlImport();
 
   const hasResults = entries.length > 0;
 
@@ -71,13 +80,18 @@ export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
     setAdding(true);
     try {
       const files = await addReadyFiles();
-      if (files.length > 0 && onImportRef.current(files) !== false) {
-        onCloseRef.current();
+      const accepted = files.length > 0 && onImportRef.current(files) !== false;
+      if (files.failedCount === 0) {
+        if (accepted) {
+          onCloseRef.current();
+        }
+      } else if (accepted) {
+        removeEntries(files.fulfilledIndices);
       }
     } finally {
       setAdding(false);
     }
-  }, [readyCount, addReadyFiles]);
+  }, [readyCount, addReadyFiles, removeEntries]);
 
   const handleBack = useCallback(() => {
     reset();

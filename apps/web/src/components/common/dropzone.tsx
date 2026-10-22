@@ -431,7 +431,6 @@ export function Dropzone({
             } else if (files.length > 0) {
               setError(unsupportedMessage);
             }
-            setShowBulkModal(false);
           }}
         />
       )}

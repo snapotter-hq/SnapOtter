@@ -17,6 +17,11 @@ export interface UrlImportEntry {
   error?: string;
 }
 
+export type AddReadyFilesResult = File[] & {
+  failedCount: number;
+  fulfilledIndices: number[];
+};
+
 interface FetchUrlResult {
   success: boolean;
   url: string;
@@ -40,6 +45,7 @@ export function useUrlImport() {
   const [entries, setEntries] = useState<UrlImportEntry[]>([]);
   const [importing, setImporting] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const downloadAbortRef = useRef<AbortController | null>(null);
   const { t } = useTranslation();
 
   // -- helpers --
@@ -100,6 +106,8 @@ export function useUrlImport() {
       if (urls.length === 0) return;
 
       abortRef.current?.abort();
+      downloadAbortRef.current?.abort();
+      downloadAbortRef.current = null;
       const controller = new AbortController();
       abortRef.current = controller;
 
@@ -147,20 +155,72 @@ export function useUrlImport() {
     [fetchUrls, downloadAsFile],
   );
 
-  const addReadyFiles = useCallback(async (): Promise<File[]> => {
-    const ready = entries.filter(
-      (e): e is UrlImportEntry & { downloadUrl: string; filename: string } =>
-        e.status === "ready" && !!e.downloadUrl && !!e.filename,
-    );
+  const addReadyFiles = useCallback(async (): Promise<AddReadyFilesResult> => {
+    downloadAbortRef.current?.abort();
+    const controller = new AbortController();
+    downloadAbortRef.current = controller;
+
+    const readyWithIndex: Array<{
+      index: number;
+      entry: UrlImportEntry & { downloadUrl: string; filename: string };
+    }> = [];
+    for (let i = 0; i < entries.length; i++) {
+      const e = entries[i];
+      if (e.status === "ready" && e.downloadUrl && e.filename) {
+        readyWithIndex.push({
+          index: i,
+          entry: e as UrlImportEntry & { downloadUrl: string; filename: string },
+        });
+      }
+    }
 
     const settled = await Promise.allSettled(
-      ready.map((e) => downloadAsFile(e.downloadUrl, e.filename)),
+      readyWithIndex.map(({ entry }) =>
+        downloadAsFile(entry.downloadUrl, entry.filename, controller.signal),
+      ),
     );
 
-    return settled
-      .filter((r): r is PromiseFulfilledResult<File> => r.status === "fulfilled")
-      .map((r) => r.value);
+    if (controller.signal.aborted) {
+      return Object.assign([] as File[], { failedCount: 0, fulfilledIndices: [] as number[] });
+    }
+
+    const files: File[] = [];
+    const fulfilledIndices: number[] = [];
+    const failedByIndex = new Map<number, string>();
+
+    for (let i = 0; i < settled.length; i++) {
+      const outcome = settled[i];
+      const { index } = readyWithIndex[i];
+      if (outcome.status === "fulfilled") {
+        files.push(outcome.value);
+        fulfilledIndices.push(index);
+      } else {
+        const reason = outcome.reason;
+        const message = reason instanceof Error ? reason.message : String(reason);
+        failedByIndex.set(index, message);
+      }
+    }
+
+    if (failedByIndex.size > 0) {
+      setEntries((prev) =>
+        prev.map((entry, idx) => {
+          const error = failedByIndex.get(idx);
+          return error !== undefined ? { ...entry, status: "failed" as const, error } : entry;
+        }),
+      );
+    }
+
+    return Object.assign(files, {
+      failedCount: failedByIndex.size,
+      fulfilledIndices,
+    });
   }, [entries, downloadAsFile]);
+
+  const removeEntries = useCallback((indices: ReadonlySet<number> | readonly number[]) => {
+    const toRemove = indices instanceof Set ? indices : new Set(indices);
+    if (toRemove.size === 0) return;
+    setEntries((prev) => prev.filter((_, idx) => !toRemove.has(idx)));
+  }, []);
 
   const retryUrl = useCallback(
     async (index: number) => {
@@ -194,11 +254,15 @@ export function useUrlImport() {
   const cancel = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
+    downloadAbortRef.current?.abort();
+    downloadAbortRef.current = null;
     setEntries([]);
     setImporting(false);
   }, []);
 
   const reset = useCallback(() => {
+    downloadAbortRef.current?.abort();
+    downloadAbortRef.current = null;
     setEntries([]);
     setImporting(false);
   }, []);
@@ -214,6 +278,7 @@ export function useUrlImport() {
     importUrls,
     importSingleUrl,
     addReadyFiles,
+    removeEntries,
     retryUrl,
     cancel,
     reset,
