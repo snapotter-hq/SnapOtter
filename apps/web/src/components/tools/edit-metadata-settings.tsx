@@ -324,7 +324,9 @@ export function EditMetadataSettings() {
       } catch (err) {
         if (controller.signal.aborted || (err as Error)?.name === "AbortError") return;
         setInspectError(
-          err instanceof Error ? err.message : t.toolSettings["edit-metadata"].inspectFailed,
+          err instanceof Error && err.message.trim()
+            ? err.message
+            : t.toolSettings["edit-metadata"].inspectFailed,
         );
         setForm(EMPTY_FORM);
         setInitialForm(EMPTY_FORM);
@@ -514,7 +516,7 @@ export function EditMetadataSettings() {
       {hasFile && inspectError && !inspecting && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
           <AlertTriangle className="h-3 w-3 shrink-0" />
-          {t.toolSettings["edit-metadata"].couldNotReadMetadata}
+          {inspectError}
         </div>
       )}
 

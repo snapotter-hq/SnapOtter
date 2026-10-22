@@ -1201,9 +1201,7 @@ describe("self-posting tool panels: failed entry status and scoped error banners
 
       const { unmount } = render(<EditMetadataSettings />);
       await waitFor(() =>
-        expect(
-          screen.getByText(en.toolSettings["edit-metadata"].couldNotReadMetadata),
-        ).toBeInTheDocument(),
+        expect(screen.getByText(en.errors.invalidServerResponse)).toBeInTheDocument(),
       );
       expect(screen.queryByText("EXIF/IPTC")).not.toBeInTheDocument();
       unmount();
@@ -1245,9 +1243,7 @@ describe("self-posting tool panels: failed entry status and scoped error banners
 
       const { unmount } = render(<EditMetadataSettings />);
       await waitFor(() =>
-        expect(
-          screen.getByText(en.toolSettings["edit-metadata"].couldNotReadMetadata),
-        ).toBeInTheDocument(),
+        expect(screen.getByText(en.errors.invalidServerResponse)).toBeInTheDocument(),
       );
 
       act(() => {
@@ -1261,9 +1257,7 @@ describe("self-posting tool panels: failed entry status and scoped error banners
         useFileStore.getState().setSelectedIndex(0);
       });
       await waitFor(() =>
-        expect(
-          screen.getByText(en.toolSettings["edit-metadata"].couldNotReadMetadata),
-        ).toBeInTheDocument(),
+        expect(screen.getByText("Edit inspect stream disconnected")).toBeInTheDocument(),
       );
       expect(screen.queryByText("EXIF/IPTC")).not.toBeInTheDocument();
       expect(screen.getByLabelText(en.toolSettings["edit-metadata"].artist)).toHaveValue("");
@@ -1860,9 +1854,7 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       await act(async () => {
         cErrorBody.resolve({ error: "Stale c.png error" });
       });
-      expect(
-        screen.queryByText(en.toolSettings["edit-metadata"].couldNotReadMetadata),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Stale c.png error")).not.toBeInTheDocument();
       expect(screen.getByLabelText(en.toolSettings["edit-metadata"].artist)).toHaveValue(
         "FreshArtistB",
       );
@@ -1877,17 +1869,13 @@ describe("self-posting tool panels: failed entry status and scoped error banners
           new Response(JSON.stringify({ error: "Active c.png error" }), { status: 500 }),
         );
       });
-      expect(
-        screen.getByText(en.toolSettings["edit-metadata"].couldNotReadMetadata),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Active c.png error")).toBeInTheDocument();
 
       act(() => {
         useFileStore.getState().setSelectedIndex(1);
       });
       expect(pending).toHaveLength(4);
-      expect(
-        screen.queryByText(en.toolSettings["edit-metadata"].couldNotReadMetadata),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Active c.png error")).not.toBeInTheDocument();
       expect(screen.getByLabelText(en.toolSettings["edit-metadata"].artist)).toHaveValue(
         "FreshArtistB",
       );
@@ -1904,9 +1892,7 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       await act(async () => {
         pending[4].res.reject(new TypeError("Aborted network failure"));
       });
-      expect(
-        screen.queryByText(en.toolSettings["edit-metadata"].couldNotReadMetadata),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Aborted network failure")).not.toBeInTheDocument();
       expect(screen.getByLabelText(en.toolSettings["edit-metadata"].artist)).toHaveValue(
         "FreshArtistB",
       );
@@ -2065,11 +2051,34 @@ describe("self-posting tool panels: failed entry status and scoped error banners
         new Response(JSON.stringify({ error: "Inspect failed" }), { status: 500 }),
       );
     });
-    expect(
-      screen.getByText(en.toolSettings["edit-metadata"].couldNotReadMetadata),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Inspect failed")).toBeInTheDocument();
     expect(screen.getByLabelText(en.toolSettings["edit-metadata"].artist)).toHaveValue("");
     expect(screen.queryByText(/removed/i)).not.toBeInTheDocument();
+
+    // Non-Error rejection and empty Error("") message fall back to t.toolSettings["edit-metadata"].inspectFailed
+    act(() => {
+      useFileStore.getState().setSelectedIndex(0);
+    });
+    act(() => {
+      useFileStore.getState().setSelectedIndex(1);
+    });
+    expect(pending).toHaveLength(4);
+    await act(async () => {
+      pending[3].res.reject("string inspect failure");
+    });
+    expect(screen.getByText(en.toolSettings["edit-metadata"].inspectFailed)).toBeInTheDocument();
+
+    act(() => {
+      useFileStore.getState().setSelectedIndex(0);
+    });
+    act(() => {
+      useFileStore.getState().setSelectedIndex(1);
+    });
+    expect(pending).toHaveLength(5);
+    await act(async () => {
+      pending[4].res.reject(new Error("   "));
+    });
+    expect(screen.getByText(en.toolSettings["edit-metadata"].inspectFailed)).toBeInTheDocument();
 
     unmount();
   });

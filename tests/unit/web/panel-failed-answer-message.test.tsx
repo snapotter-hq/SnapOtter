@@ -41,6 +41,7 @@ import { CollageSettings } from "@/components/tools/collage-settings";
 import { ColorPaletteSettings } from "@/components/tools/color-palette-settings";
 import { CompareSettings } from "@/components/tools/compare-settings";
 import { ComposeSettings } from "@/components/tools/compose-settings";
+import { EditMetadataSettings } from "@/components/tools/edit-metadata-settings";
 import { EraseObjectSettings } from "@/components/tools/erase-object-settings";
 import type { EraserCanvasRef } from "@/components/tools/eraser-canvas";
 import { FaviconSettings } from "@/components/tools/favicon-settings";
@@ -368,6 +369,15 @@ const PANELS: PanelRow[] = [
     start: () => {
       useFileStore.getState().setFiles([image("photo.png")]);
       render(<StripMetadataSettings />);
+    },
+  },
+  {
+    panel: "edit-metadata (inspect)",
+    transport: "fetch",
+    fallback: failedWithStatus,
+    start: () => {
+      useFileStore.getState().setFiles([image("photo.png")]);
+      render(<EditMetadataSettings />);
     },
   },
   {
@@ -757,9 +767,8 @@ describe("ocr: a failed answer", () => {
 
 describe("no panel reads a failed answer's body by hand", () => {
   // Every tool panel that posts for itself and reads a non-2xx JSON body.
-  // Edit Metadata and Remove Background are listed here rather than rendered
-  // above: Edit Metadata shows a fixed line for a failed inspect, and Remove
-  // Background's effects request only exists after a finished first pass.
+  // Remove Background is listed here rather than rendered above because its
+  // effects request only exists after a finished first pass.
   const ROUTED = [
     "barcode-generate",
     "barcode-read",
