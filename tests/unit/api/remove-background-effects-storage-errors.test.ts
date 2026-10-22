@@ -21,6 +21,7 @@ const getObjectBuffer = vi.fn();
 // real one. A test can answer for S3 instead.
 const localMissing = (err: unknown) => (err as NodeJS.ErrnoException)?.code === "ENOENT";
 const isMissingObjectError = vi.fn(localMissing);
+const isStorageServiceFault = vi.fn<(_err: unknown) => boolean>(() => false);
 
 vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
   const actual =
@@ -30,6 +31,7 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
     putObject: (...args: unknown[]) => putObject(...args),
     getObjectBuffer: (...args: unknown[]) => getObjectBuffer(...args),
     isMissingObjectError: (err: unknown) => isMissingObjectError(err),
+    isStorageServiceFault: (err: unknown) => isStorageServiceFault(err),
   };
 });
 
@@ -114,6 +116,8 @@ describe("remove-background effects: reading the stored mask and original", () =
     getObjectBuffer.mockReset();
     isMissingObjectError.mockReset();
     isMissingObjectError.mockImplementation(localMissing);
+    isStorageServiceFault.mockReset();
+    isStorageServiceFault.mockReturnValue(false);
     requestLogError.mockReset();
   });
 
@@ -184,6 +188,76 @@ describe("remove-background effects: reading the stored mask and original", () =
     const res = await app.inject(effectsRequest(settings));
     expect(res.statusCode).toBe(410);
     expect(isMissingObjectError).toHaveBeenCalledWith(noSuchKey);
+  });
+
+  it("normalizes S3 GetObject faults on the stored mask and original into a 503 storage-unavailable SafeError (#2953)", async () => {
+    const slowDown = Object.assign(new Error("Please reduce your request rate."), {
+      name: "SlowDown",
+      $metadata: { httpStatusCode: 503 },
+    });
+    const accessDenied = Object.assign(new Error("Access Denied"), {
+      name: "AccessDenied",
+      $metadata: { httpStatusCode: 403 },
+    });
+    isMissingObjectError.mockReturnValue(false);
+    isStorageServiceFault.mockReturnValue(true);
+    getObjectBuffer.mockImplementation(async (key: string) => {
+      throw key.endsWith("_mask.png") ? slowDown : accessDenied;
+    });
+
+    app = await buildApp();
+    const res = await app.inject(effectsRequest(settings));
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toEqual({
+      error: "The server's storage service is unavailable.",
+      code: "storage-unavailable",
+    });
+    expect(requestLogError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: "outputs/job/cat_original.png",
+        err: expect.objectContaining({
+          name: "SafeError",
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-unavailable",
+          statusCode: 503,
+          cause: accessDenied,
+        }),
+      }),
+      "Stored cutout read failed",
+    );
+    expect(putObject).not.toHaveBeenCalled();
+
+    // Mixed rejection: one key missing (NoSuchKey) and one key failing with an S3 service fault (SlowDown)
+    const noSuchKey = Object.assign(new Error("The specified key does not exist."), {
+      name: "NoSuchKey",
+      $metadata: { httpStatusCode: 404 },
+    });
+    requestLogError.mockClear();
+    isMissingObjectError.mockImplementation((err) => err === noSuchKey);
+    isStorageServiceFault.mockImplementation((err) => err !== noSuchKey);
+    getObjectBuffer.mockImplementation(async (key: string) => {
+      throw key.endsWith("_mask.png") ? noSuchKey : slowDown;
+    });
+    const mixedRes = await app.inject(effectsRequest(settings));
+    expect(mixedRes.statusCode).toBe(503);
+    expect(mixedRes.json()).toEqual({
+      error: "The server's storage service is unavailable.",
+      code: "storage-unavailable",
+    });
+    expect(requestLogError).not.toHaveBeenCalledWith(
+      expect.anything(),
+      "Stored cutout read failed",
+    );
+
+    // Unexpected non-S3 defect in S3 mode still passes through normalizeS3ReadFault as a 500 bug
+    const unexpectedBug = new TypeError("unexpected S3 client defect");
+    getObjectBuffer.mockImplementation(async () => {
+      throw unexpectedBug;
+    });
+    const bugRes = await app.inject(effectsRequest(settings));
+    expect(bugRes.statusCode).toBe(500);
+    expect(bugRes.json()).toEqual({ error: "Internal server error" });
   });
 
   it("answers 400 for a jobId or filename the store would refuse, without reading", async () => {

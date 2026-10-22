@@ -78,6 +78,8 @@ import {
   getObjectSize,
   getObjectStream,
   isMissingObjectError,
+  isStorageServiceFault,
+  normalizeS3ReadFault,
   putObject,
   putObjectStream,
   verifyS3Bucket,
@@ -172,6 +174,8 @@ export async function loadToolInputBuffer(toolId: string, ref: string): Promise<
     } catch (err) {
       if (isMissingObjectError(err)) {
         await verifyS3Bucket();
+      } else if (isStorageServiceFault(err)) {
+        throw normalizeS3ReadFault(err);
       }
       throw err;
     }
@@ -182,7 +186,12 @@ export async function loadToolInputBuffer(toolId: string, ref: string): Promise<
       );
     }
   }
-  return getObjectBuffer(ref);
+  try {
+    return await getObjectBuffer(ref);
+  } catch (err) {
+    if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+    throw err;
+  }
 }
 
 export interface LoadedToolInputs {
@@ -230,6 +239,7 @@ export async function loadToolInputs(
   try {
     return await readToolInputs(toolId, refs, filename, scratchDir, signal);
   } catch (err) {
+    if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
     if (!isMissingObjectError(err)) throw err;
     // The OCR PDF path also writes to scratch, where an ENOENT would be our
     // own bug. Relabel only when storage confirms a queued input is gone.

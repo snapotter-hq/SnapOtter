@@ -17,6 +17,7 @@ const getObjectBuffer = vi.fn();
 // real one. A test can answer for S3 instead.
 const localMissing = (err: unknown) => (err as NodeJS.ErrnoException)?.code === "ENOENT";
 const isMissingObjectError = vi.fn(localMissing);
+const isStorageServiceFault = vi.fn<(_err: unknown) => boolean>(() => false);
 
 vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
   const actual =
@@ -25,6 +26,8 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
     putObject: (...args: unknown[]) => putObject(...args),
     getObjectBuffer: (...args: unknown[]) => getObjectBuffer(...args),
     isMissingObjectError: (err: unknown) => isMissingObjectError(err),
+    isStorageServiceFault: (err: unknown) => isStorageServiceFault(err),
+    normalizeS3ReadFault: actual.normalizeS3ReadFault,
     isValidObjectKey: actual.isValidObjectKey,
   };
 });
@@ -185,6 +188,8 @@ describe("json-bodied routes", () => {
     putObject.mockReset();
     getObjectBuffer.mockReset();
     isMissingObjectError.mockClear();
+    isStorageServiceFault.mockReset();
+    isStorageServiceFault.mockReturnValue(false);
   });
 
   afterEach(async () => {
@@ -324,6 +329,41 @@ describe("json-bodied routes", () => {
     });
     expect(res.statusCode).toBe(410);
     expect(isMissingObjectError).toHaveBeenCalledWith(noSuchKey);
+  });
+
+  it("passport-photo generate normalizes S3 GetObject faults on the stored cutout into a 503 storage-unavailable SafeError (#2953)", async () => {
+    const slowDown = Object.assign(new Error("Please reduce your request rate."), {
+      name: "SlowDown",
+      $metadata: { httpStatusCode: 503 },
+    });
+    isStorageServiceFault.mockReturnValue(true);
+    getObjectBuffer.mockImplementation(async () => {
+      throw slowDown;
+    });
+    app = await buildApp(registerPassportPhoto);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/passport-photo/generate",
+      payload: passportBody,
+    });
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toEqual({
+      error: "The server's storage service is unavailable.",
+      code: "storage-unavailable",
+    });
+    expect(putObject).not.toHaveBeenCalled();
+
+    // Unexpected non-S3 defect in S3 mode still passes through normalizeS3ReadFault as a 500 bug
+    getObjectBuffer.mockImplementation(async () => {
+      throw new TypeError("unexpected S3 client defect");
+    });
+    const bugRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/passport-photo/generate",
+      payload: passportBody,
+    });
+    expect(bugRes.statusCode).toBe(500);
+    expect(bugRes.json()).toEqual({ error: "Internal server error" });
   });
 
   it("passport-photo generate answers 400 for a jobId or filename the store would refuse", async () => {

@@ -31,8 +31,10 @@ import { multipartFailure } from "../../lib/multipart-parts.js";
 import {
   getObjectBuffer,
   isMissingObjectError,
+  isStorageServiceFault,
   isValidObjectKey,
   normalizeOperationalWriteError,
+  normalizeS3ReadFault,
   putObject,
 } from "../../lib/object-storage.js";
 import { isUniqueViolation } from "../../lib/pg-errors.js";
@@ -483,6 +485,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
       try {
         bgRemovedBuffer = await getObjectBuffer(bgRemovedKey);
       } catch (err) {
+        if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
         if (!isMissingObjectError(err)) throw err;
         // Expected once in a while; a stream of these means the volume or
         // bucket lost outputs it should still hold.

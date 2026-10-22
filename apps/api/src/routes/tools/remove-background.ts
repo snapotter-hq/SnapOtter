@@ -44,8 +44,10 @@ import { multipartFailure } from "../../lib/multipart-parts.js";
 import {
   getObjectBuffer,
   isMissingObjectError,
+  isStorageServiceFault,
   isValidObjectKey,
   normalizeOperationalWriteError,
+  normalizeS3ReadFault,
   putObject,
 } from "../../lib/object-storage.js";
 import {
@@ -542,7 +544,12 @@ export function registerRemoveBackground(app: FastifyInstance) {
         ].flatMap(({ key, read }) =>
           read.status === "rejected" ? [{ key, err: read.reason }] : [],
         );
-        const faults = reads.filter(({ err }) => !isMissingObjectError(err));
+        const faults = reads
+          .filter(({ err }) => !isMissingObjectError(err))
+          .map(({ key, err }) => ({
+            key,
+            err: isStorageServiceFault(err) ? normalizeS3ReadFault(err) : err,
+          }));
         if (faults.length > 0) {
           // Only the first reaches the error handler; keep the rest in the logs.
           for (const { key, err } of faults.slice(1)) {

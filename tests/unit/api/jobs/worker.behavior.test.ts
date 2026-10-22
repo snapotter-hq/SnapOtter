@@ -20,6 +20,8 @@ const objectStorageMocks = vi.hoisted(() => ({
   // Stands in for the real predicate (covered in object-storage-fault.test.ts):
   // local-backend semantics, where a missing object is a bare ENOENT.
   isMissingObjectError: vi.fn((err: unknown) => (err as { code?: string })?.code === "ENOENT"),
+  isStorageServiceFault: vi.fn<(_err: unknown) => boolean>(() => false),
+  normalizeS3ReadFault: vi.fn((err: unknown) => err),
   putObject: vi.fn(),
   putObjectStream: vi.fn(),
   verifyS3Bucket: vi.fn(),
@@ -47,18 +49,14 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
     rm: vi.fn(),
   }));
 
-  const { SafeError, isSafeMessageError, isToolInputError, hasServerErrorStatus } =
-    await vi.importActual<typeof import("../../../../packages/shared/src/tool-errors.js")>(
-      "../../../../packages/shared/src/tool-errors.js",
-    );
+  const toolErrors = await vi.importActual<
+    typeof import("../../../../packages/shared/src/tool-errors.js")
+  >("../../../../packages/shared/src/tool-errors.js");
   const { IMAGE_EXT_TO_MIME } = await vi.importActual<
     typeof import("../../../../packages/shared/src/image-mime.js")
   >("../../../../packages/shared/src/image-mime.js");
   vi.doMock("@snapotter/shared", () => ({
-    SafeError,
-    isSafeMessageError,
-    isToolInputError,
-    hasServerErrorStatus,
+    ...toolErrors,
     IMAGE_EXT_TO_MIME,
     ANALYTICS_EVENTS: {},
     TOOLS: [],
@@ -593,6 +591,262 @@ describe("worker result payload behavior", () => {
       });
       expect(getGenericObjectSize).toHaveBeenCalledTimes(1);
       expect(checkConnection).toHaveBeenCalledTimes(1);
+    });
+
+    it("normalizes non-missing S3 GetObject and HeadObject faults in loadToolInputBuffer and loadToolInputs into a 503 storage-unavailable SafeError (#2953)", async () => {
+      const { Readable } = await import("node:stream");
+      const getGenericObjectSize = vi.fn();
+      const getGenericObjectStream = vi.fn();
+      const checkConnection = vi.fn();
+      const dbSetMock = vi.fn(() => ({ where: vi.fn().mockResolvedValue(undefined) }));
+      const dbUpdateMock = vi.fn(() => ({ set: dbSetMock }));
+      const { isMissingObjectError: s3IsMissingObjectError } = await vi.importActual<
+        typeof import("../../../../packages/enterprise/src/storage-s3.js")
+      >("../../../../packages/enterprise/src/storage-s3.js");
+      const actualShared = await vi.importActual<
+        typeof import("../../../../packages/shared/src/index.js")
+      >("../../../../packages/shared/src/index.js");
+
+      const workerMod = await loadWorker("", () => {
+        vi.doMock("@snapotter/shared", () => ({
+          ...actualShared,
+          ANALYTICS_EVENTS: {},
+          TOOLS: [],
+          COMPRESS_PRESETS: [],
+          CAMERA_RAW_INPUTS: [],
+          getBundleForTool: vi.fn(() => null),
+          getOptionalBundleForTool: vi.fn(() => null),
+        }));
+        vi.doMock("../../../../apps/api/src/config.js", () => ({
+          env: {
+            BASE_PATH: "",
+            SCRATCH_PATH: "",
+            STORAGE_MODE: "s3",
+            WORKSPACE_PATH: "/unused",
+            S3_BUCKET: "snap-bucket",
+            S3_REGION: "us-east-1",
+            S3_ENDPOINT: "https://s3.example.test",
+            S3_ACCESS_KEY_ID: "AKIA-TEST",
+            S3_SECRET_ACCESS_KEY: "secret",
+            S3_FORCE_PATH_STYLE: true,
+            S3_PREFIX: "",
+            JOB_TIMEOUT_LONG_S: 60,
+            JOB_TIMEOUT_FAST_S: 15,
+          },
+        }));
+        vi.doMock("../../../../apps/api/src/db/index.js", () => ({
+          db: { update: dbUpdateMock },
+          schema: { jobs: { id: "jobs.id" } },
+        }));
+        vi.doMock("@snapotter/media-engine", () => ({
+          HW_ACCEL_FAMILIES: [],
+          hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+          softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+        }));
+        vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+          binaryOverrideWarning: vi.fn(),
+          checkBinaryOverrides: vi.fn(() => []),
+          isBinarySpawnFailure,
+          probeFailureLevel: vi.fn(() => "warn"),
+        }));
+        vi.doMock("node:fs/promises", () => ({
+          mkdir: vi.fn().mockResolvedValue(undefined),
+          readFile: vi.fn(),
+          rm: vi.fn().mockResolvedValue(undefined),
+        }));
+        vi.doMock("@snapotter/enterprise", () => ({
+          loadS3Storage: vi.fn(async () => ({
+            isMissingObjectError: s3IsMissingObjectError,
+            configureS3: vi.fn(),
+            checkConnection,
+            deleteGenericPrefix: vi.fn().mockResolvedValue(undefined),
+            getGenericObjectSize,
+            getGenericObjectStream,
+          })),
+        }));
+        vi.doUnmock("../../../../apps/api/src/lib/object-storage.js");
+      });
+      const { classifyError } = await vi.importActual<
+        typeof import("../../../../apps/api/src/lib/error-report.js")
+      >("../../../../apps/api/src/lib/error-report.js");
+      const { loadToolInputBuffer, loadToolInputs } = workerMod;
+
+      const s3Faults = [
+        Object.assign(new Error("Please reduce your request rate."), {
+          name: "SlowDown",
+          $metadata: { httpStatusCode: 503 },
+        }),
+        Object.assign(new Error("Access Denied"), {
+          name: "AccessDenied",
+          $metadata: { httpStatusCode: 403 },
+        }),
+        Object.assign(new Error("The specified bucket does not exist"), {
+          name: "NoSuchBucket",
+          $metadata: { httpStatusCode: 404 },
+        }),
+        Object.assign(new Error("Premature close"), { code: "ERR_STREAM_PREMATURE_CLOSE" }),
+        Object.assign(new Error("S3 stream reset"), { code: "EIO", syscall: "read" }),
+      ];
+
+      for (const fault of s3Faults) {
+        // 1. loadToolInputs (GetObject via getObjectBuffer)
+        getGenericObjectStream.mockRejectedValueOnce(fault);
+        const caughtLoad = await loadToolInputs(
+          "image-enhancement",
+          ["uploads/job-1/photo.jpg"],
+          "photo.jpg",
+          "/tmp/job-1",
+          new AbortController().signal,
+        ).catch((err: unknown) => err);
+        expect(caughtLoad).toMatchObject({
+          name: "SafeError",
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-unavailable",
+          statusCode: 503,
+          message: "The server's storage service is unavailable.",
+          cause: fault,
+        });
+        expect(classifyError(caughtLoad, "worker")).toBe("operational");
+
+        // 2. loadToolInputBuffer directly (GetObject)
+        getGenericObjectStream.mockRejectedValueOnce(fault);
+        const caughtBuf = await loadToolInputBuffer(
+          "image-enhancement",
+          "uploads/job-1/photo.jpg",
+        ).catch((err: unknown) => err);
+        expect(caughtBuf).toMatchObject({
+          name: "SafeError",
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-unavailable",
+          statusCode: 503,
+          message: "The server's storage service is unavailable.",
+          cause: fault,
+        });
+
+        // 3. loadToolInputBuffer and loadToolInputs OCR size probe (HeadObject via getObjectSize)
+        getGenericObjectSize.mockRejectedValueOnce(fault);
+        const caughtOcrSize = await loadToolInputBuffer("ocr", "uploads/job-1/scan.png").catch(
+          (err: unknown) => err,
+        );
+        expect(caughtOcrSize).toMatchObject({
+          name: "SafeError",
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-unavailable",
+          statusCode: 503,
+          message: "The server's storage service is unavailable.",
+          cause: fault,
+        });
+
+        getGenericObjectSize.mockRejectedValueOnce(fault);
+        const caughtOcrInputs = await loadToolInputs(
+          "ocr",
+          ["uploads/job-1/scan.png"],
+          "scan.png",
+          "/tmp/job-1",
+          new AbortController().signal,
+        ).catch((err: unknown) => err);
+        expect(caughtOcrInputs).toMatchObject({
+          name: "SafeError",
+          isSafeMessage: true,
+          kind: "operational",
+          code: "storage-unavailable",
+          statusCode: 503,
+          message: "The server's storage service is unavailable.",
+          cause: fault,
+        });
+      }
+
+      // Mid-stream S3 error emitted while reading chunks in getObjectBuffer
+      const midStreamFault = Object.assign(new Error("Premature close"), {
+        code: "ERR_STREAM_PREMATURE_CLOSE",
+      });
+      getGenericObjectStream.mockResolvedValueOnce(
+        Readable.from(
+          (async function* () {
+            yield Buffer.from("partial");
+            throw midStreamFault;
+          })(),
+        ),
+      );
+      const caughtMid = await loadToolInputs(
+        "image-enhancement",
+        ["uploads/job-1/photo.jpg"],
+        "photo.jpg",
+        "/tmp/job-1",
+        new AbortController().signal,
+      ).catch((err: unknown) => err);
+      expect(caughtMid).toMatchObject({
+        name: "SafeError",
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause: midStreamFault,
+      });
+      expect(classifyError(caughtMid, "worker")).toBe("operational");
+
+      // Unexpected non-S3 defect passes through unwrapped as "bug"
+      const unexpectedBug = new TypeError("unexpected S3 client defect");
+      getGenericObjectStream.mockRejectedValueOnce(unexpectedBug);
+      const caughtBug = await loadToolInputs(
+        "image-enhancement",
+        ["uploads/job-1/photo.jpg"],
+        "photo.jpg",
+        "/tmp/job-1",
+        new AbortController().signal,
+      ).catch((err: unknown) => err);
+      expect(caughtBug).toBe(unexpectedBug);
+      expect(classifyError(caughtBug, "worker")).toBe("bug");
+      expect(checkConnection).not.toHaveBeenCalled();
+
+      // processToolJob persists code: "storage-unavailable" and httpStatus: 503 on the failed job row
+      const { Worker } = await import("bullmq");
+      workerMod.startWorkers();
+      const workerCalls = (Worker as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+      const imageCall = workerCalls.find(([queue]) => String(queue).endsWith("image"));
+      if (!imageCall) throw new Error("image pool worker not registered");
+      const processor = imageCall[1] as (job: unknown) => Promise<unknown>;
+
+      const slowDown = s3Faults[0];
+      getGenericObjectStream.mockRejectedValueOnce(slowDown);
+      dbSetMock.mockClear();
+      const jobErr = await processor({
+        id: "job-s3-slowdown",
+        attemptsMade: 0,
+        opts: { attempts: 1 },
+        updateProgress: vi.fn(),
+        data: {
+          jobId: "job-s3-slowdown",
+          toolId: "compress",
+          userId: null,
+          pool: "image",
+          inputRefs: ["uploads/job-s3-slowdown/in.jpg"],
+          filename: "in.jpg",
+          settings: {},
+          kind: "tool",
+        },
+      }).catch((err: unknown) => err);
+      expect(jobErr).toMatchObject({
+        name: "SafeError",
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        cause: slowDown,
+      });
+      expect(dbSetMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          status: "failed",
+          error: {
+            code: "storage-unavailable",
+            httpStatus: 503,
+            message: "The server's storage service is unavailable.",
+          },
+        }),
+      );
     });
   });
 
