@@ -45,6 +45,7 @@ afterEach(() => {
 });
 
 async function loadConfig(overrides: Record<string, string>) {
+  for (const key of isolationEnvKeys) delete process.env[key];
   for (const [key, value] of Object.entries(overrides)) process.env[key] = value;
   vi.resetModules();
   return (await import("../../playwright.config.js")).default;
@@ -184,17 +185,99 @@ describe("main Playwright harness isolation", () => {
   });
 
   test("generates distinct endpoint pairs when no endpoint override is supplied", async () => {
-    for (const key of isolationEnvKeys) delete process.env[key];
     const first = await loadConfig({});
     const firstApiUrl = process.env.API_URL;
     const firstWebUrl = first.use?.baseURL;
 
-    for (const key of isolationEnvKeys) delete process.env[key];
     const second = await loadConfig({});
 
     expect(firstApiUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
     expect(firstWebUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
     expect([process.env.API_URL, second.use?.baseURL]).not.toEqual([firstApiUrl, firstWebUrl]);
+  });
+
+  test("keeps default API and web ports disjoint and below the Linux ephemeral range (32768)", async () => {
+    const actualCrypto = await import("node:crypto");
+    const randomIntCalls: Array<[number, number]> = [];
+    vi.doMock("node:crypto", () => ({
+      ...actualCrypto,
+      randomInt: (min: number, max: number) => {
+        randomIntCalls.push([min, max]);
+        return max - 1;
+      },
+    }));
+    try {
+      const boundaryConfig = await loadConfig({});
+      expect(randomIntCalls).toEqual([
+        [15_000, 22_000],
+        [23_000, 30_000],
+      ]);
+      expect(process.env.PLAYWRIGHT_API_PORT).toBe("21999");
+      expect(process.env.PLAYWRIGHT_WEB_PORT).toBe("29999");
+      expect(boundaryConfig.use?.baseURL).toBe("http://127.0.0.1:29999");
+    } finally {
+      vi.doUnmock("node:crypto");
+    }
+
+    for (let i = 0; i < 25; i += 1) {
+      const config = await loadConfig({});
+      const apiPort = Number(process.env.PLAYWRIGHT_API_PORT);
+      const webPort = Number(process.env.PLAYWRIGHT_WEB_PORT);
+
+      expect(webPort).toBeLessThan(32_768);
+      expect(webPort).toBeGreaterThanOrEqual(23_000);
+      expect(webPort).toBeLessThan(30_000);
+      expect(apiPort).toBeGreaterThanOrEqual(15_000);
+      expect(apiPort).toBeLessThan(22_000);
+      expect(process.env.PLAYWRIGHT_API_URL).toBe(`http://127.0.0.1:${apiPort}`);
+      expect(process.env.PLAYWRIGHT_WEB_URL).toBe(`http://127.0.0.1:${webPort}`);
+      expect(config.use?.baseURL).toBe(`http://127.0.0.1:${webPort}`);
+    }
+  });
+
+  test("derives endpoint ports from URL overrides and rejects malformed endpoint overrides", async () => {
+    const portOnlyConfig = await loadConfig({
+      PLAYWRIGHT_API_PORT: "19124",
+      PLAYWRIGHT_WEB_PORT: "29124",
+    });
+    expect(process.env.PLAYWRIGHT_API_URL).toBe("http://127.0.0.1:19124");
+    expect(process.env.PLAYWRIGHT_WEB_URL).toBe("http://127.0.0.1:29124");
+    expect(portOnlyConfig.use?.baseURL).toBe("http://127.0.0.1:29124");
+
+    const config = await loadConfig({
+      API_URL: "http://localhost:19123",
+      PLAYWRIGHT_WEB_URL: "http://localhost:29123",
+    });
+    const [, webServer] = config.webServer as Array<{ command: string }>;
+    expect(process.env.PLAYWRIGHT_API_PORT).toBe("19123");
+    expect(process.env.PLAYWRIGHT_API_URL).toBe("http://localhost:19123");
+    expect(process.env.PLAYWRIGHT_WEB_PORT).toBe("29123");
+    expect(config.use?.baseURL).toBe("http://localhost:29123");
+    expect(webServer.command).toContain("--host localhost --port 29123 --strictPort");
+
+    await expect(loadConfig({ PLAYWRIGHT_API_PORT: "not-a-port" })).rejects.toThrow(
+      /PLAYWRIGHT_API_PORT must be an integer port/,
+    );
+    await expect(loadConfig({ PLAYWRIGHT_WEB_PORT: "1023" })).rejects.toThrow(
+      /PLAYWRIGHT_WEB_PORT must be between 1024 and 65535/,
+    );
+    await expect(loadConfig({ PLAYWRIGHT_API_URL: "https://127.0.0.1:18128" })).rejects.toThrow(
+      /PLAYWRIGHT_API_URL must use http/,
+    );
+    await expect(
+      loadConfig({ PLAYWRIGHT_WEB_URL: "http://127.0.0.1:28128/subpath" }),
+    ).rejects.toThrow(
+      /PLAYWRIGHT_WEB_URL must be an origin without credentials, path, query, or hash/,
+    );
+    await expect(loadConfig({ PLAYWRIGHT_WEB_URL: "http://localhost" })).rejects.toThrow(
+      /PLAYWRIGHT_WEB_URL must be between 1024 and 65535, received "80"/,
+    );
+    await expect(
+      loadConfig({
+        PLAYWRIGHT_WEB_PORT: "28128",
+        PLAYWRIGHT_WEB_URL: "http://127.0.0.1:28129",
+      }),
+    ).rejects.toThrow(/PLAYWRIGHT_WEB_PORT must match the port in PLAYWRIGHT_WEB_URL/);
   });
 
   test("isolates every mutable path by a stable run identity", async () => {
@@ -633,6 +716,91 @@ describe("local analytics Playwright isolation", () => {
     expect(configSource).not.toContain("reuseExistingServer: !process.env.CI");
     expect(authSetup).toContain("PLAYWRIGHT_AUTH_FILE");
     expect(authSetup).not.toContain('"test-results", ".auth"');
+  });
+
+  test("keeps default API and web ports disjoint and below the Linux ephemeral range (32768)", async () => {
+    const actualCrypto = await import("node:crypto");
+    const randomIntCalls: Array<[number, number]> = [];
+    vi.doMock("node:crypto", () => ({
+      ...actualCrypto,
+      randomInt: (min: number, max: number) => {
+        randomIntCalls.push([min, max]);
+        return max - 1;
+      },
+    }));
+    try {
+      const boundaryConfig = await loadAnalyticsLocalConfig({});
+      expect(randomIntCalls).toEqual([
+        [15_000, 22_000],
+        [23_000, 30_000],
+      ]);
+      expect(process.env.PLAYWRIGHT_API_PORT).toBe("21999");
+      expect(process.env.PLAYWRIGHT_WEB_PORT).toBe("29999");
+      expect(boundaryConfig.use?.baseURL).toBe("http://127.0.0.1:29999");
+    } finally {
+      vi.doUnmock("node:crypto");
+    }
+
+    for (let i = 0; i < 25; i += 1) {
+      const config = await loadAnalyticsLocalConfig({});
+      const apiPort = Number(process.env.PLAYWRIGHT_API_PORT);
+      const webPort = Number(process.env.PLAYWRIGHT_WEB_PORT);
+
+      expect(webPort).toBeLessThan(32_768);
+      expect(webPort).toBeGreaterThanOrEqual(23_000);
+      expect(webPort).toBeLessThan(30_000);
+      expect(apiPort).toBeGreaterThanOrEqual(15_000);
+      expect(apiPort).toBeLessThan(22_000);
+      expect(process.env.PLAYWRIGHT_API_URL).toBe(`http://127.0.0.1:${apiPort}`);
+      expect(process.env.PLAYWRIGHT_WEB_URL).toBe(`http://127.0.0.1:${webPort}`);
+      expect(config.use?.baseURL).toBe(`http://127.0.0.1:${webPort}`);
+    }
+  });
+
+  test("derives endpoint ports from URL overrides and rejects malformed endpoint overrides", async () => {
+    const portOnlyConfig = await loadAnalyticsLocalConfig({
+      PLAYWRIGHT_API_PORT: "19491",
+      PLAYWRIGHT_WEB_PORT: "29491",
+    });
+    expect(process.env.PLAYWRIGHT_API_URL).toBe("http://127.0.0.1:19491");
+    expect(process.env.PLAYWRIGHT_WEB_URL).toBe("http://127.0.0.1:29491");
+    expect(portOnlyConfig.use?.baseURL).toBe("http://127.0.0.1:29491");
+
+    const config = await loadAnalyticsLocalConfig({
+      API_URL: "http://localhost:19490",
+      PLAYWRIGHT_WEB_URL: "http://localhost:29490",
+    });
+    expect(process.env.PLAYWRIGHT_API_PORT).toBe("19490");
+    expect(process.env.PLAYWRIGHT_API_URL).toBe("http://localhost:19490");
+    expect(process.env.PLAYWRIGHT_WEB_PORT).toBe("29490");
+    expect(config.use?.baseURL).toBe("http://localhost:29490");
+
+    await expect(loadAnalyticsLocalConfig({ PLAYWRIGHT_API_PORT: "invalid" })).rejects.toThrow(
+      /PLAYWRIGHT_API_PORT must be an integer port/,
+    );
+    await expect(loadAnalyticsLocalConfig({ PLAYWRIGHT_WEB_PORT: "70000" })).rejects.toThrow(
+      /PLAYWRIGHT_WEB_PORT must be between 1024 and 65535/,
+    );
+    await expect(
+      loadAnalyticsLocalConfig({ PLAYWRIGHT_API_URL: "https://127.0.0.1:18490" }),
+    ).rejects.toThrow(/PLAYWRIGHT_API_URL must use http/);
+    await expect(
+      loadAnalyticsLocalConfig({ PLAYWRIGHT_WEB_URL: "http://192.168.1.10:28490" }),
+    ).rejects.toThrow(/PLAYWRIGHT_WEB_URL must use a loopback host/);
+    await expect(
+      loadAnalyticsLocalConfig({ PLAYWRIGHT_WEB_URL: "http://127.0.0.1:28490?foo=1" }),
+    ).rejects.toThrow(
+      /PLAYWRIGHT_WEB_URL must be an origin without credentials, path, query, or hash/,
+    );
+    await expect(
+      loadAnalyticsLocalConfig({ PLAYWRIGHT_WEB_URL: "http://localhost" }),
+    ).rejects.toThrow(/PLAYWRIGHT_WEB_URL must be between 1024 and 65535, received "80"/);
+    await expect(
+      loadAnalyticsLocalConfig({
+        PLAYWRIGHT_API_PORT: "18490",
+        PLAYWRIGHT_API_URL: "http://127.0.0.1:18491",
+      }),
+    ).rejects.toThrow(/PLAYWRIGHT_API_PORT must match the port in PLAYWRIGHT_API_URL/);
   });
 });
 

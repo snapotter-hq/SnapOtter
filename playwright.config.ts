@@ -39,7 +39,7 @@ function parsePort(value: string, envName: string): number {
 }
 
 function randomPort(min: number): number {
-  return randomInt(min, min + 10_000);
+  return randomInt(min, min + 7_000);
 }
 
 function resolveEndpoint(kind: "API" | "WEB", defaultPortFloor: number): E2eEndpoint {
@@ -79,8 +79,8 @@ function resolveEndpoint(kind: "API" | "WEB", defaultPortFloor: number): E2eEndp
   return { host: parsedUrl.hostname, port, url };
 }
 
-const apiEndpoint = resolveEndpoint("API", 20_000);
-const webEndpoint = resolveEndpoint("WEB", 30_000);
+const apiEndpoint = resolveEndpoint("API", 15_000);
+const webEndpoint = resolveEndpoint("WEB", 23_000);
 const TEST_API_URL = apiEndpoint.url;
 const TEST_WEB_URL = webEndpoint.url;
 process.env.API_URL = TEST_API_URL;
