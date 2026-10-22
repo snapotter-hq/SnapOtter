@@ -997,6 +997,7 @@ for step_kind in ("faces", "colorize"):
         (RuntimeError("[enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes."), "[enforce fail at alloc_cpu.cpp:114] DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes."),
         (RuntimeError("Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 3)"), "Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 3)"),
         (OSError(12, "Cannot allocate memory"), "[Errno 12] Cannot allocate memory"),
+        (OSError(12, "Nicht genügend Hauptspeicher verfügbar"), "[Errno 12] Nicht genügend Hauptspeicher verfügbar"),
     ):
         if step_kind == "faces":
             mod.enhance_faces = lambda _img, _fidelity=0.7, _e=oom_exc: (_ for _ in ()).throw(_e)
@@ -1017,6 +1018,18 @@ for step_kind in ("faces", "colorize"):
             assert not any("skipped" in e.get("warning", "").lower() for e in events_oom), events_oom
         else:
             raise AssertionError(f"Expected SystemExit(1) for {oom_exc!r} in {step_kind}")
+
+# Non-ENOMEM OSError (e.g. errno 13 EACCES) is not treated as OOM: logs warning and skips the step
+mod.enhance_faces = lambda _img, _fidelity=0.7: (_ for _ in ()).throw(OSError(13, "Permission denied"))
+mod.colorize_bw = lambda _img, intensity=0.85: (_ for _ in ()).throw(OSError(13, "Permission denied"))
+out_buf, err_buf = io.StringIO(), io.StringIO()
+with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+    mod.main()
+payload_eacces = json.loads(out_buf.getvalue().strip())
+events_eacces = parse_stderr_events(err_buf.getvalue())
+assert payload_eacces["success"] is True, payload_eacces
+assert {"warning": "[restore] Face enhancement skipped: [Errno 13] Permission denied"} in events_eacces, events_eacces
+assert {"warning": "[restore] Colorization skipped: [Errno 13] Permission denied"} in events_eacces, events_eacces
 
 print("RESTORE_3078_OK")
 `);
@@ -1237,6 +1250,7 @@ for oom_exc, expected_err in (
     (RuntimeError("DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes."), "DefaultCPUAllocator: not enough memory: you tried to allocate 600000000 bytes."),
     (RuntimeError("Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 3)"), "Unable to allocate 1.86 GiB for an array with shape (4096, 4096, 3)"),
     (OSError(12, "Cannot allocate memory"), "[Errno 12] Cannot allocate memory"),
+    (OSError(12, "Nicht genügend Hauptspeicher verfügbar"), "[Errno 12] Nicht genügend Hauptspeicher verfügbar"),
 ):
     session_calls.clear()
     session_behaviors[:] = [oom_exc, "ok"]
@@ -1253,6 +1267,19 @@ for oom_exc, expected_err in (
         assert not any("warning" in e for e in events_oom), events_oom
     else:
         raise AssertionError(f"Expected SystemExit(1) for per-face {oom_exc!r}")
+
+# Non-ENOMEM OSError on face 0 logs warning and continues to face 1 (#3453)
+session_calls.clear()
+session_behaviors[:] = [OSError(13, "Permission denied"), "ok"]
+out_buf, err_buf = io.StringIO(), io.StringIO()
+with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+    mod.main()
+payload_face_eacces = json.loads(out_buf.getvalue().strip())
+events_face_eacces = parse_stderr_events(err_buf.getvalue())
+assert payload_face_eacces["success"] is True, payload_face_eacces
+assert payload_face_eacces["facesEnhanced"] == 1, payload_face_eacces
+assert len(session_calls) == 2, session_calls
+assert {"warning": "[restore] CodeFormer inference failed for face 0: [Errno 13] Permission denied"} in events_face_eacces, events_face_eacces
 
 # 5. mp.tasks.vision.FaceDetector fallback (AttributeError on mp.solutions) + longest > 1920 downscale
 mod._ensure_face_detect_model = lambda: "/tmp/fake-blaze-face.tflite"

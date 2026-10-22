@@ -111,6 +111,7 @@ for oom_mod in (gif_remove_bg, remove_bg, restore):
         ),
         RuntimeError("OSError: [Errno 12] Cannot allocate memory"),
         OSError(12, "Cannot allocate memory"),
+        OSError(12, "Nicht genügend Hauptspeicher verfügbar"),
         RuntimeError("DefaultCPUAllocator: NOT ENOUGH MEMORY"),
         RuntimeError("DefaultCPUAllocator: CAN'T ALLOCATE MEMORY"),
         RuntimeError(
@@ -124,13 +125,13 @@ for oom_mod in (gif_remove_bg, remove_bg, restore):
         oom_mod._is_oom(RuntimeError("RuntimeError: DefaultCPUAllocator: invalid alignment"))
         is False
     )
+    assert oom_mod._is_oom(OSError(13, "Permission denied")) is False
+    assert oom_mod._is_oom(OSError("disk read failed")) is False
 for host_oom_mod in (gif_remove_bg, remove_bg):
     assert host_oom_mod._is_host_oom(MemoryError()) is True, (
         f"{host_oom_mod.__name__}._is_host_oom must recognize bare MemoryError()"
     )
     assert host_oom_mod._is_host_oom(RuntimeError("MemoryError")) is True
-    assert host_oom_mod._is_oom(OSError(12, "Nicht genügend Hauptspeicher verfügbar")) is True
-    assert host_oom_mod._is_oom(OSError(13, "Permission denied")) is False
     for host_oom_err in (
         RuntimeError("std::bad_alloc"),
         RuntimeError(

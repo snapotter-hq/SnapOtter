@@ -7,6 +7,7 @@ Multi-step pipeline for restoring old and damaged photos:
 4. Noise reduction (OpenCV NLMeans)
 5. Optional B&W colorization (DDColor ONNX)
 """
+import errno
 import sys
 import json
 import os
@@ -54,6 +55,8 @@ def emit_warning(message):
 
 def _is_oom(err):
     if isinstance(err, MemoryError):
+        return True
+    if isinstance(err, OSError) and err.errno == errno.ENOMEM:
         return True
     m = str(err).lower()
     return any(s in m for s in _OOM_MARKERS)
