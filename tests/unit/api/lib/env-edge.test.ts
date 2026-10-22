@@ -131,6 +131,30 @@ describe("loadEnv edge validation", () => {
     expect(env.OIDC_ISSUER_URL).toBe("keycloak.lan:8080/realms/x");
   });
 
+  it.each([
+    [undefined, "user"],
+    ["", "user"],
+    ["   ", "user"],
+    ["\t\n ", "user"],
+    [" editor \n", "editor"],
+    ["\tadmin ", "admin"],
+    [" disabled \n", "disabled"],
+    [" custom-role \r\n", "custom-role"],
+  ])(
+    "trims OIDC_DEFAULT_ROLE %j and falls back to %j when blank (#3301)",
+    (defaultRole, expected) => {
+      restoreEnv();
+      const rawEnv: NodeJS.ProcessEnv = { ...process.env };
+      if (defaultRole === undefined) {
+        delete rawEnv.OIDC_DEFAULT_ROLE;
+      } else {
+        rawEnv.OIDC_DEFAULT_ROLE = defaultRole;
+      }
+      const env = loadEnv(rawEnv);
+      expect(env.OIDC_DEFAULT_ROLE).toBe(expected);
+    },
+  );
+
   it("rejects enabled SAML without IdP settings and external URL", () => {
     expectLoadEnvError(
       {
@@ -400,6 +424,30 @@ describe("loadEnv edge validation", () => {
       }
       const env = loadEnv(rawEnv);
       expect(env.SAML_EMAIL_ATTRIBUTE).toBe(expected);
+    },
+  );
+
+  it.each([
+    [undefined, "user"],
+    ["", "user"],
+    ["   ", "user"],
+    ["\t\n ", "user"],
+    [" editor \n", "editor"],
+    ["\tadmin ", "admin"],
+    [" disabled \n", "disabled"],
+    [" custom-role \r\n", "custom-role"],
+  ])(
+    "trims SAML_DEFAULT_ROLE %j and falls back to %j when blank (#3301)",
+    (defaultRole, expected) => {
+      restoreEnv();
+      const rawEnv: NodeJS.ProcessEnv = { ...process.env };
+      if (defaultRole === undefined) {
+        delete rawEnv.SAML_DEFAULT_ROLE;
+      } else {
+        rawEnv.SAML_DEFAULT_ROLE = defaultRole;
+      }
+      const env = loadEnv(rawEnv);
+      expect(env.SAML_DEFAULT_ROLE).toBe(expected);
     },
   );
 

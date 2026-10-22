@@ -179,7 +179,11 @@ const envSchema = z
       .enum(["true", "false"])
       .default("true")
       .transform((v) => v === "true"),
-    OIDC_DEFAULT_ROLE: z.string().default("user"),
+    OIDC_DEFAULT_ROLE: z
+      .string()
+      .trim()
+      .default("user")
+      .transform((v) => v || "user"),
     OIDC_AUTO_LINK_USERS: z
       .enum(["true", "false"])
       .default("false")
@@ -203,7 +207,11 @@ const envSchema = z
       .enum(["true", "false"])
       .default("false")
       .transform((v) => v === "true"),
-    SAML_DEFAULT_ROLE: z.string().default("user"),
+    SAML_DEFAULT_ROLE: z
+      .string()
+      .trim()
+      .default("user")
+      .transform((v) => v || "user"),
     SAML_PROVIDER_NAME: z.string().trim().default(""),
     SAML_USERNAME_ATTRIBUTE: z.string().trim().default(""),
     SAML_EMAIL_ATTRIBUTE: z
