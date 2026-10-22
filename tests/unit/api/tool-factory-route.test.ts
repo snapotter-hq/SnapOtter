@@ -27,7 +27,7 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
   },
   pool: {},
   closeDb: async () => {},
-  schema: { settings: {}, userFiles: { id: {} }, jobs: { id: {}, status: {} } },
+  schema: { settings: {}, userFiles: { id: {} }, jobs: { id: {}, status: {}, error: {} } },
 }));
 
 vi.mock("../../../apps/api/src/config.js", () => ({
@@ -1241,6 +1241,127 @@ describe("createToolRoute", () => {
           details: "Sharp exploded",
         }),
       );
+    });
+
+    it("returns 422 with canceled: true when waitForJob rejects with Canceled and the job row status is canceled", async () => {
+      vi.mocked(waitForJob).mockRejectedValueOnce(new Error("Canceled"));
+      jobRows.rows = [{ status: "canceled" }];
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const reply = createMockReply();
+      const req = createMockRequest({ fileBuffer: Buffer.from("png-data"), settings: "{}" });
+
+      try {
+        await app.routes[apiToolPath(id)](req, reply);
+      } finally {
+        jobRows.rows = [];
+      }
+
+      expect(reply.status).toHaveBeenCalledWith(422);
+      expect(reply.send).toHaveBeenCalledWith({
+        error: "Canceled",
+        canceled: true,
+      });
+      expect(req.log.warn).not.toHaveBeenCalled();
+      expect(req.log.error).not.toHaveBeenCalled();
+    });
+
+    it("falls through to the generic 422 path without logging a status-read warning when waitForJob rejects with Canceled but the job row status is failed", async () => {
+      vi.mocked(waitForJob).mockRejectedValueOnce(new Error("Canceled"));
+      jobRows.rows = [{ status: "failed", error: null }];
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const reply = createMockReply();
+      const req = createMockRequest({ fileBuffer: Buffer.from("png-data"), settings: "{}" });
+
+      try {
+        await app.routes[apiToolPath(id)](req, reply);
+      } finally {
+        jobRows.rows = [];
+      }
+
+      expect(req.log.warn).not.toHaveBeenCalled();
+      expect(req.log.error).toHaveBeenCalledWith(expect.anything(), "tool processing failed");
+      expect(reply.status).toHaveBeenCalledWith(422);
+      expect(reply.send).toHaveBeenCalledWith({
+        error: "Processing failed",
+        details: "Canceled",
+      });
+    });
+
+    it("logs a warning on request.log and falls through when reading canceled job status fails (#3527)", async () => {
+      const statusReadErr = new Error("db read timeout");
+      vi.mocked(waitForJob).mockRejectedValueOnce(new Error("Canceled"));
+      const select = vi.mocked(db.select);
+      const original = select.getMockImplementation();
+      select.mockImplementation(((fields?: Record<string, unknown>) =>
+        fields && "status" in fields
+          ? { from: () => ({ where: () => Promise.reject(statusReadErr) }) }
+          : original?.(fields as never)) as never);
+
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const reply = createMockReply();
+      const req = createMockRequest({ fileBuffer: Buffer.from("png-data"), settings: "{}" });
+
+      try {
+        await app.routes[apiToolPath(id)](req, reply);
+      } finally {
+        select.mockImplementation(original as never);
+      }
+
+      const jobId = vi.mocked(enqueueToolJob).mock.calls[0][0].jobId;
+      expect(req.log.warn).toHaveBeenCalledTimes(1);
+      expect(req.log.warn).toHaveBeenCalledWith(
+        { err: statusReadErr, jobId },
+        "canceled job status read failed",
+      );
+      expect(req.log.error).toHaveBeenCalledWith(
+        expect.objectContaining({ toolId: id }),
+        "tool processing failed",
+      );
+      expect(reply.status).toHaveBeenCalledWith(422);
+      expect(reply.send).toHaveBeenCalledWith({
+        error: "Processing failed",
+        details: "Canceled",
+      });
+    });
+
+    it("logs a warning on request.log when reading failed job error column fails", async () => {
+      const errorReadErr = new Error("db error read timeout");
+      vi.mocked(waitForJob).mockRejectedValueOnce(new Error("Sharp exploded"));
+      const select = vi.mocked(db.select);
+      const original = select.getMockImplementation();
+      select.mockImplementation(((fields?: Record<string, unknown>) =>
+        fields && "error" in fields
+          ? { from: () => ({ where: () => Promise.reject(errorReadErr) }) }
+          : original?.(fields as never)) as never);
+
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const reply = createMockReply();
+      const req = createMockRequest({ fileBuffer: Buffer.from("png-data"), settings: "{}" });
+
+      try {
+        await app.routes[apiToolPath(id)](req, reply);
+      } finally {
+        select.mockImplementation(original as never);
+      }
+
+      const jobId = vi.mocked(enqueueToolJob).mock.calls[0][0].jobId;
+      expect(req.log.warn).toHaveBeenCalledWith(
+        { err: errorReadErr, jobId },
+        "failed job row read failed",
+      );
+      expect(reply.status).toHaveBeenCalledWith(422);
+      expect(reply.send).toHaveBeenCalledWith({
+        error: "Processing failed",
+        details: "Sharp exploded",
+      });
     });
 
     it("answers the status the worker recorded for rejected input", async () => {

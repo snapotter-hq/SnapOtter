@@ -719,7 +719,10 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
               .from(schema.jobs)
               .where(eq(schema.jobs.id, jobId))
               .then((rows) => rows[0]?.status === "canceled")
-              .catch(() => false);
+              .catch((readErr) => {
+                request.log.warn({ err: readErr, jobId }, "canceled job status read failed");
+                return false;
+              });
             if (wasCanceled) {
               return reply.status(422).send({ error: "Canceled", canceled: true });
             }
