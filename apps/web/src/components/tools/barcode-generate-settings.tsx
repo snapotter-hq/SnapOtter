@@ -19,6 +19,16 @@ const BARCODE_TYPES = [
 const INPUT_CLASS =
   "w-full mt-0.5 px-2 py-1.5 rounded border border-border bg-background text-sm text-foreground";
 
+interface BarcodeGenerateResponse {
+  downloadUrl: string;
+}
+
+function isBarcodeGenerateResponse(value: unknown): value is BarcodeGenerateResponse {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return typeof data.downloadUrl === "string" && data.downloadUrl.length > 0;
+}
+
 export function BarcodeGenerateSettings() {
   const { t } = useTranslation();
   const ts = t.toolSettings["barcode-generate"];
@@ -88,11 +98,16 @@ export function BarcodeGenerateSettings() {
         );
       }
 
-      const data = resolveServerUrls(await res.json());
+      const raw = await res.json().catch((err: unknown) => {
+        if (err instanceof SyntaxError) return null;
+        throw err;
+      });
       if (controller.signal.aborted || storeReset) return;
-      if (data.downloadUrl) {
-        setResultUrl(data.downloadUrl);
+      const data = resolveServerUrls(raw);
+      if (!isBarcodeGenerateResponse(data)) {
+        throw new Error(t.errors.invalidServerResponse);
       }
+      setResultUrl(data.downloadUrl);
     } catch (err) {
       if (
         controller.signal.aborted ||

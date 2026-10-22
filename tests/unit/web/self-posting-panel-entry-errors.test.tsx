@@ -24,12 +24,15 @@ vi.mock("@/contexts/i18n-context", async (importOriginal) => {
   };
 });
 
+import { BarcodeGenerateSettings } from "@/components/tools/barcode-generate-settings";
 import { BeautifySettings } from "@/components/tools/beautify-settings";
 import { ColorPaletteSettings } from "@/components/tools/color-palette-settings";
 import { CompareSettings } from "@/components/tools/compare-settings";
 import { ComposeSettings } from "@/components/tools/compose-settings";
+import { EditMetadataSettings } from "@/components/tools/edit-metadata-settings";
 import { InfoSettings } from "@/components/tools/info-settings";
 import { StitchSettings } from "@/components/tools/stitch-settings";
+import { StripMetadataSettings } from "@/components/tools/strip-metadata-settings";
 import { WatermarkImageSettings } from "@/components/tools/watermark-image-settings";
 import { useFileStore } from "@/stores/file-store";
 
@@ -646,6 +649,333 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       expect(entries[2].status).toBe("failed");
       expect(entries[2].processedUrl).toBeNull();
       expect(entries[2].error).toBe(en.errors.invalidServerResponse);
+      unmount();
+    }
+  });
+
+  it("rejects non-JSON and malformed 2xx payloads across beautify, barcode-generate, strip-metadata, and edit-metadata (#3496)", async () => {
+    // 1. BeautifySettings (image-background branch)
+    for (const badBody of [
+      "<html>gateway</html>",
+      "null",
+      "{}",
+      "[]",
+      JSON.stringify({ downloadUrl: "" }),
+      JSON.stringify({ downloadUrl: "/api/v1/download/j/out.png", originalSize: -1 }),
+      JSON.stringify({ downloadUrl: "/api/v1/download/j/out.png", processedSize: -1 }),
+      JSON.stringify({ downloadUrl: "/api/v1/download/j/out.png", previewUrl: "" }),
+    ]) {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("a.png")]);
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(badBody, { status: 200 })),
+      );
+
+      const { container, unmount } = render(<BeautifySettings />);
+      fireEvent.click(screen.getByRole("button", { name: en.toolSettings.beautify.bgImage }));
+      chooseSecondaryFile(container, image("bg.png"));
+      fireEvent.click(screen.getByTestId("beautify-submit"));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+      const entry = useFileStore.getState().entries[0];
+      expect(entry.status).toBe("failed");
+      expect(entry.processedUrl).toBeNull();
+      expect(entry.error).toBe(en.errors.invalidServerResponse);
+      expect(screen.getByText(en.errors.invalidServerResponse)).toBeInTheDocument();
+      expect(screen.queryByTestId("beautify-download")).not.toBeInTheDocument();
+      unmount();
+    }
+
+    // BeautifySettings also accepts a minimal 200 response with only downloadUrl and rethrows non-SyntaxError body read failures.
+    {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("a.png")]);
+      let beautifyCall = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          beautifyCall++;
+          if (beautifyCall === 1) {
+            return new Response(
+              JSON.stringify({ downloadUrl: "/api/v1/download/j/beautify-min.png" }),
+              { status: 200 },
+            );
+          }
+          return {
+            ok: true,
+            status: 200,
+            json: () => Promise.reject(new TypeError("Beautify stream disconnected")),
+          } as unknown as Response;
+        }),
+      );
+
+      const { container, unmount } = render(<BeautifySettings />);
+      fireEvent.click(screen.getByRole("button", { name: en.toolSettings.beautify.bgImage }));
+      chooseSecondaryFile(container, image("bg.png"));
+      fireEvent.click(screen.getByTestId("beautify-submit"));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+      expect(useFileStore.getState().entries[0].status).toBe("completed");
+      expect(useFileStore.getState().entries[0].processedUrl).toBe(
+        "/api/v1/download/j/beautify-min.png",
+      );
+      expect(useFileStore.getState().entries[0].originalSize).toBe(3);
+      expect(useFileStore.getState().entries[0].processedSize).toBeNull();
+
+      fireEvent.click(screen.getByTestId("beautify-submit"));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+      expect(useFileStore.getState().entries[0].status).toBe("failed");
+      expect(useFileStore.getState().entries[0].error).toBe("Beautify stream disconnected");
+      unmount();
+    }
+
+    // 2. BarcodeGenerateSettings
+    for (const badBody of [
+      "<html>gateway</html>",
+      "null",
+      "{}",
+      "[]",
+      JSON.stringify({ downloadUrl: "" }),
+      JSON.stringify({ downloadUrl: 42 }),
+    ]) {
+      useFileStore.getState().reset();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(badBody, { status: 200 })),
+      );
+
+      const { unmount } = render(<BarcodeGenerateSettings />);
+      fireEvent.change(screen.getByTestId("barcode-input-text"), { target: { value: "12345" } });
+      fireEvent.click(screen.getByTestId("barcode-generate-submit"));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+      expect(useFileStore.getState().error).toBe(en.errors.invalidServerResponse);
+      expect(screen.getByText(en.errors.invalidServerResponse)).toBeInTheDocument();
+      expect(screen.queryByTestId("barcode-generate-download")).not.toBeInTheDocument();
+      unmount();
+    }
+
+    // BarcodeGenerateSettings rethrows non-SyntaxError body read failures and accepts valid downloadUrl.
+    {
+      useFileStore.getState().reset();
+      let barcodeCall = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          barcodeCall++;
+          if (barcodeCall === 1) {
+            return {
+              ok: true,
+              status: 200,
+              json: () => Promise.reject(new TypeError("Barcode stream disconnected")),
+            } as unknown as Response;
+          }
+          return new Response(JSON.stringify({ downloadUrl: "/api/v1/download/j/barcode.png" }), {
+            status: 200,
+          });
+        }),
+      );
+
+      const { unmount } = render(<BarcodeGenerateSettings />);
+      fireEvent.change(screen.getByTestId("barcode-input-text"), { target: { value: "12345" } });
+      fireEvent.click(screen.getByTestId("barcode-generate-submit"));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+      expect(useFileStore.getState().error).toBe("Barcode stream disconnected");
+      expect(screen.queryByTestId("barcode-generate-download")).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId("barcode-generate-submit"));
+      await waitFor(() =>
+        expect(screen.getByTestId("barcode-generate-download")).toHaveAttribute(
+          "href",
+          "/api/v1/download/j/barcode.png",
+        ),
+      );
+      expect(useFileStore.getState().error).toBeNull();
+      unmount();
+    }
+
+    // 3. StripMetadataSettings (inspect)
+    for (const badBody of [
+      "<html>gateway</html>",
+      "null",
+      "{}",
+      "[]",
+      JSON.stringify({ filename: "", fileSize: 100 }),
+      JSON.stringify({ filename: "a.png", fileSize: -1 }),
+      JSON.stringify({ filename: "a.png", fileSize: 100, exif: "not-an-object" }),
+      JSON.stringify({ filename: "a.png", fileSize: 100, exifError: 123 }),
+      JSON.stringify({ filename: "a.png", fileSize: 100, gps: [] }),
+      JSON.stringify({
+        filename: "a.png",
+        fileSize: 100,
+        gps: { _latitude: "51.5", _longitude: -0.1 },
+      }),
+      JSON.stringify({ filename: "a.png", fileSize: 100, icc: "not-an-object" }),
+      JSON.stringify({ filename: "a.png", fileSize: 100, xmp: 42 }),
+    ]) {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("a.png")]);
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(badBody, { status: 200 })),
+      );
+
+      const { unmount } = render(<StripMetadataSettings />);
+      await waitFor(() =>
+        expect(screen.getByText(en.errors.invalidServerResponse)).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByText(en.toolSettings["strip-metadata"].noMetadataFound),
+      ).not.toBeInTheDocument();
+      unmount();
+    }
+
+    // StripMetadataSettings does not cache a malformed 200 payload and rethrows non-SyntaxError body read failures.
+    {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("a.png"), image("b.png")]);
+      let stripInspectCalls = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          stripInspectCalls++;
+          if (stripInspectCalls === 1) {
+            return new Response("{}", { status: 200 });
+          }
+          if (stripInspectCalls === 2) {
+            return {
+              ok: true,
+              status: 200,
+              json: () => Promise.reject(new TypeError("Strip inspect stream disconnected")),
+            } as unknown as Response;
+          }
+          return new Response(JSON.stringify({ filename: "a.png", fileSize: 100 }), {
+            status: 200,
+          });
+        }),
+      );
+
+      const { unmount } = render(<StripMetadataSettings />);
+      await waitFor(() =>
+        expect(screen.getByText(en.errors.invalidServerResponse)).toBeInTheDocument(),
+      );
+
+      act(() => {
+        useFileStore.getState().setSelectedIndex(1);
+      });
+      await waitFor(() =>
+        expect(screen.getByText("Strip inspect stream disconnected")).toBeInTheDocument(),
+      );
+
+      // Switching back to index 0 refetches because the first "{}" response was not cached.
+      act(() => {
+        useFileStore.getState().setSelectedIndex(0);
+      });
+      await waitFor(() =>
+        expect(
+          screen.getByText(en.toolSettings["strip-metadata"].noMetadataFound),
+        ).toBeInTheDocument(),
+      );
+      expect(stripInspectCalls).toBe(3);
+      unmount();
+    }
+
+    // 4. EditMetadataSettings (inspect): rejects malformed 2xx without caching or crashing
+    for (const badBody of [
+      "<html>gateway</html>",
+      "null",
+      "{}",
+      "[]",
+      JSON.stringify({ filename: "", fileSize: 100 }),
+      JSON.stringify({ filename: "a.png", fileSize: -1 }),
+      JSON.stringify({ filename: "a.png", fileSize: 100, exif: "not-an-object" }),
+      JSON.stringify({ filename: "a.png", fileSize: 100, iptc: [] }),
+      JSON.stringify({ filename: "a.png", fileSize: 100, gps: 42 }),
+      JSON.stringify({
+        filename: "a.png",
+        fileSize: 100,
+        gps: { GPSLatitude: "51.5", GPSLongitude: -0.1 },
+      }),
+      JSON.stringify({ filename: "a.png", fileSize: 100, xmp: "bad" }),
+      JSON.stringify({ filename: "a.png", fileSize: 100, keywords: "not-an-array" }),
+      JSON.stringify({ filename: "a.png", fileSize: 100, keywords: [42] }),
+    ]) {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("a.png")]);
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(badBody, { status: 200 })),
+      );
+
+      const { unmount } = render(<EditMetadataSettings />);
+      await waitFor(() =>
+        expect(
+          screen.getByText(en.toolSettings["edit-metadata"].couldNotReadMetadata),
+        ).toBeInTheDocument(),
+      );
+      expect(screen.queryByText("EXIF/IPTC")).not.toBeInTheDocument();
+      unmount();
+    }
+
+    // EditMetadataSettings does not cache a malformed 200 payload, resets form fields when switching to a file with a malformed payload, and surfaces non-SyntaxError body read failures.
+    {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("a.png"), image("b.png")]);
+      let editInspectCalls = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          editInspectCalls++;
+          if (editInspectCalls === 1) {
+            return new Response("{}", { status: 200 });
+          }
+          if (editInspectCalls === 2) {
+            return new Response(
+              JSON.stringify({
+                filename: "b.png",
+                fileSize: 100,
+                exif: { Artist: "Ada" },
+                iptc: null,
+                xmp: null,
+                gps: null,
+                keywords: ["tag1"],
+              }),
+              { status: 200 },
+            );
+          }
+          return {
+            ok: true,
+            status: 200,
+            json: () => Promise.reject(new TypeError("Edit inspect stream disconnected")),
+          } as unknown as Response;
+        }),
+      );
+
+      const { unmount } = render(<EditMetadataSettings />);
+      await waitFor(() =>
+        expect(
+          screen.getByText(en.toolSettings["edit-metadata"].couldNotReadMetadata),
+        ).toBeInTheDocument(),
+      );
+
+      act(() => {
+        useFileStore.getState().setSelectedIndex(1);
+      });
+      await waitFor(() => expect(screen.getByText("EXIF/IPTC")).toBeInTheDocument());
+      expect(screen.getByLabelText(en.toolSettings["edit-metadata"].artist)).toHaveValue("Ada");
+
+      // Switching back to index 0 refetches because the first "{}" response was not cached, and resets form fields on stream failure.
+      act(() => {
+        useFileStore.getState().setSelectedIndex(0);
+      });
+      await waitFor(() =>
+        expect(
+          screen.getByText(en.toolSettings["edit-metadata"].couldNotReadMetadata),
+        ).toBeInTheDocument(),
+      );
+      expect(screen.queryByText("EXIF/IPTC")).not.toBeInTheDocument();
+      expect(screen.getByLabelText(en.toolSettings["edit-metadata"].artist)).toHaveValue("");
+      expect(editInspectCalls).toBe(3);
       unmount();
     }
   });

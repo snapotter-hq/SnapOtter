@@ -1469,29 +1469,47 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
         );
       }
 
-      const result = resolveServerUrls(await response.json());
+      const raw = await response.json().catch((err: unknown) => {
+        if (err instanceof SyntaxError) return null;
+        throw err;
+      });
       // The user may have swapped the file or undone the cutout while this
       // request ran; skip updating the library id, claiming, and downloading
       // for a file that is no longer the active entry (#2243).
       if (isStaleEffectsRun()) return;
-      if (typeof result?.downloadUrl !== "string" || !result.downloadUrl) {
+      const result = resolveServerUrls(raw);
+      const savedFileIdResult =
+        result && typeof result === "object" && !Array.isArray(result)
+          ? (result as Record<string, unknown>).savedFileId
+          : undefined;
+      if (
+        !result ||
+        typeof result !== "object" ||
+        Array.isArray(result) ||
+        typeof (result as Record<string, unknown>).downloadUrl !== "string" ||
+        !(result as Record<string, unknown>).downloadUrl ||
+        (savedFileIdResult !== undefined &&
+          savedFileIdResult !== null &&
+          (typeof savedFileIdResult !== "string" || !savedFileIdResult))
+      ) {
         throw new Error(t.errors.invalidResponse);
       }
+      const downloadUrlResult = (result as Record<string, unknown>).downloadUrl as string;
       setEffectsError(null);
 
       // Surface the "saved to your files" indicator and, on overwrite,
       // re-anchor so a subsequent run derives from the saved version (#565).
       const store = useFileStore.getState();
-      if (result.savedFileId) {
-        store.setLastSavedLibraryFileId(result.savedFileId as string);
+      if (typeof savedFileIdResult === "string") {
+        store.setLastSavedLibraryFileId(savedFileIdResult);
         if (librarySaveMode === "overwrite") {
-          store.updateEntryById(capturedEntry.id, { serverFileId: result.savedFileId as string });
+          store.updateEntryById(capturedEntry.id, { serverFileId: savedFileIdResult });
         }
       }
 
       // Auto-trigger download
       const a = document.createElement("a");
-      a.href = result.downloadUrl;
+      a.href = downloadUrlResult;
       a.download = "";
       document.body.appendChild(a);
       a.click();

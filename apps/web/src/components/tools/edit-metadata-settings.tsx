@@ -22,6 +22,40 @@ interface InspectResult {
   keywords?: string[];
 }
 
+function isOptionalRecord(value: unknown): value is Record<string, unknown> | null | undefined {
+  return (
+    value === undefined || value === null || (typeof value === "object" && !Array.isArray(value))
+  );
+}
+
+function isOptionalFiniteNumber(value: unknown): value is number | null | undefined {
+  return (
+    value === undefined || value === null || (typeof value === "number" && Number.isFinite(value))
+  );
+}
+
+function isInspectResult(value: unknown): value is InspectResult {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return (
+    typeof data.filename === "string" &&
+    data.filename.length > 0 &&
+    typeof data.fileSize === "number" &&
+    Number.isFinite(data.fileSize) &&
+    data.fileSize >= 0 &&
+    isOptionalRecord(data.exif) &&
+    isOptionalRecord(data.iptc) &&
+    isOptionalRecord(data.xmp) &&
+    isOptionalRecord(data.gps) &&
+    (!data.gps ||
+      (isOptionalFiniteNumber(data.gps.GPSLatitude) &&
+        isOptionalFiniteNumber(data.gps.GPSLongitude))) &&
+    (data.keywords === undefined ||
+      (Array.isArray(data.keywords) &&
+        data.keywords.every((item): item is string => typeof item === "string")))
+  );
+}
+
 interface FormFields {
   artist: string;
   copyright: string;
@@ -269,7 +303,13 @@ export function EditMetadataSettings() {
             ),
           );
         }
-        const data: InspectResult = await res.json();
+        const data = await res.json().catch((err: unknown) => {
+          if (err instanceof SyntaxError) return null;
+          throw err;
+        });
+        if (!isInspectResult(data)) {
+          throw new Error(t.errors.invalidServerResponse);
+        }
         setInspectCache((prev) => new Map(prev).set(fileKey, data));
         populateForm(data);
       } catch (err) {

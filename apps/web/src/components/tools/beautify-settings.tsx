@@ -1347,6 +1347,38 @@ export function BeautifyControls({
 
 // -- Settings Panel ---------------------------------------------------------
 
+interface BeautifyResponse {
+  jobId?: string | null;
+  downloadUrl: string;
+  previewUrl?: string | null;
+  originalSize?: number | null;
+  processedSize?: number | null;
+}
+
+function isOptionalUrl(value: unknown): value is string | null | undefined {
+  return value === undefined || value === null || (typeof value === "string" && value.length > 0);
+}
+
+function isOptionalSize(value: unknown): value is number | null | undefined {
+  return (
+    value === undefined ||
+    value === null ||
+    (typeof value === "number" && Number.isFinite(value) && value >= 0)
+  );
+}
+
+function isBeautifyResponse(value: unknown): value is BeautifyResponse {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return (
+    typeof data.downloadUrl === "string" &&
+    data.downloadUrl.length > 0 &&
+    isOptionalUrl(data.previewUrl) &&
+    isOptionalSize(data.originalSize) &&
+    isOptionalSize(data.processedSize)
+  );
+}
+
 export function BeautifySettings({
   onImageStyle,
   onImageOverlay,
@@ -1476,16 +1508,25 @@ export function BeautifySettings({
           );
         }
 
-        const result = resolveServerUrls(await res.json());
+        const raw = await res.json().catch((err: unknown) => {
+          if (err instanceof SyntaxError) return null;
+          throw err;
+        });
         if (controller.signal.aborted || storeReset) return;
-        setJobId(result.jobId);
+        const result = resolveServerUrls(raw);
+        if (!isBeautifyResponse(result)) {
+          throw new Error(t.errors.invalidServerResponse);
+        }
+        if (typeof result.jobId === "string" && result.jobId) {
+          setJobId(result.jobId);
+        }
         useFileStore.getState().updateEntryById(entryId, {
           processedUrl: result.downloadUrl,
           processedPreviewUrl: result.previewUrl ?? null,
           processedFilename: null,
           status: "completed",
-          originalSize: result.originalSize,
-          processedSize: result.processedSize,
+          ...(result.originalSize != null ? { originalSize: result.originalSize } : {}),
+          processedSize: result.processedSize ?? null,
         });
         setManualDownloadByEntry((prev) => ({
           ...prev,

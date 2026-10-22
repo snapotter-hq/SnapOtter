@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
+import { en } from "@snapotter/shared";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -434,5 +435,65 @@ describe("remove-background result after the files change (#2107)", () => {
     });
 
     expect(signals[1]?.aborted).toBe(true);
+  });
+
+  it("rejects non-JSON and malformed 2xx effects responses with invalidResponse (#3496)", async () => {
+    const a = png("a.png");
+    useFileStore.getState().setFiles([a]);
+    useFileStore.getState().updateEntry(0, {
+      serverFileId: "lib-a-v1",
+      processedUrl: "/api/v1/download/JOBA/a_mask.png",
+    });
+    useFileStore.getState().setLibrarySaveMode("overwrite");
+    useFileStore.getState().setLastSavedLibraryFileId(null);
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    for (const badBody of [
+      "<html>gateway</html>",
+      "null",
+      "{}",
+      "[]",
+      JSON.stringify({ downloadUrl: "", savedFileId: "lib-a-v2" }),
+      JSON.stringify({
+        downloadUrl: "/api/v1/download/JOBA/a_effects.png",
+        savedFileId: 123,
+      }),
+      JSON.stringify({
+        downloadUrl: "/api/v1/download/JOBA/a_effects.png",
+        savedFileId: "",
+      }),
+    ]) {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(badBody, { status: 200 })),
+      );
+
+      const { unmount } = render(<RemoveBgSettings />);
+      fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+
+      await waitFor(() => expect(screen.getByText(en.errors.invalidResponse)).toBeInTheDocument());
+      expect(clickSpy).not.toHaveBeenCalled();
+      expect(useFileStore.getState().lastSavedLibraryFileId).toBeNull();
+      expect(useFileStore.getState().entries[0].serverFileId).toBe("lib-a-v1");
+      expect(useFileStore.getState().entries[0].claimed).toBe(false);
+      unmount();
+    }
+
+    // Rethrows non-SyntaxError body read failures on effects response.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: () => Promise.reject(new TypeError("Effects stream disconnected")),
+      })) as unknown as typeof fetch,
+    );
+    const { unmount } = render(<RemoveBgSettings />);
+    fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+    await waitFor(() =>
+      expect(screen.getByText("Effects stream disconnected")).toBeInTheDocument(),
+    );
+    expect(clickSpy).not.toHaveBeenCalled();
+    unmount();
   });
 });

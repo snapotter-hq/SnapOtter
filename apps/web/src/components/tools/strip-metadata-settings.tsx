@@ -22,6 +22,40 @@ interface MetadataResult {
   xmp?: Record<string, string> | null;
 }
 
+function isOptionalRecord(value: unknown): value is Record<string, unknown> | null | undefined {
+  return (
+    value === undefined || value === null || (typeof value === "object" && !Array.isArray(value))
+  );
+}
+
+function isOptionalFiniteNumber(value: unknown): value is number | null | undefined {
+  return (
+    value === undefined || value === null || (typeof value === "number" && Number.isFinite(value))
+  );
+}
+
+function isMetadataResult(value: unknown): value is MetadataResult {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return (
+    typeof data.filename === "string" &&
+    data.filename.length > 0 &&
+    typeof data.fileSize === "number" &&
+    Number.isFinite(data.fileSize) &&
+    data.fileSize >= 0 &&
+    isOptionalRecord(data.exif) &&
+    (data.exifError === undefined ||
+      data.exifError === null ||
+      typeof data.exifError === "string") &&
+    isOptionalRecord(data.gps) &&
+    (!data.gps ||
+      (isOptionalFiniteNumber(data.gps._latitude) &&
+        isOptionalFiniteNumber(data.gps._longitude))) &&
+    isOptionalRecord(data.icc) &&
+    isOptionalRecord(data.xmp)
+  );
+}
+
 interface StripMetadataControlsProps {
   settings?: Record<string, unknown>;
   onChange?: (settings: Record<string, unknown>) => void;
@@ -237,7 +271,13 @@ export function StripMetadataSettings() {
             ),
           );
         }
-        const data: MetadataResult = await res.json();
+        const data = await res.json().catch((err: unknown) => {
+          if (err instanceof SyntaxError) return null;
+          throw err;
+        });
+        if (!isMetadataResult(data)) {
+          throw new Error(t.errors.invalidServerResponse);
+        }
         setMetadata(data);
         if (fileKey) setMetadataCache((prev) => new Map(prev).set(fileKey, data));
       } catch (err) {
