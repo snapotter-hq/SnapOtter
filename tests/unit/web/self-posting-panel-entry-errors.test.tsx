@@ -35,6 +35,7 @@ import { StitchSettings } from "@/components/tools/stitch-settings";
 import { StripMetadataSettings } from "@/components/tools/strip-metadata-settings";
 import { WatermarkImageSettings } from "@/components/tools/watermark-image-settings";
 import { classifyFeedbackError, FeedbackCategoryError } from "@/lib/feedback";
+import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
 class FakeXhr {
@@ -599,6 +600,7 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       );
       expect(useFileStore.getState().entries[0].originalSize).toBe(3);
       expect(useFileStore.getState().entries[0].processedSize).toBeNull();
+      expect(screen.queryByText(/KB/)).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByTestId("compose-submit"));
       await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
@@ -679,6 +681,10 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       expect(entries[1].originalSize).toBe(3);
       expect(entries[1].processedSize).toBeNull();
       expect(entries[1].error).toBeNull();
+      act(() => {
+        useFileStore.getState().setSelectedIndex(1);
+      });
+      expect(screen.queryByText(/KB/)).not.toBeInTheDocument();
       expect(entries[2].status).toBe("failed");
       expect(entries[2].processedUrl).toBeNull();
       expect(entries[2].error).toBe(en.errors.invalidServerResponse);
@@ -690,12 +696,12 @@ describe("self-posting tool panels: failed entry status and scoped error banners
     }
   });
 
-  it("preserves entry.originalSize when compose and watermark-image 2xx responses omit or null originalSize (#3506)", async () => {
+  it("preserves entry.originalSize and renders inline size summary when compose and watermark-image 2xx responses omit or null originalSize (#3506, #3673)", async () => {
     // 1. ComposeSettings: omitted originalSize, null originalSize, and explicit numeric originalSize.
     {
       useFileStore.getState().reset();
-      useFileStore.getState().setFiles([image("a.png", "seven-7")]);
-      expect(useFileStore.getState().entries[0].originalSize).toBe(7);
+      useFileStore.getState().setFiles([image("a.png", "x".repeat(1024))]);
+      expect(useFileStore.getState().entries[0].originalSize).toBe(1024);
 
       let composeCall = 0;
       vi.stubGlobal(
@@ -704,7 +710,10 @@ describe("self-posting tool panels: failed entry status and scoped error banners
           composeCall++;
           if (composeCall === 1) {
             return new Response(
-              JSON.stringify({ downloadUrl: "/api/v1/download/j/compose-omitted.png" }),
+              JSON.stringify({
+                downloadUrl: "/api/v1/download/j/compose-omitted.png",
+                processedSize: 512,
+              }),
               { status: 200 },
             );
           }
@@ -713,6 +722,7 @@ describe("self-posting tool panels: failed entry status and scoped error banners
               JSON.stringify({
                 downloadUrl: "/api/v1/download/j/compose-null.png",
                 originalSize: null,
+                processedSize: 256,
               }),
               { status: 200 },
             );
@@ -720,7 +730,7 @@ describe("self-posting tool panels: failed entry status and scoped error banners
           return new Response(
             JSON.stringify({
               downloadUrl: "/api/v1/download/j/compose-explicit.png",
-              originalSize: 1024,
+              originalSize: 2048,
               processedSize: 512,
             }),
             { status: 200 },
@@ -733,26 +743,44 @@ describe("self-posting tool panels: failed entry status and scoped error banners
 
       fireEvent.click(screen.getByTestId("compose-submit"));
       await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
-      expect(useFileStore.getState().entries[0].originalSize).toBe(7);
-      expect(useFileStore.getState().originalSize).toBe(7);
-
-      fireEvent.click(screen.getByTestId("compose-submit"));
-      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
-      expect(useFileStore.getState().entries[0].originalSize).toBe(7);
-      expect(useFileStore.getState().originalSize).toBe(7);
+      expect(useFileStore.getState().entries[0].originalSize).toBe(1024);
+      expect(useFileStore.getState().originalSize).toBe(1024);
+      expect(
+        screen.getByText(format(en.toolSettings.compose.originalKb, { size: "1.0" })),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(format(en.toolSettings.compose.processedKb, { size: "0.5" })),
+      ).toBeInTheDocument();
 
       fireEvent.click(screen.getByTestId("compose-submit"));
       await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
       expect(useFileStore.getState().entries[0].originalSize).toBe(1024);
       expect(useFileStore.getState().originalSize).toBe(1024);
+      expect(
+        screen.getByText(format(en.toolSettings.compose.originalKb, { size: "1.0" })),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(format(en.toolSettings.compose.processedKb, { size: "0.3" })),
+      ).toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId("compose-submit"));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+      expect(useFileStore.getState().entries[0].originalSize).toBe(2048);
+      expect(useFileStore.getState().originalSize).toBe(2048);
+      expect(
+        screen.getByText(format(en.toolSettings.compose.originalKb, { size: "2.0" })),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(format(en.toolSettings.compose.processedKb, { size: "0.5" })),
+      ).toBeInTheDocument();
       unmount();
     }
 
     // 2. WatermarkImageSettings (single-file branch): omitted originalSize, null originalSize, and explicit numeric originalSize.
     {
       useFileStore.getState().reset();
-      useFileStore.getState().setFiles([image("a.png", "nine-byte")]);
-      expect(useFileStore.getState().entries[0].originalSize).toBe(9);
+      useFileStore.getState().setFiles([image("a.png", "x".repeat(1024))]);
+      expect(useFileStore.getState().entries[0].originalSize).toBe(1024);
 
       let singleCall = 0;
       vi.stubGlobal(
@@ -761,7 +789,10 @@ describe("self-posting tool panels: failed entry status and scoped error banners
           singleCall++;
           if (singleCall === 1) {
             return new Response(
-              JSON.stringify({ downloadUrl: "/api/v1/download/j/wm-omitted.png" }),
+              JSON.stringify({
+                downloadUrl: "/api/v1/download/j/wm-omitted.png",
+                processedSize: 512,
+              }),
               { status: 200 },
             );
           }
@@ -770,6 +801,7 @@ describe("self-posting tool panels: failed entry status and scoped error banners
               JSON.stringify({
                 downloadUrl: "/api/v1/download/j/wm-null.png",
                 originalSize: null,
+                processedSize: 256,
               }),
               { status: 200 },
             );
@@ -778,7 +810,7 @@ describe("self-posting tool panels: failed entry status and scoped error banners
             JSON.stringify({
               downloadUrl: "/api/v1/download/j/wm-explicit.png",
               originalSize: 2048,
-              processedSize: 1500,
+              processedSize: 1536,
             }),
             { status: 200 },
           );
@@ -790,18 +822,36 @@ describe("self-posting tool panels: failed entry status and scoped error banners
 
       fireEvent.click(screen.getByTestId("watermark-image-submit"));
       await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
-      expect(useFileStore.getState().entries[0].originalSize).toBe(9);
-      expect(useFileStore.getState().originalSize).toBe(9);
+      expect(useFileStore.getState().entries[0].originalSize).toBe(1024);
+      expect(useFileStore.getState().originalSize).toBe(1024);
+      expect(
+        screen.getByText(format(en.toolSettings["watermark-image"].originalKb, { size: "1.0" })),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(format(en.toolSettings["watermark-image"].processedKb, { size: "0.5" })),
+      ).toBeInTheDocument();
 
       fireEvent.click(screen.getByTestId("watermark-image-submit"));
       await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
-      expect(useFileStore.getState().entries[0].originalSize).toBe(9);
-      expect(useFileStore.getState().originalSize).toBe(9);
+      expect(useFileStore.getState().entries[0].originalSize).toBe(1024);
+      expect(useFileStore.getState().originalSize).toBe(1024);
+      expect(
+        screen.getByText(format(en.toolSettings["watermark-image"].originalKb, { size: "1.0" })),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(format(en.toolSettings["watermark-image"].processedKb, { size: "0.3" })),
+      ).toBeInTheDocument();
 
       fireEvent.click(screen.getByTestId("watermark-image-submit"));
       await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
       expect(useFileStore.getState().entries[0].originalSize).toBe(2048);
       expect(useFileStore.getState().originalSize).toBe(2048);
+      expect(
+        screen.getByText(format(en.toolSettings["watermark-image"].originalKb, { size: "2.0" })),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(format(en.toolSettings["watermark-image"].processedKb, { size: "1.5" })),
+      ).toBeInTheDocument();
       unmount();
     }
 
@@ -810,8 +860,14 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       useFileStore.getState().reset();
       useFileStore
         .getState()
-        .setFiles([image("a.png", "four"), image("b.png", "five5"), image("c.png", "six666")]);
-      expect(useFileStore.getState().entries.map((e) => e.originalSize)).toEqual([4, 5, 6]);
+        .setFiles([
+          image("a.png", "a".repeat(1024)),
+          image("b.png", "b".repeat(2048)),
+          image("c.png", "c".repeat(3072)),
+        ]);
+      expect(useFileStore.getState().entries.map((e) => e.originalSize)).toEqual([
+        1024, 2048, 3072,
+      ]);
 
       let batchCall = 0;
       vi.stubGlobal(
@@ -819,15 +875,20 @@ describe("self-posting tool panels: failed entry status and scoped error banners
         vi.fn(async () => {
           batchCall++;
           if (batchCall === 1) {
-            return new Response(JSON.stringify({ downloadUrl: "/api/v1/download/j/batch-a.png" }), {
-              status: 200,
-            });
+            return new Response(
+              JSON.stringify({
+                downloadUrl: "/api/v1/download/j/batch-a.png",
+                processedSize: 512,
+              }),
+              { status: 200 },
+            );
           }
           if (batchCall === 2) {
             return new Response(
               JSON.stringify({
                 downloadUrl: "/api/v1/download/j/batch-b.png",
                 originalSize: null,
+                processedSize: 1536,
               }),
               { status: 200 },
             );
@@ -836,7 +897,7 @@ describe("self-posting tool panels: failed entry status and scoped error banners
             JSON.stringify({
               downloadUrl: "/api/v1/download/j/batch-c.png",
               originalSize: 4096,
-              processedSize: 3000,
+              processedSize: 3072,
             }),
             { status: 200 },
           );
@@ -848,8 +909,36 @@ describe("self-posting tool panels: failed entry status and scoped error banners
 
       fireEvent.click(screen.getByTestId("watermark-image-submit"));
       await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
-      expect(useFileStore.getState().entries.map((e) => e.originalSize)).toEqual([4, 5, 4096]);
-      expect(useFileStore.getState().originalSize).toBe(4);
+      expect(useFileStore.getState().entries.map((e) => e.originalSize)).toEqual([
+        1024, 2048, 4096,
+      ]);
+      expect(useFileStore.getState().originalSize).toBe(1024);
+      expect(
+        screen.getByText(format(en.toolSettings["watermark-image"].originalKb, { size: "1.0" })),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(format(en.toolSettings["watermark-image"].processedKb, { size: "0.5" })),
+      ).toBeInTheDocument();
+
+      act(() => {
+        useFileStore.getState().setSelectedIndex(1);
+      });
+      expect(
+        screen.getByText(format(en.toolSettings["watermark-image"].originalKb, { size: "2.0" })),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(format(en.toolSettings["watermark-image"].processedKb, { size: "1.5" })),
+      ).toBeInTheDocument();
+
+      act(() => {
+        useFileStore.getState().setSelectedIndex(2);
+      });
+      expect(
+        screen.getByText(format(en.toolSettings["watermark-image"].originalKb, { size: "4.0" })),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(format(en.toolSettings["watermark-image"].processedKb, { size: "3.0" })),
+      ).toBeInTheDocument();
       unmount();
     }
   });

@@ -176,7 +176,7 @@ export function ComposeSettings() {
         ...prev,
         [entryId]: {
           downloadUrl: result.downloadUrl,
-          originalSize: result.originalSize ?? null,
+          originalSize: result.originalSize ?? capturedEntry.originalSize,
           processedSize: result.processedSize ?? null,
         },
       }));
@@ -214,7 +214,9 @@ export function ComposeSettings() {
       ? resultsByEntry[currentEntry.id]
       : undefined;
   const downloadUrl = activeEntryResult?.downloadUrl ?? null;
-  const originalSize = activeEntryResult?.originalSize ?? null;
+  const originalSize = activeEntryResult
+    ? (activeEntryResult.originalSize ?? currentEntry?.originalSize ?? null)
+    : null;
   const processedSize = activeEntryResult?.processedSize ?? null;
 
   return (
