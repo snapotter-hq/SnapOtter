@@ -581,8 +581,8 @@ test.describe("Pipeline with various tools", () => {
             {
               toolId: "replace-color",
               settings: {
-                targetColor: "#ffffff",
-                replacementColor: "#f0f0f0",
+                sourceColor: "#ffffff",
+                targetColor: "#f0f0f0",
                 tolerance: 20,
               },
             },
@@ -1083,8 +1083,8 @@ test.describe("Pipeline: tool combination chains", () => {
             {
               toolId: "replace-color",
               settings: {
-                targetColor: "#FFFFFF",
-                replacementColor: "#FFFF00",
+                sourceColor: "#FFFFFF",
+                targetColor: "#FFFF00",
                 tolerance: 30,
               },
             },

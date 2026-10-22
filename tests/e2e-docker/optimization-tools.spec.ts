@@ -381,17 +381,17 @@ test.describe("Image to PDF — extended", () => {
   });
 });
 
-// ─── Replace Color — Extended ──────────────────────────────────────
+// ─── Replace Color: Extended ──────────────────────────────────────
 
-test.describe("Replace Color — extended", () => {
+test.describe("Replace Color: extended", () => {
   test("replace color on WebP image", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/replace-color", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.webp", mimeType: "image/webp", buffer: WEBP_50x50 },
         settings: JSON.stringify({
-          targetColor: "#000000",
-          replacementColor: "#ffffff",
+          sourceColor: "#000000",
+          targetColor: "#ffffff",
           tolerance: 20,
         }),
       },
@@ -408,8 +408,8 @@ test.describe("Replace Color — extended", () => {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
         settings: JSON.stringify({
-          targetColor: "#ff0000",
-          replacementColor: "#00ff00",
+          sourceColor: "#ff0000",
+          targetColor: "#00ff00",
           tolerance: 0,
         }),
       },
@@ -425,8 +425,8 @@ test.describe("Replace Color — extended", () => {
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
         settings: JSON.stringify({
-          targetColor: "#808080",
-          replacementColor: "#ff0000",
+          sourceColor: "#808080",
+          targetColor: "#ff0000",
           tolerance: 100,
         }),
       },
@@ -442,8 +442,8 @@ test.describe("Replace Color — extended", () => {
       multipart: {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
         settings: JSON.stringify({
-          targetColor: "#ffffff",
-          replacementColor: "#cccccc",
+          sourceColor: "#ffffff",
+          targetColor: "#cccccc",
           tolerance: 15,
         }),
       },
@@ -460,8 +460,8 @@ test.describe("Replace Color — extended", () => {
       multipart: {
         file: { name: "portrait.jpg", mimeType: "image/jpeg", buffer: portrait },
         settings: JSON.stringify({
-          targetColor: "#ffffff",
-          replacementColor: "#000000",
+          sourceColor: "#ffffff",
+          targetColor: "#000000",
           tolerance: 40,
         }),
       },
@@ -999,9 +999,9 @@ test.describe("Favicon -- multi-size", () => {
   });
 });
 
-// ─── Replace Color -- Tolerance Levels ────────────────────────────
+// ─── Replace Color: Tolerance Levels ────────────────────────────
 
-test.describe("Replace Color -- tolerance levels", () => {
+test.describe("Replace Color: tolerance levels", () => {
   const tolerances = [0, 5, 10, 25, 50, 75, 100] as const;
 
   for (const tolerance of tolerances) {
@@ -1011,8 +1011,8 @@ test.describe("Replace Color -- tolerance levels", () => {
         multipart: {
           file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
           settings: JSON.stringify({
-            targetColor: "#FFFFFF",
-            replacementColor: "#FF0000",
+            sourceColor: "#FFFFFF",
+            targetColor: "#FF0000",
             tolerance,
           }),
         },
@@ -1025,17 +1025,17 @@ test.describe("Replace Color -- tolerance levels", () => {
   }
 });
 
-// ─── Replace Color -- Download Verification ───────────────────────
+// ─── Replace Color: Download Verification ───────────────────────
 
-test.describe("Replace Color -- download verification", () => {
+test.describe("Replace Color: download verification", () => {
   test("replaced-color image is downloadable and valid", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/replace-color", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
         settings: JSON.stringify({
-          targetColor: "#FFFFFF",
-          replacementColor: "#00FF00",
+          sourceColor: "#FFFFFF",
+          targetColor: "#00FF00",
           tolerance: 30,
         }),
       },
@@ -1174,8 +1174,8 @@ test.describe("Auth failure", () => {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
         settings: JSON.stringify({
-          targetColor: "#ffffff",
-          replacementColor: "#000000",
+          sourceColor: "#ffffff",
+          targetColor: "#000000",
           tolerance: 30,
         }),
       },

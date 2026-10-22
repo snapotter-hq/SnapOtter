@@ -492,8 +492,8 @@ test.describe("Batch Replace Color", () => {
         {
           name: "settings",
           value: JSON.stringify({
-            targetColor: "#ffffff",
-            replacementColor: "#ff00ff",
+            sourceColor: "#ffffff",
+            targetColor: "#ff00ff",
             tolerance: 25,
           }),
         },

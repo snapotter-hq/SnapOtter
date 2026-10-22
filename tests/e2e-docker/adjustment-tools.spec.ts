@@ -158,8 +158,8 @@ test.describe("Replace Color", () => {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
         settings: JSON.stringify({
-          targetColor: "#ffffff",
-          replacementColor: "#000000",
+          sourceColor: "#ffffff",
+          targetColor: "#000000",
           tolerance: 30,
         }),
       },
@@ -176,8 +176,8 @@ test.describe("Replace Color", () => {
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
         settings: JSON.stringify({
-          targetColor: "#ff0000",
-          replacementColor: "#00ff00",
+          sourceColor: "#ff0000",
+          targetColor: "#00ff00",
           tolerance: 5,
         }),
       },
@@ -193,8 +193,8 @@ test.describe("Replace Color", () => {
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
         settings: JSON.stringify({
-          targetColor: "#808080",
-          replacementColor: "#0000ff",
+          sourceColor: "#808080",
+          targetColor: "#0000ff",
           tolerance: 80,
         }),
       },

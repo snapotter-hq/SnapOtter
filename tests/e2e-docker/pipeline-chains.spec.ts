@@ -184,8 +184,8 @@ test.describe("Enhancement + Replace Color + Convert chain", () => {
             {
               toolId: "replace-color",
               settings: {
-                targetColor: "#ffffff",
-                replacementColor: "#f0f0f0",
+                sourceColor: "#ffffff",
+                targetColor: "#f0f0f0",
                 tolerance: 20,
               },
             },

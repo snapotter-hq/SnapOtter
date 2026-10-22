@@ -137,8 +137,8 @@ test.describe("5-step color correction workflow", () => {
             {
               toolId: "replace-color",
               settings: {
-                targetColor: "#ffffff",
-                replacementColor: "#f5f5f5",
+                sourceColor: "#ffffff",
+                targetColor: "#f5f5f5",
                 tolerance: 10,
               },
             },

@@ -635,8 +635,8 @@ test.describe("Pipeline with multiple color operations", () => {
             {
               toolId: "replace-color",
               settings: {
-                targetColor: "#ffffff",
-                replacementColor: "#f0f0e0",
+                sourceColor: "#ffffff",
+                targetColor: "#f0f0e0",
                 tolerance: 25,
               },
             },

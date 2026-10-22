@@ -298,8 +298,8 @@ async function main() {
   await test("Sharpening", "sharpening", { sigma: 1.5, amount: 1.0 });
   await test("Border", "border", { size: 20, color: "#ff0000" });
   await test("Replace Color", "replace-color", {
-    targetColor: "#ffffff",
-    replacementColor: "#000000",
+    sourceColor: "#ffffff",
+    targetColor: "#000000",
     tolerance: 30,
   });
 

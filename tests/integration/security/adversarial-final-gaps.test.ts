@@ -712,15 +712,23 @@ describe("1x1 pixel image through previously untested tools", () => {
       {
         name: "settings",
         content: JSON.stringify({
-          targetColor: "#000000",
-          replacementColor: "#FF0000",
+          sourceColor: "#000000",
+          targetColor: "#FF0000",
           tolerance: 50,
         }),
       },
     ]);
 
-    // May succeed or reject due to tiny image
-    expect([200, 400, 422]).toContain(res.statusCode);
+    expect(res.statusCode).toBe(200);
+    const { downloadUrl } = JSON.parse(res.body);
+    const dlRes = await app.inject({
+      method: "GET",
+      url: downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dlRes.statusCode).toBe(200);
+    const { data } = await sharp(dlRes.rawPayload).raw().toBuffer({ resolveWithObject: true });
+    expect([data[0], data[1], data[2]]).toEqual([255, 0, 0]);
   });
 
   it("gets info for a 1x1 pixel image", async () => {
