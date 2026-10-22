@@ -72,6 +72,39 @@ describe("isMissingObjectError", () => {
     ).toBe(false);
   });
 
+  it("rejects non-timeout HTTP 404 body stream resets and XML parse failures (#3265)", () => {
+    expect(
+      s3.isMissingObjectError(
+        Object.assign(new Error("aborted\n  Deserialization error: ..."), {
+          name: "Error",
+          code: "ECONNRESET",
+          $metadata: { httpStatusCode: 404 },
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      s3.isMissingObjectError(
+        Object.assign(new Error("Premature close"), {
+          name: "CustomStreamError",
+          code: "ERR_STREAM_PREMATURE_CLOSE",
+          $metadata: { httpStatusCode: 404 },
+        }),
+      ),
+    ).toBe(false);
+    const xmlParseErr = Object.assign(
+      new Error("@aws-sdk XML parse error: missing closing tag </Code>."),
+      {
+        name: "CustomParserError",
+        $metadata: { httpStatusCode: 404 },
+      },
+    );
+    Object.defineProperty(xmlParseErr, "$responseBodyText", {
+      value: '<?xml version="1.0"?><Error><Code>NoSuchBucket',
+    });
+    expect(s3.isMissingObjectError(xmlParseErr)).toBe(false);
+    expect(s3.isMissingObjectError(sdkError("Error", 404))).toBe(false);
+  });
+
   it("rejects non-SDK errors", () => {
     expect(s3.isMissingObjectError(new Error("boom"))).toBe(false);
     expect(s3.isMissingObjectError({ code: "ENOENT", syscall: "open" })).toBe(false);
@@ -378,6 +411,116 @@ describe("S3Client stalled endpoint timeout (#2755)", () => {
       });
     } finally {
       http.IncomingMessage.prototype.setTimeout = origSetTimeout;
+      for (const socket of sockets) socket.destroy();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  it("propagates HTTP 404 body stream resets and XML parse failures instead of treating them as missing objects (#3265)", async () => {
+    const sockets = new Set<net.Socket>();
+    let responseMode: "reset-404" | "truncated-xml-404" | "html-404" = "reset-404";
+
+    const server = http.createServer((_req, res) => {
+      if (responseMode === "reset-404") {
+        res.writeHead(404, {
+          "Content-Length": "1000",
+          "Content-Type": "application/xml",
+        });
+        res.write('<?xml version="1.0"?><Error><Code>NoSuchBucket');
+        setTimeout(() => {
+          res.socket?.destroy();
+        }, 20);
+        return;
+      }
+      if (responseMode === "truncated-xml-404") {
+        const body = '<?xml version="1.0"?><Error><Code>NoSuchBucket';
+        res.writeHead(404, {
+          "Content-Length": String(Buffer.byteLength(body)),
+          "Content-Type": "application/xml",
+        });
+        res.end(body);
+        return;
+      }
+      const html = "<html><body><h1>404 Not Found</h1><hr>nginx</body></html>";
+      res.writeHead(404, {
+        "Content-Length": String(Buffer.byteLength(html)),
+        "Content-Type": "text/html",
+      });
+      res.end(html);
+    });
+    server.on("connection", (socket) => sockets.add(socket));
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as net.AddressInfo;
+
+    try {
+      s3.configureS3({
+        bucket: "broken-404-bucket",
+        region: "us-east-1",
+        endpoint: `http://127.0.0.1:${port}`,
+        accessKeyId: "k",
+        secretAccessKey: "s",
+        forcePathStyle: true,
+        prefix: "",
+      });
+
+      // 1. Mid-body TCP reset on a 404 XML response (e.g. NoSuchBucket truncated by a reset).
+      responseMode = "reset-404";
+      const resetThumbErr = await s3.getThumbnail("a.png").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(resetThumbErr).toMatchObject({
+        name: "Error",
+        code: "ECONNRESET",
+        $metadata: { httpStatusCode: 404 },
+      });
+      expect(s3.isMissingObjectError(resetThumbErr)).toBe(false);
+
+      const resetDeleteErr = await s3.deleteObject("a.png").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(resetDeleteErr).toMatchObject({
+        name: "Error",
+        code: "ECONNRESET",
+        $metadata: { httpStatusCode: 404 },
+      });
+
+      // 2. Truncated XML 404 body that closes cleanly before </Code>.
+      responseMode = "truncated-xml-404";
+      const truncatedThumbErr = await s3.getThumbnail("a.png").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(truncatedThumbErr).toMatchObject({
+        name: "Error",
+        $metadata: { httpStatusCode: 404 },
+      });
+      expect(truncatedThumbErr).toHaveProperty("$responseBodyText");
+      expect(s3.isMissingObjectError(truncatedThumbErr)).toBe(false);
+
+      const truncatedDeleteThumbErr = await s3.deleteThumbnail("a.png").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(truncatedDeleteThumbErr).toMatchObject({
+        name: "Error",
+        $metadata: { httpStatusCode: 404 },
+      });
+
+      // 3. Reverse-proxy HTML 404 error page.
+      responseMode = "html-404";
+      const htmlDeleteGenericErr = await s3.deleteGenericObject("uploads/job-1/a.png").then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(htmlDeleteGenericErr).toMatchObject({
+        name: "Error",
+        $metadata: { httpStatusCode: 404 },
+      });
+      expect(htmlDeleteGenericErr).toHaveProperty("$responseBodyText");
+      expect(s3.isMissingObjectError(htmlDeleteGenericErr)).toBe(false);
+    } finally {
       for (const socket of sockets) socket.destroy();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }

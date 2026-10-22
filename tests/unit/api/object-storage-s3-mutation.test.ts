@@ -85,6 +85,7 @@ import {
   getObjectSize,
   getObjectStream,
   isMissingObjectError,
+  isS3MissingShape,
   listJobDirs,
   listObjects,
   normalizeOperationalWriteError,
@@ -166,6 +167,30 @@ describe("object-storage S3 dispatch (STORAGE_MODE=s3)", () => {
           code: "ETIMEDOUT",
           $metadata: { httpStatusCode: 404 },
         }),
+      ],
+      [
+        "a 404 XML response reset mid-body during deserialization (#3265)",
+        Object.assign(new Error("aborted\n  Deserialization error: ..."), {
+          name: "Error",
+          code: "ECONNRESET",
+          $metadata: { httpStatusCode: 404 },
+        }),
+      ],
+      [
+        "a 404 response whose body failed XML parsing (#3265)",
+        (() => {
+          const err = Object.assign(
+            new Error("@aws-sdk XML parse error: missing closing tag </Code>."),
+            {
+              name: "Error",
+              $metadata: { httpStatusCode: 404 },
+            },
+          );
+          Object.defineProperty(err, "$responseBodyText", {
+            value: '<?xml version="1.0"?><Error><Code>NoSuchBucket',
+          });
+          return err;
+        })(),
       ],
       [
         "the endpoint unreachable",
@@ -512,6 +537,15 @@ describe("object-storage S3 dispatch (STORAGE_MODE=s3)", () => {
         "an S3 premature close on getObjectStream",
         "stream" as const,
         Object.assign(new Error("Premature close"), { code: "ERR_STREAM_PREMATURE_CLOSE" }),
+      ],
+      [
+        "a 404 XML response reset mid-body on getObjectStream (#3265)",
+        "stream" as const,
+        Object.assign(new Error("aborted\n  Deserialization error: ..."), {
+          name: "Error",
+          code: "ECONNRESET",
+          $metadata: { httpStatusCode: 404 },
+        }),
       ],
     ])("answers 503 storage-unavailable for %s", async (_label, step, cause) => {
       if (step === "size") {
@@ -1218,6 +1252,47 @@ describe("isMissingObjectError with the S3 module loaded (#901)", () => {
       false,
     );
   });
+
+  it("rejects non-timeout HTTP 404 body stream resets and XML parse failures in isS3MissingShape and isMissingObjectError (#3265)", async () => {
+    await getObjectSize("uploads/j/a.png");
+    expect(isS3MissingShape({ name: "NoSuchKey", $metadata: { httpStatusCode: 404 } })).toBe(true);
+    expect(isS3MissingShape({ name: "NotFound", $metadata: { httpStatusCode: 404 } })).toBe(true);
+    const resetOn404 = Object.assign(new Error("aborted\n  Deserialization error: ..."), {
+      name: "CustomStreamError",
+      code: "ECONNRESET",
+      $metadata: { httpStatusCode: 404 },
+    });
+    expect(isS3MissingShape(resetOn404)).toBe(false);
+    expect(isMissingObjectError(resetOn404)).toBe(false);
+
+    const prematureCloseOn404 = Object.assign(new Error("Premature close"), {
+      name: "CustomStreamError",
+      code: "ERR_STREAM_PREMATURE_CLOSE",
+      $metadata: { httpStatusCode: 404 },
+    });
+    expect(isS3MissingShape(prematureCloseOn404)).toBe(false);
+    expect(isMissingObjectError(prematureCloseOn404)).toBe(false);
+
+    const xmlParseErr = Object.assign(
+      new Error("@aws-sdk XML parse error: missing closing tag </Code>."),
+      {
+        name: "CustomParserError",
+        $metadata: { httpStatusCode: 404 },
+      },
+    );
+    Object.defineProperty(xmlParseErr, "$responseBodyText", {
+      value: '<?xml version="1.0"?><Error><Code>NoSuchBucket',
+    });
+    expect(isS3MissingShape(xmlParseErr)).toBe(false);
+    expect(isMissingObjectError(xmlParseErr)).toBe(false);
+
+    const genericErrOn404 = Object.assign(new Error("@aws-sdk XML parse error: mismatched tags"), {
+      name: "Error",
+      $metadata: { httpStatusCode: 404 },
+    });
+    expect(isS3MissingShape(genericErrOn404)).toBe(false);
+    expect(isMissingObjectError(genericErrOn404)).toBe(false);
+  });
 });
 
 describe("normalizeS3ReadFault (#2808)", () => {
@@ -1268,6 +1343,45 @@ describe("normalizeS3ReadFault (#2808)", () => {
       }),
     ],
     [
+      "ECONNRESET on a 404 XML error body (#3265)",
+      Object.assign(new Error("aborted\n  Deserialization error: ..."), {
+        name: "Error",
+        code: "ECONNRESET",
+        $metadata: { httpStatusCode: 404 },
+      }),
+    ],
+    [
+      "ERR_STREAM_PREMATURE_CLOSE on a 404 XML error body (#3265)",
+      Object.assign(new Error("Premature close"), {
+        name: "CustomStreamError",
+        code: "ERR_STREAM_PREMATURE_CLOSE",
+        $metadata: { httpStatusCode: 404 },
+      }),
+    ],
+    [
+      "XML parse error with $responseBodyText on a 404 response (#3265)",
+      (() => {
+        const err = Object.assign(
+          new Error("@aws-sdk XML parse error: missing closing tag </Code>."),
+          {
+            name: "CustomParserError",
+            $metadata: { httpStatusCode: 404 },
+          },
+        );
+        Object.defineProperty(err, "$responseBodyText", {
+          value: '<?xml version="1.0"?><Error><Code>NoSuchBucket',
+        });
+        return err;
+      })(),
+    ],
+    [
+      "generic Error on a 404 response body deserialization failure (#3265)",
+      Object.assign(new Error("@aws-sdk XML parse error: mismatched tags"), {
+        name: "Error",
+        $metadata: { httpStatusCode: 404 },
+      }),
+    ],
+    [
       "network connectivity error (ECONNREFUSED)",
       Object.assign(new Error("connect ECONNREFUSED 10.0.0.9:9000"), {
         code: "ECONNREFUSED",
@@ -1303,6 +1417,41 @@ describe("normalizeS3ReadFault (#2808)", () => {
       code: "storage-unavailable",
       statusCode: 503,
       cause: timeoutOn404,
+    });
+  });
+
+  it("normalizes non-timeout HTTP 404 body stream resets and XML parse errors in normalizeOperationalWriteError (#3265)", () => {
+    const resetOn404 = Object.assign(new Error("aborted\n  Deserialization error: ..."), {
+      name: "Error",
+      code: "ECONNRESET",
+      $metadata: { httpStatusCode: 404 },
+    });
+    expect(normalizeOperationalWriteError(resetOn404)).toMatchObject({
+      message: STORAGE_UNAVAILABLE_MESSAGE,
+      isSafeMessage: true,
+      kind: "operational",
+      code: "storage-unavailable",
+      statusCode: 503,
+      cause: resetOn404,
+    });
+
+    const xmlParseOn404 = Object.assign(
+      new Error("@aws-sdk XML parse error: missing closing tag </Code>."),
+      {
+        name: "CustomParserError",
+        $metadata: { httpStatusCode: 404 },
+      },
+    );
+    Object.defineProperty(xmlParseOn404, "$responseBodyText", {
+      value: '<?xml version="1.0"?><Error><Code>NoSuchBucket',
+    });
+    expect(normalizeOperationalWriteError(xmlParseOn404)).toMatchObject({
+      message: STORAGE_UNAVAILABLE_MESSAGE,
+      isSafeMessage: true,
+      kind: "operational",
+      code: "storage-unavailable",
+      statusCode: 503,
+      cause: xmlParseOn404,
     });
   });
 
@@ -1439,6 +1588,14 @@ describe("objectExists S3 fault classification (#2924)", () => {
       Object.assign(new Error("Access Denied"), {
         name: "AccessDenied",
         $metadata: { httpStatusCode: 403 },
+      }),
+    ],
+    [
+      "a 404 body deserialization failure on HeadObject (#3265)",
+      Object.assign(new Error("aborted\n  Deserialization error: ..."), {
+        name: "Error",
+        code: "ECONNRESET",
+        $metadata: { httpStatusCode: 404 },
       }),
     ],
     [

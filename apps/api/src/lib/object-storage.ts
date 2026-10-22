@@ -662,10 +662,16 @@ export function isS3MissingShape(error: unknown): boolean {
   if (typeof error !== "object" || error === null || !("$metadata" in error)) return false;
   const e = error as {
     name?: string;
-    code?: string;
+    code?: unknown;
     $metadata?: { httpStatusCode?: number };
   };
-  if (e.name === "NoSuchBucket" || e.name === "TimeoutError" || e.code === "ETIMEDOUT") {
+  if (
+    e.name === "NoSuchBucket" ||
+    e.name === "TimeoutError" ||
+    e.name === "Error" ||
+    typeof e.code === "string" ||
+    "$responseBodyText" in error
+  ) {
     return false;
   }
   return e.name === "NoSuchKey" || e.$metadata?.httpStatusCode === 404;
