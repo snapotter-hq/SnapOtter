@@ -45,13 +45,16 @@ const putObjectStreamMock = vi.hoisted(() =>
 const deleteObjectMock = vi.hoisted(() => vi.fn(async () => {}));
 const validatePdfPathMock = vi.hoisted(() => vi.fn(async () => {}));
 const getToolConfigSpy = vi.hoisted(() => vi.fn());
+const selectWhereMock = vi.hoisted(() =>
+  vi.fn<(...args: unknown[]) => Promise<Array<{ error?: unknown }>>>(async () => []),
+);
 
 // Mock DB
 vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {
     select: () => ({
       from: () => ({
-        where: () => ({ get: () => null }),
+        where: (...args: unknown[]) => selectWhereMock(...args),
         all: () => [],
       }),
     }),
@@ -70,7 +73,7 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
     settings: { key: {} },
     pipelines: { id: {} },
     userFiles: { id: {} },
-    jobs: { id: {}, status: {} },
+    jobs: { id: {}, status: {}, error: {} },
   },
 }));
 
@@ -951,7 +954,84 @@ describe("pipeline step error message formatting", () => {
         { toolId: "pipeline", jobId: expect.any(String), code: "ENGINE_UNAVAILABLE" },
         "pipeline step failed on a server fault",
       );
+
+      // When waitForJob rejects after processPipelineFinalize settled schema.jobs.error
+      // with a 503 storage fault, answer 503 with the settled message and code (#3479).
+      const reconstructedBullErr = new Error("The server's storage service is unavailable.");
+      waitForJobMock.mockRejectedValueOnce(reconstructedBullErr);
+      selectWhereMock.mockResolvedValueOnce([
+        {
+          error: {
+            message: "The server's storage service is unavailable.",
+            code: "storage-unavailable",
+            httpStatus: 503,
+          },
+        },
+      ]);
+      const finalizeFaultLog = { error: vi.fn(), warn: vi.fn() };
+      const finalizeFaultReply = await invokePipelineExecuteRoute(parts, finalizeFaultLog);
+      expect(finalizeFaultReply.statusCode).toBe(503);
+      expect(finalizeFaultReply.payload).toEqual({
+        error: "The server's storage service is unavailable.",
+        code: "storage-unavailable",
+      });
+      expect(finalizeFaultLog.error).toHaveBeenCalledWith(
+        {
+          err: reconstructedBullErr,
+          toolId: "pipeline",
+          jobId: expect.any(String),
+          code: "storage-unavailable",
+        },
+        "pipeline finalize failed on a server fault",
+      );
+
+      // When the settled 5xx row has details and no code, include details and omit code (#3479).
+      waitForJobMock.mockRejectedValueOnce(reconstructedBullErr);
+      selectWhereMock.mockResolvedValueOnce([
+        {
+          error: {
+            message: "Workspace storage limit reached",
+            details: "Send fewer files at a time",
+            httpStatus: 503,
+          },
+        },
+      ]);
+      const detailsFaultReply = await invokePipelineExecuteRoute(parts);
+      expect(detailsFaultReply.statusCode).toBe(503);
+      expect(detailsFaultReply.payload).toEqual({
+        error: "Workspace storage limit reached",
+        details: "Send fewer files at a time",
+      });
+
+      // When the settled row has no httpStatus (or a non-5xx httpStatus), rethrow the waitForJob rejection (#3479).
+      const genericFinalizeErr = new Error("Pipeline processing failed");
+      waitForJobMock.mockRejectedValueOnce(genericFinalizeErr);
+      selectWhereMock.mockResolvedValueOnce([
+        {
+          error: {
+            message: "Pipeline processing failed",
+          },
+        },
+      ]);
+      const nonServerFaultLog = { error: vi.fn(), warn: vi.fn() };
+      await expect(invokePipelineExecuteRoute(parts, nonServerFaultLog)).rejects.toBe(
+        genericFinalizeErr,
+      );
+      expect(nonServerFaultLog.error).not.toHaveBeenCalled();
+
+      // When reading schema.jobs.error rejects, warn and rethrow the waitForJob rejection (#3479).
+      const redisDownErr = new Error("connect ECONNREFUSED 127.0.0.1:6379");
+      const dbReadErr = new Error("postgres read failed");
+      waitForJobMock.mockRejectedValueOnce(redisDownErr);
+      selectWhereMock.mockRejectedValueOnce(dbReadErr);
+      const readFailLog = { error: vi.fn(), warn: vi.fn() };
+      await expect(invokePipelineExecuteRoute(parts, readFailLog)).rejects.toBe(redisDownErr);
+      expect(readFailLog.warn).toHaveBeenCalledWith(
+        { err: dbReadErr, jobId: expect.any(String) },
+        "failed pipeline job row read failed",
+      );
     } finally {
+      selectWhereMock.mockReset().mockResolvedValue([]);
       waitForJobMock.mockReset();
       waitForJobMock.mockResolvedValue(null);
     }

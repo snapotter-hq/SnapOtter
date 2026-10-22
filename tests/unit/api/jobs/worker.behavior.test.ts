@@ -994,6 +994,7 @@ describe("worker result payload behavior", () => {
 
       for (const fault of s3Faults) {
         getGenericObjectStream.mockRejectedValueOnce(fault);
+        dbSetMock.mockClear();
         const caughtFinalize = await processor(finalizeJob).catch((err: unknown) => err);
         expect(caughtFinalize).toMatchObject({
           name: "SafeError",
@@ -1005,6 +1006,16 @@ describe("worker result payload behavior", () => {
           cause: fault,
         });
         expect(classifyError(caughtFinalize, "worker")).toBe("operational");
+        expect(dbSetMock).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            status: "failed",
+            error: {
+              code: "storage-unavailable",
+              httpStatus: 503,
+              message: "The server's storage service is unavailable.",
+            },
+          }),
+        );
       }
 
       // Mid-stream S3 error in processPipelineFinalize
@@ -1019,6 +1030,7 @@ describe("worker result payload behavior", () => {
           })(),
         ),
       );
+      dbSetMock.mockClear();
       const caughtMid = await processor(finalizeJob).catch((err: unknown) => err);
       expect(caughtMid).toMatchObject({
         name: "SafeError",
@@ -1029,13 +1041,32 @@ describe("worker result payload behavior", () => {
         cause: midStreamFault,
       });
       expect(classifyError(caughtMid, "worker")).toBe("operational");
+      expect(dbSetMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          status: "failed",
+          error: {
+            code: "storage-unavailable",
+            httpStatus: 503,
+            message: "The server's storage service is unavailable.",
+          },
+        }),
+      );
 
       // Unexpected non-S3 defect in processPipelineFinalize still classifies as "bug"
       const unexpectedBug = new TypeError("unexpected S3 client defect");
       getGenericObjectStream.mockRejectedValueOnce(unexpectedBug);
+      dbSetMock.mockClear();
       const caughtBug = await processor(finalizeJob).catch((err: unknown) => err);
       expect(caughtBug).toBe(unexpectedBug);
       expect(classifyError(caughtBug, "worker")).toBe("bug");
+      expect(dbSetMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          status: "failed",
+          error: {
+            message: "Pipeline processing failed",
+          },
+        }),
+      );
 
       // Missing-object rejection (isStorageServiceFault === false) rethrows untouched
       const noSuchKey = Object.assign(new Error("The specified key does not exist."), {
@@ -1043,8 +1074,17 @@ describe("worker result payload behavior", () => {
         $metadata: { httpStatusCode: 404 },
       });
       getGenericObjectStream.mockRejectedValueOnce(noSuchKey);
+      dbSetMock.mockClear();
       const caughtMissing = await processor(finalizeJob).catch((err: unknown) => err);
       expect(caughtMissing).toBe(noSuchKey);
+      expect(dbSetMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          status: "failed",
+          error: {
+            message: "Pipeline processing failed",
+          },
+        }),
+      );
 
       // Secondary getObjectBuffer(data.inputRefs[1]) in erase-object AI job handler
       const slowDown = s3Faults[0];
@@ -4121,6 +4161,270 @@ describe("processPipelineFinalize (#3167, #2703)", () => {
       }),
     ).rejects.toBe(dbErr);
     expect(reportErrorMock).not.toHaveBeenCalled();
+  });
+
+  it("settles schema.jobs, records pipeline-batch child outcomes, and passes 503 storage status and code through failSingleJobGuarded on output copy faults (#3479)", async () => {
+    const { SafeError } = await vi.importActual<
+      typeof import("../../../../packages/shared/src/tool-errors.js")
+    >("../../../../packages/shared/src/tool-errors.js");
+    const {
+      processor,
+      failedListener,
+      failSingleJobGuardedMock,
+      updateSingleFileProgressAtomicallyMock,
+      recordChildOutcomeMock,
+      reportErrorMock,
+      trackEventMock,
+      logger,
+    } = await setupPipelineFinalizeProcessor({
+      "pf-copy-1-s0": {
+        id: "pf-copy-1-s0",
+        status: "completed",
+        toolId: "resize",
+        bytesIn: 200,
+        bytesOut: 120,
+        outputRefs: ["outputs/pf-copy-1-s0/out.png"],
+        progress: { percent: 100, stage: "complete" },
+      },
+      "pf-copy-batch-f0-s0": {
+        id: "pf-copy-batch-f0-s0",
+        status: "completed",
+        toolId: "resize",
+        bytesIn: 200,
+        bytesOut: 120,
+        outputRefs: ["outputs/pf-copy-batch-f0-s0/out.png"],
+        progress: { percent: 100, stage: "complete" },
+      },
+    });
+
+    const txWhereMock = vi.fn().mockResolvedValue(undefined);
+    const txSetMock = vi.fn(() => ({ where: txWhereMock }));
+    const txStub = { update: vi.fn(() => ({ set: txSetMock })) };
+    updateSingleFileProgressAtomicallyMock.mockImplementation(
+      async (_progress: unknown, mutate: (tx: unknown) => Promise<void>) => {
+        await mutate(txStub);
+      },
+    );
+
+    // 1. Single-file pipeline putObject 503 SafeError (e.g. storage-unavailable / workspace-cap)
+    const storageUnavailable = new SafeError("The server's storage service is unavailable.", {
+      kind: "operational",
+      code: "storage-unavailable",
+      statusCode: 503,
+    });
+    objectStorageMocks.getObjectBuffer.mockResolvedValueOnce(Buffer.from("png-out"));
+    objectStorageMocks.putObject
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(storageUnavailable);
+
+    await expect(
+      processor({
+        id: "pf-copy-1",
+        name: "pipeline-finalize",
+        data: {
+          kind: "pipeline-finalize",
+          jobId: "pf-copy-1",
+          clientJobId: "pfc-copy-1",
+          toolId: "pipeline",
+          userId: null,
+          pool: "image",
+          totalSteps: 1,
+          inputRefs: [],
+          filename: "in.png",
+          settings: {},
+        },
+      }),
+    ).rejects.toBe(storageUnavailable);
+
+    expect(updateSingleFileProgressAtomicallyMock).toHaveBeenCalledWith(
+      {
+        jobId: "pfc-copy-1",
+        phase: "failed",
+        percent: 0,
+        error: "The server's storage service is unavailable.",
+        code: "storage-unavailable",
+        httpStatus: 503,
+        expectedPipelineFlowId: "pf-copy-1",
+      },
+      expect.any(Function),
+    );
+    expect(txSetMock).toHaveBeenCalledWith({
+      status: "failed",
+      completedAt: expect.any(Date),
+      error: {
+        message: "The server's storage service is unavailable.",
+        code: "storage-unavailable",
+        httpStatus: 503,
+      },
+    });
+    expect(trackEventMock).toHaveBeenCalledTimes(1);
+
+    // 1b. Single-file pipeline where updateSingleFileProgressAtomically also rejects during output-copy fault:
+    // logs/reports writeErr without parentId and still rethrows the original storageUnavailable error.
+    (logger.error as ReturnType<typeof vi.fn>).mockClear();
+    reportErrorMock.mockClear();
+    const singleWriteErr = new Error("single-file terminal write failed");
+    objectStorageMocks.getObjectBuffer.mockResolvedValueOnce(Buffer.from("png-out"));
+    objectStorageMocks.putObject.mockRejectedValueOnce(storageUnavailable);
+    updateSingleFileProgressAtomicallyMock.mockRejectedValueOnce(singleWriteErr);
+
+    await expect(
+      processor({
+        id: "pf-copy-1",
+        name: "pipeline-finalize",
+        data: {
+          kind: "pipeline-finalize",
+          jobId: "pf-copy-1",
+          clientJobId: "pfc-copy-1",
+          toolId: "pipeline",
+          userId: null,
+          pool: "image",
+          totalSteps: 1,
+          inputRefs: [],
+          filename: "in.png",
+          settings: {},
+        },
+      }),
+    ).rejects.toBe(storageUnavailable);
+    expect(logger.error).toHaveBeenCalledWith(
+      { err: singleWriteErr, jobId: "pf-copy-1" },
+      "failed pipeline terminal write failed",
+    );
+    expect(reportErrorMock).toHaveBeenCalledWith(singleWriteErr, {
+      source: "worker",
+      pool: "image",
+      jobId: "pf-copy-1",
+    });
+
+    // 2. Pipeline-batch child: records child outcome and logs/reports terminal DB or counter write faults without displacing the storage fault
+    (logger.error as ReturnType<typeof vi.fn>).mockClear();
+    reportErrorMock.mockClear();
+    updateSingleFileProgressAtomicallyMock.mockClear();
+    txSetMock.mockClear();
+    trackEventMock.mockClear();
+    const workspaceCap = new SafeError("Workspace storage limit reached", {
+      kind: "operational",
+      code: "workspace-cap",
+      statusCode: 503,
+    });
+    const dbWriteErr = new Error("postgres write failed");
+    const outcomeWriteErr = new Error("redis counter failed");
+    objectStorageMocks.getObjectBuffer.mockResolvedValueOnce(Buffer.from("png-out"));
+    objectStorageMocks.putObject.mockRejectedValueOnce(workspaceCap);
+    updateSingleFileProgressAtomicallyMock.mockRejectedValueOnce(dbWriteErr);
+    recordChildOutcomeMock.mockRejectedValueOnce(outcomeWriteErr);
+
+    await expect(
+      processor({
+        id: "pf-copy-batch-f0",
+        name: "pipeline-finalize",
+        data: {
+          kind: "pipeline-finalize",
+          jobId: "pf-copy-batch-f0",
+          parentId: "bp-copy",
+          totalFiles: 2,
+          toolId: "pipeline",
+          userId: null,
+          pool: "image",
+          totalSteps: 1,
+          inputRefs: [],
+          filename: "in.png",
+          settings: {},
+        },
+      }),
+    ).rejects.toBe(workspaceCap);
+
+    expect(recordChildOutcomeMock).toHaveBeenCalledWith(
+      "bp-copy",
+      2,
+      "in.png",
+      "Workspace storage limit reached",
+    );
+    expect(logger.error).toHaveBeenCalledWith(
+      { err: dbWriteErr, jobId: "pf-copy-batch-f0", parentId: "bp-copy" },
+      "failed pipeline terminal write failed",
+    );
+    expect(logger.error).toHaveBeenCalledWith(
+      { err: outcomeWriteErr, jobId: "pf-copy-batch-f0", parentId: "bp-copy" },
+      "failed pipeline batch outcome write failed",
+    );
+    expect(reportErrorMock).toHaveBeenCalledWith(dbWriteErr, {
+      source: "worker",
+      pool: "image",
+      jobId: "pf-copy-batch-f0",
+    });
+    expect(reportErrorMock).toHaveBeenCalledWith(outcomeWriteErr, {
+      source: "worker",
+      pool: "image",
+      jobId: "pf-copy-batch-f0",
+    });
+    expect(trackEventMock).toHaveBeenCalledTimes(1);
+
+    // 2b. Pipeline-batch child with a non-SafeError defect records "Pipeline processing failed" via recordChildOutcome.
+    recordChildOutcomeMock.mockClear();
+    const rawCopyDefect = new TypeError("unexpected copy defect");
+    objectStorageMocks.getObjectBuffer.mockRejectedValueOnce(rawCopyDefect);
+    await expect(
+      processor({
+        id: "pf-copy-batch-f0",
+        name: "pipeline-finalize",
+        data: {
+          kind: "pipeline-finalize",
+          jobId: "pf-copy-batch-f0",
+          parentId: "bp-copy",
+          totalFiles: 2,
+          toolId: "pipeline",
+          userId: null,
+          pool: "image",
+          totalSteps: 1,
+          inputRefs: [],
+          filename: "in.png",
+          settings: {},
+        },
+      }),
+    ).rejects.toBe(rawCopyDefect);
+    expect(recordChildOutcomeMock).toHaveBeenCalledWith(
+      "bp-copy",
+      2,
+      "in.png",
+      "Pipeline processing failed",
+    );
+
+    // 3. worker.on("failed") safety net unwraps UnrecoverableError.cause and forwards 503 SafeError message, code, and httpStatus into failSingleJobGuarded
+    const { UnrecoverableError } = await import("bullmq");
+    const wrappedUnrecoverable = Object.assign(new UnrecoverableError(storageUnavailable.message), {
+      cause: storageUnavailable,
+    });
+    failSingleJobGuardedMock.mockClear();
+    failedListener?.(
+      {
+        id: "pf-copy-1",
+        data: {
+          kind: "pipeline-finalize",
+          jobId: "pf-copy-1",
+          clientJobId: "pfc-copy-1",
+          toolId: "pipeline",
+          pool: "image",
+          totalSteps: 1,
+        },
+      },
+      wrappedUnrecoverable,
+    );
+    await vi.waitFor(() => {
+      expect(failSingleJobGuardedMock).toHaveBeenCalledWith({
+        jobId: "pfc-copy-1",
+        message: "The server's storage service is unavailable.",
+        code: "storage-unavailable",
+        httpStatus: 503,
+        expectedPipelineFlowId: "pf-copy-1",
+      });
+      expect(failSingleJobGuardedMock).toHaveBeenCalledWith({
+        jobId: "pf-copy-1",
+        message: "The server's storage service is unavailable.",
+        code: "storage-unavailable",
+        httpStatus: 503,
+      });
+    });
   });
 });
 

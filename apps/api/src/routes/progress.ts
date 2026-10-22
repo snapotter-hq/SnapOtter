@@ -743,6 +743,9 @@ export async function failBatchJob(args: FailBatchJobArgs): Promise<boolean> {
 export interface FailSingleJobArgs {
   jobId: string;
   message: string;
+  code?: string;
+  details?: string;
+  httpStatus?: number;
   expectedArtifactJobId?: string;
   expectedPipelineFlowId?: string;
 }
@@ -761,6 +764,9 @@ export async function failSingleJobGuarded(args: FailSingleJobArgs): Promise<voi
     phase: "failed",
     percent: 0,
     error: args.message,
+    ...(args.code && { code: args.code }),
+    ...(args.details && { details: args.details }),
+    ...(args.httpStatus !== undefined && { httpStatus: args.httpStatus }),
   };
   let applied = false;
   await enqueuePersist(args.jobId, async () => {
@@ -770,7 +776,7 @@ export async function failSingleJobGuarded(args: FailSingleJobArgs): Promise<voi
         status: "failed",
         completedAt: new Date(),
         progress: { percent: 0 },
-        error: { message: args.message },
+        error: singleFileErrorRow(frame),
       })
       .where(
         and(

@@ -611,7 +611,57 @@ describe("expectedPipelineFlowId pointer guard (#2741)", () => {
       message: "Pipeline processing failed",
       expectedPipelineFlowId: "flow-1",
     });
+    expect(dbMocks.updated.at(-1)).toMatchObject({
+      status: "failed",
+      progress: { percent: 0 },
+      error: {
+        message: "Pipeline processing failed",
+      },
+    });
     expect(redisMocks.setex).toHaveBeenCalledTimes(1);
+    const bareFrame = JSON.parse((redisMocks.setex.mock.calls[0] as unknown[])[2] as string);
+    expect(bareFrame).toEqual({
+      jobId: "alias-1",
+      type: "single",
+      phase: "failed",
+      percent: 0,
+      error: "Pipeline processing failed",
+    });
+    await Promise.resolve();
+    expect(redisMocks.publish).toHaveBeenCalledTimes(1);
+
+    redisMocks.setex.mockClear();
+    redisMocks.publish.mockClear();
+    await failSingleJobGuarded({
+      jobId: "alias-1",
+      message: "The server's storage service is unavailable.",
+      code: "storage-unavailable",
+      details: "Check S3_ENDPOINT",
+      httpStatus: 503,
+      expectedPipelineFlowId: "flow-1",
+    });
+    expect(dbMocks.updated.at(-1)).toMatchObject({
+      status: "failed",
+      progress: { percent: 0 },
+      error: {
+        message: "The server's storage service is unavailable.",
+        code: "storage-unavailable",
+        details: "Check S3_ENDPOINT",
+        httpStatus: 503,
+      },
+    });
+    expect(redisMocks.setex).toHaveBeenCalledTimes(1);
+    const failFrame = JSON.parse((redisMocks.setex.mock.calls[0] as unknown[])[2] as string);
+    expect(failFrame).toEqual({
+      jobId: "alias-1",
+      type: "single",
+      phase: "failed",
+      percent: 0,
+      error: "The server's storage service is unavailable.",
+      code: "storage-unavailable",
+      details: "Check S3_ENDPOINT",
+      httpStatus: 503,
+    });
     await Promise.resolve();
     expect(redisMocks.publish).toHaveBeenCalledTimes(1);
   });

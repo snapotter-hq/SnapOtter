@@ -839,11 +839,37 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           await getFlowProducer().add(tree);
           uncommittedUploadKey = undefined;
 
-          // Wait for the finalize job (pipelines block to completion). A
-          // rejection here is a server fault (Redis down, a crashed finalize)
-          // and BullMQ's text can carry internal paths, so it is left to the
-          // error handler, which masks it, logs it and reports it (#2179).
-          const result = await waitForJob(pipelinePool, jobId, 10 * 60_000);
+          // Wait for the finalize job (pipelines block to completion). When the
+          // finalize settled the row with a status-bearing fault (a 503 storage
+          // failure during output copy), answer from the row like tool-factory
+          // does (#3479); any other rejection (Redis down, a crashed finalize)
+          // reaches the error handler, which masks it, logs it and reports it
+          // (#2179).
+          let result: ToolJobResult | null;
+          try {
+            result = await waitForJob(pipelinePool, jobId, 10 * 60_000);
+          } catch (err) {
+            const failure = await db
+              .select({ error: schema.jobs.error })
+              .from(schema.jobs)
+              .where(eq(schema.jobs.id, jobId))
+              .then((rows) => rows[0]?.error ?? null)
+              .catch((readErr) => {
+                request.log.warn({ err: readErr, jobId }, "failed pipeline job row read failed");
+                return null;
+              });
+            if (typeof failure?.httpStatus === "number" && failure.httpStatus >= 500) {
+              request.log.error(
+                { err, toolId: "pipeline", jobId, code: failure.code },
+                "pipeline finalize failed on a server fault",
+              );
+              const body: Record<string, unknown> = { error: failure.message };
+              if (failure.details !== undefined) body.details = failure.details;
+              if (failure.code) body.code = failure.code;
+              return reply.status(failure.httpStatus).send(body);
+            }
+            throw err;
+          }
 
           if (!result) {
             // The flow keeps running and the finalize's terminal single

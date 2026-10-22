@@ -1706,20 +1706,91 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
 
   // Copy last step's output to outputs/<pipelineJobId>/<filename> so
   // the legacy download URL /api/v1/download/<pipelineJobId>/... works.
-  let lastOutputBuffer: Buffer;
-  try {
-    lastOutputBuffer = await getObjectBuffer(lastOutputRef);
-  } catch (err) {
-    if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
-    throw err;
-  }
   const outFilename = lastOutputRef.split("/").pop() ?? "output";
   const parentKey = `outputs/${data.jobId}/${outFilename}`;
-  await putObject(
-    resultPayloadKey(data.jobId),
-    Buffer.from(JSON.stringify({ stepsCompleted: totalSteps, steps }), "utf8"),
-  );
-  await putObject(parentKey, lastOutputBuffer);
+  let lastOutputBuffer: Buffer;
+  try {
+    try {
+      lastOutputBuffer = await getObjectBuffer(lastOutputRef);
+    } catch (err) {
+      if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+      throw err;
+    }
+    await putObject(
+      resultPayloadKey(data.jobId),
+      Buffer.from(JSON.stringify({ stepsCompleted: totalSteps, steps }), "utf8"),
+    );
+    await putObject(parentKey, lastOutputBuffer);
+  } catch (err) {
+    // Settle the durable row (and batch outcome for pipeline-batch children)
+    // before rethrowing so POST /api/v1/pipeline/execute and processBatchFinalize
+    // read the 503 storage status and code instead of falling back to 500 or a
+    // generic message (#3479).
+    const isServerSafeFault = isSafeMessageError(err) && hasServerErrorStatus(err);
+    const errorMsg = isServerSafeFault ? friendlyError(err.message) : "Pipeline processing failed";
+    const errorFields = isServerSafeFault
+      ? {
+          ...validationErrorFields(err),
+          ...failureStatus(err),
+        }
+      : {};
+    try {
+      await updateSingleFileProgressAtomically(
+        {
+          jobId: progressJobId,
+          phase: "failed",
+          percent: 0,
+          error: errorMsg,
+          ...errorFields,
+          ...(progressJobId !== data.jobId && { expectedPipelineFlowId: data.jobId }),
+        },
+        async (tx) => {
+          await tx
+            .update(schema.jobs)
+            .set({
+              status: "failed",
+              completedAt: new Date(),
+              error: { message: errorMsg, ...errorFields },
+            })
+            .where(eq(schema.jobs.id, data.jobId));
+        },
+      );
+    } catch (writeErr) {
+      logger.error(
+        { err: writeErr, jobId: data.jobId, ...(data.parentId && { parentId: data.parentId }) },
+        "failed pipeline terminal write failed",
+      );
+      void reportError(writeErr, { source: "worker", pool: data.pool, jobId: data.jobId });
+    }
+
+    if (data.parentId && data.totalFiles !== undefined) {
+      try {
+        await recordChildOutcome(data.parentId, data.totalFiles, data.filename, errorMsg);
+      } catch (outcomeErr) {
+        logger.error(
+          { err: outcomeErr, jobId: data.jobId, parentId: data.parentId },
+          "failed pipeline batch outcome write failed",
+        );
+        void reportError(outcomeErr, { source: "worker", pool: data.pool, jobId: data.jobId });
+      }
+    }
+
+    if (analyticsEnabled()) {
+      void trackEvent(
+        ANALYTICS_EVENTS.PIPELINE_EXECUTED,
+        pipelineExecutedProps(
+          data,
+          totalSteps,
+          steps.map((s) => s.toolId),
+          Date.now() - startTime,
+          "failed",
+        ),
+        data.analyticsDistinctId,
+      );
+    }
+
+    throw err;
+  }
 
   // Modality-aware preview of the final output (video poster / pdf first page /
   // image thumb) so the pipeline result carries a previewUrl like single-tool
@@ -2706,7 +2777,19 @@ export function startWorkers(): void {
       // cancelSingleJobGuarded rather than failSingleJobGuarded, matching the
       // finalize's own too-late rule. Pipeline-batch children (parentId set)
       // report through batch-finalize instead of single-file progress (#3190).
+      const failedErr =
+        err.name === "UnrecoverableError" && err.cause instanceof Error ? err.cause : err;
       if (data?.kind === "pipeline-finalize" && !data.parentId) {
+        const isServerSafeFault = isSafeMessageError(failedErr) && hasServerErrorStatus(failedErr);
+        const finalizeErrorMsg = isServerSafeFault
+          ? friendlyError(failedErr.message)
+          : "Pipeline processing failed";
+        const finalizeErrorFields = isServerSafeFault
+          ? {
+              ...validationErrorFields(failedErr),
+              ...failureStatus(failedErr),
+            }
+          : {};
         void isCanceledPipelineFlow(data.jobId, data.totalSteps ?? 0)
           .catch((probeErr) => {
             logger.error(
@@ -2725,7 +2808,8 @@ export function startWorkers(): void {
                   })
                 : failSingleJobGuarded({
                     jobId,
-                    message: "Pipeline processing failed",
+                    message: finalizeErrorMsg,
+                    ...finalizeErrorFields,
                     ...(expectedPipelineFlowId && { expectedPipelineFlowId }),
                   })
               ).catch((netErr) => {
@@ -2737,8 +2821,6 @@ export function startWorkers(): void {
             if (frameId !== data.jobId) void netSettle(data.jobId);
           });
       }
-      const failedErr =
-        err.name === "UnrecoverableError" && err.cause instanceof Error ? err.cause : err;
       const pf = (failedErr as { pythonFrames?: unknown }).pythonFrames;
       if (Array.isArray(pf) && pf.length) {
         logger.error({ pool, jobId: job.id, pythonFrames: pf }, "sidecar failure");
