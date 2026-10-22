@@ -189,6 +189,37 @@ const STORES: StoreRow[] = [
       return result.current.entries[0]?.error;
     },
   },
+  {
+    site: "url import download",
+    fallback: `Download failed: ${STATUS}`,
+    run: async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (input: RequestInfo | URL) =>
+          String(input).endsWith("/api/v1/fetch-urls")
+            ? new Response(
+                JSON.stringify({
+                  results: [
+                    {
+                      success: true,
+                      url: "https://example.com/a.png",
+                      filename: "a.png",
+                      size: 8,
+                      downloadUrl: "https://example.com/dl/a.png",
+                    },
+                  ],
+                }),
+                { status: 200, headers: { "Content-Type": "application/json" } },
+              )
+            : failedResponse(),
+        ),
+      );
+      const { result } = renderHook(() => useUrlImport());
+      await act(() => result.current.importUrls(["https://example.com/a.png"]));
+      await act(() => result.current.addReadyFiles());
+      return result.current.entries[0]?.error;
+    },
+  },
 ];
 
 describe.each(STORES)("$site: a failed answer", (row) => {
@@ -198,17 +229,16 @@ describe.each(STORES)("$site: a failed answer", (row) => {
   });
 });
 
-describe.each(STORES.filter((row) => row.site !== "url import"))(
-  "$site: FEATURE_NOT_INSTALLED",
-  (row) => {
-    it("ends on the install message in the locale it was given", async () => {
-      answer = { status: 501, body: FEATURE_NOT_INSTALLED };
-      expect(await row.run(de)).toBe(
-        format(de.errors.featureNotInstalled, { feature: de.featureBundles.ocr.name }),
-      );
-    });
-  },
-);
+describe.each(
+  STORES.filter((row) => row.site !== "url import" && row.site !== "url import download"),
+)("$site: FEATURE_NOT_INSTALLED", (row) => {
+  it("ends on the install message in the locale it was given", async () => {
+    answer = { status: 501, body: FEATURE_NOT_INSTALLED };
+    expect(await row.run(de)).toBe(
+      format(de.errors.featureNotInstalled, { feature: de.featureBundles.ocr.name }),
+    );
+  });
+});
 
 const GERMAN_INSTALL_MESSAGE = format(de.errors.featureNotInstalled, {
   feature: de.featureBundles.ocr.name,
@@ -229,6 +259,40 @@ describe("url import: FEATURE_NOT_INSTALLED", () => {
     await waitFor(() => expect(result.current.t).toBe(de));
 
     await act(() => result.current.hook.importUrls(["https://example.com/a.png"]));
+    expect(result.current.hook.entries[0]?.error).toBe(GERMAN_INSTALL_MESSAGE);
+  });
+
+  it("ends on the install message in the viewer's locale when download fails", async () => {
+    storageMap.set("snapotter-locale", "de");
+    answer = { status: 501, body: FEATURE_NOT_INSTALLED };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) =>
+        String(input).endsWith("/api/v1/fetch-urls")
+          ? new Response(
+              JSON.stringify({
+                results: [
+                  {
+                    success: true,
+                    url: "https://example.com/a.png",
+                    filename: "a.png",
+                    size: 8,
+                    downloadUrl: "https://example.com/dl/a.png",
+                  },
+                ],
+              }),
+              { status: 200, headers: { "Content-Type": "application/json" } },
+            )
+          : failedResponse(),
+      ),
+    );
+    const { result } = renderHook(() => ({ hook: useUrlImport(), t: useTranslation().t }), {
+      wrapper: inGerman,
+    });
+    await waitFor(() => expect(result.current.t).toBe(de));
+
+    await act(() => result.current.hook.importUrls(["https://example.com/a.png"]));
+    await act(() => result.current.hook.addReadyFiles());
     expect(result.current.hook.entries[0]?.error).toBe(GERMAN_INSTALL_MESSAGE);
   });
 });

@@ -166,15 +166,23 @@ export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
                     {entry.filename || filenameFromUrl(entry.url)}
                   </span>
                   {entry.status === "failed" && (
-                    <button
-                      type="button"
-                      onClick={() => retryUrl(i)}
-                      disabled={adding}
-                      className="p-1 rounded hover:bg-muted text-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                      title={t.urlImport.retryButton}
-                    >
-                      <RotateCw className="h-3.5 w-3.5" />
-                    </button>
+                    <>
+                      <span
+                        className="text-xs text-destructive max-w-[50%] truncate"
+                        title={entry.error || t.urlImport.failedStatus}
+                      >
+                        {entry.error || t.urlImport.failedStatus}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => retryUrl(i)}
+                        disabled={adding}
+                        className="p-1 rounded hover:bg-muted text-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={t.urlImport.retryButton}
+                      >
+                        <RotateCw className="h-3.5 w-3.5" />
+                      </button>
+                    </>
                   )}
                   {entry.status === "ready" && entry.size != null && (
                     <span className="text-xs text-muted-foreground whitespace-nowrap">

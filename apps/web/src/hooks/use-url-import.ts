@@ -102,11 +102,14 @@ export function useUrlImport() {
   const downloadAsFile = useCallback(
     async (downloadUrl: string, filename: string, signal?: AbortSignal): Promise<File> => {
       const res = await fetch(downloadUrl, { headers: formatHeaders(), signal });
-      if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(failedAnswerMessage(t, body, res.status, `Download failed: ${res.status}`));
+      }
       const blob = await res.blob();
       return new File([blob], filename, { type: blob.type });
     },
-    [],
+    [t],
   );
 
   // -- public API --

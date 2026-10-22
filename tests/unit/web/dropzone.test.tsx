@@ -2478,11 +2478,13 @@ describe("Dropzone", () => {
 
       expect(addBtn.disabled).toBe(false);
       expect(backBtn.disabled).toBe(false);
+      expect(within(dialog).getByText("Failed")).toBeDefined();
 
       fireEvent.click(retryBtn);
 
       expect(addBtn.disabled).toBe(true);
       expect(backBtn.disabled).toBe(true);
+      expect(within(dialog).queryByText("Failed")).toBeNull();
 
       // First retry fails: Back and Add 1 Files re-enable while b.png stays failed.
       await act(async () => {
@@ -2503,6 +2505,7 @@ describe("Dropzone", () => {
       });
 
       const retryBtnAfterFail = await within(dialog).findByTitle(en.urlImport.retryButton);
+      expect(within(dialog).getByText("Still failing")).toBeDefined();
       expect(addBtn.disabled).toBe(false);
       expect(backBtn.disabled).toBe(false);
 
@@ -2510,6 +2513,7 @@ describe("Dropzone", () => {
       fireEvent.click(retryBtnAfterFail);
       expect(addBtn.disabled).toBe(true);
       expect(backBtn.disabled).toBe(true);
+      expect(within(dialog).queryByText("Still failing")).toBeNull();
 
       await act(async () => {
         resolveRetry?.(
@@ -2535,11 +2539,81 @@ describe("Dropzone", () => {
       })) as HTMLButtonElement;
       expect(updatedAddBtn.disabled).toBe(false);
       expect(backBtn.disabled).toBe(false);
+      expect(within(dialog).queryByText("Still failing")).toBeNull();
+      expect(within(dialog).getByText("16 B")).toBeDefined();
 
       fireEvent.click(backBtn);
       expect(within(dialog).queryByText("a.png")).toBeNull();
       expect(within(dialog).queryByText("b.png")).toBeNull();
       expect(within(dialog).getByRole("button", { name: en.urlImport.importButton })).toBeDefined();
+    });
+
+    it("renders entry.error or falls back to t.urlImport.failedStatus on failed rows in UrlImportModal and formats download errors via failedAnswerMessage (#3515)", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.endsWith("/api/v1/fetch-urls")) {
+            return Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  results: [
+                    {
+                      success: false,
+                      url: "https://example.com/missing.png",
+                      error: "HTTP 404 Not Found",
+                    },
+                    {
+                      success: false,
+                      url: "https://example.com/no-error.png",
+                    },
+                    {
+                      success: true,
+                      url: "https://example.com/dl-fail.png",
+                      filename: "dl-fail.png",
+                      size: 16,
+                      downloadUrl: "https://example.com/dl/dl-fail.png",
+                    },
+                  ],
+                }),
+                { status: 200, headers: { "Content-Type": "application/json" } },
+              ),
+            );
+          }
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({ error: "Expired download token", details: "TTL exceeded" }),
+              { status: 410, headers: { "Content-Type": "application/json" } },
+            ),
+          );
+        }),
+      );
+
+      render(<UrlImportModal onClose={vi.fn()} onImport={vi.fn()} />);
+
+      const dialog = screen.getByRole("dialog");
+      fireEvent.change(within(dialog).getByRole("textbox"), {
+        target: {
+          value:
+            "https://example.com/missing.png\nhttps://example.com/no-error.png\nhttps://example.com/dl-fail.png",
+        },
+      });
+      fireEvent.click(within(dialog).getByRole("button", { name: en.urlImport.importButton }));
+
+      // Wait for initial fetch-urls results to render.
+      const addBtn = await within(dialog).findByRole("button", { name: "Add 1 Files" });
+      const missingErrorEl = within(dialog).getByText("HTTP 404 Not Found");
+      expect(missingErrorEl).toBeDefined();
+      expect(missingErrorEl.getAttribute("title")).toBe("HTTP 404 Not Found");
+      expect(missingErrorEl.className).toContain("max-w-[50%]");
+      const fallbackErrorEl = within(dialog).getByText(en.urlImport.failedStatus);
+      expect(fallbackErrorEl).toBeDefined();
+      expect(fallbackErrorEl.getAttribute("title")).toBe(en.urlImport.failedStatus);
+
+      // Trigger addReadyFiles, which fails download with a JSON error body.
+      fireEvent.click(addBtn);
+
+      expect(await within(dialog).findByText("Expired download token: TTL exceeded")).toBeDefined();
     });
   });
 });
