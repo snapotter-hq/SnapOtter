@@ -1286,4 +1286,415 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       unmount();
     }
   });
+
+  it("ignores aborted inspect completions and does not re-trigger inspect effects on cache updates in StripMetadataSettings and EditMetadataSettings (#3507)", async () => {
+    function deferred<T>() {
+      let resolve!: (value: T) => void;
+      let reject!: (reason?: unknown) => void;
+      const promise = new Promise<T>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    }
+
+    // 1. StripMetadataSettings: switching files while an inspect request is in flight does not clear inspecting, overwrite metadata/error, or re-run the effect when the aborted request resolves.
+    {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("a.png"), image("b.png"), image("c.png")]);
+
+      const pending: Array<{
+        signal: AbortSignal | null | undefined;
+        res: ReturnType<typeof deferred<Response>>;
+      }> = [];
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+          const res = deferred<Response>();
+          pending.push({ signal: init?.signal, res });
+          return res.promise;
+        }),
+      );
+
+      const { unmount } = render(<StripMetadataSettings />);
+      expect(pending).toHaveLength(1);
+      expect(
+        screen.getByText(en.toolSettings["strip-metadata"].readingMetadata),
+      ).toBeInTheDocument();
+
+      // Switch to b.png while a.png's inspect request is still pending.
+      act(() => {
+        useFileStore.getState().setSelectedIndex(1);
+      });
+      expect(pending).toHaveLength(2);
+      expect(pending[0].signal?.aborted).toBe(true);
+      expect(pending[1].signal?.aborted).toBe(false);
+
+      // Resolve a.png's aborted request with valid metadata before b.png settles.
+      await act(async () => {
+        pending[0].res.resolve(
+          new Response(
+            JSON.stringify({
+              filename: "a.png",
+              fileSize: 100,
+              exif: { Artist: "StaleArtistA" },
+            }),
+            { status: 200 },
+          ),
+        );
+      });
+
+      // b.png must still be inspecting, not overwritten by a.png, and not re-fetched.
+      expect(pending).toHaveLength(2);
+      expect(pending[1].signal?.aborted).toBe(false);
+      expect(
+        screen.getByText(en.toolSettings["strip-metadata"].readingMetadata),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("StaleArtistA")).not.toBeInTheDocument();
+
+      // Now resolve b.png's inspect request.
+      await act(async () => {
+        pending[1].res.resolve(
+          new Response(
+            JSON.stringify({
+              filename: "b.png",
+              fileSize: 200,
+              exif: { Artist: "FreshArtistB" },
+            }),
+            { status: 200 },
+          ),
+        );
+      });
+
+      expect(
+        screen.queryByText(en.toolSettings["strip-metadata"].readingMetadata),
+      ).not.toBeInTheDocument();
+      expect(screen.getByText("FreshArtistB")).toBeInTheDocument();
+      // Caching b.png must not re-trigger the useEffect or abort anything.
+      expect(pending).toHaveLength(2);
+
+      // Switch to c.png (starts request #3), resolve 500 headers first, then switch back to cached b.png while body.json() is pending.
+      act(() => {
+        useFileStore.getState().setSelectedIndex(2);
+      });
+      expect(pending).toHaveLength(3);
+      expect(
+        screen.getByText(en.toolSettings["strip-metadata"].readingMetadata),
+      ).toBeInTheDocument();
+
+      const cErrorBody = deferred<Record<string, unknown>>();
+      await act(async () => {
+        pending[2].res.resolve({
+          ok: false,
+          status: 500,
+          json: () => cErrorBody.promise,
+        } as unknown as Response);
+      });
+
+      act(() => {
+        useFileStore.getState().setSelectedIndex(1);
+      });
+      expect(pending).toHaveLength(3);
+      expect(pending[2].signal?.aborted).toBe(true);
+      expect(
+        screen.queryByText(en.toolSettings["strip-metadata"].readingMetadata),
+      ).not.toBeInTheDocument();
+      expect(screen.getByText("FreshArtistB")).toBeInTheDocument();
+
+      await act(async () => {
+        cErrorBody.resolve({ error: "Stale c.png error" });
+      });
+      expect(screen.queryByText("Stale c.png error")).not.toBeInTheDocument();
+      expect(screen.getByText("FreshArtistB")).toBeInTheDocument();
+
+      // Switch to c.png again (starts request #4), let it fail while selected so inspectError renders, then switch to cached b.png to verify cache hit clears inspectError.
+      act(() => {
+        useFileStore.getState().setSelectedIndex(2);
+      });
+      expect(pending).toHaveLength(4);
+      await act(async () => {
+        pending[3].res.resolve(
+          new Response(JSON.stringify({ error: "Active c.png error" }), { status: 500 }),
+        );
+      });
+      expect(screen.getByText("Active c.png error")).toBeInTheDocument();
+
+      act(() => {
+        useFileStore.getState().setSelectedIndex(1);
+      });
+      expect(pending).toHaveLength(4);
+      expect(screen.queryByText("Active c.png error")).not.toBeInTheDocument();
+      expect(screen.getByText("FreshArtistB")).toBeInTheDocument();
+
+      // Switch to c.png (starts request #5), abort by switching to b.png, and reject request #5 with a non-AbortError to exercise the catch abort guard.
+      act(() => {
+        useFileStore.getState().setSelectedIndex(2);
+      });
+      expect(pending).toHaveLength(5);
+      act(() => {
+        useFileStore.getState().setSelectedIndex(1);
+      });
+      expect(pending[4].signal?.aborted).toBe(true);
+      await act(async () => {
+        pending[4].res.reject(new TypeError("Aborted network failure"));
+      });
+      expect(screen.queryByText("Aborted network failure")).not.toBeInTheDocument();
+      expect(screen.getByText("FreshArtistB")).toBeInTheDocument();
+
+      // Switch to c.png (starts request #6), resolve 200 headers first, then switch to an out-of-range index while res.json() is pending (hasFile stays true, currentFile is null).
+      act(() => {
+        useFileStore.getState().setSelectedIndex(2);
+      });
+      expect(pending).toHaveLength(6);
+      const cOkBody = deferred<Record<string, unknown>>();
+      await act(async () => {
+        pending[5].res.resolve({
+          ok: true,
+          status: 200,
+          json: () => cOkBody.promise,
+        } as unknown as Response);
+      });
+
+      act(() => {
+        useFileStore.getState().setSelectedIndex(99);
+      });
+      expect(pending[5].signal?.aborted).toBe(true);
+      expect(
+        screen.queryByText(en.toolSettings["strip-metadata"].readingMetadata),
+      ).not.toBeInTheDocument();
+
+      await act(async () => {
+        cOkBody.resolve({
+          filename: "c.png",
+          fileSize: 300,
+          exif: { Artist: "StaleArtistC" },
+        });
+      });
+      expect(screen.queryByText("StaleArtistC")).not.toBeInTheDocument();
+      expect(pending).toHaveLength(6);
+
+      // Re-selecting c.png starts request #7 because the aborted 200 response was not cached.
+      act(() => {
+        useFileStore.getState().setSelectedIndex(2);
+      });
+      expect(pending).toHaveLength(7);
+
+      unmount();
+    }
+
+    // 2. EditMetadataSettings: switching files while an inspect request is in flight does not clear inspecting, overwrite form/inspectData/error, or re-run the effect when the aborted request resolves.
+    {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("a.png"), image("b.png"), image("c.png")]);
+
+      const pending: Array<{
+        signal: AbortSignal | null | undefined;
+        res: ReturnType<typeof deferred<Response>>;
+      }> = [];
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+          const res = deferred<Response>();
+          pending.push({ signal: init?.signal, res });
+          return res.promise;
+        }),
+      );
+
+      const { unmount } = render(<EditMetadataSettings />);
+      expect(pending).toHaveLength(1);
+      expect(
+        screen.getByText(en.toolSettings["edit-metadata"].readingMetadata),
+      ).toBeInTheDocument();
+
+      // Switch to b.png while a.png's inspect request is still pending.
+      act(() => {
+        useFileStore.getState().setSelectedIndex(1);
+      });
+      expect(pending).toHaveLength(2);
+      expect(pending[0].signal?.aborted).toBe(true);
+      expect(pending[1].signal?.aborted).toBe(false);
+
+      // Resolve a.png's aborted request with valid metadata before b.png settles.
+      await act(async () => {
+        pending[0].res.resolve(
+          new Response(
+            JSON.stringify({
+              filename: "a.png",
+              fileSize: 100,
+              exif: { Artist: "StaleArtistA" },
+              iptc: null,
+              xmp: null,
+              gps: null,
+              keywords: ["stale-kw"],
+            }),
+            { status: 200 },
+          ),
+        );
+      });
+
+      // b.png must still be inspecting, not overwritten by a.png, and not re-fetched.
+      expect(pending).toHaveLength(2);
+      expect(pending[1].signal?.aborted).toBe(false);
+      expect(
+        screen.getByText(en.toolSettings["edit-metadata"].readingMetadata),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText(en.toolSettings["edit-metadata"].artist)).toHaveValue("");
+      expect(screen.queryByText("EXIF/IPTC")).not.toBeInTheDocument();
+
+      // Now resolve b.png's inspect request.
+      await act(async () => {
+        pending[1].res.resolve(
+          new Response(
+            JSON.stringify({
+              filename: "b.png",
+              fileSize: 200,
+              exif: { Artist: "FreshArtistB" },
+              iptc: null,
+              xmp: null,
+              gps: null,
+              keywords: ["fresh-kw"],
+            }),
+            { status: 200 },
+          ),
+        );
+      });
+
+      expect(
+        screen.queryByText(en.toolSettings["edit-metadata"].readingMetadata),
+      ).not.toBeInTheDocument();
+      expect(screen.getByLabelText(en.toolSettings["edit-metadata"].artist)).toHaveValue(
+        "FreshArtistB",
+      );
+      expect(screen.getByText("EXIF/IPTC")).toBeInTheDocument();
+      // Caching b.png must not re-trigger the useEffect or abort anything.
+      expect(pending).toHaveLength(2);
+
+      // Switch to c.png (starts request #3), resolve 500 headers first, then switch back to cached b.png while body.json() is pending.
+      act(() => {
+        useFileStore.getState().setSelectedIndex(2);
+      });
+      expect(pending).toHaveLength(3);
+      expect(
+        screen.getByText(en.toolSettings["edit-metadata"].readingMetadata),
+      ).toBeInTheDocument();
+
+      const cErrorBody = deferred<Record<string, unknown>>();
+      await act(async () => {
+        pending[2].res.resolve({
+          ok: false,
+          status: 500,
+          json: () => cErrorBody.promise,
+        } as unknown as Response);
+      });
+
+      act(() => {
+        useFileStore.getState().setSelectedIndex(1);
+      });
+      expect(pending).toHaveLength(3);
+      expect(pending[2].signal?.aborted).toBe(true);
+      expect(
+        screen.queryByText(en.toolSettings["edit-metadata"].readingMetadata),
+      ).not.toBeInTheDocument();
+      expect(screen.getByLabelText(en.toolSettings["edit-metadata"].artist)).toHaveValue(
+        "FreshArtistB",
+      );
+
+      await act(async () => {
+        cErrorBody.resolve({ error: "Stale c.png error" });
+      });
+      expect(
+        screen.queryByText(en.toolSettings["edit-metadata"].couldNotReadMetadata),
+      ).not.toBeInTheDocument();
+      expect(screen.getByLabelText(en.toolSettings["edit-metadata"].artist)).toHaveValue(
+        "FreshArtistB",
+      );
+
+      // Switch to c.png again (starts request #4), let it fail while selected so inspectError renders, then switch to cached b.png to verify cache hit clears inspectError.
+      act(() => {
+        useFileStore.getState().setSelectedIndex(2);
+      });
+      expect(pending).toHaveLength(4);
+      await act(async () => {
+        pending[3].res.resolve(
+          new Response(JSON.stringify({ error: "Active c.png error" }), { status: 500 }),
+        );
+      });
+      expect(
+        screen.getByText(en.toolSettings["edit-metadata"].couldNotReadMetadata),
+      ).toBeInTheDocument();
+
+      act(() => {
+        useFileStore.getState().setSelectedIndex(1);
+      });
+      expect(pending).toHaveLength(4);
+      expect(
+        screen.queryByText(en.toolSettings["edit-metadata"].couldNotReadMetadata),
+      ).not.toBeInTheDocument();
+      expect(screen.getByLabelText(en.toolSettings["edit-metadata"].artist)).toHaveValue(
+        "FreshArtistB",
+      );
+
+      // Switch to c.png (starts request #5), abort by switching to b.png, and reject request #5 with a non-AbortError to exercise the catch abort guard.
+      act(() => {
+        useFileStore.getState().setSelectedIndex(2);
+      });
+      expect(pending).toHaveLength(5);
+      act(() => {
+        useFileStore.getState().setSelectedIndex(1);
+      });
+      expect(pending[4].signal?.aborted).toBe(true);
+      await act(async () => {
+        pending[4].res.reject(new TypeError("Aborted network failure"));
+      });
+      expect(
+        screen.queryByText(en.toolSettings["edit-metadata"].couldNotReadMetadata),
+      ).not.toBeInTheDocument();
+      expect(screen.getByLabelText(en.toolSettings["edit-metadata"].artist)).toHaveValue(
+        "FreshArtistB",
+      );
+
+      // Switch to c.png (starts request #6), resolve 200 headers first, then switch to an out-of-range index while res.json() is pending (hasFile stays true, currentFile is null).
+      act(() => {
+        useFileStore.getState().setSelectedIndex(2);
+      });
+      expect(pending).toHaveLength(6);
+      const cOkBody = deferred<Record<string, unknown>>();
+      await act(async () => {
+        pending[5].res.resolve({
+          ok: true,
+          status: 200,
+          json: () => cOkBody.promise,
+        } as unknown as Response);
+      });
+
+      act(() => {
+        useFileStore.getState().setSelectedIndex(99);
+      });
+      expect(pending[5].signal?.aborted).toBe(true);
+      expect(
+        screen.queryByText(en.toolSettings["edit-metadata"].readingMetadata),
+      ).not.toBeInTheDocument();
+
+      await act(async () => {
+        cOkBody.resolve({
+          filename: "c.png",
+          fileSize: 300,
+          exif: { Artist: "StaleArtistC" },
+          iptc: null,
+          xmp: null,
+          gps: null,
+          keywords: [],
+        });
+      });
+      expect(pending).toHaveLength(6);
+
+      // Re-selecting c.png starts request #7 because the aborted 200 response was not cached.
+      act(() => {
+        useFileStore.getState().setSelectedIndex(2);
+      });
+      expect(pending).toHaveLength(7);
+
+      unmount();
+    }
+  });
 });

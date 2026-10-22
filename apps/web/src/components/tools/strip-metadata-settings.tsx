@@ -219,8 +219,8 @@ export function StripMetadataSettings() {
     stripXmp: false,
   });
 
-  // Per-file metadata cache (from feature branch)
-  const [metadataCache, setMetadataCache] = useState<Map<string, MetadataResult>>(new Map());
+  // Per-file metadata cache
+  const metadataCacheRef = useRef<Map<string, MetadataResult>>(new Map());
   const [metadata, setMetadata] = useState<MetadataResult | null>(null);
   const [inspecting, setInspecting] = useState(false);
   const [inspectError, setInspectError] = useState<string | null>(null);
@@ -234,14 +234,17 @@ export function StripMetadataSettings() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: t only supplies error fallbacks; a locale switch must not refetch
   useEffect(() => {
     if (!currentFile || !fileKey) {
+      setInspecting(false);
       setMetadata(null);
       setInspectError(null);
       return;
     }
 
     // Check cache first
-    const cached = metadataCache.get(fileKey);
+    const cached = metadataCacheRef.current.get(fileKey);
     if (cached) {
+      setInspecting(false);
+      setInspectError(null);
       setMetadata(cached);
       return;
     }
@@ -260,8 +263,10 @@ export function StripMetadataSettings() {
           body: formData,
           signal: controller.signal,
         });
+        if (controller.signal.aborted) return;
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
+          if (controller.signal.aborted) return;
           throw new Error(
             failedAnswerMessage(
               t,
@@ -275,23 +280,26 @@ export function StripMetadataSettings() {
           if (err instanceof SyntaxError) return null;
           throw err;
         });
+        if (controller.signal.aborted) return;
         if (!isMetadataResult(data)) {
           throw new Error(t.errors.invalidServerResponse);
         }
+        metadataCacheRef.current.set(fileKey, data);
         setMetadata(data);
-        if (fileKey) setMetadataCache((prev) => new Map(prev).set(fileKey, data));
       } catch (err) {
-        if ((err as Error).name === "AbortError") return;
+        if (controller.signal.aborted || (err as Error)?.name === "AbortError") return;
         setInspectError(
           err instanceof Error ? err.message : t.toolSettings["strip-metadata"].inspectFailed,
         );
       } finally {
-        setInspecting(false);
+        if (!controller.signal.aborted) {
+          setInspecting(false);
+        }
       }
     })();
 
     return () => controller.abort();
-  }, [currentFile, fileKey, metadataCache]);
+  }, [currentFile, fileKey]);
 
   const handleProcess = () => {
     if (files.length > 1) {

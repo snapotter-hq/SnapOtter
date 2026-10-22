@@ -1,5 +1,5 @@
 import { AlertTriangle, BookmarkPlus, Loader2, MapPin, PenLine, Plus, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
 import { MetadataGrid } from "@/components/common/metadata-grid";
 import { ProgressCard } from "@/components/common/progress-card";
@@ -218,7 +218,7 @@ export function EditMetadataSettings() {
   const [inspectData, setInspectData] = useState<InspectResult | null>(null);
   const [inspecting, setInspecting] = useState(false);
   const [inspectError, setInspectError] = useState<string | null>(null);
-  const [inspectCache, setInspectCache] = useState<Map<string, InspectResult>>(new Map());
+  const inspectCacheRef = useRef<Map<string, InspectResult>>(new Map());
   const [keywordInput, setKeywordInput] = useState("");
   const [templates, setTemplates] = useState<Template[]>(loadTemplates);
   const [templateName, setTemplateName] = useState("");
@@ -264,6 +264,7 @@ export function EditMetadataSettings() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: t only supplies error fallbacks; a locale switch must not refetch or reset the form
   useEffect(() => {
     if (!currentFile || !fileKey) {
+      setInspecting(false);
       setForm(EMPTY_FORM);
       setInitialForm(EMPTY_FORM);
       setInspectData(null);
@@ -272,8 +273,10 @@ export function EditMetadataSettings() {
       return;
     }
 
-    const cached = inspectCache.get(fileKey);
+    const cached = inspectCacheRef.current.get(fileKey);
     if (cached) {
+      setInspecting(false);
+      setInspectError(null);
       populateForm(cached);
       return;
     }
@@ -292,8 +295,10 @@ export function EditMetadataSettings() {
           body: formData,
           signal: controller.signal,
         });
+        if (controller.signal.aborted) return;
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
+          if (controller.signal.aborted) return;
           throw new Error(
             failedAnswerMessage(
               t,
@@ -307,25 +312,28 @@ export function EditMetadataSettings() {
           if (err instanceof SyntaxError) return null;
           throw err;
         });
+        if (controller.signal.aborted) return;
         if (!isInspectResult(data)) {
           throw new Error(t.errors.invalidServerResponse);
         }
-        setInspectCache((prev) => new Map(prev).set(fileKey, data));
+        inspectCacheRef.current.set(fileKey, data);
         populateForm(data);
       } catch (err) {
-        if ((err as Error).name === "AbortError") return;
+        if (controller.signal.aborted || (err as Error)?.name === "AbortError") return;
         setInspectError(
           err instanceof Error ? err.message : t.toolSettings["edit-metadata"].inspectFailed,
         );
         setForm(EMPTY_FORM);
         setInitialForm(EMPTY_FORM);
       } finally {
-        setInspecting(false);
+        if (!controller.signal.aborted) {
+          setInspecting(false);
+        }
       }
     })();
 
     return () => controller.abort();
-  }, [currentFile, fileKey, inspectCache, populateForm]);
+  }, [currentFile, fileKey, populateForm]);
 
   const setField = <K extends keyof FormFields>(key: K, value: FormFields[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
