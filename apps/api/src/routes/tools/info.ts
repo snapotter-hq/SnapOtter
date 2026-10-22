@@ -1,13 +1,13 @@
 import { execFile } from "node:child_process";
 import { rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { extname, join } from "node:path";
 import { promisify } from "node:util";
 import { hasServerErrorStatus } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { stripInternalPaths } from "../../lib/errors.js";
-import { validateImageBuffer } from "../../lib/file-validation.js";
+import { isRawExtension, validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import {
   DecoderOutOfMemoryError,
@@ -61,7 +61,7 @@ export function registerInfo(app: FastifyInstance) {
       // HEIC/HEIF: Sharp can read container headers but can't decode HEVC pixels,
       // so unconditionally pre-decode to PNG (matching createToolRoute behavior).
       let metaBuffer = fileBuffer;
-      const ext = filename.split(".").pop()?.toLowerCase();
+      const ext = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
 
       if (detectedFormat === "svg" || isSvgBuffer(fileBuffer)) {
         try {
@@ -174,7 +174,8 @@ interface ExifMeta {
 }
 
 async function readExifToolMeta(buffer: Buffer, ext?: string): Promise<ExifMeta | null> {
-  const suffix = ext ? `.${ext}` : ".dng";
+  const safeExt = ext?.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const suffix = safeExt && isRawExtension(safeExt) ? `.${safeExt}` : ".dng";
   const tmpPath = join(tmpdir(), `info-exif-${Date.now()}${suffix}`);
   try {
     await writeFile(tmpPath, buffer).catch((writeErr: unknown) => {

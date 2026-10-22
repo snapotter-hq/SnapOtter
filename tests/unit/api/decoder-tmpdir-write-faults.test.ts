@@ -19,6 +19,7 @@ const deletePrefix = vi.fn();
 const decodeHeic = vi.fn();
 const decodeToSharpCompat = vi.fn();
 const writeFileFailure = { next: null as Error | null };
+const infoExifPaths: string[] = [];
 const uploadedBuffers = new Map<string, Buffer>();
 
 vi.mock("node:fs/promises", async (importOriginal) => {
@@ -26,10 +27,13 @@ vi.mock("node:fs/promises", async (importOriginal) => {
   return {
     ...actual,
     writeFile: (async (path: unknown, ...rest: unknown[]) => {
-      if (writeFileFailure.next && /info-exif-/.test(String(path))) {
-        const err = writeFileFailure.next;
-        writeFileFailure.next = null;
-        throw err;
+      if (/info-exif-/.test(String(path))) {
+        infoExifPaths.push(String(path));
+        if (writeFileFailure.next) {
+          const err = writeFileFailure.next;
+          writeFileFailure.next = null;
+          throw err;
+        }
       }
       return (actual.writeFile as (...args: unknown[]) => unknown)(path, ...rest);
     }) as typeof actual.writeFile,
@@ -384,6 +388,7 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
     decodeHeic.mockReset().mockResolvedValue(PNG);
     decodeToSharpCompat.mockReset().mockResolvedValue(PNG);
     writeFileFailure.next = null;
+    infoExifPaths.length = 0;
   });
 
   describe.each(ROUTES)("$name", (route) => {
@@ -564,5 +569,34 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
       expect(res.statusCode, res.body).toBe(200);
       expect(res.json()).toMatchObject({ filename: "photo.dng" });
     });
+
+    it.each([
+      ["", undefined, ".dng"],
+      ["DSCF0001", undefined, ".dng"],
+      [".raf", undefined, ".dng"],
+      ["DSCF0001.", undefined, ".dng"],
+      ["DSCF0001.RAF", "raf", ".raf"],
+      ["shoot.2026.RAF", "raf", ".raf"],
+      ["DSCF0001.r-a_f", "r-a_f", ".raf"],
+      ["DSCF0001.---", "---", ".dng"],
+      ["DSCF0001.notaraw", "notaraw", ".dng"],
+    ] as const)(
+      "extracts ext=%s -> %s with extname and writes readExifToolMeta temp file with %s suffix (#3278)",
+      async (filename, expectedExt, expectedSuffix) => {
+        const rafMagic = Buffer.from("FUJIFILMCCD-RAW 0201", "ascii");
+        const res = await app.inject({
+          method: "POST",
+          url: apiToolPath("info"),
+          ...multipartBody([
+            { filename, contentType: "application/octet-stream", content: rafMagic },
+          ]),
+        });
+
+        expect(res.statusCode, res.body).toBe(200);
+        expect(decodeToSharpCompat).toHaveBeenCalledWith(rafMagic, "raw", expectedExt);
+        expect(infoExifPaths).toHaveLength(1);
+        expect(infoExifPaths[0]).toMatch(new RegExp(`info-exif-\\d+\\${expectedSuffix}$`));
+      },
+    );
   });
 });

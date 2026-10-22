@@ -1451,7 +1451,14 @@ describe("files route logic", () => {
       );
       expect(filesRouteSrc).not.toContain('.split(".").pop()');
 
+      const infoRouteSrc = readFileSync(
+        resolve(process.cwd(), "apps/api/src/routes/tools/info.ts"),
+        "utf8",
+      );
+      expect(infoRouteSrc).not.toContain('.split(".").pop()');
+
       const callerFiles = [
+        "apps/api/src/lib/image-input-prep.ts",
         "apps/api/src/modality/image-input.ts",
         "apps/api/src/routes/user-files.ts",
         "apps/api/src/routes/batch.ts",
