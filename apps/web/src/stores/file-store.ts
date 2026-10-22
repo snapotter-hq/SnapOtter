@@ -6,7 +6,7 @@ import {
   type Modality,
 } from "@snapotter/shared";
 import { create } from "zustand";
-import { fetchDecodedPreview, needsServerPreview } from "@/lib/image-preview";
+import { fetchDecodedPreview, needsServerPreview, revokePreviewUrl } from "@/lib/image-preview";
 
 export type PreviewKind = "image" | "video" | "audio" | "document" | "none";
 
@@ -283,7 +283,10 @@ export const useFileStore = create<FileState>((set, get) => ({
         fetchDecodedPreview(file).then((result) => {
           const state = get();
           const idx = state.entries.findIndex((e) => e.id === entryId && e.file === file);
-          if (idx === -1) return;
+          if (idx === -1) {
+            if (result?.url) revokePreviewUrl(result.url);
+            return;
+          }
           const updated = [...state.entries];
           const oldBlobUrl = updated[idx].blobUrl;
           updated[idx] = {
@@ -332,7 +335,10 @@ export const useFileStore = create<FileState>((set, get) => ({
         fetchDecodedPreview(file).then((result) => {
           const state = get();
           const foundIdx = state.entries.findIndex((e) => e.id === entryId && e.file === file);
-          if (foundIdx === -1) return;
+          if (foundIdx === -1) {
+            if (result?.url) revokePreviewUrl(result.url);
+            return;
+          }
           const updated = [...state.entries];
           const oldBlobUrl = updated[foundIdx].blobUrl;
           updated[foundIdx] = {
