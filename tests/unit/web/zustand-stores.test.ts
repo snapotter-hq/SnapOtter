@@ -1647,28 +1647,95 @@ describe("useCollageStore", () => {
     expect(s.templateId).toBe("3-h-equal");
   });
 
-  it("removeImage removes image by index and revokes blob URL", () => {
-    const file1 = new File(["a"], "a.png", { type: "image/png" });
-    const file2 = new File(["b"], "b.png", { type: "image/png" });
+  it("removeImage removes image by index and revokes blob URL and previewBlobUrl once", async () => {
+    const imagePreview = await import("@/lib/image-preview");
+    const needsMock = vi.mocked(imagePreview.needsServerPreview);
+    const fetchPreviewMock = vi.mocked(imagePreview.fetchDecodedPreview);
+    const revokePreviewMock = vi.mocked(imagePreview.revokePreviewUrl);
+
+    needsMock.mockReturnValueOnce(true).mockReturnValueOnce(true);
+    fetchPreviewMock
+      .mockResolvedValueOnce({ url: "blob:preview-1", originalWidth: 100, originalHeight: 100 })
+      .mockResolvedValueOnce({ url: "blob:preview-2", originalWidth: 100, originalHeight: 100 });
+    createObjectURL.mockReturnValueOnce("blob:raw-1").mockReturnValueOnce("blob:raw-2");
+
+    const file1 = new File(["a"], "a.heic", { type: "image/heic" });
+    const file2 = new File(["b"], "b.heic", { type: "image/heic" });
     useCollageStore.getState().addImages([file1, file2]);
+
+    await vi.waitFor(() => {
+      expect(useCollageStore.getState().images[0].previewBlobUrl).toBe("blob:preview-1");
+      expect(useCollageStore.getState().images[1].previewBlobUrl).toBe("blob:preview-2");
+    });
+
     revokeObjectURL.mockClear();
+    revokePreviewMock.mockClear();
+    const abort = vi.fn();
+    const run = beginCollageRun(abort);
 
     useCollageStore.getState().removeImage(0);
 
     const s = useCollageStore.getState();
     expect(s.images).toHaveLength(1);
     expect(s.images[0].file).toBe(file2);
-    expect(revokeObjectURL).toHaveBeenCalledWith("blob:fake-url");
+    expect(revokeObjectURL).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:raw-1");
+    expect(revokePreviewMock).toHaveBeenCalledTimes(1);
+    expect(revokePreviewMock).toHaveBeenCalledWith("blob:preview-1");
+    expect(abort).toHaveBeenCalledTimes(1);
+    expect(run.isCurrent()).toBe(false);
+
+    // Removing an image without previewBlobUrl does not call revokePreviewUrl
+    const pngFile = new File(["c"], "c.png", { type: "image/png" });
+    createObjectURL.mockReturnValueOnce("blob:raw-3");
+    useCollageStore.getState().addImages([pngFile]);
+    revokeObjectURL.mockClear();
+    revokePreviewMock.mockClear();
+
+    useCollageStore.getState().removeImage(1);
+
+    expect(revokeObjectURL).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:raw-3");
+    expect(revokePreviewMock).not.toHaveBeenCalled();
   });
 
-  it("removeImage resets when last image is removed", () => {
-    const file = new File(["a"], "a.png", { type: "image/png" });
+  it("removeImage resets when last image is removed without double-revoking blob or preview URLs (#3526)", async () => {
+    const imagePreview = await import("@/lib/image-preview");
+    const needsMock = vi.mocked(imagePreview.needsServerPreview);
+    const fetchPreviewMock = vi.mocked(imagePreview.fetchDecodedPreview);
+    const revokePreviewMock = vi.mocked(imagePreview.revokePreviewUrl);
+
+    needsMock.mockReturnValueOnce(true);
+    fetchPreviewMock.mockResolvedValueOnce({
+      url: "blob:preview-last",
+      originalWidth: 100,
+      originalHeight: 100,
+    });
+    createObjectURL.mockReturnValueOnce("blob:raw-last");
+
+    const file = new File(["a"], "a.heic", { type: "image/heic" });
     useCollageStore.getState().addImages([file]);
 
+    await vi.waitFor(() => {
+      expect(useCollageStore.getState().images[0].previewBlobUrl).toBe("blob:preview-last");
+    });
+
+    revokeObjectURL.mockClear();
+    revokePreviewMock.mockClear();
+    const abort = vi.fn();
+    const run = beginCollageRun(abort);
+
     useCollageStore.getState().removeImage(0);
+
     const s = useCollageStore.getState();
     expect(s.images).toEqual([]);
     expect(s.phase).toBe("upload");
+    expect(revokeObjectURL).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:raw-last");
+    expect(revokePreviewMock).toHaveBeenCalledTimes(1);
+    expect(revokePreviewMock).toHaveBeenCalledWith("blob:preview-last");
+    expect(abort).toHaveBeenCalledTimes(1);
+    expect(run.isCurrent()).toBe(false);
   });
 
   it("addImages triggers async preview loading for HEIC files", async () => {
