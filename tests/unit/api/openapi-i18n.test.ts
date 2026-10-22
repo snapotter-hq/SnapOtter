@@ -78,7 +78,7 @@ describe("generateLocaleLlmsTxt", () => {
   });
 });
 
-describe("openapi.zh-TW.yaml auth and roles descriptions (#3585)", () => {
+describe("openapi.zh-TW.yaml auth, roles, and features descriptions (#3585, #3597)", () => {
   const specDir = resolve(import.meta.dirname, "../../../apps/api/src");
   const english = load(readFileSync(join(specDir, "openapi.yaml"), "utf8")) as {
     paths: Record<string, Record<string, { description?: string }>>;
@@ -90,7 +90,7 @@ describe("openapi.zh-TW.yaml auth and roles descriptions (#3585)", () => {
     };
   };
 
-  const simplifiedOnlyChars = /[户码创权义给该将认无删备]/;
+  const simplifiedOnlyChars = /[户码创权义给该将认无删备踪]/;
 
   const expectedDescriptions: Array<{
     path: string;
@@ -102,6 +102,12 @@ describe("openapi.zh-TW.yaml auth and roles descriptions (#3585)", () => {
       method: "post",
       expected:
         "重設本機使用者的密碼。需要對目標目前角色的 users:manage 權限和權限，包括層次結構、權限、工具存取權限和任何 API-key 範圍。\n",
+    },
+    {
+      path: "/api/v1/admin/features/{bundleId}/install",
+      method: "post",
+      expected:
+        "開始非同步安裝 AI 功能套件。下載模型並設定 Python sidecar。回傳可透過 SSE 端點進行進度追蹤的 jobId。需要 features:manage 權限。\n\n對於 bundleId=ocr，支援在官方 Linux amd64 與 arm64 容器中安裝。系統會下載為此主機選擇的目標，驗證版本索引的 Ed25519 簽章與 artifact/模型摘要，對暫存的不可變世代執行冒煙測試，並以原子方式啟用它。即使容器具有 NVIDIA GPU 存取權限，OCR 執行階段仍會使用 CPU。高精準度執行階段需要至少 4 GiB 的有效記憶體（已設定的容器 cgroup 限制，否則為主機記憶體）。低於該已簽章相容性下限的系統會在下載前被拒絕，並回傳 compatibilityReason=insufficient-memory。快速 Tesseract OCR 不受此要求限制。\n\n安裝會在伺服器端依序執行：在另一個安裝正在執行時發出的請求會進入佇列（queued=true）而非被拒絕，並在執行中的安裝完成時自動啟動。對同一個執行中套件的重複請求會進行去重，並回傳相同的 jobId。",
     },
     {
       path: "/api/v1/roles",

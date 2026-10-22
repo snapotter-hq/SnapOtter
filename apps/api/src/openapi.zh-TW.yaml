@@ -7332,24 +7332,11 @@ paths:
         - Features
       summary: 安裝功能套件
       description: |-
-        開始 AI 功能包的非同步安裝。 下載模型和
-        配置 Python sidecar。 返回 jobId 用於進度跟踪
-        透過 SSE 端點。 需要 features:manage 權限。
+        開始非同步安裝 AI 功能套件。下載模型並設定 Python sidecar。回傳可透過 SSE 端點進行進度追蹤的 jobId。需要 features:manage 權限。
 
-        對於 bundleId=ocr，支援在官方 Linux amd64 和 arm64 容器中安裝。
-        它下載為此主機選擇的目標，驗證版本
-        索引的 Ed25519 簽章和 artifact/模型摘要、冒煙測試
-        上演不可變的生成，並以原子方式活化它。 OCR
-        即使容器具有 NVIDIA GPU 存取權限，運行時也會使用 CPU。 的
-        準確的運行時間需要至少 4 GiB 的有效記憶體（
-        配置容器 cgroup 限制，否則主機記憶體）。 低於該簽名的系統
-        下載前相容性最低被拒絕compatibilityReason=insufficient-memory。 Fast Tesseract OCR 不是
-        須符合此要求。
+        對於 bundleId=ocr，支援在官方 Linux amd64 與 arm64 容器中安裝。系統會下載為此主機選擇的目標，驗證版本索引的 Ed25519 簽章與 artifact/模型摘要，對暫存的不可變世代執行冒煙測試，並以原子方式啟用它。即使容器具有 NVIDIA GPU 存取權限，OCR 執行階段仍會使用 CPU。高精準度執行階段需要至少 4 GiB 的有效記憶體（已設定的容器 cgroup 限制，否則為主機記憶體）。低於該已簽章相容性下限的系統會在下載前被拒絕，並回傳 compatibilityReason=insufficient-memory。快速 Tesseract OCR 不受此要求限制。
 
-        安裝在伺服器端序列化：一個請求在另一個請求時發出
-        安裝正在運行排隊（queued=true）而不是被拒絕，並且
-        運行安裝完成時自動啟動。 重複一次
-        對相同正在執行的捆綁包的請求已進行重複資料刪除並傳回相同的內容jobId。
+        安裝會在伺服器端依序執行：在另一個安裝正在執行時發出的請求會進入佇列（queued=true）而非被拒絕，並在執行中的安裝完成時自動啟動。對同一個執行中套件的重複請求會進行去重，並回傳相同的 jobId。
       security:
         - bearerAuth: []
       parameters:
@@ -21198,7 +21185,7 @@ x-i18n:
     paths./api/v1/admin/features/{bundleId}/install.post.description:
       sourceHash: 6051af19be7e
       provenance: machine
-      outputHash: 720bd01acd09
+      outputHash: 5c7cc536a11b
     paths./api/v1/admin/features/{bundleId}/uninstall.post.summary:
       sourceHash: 160eaf179d4f
       provenance: machine
