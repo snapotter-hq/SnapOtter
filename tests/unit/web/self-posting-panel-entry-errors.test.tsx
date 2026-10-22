@@ -597,6 +597,7 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       expect(useFileStore.getState().entries[0].processedUrl).toBe(
         "/api/v1/download/j/minimal.png",
       );
+      expect(useFileStore.getState().entries[0].originalSize).toBe(3);
       expect(useFileStore.getState().entries[0].processedSize).toBeNull();
 
       fireEvent.click(screen.getByTestId("compose-submit"));
@@ -675,6 +676,7 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       );
       expect(entries[1].status).toBe("completed");
       expect(entries[1].processedUrl).toBe("/api/v1/download/j/b.png");
+      expect(entries[1].originalSize).toBe(3);
       expect(entries[1].processedSize).toBeNull();
       expect(entries[1].error).toBeNull();
       expect(entries[2].status).toBe("failed");
@@ -684,6 +686,170 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       expect(classifyFeedbackError(entries[2].error, entries[2].errorCategory)).toBe(
         "processing_error",
       );
+      unmount();
+    }
+  });
+
+  it("preserves entry.originalSize when compose and watermark-image 2xx responses omit or null originalSize (#3506)", async () => {
+    // 1. ComposeSettings: omitted originalSize, null originalSize, and explicit numeric originalSize.
+    {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("a.png", "seven-7")]);
+      expect(useFileStore.getState().entries[0].originalSize).toBe(7);
+
+      let composeCall = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          composeCall++;
+          if (composeCall === 1) {
+            return new Response(
+              JSON.stringify({ downloadUrl: "/api/v1/download/j/compose-omitted.png" }),
+              { status: 200 },
+            );
+          }
+          if (composeCall === 2) {
+            return new Response(
+              JSON.stringify({
+                downloadUrl: "/api/v1/download/j/compose-null.png",
+                originalSize: null,
+              }),
+              { status: 200 },
+            );
+          }
+          return new Response(
+            JSON.stringify({
+              downloadUrl: "/api/v1/download/j/compose-explicit.png",
+              originalSize: 1024,
+              processedSize: 512,
+            }),
+            { status: 200 },
+          );
+        }),
+      );
+
+      const { container, unmount } = render(<ComposeSettings />);
+      chooseSecondaryFile(container, image("overlay.png"));
+
+      fireEvent.click(screen.getByTestId("compose-submit"));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+      expect(useFileStore.getState().entries[0].originalSize).toBe(7);
+      expect(useFileStore.getState().originalSize).toBe(7);
+
+      fireEvent.click(screen.getByTestId("compose-submit"));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+      expect(useFileStore.getState().entries[0].originalSize).toBe(7);
+      expect(useFileStore.getState().originalSize).toBe(7);
+
+      fireEvent.click(screen.getByTestId("compose-submit"));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+      expect(useFileStore.getState().entries[0].originalSize).toBe(1024);
+      expect(useFileStore.getState().originalSize).toBe(1024);
+      unmount();
+    }
+
+    // 2. WatermarkImageSettings (single-file branch): omitted originalSize, null originalSize, and explicit numeric originalSize.
+    {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("a.png", "nine-byte")]);
+      expect(useFileStore.getState().entries[0].originalSize).toBe(9);
+
+      let singleCall = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          singleCall++;
+          if (singleCall === 1) {
+            return new Response(
+              JSON.stringify({ downloadUrl: "/api/v1/download/j/wm-omitted.png" }),
+              { status: 200 },
+            );
+          }
+          if (singleCall === 2) {
+            return new Response(
+              JSON.stringify({
+                downloadUrl: "/api/v1/download/j/wm-null.png",
+                originalSize: null,
+              }),
+              { status: 200 },
+            );
+          }
+          return new Response(
+            JSON.stringify({
+              downloadUrl: "/api/v1/download/j/wm-explicit.png",
+              originalSize: 2048,
+              processedSize: 1500,
+            }),
+            { status: 200 },
+          );
+        }),
+      );
+
+      const { container, unmount } = render(<WatermarkImageSettings />);
+      chooseSecondaryFile(container, image("mark.png"));
+
+      fireEvent.click(screen.getByTestId("watermark-image-submit"));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+      expect(useFileStore.getState().entries[0].originalSize).toBe(9);
+      expect(useFileStore.getState().originalSize).toBe(9);
+
+      fireEvent.click(screen.getByTestId("watermark-image-submit"));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+      expect(useFileStore.getState().entries[0].originalSize).toBe(9);
+      expect(useFileStore.getState().originalSize).toBe(9);
+
+      fireEvent.click(screen.getByTestId("watermark-image-submit"));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+      expect(useFileStore.getState().entries[0].originalSize).toBe(2048);
+      expect(useFileStore.getState().originalSize).toBe(2048);
+      unmount();
+    }
+
+    // 3. WatermarkImageSettings (multi-file batch branch): omitted originalSize, null originalSize, and explicit numeric originalSize.
+    {
+      useFileStore.getState().reset();
+      useFileStore
+        .getState()
+        .setFiles([image("a.png", "four"), image("b.png", "five5"), image("c.png", "six666")]);
+      expect(useFileStore.getState().entries.map((e) => e.originalSize)).toEqual([4, 5, 6]);
+
+      let batchCall = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          batchCall++;
+          if (batchCall === 1) {
+            return new Response(JSON.stringify({ downloadUrl: "/api/v1/download/j/batch-a.png" }), {
+              status: 200,
+            });
+          }
+          if (batchCall === 2) {
+            return new Response(
+              JSON.stringify({
+                downloadUrl: "/api/v1/download/j/batch-b.png",
+                originalSize: null,
+              }),
+              { status: 200 },
+            );
+          }
+          return new Response(
+            JSON.stringify({
+              downloadUrl: "/api/v1/download/j/batch-c.png",
+              originalSize: 4096,
+              processedSize: 3000,
+            }),
+            { status: 200 },
+          );
+        }),
+      );
+
+      const { container, unmount } = render(<WatermarkImageSettings />);
+      chooseSecondaryFile(container, image("mark.png"));
+
+      fireEvent.click(screen.getByTestId("watermark-image-submit"));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+      expect(useFileStore.getState().entries.map((e) => e.originalSize)).toEqual([4, 5, 4096]);
+      expect(useFileStore.getState().originalSize).toBe(4);
       unmount();
     }
   });

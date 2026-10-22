@@ -169,7 +169,7 @@ export function ComposeSettings() {
         processedPreviewUrl: result.previewUrl ?? null,
         processedFilename: null,
         status: "completed",
-        originalSize: result.originalSize ?? undefined,
+        ...(result.originalSize != null ? { originalSize: result.originalSize } : {}),
         processedSize: result.processedSize ?? null,
       });
       setResultsByEntry((prev) => ({
