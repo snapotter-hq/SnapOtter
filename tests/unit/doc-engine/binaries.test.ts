@@ -114,10 +114,11 @@ describe("qpdf exit and signal handling (#1331, #2920)", () => {
     const sofficeStub = join(dir, "soffice");
     const pdfcpuStub = join(dir, "pdfcpu");
     const pidFile = join(dir, "spawned.pid");
-    // Write $$ and exec sleep 30 so /bin/sh replaces its process image with
-    // sleep under the same PID; SIGKILL from onAbort then terminates sleep
-    // directly instead of leaving an orphaned child process.
-    const sleepStub = `#!/bin/sh\necho $$ > "${pidFile}"\nexec sleep 30\n`;
+    // Write $$ to a temp file, atomically rename it into pidFile, and exec
+    // sleep 30 so /bin/sh replaces its process image with sleep under the same
+    // PID; SIGKILL from onAbort then terminates sleep directly instead of
+    // leaving an orphaned child process.
+    const sleepStub = `#!/bin/sh\necho $$ > "${pidFile}.tmp"\nmv "${pidFile}.tmp" "${pidFile}"\nexec sleep 30\n`;
     for (const p of [stubPath, gsStub, sofficeStub, pdfcpuStub]) {
       writeFileSync(p, sleepStub);
       chmodSync(p, 0o755);
@@ -150,18 +151,40 @@ describe("qpdf exit and signal handling (#1331, #2920)", () => {
 
       for (const run of runners) {
         rmSync(pidFile, { force: true });
+        rmSync(`${pidFile}.tmp`, { force: true });
         const ac = new AbortController();
         const pending = run(ac.signal);
-        await vi.waitFor(() => {
-          expect(existsSync(pidFile)).toBe(true);
-        });
-        const pid = Number(readFileSync(pidFile, "utf8").trim());
-        expect(Number.isInteger(pid) && pid > 0).toBe(true);
-        ac.abort();
-        await expect(pending).rejects.toThrow("Canceled");
-        await vi.waitFor(() => {
-          expect(() => process.kill(pid, 0)).toThrow();
-        });
+        let pid: number | undefined;
+        try {
+          pid = await Promise.race([
+            vi.waitFor(() => {
+              expect(existsSync(pidFile)).toBe(true);
+              const raw = readFileSync(pidFile, "utf8");
+              expect(raw).toMatch(/^\d+\n$/);
+              const parsed = Number(raw.trim());
+              expect(Number.isInteger(parsed) && parsed > 0).toBe(true);
+              return parsed;
+            }),
+            pending.then((val: unknown) => {
+              throw new Error(`Runner resolved before abort: ${String(val)}`);
+            }),
+          ]);
+          ac.abort();
+          await expect(pending).rejects.toThrow("Canceled");
+          await vi.waitFor(() => {
+            expect(() => process.kill(pid as number, 0)).toThrow();
+          });
+        } finally {
+          ac.abort();
+          if (pid !== undefined) {
+            try {
+              process.kill(pid, "SIGKILL");
+            } catch {
+              // Child process already exited.
+            }
+          }
+          await pending.catch(() => {});
+        }
       }
     } finally {
       if (savedGsPath === undefined) delete process.env.GS_PATH;
