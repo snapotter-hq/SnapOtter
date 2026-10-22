@@ -343,13 +343,16 @@ export function EraseObjectSettings({
       onStoppable(() => {
         // First, so a teardown step that throws can't leave the job running.
         const keepRequest = !settled && abandonedJob.keepRequestOnStop();
-        stopProgress();
-        if (keepRequest) {
-          abandoned = true;
-          rejectOnce(new Error("Erase Object batch stopped"));
-          return;
+        try {
+          stopProgress();
+        } finally {
+          if (keepRequest) {
+            abandoned = true;
+            rejectOnce(new Error("Erase Object batch stopped"));
+          } else {
+            abandon(new Error("Erase Object batch stopped"));
+          }
         }
-        abandon(new Error("Erase Object batch stopped"));
       });
 
       const maskFile = new File([maskBlob], "mask.png", { type: "image/png" });
@@ -838,22 +841,53 @@ export function EraseObjectSettings({
     // This keys on the store rather than on unmount because the panel also
     // unmounts when the layout swaps across the breakpoint, and that must not
     // end the run.
-    const batchFiles = new Set(work.map((w) => w.file));
+    const isWorkEntryPresent = (
+      entryId: string,
+      file: File,
+      entries = useFileStore.getState().entries,
+    ) => entries.some((e) => e.id === entryId && e.file === file);
+    let activeWorkIndex = 0;
+    let activeWorkEntry: { entryId: string; file: File } | null = null;
+    let activeEntryAborted = false;
     let filesGone = false;
     let stopInFlight: (() => void) | null = null;
     const unsubscribe = useFileStore.subscribe((state) => {
-      if (
-        filesGone ||
-        (state.stopCount === startStopCount && state.entries.some((e) => batchFiles.has(e.file)))
-      ) {
+      if (filesGone) return;
+      const hasRemainingWork =
+        state.stopCount === startStopCount &&
+        work
+          .slice(activeWorkIndex)
+          .some((w) => isWorkEntryPresent(w.entryId, w.file, state.entries));
+      if (hasRemainingWork) {
+        if (
+          activeWorkEntry &&
+          !isWorkEntryPresent(activeWorkEntry.entryId, activeWorkEntry.file, state.entries)
+        ) {
+          activeEntryAborted = true;
+          activeWorkEntry = null;
+          const stop = stopInFlight;
+          stopInFlight = null;
+          try {
+            stop?.();
+          } catch (err) {
+            reportRunEndFailure(
+              "Stopping an Erase Object batch whose files left failed",
+              err,
+              "erase-object",
+            );
+          }
+        }
         return;
       }
       filesGone = true;
+      activeWorkEntry = null;
+      const stop = stopInFlight;
+      stopInFlight = null;
       // This runs inside whoever replaced the files or left the route: a throw
       // here must not break their update.
       let stopError: { cause: unknown } | null = null;
       for (const step of [
-        () => stopInFlight?.(),
+        () => stop?.(),
         () => {
           if (useFileStore.getState().processing) setProcessing(false);
         },
@@ -907,8 +941,10 @@ export function EraseObjectSettings({
       }
 
       for (let wi = 0; wi < work.length; wi++) {
+        activeWorkIndex = wi;
         if (filesGone) break;
         const { entryId, file, maskBlob } = work[wi];
+        if (!isWorkEntryPresent(entryId, file)) continue;
         const basePercent = (wi / work.length) * 100;
         const sliceWeight = 100 / work.length;
 
@@ -931,12 +967,15 @@ export function EraseObjectSettings({
           error: null,
         });
 
+        activeWorkEntry = { entryId, file };
+        activeEntryAborted = false;
         try {
           await processOneFile(
             entryId,
             file,
             maskBlob,
             (pct) => {
+              if (filesGone || activeEntryAborted) return;
               setProgressPercent(basePercent + (pct / 100) * sliceWeight);
             },
             (stop) => {
@@ -945,6 +984,7 @@ export function EraseObjectSettings({
           );
         } catch (err) {
           if (filesGone) break;
+          if (activeEntryAborted || !isWorkEntryPresent(entryId, file)) continue;
           revokeEntryBlobs(entryId);
           useFileStore.getState().updateEntryById(entryId, {
             processedUrl: null,
@@ -956,6 +996,7 @@ export function EraseObjectSettings({
             errorCategory: feedbackCategoryOf(err),
           });
         } finally {
+          activeWorkEntry = null;
           stopInFlight = null;
         }
       }

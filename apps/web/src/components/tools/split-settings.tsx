@@ -110,19 +110,31 @@ export function SplitSettings() {
     setTiles([]);
     setZipBlobUrl(null);
 
+    const startEntries = useFileStore.getState().entries;
     const runFiles = new Set(files);
-    const unsubscribeFiles = useFileStore.subscribe((state) => {
-      if (!state.files.some((f) => runFiles.has(f))) {
-        controller.abort();
-      }
-    });
-    const isCanceled = () => !run.isCurrent() || controller.signal.aborted;
     const previewTiles: Array<{ row: number; col: number; blobUrl: string | null }> = [];
     const revokePreviewTiles = () => {
-      for (const t of previewTiles) {
+      for (const t of previewTiles.splice(0)) {
         if (t.blobUrl) URL.revokeObjectURL(t.blobUrl);
       }
     };
+    let filesChanged = false;
+    const unsubscribeFiles = useFileStore.subscribe((state) => {
+      const hasRunEntries =
+        startEntries.length > 0
+          ? startEntries.every((b) => state.entries.some((e) => e.id === b.id && e.file === b.file))
+          : state.files.length > 0 && Array.from(runFiles).every((f) => state.files.includes(f));
+      if (!hasRunEntries) {
+        filesChanged = true;
+        unsubscribeFiles();
+        controller.abort();
+        revokePreviewTiles();
+        if (run.isCurrent()) {
+          setProcessing(false);
+        }
+      }
+    });
+    const isCanceled = () => !run.isCurrent() || controller.signal.aborted || filesChanged;
 
     try {
       const effectiveGrid = getEffectiveGrid();
@@ -230,7 +242,7 @@ export function SplitSettings() {
     } finally {
       unsubscribeFiles();
       run.end();
-      if (run.isCurrent()) {
+      if (run.isCurrent() && !filesChanged) {
         setProcessing(false);
       }
     }

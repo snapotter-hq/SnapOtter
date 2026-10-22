@@ -440,23 +440,86 @@ export function OcrSettings() {
     // the store rather than on unmount because the panel also unmounts when the
     // layout swaps across the breakpoint, and that must not end the scan.
     const startStopCount = useFileStore.getState().stopCount;
+    let activeIndex = 0;
+    let activeItemIndex: number | null = null;
+    let activeEntryAborted = false;
     let filesGone = false;
+    let stoppedEarly = false;
     let stopInFlight: (() => void) | null = null;
-    const unsubscribe = useFileStore.subscribe((state) => {
-      if (
-        filesGone ||
-        (state.stopCount === startStopCount &&
-          state.files.some((f) => runFiles.has(f)) &&
-          (runEntryIds.size === 0 || state.entries.some((e) => runEntryIds.has(e.id))))
-      ) {
-        return;
+    const isBatchItemPresent = (index: number, state = useFileStore.getState()): boolean => {
+      const file = files[index];
+      if (!file) return false;
+      const entry = startEntries[index];
+      if (entry) {
+        return state.entries.some((e) => e.id === entry.id && e.file === file);
       }
-      filesGone = true;
+      return state.files.includes(file);
+    };
+    const hasAnyBatchItem = (state: ReturnType<typeof useFileStore.getState>): boolean => {
+      if (state.stopCount !== startStopCount) return false;
+      for (let idx = 0; idx < total; idx++) {
+        if (isBatchItemPresent(idx, state)) return true;
+      }
+      return false;
+    };
+    const hasRemainingWork = (state: ReturnType<typeof useFileStore.getState>): boolean => {
+      if (state.stopCount !== startStopCount) return false;
+      for (let idx = activeIndex; idx < total; idx++) {
+        if (isBatchItemPresent(idx, state)) return true;
+      }
+      return false;
+    };
+    let processedCount = 0;
+    let resultsCommitted = false;
+    const commitCompletedResults = () => {
+      if (resultsCommitted || filesGone || processedCount === 0) return;
+      resultsCommitted = true;
+      const joined = results.join("\n\n");
+      if (errors.length === processedCount) {
+        setError(errors.join("; "));
+      } else if (errors.length > 0) {
+        setError(
+          format(t.toolSettings.ocr.filesFailed, { failed: errors.length, total: processedCount }),
+        );
+      }
+
+      const store = useFileStore.getState();
+      const targetEntryId = resolveOcrEntryId(store, capturedEntryId);
+      if (errors.length < processedCount && targetEntryId && joined.length > 0) {
+        const prevUrl = store.entries.find((e) => e.id === targetEntryId)?.processedUrl;
+        if (prevUrl?.startsWith("blob:")) URL.revokeObjectURL(prevUrl);
+        const blob = new Blob([joined], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        store.updateEntryById(targetEntryId, {
+          processedUrl: url,
+          processedFilename: ocrFilenameFor(files),
+          status: "completed",
+          ...(autoSavedFileId && capturedSaveMode === "overwrite"
+            ? { serverFileId: autoSavedFileId }
+            : {}),
+        });
+        if (autoSavedFileId) {
+          store.markClaimedById(targetEntryId);
+        }
+      }
+      updateOcrResult({
+        text: joined,
+        savedLibraryFileId: autoSavedFileId ?? null,
+        resultEntryId: targetEntryId,
+      });
+    };
+    const stopScanNow = (commitPartial: boolean) => {
+      stoppedEarly = true;
+      activeEntryAborted = true;
+      activeItemIndex = null;
+      const stop = stopInFlight;
+      stopInFlight = null;
       // This runs inside whoever replaced the files or left the route: a throw
       // here must not break their update.
       let stopError: { cause: unknown } | null = null;
       for (const step of [
-        () => stopInFlight?.(),
+        () => stop?.(),
+        ...(commitPartial ? [commitCompletedResults] : []),
         () => {
           if (useFileStore.getState().processing) setProcessing(false);
         },
@@ -471,11 +534,36 @@ export function OcrSettings() {
       if (stopError) {
         reportRunEndFailure("Stopping an OCR scan whose files left failed", stopError.cause, "ocr");
       }
+    };
+    const unsubscribe = useFileStore.subscribe((state) => {
+      if (filesGone) return;
+      if (!hasAnyBatchItem(state)) {
+        filesGone = true;
+        if (!stoppedEarly) stopScanNow(false);
+        return;
+      }
+      if (!hasRemainingWork(state)) {
+        if (!stoppedEarly) stopScanNow(true);
+        return;
+      }
+      if (activeItemIndex !== null && !isBatchItemPresent(activeItemIndex, state)) {
+        activeEntryAborted = true;
+        activeItemIndex = null;
+        const stop = stopInFlight;
+        stopInFlight = null;
+        try {
+          stop?.();
+        } catch (err) {
+          reportRunEndFailure("Stopping an OCR scan whose files left failed", err, "ocr");
+        }
+      }
     });
 
     try {
       for (let i = 0; i < total; i++) {
-        if (filesGone) break;
+        activeIndex = i;
+        if (filesGone || stoppedEarly) break;
+        if (!isBatchItemPresent(i)) continue;
         const file = files[i];
         const prefix = total > 1 ? `[${i + 1}/${total}] ` : "";
         // Each file gets an equal share of the 0-100 progress bar
@@ -490,19 +578,21 @@ export function OcrSettings() {
           ? { fileId: serverFileId, saveMode: capturedSaveMode }
           : undefined;
 
+        activeItemIndex = i;
+        activeEntryAborted = false;
         try {
           const { text, savedFileId } = await ocrOneFile(
             file,
             settings,
             {
               onUploadProgress: (pct) => {
-                if (filesGone) return;
+                if (filesGone || stoppedEarly || activeEntryAborted) return;
                 setProgressPhase("uploading");
                 setProgressPercent(fileBase + (pct / 100) * fileShare * 0.15);
                 setProgressStage(`${prefix}Uploading...`);
               },
               onProcessingProgress: (pct, stage) => {
-                if (filesGone) return;
+                if (filesGone || stoppedEarly || activeEntryAborted) return;
                 setProgressPhase("processing");
                 setProgressPercent(fileBase + fileShare * 0.15 + (pct / 100) * fileShare * 0.85);
                 setProgressStage(`${prefix}${stage}`);
@@ -520,6 +610,8 @@ export function OcrSettings() {
             library,
           );
           if (filesGone) break;
+          if (activeEntryAborted || !isBatchItemPresent(i)) continue;
+          processedCount++;
           // Only single-file runs send a fileId, so savedFileId is single-file only.
           if (savedFileId) {
             autoSavedFileId = savedFileId;
@@ -532,6 +624,8 @@ export function OcrSettings() {
           );
         } catch (err) {
           if (filesGone) break;
+          if (activeEntryAborted || !isBatchItemPresent(i)) continue;
+          processedCount++;
           const msg = err instanceof Error ? err.message : String(err);
           errors.push(`${file.name}: ${msg}`);
           results.push(
@@ -540,53 +634,28 @@ export function OcrSettings() {
               : "",
           );
         } finally {
+          activeItemIndex = null;
           stopInFlight = null;
         }
       }
     } finally {
       unsubscribe();
       clearRunProgressTimer(runTimer);
-      if (!filesGone) setProgressPhase("idle");
+      if (!filesGone && !stoppedEarly) setProgressPhase("idle");
     }
 
     // The text and errors belong to a scan that was stopped. Its store watch
     // already cleared processing when the stop fired, so don't write it again
     // after the await where a next run may have started (#1994).
-    if (filesGone) {
+    if (filesGone || stoppedEarly || processedCount === 0) {
+      if (!filesGone && !stoppedEarly) {
+        setProcessing(false);
+      }
       return;
     }
 
-    const joined = results.join("\n\n");
     try {
-      if (errors.length === total) {
-        setError(errors.join("; "));
-      } else if (errors.length > 0) {
-        setError(format(t.toolSettings.ocr.filesFailed, { failed: errors.length, total }));
-      }
-
-      if (errors.length < total && capturedEntryId && joined.length > 0) {
-        const store = useFileStore.getState();
-        const prevUrl = store.entries.find((e) => e.id === capturedEntryId)?.processedUrl;
-        if (prevUrl?.startsWith("blob:")) URL.revokeObjectURL(prevUrl);
-        const blob = new Blob([joined], { type: "text/plain" });
-        const url = URL.createObjectURL(blob);
-        store.updateEntryById(capturedEntryId, {
-          processedUrl: url,
-          processedFilename: ocrFilenameFor(files),
-          status: "completed",
-          ...(autoSavedFileId && capturedSaveMode === "overwrite"
-            ? { serverFileId: autoSavedFileId }
-            : {}),
-        });
-        if (autoSavedFileId) {
-          store.markClaimedById(capturedEntryId);
-        }
-      }
-      updateOcrResult({
-        text: joined,
-        savedLibraryFileId: autoSavedFileId ?? null,
-        resultEntryId: capturedEntryId,
-      });
+      commitCompletedResults();
     } finally {
       setProcessing(false);
     }

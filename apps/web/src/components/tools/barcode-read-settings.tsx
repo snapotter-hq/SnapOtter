@@ -340,23 +340,65 @@ export function BarcodeReadSettings() {
     // also unmounts when the layout swaps across the breakpoint, and that must
     // not end the scan.
     const startStopCount = useFileStore.getState().stopCount;
+    let activeIndex = 0;
+    let activeItemIndex: number | null = null;
+    let activeEntryAborted = false;
     let filesGone = false;
+    let stoppedEarly = false;
     let stopInFlight: (() => void) | null = null;
-    const unsubscribe = useFileStore.subscribe((state) => {
-      if (
-        filesGone ||
-        (state.stopCount === startStopCount &&
-          state.files.some((f) => runFiles.has(f)) &&
-          (runEntryIds.size === 0 || state.entries.some((e) => runEntryIds.has(e.id))))
-      ) {
-        return;
+    const isBatchItemPresent = (index: number, state = useFileStore.getState()): boolean => {
+      const file = files[index];
+      if (!file) return false;
+      const entry = initialEntries[index];
+      if (entry) {
+        return state.entries.some((e) => e.id === entry.id && e.file === file);
       }
-      filesGone = true;
+      return state.files.includes(file);
+    };
+    const hasAnyBatchItem = (state: ReturnType<typeof useFileStore.getState>): boolean => {
+      if (state.stopCount !== startStopCount) return false;
+      for (let idx = 0; idx < total; idx++) {
+        if (isBatchItemPresent(idx, state)) return true;
+      }
+      return false;
+    };
+    const hasRemainingWork = (state: ReturnType<typeof useFileStore.getState>): boolean => {
+      if (state.stopCount !== startStopCount) return false;
+      for (let idx = activeIndex; idx < total; idx++) {
+        if (isBatchItemPresent(idx, state)) return true;
+      }
+      return false;
+    };
+    let processedCount = 0;
+    let resultsCommitted = false;
+    const commitCompletedResults = () => {
+      if (resultsCommitted || filesGone || processedCount === 0) return;
+      resultsCommitted = true;
+      if (errors.length === processedCount) {
+        setError(errors.join("; "));
+      } else if (errors.length > 0) {
+        setError(
+          format(t.toolSettings["barcode-read"].filesFailed, {
+            count: errors.length,
+            total: processedCount,
+          }),
+        );
+      }
+
+      setBarcodeResults(allResults);
+    };
+    const stopScanNow = (commitPartial: boolean) => {
+      stoppedEarly = true;
+      activeEntryAborted = true;
+      activeItemIndex = null;
+      const stop = stopInFlight;
+      stopInFlight = null;
       // This runs inside whoever replaced the files or left the route: a throw
       // here must not break their update.
       let stopError: { cause: unknown } | null = null;
       for (const step of [
-        () => stopInFlight?.(),
+        () => stop?.(),
+        ...(commitPartial ? [commitCompletedResults] : []),
         () => {
           if (useFileStore.getState().processing) setProcessing(false);
         },
@@ -375,17 +417,48 @@ export function BarcodeReadSettings() {
           "barcode-read",
         );
       }
+    };
+    const unsubscribe = useFileStore.subscribe((state) => {
+      if (filesGone) return;
+      if (!hasAnyBatchItem(state)) {
+        filesGone = true;
+        if (!stoppedEarly) stopScanNow(false);
+        return;
+      }
+      if (!hasRemainingWork(state)) {
+        if (!stoppedEarly) stopScanNow(true);
+        return;
+      }
+      if (activeItemIndex !== null && !isBatchItemPresent(activeItemIndex, state)) {
+        activeEntryAborted = true;
+        activeItemIndex = null;
+        const stop = stopInFlight;
+        stopInFlight = null;
+        try {
+          stop?.();
+        } catch (err) {
+          reportRunEndFailure(
+            "Stopping a barcode scan whose files left failed",
+            err,
+            "barcode-read",
+          );
+        }
+      }
     });
 
     try {
       for (let i = 0; i < total; i++) {
-        if (filesGone) break;
+        activeIndex = i;
+        if (filesGone || stoppedEarly) break;
+        if (!isBatchItemPresent(i)) continue;
         const file = files[i];
         const entryId = entryIds[i];
         const prefix = total > 1 ? `[${i + 1}/${total}] ` : "";
         const fileBase = (i / total) * 100;
         const fileShare = 100 / total;
 
+        activeItemIndex = i;
+        activeEntryAborted = false;
         try {
           setProgressStage(
             `${prefix}${format(t.toolSettings["barcode-read"].scanningFile, { name: file.name })}`,
@@ -395,12 +468,12 @@ export function BarcodeReadSettings() {
             file,
             tryHarder,
             (pct) => {
-              if (filesGone) return;
+              if (filesGone || stoppedEarly || activeEntryAborted) return;
               setProgressPhase("uploading");
               setProgressPercent(fileBase + (pct / 100) * fileShare * 0.5);
             },
             (answer) => {
-              if (filesGone) return;
+              if (filesGone || activeEntryAborted || !isBatchItemPresent(i)) return;
               setProgressPhase("processing");
               setProgressPercent(fileBase + fileShare);
 
@@ -425,39 +498,41 @@ export function BarcodeReadSettings() {
             },
             t,
           );
+          if (filesGone) break;
+          if (activeEntryAborted || !isBatchItemPresent(i)) continue;
+          processedCount++;
         } catch (err) {
           if (filesGone) break;
+          if (activeEntryAborted || !isBatchItemPresent(i)) continue;
+          const hadLandedResult = allResults.length === processedCount + 1;
+          processedCount++;
           const msg = err instanceof Error ? err.message : String(err);
           errors.push(`${file.name}: ${msg}`);
           // A throw while landing comes after this file's barcodes went in.
-          if (allResults.length === i) allResults.push({ filename: file.name, barcodes: [] });
+          if (!hadLandedResult) allResults.push({ filename: file.name, barcodes: [] });
         } finally {
+          activeItemIndex = null;
           stopInFlight = null;
         }
       }
     } finally {
       unsubscribe();
       clearRunProgressTimer(runTimer);
-      if (!filesGone) setProgressPhase("idle");
+      if (!filesGone && !stoppedEarly) setProgressPhase("idle");
     }
 
     // The results and errors belong to a scan that was stopped. Its store watch
     // already cleared processing when the stop fired, so don't write it again
     // after the await where a next run may have started (#1994).
-    if (filesGone) {
+    if (filesGone || stoppedEarly || processedCount === 0) {
+      if (!filesGone && !stoppedEarly) {
+        setProcessing(false);
+      }
       return;
     }
 
     try {
-      if (errors.length === total) {
-        setError(errors.join("; "));
-      } else if (errors.length > 0) {
-        setError(
-          format(t.toolSettings["barcode-read"].filesFailed, { count: errors.length, total }),
-        );
-      }
-
-      setBarcodeResults(allResults);
+      commitCompletedResults();
     } finally {
       setProcessing(false);
     }

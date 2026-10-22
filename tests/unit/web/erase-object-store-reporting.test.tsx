@@ -2763,6 +2763,100 @@ describe("erase-object batch: leaving the page mid-batch (#1894)", () => {
 
     expect(useFileStore.getState().processing).toBe(true);
   });
+
+  it("skips a queued entry removed via removeFile mid-batch and finishes the remaining entries (#3465)", async () => {
+    renderPanel(3);
+    const first = await submit(1);
+
+    act(() => {
+      useFileStore.getState().removeFile(1);
+    });
+    expect(first.aborted).toBe(false);
+    expect(useFileStore.getState().processing).toBe(true);
+
+    first.respond(200, GOOD_BODY);
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    FakeXhr.instances[1].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(FakeXhr.instances).toHaveLength(2);
+    expect(entry(0).status).toBe("completed");
+    expect(entry(1).file.name).toBe("three.png");
+    expect(entry(1).status).toBe("completed");
+  });
+
+  it("aborts only the in-flight entry when removed via removeFile and continues to the remaining entries (#3465)", async () => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png"), image("three.png")]);
+    renderPanel(3);
+    const first = await submit(1);
+    const abortBoom = new Error("abort blew up on partial removeFile");
+    vi.spyOn(first, "abort").mockImplementationOnce(() => {
+      throw abortBoom;
+    });
+
+    expect(() =>
+      act(() => {
+        useFileStore.getState().removeFile(0);
+      }),
+    ).not.toThrow();
+    expect(FakeEventSource.instances[0].readyState).toBe(2);
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    const [reportedErr, reportedTags] = vi.mocked(captureHandledError).mock.calls[0];
+    expect(reportedErr.message).toBe("Stopping an Erase Object batch whose files left failed");
+    expect(reportedErr.cause).toBe(abortBoom);
+    expect(reportedTags).toEqual({ error_class: "bug", tool_id: "erase-object" });
+
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    const second = FakeXhr.instances[1];
+    second.respond(202, { jobId: "queued-2", async: true });
+    const closeBoom = new Error("stream close blew up on partial removeFile");
+    vi.spyOn(FakeEventSource.instances[1], "close").mockImplementationOnce(() => {
+      throw closeBoom;
+    });
+
+    expect(() =>
+      act(() => {
+        useFileStore.getState().removeFile(0);
+      }),
+    ).not.toThrow();
+    const secondJobId = second.body?.get("clientJobId");
+    await waitFor(() =>
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        `/api/v1/jobs/${secondJobId}/cancel`,
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(captureHandledError).mock.calls[1][0].cause).toBe(closeBoom);
+
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(3));
+    FakeXhr.instances[2].respond(200, GOOD_BODY);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(FakeXhr.instances).toHaveLength(3);
+    expect(entry(0).file.name).toBe("three.png");
+    expect(entry(0).status).toBe("completed");
+  });
+
+  it("aborts the last remaining in-flight entry when removed via removeFile after an earlier entry completed, clears processing, and preserves the completed entry (#3465)", async () => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    renderPanel(2);
+    const first = await submit(1);
+    first.respond(200, GOOD_BODY);
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    const second = FakeXhr.instances[1];
+
+    act(() => {
+      useFileStore.getState().removeFile(1);
+    });
+
+    expect(second.aborted).toBe(true);
+    expect(FakeEventSource.instances[1].readyState).toBe(2);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(entry(0).file.name).toBe("one.png");
+    expect(entry(0).status).toBe("completed");
+  });
 });
 
 describe("erase-object single file: leaving the page mid-run (#1975)", () => {

@@ -2554,4 +2554,131 @@ describe("multi-file self-posting panels partial removeFile (#3446)", () => {
 
     anchorClickSpy.mockRestore();
   });
+
+  it("split: aborts the combined split run, revokes preview tile blob URLs, and clears processing when any participating input entry is removed mid-run (#3465)", async () => {
+    const AdmZip = (await import("adm-zip")).default;
+    const zip = new AdmZip();
+    zip.addFile("tile_r0_c0.png", Buffer.from([1, 2, 3]));
+    const zipBytes = new Uint8Array(zip.toBuffer());
+
+    // 1. Removing the first or second file while the first file is in flight aborts fetch and clears processing.
+    let resolveFirst: (res: Response) => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init?: RequestInit) => {
+        fetchSignals.push(init?.signal ?? undefined);
+        return new Promise<Response>((resolve) => {
+          resolveFirst = resolve;
+        });
+      }),
+    );
+
+    useFileStore.getState().reset();
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    const view1 = render(<SplitSettings />);
+    fireEvent.click(screen.getByTestId("split-submit"));
+    await vi.waitFor(() => expect(fetchSignals).toHaveLength(1));
+    expect(useSplitStore.getState().processing).toBe(true);
+
+    act(() => {
+      useFileStore.getState().removeFile(1);
+    });
+
+    expect(useFileStore.getState().entries).toHaveLength(1);
+    expect(fetchSignals[0]?.aborted).toBe(true);
+    expect(useSplitStore.getState().processing).toBe(false);
+
+    await act(async () => {
+      resolveFirst({
+        ok: true,
+        status: 200,
+        blob: async () => zipBytes as unknown as Blob,
+      } as Response);
+    });
+
+    expect(fetchSignals).toHaveLength(1);
+    expect(useSplitStore.getState().tiles).toEqual([]);
+    expect(useSplitStore.getState().zipBlobUrl).toBeNull();
+    expect(useSplitStore.getState().processing).toBe(false);
+    view1.unmount();
+
+    // 2. Removing the second file while the second file is in flight revokes preview tile blob URLs from the first file and clears processing.
+    fetchSignals.length = 0;
+    let callCount = 0;
+    let resolveSecond: (res: Response) => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init?: RequestInit) => {
+        callCount++;
+        fetchSignals.push(init?.signal ?? undefined);
+        if (callCount === 1) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            blob: async () => zipBytes as unknown as Blob,
+          } as Response);
+        }
+        return new Promise<Response>((resolve) => {
+          resolveSecond = resolve;
+        });
+      }),
+    );
+
+    useFileStore.getState().reset();
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    const view2 = render(<SplitSettings />);
+    fireEvent.click(screen.getByTestId("split-submit"));
+    await vi.waitFor(() => expect(fetchSignals).toHaveLength(2));
+    expect(useSplitStore.getState().processing).toBe(true);
+
+    vi.mocked(URL.revokeObjectURL).mockClear();
+    act(() => {
+      useFileStore.getState().removeFile(1);
+    });
+
+    expect(fetchSignals[1]?.aborted).toBe(true);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:mock");
+    expect(useSplitStore.getState().processing).toBe(false);
+    expect(useSplitStore.getState().tiles).toEqual([]);
+    expect(useSplitStore.getState().zipBlobUrl).toBeNull();
+
+    vi.mocked(URL.revokeObjectURL).mockClear();
+    await act(async () => {
+      resolveSecond({
+        ok: true,
+        status: 200,
+        blob: async () => zipBytes as unknown as Blob,
+      } as Response);
+    });
+
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+    expect(useSplitStore.getState().tiles).toEqual([]);
+    expect(useSplitStore.getState().zipBlobUrl).toBeNull();
+    expect(useSplitStore.getState().processing).toBe(false);
+
+    // 3. Adding a non-participating file mid-run and removing it keeps the split run in flight.
+    fetchSignals.length = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init?: RequestInit) => {
+        fetchSignals.push(init?.signal ?? undefined);
+        return new Promise<Response>(() => {});
+      }),
+    );
+    act(() => {
+      useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    });
+    fireEvent.click(screen.getByTestId("split-submit"));
+    await vi.waitFor(() => expect(fetchSignals).toHaveLength(1));
+    act(() => {
+      useFileStore.getState().addFiles([image("extra.png")]);
+      useFileStore.getState().removeFile(2);
+    });
+    expect(fetchSignals[0]?.aborted).toBe(false);
+    expect(useSplitStore.getState().processing).toBe(true);
+    act(() => {
+      useFileStore.getState().reset();
+    });
+    view2.unmount();
+  });
 });

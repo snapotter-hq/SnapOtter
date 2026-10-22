@@ -125,7 +125,8 @@ const panels: Panel[] = [
     goodBody: { filename: "one.png", barcodes: [], annotatedUrl: ANNOTATED_URL },
     stopMessage: "Stopping a barcode scan whose files left failed",
     toolId: "barcode-read",
-    shownResult: () => screen.queryByText(en.toolSettings["barcode-read"].noBarcodesFound),
+    shownResult: () =>
+      screen.queryAllByText(en.toolSettings["barcode-read"].noBarcodesFound)[0] ?? null,
     writesEntries: true,
   },
   {
@@ -382,6 +383,141 @@ describe.each(panels)("$name: the scan stops once its files leave the store (#19
     await act(async () => {});
 
     expect(useFileStore.getState().processing).toBe(true);
+  });
+
+  it("skips a queued entry removed via removeFile mid-scan and finishes the remaining entries (#3465)", async () => {
+    panel.render();
+    const first = await submit(panel);
+
+    act(() => {
+      useFileStore.getState().removeFile(1);
+    });
+    expect(first.aborted).toBe(false);
+    expect(useFileStore.getState().processing).toBe(true);
+
+    first.respond(200, panel.goodBody);
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    FakeXhr.instances[1].respond(
+      200,
+      panel.writesEntries
+        ? { ...(panel.goodBody as Record<string, unknown>), filename: "three.png" }
+        : panel.goodBody,
+    );
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(FakeXhr.instances).toHaveLength(2);
+    expect(panel.shownResult()).not.toBeNull();
+    if (panel.writesEntries) {
+      expect(entry(0).status).toBe("completed");
+      expect(entry(1).file.name).toBe("three.png");
+      expect(entry(1).status).toBe("completed");
+    }
+  });
+
+  it("aborts only the in-flight entry when removed via removeFile and continues to the remaining entries (#3465)", async () => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png"), image("three.png")]);
+    panel.render();
+    const first = await submit(panel);
+
+    act(() => {
+      useFileStore.getState().removeFile(0);
+    });
+    expect(first.aborted).toBe(true);
+    expect(useFileStore.getState().processing).toBe(true);
+
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    const second = FakeXhr.instances[1];
+    const abortBoom = new Error("abort blew up on partial removeFile");
+    vi.spyOn(second, "abort").mockImplementationOnce(() => {
+      throw abortBoom;
+    });
+
+    expect(() =>
+      act(() => {
+        useFileStore.getState().removeFile(0);
+      }),
+    ).not.toThrow();
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    const [reportedErr, reportedTags] = vi.mocked(captureHandledError).mock.calls[0];
+    expect(reportedErr.message).toBe(panel.stopMessage);
+    expect(reportedErr.cause).toBe(abortBoom);
+    expect(reportedTags).toEqual({ error_class: "bug", tool_id: panel.toolId });
+
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(3));
+    FakeXhr.instances[2].respond(200, panel.goodBody);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(FakeXhr.instances).toHaveLength(3);
+    expect(useFileStore.getState().error).toBeNull();
+    expect(panel.shownResult()).not.toBeNull();
+    expect(entry(0).file.name).toBe("three.png");
+    expect(entry(0).status).toBe("completed");
+    expect(entry(0).processedUrl).not.toBeNull();
+  });
+
+  it("aborts the last remaining in-flight entry when removed via removeFile after an earlier entry completed, clears processing, and preserves the completed entry's result (#3465)", async () => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    panel.render();
+    const first = await submit(panel);
+    first.respond(200, panel.goodBody);
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    const second = FakeXhr.instances[1];
+
+    act(() => {
+      useFileStore.getState().removeFile(1);
+    });
+
+    expect(second.aborted).toBe(true);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().error).toBeNull();
+    expect(panel.shownResult()).not.toBeNull();
+    expect(entry(0).file.name).toBe("one.png");
+    expect(entry(0).status).toBe("completed");
+    expect(entry(0).processedUrl).not.toBeNull();
+
+    // Starting a new scan on the remaining entry before the stopped scan's microtask drains is not clobbered.
+    fireEvent.click(screen.getByTestId(panel.submitTestId));
+    await act(async () => {});
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(FakeXhr.instances).toHaveLength(3);
+    FakeXhr.instances[2].respond(200, panel.goodBody);
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+  });
+
+  it("counts errors against processedCount when entries are removed via removeFile mid-scan (#3465)", async () => {
+    // 1. Removing entry 0 while in flight and failing entry 1 reports the single-entry error (errors.length === processedCount).
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    panel.render();
+    await submit(panel);
+
+    act(() => {
+      useFileStore.getState().removeFile(0);
+    });
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    FakeXhr.instances[1].respond(500, { error: "Scan failed on two" });
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(useFileStore.getState().error).toContain("two.png:");
+    expect(useFileStore.getState().error).toContain("Scan failed on two");
+
+    // 2. Removing entry 1 while queued, succeeding on entry 0, and failing on entry 2 formats filesFailed against processedCount (2, not 3).
+    FakeXhr.instances = [];
+    act(() => {
+      useFileStore.getState().setFiles([image("one.png"), image("two.png"), image("three.png")]);
+    });
+    const run2First = await submit(panel);
+    act(() => {
+      useFileStore.getState().removeFile(1);
+    });
+    run2First.respond(200, panel.goodBody);
+    await waitFor(() => expect(FakeXhr.instances).toHaveLength(2));
+    FakeXhr.instances[1].respond(500, { error: "Scan failed on three" });
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+    expect(useFileStore.getState().error).toContain("1");
+    expect(useFileStore.getState().error).toContain("2");
+    expect(useFileStore.getState().error).not.toContain("3");
   });
 });
 
