@@ -9,6 +9,7 @@ import { gzipSync } from "node:zlib";
 import { SafeError } from "@snapotter/shared";
 import Fastify, { type FastifyRequest } from "fastify";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 const onConflictDoUpdateMock = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<{ rowCount: number }>>(async () => ({ rowCount: 1 })),
@@ -256,9 +257,11 @@ vi.mock("../../../apps/api/src/permissions.js", () => ({
 }));
 
 import { autoOrient } from "../../../apps/api/src/lib/auto-orient.js";
+import { getFirstMissingBundleForTool } from "../../../apps/api/src/lib/feature-status.js";
 import { validateImageBuffer } from "../../../apps/api/src/lib/file-validation.js";
 import { createUniqueNamer } from "../../../apps/api/src/lib/filename.js";
 import { logger } from "../../../apps/api/src/lib/logger.js";
+import { hasEffectiveToolAccess } from "../../../apps/api/src/permissions.js";
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
 import {
   pipelineDefinitionSchema,
@@ -486,20 +489,535 @@ describe("pipeline tool registry lookup", () => {
 
 // ── Pipeline step error wrapping ───────────────────────────────────────
 
+async function invokePipelineExecuteRoute(
+  parts: Array<
+    | { type: "file"; filename: string; content: Buffer }
+    | { type: "field"; fieldname: string; value: string }
+  >,
+  logOverride?: { error: ReturnType<typeof vi.fn>; warn: ReturnType<typeof vi.fn> },
+) {
+  let handler: ((req: unknown, rep: unknown) => Promise<unknown>) | undefined;
+  await registerPipelineRoutes({
+    post: vi.fn((url: string, _opts: unknown, fn: typeof handler) => {
+      if (url === "/api/v1/pipeline/execute") handler = fn;
+    }),
+    get: vi.fn(),
+    delete: vi.fn(),
+    log: { info: vi.fn() },
+  } as never);
+
+  const request = {
+    headers: {},
+    log: logOverride ?? { error: vi.fn(), warn: vi.fn() },
+    raw: {
+      aborted: false,
+      once: vi.fn(),
+      removeListener: vi.fn(),
+    },
+    parts: async function* () {
+      for (const p of parts) {
+        if (p.type === "file") {
+          yield {
+            type: "file" as const,
+            fieldname: "file",
+            filename: p.filename,
+            file: Readable.from([p.content]),
+          };
+        } else {
+          yield p;
+        }
+      }
+    },
+  };
+  const reply = {
+    statusCode: 200,
+    payload: undefined as unknown,
+    status(code: number) {
+      this.statusCode = code;
+      return this;
+    },
+    send(payload: unknown) {
+      this.payload = payload;
+      return payload;
+    },
+  };
+
+  if (!handler) {
+    throw new Error("POST /api/v1/pipeline/execute handler was not registered");
+  }
+  await handler(request, reply);
+  return reply;
+}
+
+async function invokePipelineBatchRoute(
+  parts: Array<
+    | { type: "file"; filename: string; content: Buffer }
+    | { type: "field"; fieldname: string; value: string }
+  >,
+  log: { error: ReturnType<typeof vi.fn>; warn: ReturnType<typeof vi.fn> } = {
+    error: vi.fn(),
+    warn: vi.fn(),
+  },
+) {
+  let handler: ((req: unknown, rep: unknown) => Promise<unknown>) | undefined;
+  await registerPipelineRoutes({
+    post: vi.fn((url: string, _opts: unknown, fn: typeof handler) => {
+      if (url === "/api/v1/pipeline/batch") handler = fn;
+    }),
+    get: vi.fn(),
+    delete: vi.fn(),
+    log: { info: vi.fn() },
+  } as never);
+
+  const request = {
+    headers: {},
+    log,
+    raw: {
+      aborted: false,
+      once: vi.fn(),
+      removeListener: vi.fn(),
+    },
+    parts: async function* () {
+      for (const p of parts) {
+        if (p.type === "file") {
+          yield {
+            type: "file" as const,
+            fieldname: "file",
+            filename: p.filename,
+            file: Readable.from([p.content]),
+          };
+        } else {
+          yield p;
+        }
+      }
+    },
+  };
+  const reply = {
+    statusCode: 200,
+    payload: undefined as unknown,
+    log: request.log,
+    status(code: number) {
+      this.statusCode = code;
+      return this;
+    },
+    send(payload: unknown) {
+      this.payload = payload;
+      return payload;
+    },
+  };
+
+  if (!handler) {
+    throw new Error("POST /api/v1/pipeline/batch handler was not registered");
+  }
+  await handler(request, reply);
+  return reply;
+}
+
 describe("pipeline step error message formatting", () => {
-  it("wraps step errors with step number and tool ID", () => {
-    const stepErr = new Error("Invalid dimensions");
-    const i = 2;
-    const toolId = "resize";
-    const msg = stepErr instanceof Error ? stepErr.message : "Processing failed";
-    const wrapped = `Step ${i + 1} (${toolId}): ${msg}`;
-    expect(wrapped).toBe("Step 3 (resize): Invalid dimensions");
+  const stepErrorTestToolId = `pipeline-step-err-${Math.random().toString(36).slice(2, 8)}`;
+  const stepSettingsSchema = z.object({
+    width: z.number().int().positive("Width must be positive").optional(),
+    height: z.number().int().positive("Height must be positive").optional(),
   });
 
-  it("falls back to generic message for non-Error", () => {
-    const stepErr = "some string";
-    const msg = stepErr instanceof Error ? stepErr.message : "Processing failed";
-    expect(msg).toBe("Processing failed");
+  registerToolProcessFn({
+    toolId: stepErrorTestToolId,
+    settingsSchema: stepSettingsSchema,
+    process: async (buf: Buffer) => ({
+      buffer: buf,
+      filename: "out.png",
+      contentType: "image/png",
+    }),
+  });
+  registerToolProcessFn({
+    toolId: "protect-pdf",
+    settingsSchema: z.object({ userPassword: z.string() }),
+    process: async () => {
+      throw new Error("unused");
+    },
+  });
+  registerToolProcessFn({
+    toolId: "ocr-pdf",
+    settingsSchema: {
+      safeParse: (d: unknown) => ({ success: true, data: d ?? {} }),
+      parse: (d: unknown) => d ?? {},
+    } as never,
+    process: async () => {
+      throw new Error("unused");
+    },
+  });
+
+  it("formats unknown-tool 400 errors with 1-based step number and tool ID (#3346)", async () => {
+    vi.clearAllMocks();
+
+    const reply = await invokePipelineExecuteRoute([
+      { type: "file", filename: "photo.png", content: Buffer.from("png-bytes") },
+      {
+        type: "field",
+        fieldname: "pipeline",
+        value: JSON.stringify({
+          steps: [
+            { toolId: stepErrorTestToolId, settings: { width: 100 } },
+            { toolId: "unknown-step-tool", settings: {} },
+          ],
+        }),
+      },
+    ]);
+
+    expect(reply.statusCode).toBe(400);
+    expect(reply.payload).toEqual({
+      error: "Step 2 (unknown-step-tool): Tool not found or not available",
+    });
+    expect(putObjectMock).not.toHaveBeenCalled();
+    expect(flowAddMock).not.toHaveBeenCalled();
+
+    const aliasReply = await invokePipelineExecuteRoute([
+      { type: "file", filename: "photo.png", content: Buffer.from("png-bytes") },
+      {
+        type: "field",
+        fieldname: "pipeline",
+        value: JSON.stringify({
+          steps: [
+            { toolId: stepErrorTestToolId, settings: { width: 100 } },
+            { toolId: "resize", settings: { contentAware: true, width: 100 } },
+          ],
+        }),
+      },
+    ]);
+
+    expect(aliasReply.statusCode).toBe(400);
+    expect(aliasReply.payload).toEqual({
+      error: "Step 2 (resize): Tool not found or not available",
+    });
+  });
+
+  it("formats invalid-settings 400 errors with 1-based step number, tool ID, and issue details (#3346)", async () => {
+    vi.clearAllMocks();
+
+    const reply = await invokePipelineExecuteRoute([
+      { type: "file", filename: "photo.png", content: Buffer.from("png-bytes") },
+      {
+        type: "field",
+        fieldname: "pipeline",
+        value: JSON.stringify({
+          steps: [
+            { toolId: stepErrorTestToolId, settings: { width: 100 } },
+            { toolId: stepErrorTestToolId, settings: { width: -10 } },
+          ],
+        }),
+      },
+    ]);
+
+    expect(reply.statusCode).toBe(400);
+    expect(reply.payload).toEqual({
+      error: `Step 2 (${stepErrorTestToolId}): Invalid settings`,
+      details: [{ path: "width", message: "Width must be positive" }],
+    });
+    expect(putObjectMock).not.toHaveBeenCalled();
+    expect(flowAddMock).not.toHaveBeenCalled();
+  });
+
+  it("formats permission, password-tool, OCR capability, missing-bundle, and pixel-limit step errors with 1-based step index (#3346)", async () => {
+    vi.clearAllMocks();
+    const prevMaxPixels = envMock.MAX_PIPELINE_STEP_PIXELS;
+
+    try {
+      vi.mocked(hasEffectiveToolAccess).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+      const forbiddenReply = await invokePipelineExecuteRoute([
+        { type: "file", filename: "photo.png", content: Buffer.from("png-bytes") },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [
+              { toolId: stepErrorTestToolId, settings: {} },
+              { toolId: stepErrorTestToolId, settings: {} },
+            ],
+          }),
+        },
+      ]);
+      expect(forbiddenReply.statusCode).toBe(403);
+      expect(forbiddenReply.payload).toEqual({
+        error: `Step 2 (${stepErrorTestToolId}): You don't have permission to use this tool`,
+      });
+
+      const passwordToolReply = await invokePipelineExecuteRoute([
+        { type: "file", filename: "photo.png", content: Buffer.from("png-bytes") },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [
+              { toolId: stepErrorTestToolId, settings: {} },
+              { toolId: "protect-pdf", settings: { userPassword: "secret" } },
+            ],
+          }),
+        },
+      ]);
+      expect(passwordToolReply.statusCode).toBe(400);
+      expect(passwordToolReply.payload).toEqual({
+        error: "Step 2: This tool cannot be used in pipelines because it requires a password",
+      });
+
+      const ocrIncompatibleReply = await invokePipelineExecuteRoute([
+        { type: "file", filename: "photo.png", content: Buffer.from("png-bytes") },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [
+              { toolId: stepErrorTestToolId, settings: {} },
+              { toolId: "ocr-pdf", settings: { quality: "fast", language: "ko" } },
+            ],
+          }),
+        },
+      ]);
+      expect(ocrIncompatibleReply.statusCode).toBe(501);
+      expect(ocrIncompatibleReply.payload).toEqual({
+        error: 'Step 2 (ocr-pdf): Feature "OCR" is incompatible',
+        code: "FEATURE_INCOMPATIBLE",
+        feature: "ocr",
+        featureName: "OCR",
+        requestedQuality: "fast",
+        compatibilityReason: "fast-korean-unsupported",
+        guidance: expect.any(String),
+      });
+
+      vi.mocked(getFirstMissingBundleForTool)
+        .mockReturnValueOnce(null)
+        .mockReturnValueOnce("background-removal" as never);
+      const missingBundleReply = await invokePipelineExecuteRoute([
+        { type: "file", filename: "photo.png", content: Buffer.from("png-bytes") },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [
+              { toolId: stepErrorTestToolId, settings: {} },
+              { toolId: stepErrorTestToolId, settings: {} },
+            ],
+          }),
+        },
+      ]);
+      expect(missingBundleReply.statusCode).toBe(501);
+      expect(missingBundleReply.payload).toEqual({
+        error: `Step 2 (${stepErrorTestToolId}): Feature "Background Removal" is not installed`,
+        code: "FEATURE_NOT_INSTALLED",
+        feature: "background-removal",
+        featureName: "Background Removal",
+      });
+
+      envMock.MAX_PIPELINE_STEP_PIXELS = 10_000;
+      const pixelLimitReply = await invokePipelineExecuteRoute([
+        { type: "file", filename: "photo.png", content: Buffer.from("png-bytes") },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [
+              { toolId: stepErrorTestToolId, settings: { width: 50, height: 50 } },
+              { toolId: stepErrorTestToolId, settings: { width: 200, height: 100 } },
+            ],
+          }),
+        },
+      ]);
+      expect(pixelLimitReply.statusCode).toBe(400);
+      expect(pixelLimitReply.payload).toEqual({
+        error: `Step 2 (${stepErrorTestToolId}): Output dimensions 200x100 exceed per-step pixel limit`,
+      });
+    } finally {
+      vi.mocked(hasEffectiveToolAccess).mockReset().mockResolvedValue(true);
+      vi.mocked(getFirstMissingBundleForTool).mockReset().mockReturnValue(null);
+      envMock.MAX_PIPELINE_STEP_PIXELS = prevMaxPixels;
+    }
+  });
+
+  it("forwards the worker finalize step failure message, canceled marker, or 5xx fault status (#3346)", async () => {
+    vi.clearAllMocks();
+    const parts = [
+      { type: "file" as const, filename: "photo.png", content: Buffer.from("png-bytes") },
+      {
+        type: "field" as const,
+        fieldname: "pipeline",
+        value: JSON.stringify({
+          steps: [
+            { toolId: stepErrorTestToolId, settings: { width: 100 } },
+            { toolId: stepErrorTestToolId, settings: { width: 80 } },
+            { toolId: stepErrorTestToolId, settings: { width: 60 } },
+          ],
+        }),
+      },
+    ];
+
+    try {
+      waitForJobMock.mockResolvedValueOnce({
+        outputRefs: [],
+        filename: "photo.png",
+        contentType: "",
+        originalSize: 9,
+        processedSize: 0,
+        resultPayload: {
+          error: "Step 3: Invalid dimensions",
+          stepsCompleted: 2,
+          steps: [
+            { step: 1, toolId: stepErrorTestToolId, size: 9 },
+            { step: 2, toolId: stepErrorTestToolId, size: 9 },
+          ],
+        },
+      });
+
+      const reply = await invokePipelineExecuteRoute(parts);
+      expect(reply.statusCode).toBe(422);
+      expect(reply.payload).toEqual({
+        error: "Step 3: Invalid dimensions",
+        completedSteps: [
+          { step: 1, toolId: stepErrorTestToolId, size: 9 },
+          { step: 2, toolId: stepErrorTestToolId, size: 9 },
+        ],
+      });
+
+      waitForJobMock.mockResolvedValueOnce({
+        outputRefs: [],
+        filename: "photo.png",
+        contentType: "",
+        originalSize: 9,
+        processedSize: 0,
+        resultPayload: {
+          error: "Canceled",
+          canceled: true,
+          stepsCompleted: 1,
+          steps: [{ step: 1, toolId: stepErrorTestToolId, size: 9 }],
+        },
+      });
+
+      const canceledReply = await invokePipelineExecuteRoute(parts);
+      expect(canceledReply.statusCode).toBe(422);
+      expect(canceledReply.payload).toEqual({
+        error: "Canceled",
+        canceled: true,
+        completedSteps: [{ step: 1, toolId: stepErrorTestToolId, size: 9 }],
+      });
+
+      waitForJobMock.mockResolvedValueOnce({
+        outputRefs: [],
+        filename: "photo.png",
+        contentType: "",
+        originalSize: 9,
+        processedSize: 0,
+        resultPayload: {
+          error: "Step 2: PDF engine is not available",
+          httpStatus: 503,
+          code: "ENGINE_UNAVAILABLE",
+          details: "qpdf is not installed",
+          stepsCompleted: 1,
+          steps: [{ step: 1, toolId: stepErrorTestToolId, size: 9 }],
+        },
+      });
+      const log = { error: vi.fn(), warn: vi.fn() };
+      const serverFaultReply = await invokePipelineExecuteRoute(parts, log);
+      expect(serverFaultReply.statusCode).toBe(503);
+      expect(serverFaultReply.payload).toEqual({
+        error: "Step 2: PDF engine is not available",
+        code: "ENGINE_UNAVAILABLE",
+        details: "qpdf is not installed",
+        completedSteps: [{ step: 1, toolId: stepErrorTestToolId, size: 9 }],
+      });
+      expect(log.error).toHaveBeenCalledWith(
+        { toolId: "pipeline", jobId: expect.any(String), code: "ENGINE_UNAVAILABLE" },
+        "pipeline step failed on a server fault",
+      );
+    } finally {
+      waitForJobMock.mockReset();
+      waitForJobMock.mockResolvedValue(null);
+    }
+  });
+
+  it("formats step validation errors on /api/v1/pipeline/batch and /api/v1/pipeline/save (#3346)", async () => {
+    vi.clearAllMocks();
+    const prevMaxPixels = envMock.MAX_PIPELINE_STEP_PIXELS;
+
+    const app = Fastify({ logger: false });
+    registerErrorHandler(app);
+    await registerPipelineRoutes(app);
+    await app.ready();
+
+    try {
+      const batchUnknownReply = await invokePipelineBatchRoute([
+        { type: "file", filename: "photo.png", content: Buffer.from("png-bytes") },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [
+              { toolId: stepErrorTestToolId, settings: {} },
+              { toolId: "unknown-batch-tool", settings: {} },
+            ],
+          }),
+        },
+      ]);
+      expect(batchUnknownReply.statusCode).toBe(400);
+      expect(batchUnknownReply.payload).toEqual({
+        error: 'Step 2: Tool "unknown-batch-tool" not found',
+      });
+
+      const batchInvalidSettingsReply = await invokePipelineBatchRoute([
+        { type: "file", filename: "photo.png", content: Buffer.from("png-bytes") },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [
+              { toolId: stepErrorTestToolId, settings: { width: 100 } },
+              { toolId: stepErrorTestToolId, settings: { width: -5 } },
+            ],
+          }),
+        },
+      ]);
+      expect(batchInvalidSettingsReply.statusCode).toBe(400);
+      expect(batchInvalidSettingsReply.payload).toEqual({
+        error: `Step 2 (${stepErrorTestToolId}): Invalid settings`,
+        details: [{ path: "width", message: "Width must be positive" }],
+      });
+
+      const saveUnknownRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/pipeline/save",
+        headers: { "content-type": "application/json" },
+        payload: {
+          name: "Unknown Step Pipeline",
+          steps: [
+            { toolId: stepErrorTestToolId, settings: {} },
+            { toolId: "unknown-save-tool", settings: {} },
+          ],
+        },
+      });
+      expect(saveUnknownRes.statusCode).toBe(400);
+      expect(saveUnknownRes.json()).toEqual({
+        error: 'Step 2: Tool "unknown-save-tool" not found',
+      });
+
+      vi.mocked(hasEffectiveToolAccess).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+      const saveForbiddenRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/pipeline/save",
+        headers: { "content-type": "application/json" },
+        payload: {
+          name: "Forbidden Step Pipeline",
+          steps: [
+            { toolId: stepErrorTestToolId, settings: {} },
+            { toolId: stepErrorTestToolId, settings: {} },
+          ],
+        },
+      });
+      expect(saveForbiddenRes.statusCode).toBe(403);
+      expect(saveForbiddenRes.json()).toEqual({
+        error: "Step 2: You don't have permission to use this tool",
+      });
+    } finally {
+      await app.close();
+      vi.mocked(hasEffectiveToolAccess).mockReset().mockResolvedValue(true);
+      envMock.MAX_PIPELINE_STEP_PIXELS = prevMaxPixels;
+    }
   });
 });
 
@@ -588,67 +1106,6 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
       contentType: "image/png",
     }),
   });
-
-  async function invokePipelineBatchRoute(
-    parts: Array<
-      | { type: "file"; filename: string; content: Buffer }
-      | { type: "field"; fieldname: string; value: string }
-    >,
-    log: { error: ReturnType<typeof vi.fn>; warn: ReturnType<typeof vi.fn> } = {
-      error: vi.fn(),
-      warn: vi.fn(),
-    },
-  ) {
-    let handler: ((req: unknown, rep: unknown) => Promise<unknown>) | undefined;
-    await registerPipelineRoutes({
-      post: vi.fn((url: string, _opts: unknown, fn: typeof handler) => {
-        if (url === "/api/v1/pipeline/batch") handler = fn;
-      }),
-      get: vi.fn(),
-      delete: vi.fn(),
-      log: { info: vi.fn() },
-    } as never);
-
-    const request = {
-      headers: {},
-      log,
-      raw: {
-        aborted: false,
-        once: vi.fn(),
-        removeListener: vi.fn(),
-      },
-      parts: async function* () {
-        for (const p of parts) {
-          if (p.type === "file") {
-            yield {
-              type: "file" as const,
-              fieldname: "file",
-              filename: p.filename,
-              file: Readable.from([p.content]),
-            };
-          } else {
-            yield p;
-          }
-        }
-      },
-    };
-    const reply = {
-      statusCode: 200,
-      payload: undefined as unknown,
-      log: request.log,
-      status(code: number) {
-        this.statusCode = code;
-        return this;
-      },
-      send(payload: unknown) {
-        this.payload = payload;
-        return payload;
-      },
-    };
-
-    await handler?.(request, reply);
-    return reply;
-  }
 
   it("removes empty spooled files without calling readFile and preserves slot alignment (#2684)", async () => {
     vi.clearAllMocks();
@@ -1738,63 +2195,6 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
       throw new Error("unused");
     },
   });
-
-  async function invokePipelineExecuteRoute(
-    parts: Array<
-      | { type: "file"; filename: string; content: Buffer }
-      | { type: "field"; fieldname: string; value: string }
-    >,
-    logOverride?: { error: ReturnType<typeof vi.fn>; warn: ReturnType<typeof vi.fn> },
-  ) {
-    let handler: ((req: unknown, rep: unknown) => Promise<unknown>) | undefined;
-    await registerPipelineRoutes({
-      post: vi.fn((url: string, _opts: unknown, fn: typeof handler) => {
-        if (url === "/api/v1/pipeline/execute") handler = fn;
-      }),
-      get: vi.fn(),
-      delete: vi.fn(),
-      log: { info: vi.fn() },
-    } as never);
-
-    const request = {
-      headers: {},
-      log: logOverride ?? { error: vi.fn(), warn: vi.fn() },
-      raw: {
-        aborted: false,
-        once: vi.fn(),
-        removeListener: vi.fn(),
-      },
-      parts: async function* () {
-        for (const p of parts) {
-          if (p.type === "file") {
-            yield {
-              type: "file" as const,
-              fieldname: "file",
-              filename: p.filename,
-              file: Readable.from([p.content]),
-            };
-          } else {
-            yield p;
-          }
-        }
-      },
-    };
-    const reply = {
-      statusCode: 200,
-      payload: undefined as unknown,
-      status(code: number) {
-        this.statusCode = code;
-        return this;
-      },
-      send(payload: unknown) {
-        this.payload = payload;
-        return payload;
-      },
-    };
-
-    await handler?.(request, reply);
-    return reply;
-  }
 
   it.each([
     [
