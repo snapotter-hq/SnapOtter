@@ -24,6 +24,10 @@ function isQpdfTimeout(err: unknown): boolean {
   );
 }
 
+function isAbortError(err: unknown): boolean {
+  return err instanceof Error && (err.name === "AbortError" || err.message === "Canceled");
+}
+
 function damagedPdfError(err: unknown): InputValidationError {
   return new InputValidationError(
     `Damaged PDF: ${err instanceof Error ? stripInternalPaths(err.message).slice(0, 300) : "structural check failed"}`,
@@ -82,10 +86,14 @@ export async function validatePdfPath(
   opts.signal?.throwIfAborted();
   if (opts.lenient || !qpdfAvailable()) return;
 
+  const qpdfOpts = opts.signal ? { signal: opts.signal } : undefined;
+
   let passwordProtected: boolean;
   try {
-    passwordProtected = await qpdfRequiresPassword(filePath);
+    passwordProtected = await qpdfRequiresPassword(filePath, ...(qpdfOpts ? [qpdfOpts] : []));
   } catch (err) {
+    opts.signal?.throwIfAborted();
+    if (isAbortError(err)) throw err;
     const unavailable = qpdfUnavailable(err);
     if (unavailable) throw unavailable;
     if (!isQpdfTimeout(err)) throw damagedPdfError(err);
@@ -111,8 +119,10 @@ export async function validatePdfPath(
   }
 
   try {
-    await qpdfCheck(filePath);
+    await qpdfCheck(filePath, ...(qpdfOpts ? [qpdfOpts] : []));
   } catch (err) {
+    opts.signal?.throwIfAborted();
+    if (isAbortError(err)) throw err;
     const unavailable = qpdfUnavailable(err);
     if (unavailable) throw unavailable;
     if (!isQpdfTimeout(err)) throw damagedPdfError(err);
@@ -139,8 +149,10 @@ export async function validatePdfPath(
   if (env.MAX_PDF_PAGES > 0) {
     let pages: number;
     try {
-      pages = await qpdfPageCount(filePath);
+      pages = await qpdfPageCount(filePath, ...(qpdfOpts ? [qpdfOpts] : []));
     } catch (err) {
+      opts.signal?.throwIfAborted();
+      if (isAbortError(err)) throw err;
       const unavailable = qpdfUnavailable(err);
       if (unavailable) throw unavailable;
       if (!isQpdfTimeout(err)) throw damagedPdfError(err);

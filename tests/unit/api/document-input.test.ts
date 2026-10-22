@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FastifyBaseLogger } from "fastify";
@@ -386,6 +386,188 @@ describe("path-backed PDF validation", () => {
     ).rejects.toMatchObject({ name: "AbortError" });
     expect(qpdf.requiresPassword).not.toHaveBeenCalled();
     expect(qpdf.check).not.toHaveBeenCalled();
+  });
+
+  it("forwards AbortSignal to all three qpdf probes when provided (#3561)", async () => {
+    const inputPath = join(scratchDir, "signal-forwarded.pdf");
+    writeFileSync(inputPath, "%PDF-path-backed");
+    const controller = new AbortController();
+    qpdf.requiresPassword.mockResolvedValueOnce(false);
+    qpdf.check.mockResolvedValueOnce(undefined);
+    qpdf.pageCount.mockResolvedValueOnce(3);
+    const originalMaxPages = env.MAX_PDF_PAGES;
+    env.MAX_PDF_PAGES = 10;
+
+    try {
+      await expect(
+        validatePdfPath(inputPath, {
+          rejectPasswordProtected: true,
+          signal: controller.signal,
+        }),
+      ).resolves.toBeUndefined();
+    } finally {
+      env.MAX_PDF_PAGES = originalMaxPages;
+    }
+
+    expect(qpdf.requiresPassword).toHaveBeenCalledWith(inputPath, {
+      signal: controller.signal,
+    });
+    expect(qpdf.check).toHaveBeenCalledWith(inputPath, {
+      signal: controller.signal,
+    });
+    expect(qpdf.pageCount).toHaveBeenCalledWith(inputPath, {
+      signal: controller.signal,
+    });
+  });
+
+  it("rethrows abort errors instead of wrapping them as Damaged PDF when qpdf probes are canceled mid-flight (#3561)", async () => {
+    const inputPath = join(scratchDir, "canceled-mid-probe.pdf");
+    writeFileSync(inputPath, "%PDF-path-backed");
+    const originalMaxPages = env.MAX_PDF_PAGES;
+    env.MAX_PDF_PAGES = 10;
+
+    try {
+      // 1. Aborted during qpdfRequiresPassword
+      const pwController = new AbortController();
+      const pwReason = new DOMException("Client disconnected", "AbortError");
+      qpdf.requiresPassword.mockImplementationOnce(
+        async (_path: string, opts?: { signal?: AbortSignal }) => {
+          expect(opts?.signal).toBe(pwController.signal);
+          pwController.abort(pwReason);
+          throw new Error("Canceled");
+        },
+      );
+      await expect(
+        validatePdfPath(inputPath, {
+          rejectPasswordProtected: true,
+          signal: pwController.signal,
+        }),
+      ).rejects.toBe(pwReason);
+      expect(qpdf.check).not.toHaveBeenCalled();
+
+      // 2. Aborted during qpdfCheck
+      const checkController = new AbortController();
+      const checkReason = new DOMException("Job canceled", "AbortError");
+      qpdf.requiresPassword.mockResolvedValueOnce(false);
+      qpdf.check.mockImplementationOnce(async (_path: string, opts?: { signal?: AbortSignal }) => {
+        expect(opts?.signal).toBe(checkController.signal);
+        checkController.abort(checkReason);
+        throw new Error("Canceled");
+      });
+      await expect(
+        validatePdfPath(inputPath, {
+          rejectPasswordProtected: true,
+          signal: checkController.signal,
+        }),
+      ).rejects.toBe(checkReason);
+      expect(qpdf.pageCount).not.toHaveBeenCalled();
+
+      // 3. Aborted during qpdfPageCount
+      const pageController = new AbortController();
+      const pageReason = new DOMException("Timeout expired", "AbortError");
+      qpdf.requiresPassword.mockResolvedValueOnce(false);
+      qpdf.check.mockResolvedValueOnce(undefined);
+      qpdf.pageCount.mockImplementationOnce(
+        async (_path: string, opts?: { signal?: AbortSignal }) => {
+          expect(opts?.signal).toBe(pageController.signal);
+          pageController.abort(pageReason);
+          throw new Error("Canceled");
+        },
+      );
+      await expect(
+        validatePdfPath(inputPath, {
+          rejectPasswordProtected: true,
+          signal: pageController.signal,
+        }),
+      ).rejects.toBe(pageReason);
+
+      // 4. Direct AbortError / Canceled error from probe even without signal.aborted
+      for (const abortErr of [
+        Object.assign(new Error("The operation was aborted"), { name: "AbortError" }),
+        new Error("Canceled"),
+      ]) {
+        qpdf.requiresPassword.mockRejectedValueOnce(abortErr);
+        await expect(validatePdfPath(inputPath, { rejectPasswordProtected: true })).rejects.toBe(
+          abortErr,
+        );
+
+        qpdf.requiresPassword.mockResolvedValueOnce(false);
+        qpdf.check.mockRejectedValueOnce(abortErr);
+        await expect(validatePdfPath(inputPath, { rejectPasswordProtected: true })).rejects.toBe(
+          abortErr,
+        );
+
+        qpdf.requiresPassword.mockResolvedValueOnce(false);
+        qpdf.check.mockResolvedValueOnce(undefined);
+        qpdf.pageCount.mockRejectedValueOnce(abortErr);
+        await expect(validatePdfPath(inputPath, { rejectPasswordProtected: true })).rejects.toBe(
+          abortErr,
+        );
+      }
+
+      // 5. Aborted signal takes precedence over QpdfTimeoutError and ENOMEM spawn failures
+      vi.clearAllMocks();
+      const raceController = new AbortController();
+      const raceReason = new DOMException("Client disconnected during race", "AbortError");
+      const warn = vi.fn();
+      qpdf.requiresPassword.mockResolvedValueOnce(false);
+      qpdf.check.mockImplementationOnce(async () => {
+        raceController.abort(raceReason);
+        throw new QpdfTimeoutError("qpdf timed out after 30s");
+      });
+      await expect(
+        validatePdfPath(inputPath, {
+          rejectPasswordProtected: true,
+          signal: raceController.signal,
+          log: { warn },
+        }),
+      ).rejects.toBe(raceReason);
+      expect(warn).not.toHaveBeenCalled();
+      expect(qpdf.pageCount).not.toHaveBeenCalled();
+
+      vi.clearAllMocks();
+      const sigkillController = new AbortController();
+      const sigkillReason = new DOMException("Canceled before SIGKILL close", "AbortError");
+      qpdf.requiresPassword.mockImplementationOnce(async () => {
+        sigkillController.abort(sigkillReason);
+        throw Object.assign(new Error("spawn /usr/bin/qpdf ENOMEM"), {
+          code: "ENOMEM",
+          syscall: "spawn",
+          signal: "SIGKILL",
+        });
+      });
+      await expect(
+        validatePdfPath(inputPath, {
+          rejectPasswordProtected: true,
+          signal: sigkillController.signal,
+        }),
+      ).rejects.toBe(sigkillReason);
+      expect(qpdf.check).not.toHaveBeenCalled();
+    } finally {
+      env.MAX_PDF_PAGES = originalMaxPages;
+    }
+  });
+
+  it("forwards signal from DocumentInputHandler.prepare and cleans up scratch dir on abort (#3561)", async () => {
+    const controller = new AbortController();
+    const abortReason = new DOMException("Upload canceled", "AbortError");
+    qpdf.requiresPassword.mockImplementationOnce(
+      async (_path: string, opts?: { signal?: AbortSignal }) => {
+        expect(opts?.signal).toBe(controller.signal);
+        controller.abort(abortReason);
+        throw new Error("Canceled");
+      },
+    );
+
+    await expect(
+      new DocumentInputHandler().prepare(Buffer.from("%PDF-path-backed"), "scan.pdf", {
+        scratchDir,
+        rejectPasswordProtected: true,
+        signal: controller.signal,
+      }),
+    ).rejects.toBe(abortReason);
+    expect(qpdf.check).not.toHaveBeenCalled();
+    expect(readdirSync(scratchDir)).toEqual([]);
   });
 });
 
