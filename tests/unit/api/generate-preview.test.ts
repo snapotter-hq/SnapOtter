@@ -281,7 +281,9 @@ describe("generatePreview honesty (#746)", () => {
       .mockRejectedValueOnce(new DecoderUnavailableError("No LibRaw found."));
     try {
       const cr2Key = await generatePreview(cr2Buffer, "image/x-canon-cr2", JOB_ID, "edit-metadata");
-      expect(cr2Spy).toHaveBeenCalledWith(cr2Buffer, "raw", "cr2");
+      expect(cr2Spy).toHaveBeenCalledOnce();
+      expect(cr2Spy.mock.calls[0]?.[0]).toBe(cr2Buffer);
+      expect(cr2Spy.mock.calls[0]?.slice(1)).toEqual(["raw", "cr2"]);
       expect(cr2Key).toBeUndefined();
       expect(putObjectMock).not.toHaveBeenCalled();
       expect(reportEngineUnavailableMock).toHaveBeenCalledOnce();
