@@ -7,6 +7,7 @@ const listObjectsMock = vi.hoisted(() => vi.fn());
 const getObjectBufferMock = vi.hoisted(() => vi.fn());
 const getObjectSizeMock = vi.hoisted(() => vi.fn());
 const isMissingObjectErrorMock = vi.hoisted(() => vi.fn());
+const isStorageServiceFaultMock = vi.hoisted(() => vi.fn());
 const reportErrorMock = vi.hoisted(() => vi.fn());
 const loggerErrorMock = vi.hoisted(() => vi.fn());
 const loggerWarnMock = vi.hoisted(() => vi.fn());
@@ -35,6 +36,7 @@ async function loadJobReconciliation() {
   getObjectBufferMock.mockReset();
   getObjectSizeMock.mockReset();
   isMissingObjectErrorMock.mockReset();
+  isStorageServiceFaultMock.mockReset().mockReturnValue(false);
   reportErrorMock.mockReset();
   loggerErrorMock.mockReset();
   loggerWarnMock.mockReset();
@@ -139,11 +141,17 @@ async function loadJobReconciliation() {
     },
   }));
 
+  const actualObjectStorage = await vi.importActual<
+    typeof import("../../../../apps/api/src/lib/object-storage.js")
+  >("../../../../apps/api/src/lib/object-storage.js");
+
   vi.doMock("../../../../apps/api/src/lib/object-storage.js", () => ({
     getObjectBuffer: getObjectBufferMock,
     getObjectSize: getObjectSizeMock,
     isMissingObjectError: isMissingObjectErrorMock,
+    isStorageServiceFault: isStorageServiceFaultMock,
     listObjects: listObjectsMock,
+    normalizeS3ReadFault: actualObjectStorage.normalizeS3ReadFault,
   }));
 
   vi.doMock("../../../../apps/api/src/jobs/queues.js", () => ({
@@ -943,5 +951,283 @@ describe("reconcileStrandedJobs per-row fault isolation (#1498)", () => {
       emptyErrorsValues?.progress as { result?: Record<string, unknown> } | undefined
     )?.result;
     expect(emptyErrorsResult?.errors).toBeUndefined();
+  });
+
+  it("normalizes S3 service and EIO faults from listObjects and readResultPayload getObjectBuffer into 503 operational SafeErrors before logging and reporting (#3666)", async () => {
+    const { reconcileStrandedJobs } = await loadJobReconciliation();
+    const { classifyError } = await vi.importActual<
+      typeof import("../../../../apps/api/src/lib/error-report.js")
+    >("../../../../apps/api/src/lib/error-report.js");
+
+    const s3Faults = [
+      Object.assign(new Error("Please reduce your request rate."), {
+        name: "SlowDown",
+        $metadata: { httpStatusCode: 503 },
+      }),
+      Object.assign(new Error("Access Denied"), {
+        name: "AccessDenied",
+        $metadata: { httpStatusCode: 403 },
+      }),
+      Object.assign(new Error("The specified bucket does not exist"), {
+        name: "NoSuchBucket",
+        $metadata: { httpStatusCode: 404 },
+      }),
+      Object.assign(new Error("We encountered an internal error. Please try again."), {
+        name: "InternalError",
+        $metadata: { httpStatusCode: 500 },
+      }),
+      Object.assign(new Error("EIO: i/o error, read"), {
+        code: "EIO",
+        syscall: "read",
+      }),
+      Object.assign(new Error("Premature close"), {
+        code: "ERR_STREAM_PREMATURE_CLOSE",
+      }),
+    ];
+
+    isStorageServiceFaultMock.mockReturnValue(true);
+    isMissingObjectErrorMock.mockReturnValue(false);
+
+    // 1. listObjects faults in reconcileStrandedJobs
+    for (const [idx, fault] of s3Faults.entries()) {
+      reportErrorMock.mockClear();
+      loggerErrorMock.mockClear();
+      dbUpdateSetCalls.length = 0;
+      const jobId = `job-s3-list-fault-${idx}`;
+      dbSelectRows.rows = [
+        {
+          id: jobId,
+          toolId: "convert",
+          pool: "image",
+          type: "tool",
+          status: "processing",
+          bytesIn: 100,
+          inputRefs: [],
+          progress: null,
+        },
+      ];
+      listObjectsMock.mockRejectedValueOnce(fault);
+
+      const summary = await reconcileStrandedJobs({ graceMs: 0 });
+      expect(summary.outcomes).toEqual([]);
+      expect(dbUpdateSetCalls).toHaveLength(0);
+      expect(reportErrorMock).toHaveBeenCalledTimes(1);
+
+      const [reportedErr, reportCtx] = reportErrorMock.mock.calls[0] as [
+        unknown,
+        Record<string, unknown>,
+      ];
+      expect(reportedErr).toMatchObject({
+        name: "SafeError",
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        message: "The server's storage service is unavailable.",
+        cause: fault,
+      });
+      expect(classifyError(reportedErr, "worker")).toBe("operational");
+      expect(reportCtx).toEqual({
+        source: "worker",
+        pool: "system",
+        toolId: "convert",
+        jobId,
+      });
+      expect(loggerErrorMock).toHaveBeenCalledWith(
+        { err: reportedErr, jobId, toolId: "convert" },
+        "Failed to reconcile stranded job row; leaving non-terminal for next sweep",
+      );
+    }
+
+    // 2. getObjectBuffer faults in readResultPayload
+    for (const [idx, fault] of s3Faults.entries()) {
+      reportErrorMock.mockClear();
+      loggerErrorMock.mockClear();
+      dbUpdateSetCalls.length = 0;
+      const jobId = `job-s3-sidecar-fault-${idx}`;
+      dbSelectRows.rows = [
+        {
+          id: jobId,
+          toolId: "compress",
+          pool: "image",
+          type: "tool",
+          status: "processing",
+          bytesIn: 250,
+          inputRefs: [],
+          progress: null,
+        },
+      ];
+      listObjectsMock.mockResolvedValueOnce([
+        { key: `outputs/${jobId}/.result-payload.json`, size: 64, mtimeMs: 1_000 },
+        { key: `outputs/${jobId}/out.jpg`, size: 512, mtimeMs: 1_001 },
+      ]);
+      getObjectBufferMock.mockRejectedValueOnce(fault);
+
+      const summary = await reconcileStrandedJobs({ graceMs: 0 });
+      expect(summary.outcomes).toEqual([]);
+      expect(dbUpdateSetCalls).toHaveLength(0);
+      expect(reportErrorMock).toHaveBeenCalledTimes(1);
+
+      const [reportedErr, reportCtx] = reportErrorMock.mock.calls[0] as [
+        unknown,
+        Record<string, unknown>,
+      ];
+      expect(reportedErr).toMatchObject({
+        name: "SafeError",
+        isSafeMessage: true,
+        kind: "operational",
+        code: "storage-unavailable",
+        statusCode: 503,
+        message: "The server's storage service is unavailable.",
+        cause: fault,
+      });
+      expect(classifyError(reportedErr, "worker")).toBe("operational");
+      expect(reportCtx).toEqual({
+        source: "worker",
+        pool: "system",
+        toolId: "compress",
+        jobId,
+      });
+      expect(loggerErrorMock).toHaveBeenCalledWith(
+        { err: reportedErr, jobId, toolId: "compress" },
+        "Failed to reconcile stranded job row; leaving non-terminal for next sweep",
+      );
+    }
+
+    // 3. Missing sidecar (NoSuchKey / ENOENT) in readResultPayload recovers primary artifact without error
+    isStorageServiceFaultMock.mockReturnValue(false);
+    isMissingObjectErrorMock.mockReturnValueOnce(true);
+    reportErrorMock.mockClear();
+    loggerErrorMock.mockClear();
+    dbUpdateSetCalls.length = 0;
+    dbSelectRows.rows = [
+      {
+        id: "job-s3-missing-sidecar",
+        toolId: "compress",
+        pool: "image",
+        type: "tool",
+        status: "processing",
+        bytesIn: 200,
+        inputRefs: [],
+        progress: null,
+      },
+    ];
+    listObjectsMock.mockResolvedValueOnce([
+      { key: "outputs/job-s3-missing-sidecar/.result-payload.json", size: 64, mtimeMs: 1_000 },
+      { key: "outputs/job-s3-missing-sidecar/out.jpg", size: 512, mtimeMs: 1_001 },
+    ]);
+    getObjectBufferMock.mockRejectedValueOnce(
+      Object.assign(new Error("The specified key does not exist."), {
+        name: "NoSuchKey",
+        $metadata: { httpStatusCode: 404 },
+      }),
+    );
+
+    const missingSidecarSummary = await reconcileStrandedJobs({ graceMs: 0 });
+    expect(missingSidecarSummary.recovered).toBe(1);
+    expect(reportErrorMock).not.toHaveBeenCalled();
+    expect(loggerErrorMock).not.toHaveBeenCalled();
+
+    // 4. Unexpected non-S3 defect in S3 mode still passes through normalizeS3ReadFault as a "bug"
+    isStorageServiceFaultMock.mockReturnValue(true);
+    isMissingObjectErrorMock.mockReturnValue(false);
+    for (const stage of ["listObjects", "getObjectBuffer"] as const) {
+      reportErrorMock.mockClear();
+      loggerErrorMock.mockClear();
+      const jobId = `job-s3-bug-${stage}`;
+      dbSelectRows.rows = [
+        {
+          id: jobId,
+          toolId: "resize",
+          pool: "image",
+          type: "tool",
+          status: "processing",
+          bytesIn: 100,
+          inputRefs: [],
+          progress: null,
+        },
+      ];
+      const unexpectedBug = new TypeError(`unexpected ${stage} defect`);
+      if (stage === "listObjects") {
+        listObjectsMock.mockRejectedValueOnce(unexpectedBug);
+      } else {
+        listObjectsMock.mockResolvedValueOnce([
+          { key: `outputs/${jobId}/.result-payload.json`, size: 64, mtimeMs: 1_000 },
+          { key: `outputs/${jobId}/out.png`, size: 256, mtimeMs: 1_001 },
+        ]);
+        getObjectBufferMock.mockRejectedValueOnce(unexpectedBug);
+      }
+
+      await reconcileStrandedJobs({ graceMs: 0 });
+      expect(reportErrorMock).toHaveBeenCalledTimes(1);
+      const [reportedErr] = reportErrorMock.mock.calls[0] as [unknown];
+      expect(reportedErr).toBe(unexpectedBug);
+      expect(classifyError(reportedErr, "worker")).toBe("bug");
+    }
+
+    // 5. DB connectivity fault during settlement in S3 mode is not mislabeled as storage-unavailable
+    reportErrorMock.mockClear();
+    loggerErrorMock.mockClear();
+    dbSelectRows.rows = [
+      {
+        id: "job-s3-db-fault",
+        toolId: "rotate",
+        pool: "image",
+        type: "tool",
+        status: "queued",
+        bytesIn: null,
+        inputRefs: [],
+        progress: null,
+      },
+    ];
+    listObjectsMock.mockResolvedValueOnce([]);
+    const dbConnErr = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:5432"), {
+      code: "ECONNREFUSED",
+    });
+    const { db } = await import("../../../../apps/api/src/db/index.js");
+    vi.mocked(db.transaction).mockRejectedValueOnce(dbConnErr);
+
+    await reconcileStrandedJobs({ graceMs: 0 });
+    expect(reportErrorMock).toHaveBeenCalledWith(dbConnErr, {
+      source: "worker",
+      pool: "system",
+      toolId: "rotate",
+      jobId: "job-s3-db-fault",
+    });
+    expect(classifyError(dbConnErr, "worker")).toBe("operational");
+
+    // 6. Local-mode EIO (isStorageServiceFault === false) bypasses normalizeS3ReadFault
+    isStorageServiceFaultMock.mockReturnValue(false);
+    reportErrorMock.mockClear();
+    loggerErrorMock.mockClear();
+    dbSelectRows.rows = [
+      {
+        id: "job-local-sidecar-eio",
+        toolId: "compress",
+        pool: "image",
+        type: "tool",
+        status: "processing",
+        bytesIn: 100,
+        inputRefs: [],
+        progress: null,
+      },
+    ];
+    const localEio = Object.assign(new Error("EIO: i/o error, read"), {
+      code: "EIO",
+      syscall: "read",
+    });
+    listObjectsMock.mockResolvedValueOnce([
+      { key: "outputs/job-local-sidecar-eio/.result-payload.json", size: 64, mtimeMs: 1_000 },
+      { key: "outputs/job-local-sidecar-eio/out.jpg", size: 256, mtimeMs: 1_001 },
+    ]);
+    getObjectBufferMock.mockRejectedValueOnce(localEio);
+
+    await reconcileStrandedJobs({ graceMs: 0 });
+    expect(reportErrorMock).toHaveBeenCalledWith(localEio, {
+      source: "worker",
+      pool: "system",
+      toolId: "compress",
+      jobId: "job-local-sidecar-eio",
+    });
   });
 });

@@ -40,7 +40,9 @@ import {
   getObjectBuffer,
   getObjectSize,
   isMissingObjectError,
+  isStorageServiceFault,
   listObjects,
+  normalizeS3ReadFault,
   type ObjectInfo,
 } from "../lib/object-storage.js";
 import { clearTerminalReplayKey } from "../routes/progress.js";
@@ -156,6 +158,7 @@ async function readResultPayload(
     raw = await getObjectBuffer(sidecar.key);
   } catch (err) {
     if (isMissingObjectError(err)) return undefined;
+    if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
     throw err;
   }
   try {
@@ -536,7 +539,13 @@ export async function reconcileStrandedJobs(
     }
 
     try {
-      const objects = await listObjects(`outputs/${row.id}/`);
+      let objects: ObjectInfo[];
+      try {
+        objects = await listObjects(`outputs/${row.id}/`);
+      } catch (err) {
+        if (isStorageServiceFault(err)) throw normalizeS3ReadFault(err);
+        throw err;
+      }
       const artifacts = orderArtifacts(objects);
       const outcome =
         artifacts.length > 0
