@@ -104,11 +104,12 @@ function clearSplitResult(prev: Pick<SplitState, "tiles" | "zipBlobUrl">): {
   runFileCount: number;
   zipBlobUrl: null;
   processing: false;
+  error: null;
 } {
   cancelActiveSplitRun();
   if (prev.zipBlobUrl) URL.revokeObjectURL(prev.zipBlobUrl);
   revokeRemovedTileUrls(prev.tiles);
-  return { tiles: [], runFileCount: 0, zipBlobUrl: null, processing: false };
+  return { tiles: [], runFileCount: 0, zipBlobUrl: null, processing: false, error: null };
 }
 
 export const useSplitStore = create<SplitState>((set, get) => ({
@@ -126,7 +127,7 @@ export const useSplitStore = create<SplitState>((set, get) => ({
   runFileCount: 0,
   zipBlobUrl: null,
 
-  setMode: (mode) => set({ mode, ...clearSplitResult(get()), error: null }),
+  setMode: (mode) => set({ mode, ...clearSplitResult(get()) }),
   setColumns: (columns) =>
     set({ columns: Math.max(1, Math.min(100, columns)), ...clearSplitResult(get()) }),
   setRows: (rows) => set({ rows: Math.max(1, Math.min(100, rows)), ...clearSplitResult(get()) }),
@@ -150,12 +151,11 @@ export const useSplitStore = create<SplitState>((set, get) => ({
   },
 
   applyPreset: (cols, rows) =>
-    set({ mode: "grid", columns: cols, rows, ...clearSplitResult(get()), error: null }),
+    set({ mode: "grid", columns: cols, rows, ...clearSplitResult(get()) }),
 
   reset: () => {
     set({
       ...clearSplitResult(get()),
-      error: null,
       imageDimensions: null,
     });
   },

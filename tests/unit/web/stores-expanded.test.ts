@@ -382,13 +382,15 @@ describe("useSplitStore expanded", () => {
     ["setOutputFormat", () => useSplitStore.getState().setOutputFormat("webp")],
     ["setQuality", () => useSplitStore.getState().setQuality(75)],
     ["applyPreset", () => useSplitStore.getState().applyPreset(2, 2)],
+    ["reset", () => useSplitStore.getState().reset()],
   ])(
-    "%s revokes previous tile and zip blob URLs, resets runFileCount, and cancels in-flight runs (#3184, #3492)",
+    "%s revokes previous tile and zip blob URLs, resets runFileCount, clears error, and cancels in-flight runs (#3184, #3492, #3500)",
     (_name, act) => {
       const abort = vi.fn();
       const run = beginSplitRun(abort);
       useSplitStore.setState({
         processing: true,
+        error: "Failed to split one.png: Server error",
         tiles: [
           { row: 0, col: 0, label: "1", width: 100, height: 100, blobUrl: "blob:tile-1" },
           { row: 0, col: 1, label: "2", width: 100, height: 100, blobUrl: "blob:tile-2" },
@@ -404,6 +406,7 @@ describe("useSplitStore expanded", () => {
       expect(abort).toHaveBeenCalledTimes(1);
       expect(run.isCurrent()).toBe(false);
       expect(useSplitStore.getState().processing).toBe(false);
+      expect(useSplitStore.getState().error).toBeNull();
       expect(revokeObjectURL).toHaveBeenCalledWith("blob:zip-1");
       expect(revokeObjectURL).toHaveBeenCalledWith("blob:tile-1");
       expect(revokeObjectURL).toHaveBeenCalledWith("blob:tile-2");
