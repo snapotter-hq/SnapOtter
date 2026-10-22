@@ -2820,6 +2820,19 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
         errors: [{ filename: "b.png", error: "corrupt at [internal]" }],
       }),
     );
+    const partialSidecarCall = objectStorageMocks.putObject.mock.calls.find(
+      ([key]) => key === "outputs/batch-partial/.result-payload.json",
+    );
+    expect(partialSidecarCall).toBeDefined();
+    expect(JSON.parse(String(partialSidecarCall?.[1]))).toEqual({
+      zipFilename: "batch-resize-batch-pa.zip",
+      fileResults: { "0": "a.png" },
+      fileNotes: {},
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 1,
+      errors: [{ filename: "b.png", error: "corrupt at [internal]" }],
+    });
 
     // Partially canceled batch with empty Redis counters
     cancelBatchJobMock.mockClear();
@@ -2847,6 +2860,19 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
         errors: [{ filename: "d.png", error: "Canceled" }],
       }),
     );
+    const cancelSidecarCall = objectStorageMocks.putObject.mock.calls.find(
+      ([key]) => key === "outputs/batch-partial-cancel/.result-payload.json",
+    );
+    expect(cancelSidecarCall).toBeDefined();
+    expect(JSON.parse(String(cancelSidecarCall?.[1]))).toEqual({
+      zipFilename: "batch-resize-batch-pa.zip",
+      fileResults: { "0": "a.png" },
+      fileNotes: {},
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 1,
+      errors: [{ filename: "d.png", error: "Canceled" }],
+    });
 
     // Packaging failure on a partially succeeded batch with empty Redis counters
     completeBatchJobMock.mockClear();

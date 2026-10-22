@@ -1414,10 +1414,6 @@ describe("stranded-job reconciliation", () => {
             completedFiles: 1,
             failedFiles: 1,
           } as never,
-          error: {
-            message: "1 file(s) failed",
-            details: [{ filename: "empty.jpg", error: "File is empty" }],
-          },
         })
         .where(eq(schema.jobs.id, parentId));
 
@@ -1479,7 +1475,11 @@ describe("stranded-job reconciliation", () => {
             pool: "system",
             inputRefs: [],
             filename: "",
-            settings: { flowChildCount: 2, fileIndexMap: [1, 2] },
+            settings: {
+              flowChildCount: 2,
+              fileIndexMap: [1, 2],
+              preFailureFaults: [{ filename: "empty.jpg", error: "File is empty" }],
+            },
             kind: "batch-finalize",
             totalFiles: 3,
           } as never,
@@ -1564,10 +1564,6 @@ describe("stranded-job reconciliation", () => {
             completedFiles: 2,
             failedFiles: 1,
           } as never,
-          error: {
-            message: "1 file(s) failed",
-            details: [{ filename: "b.jpg", error: "Canceled" }],
-          },
         })
         .where(eq(schema.jobs.id, parentId));
 

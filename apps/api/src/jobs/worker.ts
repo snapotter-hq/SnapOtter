@@ -2224,6 +2224,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
           totalFiles,
           completedFiles: totalFiles,
           failedFiles,
+          errors: batchErrors,
         }),
         "utf8",
       ),

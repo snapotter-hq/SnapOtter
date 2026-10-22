@@ -811,4 +811,137 @@ describe("reconcileStrandedJobs per-row fault isolation (#1498)", () => {
     expect(indexSource).toContain("reconcileOrphanedJobsAtStartup()");
     expect(indexSource).not.toContain("Orphaned job reconciled at startup");
   });
+
+  it("restores batch row.error from sidecar errors, strips result.errors, and preserves existing row.error when sidecar errors is empty (#3489)", async () => {
+    const { reconcileStrandedJobs } = await loadJobReconciliation();
+
+    dbSelectRows.rows = [
+      {
+        id: "batch-with-sidecar-errors",
+        toolId: "compress",
+        pool: "system",
+        type: "batch",
+        status: "processing",
+        bytesIn: null,
+        inputRefs: [],
+        progress: { percent: 50, totalFiles: 3, completedFiles: 1, failedFiles: 0 },
+      },
+      {
+        id: "batch-empty-sidecar-errors",
+        toolId: "compress",
+        pool: "system",
+        type: "batch",
+        status: "processing",
+        bytesIn: null,
+        inputRefs: [],
+        progress: { percent: 100, totalFiles: 2, completedFiles: 2, failedFiles: 0 },
+      },
+    ];
+
+    listObjectsMock.mockImplementation(async (prefix: string) => {
+      if (prefix === "outputs/batch-with-sidecar-errors/") {
+        return [
+          {
+            key: "outputs/batch-with-sidecar-errors/.result-payload.json",
+            size: 128,
+            mtimeMs: 1_000,
+          },
+          {
+            key: "outputs/batch-with-sidecar-errors/batch-compress.zip",
+            size: 2_048,
+            mtimeMs: 1_001,
+          },
+        ];
+      }
+      if (prefix === "outputs/batch-empty-sidecar-errors/") {
+        return [
+          {
+            key: "outputs/batch-empty-sidecar-errors/.result-payload.json",
+            size: 96,
+            mtimeMs: 1_000,
+          },
+          {
+            key: "outputs/batch-empty-sidecar-errors/batch-compress.zip",
+            size: 1_024,
+            mtimeMs: 1_001,
+          },
+        ];
+      }
+      return [];
+    });
+
+    getObjectBufferMock.mockImplementation(async (key: string) => {
+      if (key === "outputs/batch-with-sidecar-errors/.result-payload.json") {
+        return Buffer.from(
+          JSON.stringify({
+            zipFilename: "batch-compress.zip",
+            fileResults: { "1": "ok.jpg" },
+            fileNotes: {},
+            totalFiles: 3,
+            completedFiles: 3,
+            failedFiles: 2,
+            errors: [
+              { filename: "empty.jpg", error: "File is empty" },
+              { filename: "corrupt.jpg", error: "Invalid image" },
+              { filename: 123, error: "ignored malformed entry" },
+              { filename: "missing-error.jpg", error: 456 },
+              null,
+            ],
+          }),
+          "utf8",
+        );
+      }
+      if (key === "outputs/batch-empty-sidecar-errors/.result-payload.json") {
+        return Buffer.from(
+          JSON.stringify({
+            zipFilename: "batch-compress.zip",
+            fileResults: { "0": "a.jpg", "1": "b.jpg" },
+            fileNotes: {},
+            totalFiles: 2,
+            completedFiles: 2,
+            failedFiles: 0,
+            errors: [],
+          }),
+          "utf8",
+        );
+      }
+      throw new Error(`unexpected getObjectBuffer(${key})`);
+    });
+
+    const summary = await reconcileStrandedJobs({ graceMs: 0 });
+    expect(summary.recovered).toBe(2);
+
+    // dbUpdateSetCalls[0] = batch-with-sidecar-errors row, [1] = its alias check
+    const withErrorsValues = dbUpdateSetCalls[0]?.values;
+    expect(withErrorsValues).toMatchObject({
+      status: "completed",
+      bytesOut: 2_048,
+      error: {
+        message: "2 file(s) failed",
+        details: [
+          { filename: "empty.jpg", error: "File is empty" },
+          { filename: "corrupt.jpg", error: "Invalid image" },
+        ],
+      },
+      progress: {
+        percent: 100,
+        stage: "complete",
+        totalFiles: 3,
+        completedFiles: 3,
+        failedFiles: 2,
+      },
+    });
+    const withErrorsResult = (
+      withErrorsValues?.progress as { result?: Record<string, unknown> } | undefined
+    )?.result;
+    expect(withErrorsResult?.errors).toBeUndefined();
+
+    // dbUpdateSetCalls[2] = batch-empty-sidecar-errors row
+    const emptyErrorsValues = dbUpdateSetCalls[2]?.values;
+    expect(emptyErrorsValues?.error).toBeUndefined();
+    const emptyErrorsResult = (
+      emptyErrorsValues?.progress as { result?: Record<string, unknown> } | undefined
+    )?.result;
+    expect(emptyErrorsResult?.errors).toBeUndefined();
+  });
 });

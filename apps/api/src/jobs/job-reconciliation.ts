@@ -267,6 +267,25 @@ function isBatchCount(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
+function pickBatchErrors(value: unknown): Array<{ filename: string; error: string }> {
+  if (!Array.isArray(value)) return [];
+  const out: Array<{ filename: string; error: string }> = [];
+  for (const entry of value) {
+    if (
+      typeof entry === "object" &&
+      entry !== null &&
+      typeof (entry as { filename?: unknown }).filename === "string" &&
+      typeof (entry as { error?: unknown }).error === "string"
+    ) {
+      out.push({
+        filename: (entry as { filename: string }).filename,
+        error: (entry as { error: string }).error,
+      });
+    }
+  }
+  return out;
+}
+
 /**
  * Non-terminal clientJobId alias rows still pointing at this artifact or
  * pipeline flow job (#2682, #2701). Guarded on `settings->>'artifactJobId'`
@@ -325,7 +344,9 @@ async function recoverFromOutputs(
     delete result.totalFiles;
     delete result.completedFiles;
     delete result.failedFiles;
+    delete result.errors;
   }
+  const sidecarErrors = row.type === "batch" ? pickBatchErrors(toolPayload?.errors) : [];
   const totalFiles = pickBatchCounter("totalFiles");
   const completedFiles = pickBatchCounter("completedFiles");
   const failedFiles = pickBatchCounter("failedFiles");
@@ -345,6 +366,9 @@ async function recoverFromOutputs(
         bytesIn: originalSize || null,
         bytesOut: primary.size,
         progress,
+        ...(sidecarErrors.length > 0 && {
+          error: { message: `${sidecarErrors.length} file(s) failed`, details: sidecarErrors },
+        }),
       })
       .where(and(eq(schema.jobs.id, row.id), inArray(schema.jobs.status, NON_TERMINAL)))
       .returning({ id: schema.jobs.id });
