@@ -464,7 +464,8 @@ export async function stageAutoSaveToLibrary(opts: AutoSaveOpts): Promise<Staged
           userId: parentUserId,
           originalName: opts.outName,
           storedName: stagedBlobName,
-          mimeType: opts.contentType,
+          mimeType:
+            opts.contentType === "application/postscript" ? "image/x-eps" : opts.contentType,
           size: opts.buffer.length,
           width,
           height,

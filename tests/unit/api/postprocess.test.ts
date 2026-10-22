@@ -9,9 +9,27 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { IMAGE_EXT_TO_MIME } from "../../../packages/shared/src/image-mime.js";
 
 // Minimal mocks so the module loads without Postgres/Redis/sharp
+const parentLookupMock = vi.hoisted(() => vi.fn());
 vi.mock("../../../apps/api/src/db/index.js", () => ({
-  db: {},
-  schema: { jobs: {}, userFiles: {} },
+  db: {
+    select: () => ({
+      from: () => ({
+        where: parentLookupMock,
+      }),
+    }),
+  },
+  schema: { jobs: {}, userFiles: { id: "id" }, users: { id: "id", storageUsed: "storageUsed" } },
+}));
+
+const saveFileMock = vi.hoisted(() => vi.fn());
+vi.mock("../../../apps/api/src/lib/file-storage.js", () => ({
+  saveFile: saveFileMock,
+  deleteStoredFile: vi.fn(),
+}));
+
+const quotaRefusalMock = vi.hoisted(() => vi.fn());
+vi.mock("../../../apps/api/src/lib/quota.js", () => ({
+  quotaRefusal: quotaRefusalMock,
 }));
 
 const putObjectMock = vi.hoisted(() => vi.fn());
@@ -66,9 +84,11 @@ vi.mock("../../../apps/api/src/lib/format-decoders.js", async (importOriginal) =
 });
 
 import {
+  type AutoSaveTx,
   buildOutputName,
   CONTENT_TYPE_TO_EXT,
   generatePreview,
+  stageAutoSaveToLibrary,
 } from "../../../apps/api/src/jobs/postprocess.js";
 
 describe("buildOutputName", () => {
@@ -528,5 +548,98 @@ describe("generatePreview", () => {
       { err: putErr, jobId: "job-heic-put-err", contentType: "image/heic" },
       "preview generation failed; result has no renderable preview",
     );
+  });
+});
+
+describe("stageAutoSaveToLibrary MIME normalization (#3223)", () => {
+  beforeEach(() => {
+    parentLookupMock.mockReset();
+    saveFileMock.mockReset();
+    quotaRefusalMock.mockReset();
+    sharpMock.mockReset();
+    parentLookupMock.mockResolvedValue([
+      {
+        id: "file-parent-1",
+        userId: "user-1",
+        version: 1,
+        toolChain: ["upload"],
+      },
+    ]);
+    saveFileMock.mockImplementation(async (_buf: Buffer, name: string) => `stored-${name}`);
+    quotaRefusalMock.mockResolvedValue(null);
+  });
+
+  it("normalizes application/postscript to image/x-eps when inserting into user_files (#3223)", async () => {
+    const inserted: Record<string, unknown>[] = [];
+    const tx: AutoSaveTx = {
+      select: (() => ({
+        from: () => ({
+          where: () => ({
+            limit: () => ({
+              for: async () => [{ id: "file-parent-1" }],
+            }),
+          }),
+        }),
+      })) as unknown as AutoSaveTx["select"],
+      insert: (() => ({
+        values: async (row: Record<string, unknown>) => {
+          inserted.push(row);
+        },
+      })) as unknown as AutoSaveTx["insert"],
+      update: (() => ({
+        set: () => ({
+          where: async () => {},
+        }),
+      })) as unknown as AutoSaveTx["update"],
+    };
+
+    const staged = await stageAutoSaveToLibrary({
+      fileId: "file-parent-1",
+      saveMode: "new",
+      userId: "user-1",
+      buffer: Buffer.from("%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: 0 0 100 100\n"),
+      outName: "photo_convert.eps",
+      contentType: "application/postscript",
+      toolId: "convert",
+      jobId: "job-eps-autosave",
+    });
+
+    const commitRes = await staged.commit?.(tx);
+    expect(commitRes?.fileId).toBeDefined();
+    expect(sharpMock).not.toHaveBeenCalled();
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0]).toMatchObject({
+      userId: "user-1",
+      originalName: "photo_convert.eps",
+      storedName: "stored-photo_convert.eps",
+      mimeType: "image/x-eps",
+      width: null,
+      height: null,
+      version: 1,
+      parentId: null,
+      toolChain: ["upload", "convert"],
+    });
+
+    sharpMock.mockReturnValueOnce({
+      metadata: async () => ({ width: 320, height: 240 }),
+    });
+    const stagedPng = await stageAutoSaveToLibrary({
+      fileId: "file-parent-1",
+      saveMode: "new",
+      userId: "user-1",
+      buffer: Buffer.from("png-bytes"),
+      outName: "photo_convert.png",
+      contentType: "image/png",
+      toolId: "convert",
+      jobId: "job-png-autosave",
+    });
+    await stagedPng.commit?.(tx);
+    expect(inserted).toHaveLength(2);
+    expect(inserted[1]).toMatchObject({
+      originalName: "photo_convert.png",
+      mimeType: "image/png",
+      width: 320,
+      height: 240,
+    });
   });
 });

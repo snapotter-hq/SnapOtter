@@ -205,6 +205,7 @@ describe("autoSaveToLibrary under a user cancel (#2143)", () => {
       parentId: "file-1",
       version: 4,
       storedName: "stored-out.pdf",
+      mimeType: "application/pdf",
       toolChain: ["resize", "compress"],
     });
     expect(stubs.deleted).toEqual([]);
@@ -839,5 +840,24 @@ describe("autoSaveToLibrary under a user cancel (#2143)", () => {
     expect(stubs.deleted).toEqual(["stored-out.pdf"]);
     expect(loggerMock.warn).not.toHaveBeenCalled();
     expect(reportErrorMock).not.toHaveBeenCalled();
+  });
+
+  it("normalizes application/postscript to image/x-eps on user_files insert (#3223)", async () => {
+    const res = await autoSaveToLibrary(
+      opts({
+        outName: "figure_convert.eps",
+        contentType: "application/postscript",
+        toolId: "convert",
+      }),
+    );
+
+    expect(res.fileId).toBeDefined();
+    expect(stubs.inserted).toHaveLength(1);
+    expect(stubs.inserted[0]).toMatchObject({
+      id: res.fileId,
+      originalName: "figure_convert.eps",
+      storedName: "stored-figure_convert.eps",
+      mimeType: "image/x-eps",
+    });
   });
 });
