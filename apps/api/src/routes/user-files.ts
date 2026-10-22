@@ -11,7 +11,12 @@
  */
 import { randomUUID } from "node:crypto";
 import { extname } from "node:path";
-import { hasServerErrorStatus, IMAGE_EXT_TO_MIME, SafeError } from "@snapotter/shared";
+import {
+  hasServerErrorStatus,
+  IMAGE_EXT_TO_MIME,
+  isSafeMessageError,
+  SafeError,
+} from "@snapotter/shared";
 import { and, desc, eq, inArray, like, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
@@ -221,7 +226,7 @@ function discardStagedBlob(request: FastifyRequest, route: string, storedName: s
 function rethrowIfLibraryStorageFault(e: unknown): void {
   if (isStorageServiceFault(e)) throw normalizeS3ReadFault(e);
   if (isS3MissingShape(e)) return;
-  if (e instanceof SafeError && e.code === "INVALID_STORED_NAME") return;
+  if (isSafeMessageError(e) && e.code === "INVALID_STORED_NAME") return;
   const { code } = (e ?? {}) as NodeJS.ErrnoException;
   if (code === "ENOENT") return;
   throw e;

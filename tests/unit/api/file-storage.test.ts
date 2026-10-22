@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { chmod, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { SafeError } from "@snapotter/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const config = vi.hoisted(() => ({
@@ -25,6 +26,7 @@ const s3Mocks = vi.hoisted(() => ({
   putThumbnail: vi.fn(),
   deleteObject: vi.fn(),
   deleteThumbnail: vi.fn(),
+  isMissingObjectError: vi.fn<(_err: unknown) => boolean>(() => false),
 }));
 
 vi.mock("@snapotter/enterprise", () => ({
@@ -136,6 +138,8 @@ beforeEach(async () => {
   s3Mocks.deleteObject.mockResolvedValue(undefined);
   s3Mocks.deleteThumbnail.mockReset();
   s3Mocks.deleteThumbnail.mockResolvedValue(undefined);
+  s3Mocks.isMissingObjectError.mockReset();
+  s3Mocks.isMissingObjectError.mockReturnValue(false);
   s3Mocks.load.mockReset();
   s3Mocks.load.mockResolvedValue({
     configureS3: s3Mocks.configure,
@@ -144,6 +148,7 @@ beforeEach(async () => {
     putThumbnail: s3Mocks.putThumbnail,
     deleteObject: s3Mocks.deleteObject,
     deleteThumbnail: s3Mocks.deleteThumbnail,
+    isMissingObjectError: s3Mocks.isMissingObjectError,
   });
   vi.resetModules();
 });
@@ -1760,5 +1765,61 @@ describe("ensureStorageDir and saveThumbnail in S3 mode (#2882)", () => {
     });
     expect(s3Mocks.load).not.toHaveBeenCalled();
     expect(s3Mocks.putThumbnail).not.toHaveBeenCalled();
+  });
+});
+
+describe("isStorageServiceFault (#3410)", () => {
+  it("returns false for a SafeError across a module reset boundary or a marker-copied error in S3 mode", async () => {
+    config.STORAGE_MODE = "s3";
+    const crossRealmInvalidName = new SafeError("Invalid stored file name", {
+      kind: "operational",
+      code: "INVALID_STORED_NAME",
+      statusCode: 400,
+    });
+    const crossRealmUnavailable = new SafeError("The server's storage service is unavailable.", {
+      kind: "operational",
+      code: "storage-unavailable",
+      statusCode: 503,
+    });
+    const markerCopiedError = Object.assign(new Error("Invalid stored file name"), {
+      isSafeMessage: true as const,
+      kind: "operational",
+      code: "INVALID_STORED_NAME",
+      statusCode: 400,
+    });
+
+    const { isStorageServiceFault, readStoredFile } = await importModule();
+    const { SafeError: ReloadedSafeError } = await import("@snapotter/shared");
+
+    expect(crossRealmInvalidName).not.toBeInstanceOf(ReloadedSafeError);
+    expect(isStorageServiceFault(crossRealmInvalidName)).toBe(false);
+    expect(isStorageServiceFault(crossRealmUnavailable)).toBe(false);
+    expect(isStorageServiceFault(markerCopiedError)).toBe(false);
+
+    const ownTraversalErr = await readStoredFile("../escape.png").catch((e: unknown) => e);
+    expect(isStorageServiceFault(ownTraversalErr)).toBe(false);
+  });
+
+  it("returns false in local mode and delegates non-SafeError checks to s3Mod.isMissingObjectError in S3 mode", async () => {
+    const { isStorageServiceFault, ensureStorageDir } = await importModule();
+    const rawFault = new Error("S3 read failed");
+    const noSuchKey = Object.assign(new Error("NoSuchKey"), {
+      name: "NoSuchKey",
+      $metadata: { httpStatusCode: 404 },
+    });
+
+    // Local mode always returns false
+    expect(isStorageServiceFault(rawFault)).toBe(false);
+
+    // S3 mode while s3Mod is still unloaded fails closed toward fault (true)
+    config.STORAGE_MODE = "s3";
+    expect(isStorageServiceFault(rawFault)).toBe(true);
+    expect(isStorageServiceFault(noSuchKey)).toBe(true);
+
+    // Once s3Mod is loaded, delegates to !s3Mod.isMissingObjectError(error)
+    await ensureStorageDir();
+    s3Mocks.isMissingObjectError.mockImplementation((err: unknown) => err === noSuchKey);
+    expect(isStorageServiceFault(noSuchKey)).toBe(false);
+    expect(isStorageServiceFault(rawFault)).toBe(true);
   });
 });

@@ -3,7 +3,7 @@ import { type FileHandle, mkdir, open, readFile, rename, statfs, unlink } from "
 import { basename, extname, isAbsolute, join } from "node:path";
 import type { Readable } from "node:stream";
 import type { S3StorageModule } from "@snapotter/enterprise";
-import { CAMERA_RAW_INPUTS, SafeError } from "@snapotter/shared";
+import { CAMERA_RAW_INPUTS, isSafeMessageError, SafeError } from "@snapotter/shared";
 import { env } from "../config.js";
 import { logger } from "./logger.js";
 import { normalizeOperationalWriteError, s3WriteFault } from "./object-storage.js";
@@ -237,7 +237,7 @@ export async function readStoredFile(
  */
 export function isStorageServiceFault(error: unknown): boolean {
   if (!isS3Enabled()) return false;
-  if (error instanceof SafeError) return false;
+  if (isSafeMessageError(error)) return false;
   return !s3Mod || !s3Mod.isMissingObjectError(error);
 }
 

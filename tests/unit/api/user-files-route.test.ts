@@ -1851,6 +1851,15 @@ describe("user files route logic", () => {
             expectedKind: "operational",
           },
           {
+            err: Object.assign(new Error("The server's storage is full."), {
+              isSafeMessage: true as const,
+              kind: "operational",
+              code: "storage-full",
+              statusCode: 503,
+            }),
+            expectedKind: "operational",
+          },
+          {
             err: Object.assign(new Error("ENAMETOOLONG: name too long, open"), {
               code: "ENAMETOOLONG",
               syscall: "open",
@@ -1946,6 +1955,28 @@ describe("user files route logic", () => {
         expect(reply3.statusCode).toBe(422);
         expect(reply3.payload).toEqual({ error: "Could not generate thumbnail" });
         expect(warn3).toHaveBeenCalledWith(
+          { fileId: row.id, storedName: row.storedName },
+          "library thumbnail: stored blob missing",
+        );
+
+        const crossRealmInvalidStoredName = Object.assign(new Error("Invalid stored file name"), {
+          isSafeMessage: true as const,
+          kind: "operational",
+          code: "INVALID_STORED_NAME",
+          statusCode: 400,
+        });
+        expect(crossRealmInvalidStoredName).not.toBeInstanceOf(SafeError);
+        mocks.readStoredFile.mockRejectedValueOnce(crossRealmInvalidStoredName);
+
+        const warn4 = vi.fn();
+        const reply4 = makeReply();
+        await thumbnailHandler(
+          { params: { id: row.id }, log: { warn: warn4, error: vi.fn() } },
+          reply4,
+        );
+        expect(reply4.statusCode).toBe(422);
+        expect(reply4.payload).toEqual({ error: "Could not generate thumbnail" });
+        expect(warn4).toHaveBeenCalledWith(
           { fileId: row.id, storedName: row.storedName },
           "library thumbnail: stored blob missing",
         );
@@ -2487,6 +2518,15 @@ describe("user files route logic", () => {
             expectedKind: "operational",
           },
           {
+            err: Object.assign(new Error("The server's storage is full."), {
+              isSafeMessage: true as const,
+              kind: "operational",
+              code: "storage-full",
+              statusCode: 503,
+            }),
+            expectedKind: "operational",
+          },
+          {
             err: Object.assign(new Error("ENAMETOOLONG: name too long, open"), {
               code: "ENAMETOOLONG",
               syscall: "open",
@@ -2528,6 +2568,12 @@ describe("user files route logic", () => {
             $metadata: { httpStatusCode: 404 },
           }),
           new SafeError("Invalid stored file name", {
+            kind: "operational",
+            code: "INVALID_STORED_NAME",
+            statusCode: 400,
+          }),
+          Object.assign(new Error("Invalid stored file name"), {
+            isSafeMessage: true as const,
             kind: "operational",
             code: "INVALID_STORED_NAME",
             statusCode: 400,
