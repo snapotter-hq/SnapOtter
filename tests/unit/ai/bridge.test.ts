@@ -506,6 +506,62 @@ describe("bridge - runPythonWithProgress (per-request fallback)", () => {
     await expect(promise).rejects.toThrow("ValueError: bad input");
   });
 
+  it("extracts structured JSON error and errorInfo from stderr when diagnostic lines precede it on per-request path (issue #3107)", async () => {
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    const promise = runPythonWithProgress("install_feature.py", []);
+
+    mock.stderr.emit(
+      "data",
+      Buffer.from(
+        "[install] rolled the venv back to its state before this bundle\n" +
+          `${JSON.stringify({
+            error: "Custom sidecar error",
+            errorInfo: {
+              type: "RuntimeError",
+              frames: [{ file: "install_feature.py", line: 64, func: "fail" }],
+            },
+          })}\n`,
+      ),
+    );
+    mock.emitEvent("close", 1, null);
+
+    const err = (await promise.catch((e: unknown) => e)) as Error & {
+      isSafeMessage?: unknown;
+      kind?: string;
+      pythonType?: string;
+      pythonFrames?: Array<{ file: string; line: number; func: string }>;
+    };
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toBe("Custom sidecar error");
+    expect(err.isSafeMessage).toBe(true);
+    expect(err.kind).toBe("bug");
+    expect(err.pythonType).toBe("RuntimeError");
+    expect(err.pythonFrames).toEqual([{ file: "install_feature.py", line: 64, func: "fail" }]);
+  });
+
+  it("extracts final traceback line when diagnostic lines precede a traceback on per-request stderr (issue #3107)", async () => {
+    const mock = createMockProcess();
+    vi.mocked(spawn).mockReturnValue(mock.process);
+
+    const promise = runPythonWithProgress("test_script.py", []);
+
+    const stderr = [
+      "[model] Loading weights...",
+      "Traceback (most recent call last):",
+      '  File "script.py", line 10, in <module>',
+      '    raise ValueError("bad input")',
+      "ValueError: bad input",
+    ].join("\n");
+
+    mock.stderr.emit("data", Buffer.from(`${stderr}\n`));
+    mock.emitEvent("close", 1, null);
+
+    const err = (await promise.catch((e: unknown) => e)) as Error;
+    expect(err.message).toBe("ValueError: bad input");
+  });
+
   it("passes script path and args to spawn correctly", async () => {
     const mock = createMockProcess();
     vi.mocked(spawn).mockReturnValue(mock.process);
@@ -2585,6 +2641,222 @@ describe("bridge - extractPythonError via dispatcher responses", () => {
     expect(err.kind).toBe("bug");
     expect(err.pythonType).toBe("RuntimeError");
     expect(err.pythonFrames).toEqual([{ file: "install_feature.py", line: 64, func: "fail" }]);
+  });
+
+  it("extracts structured JSON error and errorInfo from dispatcher stderr when diagnostic lines precede it (issue #3107)", async () => {
+    const mock = await setupReadyDispatcher();
+
+    const promise = runPythonWithProgress("install_feature.py", []);
+    await new Promise((r) => setTimeout(r, 10));
+
+    mock.stderr.emit(
+      "data",
+      Buffer.from(
+        "[install] rolled the venv back to its state before this bundle\n" +
+          `${JSON.stringify({
+            error: "Custom sidecar error",
+            errorInfo: {
+              type: "RuntimeError",
+              frames: [{ file: "install_feature.py", line: 64, func: "fail" }],
+            },
+          })}\n`,
+      ),
+    );
+
+    const line = mock.stdinWrites.join("").split("\n").filter(Boolean)[0];
+    const id = JSON.parse(line).id;
+
+    mock.stdout.emit("data", Buffer.from(`${JSON.stringify({ id, exitCode: 1, stdout: "" })}\n`));
+
+    const err = (await promise.catch((e: unknown) => e)) as Error & {
+      isSafeMessage?: unknown;
+      kind?: string;
+      pythonType?: string;
+      pythonFrames?: Array<{ file: string; line: number; func: string }>;
+    };
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toBe("Custom sidecar error");
+    expect(err.isSafeMessage).toBe(true);
+    expect(err.kind).toBe("bug");
+    expect(err.pythonType).toBe("RuntimeError");
+    expect(err.pythonFrames).toEqual([{ file: "install_feature.py", line: 64, func: "fail" }]);
+  });
+
+  it("extracts final traceback line from dispatcher stderr when diagnostic lines precede a traceback (issue #3107)", async () => {
+    const mock = await setupReadyDispatcher();
+
+    const promise = runPythonWithProgress("test.py", []);
+    await new Promise((r) => setTimeout(r, 10));
+
+    mock.stderr.emit(
+      "data",
+      Buffer.from(
+        "[model] Loading weights...\n" +
+          "Traceback (most recent call last):\n" +
+          '  File "script.py", line 10\n' +
+          "RuntimeError: model not found\n",
+      ),
+    );
+
+    const line = mock.stdinWrites.join("").split("\n").filter(Boolean)[0];
+    const id = JSON.parse(line).id;
+
+    mock.stdout.emit("data", Buffer.from(`${JSON.stringify({ id, exitCode: 1, stdout: "" })}\n`));
+
+    const err = (await promise.catch((e: unknown) => e)) as Error;
+    expect(err.message).toBe("RuntimeError: model not found");
+  });
+
+  it("prefers structured JSON error on stderr over non-JSON stdout lines (issue #3107)", async () => {
+    const mock = await setupReadyDispatcher();
+
+    const promise = runPythonWithProgress("install_feature.py", []);
+    await new Promise((r) => setTimeout(r, 10));
+
+    mock.stderr.emit(
+      "data",
+      Buffer.from(
+        "[install] rolled the venv back to its state before this bundle\n" +
+          `${JSON.stringify({ error: "Disk quota exceeded" })}\n`,
+      ),
+    );
+
+    const line = mock.stdinWrites.join("").split("\n").filter(Boolean)[0];
+    const id = JSON.parse(line).id;
+
+    mock.stdout.emit(
+      "data",
+      Buffer.from(`${JSON.stringify({ id, exitCode: 1, stdout: "Checking bundle...\n" })}\n`),
+    );
+
+    const err = (await promise.catch((e: unknown) => e)) as Error;
+    expect(err.message).toBe("Disk quota exceeded");
+  });
+
+  it("extracts traceback exception line when bracketed cleanup diagnostics follow a traceback on stderr (issue #3107)", async () => {
+    const mock = await setupReadyDispatcher();
+
+    const promise = runPythonWithProgress("install_feature.py", []);
+    await new Promise((r) => setTimeout(r, 10));
+
+    mock.stderr.emit(
+      "data",
+      Buffer.from(
+        "[install] extracting archive...\n" +
+          "Traceback (most recent call last):\n" +
+          '  File "install_feature.py", line 210, in main\n' +
+          '    raise RuntimeError("corrupt tar header")\n' +
+          "RuntimeError: corrupt tar header\n" +
+          "[install] rolled the venv back to its state before this bundle\n",
+      ),
+    );
+
+    const line = mock.stdinWrites.join("").split("\n").filter(Boolean)[0];
+    const id = JSON.parse(line).id;
+
+    mock.stdout.emit(
+      "data",
+      Buffer.from(
+        `${JSON.stringify({ id, exitCode: 1, stdout: '[install] partial output\n{"error": ""}' })}\n`,
+      ),
+    );
+
+    const err = (await promise.catch((e: unknown) => e)) as Error;
+    expect(err.message).toBe("RuntimeError: corrupt tar header");
+  });
+
+  it("skips trailing non-error JSON lines and chained tracebacks when extracting errors (issue #3107)", async () => {
+    const mock = await setupReadyDispatcher();
+
+    const promise = runPythonWithProgress("install_feature.py", []);
+    await new Promise((r) => setTimeout(r, 10));
+
+    mock.stderr.emit(
+      "data",
+      Buffer.from(
+        "Traceback (most recent call last):\n" +
+          '  File "install_feature.py", line 100, in download\n' +
+          "OSError: socket closed\n" +
+          "\n" +
+          "During handling of the above exception, another exception occurred:\n" +
+          "\n" +
+          "Traceback (most recent call last):\n" +
+          '  File "install_feature.py", line 210, in main\n' +
+          "RuntimeError: bundle download aborted\n" +
+          '{"status": "cleanup_done"}\n',
+      ),
+    );
+
+    const line = mock.stdinWrites.join("").split("\n").filter(Boolean)[0];
+    const id = JSON.parse(line).id;
+
+    mock.stdout.emit("data", Buffer.from(`${JSON.stringify({ id, exitCode: 1, stdout: "" })}\n`));
+
+    const err = (await promise.catch((e: unknown) => e)) as Error;
+    expect(err.message).toBe("RuntimeError: bundle download aborted");
+  });
+
+  it("falls back to errorInfo.type when diagnostic lines precede an empty-error JSON envelope on stderr (issue #3107)", async () => {
+    const mock = await setupReadyDispatcher();
+
+    const promise = runPythonWithProgress("test.py", []);
+    await new Promise((r) => setTimeout(r, 10));
+
+    mock.stderr.emit(
+      "data",
+      Buffer.from(
+        "[model] allocating buffer...\n" +
+          `${JSON.stringify({
+            success: false,
+            error: "",
+            errorInfo: { type: "MemoryError", message: "", frames: [] },
+          })}\n` +
+          '{"status": "cleanup_done"}\n',
+      ),
+    );
+
+    const line = mock.stdinWrites.join("").split("\n").filter(Boolean)[0];
+    const id = JSON.parse(line).id;
+
+    mock.stdout.emit("data", Buffer.from(`${JSON.stringify({ id, exitCode: 1, stdout: "" })}\n`));
+
+    const err = (await promise.catch((e: unknown) => e)) as Error & {
+      isSafeMessage?: unknown;
+      kind?: string;
+      pythonType?: string;
+    };
+    expect(err.message).toBe("MemoryError");
+    expect(err.isSafeMessage).toBe(true);
+    expect(err.kind).toBe("operational");
+    expect(err.pythonType).toBe("MemoryError");
+  });
+
+  it("prefers plain-text stderr over plain-text stdout and falls back to exit code on truncated traceback (issue #3107)", async () => {
+    const mock = await setupReadyDispatcher();
+
+    const p1 = runPythonWithProgress("test.py", []);
+    await new Promise((r) => setTimeout(r, 10));
+    mock.stderr.emit("data", Buffer.from("PermissionError: [Errno 13] Permission denied\n"));
+    const id1 = JSON.parse(mock.stdinWrites.join("").split("\n").filter(Boolean)[0]).id;
+    mock.stdout.emit(
+      "data",
+      Buffer.from(`${JSON.stringify({ id: id1, exitCode: 1, stdout: "Loading model..." })}\n`),
+    );
+    await expect(p1).rejects.toThrow("PermissionError: [Errno 13] Permission denied");
+
+    const p2 = runPythonWithProgress("test.py", []);
+    await new Promise((r) => setTimeout(r, 10));
+    mock.stderr.emit(
+      "data",
+      Buffer.from("[model] Loading weights...\nTraceback (most recent call last):\n"),
+    );
+    const lines = mock.stdinWrites.join("").split("\n").filter(Boolean);
+    const id2 = JSON.parse(lines[lines.length - 1]).id;
+    mock.stdout.emit(
+      "data",
+      Buffer.from(`${JSON.stringify({ id: id2, exitCode: 2, stdout: "" })}\n`),
+    );
+    await expect(p2).rejects.toThrow("Python script exited with code 2");
   });
 
   it("preserves unrecognized JSON and malformed-JSON stderr lines without polluting stderr with {info} or {warning} (issue #3096)", async () => {

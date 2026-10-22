@@ -163,6 +163,83 @@ export function toSidecarError(reason: unknown, fallback: string): Error {
   });
 }
 
+function parsePythonJsonCandidates(output: string): Array<Record<string, unknown>> {
+  const trimmed = output.trim();
+  if (!trimmed) return [];
+
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return [parsed as Record<string, unknown>];
+    }
+    return [];
+  } catch {
+    // Fall back to scanning individual lines in reverse when diagnostic output
+    // precedes a JSON error line.
+  }
+
+  const results: Array<Record<string, unknown>> = [];
+  const lines = trimmed.split("\n");
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i]?.trim();
+    if (!line?.startsWith("{")) continue;
+    try {
+      const parsed: unknown = JSON.parse(line);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        results.push(parsed as Record<string, unknown>);
+      }
+    } catch {
+      // Not a standalone JSON object line.
+    }
+  }
+  return results;
+}
+
+function extractStructuredErrorMessage(output: string): string | null {
+  for (const parsed of parsePythonJsonCandidates(output)) {
+    if (typeof parsed.error === "string" && parsed.error.trim()) {
+      return parsed.error;
+    }
+    const errorInfo = parsed.errorInfo as { type?: unknown } | undefined;
+    if (typeof errorInfo?.type === "string" && errorInfo.type.trim()) {
+      return errorInfo.type.trim();
+    }
+  }
+  return null;
+}
+
+function isJsonObjectString(text: string): boolean {
+  if (!text.startsWith("{")) return false;
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return !!parsed && typeof parsed === "object" && !Array.isArray(parsed);
+  } catch {
+    return false;
+  }
+}
+
+function extractTracebackErrorLine(output: string): string | null {
+  const lines = output
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  let lastTracebackIdx = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (lines[i]?.startsWith("Traceback")) {
+      lastTracebackIdx = i;
+      break;
+    }
+  }
+  if (lastTracebackIdx === -1) return null;
+  for (let i = lines.length - 1; i > lastTracebackIdx; i--) {
+    const line = lines[i];
+    if (!line || line.startsWith("Traceback")) continue;
+    if (/^\[[a-zA-Z0-9_.-]+\]\s/.test(line) || isJsonObjectString(line)) continue;
+    return line;
+  }
+  return null;
+}
+
 function extractPythonError(error: unknown): string {
   if (error && typeof error === "object") {
     const pErr = error as {
@@ -170,34 +247,28 @@ function extractPythonError(error: unknown): string {
       stdout?: string;
       message?: string;
     };
-    for (const output of [pErr.stdout, pErr.stderr]) {
-      if (output) {
-        try {
-          const parsed = JSON.parse(output.trim());
-          if (typeof parsed?.error === "string" && parsed.error.trim()) {
-            return parsed.error;
-          }
-          if (typeof parsed?.errorInfo?.type === "string" && parsed.errorInfo.type.trim()) {
-            return parsed.errorInfo.type.trim();
-          }
-        } catch {
-          const trimmed = output.trim();
-          if (trimmed && !trimmed.startsWith("Traceback")) {
-            return trimmed;
-          }
-          // Extract the last meaningful line from a Python Traceback
-          if (trimmed) {
-            const lines = trimmed
-              .split("\n")
-              .map((l) => l.trim())
-              .filter(Boolean);
-            const lastLine = lines[lines.length - 1];
-            if (lastLine && lastLine !== "Traceback (most recent call last):") {
-              return lastLine;
-            }
-          }
-        }
-      }
+    const outputs = [pErr.stdout, pErr.stderr];
+    for (const output of outputs) {
+      if (!output) continue;
+      const structured = extractStructuredErrorMessage(output);
+      if (structured) return structured;
+    }
+    for (const output of outputs) {
+      if (!output) continue;
+      const tbLine = extractTracebackErrorLine(output);
+      if (tbLine) return tbLine;
+    }
+    for (const output of [pErr.stderr, pErr.stdout]) {
+      const trimmed = output?.trim();
+      if (!trimmed || isJsonObjectString(trimmed)) continue;
+      const rawLines = trimmed.split("\n");
+      if (rawLines.some((l) => l.trim().startsWith("Traceback"))) continue;
+      const nonJsonLines = rawLines.filter((l) => {
+        const t = l.trim();
+        return Boolean(t) && !isJsonObjectString(t);
+      });
+      const candidate = nonJsonLines.join("\n").trim();
+      if (candidate) return candidate;
     }
     if (pErr.message) return pErr.message;
     // Return empty string for {stdout, stderr} objects with no useful content
@@ -219,8 +290,7 @@ export function extractPythonErrorInfo(error: unknown): PythonErrorInfo | null {
   const pErr = error as { stdout?: string; stderr?: string };
   for (const output of [pErr.stdout, pErr.stderr]) {
     if (!output) continue;
-    try {
-      const parsed = JSON.parse(output.trim()) as { errorInfo?: unknown };
+    for (const parsed of parsePythonJsonCandidates(output)) {
       const info = parsed.errorInfo as PythonErrorInfo | undefined;
       if (info && Array.isArray(info.frames)) {
         return {
@@ -236,8 +306,6 @@ export function extractPythonErrorInfo(error: unknown): PythonErrorInfo | null {
             .slice(0, 20),
         };
       }
-    } catch {
-      // not JSON; nothing structured to read
     }
   }
   return null;
@@ -326,37 +394,21 @@ function classifyDispatcherResponseFailure(
   extracted: string,
   infoType?: string,
 ): { status: "succeeded" | "failed" | "ignored"; cudaPoison: boolean } {
-  const trimmed = stdout.trim();
-  if (trimmed) {
-    const lines = trimmed.split("\n");
-    const candidates = [trimmed, lines[lines.length - 1]?.trim() ?? ""];
-    for (const candidate of candidates) {
-      if (!candidate.startsWith("{")) continue;
-      try {
-        const parsed = JSON.parse(candidate) as {
-          success?: unknown;
-          error?: unknown;
-          errorInfo?: { type?: unknown };
-        };
-        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-          const errVal = typeof parsed.error === "string" ? parsed.error.trim() : "";
-          if (errVal === "canceled" || PRE_EXEC_GATE_ERRORS.has(errVal)) {
-            return { status: "ignored", cudaPoison: false };
-          }
-          const failed =
-            exitCode !== 0 ||
-            parsed.success === false ||
-            (errVal.length > 0 && parsed.success !== true);
-          if (!failed) return { status: "succeeded", cudaPoison: false };
-          const combined = `${infoType ?? ""}\n${extracted}\n${errVal}\n${stdout}\n${stderr}`;
-          return { status: "failed", cudaPoison: CUDA_POISON_RE.test(combined) };
-        }
-      } catch {
-        // Not JSON; fall through to exitCode check below.
-      }
+  for (const parsed of parsePythonJsonCandidates(stdout)) {
+    const errVal = typeof parsed.error === "string" ? parsed.error.trim() : "";
+    if (errVal === "canceled" || PRE_EXEC_GATE_ERRORS.has(errVal)) {
+      return { status: "ignored", cudaPoison: false };
     }
+    const failed =
+      exitCode !== 0 || parsed.success === false || (errVal.length > 0 && parsed.success !== true);
+    if (!failed) return { status: "succeeded", cudaPoison: false };
+    const combined = `${infoType ?? ""}\n${extracted}\n${errVal}\n${stdout}\n${stderr}`;
+    return { status: "failed", cudaPoison: CUDA_POISON_RE.test(combined) };
   }
   if (exitCode !== 0) {
+    if (extracted === "canceled" || PRE_EXEC_GATE_ERRORS.has(extracted)) {
+      return { status: "ignored", cudaPoison: false };
+    }
     const combined = `${infoType ?? ""}\n${extracted}\n${stdout}\n${stderr}`;
     return { status: "failed", cudaPoison: CUDA_POISON_RE.test(combined) };
   }
