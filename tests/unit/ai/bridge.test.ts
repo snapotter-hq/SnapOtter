@@ -2012,6 +2012,7 @@ describe("bridge - dispatcher stdin JSON-RPC protocol", () => {
 describe("bridge - dispatcher request timeout", () => {
   let runPythonWithProgress: typeof import("../../../packages/ai/src/bridge.js").runPythonWithProgress;
   let initDispatcher: typeof import("../../../packages/ai/src/bridge.js").initDispatcher;
+  let getDispatcherStatus: typeof import("../../../packages/ai/src/bridge.js").getDispatcherStatus;
   let shutdownDispatcher: typeof import("../../../packages/ai/src/bridge.js").shutdownDispatcher;
 
   beforeEach(async () => {
@@ -2021,6 +2022,7 @@ describe("bridge - dispatcher request timeout", () => {
     const mod = await import("../../../packages/ai/src/bridge.js");
     runPythonWithProgress = mod.runPythonWithProgress;
     initDispatcher = mod.initDispatcher;
+    getDispatcherStatus = mod.getDispatcherStatus;
     shutdownDispatcher = mod.shutdownDispatcher;
   });
 
@@ -2067,6 +2069,118 @@ describe("bridge - dispatcher request timeout", () => {
     await expect(promise).rejects.toThrow("Python script timed out");
     expect(mock.process.kill).toHaveBeenCalledWith("SIGTERM");
     vi.useRealTimers();
+  });
+
+  it("clears childReady on timeout before close fires and signals proc instead of a replacement child (issue #3549)", async () => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+
+    const mockChild1 = createMockProcess();
+    const mockChild2 = createMockProcess();
+    const mockPerReq = createMockProcess();
+    const mockSiblingPerReq = createMockProcess();
+    vi.mocked(spawn)
+      .mockReturnValueOnce(mockChild1.process)
+      .mockReturnValueOnce(mockChild2.process)
+      .mockReturnValueOnce(mockPerReq.process)
+      .mockReturnValueOnce(mockSiblingPerReq.process);
+
+    const initPromise = initDispatcher();
+    mockChild1.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+    vi.advanceTimersByTime(100);
+    await initPromise;
+
+    const slowPromise = runPythonWithProgress("slow.py", [], { timeout: 1000 });
+    const slowerSibling = runPythonWithProgress("slower.py", [], { timeout: 2500 });
+    const retrySibling = runPythonWithProgress("retry-sibling.py", [], { timeout: 10_000 });
+    const settledSlow = slowPromise.catch((e: unknown) => e);
+    const settledSlower = slowerSibling.catch((e: unknown) => e);
+    await vi.advanceTimersByTimeAsync(10);
+
+    // Fire the internal request timeout on slow.py without emitting "close" on mockChild1 yet.
+    vi.advanceTimersByTime(1100);
+    await expect(settledSlow).resolves.toMatchObject({
+      message: "Python script timed out",
+      isSafeMessage: true,
+      kind: "operational",
+      code: "timeout",
+    });
+    expect(mockChild1.process.kill).toHaveBeenCalledTimes(1);
+    expect(mockChild1.process.kill).toHaveBeenCalledWith("SIGTERM");
+
+    // Immediately after timeout (before "close"), status must report neither running nor ready and pid null.
+    expect(getDispatcherStatus().running).toBe(false);
+    expect(getDispatcherStatus().ready).toBe(false);
+    expect(getDispatcherStatus().pid).toBeNull();
+
+    // A request arriving before mockChild1 emits "close" spawns mockChild2 (not yet ready)
+    // and falls back to runPerRequest instead of writing to mockChild2's stdin prematurely.
+    const fastPromise = runPythonWithProgress("fast.py", ["arg"]);
+    await vi.advanceTimersByTimeAsync(10);
+
+    expect(mockChild2.stdinWrites).toHaveLength(0);
+    expect(getDispatcherStatus().ready).toBe(false);
+
+    mockPerReq.stdout.emit("data", Buffer.from('{"fast": true}\n'));
+    mockPerReq.emitEvent("close", 0, null);
+    await expect(fastPromise).resolves.toEqual({ stdout: '{"fast": true}', stderr: "" });
+
+    // Once mockChild2 emits ready (still before mockChild1 closes), slowerSibling's 2500ms
+    // timeout on mockChild1 fires: it must NOT clobber mockChild2's child/childReady state,
+    // must NOT kill mockChild2, and must NOT signal mockChild1 a second time (since mockChild1.killed is true).
+    mockChild2.stderr.emit("data", Buffer.from('{"ready": true, "gpu": false}\n'));
+    expect(getDispatcherStatus().running).toBe(true);
+    expect(getDispatcherStatus().ready).toBe(true);
+
+    vi.advanceTimersByTime(1500);
+    await expect(settledSlower).resolves.toMatchObject({
+      message: "Python script timed out",
+      isSafeMessage: true,
+      kind: "operational",
+      code: "timeout",
+    });
+    expect(mockChild1.process.kill).toHaveBeenCalledTimes(1);
+    expect(mockChild2.process.kill).not.toHaveBeenCalled();
+    expect(getDispatcherStatus().running).toBe(true);
+    expect(getDispatcherStatus().ready).toBe(true);
+
+    // Late "close" from the timed-out mockChild1 records the crash and retries retrySibling
+    // via runPerRequest without touching mockChild2.
+    mockChild1.emitEvent("close", null, "SIGTERM");
+    expect(getDispatcherStatus().consecutiveCrashes).toBe(1);
+    expect(getDispatcherStatus().running).toBe(true);
+    expect(getDispatcherStatus().ready).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(10);
+    mockSiblingPerReq.stdout.emit("data", Buffer.from('{"retried": true}\n'));
+    mockSiblingPerReq.emitEvent("close", 0, null);
+    await expect(retrySibling).resolves.toMatchObject({
+      stdout: '{"retried": true}',
+      stderr: expect.stringContaining("[bridge] retried after dispatcher crash"),
+    });
+
+    // Also verify startChild() resets childReady = false directly when getChild() sees
+    // this.child.killed === true while this.childReady was still true (before close/timeout/shutdown).
+    vi.advanceTimersByTime(1000);
+    (mockChild2.process as { killed: boolean }).killed = true;
+    expect(getDispatcherStatus().ready).toBe(true);
+
+    const mockChild3 = createMockProcess();
+    const mockChild3PerReq = createMockProcess();
+    vi.mocked(spawn)
+      .mockReturnValueOnce(mockChild3.process)
+      .mockReturnValueOnce(mockChild3PerReq.process);
+
+    const afterKillPromise = runPythonWithProgress("after-kill.py", []);
+    await vi.advanceTimersByTimeAsync(10);
+
+    expect(getDispatcherStatus().ready).toBe(false);
+    expect(mockChild3.stdinWrites).toHaveLength(0);
+    mockChild3PerReq.stdout.emit("data", Buffer.from('{"afterKill": true}\n'));
+    mockChild3PerReq.emitEvent("close", 0, null);
+    await expect(afterKillPromise).resolves.toEqual({ stdout: '{"afterKill": true}', stderr: "" });
   });
 });
 

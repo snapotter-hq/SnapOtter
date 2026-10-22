@@ -580,6 +580,7 @@ export class PythonDispatcher {
     if (this.childFailed) return null;
     this.generation++;
     const gen = this.generation;
+    this.childReady = false;
     this.childScriptFailures = 0;
 
     try {
@@ -838,8 +839,12 @@ export class PythonDispatcher {
           this.pending.delete(id);
           // Kill the stuck dispatcher so it restarts on the next request instead of
           // blocking all subsequent operations behind the timed-out script.
-          if (this.child && !this.child.killed) {
-            this.child.kill("SIGTERM");
+          if (this.child === proc) {
+            this.child = null;
+            this.childReady = false;
+          }
+          if (!proc.killed) {
+            proc.kill("SIGTERM");
           }
           wrappedReject(
             new SafeError("Python script timed out", {
