@@ -65,15 +65,16 @@ export async function compressDetailed(
   }
 
   const metadata = await image.metadata();
-  const detectedFormat = FORMAT_MAP[metadata.format ?? ""] ?? "png";
+  const formatOut = (image as unknown as { options?: { formatOut?: string } }).options?.formatOut;
+  const detectedFormat = FORMAT_MAP[formatOut ?? ""] ?? FORMAT_MAP[metadata.format ?? ""] ?? "png";
   const outputFormat = explicitFormat ?? detectedFormat;
 
   if (targetSizeBytes !== undefined) {
-    const inputBuffer = await (metadata.format === "gif"
+    const inputBuffer = await (detectedFormat === "gif"
       ? image.gif({ reuse: false })
-      : (outputFormat === "tiff" || metadata.format === "tiff") && hasFloatPipelineStage(image)
+      : (outputFormat === "tiff" || detectedFormat === "tiff") && hasFloatPipelineStage(image)
         ? image.png()
-        : metadata.format === "tiff"
+        : detectedFormat === "tiff"
           ? image.tiff({ compression: "lzw" })
           : image
     ).toBuffer();

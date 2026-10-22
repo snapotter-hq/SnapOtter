@@ -194,6 +194,41 @@ describe("GIF Palette Reuse", () => {
       { type: "compress", options: { format: "jpeg" as "jpg", quality: 80 } },
     ]);
     expect(gifToJpeg.info.format).toBe("jpeg");
+
+    // Converting PNG -> GIF -> colorChannels -> compressDetailed (format omitted)
+    // keeps GIF output and calls .gif({ reuse: false }) (#3135).
+    const pngSrc = await sharp({
+      create: {
+        width: 10,
+        height: 10,
+        channels: 4,
+        background: { r: 200, g: 40, b: 40, alpha: 1 },
+      },
+    })
+      .png()
+      .toBuffer();
+    const pngToGifPipeline = await colorChannels(await convert(sharp(pngSrc), { format: "gif" }), {
+      red: 0,
+      green: 200,
+      blue: 100,
+    });
+    const pngToGifSpy = vi.spyOn(pngToGifPipeline, "gif");
+    const pngToGifTarget = await compressDetailed(pngToGifPipeline, {
+      targetSizeBytes: pngSrc.length * 4,
+    });
+    expect(pngToGifSpy).toHaveBeenCalledWith({ reuse: false });
+    expect((await sharp(pngToGifTarget.buffer as Buffer).metadata()).format).toBe("gif");
+    expect(await pixelAt(pngToGifTarget.buffer as Buffer, 5, 5)).toEqual([0, 80, 40, 255]);
+
+    // Converting GIF -> WebP -> compressDetailed (format omitted) must not call
+    // .gif({ reuse: false }) or reset the output back to GIF (#3135).
+    const gifConvertedToWebp = await convert(sharp(redGif), { format: "webp" });
+    const gifSpy = vi.spyOn(gifConvertedToWebp, "gif");
+    const gifToWebpTarget = await compressDetailed(gifConvertedToWebp, {
+      targetSizeBytes: redGif.length * 4,
+    });
+    expect(gifSpy).not.toHaveBeenCalled();
+    expect((await sharp(gifToWebpTarget.buffer as Buffer).metadata()).format).toBe("webp");
   });
 });
 
@@ -540,5 +575,57 @@ describe("TIFF LZW alpha preservation (#2607)", () => {
       })
     ).toBuffer();
     expect((await sharp(compressIccBuf).metadata()).hasProfile).toBe(true);
+
+    // Converting PNG -> TIFF -> compress/compressDetailed (format omitted)
+    // preserves 4-channel alpha and 8-bit uchar depth (#3135).
+    const pngToTiffTarget = await compressDetailed(await convert(sharp(png), { format: "tiff" }), {
+      targetSizeBytes: rgbaTiff.length * 4,
+    });
+    const pngToTiffTargetMeta = await sharp(pngToTiffTarget.buffer as Buffer).metadata();
+    expect(pngToTiffTargetMeta.format).toBe("tiff");
+    expect(pngToTiffTargetMeta.channels).toBe(4);
+    expect(pngToTiffTargetMeta.hasAlpha).toBe(true);
+    expect((await pixelAt(pngToTiffTarget.buffer as Buffer, 2, 2))[3]).toBe(0);
+
+    const pngToTiffFloatQuality = await (
+      await compress(await sepia(await convert(sharp(png), { format: "tiff" })), { quality: 80 })
+    ).toBuffer();
+    const pngToTiffFloatQualityMeta = await sharp(pngToTiffFloatQuality).metadata();
+    expect(pngToTiffFloatQualityMeta.format).toBe("tiff");
+    expect(pngToTiffFloatQualityMeta.depth).toBe("uchar");
+    expect(pngToTiffFloatQualityMeta.channels).toBe(4);
+    expect(pngToTiffFloatQualityMeta.hasAlpha).toBe(true);
+    expect((await pixelAt(pngToTiffFloatQuality, 2, 2))[3]).toBe(0);
+
+    const pngToTiffFloatTarget = await compressDetailed(
+      await sepia(await convert(sharp(png), { format: "tiff" })),
+      { targetSizeBytes: rgbaTiff.length * 4 },
+    );
+    const pngToTiffFloatMeta = await sharp(pngToTiffFloatTarget.buffer as Buffer).metadata();
+    expect(pngToTiffFloatMeta.format).toBe("tiff");
+    expect(pngToTiffFloatMeta.depth).toBe("uchar");
+    expect(pngToTiffFloatMeta.channels).toBe(4);
+    expect(pngToTiffFloatMeta.hasAlpha).toBe(true);
+
+    // PNG -> convert("tiff") -> sepia -> compressDetailed({ format: "webp", targetSizeBytes })
+    // casts the float pipeline via .png() rather than .tiff({ compression: "lzw" }).
+    const pngToTiffFloatThenWebp = await sepia(await convert(sharp(png), { format: "tiff" }));
+    const floatTiffPngSpy = vi.spyOn(pngToTiffFloatThenWebp, "png");
+    const floatTiffToWebpTarget = await compressDetailed(pngToTiffFloatThenWebp, {
+      format: "webp",
+      targetSizeBytes: rgbaTiff.length * 4,
+    });
+    expect(floatTiffPngSpy).toHaveBeenCalled();
+    expect((await sharp(floatTiffToWebpTarget.buffer as Buffer).metadata()).format).toBe("webp");
+
+    // Converting TIFF -> WebP -> compressDetailed (format omitted) must not call
+    // .tiff({ compression: "lzw" }) or reset the output back to TIFF (#3135).
+    const tiffConvertedToWebp = await convert(sharp(rgbaTiff), { format: "webp" });
+    const tiffSpy = vi.spyOn(tiffConvertedToWebp, "tiff");
+    const tiffToWebpTarget = await compressDetailed(tiffConvertedToWebp, {
+      targetSizeBytes: rgbaTiff.length * 4,
+    });
+    expect(tiffSpy).not.toHaveBeenCalled();
+    expect((await sharp(tiffToWebpTarget.buffer as Buffer).metadata()).format).toBe("webp");
   });
 });

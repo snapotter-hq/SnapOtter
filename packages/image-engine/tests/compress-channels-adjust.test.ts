@@ -1,9 +1,11 @@
 import sharp from "sharp";
 import { beforeAll, describe, expect, it } from "vitest";
+import { processImage } from "../src/engine.js";
 import { brightness } from "../src/operations/brightness.js";
 import { colorChannels } from "../src/operations/color-channels.js";
-import { compress } from "../src/operations/compress.js";
+import { compress, compressDetailed } from "../src/operations/compress.js";
 import { contrast } from "../src/operations/contrast.js";
+import { convert } from "../src/operations/convert.js";
 import { saturation } from "../src/operations/saturation.js";
 import type { Sharp } from "../src/types.js";
 
@@ -93,6 +95,65 @@ describe("compress: format selection", () => {
     // PNG in, AVIF requested out -> must not fall back to the input's png.
     const out = await (await compress(sharp(photoPng), { quality: 50, format: "avif" })).toBuffer();
     expect(await outputFormat(out)).toBe("avif");
+  });
+
+  it("preserves a prior convert format when options.format is omitted (#3135)", async () => {
+    const src = await solidPng(120, 90, 60, 32);
+    for (const [format, expected] of [
+      ["jpg", "jpeg"],
+      ["webp", "webp"],
+      ["avif", "avif"],
+      ["gif", "gif"],
+      ["tiff", "tiff"],
+    ] as const) {
+      const viaEngine = await processImage(src, [
+        { type: "convert", options: { format } },
+        { type: "compress", options: { quality: 60 } },
+      ]);
+      expect(await outputFormat(viaEngine.buffer)).toBe(expected);
+
+      const converted = await convert(sharp(src), { format });
+      const viaDirectQuality = await (await compress(converted, { quality: 60 })).toBuffer();
+      expect(await outputFormat(viaDirectQuality)).toBe(expected);
+
+      const viaDirectTarget = await compressDetailed(await convert(sharp(src), { format }), {
+        targetSizeBytes: 50_000,
+      });
+      expect(await outputFormat(viaDirectTarget.buffer as Buffer)).toBe(expected);
+    }
+
+    // Converting JPEG -> PNG -> compress (format omitted) preserves PNG rather
+    // than falling back to metadata.format ("jpeg").
+    const jpegSrc = await sharp(src).jpeg({ quality: 90 }).toBuffer();
+    const jpegToPngEngine = await processImage(jpegSrc, [
+      { type: "convert", options: { format: "png" } },
+      { type: "compress", options: { quality: 60 } },
+    ]);
+    expect(await outputFormat(jpegToPngEngine.buffer)).toBe("png");
+    const jpegToPngDirect = await (
+      await compress(await convert(sharp(jpegSrc), { format: "png" }), { quality: 60 })
+    ).toBuffer();
+    expect(await outputFormat(jpegToPngDirect)).toBe("png");
+
+    // Quality passed to compress (format omitted) controls output size in the
+    // converted format.
+    const webpLow = await (
+      await compress(await convert(sharp(photoPng), { format: "webp" }), { quality: 20 })
+    ).toBuffer();
+    const webpHigh = await (
+      await compress(await convert(sharp(photoPng), { format: "webp" }), { quality: 90 })
+    ).toBuffer();
+    expect(await outputFormat(webpLow)).toBe("webp");
+    expect(webpLow.length).toBeLessThan(webpHigh.length);
+
+    // Explicit compress format still overrides a prior convert format.
+    const webpThenJpg = await (
+      await compress(await convert(sharp(src), { format: "webp" }), {
+        quality: 60,
+        format: "jpg",
+      })
+    ).toBuffer();
+    expect(await outputFormat(webpThenJpg)).toBe("jpeg");
   });
 
   it("falls back to PNG for inputs Sharp cannot encode (SVG)", async () => {
