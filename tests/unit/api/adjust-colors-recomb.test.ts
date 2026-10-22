@@ -463,4 +463,64 @@ describe("adjust-colors combined recomb matrices (#2608)", () => {
     expect(tiffMeta.depth).toBe("uchar");
     expect(await firstPixel(outTiff)).toEqual([172, 153, 119]);
   });
+
+  it("applies saturation and hue before grayscale even when no recomb stage is active (#3469)", async () => {
+    const sample = await makeSolidPng(200, 50, 20);
+    const rgbaSample = await makeSolidPng(200, 50, 20, 0.5);
+
+    const plainGray = await runAdjustColors(sample, {
+      effect: "grayscale",
+    });
+    const satOnlyGray = await runAdjustColors(sample, {
+      saturation: 100,
+      effect: "grayscale",
+    });
+    const hueGray = await runAdjustColors(sample, {
+      hue: 120,
+      effect: "grayscale",
+    });
+    const satHueGray = await runAdjustColors(sample, {
+      saturation: 100,
+      hue: 120,
+      effect: "grayscale",
+    });
+    const rgbaHueGray = await runAdjustColors(rgbaSample, {
+      hue: 120,
+      effect: "grayscale",
+    });
+
+    // Unmodified rgb(200, 50, 20) -> Rec.709 grayscale [107, 107, 107]
+    expect(await firstPixel(plainGray)).toEqual([107, 107, 107]);
+    // Boosting saturation (+100) clamps red at 255 and lowers green/blue before grayscale -> [127, 127, 127]
+    expect(await firstPixel(satOnlyGray)).toEqual([127, 127, 127]);
+    // Rotating red-orange into green (+120 deg) before grayscale raises luminance to [113, 113, 113]
+    expect(await firstPixel(hueGray)).toEqual([113, 113, 113]);
+    // Boosting saturation (+100) and rotating hue (+120 deg) before grayscale -> [120, 120, 120]
+    expect(await firstPixel(satHueGray)).toEqual([120, 120, 120]);
+    // RGBA alpha=128 is preserved alongside the hue-shifted grayscale luminance
+    expect(await firstPixel(rgbaHueGray)).toEqual([113, 113, 113, 128]);
+
+    const animGif = readFixture(fixtures.image.animated.gif);
+    const inMeta = await sharp(animGif, { animated: true }).metadata();
+    const [animPlainGray, animHueGray] = await Promise.all([
+      runAdjustColors(animGif, { effect: "grayscale" }, "anim.gif"),
+      runAdjustColors(animGif, { saturation: 100, hue: 120, effect: "grayscale" }, "anim.gif"),
+    ]);
+    const outMeta = await sharp(animHueGray, { animated: true }).metadata();
+    expect(outMeta.format).toBe("gif");
+    expect(outMeta.pages).toBe(inMeta.pages);
+    expect(outMeta.width).toBe(inMeta.width);
+    expect(outMeta.pageHeight).toBe(inMeta.pageHeight);
+    const animPlainPx0 = await firstPixel(animPlainGray);
+    const animHuePx0 = await firstPixel(animHueGray);
+    expect(animHuePx0[0]).toBe(animHuePx0[1]);
+    expect(animHuePx0[1]).toBe(animHuePx0[2]);
+    expect(animHuePx0).not.toEqual(animPlainPx0);
+    const frame1Raw = await sharp(animHueGray, { page: 1, pages: 1 })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    expect(frame1Raw.data[0]).toBe(frame1Raw.data[1]);
+    expect(frame1Raw.data[1]).toBe(frame1Raw.data[2]);
+    expect(frame1Raw.data[0]).toBeGreaterThan(0);
+  });
 });

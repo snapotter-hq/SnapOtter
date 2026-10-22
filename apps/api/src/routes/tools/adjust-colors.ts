@@ -126,11 +126,8 @@ async function processColorAdjustments(
   filename: string,
 ) {
   const outputFormat = await resolveOutputFormat(inputBuffer, filename);
-  const hasPreRecomb =
-    settings.brightness !== 0 ||
-    settings.contrast !== 0 ||
-    settings.saturation !== 0 ||
-    settings.hue !== 0;
+  const hasColorModulate = settings.saturation !== 0 || settings.hue !== 0;
+  const hasPreRecomb = settings.brightness !== 0 || settings.contrast !== 0 || hasColorModulate;
   const hasRecomb =
     settings.temperature !== 0 ||
     settings.tint !== 0 ||
@@ -138,7 +135,8 @@ async function processColorAdjustments(
     settings.green !== 100 ||
     settings.blue !== 100 ||
     settings.effect === "sepia";
-  const needsPreRecombMaterialize = hasRecomb && hasPreRecomb;
+  const needsPreRecombMaterialize =
+    (hasRecomb && hasPreRecomb) || (settings.effect === "grayscale" && hasColorModulate);
   const needsPostRecombMaterialize =
     hasRecomb &&
     (settings.exposure > 0 || settings.effect === "grayscale" || settings.effect === "invert");
@@ -149,7 +147,7 @@ async function processColorAdjustments(
   // strip, and intermediate PNG materialisation (needsRecombMaterialize), which
   // would flatten a multi-frame strip into a single tall frame. Those go frame
   // by frame; the rest keep the cheaper single pass over the whole animation
-  // (#1083, #3120, #3133).
+  // (#1083, #3120, #3133, #3469).
   if (settings.sharpness > 0 || needsRecombMaterialize) {
     try {
       const perFrame = await runPerFrame(inputBuffer, outputFormat.format, async (frame) => {
@@ -184,17 +182,18 @@ async function processColorAdjustments(
     }
 
     // Color
-    if (settings.saturation !== 0 || settings.hue !== 0) {
+    if (hasColorModulate) {
       const modOpts: { saturation?: number; hue?: number } = {};
       if (settings.saturation !== 0) modOpts.saturation = 1 + settings.saturation / 100;
       if (settings.hue !== 0) modOpts.hue = settings.hue;
       image = image.modulate(modOpts);
     }
 
-    // Sharp's C++ pipeline executes sharp::Recomb before sharp::Modulate
-    // (brightness, saturation, hue) and sharp::Linear (contrast). Materialise
-    // pre-recomb adjustments to 8-bit uchar first so recomb (temperature/tint,
-    // channel multipliers, sepia) runs on the adjusted pixels (#3133).
+    // Sharp's C++ pipeline executes sharp::greyscale (pipeline.cc:388) and
+    // sharp::Recomb (pipeline.cc:678) before sharp::Modulate (brightness,
+    // saturation, hue) and sharp::Linear (contrast). Materialise pre-recomb
+    // adjustments before recomb (#3133) and saturation/hue before grayscale
+    // (#3469) so those stages run on the adjusted 8-bit uchar pixels.
     if (needsPreRecombMaterialize) {
       image = sharp(await image.png().toBuffer());
     }

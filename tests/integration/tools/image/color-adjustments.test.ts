@@ -779,6 +779,36 @@ describe("Effect combined with adjustments", () => {
     expect([raw[0], raw[1], raw[2]]).toEqual([42, 42, 42]);
   });
 
+  it("applies saturation and hue before grayscale when no recomb setting is active (#3469)", async () => {
+    const sample = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 200, g: 50, b: 20 } },
+    })
+      .png()
+      .toBuffer();
+    const res = await postTool(
+      "adjust-colors",
+      {
+        saturation: 100,
+        hue: 120,
+        effect: "grayscale",
+      },
+      sample,
+      "sample.png",
+      "image/png",
+    );
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result.downloadUrl).toBeDefined();
+    const dl = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dl.statusCode).toBe(200);
+    const raw = await sharp(dl.rawPayload).raw().toBuffer();
+    expect([raw[0], raw[1], raw[2]]).toEqual([120, 120, 120]);
+  });
+
   it("composes temperature/tint, channel multipliers, and sepia in a single request (#2608)", async () => {
     const gray = await sharp({
       create: { width: 8, height: 8, channels: 3, background: { r: 128, g: 128, b: 128 } },
