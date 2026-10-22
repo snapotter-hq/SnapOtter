@@ -112,6 +112,7 @@ describe("filenameFromUrl", () => {
     expect(filenameFromUrl("https://example.com/README.")).toMatch(FALLBACK_FILENAME_RE);
     expect(filenameFromUrl("https://example.com/..tga")).toMatch(FALLBACK_FILENAME_RE);
     expect(filenameFromUrl("https://example.com/.hidden..png")).toMatch(FALLBACK_FILENAME_RE);
+    expect(filenameFromUrl("https://example.com/.hidden.%00.png")).toMatch(FALLBACK_FILENAME_RE);
     expect(filenameFromUrl("https://example.com/.hidden.png")).toBe(".hidden.png");
   });
 });

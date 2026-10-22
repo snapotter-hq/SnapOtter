@@ -88,9 +88,9 @@ const SAFE_EXTENSIONS = new Set([
  */
 export function sanitizeFilename(raw: string): string {
   let name = basename(raw);
-  name = name.replace(/\.\./g, "");
   name = name.replace(/\0/g, "");
-  if (!name || name === "." || name === "..") {
+  name = name.replace(/\.\./g, "");
+  if (!name || name === "." || name === ".." || name.toLowerCase() === ".snapotter-staging") {
     name = "upload";
   }
 

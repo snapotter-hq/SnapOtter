@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createUniqueNamer, sanitizeFilename } from "../../../apps/api/src/lib/filename.js";
+import { isValidObjectKey } from "../../../apps/api/src/lib/object-storage.js";
 
 describe("createUniqueNamer", () => {
   it("treats names that differ only in case as a collision, keeping the casing", () => {
@@ -201,5 +202,43 @@ describe("sanitizeFilename", () => {
     for (const [input, expected] of Object.entries(cases)) {
       expect(sanitizeFilename(input)).toBe(expected);
     }
+  });
+
+  it("strips null bytes before collapsing .. sequences (#3562)", () => {
+    const sanitized = sanitizeFilename("a.\0.b.jpg");
+    expect(sanitized).toBe("ab.jpg");
+    expect(isValidObjectKey(`uploads/job/${sanitized}`)).toBe(true);
+
+    const multiNull = sanitizeFilename("a.\0\0.b..c.png");
+    expect(multiNull).toBe("abc.png");
+    expect(isValidObjectKey(`uploads/job/${multiNull}`)).toBe(true);
+
+    const trailingNullDots = sanitizeFilename("file.\0.");
+    expect(trailingNullDots).toBe("file");
+    expect(isValidObjectKey(`uploads/job/${trailingNullDots}`)).toBe(true);
+
+    for (const bare of [".\0.", "..\0."]) {
+      const result = sanitizeFilename(bare);
+      expect(result).toBe("upload");
+      expect(isValidObjectKey(`uploads/job/${result}`)).toBe(true);
+    }
+  });
+
+  it("falls back to upload for .snapotter-staging reserved name (#3562)", () => {
+    for (const raw of [
+      ".snapotter-staging",
+      ".SNAPOTTER-STAGING",
+      "/tmp/.snapotter-staging",
+      ".\0snapotter-staging",
+      ".snapotter-staging..",
+    ]) {
+      const sanitized = sanitizeFilename(raw);
+      expect(sanitized).toBe("upload");
+      expect(isValidObjectKey(`uploads/job/${sanitized}`)).toBe(true);
+    }
+
+    const withExt = sanitizeFilename(".snapotter-staging.png.php");
+    expect(withExt).toBe(".snapotter-staging.png");
+    expect(isValidObjectKey(`uploads/job/${withExt}`)).toBe(true);
   });
 });
