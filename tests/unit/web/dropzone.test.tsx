@@ -2301,5 +2301,245 @@ describe("Dropzone", () => {
       });
       expect(result.current.entries).toEqual([]);
     });
+
+    it("keeps UrlImportModal open, removes the fulfilled subset, and preserves a failed entry from initial fetch-urls when ready downloads succeed (#3680)", async () => {
+      let fetchUrlsCalls = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.endsWith("/api/v1/fetch-urls")) {
+            fetchUrlsCalls += 1;
+            if (fetchUrlsCalls === 1) {
+              return Promise.resolve(
+                new Response(
+                  JSON.stringify({
+                    results: [
+                      {
+                        success: true,
+                        url: "https://example.com/a.png",
+                        filename: "a.png",
+                        size: 8,
+                        downloadUrl: "https://example.com/dl/a.png",
+                      },
+                      {
+                        success: false,
+                        url: "https://example.com/b.png",
+                        error: "Upstream timeout",
+                      },
+                    ],
+                  }),
+                  { status: 200, headers: { "Content-Type": "application/json" } },
+                ),
+              );
+            }
+            return Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  results: [
+                    {
+                      success: true,
+                      url: "https://example.com/b.png",
+                      filename: "b.png",
+                      size: 12,
+                      downloadUrl: "https://example.com/dl/b.png",
+                    },
+                  ],
+                }),
+                { status: 200, headers: { "Content-Type": "application/json" } },
+              ),
+            );
+          }
+          if (url.endsWith("/dl/a.png")) {
+            return Promise.resolve(
+              new Response("png-a", { status: 200, headers: { "Content-Type": "image/png" } }),
+            );
+          }
+          return Promise.resolve(
+            new Response("png-b", { status: 200, headers: { "Content-Type": "image/png" } }),
+          );
+        }),
+      );
+
+      let acceptImport = false;
+      const onImport = vi.fn<(_files: File[]) => boolean | undefined>(() =>
+        acceptImport ? undefined : false,
+      );
+      const onClose = vi.fn();
+      render(<UrlImportModal onClose={onClose} onImport={onImport} />);
+
+      const dialog = screen.getByRole("dialog");
+      fireEvent.change(within(dialog).getByRole("textbox"), {
+        target: { value: "https://example.com/a.png\nhttps://example.com/b.png" },
+      });
+      fireEvent.click(within(dialog).getByRole("button", { name: en.urlImport.importButton }));
+
+      // First click: onImport refuses the ready subset, so a.png stays ready alongside failed b.png.
+      const firstAddBtn = await within(dialog).findByRole("button", { name: "Add 1 Files" });
+      fireEvent.click(firstAddBtn);
+
+      await waitFor(() => {
+        expect(onImport).toHaveBeenCalledTimes(1);
+      });
+      expect(onClose).not.toHaveBeenCalled();
+      expect(within(dialog).getByText("a.png")).toBeDefined();
+      expect(within(dialog).getByText("b.png")).toBeDefined();
+
+      // Second click: onImport accepts the ready subset; a.png is removed while modal stays open for b.png.
+      acceptImport = true;
+      fireEvent.click(within(dialog).getByRole("button", { name: "Add 1 Files" }));
+
+      await waitFor(() => {
+        expect(onImport).toHaveBeenCalledTimes(2);
+      });
+      expect(onImport.mock.calls[1]?.[0]?.map((f: File) => f.name)).toEqual(["a.png"]);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(within(dialog).queryByText("a.png")).toBeNull();
+      expect(within(dialog).getByText("b.png")).toBeDefined();
+      const retryBtn = within(dialog).getByTitle(en.urlImport.retryButton);
+      const disabledAddBtn = within(dialog).getByRole("button", {
+        name: "Add 0 Files",
+      }) as HTMLButtonElement;
+      expect(disabledAddBtn.disabled).toBe(true);
+
+      fireEvent.click(retryBtn);
+      const secondAddBtn = (await within(dialog).findByRole("button", {
+        name: "Add 1 Files",
+      })) as HTMLButtonElement;
+      expect(secondAddBtn.disabled).toBe(false);
+
+      fireEvent.click(secondAddBtn);
+      await waitFor(() => {
+        expect(onImport).toHaveBeenCalledTimes(3);
+        expect(onClose).toHaveBeenCalledTimes(1);
+      });
+      expect(onImport.mock.calls[2]?.[0]?.map((f: File) => f.name)).toEqual(["b.png"]);
+    });
+
+    it("disables Back and Add buttons in UrlImportModal while a retryUrl request is in flight (#3680)", async () => {
+      let resolveRetry: ((res: Response) => void) | undefined;
+      let fetchUrlsCalls = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.endsWith("/api/v1/fetch-urls")) {
+            fetchUrlsCalls += 1;
+            if (fetchUrlsCalls === 1) {
+              return Promise.resolve(
+                new Response(
+                  JSON.stringify({
+                    results: [
+                      {
+                        success: true,
+                        url: "https://example.com/a.png",
+                        filename: "a.png",
+                        size: 8,
+                        downloadUrl: "https://example.com/dl/a.png",
+                      },
+                      {
+                        success: false,
+                        url: "https://example.com/b.png",
+                        error: "Failed",
+                      },
+                    ],
+                  }),
+                  { status: 200, headers: { "Content-Type": "application/json" } },
+                ),
+              );
+            }
+            return new Promise<Response>((resolve) => {
+              resolveRetry = resolve;
+            });
+          }
+          return Promise.resolve(
+            new Response("png-data", { status: 200, headers: { "Content-Type": "image/png" } }),
+          );
+        }),
+      );
+
+      const onImport = vi.fn();
+      const onClose = vi.fn();
+      render(<UrlImportModal onClose={onClose} onImport={onImport} />);
+
+      const dialog = screen.getByRole("dialog");
+      fireEvent.change(within(dialog).getByRole("textbox"), {
+        target: { value: "https://example.com/a.png\nhttps://example.com/b.png" },
+      });
+      fireEvent.click(within(dialog).getByRole("button", { name: en.urlImport.importButton }));
+
+      const addBtn = (await within(dialog).findByRole("button", {
+        name: "Add 1 Files",
+      })) as HTMLButtonElement;
+      const backBtn = within(dialog).getByRole("button", {
+        name: en.common.back,
+      }) as HTMLButtonElement;
+      const retryBtn = within(dialog).getByTitle(en.urlImport.retryButton);
+
+      expect(addBtn.disabled).toBe(false);
+      expect(backBtn.disabled).toBe(false);
+
+      fireEvent.click(retryBtn);
+
+      expect(addBtn.disabled).toBe(true);
+      expect(backBtn.disabled).toBe(true);
+
+      // First retry fails: Back and Add 1 Files re-enable while b.png stays failed.
+      await act(async () => {
+        resolveRetry?.(
+          new Response(
+            JSON.stringify({
+              results: [
+                {
+                  success: false,
+                  url: "https://example.com/b.png",
+                  error: "Still failing",
+                },
+              ],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      });
+
+      const retryBtnAfterFail = await within(dialog).findByTitle(en.urlImport.retryButton);
+      expect(addBtn.disabled).toBe(false);
+      expect(backBtn.disabled).toBe(false);
+
+      // Second retry succeeds: Back and Add 2 Files disable while in flight, then re-enable.
+      fireEvent.click(retryBtnAfterFail);
+      expect(addBtn.disabled).toBe(true);
+      expect(backBtn.disabled).toBe(true);
+
+      await act(async () => {
+        resolveRetry?.(
+          new Response(
+            JSON.stringify({
+              results: [
+                {
+                  success: true,
+                  url: "https://example.com/b.png",
+                  filename: "b.png",
+                  size: 16,
+                  downloadUrl: "https://example.com/dl/b.png",
+                },
+              ],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      });
+
+      const updatedAddBtn = (await within(dialog).findByRole("button", {
+        name: "Add 2 Files",
+      })) as HTMLButtonElement;
+      expect(updatedAddBtn.disabled).toBe(false);
+      expect(backBtn.disabled).toBe(false);
+
+      fireEvent.click(backBtn);
+      expect(within(dialog).queryByText("a.png")).toBeNull();
+      expect(within(dialog).queryByText("b.png")).toBeNull();
+      expect(within(dialog).getByRole("button", { name: en.urlImport.importButton })).toBeDefined();
+    });
   });
 });

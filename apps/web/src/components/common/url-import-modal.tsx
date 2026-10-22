@@ -68,6 +68,7 @@ export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
   } = useUrlImport();
 
   const hasResults = entries.length > 0;
+  const retrying = entries.some((entry) => entry.status === "fetching");
 
   const handleImport = useCallback(() => {
     const urls = extractUrls(text);
@@ -76,12 +77,12 @@ export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
   }, [text, importUrls]);
 
   const handleAdd = useCallback(async () => {
-    if (readyCount === 0) return;
+    if (readyCount === 0 || retrying) return;
     setAdding(true);
     try {
       const files = await addReadyFiles();
       const accepted = files.length > 0 && onImportRef.current(files) !== false;
-      if (files.failedCount === 0) {
+      if (files.failedCount === 0 && files.fulfilledIndices.length === entries.length) {
         if (accepted) {
           onCloseRef.current();
         }
@@ -91,11 +92,12 @@ export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
     } finally {
       setAdding(false);
     }
-  }, [readyCount, addReadyFiles, removeEntries]);
+  }, [readyCount, retrying, addReadyFiles, entries.length, removeEntries]);
 
   const handleBack = useCallback(() => {
+    if (retrying) return;
     reset();
-  }, [reset]);
+  }, [retrying, reset]);
 
   const handleClose = useCallback(() => {
     cancel();
@@ -196,14 +198,15 @@ export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
                 <button
                   type="button"
                   onClick={handleBack}
-                  className="px-4 py-2 text-sm rounded-lg border border-border text-foreground hover:bg-muted"
+                  disabled={retrying}
+                  className="px-4 py-2 text-sm rounded-lg border border-border text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {t.common.back}
                 </button>
                 <button
                   type="button"
                   onClick={handleAdd}
-                  disabled={readyCount === 0 || adding}
+                  disabled={readyCount === 0 || adding || retrying}
                   className="px-4 py-2 text-sm rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {adding ? (
