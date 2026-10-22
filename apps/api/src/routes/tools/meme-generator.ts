@@ -1,13 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { extname, join } from "node:path";
-import { hasServerErrorStatus } from "@snapotter/shared";
-import type { FastifyInstance } from "fastify";
+import { hasServerErrorStatus, isToolInputError } from "@snapotter/shared";
+import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 import sharp, { type Metadata } from "sharp";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
+import { sanitizeFilename } from "../../lib/filename.js";
 import {
   DecoderOutOfMemoryError,
   decodeToSharpCompat,
@@ -19,7 +20,8 @@ import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/ima
 import { renderMemeTextSvg } from "../../lib/meme-text-renderer.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
-import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { decompressSvgz, isSvgzClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { InputValidationError } from "../../modality/contract.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 // ---------------------------------------------------------------------------
@@ -113,6 +115,84 @@ function getManifest(): Manifest {
 
 function findTemplate(templateId: string): Template | undefined {
   return getManifest().templates.find((t) => t.id === templateId);
+}
+
+function sanitizeSvgInput(buf: Buffer): Buffer {
+  try {
+    const decompressed = decompressSvgz(buf);
+    return sanitizeSvg(decompressed);
+  } catch (err) {
+    if (
+      isSvgzClientError(err) ||
+      (err instanceof Error && err.message.includes("SVGZ file does not contain"))
+    ) {
+      const validationErr = new InputValidationError(
+        err instanceof Error ? err.message : "Invalid SVG",
+      );
+      validationErr.cause = err;
+      throw validationErr;
+    }
+    throw err;
+  }
+}
+
+async function prepareMemeImage(
+  inputBuffer: Buffer,
+  filename: string,
+  log?: Pick<FastifyBaseLogger, "warn">,
+): Promise<Buffer> {
+  let buf = inputBuffer;
+  const validation = await validateImageBuffer(buf, filename);
+  if (!validation.valid) {
+    throw new InputValidationError(`Invalid image: ${validation.reason}`);
+  }
+  if (validation.format === "heif") {
+    try {
+      buf = await decodeHeic(buf);
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(rawErr);
+      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+      throw await asInputErrorIfUndecodable(buf, err);
+    }
+  }
+  let fallbackFormat: string | undefined;
+  if (needsCliDecode(validation.format)) {
+    try {
+      const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
+      buf = await decodeToSharpCompat(buf, validation.format, fileExt);
+    } catch (rawDecodeErr) {
+      const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+      if (
+        decodeErr instanceof DecoderOutOfMemoryError ||
+        (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+      ) {
+        throw decodeErr;
+      }
+      try {
+        const meta = await sharp(buf).metadata();
+        fallbackFormat = meta.format;
+        if (fallbackFormat !== "svg") {
+          await sharp(buf).resize(1).raw().toBuffer();
+        }
+      } catch (err) {
+        if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) throw decodeErr;
+        throw await asInputErrorIfUndecodable(buf, err);
+      }
+    }
+  }
+  let isSvg = validation.format === "svg" || fallbackFormat === "svg";
+  if (!isSvg && validation.format === "png" && filename.toLowerCase().endsWith(".apng")) {
+    const meta = await sharp(buf)
+      .metadata()
+      .catch(() => null);
+    if (meta?.format === "svg") isSvg = true;
+  }
+  if (isSvg) {
+    buf = sanitizeSvgInput(buf);
+  } else {
+    buf = await autoOrient(buf, log);
+  }
+  return buf;
 }
 
 // ---------------------------------------------------------------------------
@@ -221,39 +301,7 @@ export function registerMemeGenerator(app: FastifyInstance) {
       (s) => (s as Settings)?.textLayout ?? "top-bottom",
       async (inputBuffer: Buffer, settings: unknown, filename: string) => {
         const parsed = settingsSchema.parse(settings);
-        let buf = inputBuffer;
-        const validation = await validateImageBuffer(buf, filename);
-        if (validation.valid && validation.format === "heif") {
-          try {
-            buf = await decodeHeic(buf);
-          } catch (rawErr) {
-            throw normalizeOperationalWriteError(rawErr);
-          }
-        }
-        if (validation.valid && needsCliDecode(validation.format)) {
-          try {
-            const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
-            buf = await decodeToSharpCompat(buf, validation.format, fileExt);
-          } catch (rawDecodeErr) {
-            const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
-            if (
-              decodeErr instanceof DecoderOutOfMemoryError ||
-              (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
-            ) {
-              throw decodeErr;
-            }
-            try {
-              await sharp(buf).metadata();
-              await sharp(buf).resize(1).raw().toBuffer();
-            } catch (err) {
-              if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
-                throw decodeErr;
-              }
-              throw await asInputErrorIfUndecodable(buf, err);
-            }
-          }
-        }
-        buf = await autoOrient(buf);
+        const buf = await prepareMemeImage(inputBuffer, filename);
         return processMeme(buf, parsed, filename);
       },
     ),
@@ -280,7 +328,7 @@ export function registerMemeGenerator(app: FastifyInstance) {
             }
             imageBuffer = Buffer.concat(chunks);
             if (part.filename) {
-              filename = part.filename;
+              filename = sanitizeFilename(part.filename);
             }
           } else if (part.type === "field" && part.fieldname === "settings") {
             try {
@@ -337,57 +385,7 @@ export function registerMemeGenerator(app: FastifyInstance) {
       if (!imageBuffer) {
         return reply.status(400).send({ error: "No image provided" });
       }
-      const validation = await validateImageBuffer(imageBuffer, filename);
-      if (!validation.valid) {
-        return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
-      }
-      if (validation.format === "heif") {
-        try {
-          imageBuffer = await decodeHeic(imageBuffer);
-        } catch (rawErr) {
-          const err = normalizeOperationalWriteError(rawErr);
-          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
-          return reply.status(422).send({
-            error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
-            details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-          });
-        }
-      }
-      if (needsCliDecode(validation.format)) {
-        try {
-          const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
-          imageBuffer = await decodeToSharpCompat(imageBuffer, validation.format, fileExt);
-        } catch (rawDecodeErr) {
-          const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
-          if (
-            decodeErr instanceof DecoderOutOfMemoryError ||
-            (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
-          ) {
-            throw decodeErr;
-          }
-          try {
-            await sharp(imageBuffer).metadata();
-            await sharp(imageBuffer).resize(1).raw().toBuffer();
-          } catch (err) {
-            if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) throw decodeErr;
-            return reply.status(422).send({
-              error: `Failed to decode ${validation.format.toUpperCase()} file`,
-              details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-            });
-          }
-        }
-      }
-      if (validation.format === "svg") {
-        try {
-          imageBuffer = decompressSvgz(imageBuffer);
-          imageBuffer = sanitizeSvg(imageBuffer);
-        } catch (err) {
-          return reply.status(400).send({
-            error: err instanceof Error ? err.message : "Invalid SVG",
-          });
-        }
-      }
-      imageBuffer = await autoOrient(imageBuffer);
+      imageBuffer = await prepareMemeImage(imageBuffer, filename, request.log);
 
       const output = await processMeme(imageBuffer, settings, filename, templateTextBoxes);
 
@@ -403,9 +401,17 @@ export function registerMemeGenerator(app: FastifyInstance) {
     } catch (err) {
       if (isDecoderUnavailable(err)) throw err;
       if (hasServerErrorStatus(err)) throw err;
+      if (err instanceof InputValidationError) {
+        return reply.status(400).send({
+          error: err.message,
+        });
+      }
+      if (!isToolInputError(err)) {
+        request.log?.error({ err, toolId: "meme-generator" }, "Meme generation failed");
+      }
       return reply.status(422).send({
         error: "Processing failed",
-        details: err instanceof Error ? err.message : "Meme generation failed",
+        details: stripInternalPaths(err instanceof Error ? err.message : "Meme generation failed"),
       });
     }
   });

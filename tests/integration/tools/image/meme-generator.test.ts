@@ -720,4 +720,75 @@ describe("Meme Generator", () => {
     });
     expect(dlRes.statusCode).toBe(200);
   });
+
+  it("sanitizes nested/double-extension upload filenames (#3415)", async () => {
+    const settings = {
+      textLayout: "top-bottom",
+      textBoxes: [{ id: "top", text: "SANITIZED" }],
+    };
+
+    const nestedPayload = createMultipartPayload([
+      { name: "file", filename: "sub/photo.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify(settings) },
+    ]);
+    const nestedRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/meme-generator",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": nestedPayload.contentType,
+      },
+      body: nestedPayload.body,
+    });
+    expect(nestedRes.statusCode).toBe(200);
+    const nestedDownloadUrl = JSON.parse(nestedRes.body).downloadUrl as string;
+    expect(nestedDownloadUrl).toMatch(/\/photo\.png$/);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: nestedDownloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dlRes.statusCode).toBe(200);
+
+    const doubleExtPayload = createMultipartPayload([
+      { name: "file", filename: "meme.html.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify(settings) },
+    ]);
+    const doubleExtRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/meme-generator",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": doubleExtPayload.contentType,
+      },
+      body: doubleExtPayload.body,
+    });
+    expect(doubleExtRes.statusCode).toBe(200);
+    expect(JSON.parse(doubleExtRes.body).downloadUrl).toMatch(/\/meme\.png$/);
+
+    const dotDotPayload = createMultipartPayload([
+      { name: "file", filename: "foo..bar.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify(settings) },
+    ]);
+    const dotDotRes = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/meme-generator",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": dotDotPayload.contentType,
+      },
+      body: dotDotPayload.body,
+    });
+    expect(dotDotRes.statusCode).toBe(200);
+    const dotDotDownloadUrl = JSON.parse(dotDotRes.body).downloadUrl as string;
+    expect(dotDotDownloadUrl).toMatch(/\/foobar\.png$/);
+
+    const dotDotDlRes = await app.inject({
+      method: "GET",
+      url: dotDotDownloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dotDotDlRes.statusCode).toBe(200);
+  });
 });

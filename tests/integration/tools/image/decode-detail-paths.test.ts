@@ -144,6 +144,10 @@ const ICO_DETAIL_FROM_SHARP = new Set([
   "optimize-for-web preview",
 ]);
 
+// Routes whose HEIC decode catch delegates to asInputErrorIfUndecodable,
+// returning UNDECODABLE_IMAGE_MESSAGE instead of the raw decoder stderr.
+const HEIC_DETAIL_FROM_SHARP = new Set(["meme-generator upload"]);
+
 describe("decode failures don't expose server temp paths (#1430)", () => {
   for (const route of ROUTES) {
     for (const [format, sample] of Object.entries(SAMPLES)) {
@@ -154,7 +158,10 @@ describe("decode failures don't expose server temp paths (#1430)", () => {
         expect(res.body).not.toContain(tmpdir());
         expect(res.body).not.toMatch(/(heic|ico|jxl|raw|jp2|exr)-(in|out)-/);
         const { details } = res.json();
-        if (format === "ico" && ICO_DETAIL_FROM_SHARP.has(route.name)) {
+        if (
+          (format === "ico" && ICO_DETAIL_FROM_SHARP.has(route.name)) ||
+          (format === "heic" && HEIC_DETAIL_FROM_SHARP.has(route.name))
+        ) {
           expect(details).toMatch(/unsupported image format|can't be decoded/);
         } else {
           // The decoder's own error named its temp files; they're now masked.

@@ -224,6 +224,48 @@ describe("beautify route and processBeautify validation & backgroundImage prepar
     };
   }
 
+  async function invokeMemeMultipart(
+    filename: string,
+    content: Buffer,
+    settings: Record<string, unknown> = { textBoxes: [] },
+  ) {
+    let statusCode = 200;
+    let body: unknown;
+    const reply = {
+      status(code: number) {
+        statusCode = code;
+        return reply;
+      },
+      send(payload: unknown) {
+        body = payload;
+        return reply;
+      },
+    };
+    const requestLog = {
+      warn: vi.fn(),
+      error: vi.fn(),
+    };
+    const request = {
+      log: requestLog,
+      headers: { "content-type": "multipart/form-data; boundary=test" },
+      async *parts() {
+        yield {
+          type: "file" as const,
+          fieldname: "file",
+          filename,
+          file: Readable.from([content]),
+        };
+        yield {
+          type: "field" as const,
+          fieldname: "settings",
+          value: JSON.stringify(settings),
+        };
+      },
+    };
+    await memeHandler(request, reply);
+    return { statusCode, json: body as Record<string, unknown>, requestLog };
+  }
+
   it("rejects main image exceeding MAX_MEGAPIXELS with 400", async () => {
     const twoMpPng = await sharp({
       create: {
@@ -701,39 +743,6 @@ describe("beautify route and processBeautify validation & backgroundImage prepar
     expect(memeDotfileSvg.contentType).toBe("image/png");
 
     // 4. meme-generator HTTP route: extensionless and dotfile uploads
-    async function invokeMemeMultipart(filename: string, content: Buffer) {
-      let statusCode = 200;
-      let body: unknown;
-      const reply = {
-        status(code: number) {
-          statusCode = code;
-          return reply;
-        },
-        send(payload: unknown) {
-          body = payload;
-          return reply;
-        },
-      };
-      const request = {
-        headers: { "content-type": "multipart/form-data; boundary=test" },
-        async *parts() {
-          yield {
-            type: "file" as const,
-            fieldname: "file",
-            filename,
-            file: Readable.from([content]),
-          };
-          yield {
-            type: "field" as const,
-            fieldname: "settings",
-            value: JSON.stringify({ textBoxes: [] }),
-          };
-        },
-      };
-      await memeHandler(request, reply);
-      return { statusCode, json: body as Record<string, unknown> };
-    }
-
     const resMemeExtless = await invokeMemeMultipart("image", JPG_100);
     expect(resMemeExtless.statusCode).toBe(200);
     expect(resMemeExtless.json.downloadUrl).toBe(
@@ -745,5 +754,196 @@ describe("beautify route and processBeautify validation & backgroundImage prepar
     expect(resMemeDotfile.json.downloadUrl).toBe(
       `/api/v1/download/${resMemeDotfile.json.jobId}/.hidden.png`,
     );
+  });
+
+  it("sanitizes upload filenames and validates/prepares images in meme-generator route and registry process (#3415)", async () => {
+    const memeConfig = getToolConfig("meme-generator");
+    if (!memeConfig) throw new Error("meme-generator missing from toolRegistry");
+
+    // 1. Upload filename sanitization: nested path, ".." sequence, double extension
+    const resNested = await invokeMemeMultipart("nested/photo.png", PNG_200);
+    expect(resNested.statusCode).toBe(200);
+    expect(resNested.json.downloadUrl).toBe(`/api/v1/download/${resNested.json.jobId}/photo.png`);
+
+    const resDotDot = await invokeMemeMultipart("foo..bar.png", PNG_200);
+    expect(resDotDot.statusCode).toBe(200);
+    expect(resDotDot.json.downloadUrl).toBe(`/api/v1/download/${resDotDot.json.jobId}/foobar.png`);
+
+    const resDoubleExt = await invokeMemeMultipart("meme.html.png", PNG_200);
+    expect(resDoubleExt.statusCode).toBe(200);
+    expect(resDoubleExt.json.downloadUrl).toBe(
+      `/api/v1/download/${resDoubleExt.json.jobId}/meme.png`,
+    );
+
+    // 2. Registry process: validateImageBuffer rejection (corrupt buffer & MAX_MEGAPIXELS)
+    const invalidErr = await memeConfig.process(Buffer.from("not an image"), {}, "bad.png").then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(invalidErr).toBeInstanceOf(InputValidationError);
+    expect((invalidErr as Error).message).toBe("Invalid image: Unrecognized image format");
+
+    const twoMpPng = await sharp({
+      create: {
+        width: 2000,
+        height: 1000,
+        channels: 3,
+        background: { r: 10, g: 20, b: 30 },
+      },
+    })
+      .png()
+      .toBuffer();
+
+    const prevMaxMp = env.MAX_MEGAPIXELS;
+    (env as { MAX_MEGAPIXELS: number }).MAX_MEGAPIXELS = 1;
+    try {
+      const mpErr = await memeConfig.process(twoMpPng, {}, "huge.png").then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(mpErr).toBeInstanceOf(InputValidationError);
+      expect((mpErr as Error).message).toBe(
+        "Invalid image: Image exceeds maximum size: 2.0MP (limit: 1MP)",
+      );
+
+      const resRouteMp = await invokeMemeMultipart("huge.png", twoMpPng);
+      expect(resRouteMp.statusCode).toBe(400);
+      expect(resRouteMp.json.error).toBe(
+        "Invalid image: Image exceeds maximum size: 2.0MP (limit: 1MP)",
+      );
+    } finally {
+      (env as { MAX_MEGAPIXELS: number }).MAX_MEGAPIXELS = prevMaxMp;
+    }
+
+    // 3. Registry process & HTTP route: decompressSvgz + sanitizeSvg on .svg, .svgz, and comment-padded .apng/.tga
+    const sanitizeSpy = vi.spyOn(svgSanitize, "sanitizeSvg");
+    try {
+      const rawSvg = Buffer.from(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><feImage href="http://127.0.0.1:9/ssrf"/><script>alert(1)</script><rect width="80" height="80" fill="#00ff00"/></svg>',
+      );
+      const svgz = gzipSync(rawSvg);
+
+      const svgOut = await memeConfig.process(rawSvg, {}, "attack.svg");
+      expect(svgOut.filename).toBe("attack.png");
+      expect(sanitizeSpy).toHaveBeenCalledTimes(1);
+      const sanitizedSvgArg = sanitizeSpy.mock.results[0]?.value as Buffer;
+      expect(sanitizedSvgArg.toString("utf-8")).not.toContain("<script");
+      expect(sanitizedSvgArg.toString("utf-8")).not.toContain("127.0.0.1");
+
+      const svgzOut = await memeConfig.process(svgz, {}, "attack.svgz");
+      expect(svgzOut.filename).toBe("attack.png");
+      expect(sanitizeSpy).toHaveBeenCalledTimes(2);
+
+      const longComment = `<!-- ${"x".repeat(4500)} -->`;
+      const commentPaddedSvg = Buffer.from(
+        `${longComment}<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"><script>alert(1)</script><rect width="50" height="50" fill="red"/></svg>`,
+      );
+
+      const resRouteApng = await invokeMemeMultipart("padded.apng", commentPaddedSvg);
+      expect(resRouteApng.statusCode).toBe(200);
+      expect(sanitizeSpy).toHaveBeenCalledTimes(3);
+
+      const resRouteTga = await invokeMemeMultipart("padded.tga", commentPaddedSvg);
+      expect(resRouteTga.statusCode).toBe(200);
+      expect(sanitizeSpy).toHaveBeenCalledTimes(4);
+
+      const regApng = await memeConfig.process(commentPaddedSvg, {}, "padded.apng");
+      expect(regApng.filename).toBe("padded.png");
+      expect(sanitizeSpy).toHaveBeenCalledTimes(5);
+
+      const regTga = await memeConfig.process(commentPaddedSvg, {}, "padded.tga");
+      expect(regTga.filename).toBe("padded.png");
+      expect(sanitizeSpy).toHaveBeenCalledTimes(6);
+    } finally {
+      sanitizeSpy.mockRestore();
+    }
+
+    // 4. SVG / SVGZ client errors (element cap, corrupt gzip, non-SVG svgz) become InputValidationError (400 on HTTP)
+    const tooManyElementsSvg = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">${"<rect/>".repeat(5005)}</svg>`,
+    );
+    const nonSvgSvgz = gzipSync(Buffer.from("<html><body>not an svg</body></html>"));
+    const corruptSvgz = Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0xff, 0xff]);
+
+    const capErr = await memeConfig.process(tooManyElementsSvg, {}, "bomb.svg").then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(capErr).toBeInstanceOf(InputValidationError);
+    expect((capErr as Error).message).toContain("maximum element count");
+
+    const nonSvgErr = await memeConfig.process(nonSvgSvgz, {}, "not-svg.svgz").then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(nonSvgErr).toBeInstanceOf(InputValidationError);
+    expect((nonSvgErr as Error).message).toContain("valid SVG content");
+
+    const corruptSvgzErr = await memeConfig.process(corruptSvgz, {}, "corrupt.svgz").then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(corruptSvgzErr).toBeInstanceOf(InputValidationError);
+
+    const resRouteNonSvgSvgz = await invokeMemeMultipart("not-svg.svgz", nonSvgSvgz);
+    expect(resRouteNonSvgSvgz.statusCode).toBe(400);
+    expect(String(resRouteNonSvgSvgz.json.error)).toContain("valid SVG content");
+
+    const resRouteCorruptSvgz = await invokeMemeMultipart("corrupt.svgz", corruptSvgz);
+    expect(resRouteCorruptSvgz.statusCode).toBe(400);
+    expect(typeof resRouteCorruptSvgz.json.error).toBe("string");
+
+    // 5. Registry process decodeHeic failure wraps non-server errors with asInputErrorIfUndecodable,
+    // and decodeToSharpCompat receives lowercase fileExt
+    const heicBuf = readFixture(fixtures.image.base.heic200);
+    const heicSpy = vi
+      .spyOn(heicConverter, "decodeHeic")
+      .mockRejectedValueOnce(new Error("heif-dec failed on corrupt HEIC"));
+    try {
+      const heicErr = await memeConfig.process(heicBuf, {}, "bad.heic").then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(isToolInputError(heicErr)).toBe(true);
+      expect((heicErr as Error).message).toBe(UNDECODABLE_IMAGE_MESSAGE);
+    } finally {
+      heicSpy.mockRestore();
+    }
+
+    const cliSpy = vi.spyOn(formatDecoders, "decodeToSharpCompat").mockResolvedValueOnce(PNG_200);
+    try {
+      const dngBuf = Buffer.from("fake-raw-dng-header");
+      const outDng = await memeConfig.process(dngBuf, {}, "Photo.DNG");
+      expect(outDng.filename).toBe("Photo.png");
+      expect(cliSpy).toHaveBeenCalledWith(dngBuf, "raw", "dng");
+    } finally {
+      cliSpy.mockRestore();
+    }
+
+    // 6. Unexpected non-client error from sanitizeSvg rethrows on registry process and logs on HTTP route
+    const unexpectedErr = new TypeError("unexpected sanitizer fault");
+    const sanitizeFaultSpy = vi.spyOn(svgSanitize, "sanitizeSvg").mockImplementation(() => {
+      throw unexpectedErr;
+    });
+    try {
+      const validSvg = Buffer.from(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="blue"/></svg>',
+      );
+      const faultErr = await memeConfig.process(validSvg, {}, "valid.svg").then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(faultErr).not.toBeInstanceOf(InputValidationError);
+      expect((faultErr as { cause?: unknown }).cause).toBe(unexpectedErr);
+
+      const resRouteFault = await invokeMemeMultipart("valid.svg", validSvg);
+      expect(resRouteFault.statusCode).toBe(422);
+      expect(resRouteFault.requestLog.error).toHaveBeenCalledWith(
+        { err: unexpectedErr, toolId: "meme-generator" },
+        "Meme generation failed",
+      );
+    } finally {
+      sanitizeFaultSpy.mockRestore();
+    }
   });
 });
