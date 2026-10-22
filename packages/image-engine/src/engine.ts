@@ -86,20 +86,33 @@ const FORMAT_MAP: Record<string, string> = {
 
 const RECOMB_OPS = new Set(["color-blindness", "color-channels", "sepia"]);
 
-const PIXEL_FILTER_OPS = new Set([
-  "brightness",
+const TRANSFORM_OPS = new Set([
+  "resize",
+  "crop",
+  "rotate",
+  "flip",
+  "grayscale",
   "color-blindness",
   "color-channels",
-  "contrast",
-  "grayscale",
-  "invert",
-  "saturation",
   "sepia",
+  "brightness",
+  "saturation",
   "sharpen",
   "sharpen-advanced",
+  "contrast",
+  "invert",
 ]);
 
 type PipelineOptions = {
+  topOffsetPre?: number;
+  topOffsetPost?: number;
+  width?: number;
+  height?: number;
+  angle?: number;
+  rotationAngle?: number;
+  flip?: boolean;
+  flop?: boolean;
+  greyscale?: boolean;
   recombMatrix?: unknown;
   convKernel?: unknown;
   negate?: boolean;
@@ -108,6 +121,7 @@ type PipelineOptions = {
   saturation?: number;
   sharpenSigma?: number;
   keepMetadata?: number;
+  lastStripKeepMetadata?: number;
   formatOut?: string;
   jpegQuality?: number;
   pngPalette?: boolean;
@@ -135,30 +149,50 @@ const ENCODER_OPTION_KEYS = [
   "jxlDistance",
 ] as const;
 
-function hasPostRecombStage(image: Sharp): boolean {
+function hasNonRecombTransformStage(image: Sharp): boolean {
   const opts = (image as unknown as { options?: PipelineOptions }).options;
   if (!opts) return false;
   return (
     Boolean(opts.negate) ||
     (opts.linearA?.length ?? 0) > 0 ||
+    (opts.sharpenSigma ?? 0) !== 0 ||
     (opts.brightness ?? 1) !== 1 ||
     (opts.saturation ?? 1) !== 1 ||
-    (opts.sharpenSigma ?? 0) !== 0
+    opts.convKernel !== undefined ||
+    Boolean(opts.greyscale) ||
+    (opts.topOffsetPre ?? -1) !== -1 ||
+    (opts.topOffsetPost ?? -1) !== -1 ||
+    (opts.width ?? -1) !== -1 ||
+    (opts.height ?? -1) !== -1 ||
+    (opts.angle ?? 0) !== 0 ||
+    (opts.rotationAngle ?? 0) !== 0 ||
+    Boolean(opts.flip) ||
+    Boolean(opts.flop)
   );
 }
 
-function shouldMaterializeBefore(image: Sharp, opType: string): boolean {
-  if (!PIXEL_FILTER_OPS.has(opType)) return false;
-  if (RECOMB_OPS.has(opType)) {
-    return hasPostRecombStage(image);
-  }
+function shouldMaterializeBefore(
+  image: Sharp,
+  op: Operation,
+  metadataStrippedAll: boolean,
+): boolean {
   const opts = (image as unknown as { options?: PipelineOptions }).options;
-  return hasFloatPipelineStage(image) || Boolean(opts?.negate);
+  if (op.type === "edit-metadata") {
+    return metadataStrippedAll || (opts?.keepMetadata ?? 0) !== 0;
+  }
+  if (!TRANSFORM_OPS.has(op.type)) return false;
+  if (RECOMB_OPS.has(op.type)) {
+    return hasNonRecombTransformStage(image);
+  }
+  return hasFloatPipelineStage(image) || hasNonRecombTransformStage(image);
 }
 
 function isStripAllOptions(options: Record<string, unknown>): boolean {
   return (
     options.stripAll === true ||
+    ((options.stripExif === true || options.stripGps === true) &&
+      options.stripIcc === true &&
+      options.stripXmp === true) ||
     (options.stripExif === undefined &&
       options.stripGps === undefined &&
       options.stripIcc === undefined &&
@@ -167,9 +201,14 @@ function isStripAllOptions(options: Record<string, unknown>): boolean {
   );
 }
 
-async function materializeStage(image: Sharp, metadataStrippedAll: boolean): Promise<Sharp> {
+async function materializeStage(
+  image: Sharp,
+  metadataStrippedAll: boolean,
+  metadataRestrictedByStrip: boolean,
+): Promise<Sharp> {
   const opts = (image as unknown as { options?: PipelineOptions }).options;
   const prevKeepMetadata = opts?.keepMetadata ?? 0;
+  const prevLastStripKeepMetadata = opts?.lastStripKeepMetadata;
   const prevFormatOut = opts?.formatOut;
   const savedEncoderOpts: Partial<Record<(typeof ENCODER_OPTION_KEYS)[number], unknown>> = {};
   if (opts && prevFormatOut && prevFormatOut !== "input") {
@@ -177,7 +216,7 @@ async function materializeStage(image: Sharp, metadataStrippedAll: boolean): Pro
       savedEncoderOpts[key] = opts[key];
     }
   }
-  const shouldKeepAllForLaterOps = prevKeepMetadata === 0 && !metadataStrippedAll;
+  const shouldKeepAllForLaterOps = !metadataRestrictedByStrip && !metadataStrippedAll;
   const buf = await (shouldKeepAllForLaterOps ? image.keepMetadata() : image)
     .png({ palette: false })
     .toBuffer();
@@ -186,6 +225,9 @@ async function materializeStage(image: Sharp, metadataStrippedAll: boolean): Pro
   if (nextOpts) {
     if (prevKeepMetadata !== 0) {
       nextOpts.keepMetadata = prevKeepMetadata;
+    }
+    if (prevLastStripKeepMetadata !== undefined) {
+      nextOpts.lastStripKeepMetadata = prevLastStripKeepMetadata;
     }
     if (prevFormatOut && prevFormatOut !== "input") {
       Object.assign(nextOpts, savedEncoderOpts);
@@ -210,6 +252,7 @@ export async function processImage(
   let image: Sharp = sharp(input);
   let materialized = false;
   let metadataStrippedAll = false;
+  let metadataRestrictedByStrip = false;
 
   // Apply each operation in sequence
   for (const op of operations) {
@@ -217,8 +260,8 @@ export async function processImage(
     if (!handler) {
       throw new Error(`Unknown operation: ${op.type}`);
     }
-    if (shouldMaterializeBefore(image, op.type)) {
-      image = await materializeStage(image, metadataStrippedAll);
+    if (shouldMaterializeBefore(image, op, metadataStrippedAll)) {
+      image = await materializeStage(image, metadataStrippedAll, metadataRestrictedByStrip);
       materialized = true;
     }
     const opOptions =
@@ -230,12 +273,19 @@ export async function processImage(
         : op.options;
     image = await handler(image, opOptions);
     if (op.type === "strip-metadata") {
-      if (isStripAllOptions(op.options)) {
+      const opts = (image as unknown as { options?: PipelineOptions }).options;
+      if (isStripAllOptions(op.options) || (opts?.keepMetadata ?? 0) === 0) {
         metadataStrippedAll = true;
-        const opts = (image as unknown as { options?: PipelineOptions }).options;
+        metadataRestrictedByStrip = true;
         if (opts) opts.keepMetadata = 0;
       } else {
         metadataStrippedAll = false;
+        const strippingNothing =
+          !op.options.stripExif &&
+          !op.options.stripGps &&
+          !op.options.stripIcc &&
+          !op.options.stripXmp;
+        metadataRestrictedByStrip = !strippingNothing;
       }
     } else if (op.type === "edit-metadata") {
       metadataStrippedAll = false;

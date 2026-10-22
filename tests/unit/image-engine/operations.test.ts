@@ -1604,6 +1604,57 @@ describe("processImage", () => {
     expect(jpgRaw[0]).toBeGreaterThan(200);
   });
 
+  it("isolates repeated non-recomb adjustments, out-of-order C++ stages, and stripMetadata after editMetadata (#3151)", async () => {
+    const sample = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 100, g: 50, b: 20 } },
+    })
+      .png()
+      .toBuffer();
+
+    const desatThenBoost = await processImage(sample, [
+      { type: "saturation", options: { value: -100 } },
+      { type: "saturation", options: { value: 100 } },
+    ]);
+    const desatBoostRaw = await sharp(desatThenBoost.buffer).raw().toBuffer();
+    expect([desatBoostRaw[0], desatBoostRaw[1], desatBoostRaw[2]]).toEqual([64, 64, 64]);
+
+    const contrastThenBright = await processImage(sample, [
+      { type: "contrast", options: { value: -100 } },
+      { type: "brightness", options: { value: 100 } },
+    ]);
+    const contrastBrightRaw = await sharp(contrastThenBright.buffer).raw().toBuffer();
+    expect([contrastBrightRaw[0], contrastBrightRaw[1], contrastBrightRaw[2]]).toEqual([
+      255, 255, 255,
+    ]);
+
+    const resizeThenRotate = await processImage(png200x150, [
+      { type: "resize", options: { width: 80, height: 60 } },
+      { type: "rotate", options: { angle: 90 } },
+    ]);
+    expect(resizeThenRotate.info.width).toBe(60);
+    expect(resizeThenRotate.info.height).toBe(80);
+
+    const rotateThenCrop = await processImage(png200x150, [
+      { type: "rotate", options: { angle: 90 } },
+      { type: "crop", options: { left: 0, top: 100, width: 150, height: 100 } },
+    ]);
+    expect(rotateThenCrop.info.width).toBe(150);
+    expect(rotateThenCrop.info.height).toBe(100);
+
+    const stripThenEdit = await processImage(jpgWithExif, [
+      { type: "strip-metadata", options: { stripAll: true } },
+      { type: "edit-metadata", options: { copyright: "2026 Otter" } },
+    ]);
+    const stripThenEditMeta = await sharp(stripThenEdit.buffer).metadata();
+    expect(stripThenEditMeta.exif?.toString("latin1")).toContain("2026 Otter");
+    expect(stripThenEditMeta.exif?.toString("latin1")).not.toContain("Test Artist");
+
+    const edited = await editMetadata(sharp(jpgWithExif), { artist: "Ada" });
+    const stripped = await stripMetadata(edited, { stripAll: true });
+    const strippedMeta = await sharp(await stripped.toBuffer()).metadata();
+    expect(strippedMeta.exif).toBeUndefined();
+  });
+
   it("color-channels operation through processImage", async () => {
     const result = await processImage(png200x150, [
       { type: "color-channels", options: { red: 150, green: 50, blue: 100 } },

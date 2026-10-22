@@ -367,4 +367,89 @@ describe("stripMetadata", () => {
     expect(meta.height).toBe(16);
     expect(meta.format).toBe("jpeg");
   });
+
+  it("clears keepMetadata and withExif when stripMetadata is called after editMetadata or withMetadata (#3151)", async () => {
+    const edited = await editMetadata(richImage(), { artist: "Ada" });
+    const strippedAll = await readBack(await stripMetadata(edited, { stripAll: true }));
+    expect(strippedAll.hasExif).toBe(false);
+    expect(strippedAll.hasIcc).toBe(false);
+    expect(strippedAll.hasXmp).toBe(false);
+
+    const withMeta = richImage().withMetadata();
+    const strippedDefault = await readBack(await stripMetadata(withMeta));
+    expect(strippedDefault.hasExif).toBe(false);
+    expect(strippedDefault.hasIcc).toBe(false);
+    expect(strippedDefault.hasXmp).toBe(false);
+
+    const editedSelective = await editMetadata(richImage(), { artist: "Ada" });
+    const strippedExifOnly = await readBack(
+      await stripMetadata(editedSelective, { stripExif: true, stripIcc: false }),
+    );
+    expect(strippedExifOnly.hasExif).toBe(false);
+    expect(strippedExifOnly.hasIcc).toBe(true);
+
+    const editedGpsSelective = await editMetadata(richImage(), { artist: "Ada" });
+    const strippedGpsOnly = await readBack(
+      await stripMetadata(editedGpsSelective, { stripGps: true, stripIcc: false }),
+    );
+    expect(strippedGpsOnly.hasExif).toBe(false);
+    expect(strippedGpsOnly.hasIcc).toBe(true);
+
+    // After editMetadata with removals (which sets keepMetadata for EXIF + ICC + XMP),
+    // selective stripMetadata clears the requested ICC or XMP bit while keeping EXIF.
+    const editedWithKeepIccXmp = await editMetadata(richImage(), {
+      artist: "Ada",
+      fieldsToRemove: ["Software"],
+    });
+    const strippedIccOnly = await readBack(
+      await stripMetadata(editedWithKeepIccXmp, { stripIcc: true, stripExif: false }),
+    );
+    expect(strippedIccOnly.hasExif).toBe(true);
+    expect(strippedIccOnly.image.Artist).toBe("Ada");
+    expect(strippedIccOnly.hasIcc).toBe(false);
+    expect(strippedIccOnly.hasXmp).toBe(true);
+
+    const editedWithKeepXmp = await editMetadata(richImage(), {
+      artist: "Ada",
+      fieldsToRemove: ["Software"],
+    });
+    const strippedXmpOnly = await readBack(
+      await stripMetadata(editedWithKeepXmp, { stripXmp: true, stripExif: false }),
+    );
+    expect(strippedXmpOnly.hasExif).toBe(true);
+    expect(strippedXmpOnly.image.Artist).toBe("Ada");
+    expect(strippedXmpOnly.hasIcc).toBe(true);
+    expect(strippedXmpOnly.hasXmp).toBe(false);
+
+    // Chaining editMetadata -> stripMetadata -> editMetadata does not leak stale withExif
+    // or withExifMerge=false from the first editMetadata call.
+    const editStripEdit = await editMetadata(
+      await stripMetadata(
+        await editMetadata(richImage(), { artist: "StaleAda", fieldsToRemove: ["Software"] }),
+        { stripAll: true },
+      ),
+      { copyright: "2026 Clean" },
+    );
+    const editStripEditRead = await readBack(editStripEdit);
+    expect(editStripEditRead.image.Copyright).toBe("2026 Clean");
+    expect(editStripEditRead.image.Artist).toBe("OrigArtist");
+    expect(editStripEditRead.image.Software).toBe("OrigSoft");
+
+    // Calling stripMetadata({ stripAll: false }) (which calls .withMetadata() and sets
+    // withIccProfile = "srgb") followed by stripMetadata({ stripExif: true }) on an image
+    // that had no ICC profile does not inject a synthetic sRGB ICC profile.
+    const noIccJpg = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 10, g: 20, b: 30 } },
+    })
+      .withExif({ IFD0: { Artist: "NoIccArtist" } })
+      .jpeg()
+      .toBuffer();
+    const keptThenSelective = await stripMetadata(
+      await stripMetadata(sharp(noIccJpg), { stripAll: false }),
+      { stripExif: true },
+    );
+    const noIccRead = await readBack(keptThenSelective);
+    expect(noIccRead.hasExif).toBe(false);
+    expect(noIccRead.hasIcc).toBe(false);
+  });
 });
