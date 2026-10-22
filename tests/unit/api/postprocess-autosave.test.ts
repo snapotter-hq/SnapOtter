@@ -105,7 +105,11 @@ vi.mock("../../../apps/api/src/lib/quota.js", () => ({
   }),
 }));
 
-vi.mock("../../../apps/api/src/lib/object-storage.js", () => ({ putObject: vi.fn() }));
+vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>();
+  return { ...actual, putObject: vi.fn() };
+});
 
 vi.mock("sharp", () => ({
   default: vi.fn(() => ({

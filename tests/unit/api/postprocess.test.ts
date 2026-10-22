@@ -14,9 +14,14 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
 }));
 
 const putObjectMock = vi.hoisted(() => vi.fn());
-vi.mock("../../../apps/api/src/lib/object-storage.js", () => ({
-  putObject: putObjectMock,
-}));
+vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>();
+  return {
+    ...actual,
+    putObject: putObjectMock,
+  };
+});
 
 const sharpMock = vi.hoisted(() => vi.fn());
 vi.mock("sharp", () => ({
@@ -399,6 +404,80 @@ describe("generatePreview", () => {
     expect(putObjectMock).not.toHaveBeenCalled();
     expect(loggerWarnMock).toHaveBeenCalledWith(
       { err, jobId: "job-psd-err", contentType: "image/vnd.adobe.photoshop" },
+      "preview generation failed; result has no renderable preview",
+    );
+  });
+
+  it("routes 503 tmpdir write faults from decodeHeic and decodeToSharpCompat through reportEngineUnavailable (#3452)", async () => {
+    const enospc = Object.assign(new Error("ENOSPC: no space left on device"), {
+      code: "ENOSPC",
+      syscall: "open",
+    });
+    decodeHeicMock.mockRejectedValueOnce(enospc);
+
+    const heicKey = await generatePreview(
+      Buffer.from("heic-bytes"),
+      "image/heic",
+      "job-heic-enospc",
+      "convert-heic-enospc",
+    );
+    expect(heicKey).toBeUndefined();
+    expect(sharpMock).not.toHaveBeenCalled();
+    expect(putObjectMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledOnce();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: "storage-full",
+        cause: "SafeError",
+        toolId: "convert-heic-enospc",
+      }),
+      "Tool engine unavailable during input preparation",
+    );
+
+    loggerWarnMock.mockReset();
+    const eacces = Object.assign(new Error("EACCES: permission denied"), {
+      code: "EACCES",
+      syscall: "open",
+    });
+    decodeToSharpCompatMock.mockRejectedValueOnce(eacces);
+
+    const psdKey = await generatePreview(
+      Buffer.from("psd-bytes"),
+      "image/vnd.adobe.photoshop",
+      "job-psd-eacces",
+      "convert-psd-eacces",
+    );
+    expect(psdKey).toBeUndefined();
+    expect(sharpMock).not.toHaveBeenCalled();
+    expect(putObjectMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledOnce();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: "storage-not-writable",
+        cause: "SafeError",
+        toolId: "convert-psd-eacces",
+      }),
+      "Tool engine unavailable during input preparation",
+    );
+
+    loggerWarnMock.mockReset();
+    decodeHeicMock.mockResolvedValueOnce(Buffer.from("decoded-png"));
+    sharpMock.mockReturnValueOnce({
+      webp: () => ({ toBuffer: async () => Buffer.from("webp-preview") }),
+    });
+    const putErr = Object.assign(new Error("storage write failed"), { statusCode: 503 });
+    putObjectMock.mockRejectedValueOnce(putErr);
+
+    const putFailKey = await generatePreview(
+      Buffer.from("heic-bytes"),
+      "image/heic",
+      "job-heic-put-err",
+      "convert-heic-put-err",
+    );
+    expect(putFailKey).toBeUndefined();
+    expect(loggerWarnMock).toHaveBeenCalledOnce();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      { err: putErr, jobId: "job-heic-put-err", contentType: "image/heic" },
       "preview generation failed; result has no renderable preview",
     );
   });

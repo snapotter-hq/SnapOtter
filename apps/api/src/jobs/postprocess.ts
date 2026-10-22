@@ -11,7 +11,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { probeMedia } from "@snapotter/media-engine";
-import { type LibrarySaveMode, SafeError } from "@snapotter/shared";
+import { hasServerErrorStatus, type LibrarySaveMode, SafeError } from "@snapotter/shared";
 import { eq, sql } from "drizzle-orm";
 import sharp from "sharp";
 import { db, schema } from "../db/index.js";
@@ -23,7 +23,7 @@ import {
   isDecoderUnavailable,
 } from "../lib/format-decoders.js";
 import { logger } from "../lib/logger.js";
-import { putObject } from "../lib/object-storage.js";
+import { normalizeOperationalWriteError, putObject } from "../lib/object-storage.js";
 import { engineUnavailable } from "../modality/image-input.js";
 import { pdfFirstPagePreview, videoPosterPreview } from "../modality/preview.js";
 import { claimFinalize, releaseFinalize } from "./cancel.js";
@@ -187,11 +187,20 @@ export async function generatePreview(
     let previewInput = buffer;
     const cliFormat = CLI_DECODE_FORMAT_BY_MIME[contentType];
     // Sharp cannot decode HEIC or CLI-encoded formats natively; use system decoder first
-    if (contentType === "image/heic" || contentType === "image/heif") {
-      const { decodeHeic } = await import("../lib/heic-converter.js");
-      previewInput = await decodeHeic(buffer);
-    } else if (cliFormat) {
-      previewInput = await decodeToSharpCompat(buffer, cliFormat);
+    try {
+      if (contentType === "image/heic" || contentType === "image/heif") {
+        const { decodeHeic } = await import("../lib/heic-converter.js");
+        previewInput = await decodeHeic(buffer);
+      } else if (cliFormat) {
+        previewInput = await decodeToSharpCompat(buffer, cliFormat);
+      }
+    } catch (decodeErr) {
+      const normalized = normalizeOperationalWriteError(asDecoderOutOfMemory(decodeErr));
+      if (isDecoderUnavailable(normalized) || hasServerErrorStatus(normalized)) {
+        reportEngineUnavailable(engineUnavailable(normalized), toolId, logger);
+        return undefined;
+      }
+      throw decodeErr;
     }
     const previewBuffer = await sharp(previewInput).webp({ quality: 80 }).toBuffer();
     await putObject(key, previewBuffer);

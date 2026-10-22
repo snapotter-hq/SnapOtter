@@ -10,6 +10,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { basename } from "node:path";
+import { hasServerErrorStatus } from "@snapotter/shared";
 import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 import PQueue from "p-queue";
 import sharp from "sharp";
@@ -24,7 +25,7 @@ import {
 } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import { logger } from "../lib/logger.js";
-import { putObject } from "../lib/object-storage.js";
+import { normalizeOperationalWriteError, putObject } from "../lib/object-storage.js";
 import {
   FETCH_TIMEOUT_MS,
   MAX_URL_FETCH_SIZE,
@@ -285,8 +286,9 @@ async function fetchSingleUrl(
           decodedBuffer = Buffer.from(await decodeToSharpCompat(buffer, validation.format));
           didDecode = true;
         }
-      } catch (err) {
-        if (isDecoderUnavailable(err)) {
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(rawErr);
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
           reportEngineUnavailable(engineUnavailable(err), "fetch-urls", log);
         }
         // Decode failed: non-fatal, fall back to the raw buffer below.

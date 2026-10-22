@@ -21,7 +21,7 @@ import {
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
-import { putObject } from "../../lib/object-storage.js";
+import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 import { engineUnavailable } from "../../modality/image-input.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
@@ -245,29 +245,47 @@ export function registerEditMetadata(app: FastifyInstance) {
         let previewUrl: string | undefined;
         if (!BROWSER_PREVIEWABLE.has(contentType)) {
           try {
-            let previewInput = outputBuffer;
+            let previewInput: Buffer | null = outputBuffer;
             const cliFormat = CLI_DECODE_FORMAT_BY_MIME[contentType];
-            if (contentType === "image/heif" || contentType === "image/heic") {
-              previewInput = await decodeHeic(outputBuffer);
-            } else if (cliFormat) {
-              const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
-              try {
-                previewInput = await decodeToSharpCompat(outputBuffer, cliFormat, fileExt);
-              } catch (decodeErr) {
-                if (decodeErr instanceof DecoderOutOfMemoryError) throw decodeErr;
-                // Sharp reads some TIFF-headed RAW files (such as .dng) itself;
-                // only surface a CLI decode failure if Sharp cannot read it either.
+            try {
+              if (contentType === "image/heif" || contentType === "image/heic") {
+                previewInput = await decodeHeic(outputBuffer);
+              } else if (cliFormat) {
+                const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
                 try {
-                  await sharp(outputBuffer).metadata();
-                  await sharp(outputBuffer).resize(1).raw().toBuffer();
-                } catch {
-                  throw decodeErr;
+                  previewInput = await decodeToSharpCompat(outputBuffer, cliFormat, fileExt);
+                } catch (rawDecodeErr) {
+                  const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+                  if (
+                    decodeErr instanceof DecoderOutOfMemoryError ||
+                    (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+                  ) {
+                    throw decodeErr;
+                  }
+                  // Sharp reads some TIFF-headed RAW files (such as .dng) itself;
+                  // only surface a CLI decode failure if Sharp cannot read it either.
+                  try {
+                    await sharp(outputBuffer).metadata();
+                    await sharp(outputBuffer).resize(1).raw().toBuffer();
+                  } catch {
+                    throw decodeErr;
+                  }
                 }
               }
+            } catch (rawDecodeErr) {
+              const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+              if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
+                reportEngineUnavailable(engineUnavailable(decodeErr), "edit-metadata", request.log);
+                previewInput = null;
+              } else {
+                throw rawDecodeErr;
+              }
             }
-            const previewBuffer = await sharp(previewInput).webp({ quality: 80 }).toBuffer();
-            await putObject(`outputs/${jobId}/preview.webp`, previewBuffer);
-            previewUrl = `/api/v1/download/${jobId}/preview.webp`;
+            if (previewInput) {
+              const previewBuffer = await sharp(previewInput).webp({ quality: 80 }).toBuffer();
+              await putObject(`outputs/${jobId}/preview.webp`, previewBuffer);
+              previewUrl = `/api/v1/download/${jobId}/preview.webp`;
+            }
           } catch (err) {
             if (isDecoderUnavailable(err)) {
               reportEngineUnavailable(engineUnavailable(err), "edit-metadata", request.log);

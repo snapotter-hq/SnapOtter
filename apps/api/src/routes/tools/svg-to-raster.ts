@@ -17,7 +17,7 @@ import { decodeToSharpCompat, isDecoderUnavailable } from "../../lib/format-deco
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
-import { putObject } from "../../lib/object-storage.js";
+import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 import { isUniqueViolation } from "../../lib/pg-errors.js";
 import { decompressSvgz, isSvgBuffer, sanitizeSvg } from "../../lib/svg-sanitize.js";
 import { engineUnavailable } from "../../modality/image-input.js";
@@ -605,18 +605,30 @@ export function registerSvgToRasterRoute(
       if (NON_PREVIEWABLE.has(ext)) {
         try {
           // Sharp can't decode HEVC-encoded HEIF or JXL; decode first
-          let previewInput = buffer;
-          if (ext === "heif") {
-            previewInput = await decodeHeic(buffer);
-          } else if (ext === "jxl") {
-            previewInput = await decodeToSharpCompat(buffer, "jxl");
+          let previewInput: Buffer | null = buffer;
+          try {
+            if (ext === "heif") {
+              previewInput = await decodeHeic(buffer);
+            } else if (ext === "jxl") {
+              previewInput = await decodeToSharpCompat(buffer, "jxl");
+            }
+          } catch (rawDecodeErr) {
+            const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+            if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
+              reportEngineUnavailable(engineUnavailable(decodeErr), opts.toolId, request.log);
+              previewInput = null;
+            } else {
+              throw rawDecodeErr;
+            }
           }
-          const previewBuffer = await sharp(previewInput)
-            .resize(1200, 1200, { fit: "inside" })
-            .webp({ quality: 80 })
-            .toBuffer();
-          await putObject(`outputs/${jobId}/preview.webp`, previewBuffer);
-          previewUrl = `/api/v1/download/${jobId}/preview.webp`;
+          if (previewInput) {
+            const previewBuffer = await sharp(previewInput)
+              .resize(1200, 1200, { fit: "inside" })
+              .webp({ quality: 80 })
+              .toBuffer();
+            await putObject(`outputs/${jobId}/preview.webp`, previewBuffer);
+            previewUrl = `/api/v1/download/${jobId}/preview.webp`;
+          }
         } catch (err) {
           if (isDecoderUnavailable(err)) {
             reportEngineUnavailable(engineUnavailable(err), opts.toolId, request.log);

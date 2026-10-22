@@ -907,6 +907,139 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
       }
     });
 
+    it("preview decode in edit-metadata (including DNG), worker generatePreview, svg-to-raster, and fetch-urls reports 503 tmpdir write faults once while staying non-fatal (#3452)", async () => {
+      const enospc = () =>
+        Object.assign(new Error("ENOSPC: no space left on device, open '/tmp/in-enospc'"), {
+          code: "ENOSPC",
+          syscall: "open",
+        });
+      const eacces = () =>
+        Object.assign(new Error("EACCES: permission denied, open '/tmp/in-eacces'"), {
+          code: "EACCES",
+          syscall: "open",
+        });
+      const formatEncoders = await import("../../../apps/api/src/lib/format-encoders.js");
+      const encJxlSpy = vi
+        .spyOn(formatEncoders, "encodeJxl")
+        .mockResolvedValue(Buffer.from("jxl-bytes"));
+      const decHeicSpy = vi.spyOn(heicConverter, "decodeHeic").mockImplementation(async () => {
+        throw enospc();
+      });
+      const cliSpy = vi
+        .spyOn(formatDecoders, "decodeToSharpCompat")
+        .mockImplementation(async () => {
+          throw eacces();
+        });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string | URL | Request) => {
+          const href = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+          if (href.endsWith(".ico")) {
+            return new Response(new Uint8Array(ICO), {
+              status: 200,
+              headers: { "Content-Type": "image/x-icon" },
+            });
+          }
+          return new Response(new Uint8Array(HEIC), {
+            status: 200,
+            headers: { "Content-Type": "image/heic" },
+          });
+        }),
+      );
+
+      try {
+        // 1. edit-metadata on DNG must NOT fall back to Sharp when decodeToSharpCompat hits EACCES
+        const editDng = await post("/api/v1/tools/image/edit-metadata", [
+          { name: "file", filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG },
+          { name: "settings", content: "{}" },
+        ]);
+        expect(editDng.statusCode, editDng.body).toBe(200);
+        expect(editDng.json().previewUrl).toBeUndefined();
+        expect(
+          mocks.reportError.mock.calls.filter(
+            ([err, ctx]) =>
+              (err as { code?: string }).code === "storage-not-writable" &&
+              (ctx as { toolId?: string; statusCode?: number }).toolId === "edit-metadata" &&
+              (ctx as { statusCode?: number }).statusCode === 503,
+          ),
+        ).toHaveLength(1);
+
+        // 2. worker generatePreview on QOI output reports storage-not-writable once
+        const convertQoi = await post("/api/v1/tools/image/convert", [
+          { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+          { name: "settings", content: JSON.stringify({ format: "qoi" }) },
+        ]);
+        expect(convertQoi.statusCode, convertQoi.body).toBe(200);
+        expect(convertQoi.json().previewUrl).toBeUndefined();
+        expect(
+          mocks.reportError.mock.calls.filter(
+            ([err, ctx]) =>
+              (err as { code?: string }).code === "storage-not-writable" &&
+              (ctx as { toolId?: string; statusCode?: number }).toolId === "convert" &&
+              (ctx as { statusCode?: number }).statusCode === 503,
+          ),
+        ).toHaveLength(1);
+
+        // 3. svg-to-raster on JXL output reports storage-not-writable once
+        const svgJxl = await post("/api/v1/tools/image/svg-to-raster", [
+          { name: "file", filename: "icon.svg", contentType: "image/svg+xml", content: SVG },
+          { name: "settings", content: JSON.stringify({ outputFormat: "jxl" }) },
+        ]);
+        expect(svgJxl.statusCode, svgJxl.body).toBe(200);
+        expect(svgJxl.json().previewUrl).toBeUndefined();
+        expect(
+          mocks.reportError.mock.calls.filter(
+            ([err, ctx]) =>
+              (err as { code?: string }).code === "storage-not-writable" &&
+              (ctx as { toolId?: string; statusCode?: number }).toolId === "svg-to-raster" &&
+              (ctx as { statusCode?: number }).statusCode === 503,
+          ),
+        ).toHaveLength(1);
+
+        // 4. fetch-urls on two HEIC URLs (ENOSPC -> storage-full, deduplicated to 1 report)
+        // and one ICO URL (EACCES -> storage-not-writable)
+        const fetchRes = await app.inject({
+          method: "POST",
+          url: "/api/v1/fetch-urls",
+          headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+          payload: {
+            urls: [
+              "http://1.2.3.4:9999/photo-1.heic",
+              "http://1.2.3.4:9999/photo-2.heic",
+              "http://1.2.3.4:9999/icon.ico",
+            ],
+          },
+        });
+        expect(fetchRes.statusCode, fetchRes.body).toBe(200);
+        expect(fetchRes.json().results).toEqual([
+          expect.objectContaining({ success: true, filename: "photo-1.heic", previewUrl: null }),
+          expect.objectContaining({ success: true, filename: "photo-2.heic", previewUrl: null }),
+          expect.objectContaining({ success: true, filename: "icon.ico", previewUrl: null }),
+        ]);
+        expect(
+          mocks.reportError.mock.calls.filter(
+            ([err, ctx]) =>
+              (err as { code?: string }).code === "storage-full" &&
+              (ctx as { toolId?: string; statusCode?: number }).toolId === "fetch-urls" &&
+              (ctx as { statusCode?: number }).statusCode === 503,
+          ),
+        ).toHaveLength(1);
+        expect(
+          mocks.reportError.mock.calls.filter(
+            ([err, ctx]) =>
+              (err as { code?: string }).code === "storage-not-writable" &&
+              (ctx as { toolId?: string; statusCode?: number }).toolId === "fetch-urls" &&
+              (ctx as { statusCode?: number }).statusCode === 503,
+          ),
+        ).toHaveLength(1);
+      } finally {
+        vi.unstubAllGlobals();
+        encJxlSpy.mockRestore();
+        cliSpy.mockRestore();
+        decHeicSpy.mockRestore();
+      }
+    });
+
     it("worker process functions propagate a CLI decoder fault even on a DNG Sharp can read, and do not retry ENGINE_UNAVAILABLE", async () => {
       for (const toolId of ["blur-faces", "meme-generator", "red-eye-removal", "beautify"]) {
         const config = getToolConfig(toolId);
