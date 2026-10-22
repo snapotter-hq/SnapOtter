@@ -283,7 +283,8 @@ function scimExternalId(value: string | null | undefined): string | null {
 
 function scimPrimaryEmail(emails: ScimEmail[] | null | undefined): string | null {
   if (!emails) return null;
-  return emails.find((e) => e.primary)?.value ?? emails[0]?.value ?? null;
+  const nonBlank = emails.filter((e) => e.value.trim() !== "");
+  return nonBlank.find((e) => e.primary)?.value ?? nonBlank[0]?.value ?? null;
 }
 
 const DISABLED_ROLE_PREFIX = "disabled:";
@@ -977,7 +978,10 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
             }
             updates.username = nextUserName;
           } else if (op.path === "externalId") {
-            updates.scimExternalId = scimExternalId(op.value as string | null);
+            const externalId = scimExternalId(op.value as string | null);
+            if (externalId !== null || opType === "replace") {
+              updates.scimExternalId = externalId;
+            }
           } else if (op.path === "emails" || op.path === 'emails[type eq "work"].value') {
             // Null or an empty list clears the address on replace; a non-empty list sets the primary (or first) one.
             const email = scimPrimaryEmail(op.value as ScimEmail[] | null);
@@ -1002,7 +1006,10 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
               updates.username = nextUserName;
             }
             if (valObj.externalId !== undefined) {
-              updates.scimExternalId = scimExternalId(valObj.externalId as string | null);
+              const externalId = scimExternalId(valObj.externalId as string | null);
+              if (externalId !== null || opType === "replace") {
+                updates.scimExternalId = externalId;
+              }
             }
             if (valObj.emails !== undefined) {
               const email = scimPrimaryEmail(valObj.emails as ScimEmail[] | null);

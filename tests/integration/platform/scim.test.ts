@@ -1130,6 +1130,62 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect(row?.passwordHash).toBeNull();
     });
 
+    it("skips blank email entries on create and stores NULL when all email values are blank (#3168)", async () => {
+      const blankPrimary = await crudApp.app.inject({
+        method: "POST",
+        url: "/api/v1/scim/v2/Users",
+        headers: authHeaders(),
+        payload: {
+          userName: uniqueName("scim-post-blank-primary-email"),
+          emails: [{ value: "   ", primary: true }, { value: "fallback@example.com" }],
+        },
+      });
+      expect(blankPrimary.statusCode, blankPrimary.body).toBe(201);
+      const blankPrimaryBody = JSON.parse(blankPrimary.body);
+      expect(blankPrimaryBody.emails).toEqual([{ value: "fallback@example.com", primary: true }]);
+      expect((await userRow(blankPrimaryBody.id))?.email).toBe("fallback@example.com");
+
+      const laterPrimary = await crudApp.app.inject({
+        method: "POST",
+        url: "/api/v1/scim/v2/Users",
+        headers: authHeaders(),
+        payload: {
+          userName: uniqueName("scim-post-later-primary-email"),
+          emails: [
+            { value: "   ", primary: true },
+            { value: "secondary@example.com" },
+            { value: "real-primary@example.com", primary: true },
+          ],
+        },
+      });
+      expect(laterPrimary.statusCode, laterPrimary.body).toBe(201);
+      const laterPrimaryBody = JSON.parse(laterPrimary.body);
+      expect(laterPrimaryBody.emails).toEqual([
+        { value: "real-primary@example.com", primary: true },
+      ]);
+      expect((await userRow(laterPrimaryBody.id))?.email).toBe("real-primary@example.com");
+
+      for (const emails of [
+        [{ value: "" }],
+        [{ value: "   ", primary: true }],
+        [{ value: "" }, { value: "\t\n" }],
+      ]) {
+        const allBlank = await crudApp.app.inject({
+          method: "POST",
+          url: "/api/v1/scim/v2/Users",
+          headers: authHeaders(),
+          payload: {
+            userName: uniqueName("scim-post-all-blank-email"),
+            emails,
+          },
+        });
+        expect(allBlank.statusCode, allBlank.body).toBe(201);
+        const allBlankBody = JSON.parse(allBlank.body);
+        expect(allBlankBody.emails).toEqual([]);
+        expect((await userRow(allBlankBody.id))?.email).toBeNull();
+      }
+    });
+
     it("rejects creation without a userName using the SCIM 400 envelope", async () => {
       const res = await crudApp.app.inject({
         method: "POST",
@@ -1614,8 +1670,10 @@ describe("SCIM licensed Users and Groups CRUD", () => {
     it.each([
       ["an empty emails array", []],
       ["a null emails field", null],
+      ["a blank email entry", [{ value: "" }]],
+      ["a whitespace-only primary email entry", [{ value: "   ", primary: true }]],
     ] as const)(
-      "clears the stored email to NULL when PUT sends %s, and keeps it when emails is omitted (#3157)",
+      "clears the stored email to NULL when PUT sends %s, and keeps it when emails is omitted (#3157, #3168)",
       async (_label, emails) => {
         const { id, userName } = await createScimUser({
           userName: uniqueName("scim-put-clear-email"),
@@ -1645,6 +1703,33 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         expect((await userRow(id))?.email).toBeNull();
       },
     );
+
+    it("skips a blank primary email entry on PUT and selects the first non-blank address (#3168)", async () => {
+      const { id, userName } = await createScimUser({
+        userName: uniqueName("scim-put-skip-blank-primary"),
+        emails: [{ value: "initial@example.com", primary: true }],
+      });
+
+      const res = await crudApp.app.inject({
+        method: "PUT",
+        url: `/api/v1/scim/v2/Users/${id}`,
+        headers: authHeaders(),
+        payload: {
+          userName,
+          active: true,
+          emails: [
+            { value: "" },
+            { value: "   ", primary: true },
+            { value: "put-fallback@example.com" },
+          ],
+        },
+      });
+      expect(res.statusCode, res.body).toBe(200);
+      expect(JSON.parse(res.body).emails).toEqual([
+        { value: "put-fallback@example.com", primary: true },
+      ]);
+      expect((await userRow(id))?.email).toBe("put-fallback@example.com");
+    });
 
     it("clears externalId to NULL when PUT sends a blank one, for more than one user", async () => {
       // Issue #1008: a stored "" held the identity index, so the second user
@@ -1986,6 +2071,75 @@ describe("SCIM licensed Users and Groups CRUD", () => {
       expect((await userRow(b.id))?.scimExternalId).toBeNull();
     });
 
+    it("keeps the existing or earlier in-batch externalId when PATCH add sends null or blank (#3168)", async () => {
+      const initialExt = uniqueName("scim-patch-keep-ext");
+      const { id, userName } = await createScimUser({
+        userName: uniqueName("scim-patch-keep-ext-user"),
+        externalId: initialExt,
+      });
+
+      const keepExisting = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Users/${id}`,
+        headers: authHeaders(),
+        payload: {
+          Operations: [
+            { op: "add", path: "externalId", value: "" },
+            { op: "add", path: "externalId", value: "   " },
+            { op: "add", path: "externalId", value: null },
+            { op: "add", value: { userName, externalId: null } },
+            { op: "add", value: { externalId: "" } },
+            { op: "Add", value: { ExternalId: "   " } },
+          ],
+        },
+      });
+      expect(keepExisting.statusCode, keepExisting.body).toBe(200);
+      expect(JSON.parse(keepExisting.body).externalId).toBe(initialExt);
+      expect((await userRow(id))?.scimExternalId).toBe(initialExt);
+
+      const inBatchExt = uniqueName("scim-patch-inbatch-ext");
+      const keepInBatch = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Users/${id}`,
+        headers: authHeaders(),
+        payload: {
+          Operations: [
+            { op: "replace", path: "externalId", value: inBatchExt },
+            { op: "add", path: "externalId", value: "" },
+            { op: "add", value: { externalId: null } },
+          ],
+        },
+      });
+      expect(keepInBatch.statusCode, keepInBatch.body).toBe(200);
+      expect(JSON.parse(keepInBatch.body).externalId).toBe(inBatchExt);
+      expect((await userRow(id))?.scimExternalId).toBe(inBatchExt);
+
+      const bulkAddExt = uniqueName("scim-patch-bulk-add-ext");
+      const bulkAdd = await crudApp.app.inject({
+        method: "PATCH",
+        url: `/api/v1/scim/v2/Users/${id}`,
+        headers: authHeaders(),
+        payload: {
+          Operations: [
+            {
+              op: "add",
+              value: {
+                externalId: bulkAddExt,
+                emails: [{ value: "   ", primary: true }, { value: "bulk-added@example.com" }],
+              },
+            },
+          ],
+        },
+      });
+      expect(bulkAdd.statusCode, bulkAdd.body).toBe(200);
+      const bulkAddBody = JSON.parse(bulkAdd.body);
+      expect(bulkAddBody.externalId).toBe(bulkAddExt);
+      expect(bulkAddBody.emails).toEqual([{ value: "bulk-added@example.com", primary: true }]);
+      const bulkAddRow = await userRow(id);
+      expect(bulkAddRow?.scimExternalId).toBe(bulkAddExt);
+      expect(bulkAddRow?.email).toBe("bulk-added@example.com");
+    });
+
     it("updates email via the emails array and the work-email value path", async () => {
       const { id } = await createScimUser({ userName: uniqueName("scim-patch-email") });
 
@@ -2031,15 +2185,28 @@ describe("SCIM licensed Users and Groups CRUD", () => {
     it.each([
       ["path emails with []", { op: "replace", path: "emails", value: [] }],
       ["path emails with null", { op: "replace", path: "emails", value: null }],
+      ["path emails with blank string", { op: "replace", path: "emails", value: "" }],
+      [
+        "path emails with whitespace entry",
+        { op: "replace", path: "emails", value: [{ value: "   ", primary: true }] },
+      ],
       [
         'path emails[type eq "work"].value with []',
         { op: "replace", path: 'emails[type eq "work"].value', value: [] },
       ],
+      [
+        'path emails[type eq "work"].value with whitespace',
+        { op: "replace", path: 'emails[type eq "work"].value', value: "   " },
+      ],
       ["path-less value with emails: []", { op: "replace", value: { emails: [] } }],
       ["path-less value with emails: null", { op: "replace", value: { emails: null } }],
+      [
+        "path-less value with blank email entry",
+        { op: "replace", value: { emails: [{ value: "" }] } },
+      ],
       ["path-less value with cased Emails: null", { op: "Replace", value: { Emails: null } }],
     ])(
-      "clears the stored email to NULL when PATCH replace sends %s (#3157)",
+      "clears the stored email to NULL when PATCH replace sends %s (#3157, #3168)",
       async (_label, op) => {
         const { id, userName } = await createScimUser({
           userName: uniqueName("scim-patch-clear-email"),
@@ -2056,7 +2223,7 @@ describe("SCIM licensed Users and Groups CRUD", () => {
         expect(JSON.parse(res.body).emails).toEqual([]);
         expect((await userRow(id))?.email).toBeNull();
 
-        // Restore email and confirm an add with empty/null emails or a path-less
+        // Restore email and confirm an add with empty/null/blank emails or a path-less
         // replace that omits emails leaves both an earlier in-batch email update
         // and the already-persisted email intact.
         const inBatchRes = await crudApp.app.inject({
@@ -2065,10 +2232,17 @@ describe("SCIM licensed Users and Groups CRUD", () => {
           headers: authHeaders(),
           payload: {
             Operations: [
-              { op: "replace", path: "emails", value: "restored@example.com" },
+              {
+                op: "replace",
+                path: "emails",
+                value: [{ value: "   ", primary: true }, { value: "restored@example.com" }],
+              },
               { op: "replace", value: { userName } },
               { op: "add", path: "emails", value: [] },
+              { op: "add", path: "emails", value: "   " },
+              { op: "add", path: 'emails[type eq "work"].value', value: "" },
               { op: "add", value: { emails: null } },
+              { op: "add", value: { emails: [{ value: "   ", primary: true }] } },
             ],
           },
         });
@@ -2086,7 +2260,10 @@ describe("SCIM licensed Users and Groups CRUD", () => {
             Operations: [
               { op: "replace", value: { userName } },
               { op: "add", path: "emails", value: [] },
+              { op: "add", path: "emails", value: "" },
+              { op: "add", path: 'emails[type eq "work"].value', value: "   " },
               { op: "add", value: { emails: null } },
+              { op: "add", value: { emails: [{ value: "" }] } },
             ],
           },
         });
