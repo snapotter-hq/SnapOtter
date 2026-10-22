@@ -321,6 +321,14 @@ describe("inspectMetadata", () => {
     expect(result.xmp).toBeNull();
     expect(result.gps).toBeNull();
   });
+
+  it("handles a filename ending with a trailing dot by falling back to .jpg (#3279)", async () => {
+    const buf = readFixture(fixtures.image.exifGps);
+    const result = await inspectMetadata(buf, "DSCF0001.");
+    expect(result.filename).toBe("DSCF0001.");
+    expect(result.fileSize).toBe(buf.length);
+    expect(result.exif).not.toBeNull();
+  });
 });
 
 describe("writeMetadata", () => {
@@ -328,6 +336,13 @@ describe("writeMetadata", () => {
     const buf = readFixture(fixtures.image.exifGps);
     const result = await writeMetadata(buf, "test-with-exif.jpg", []);
     expect(Buffer.compare(result, buf)).toBe(0);
+  });
+
+  it("handles a filename ending with a trailing dot by falling back to .jpg (#3279)", async () => {
+    const buf = readFixture(fixtures.image.exifGps);
+    const written = await writeMetadata(buf, "DSCF0001.", ["-Artist=TrailingDot"]);
+    const result = await inspectMetadata(written, "DSCF0001.");
+    expect(result.exif?.Artist).toBe("TrailingDot");
   });
 
   it("writing -Artist=TestArtist then inspecting shows the artist", async () => {

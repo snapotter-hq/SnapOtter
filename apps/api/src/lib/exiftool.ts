@@ -78,9 +78,10 @@ async function findExiftool(): Promise<string> {
  */
 export async function inspectMetadata(buffer: Buffer, filename: string): Promise<InspectResult> {
   const bin = await findExiftool();
-  const ext = extname(filename) || ".jpg";
+  const safeExt = extname(filename).replace(/[^a-z0-9]/gi, "");
+  const suffix = safeExt ? `.${safeExt}` : ".jpg";
   const id = randomUUID();
-  const tempPath = join(tmpdir(), `exif-inspect-${id}${ext}`);
+  const tempPath = join(tmpdir(), `exif-inspect-${id}${suffix}`);
 
   try {
     await writeFile(tempPath, buffer);
@@ -156,9 +157,10 @@ export async function writeMetadata(
   if (tags.length === 0) return buffer;
 
   const bin = await findExiftool();
-  const ext = extname(filename) || ".jpg";
+  const safeExt = extname(filename).replace(/[^a-z0-9]/gi, "");
+  const suffix = safeExt ? `.${safeExt}` : ".jpg";
   const id = randomUUID();
-  const tempPath = join(tmpdir(), `exif-write-${id}${ext}`);
+  const tempPath = join(tmpdir(), `exif-write-${id}${suffix}`);
 
   try {
     await writeFile(tempPath, buffer);

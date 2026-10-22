@@ -180,13 +180,41 @@ describe("inspectMetadata argv and options", () => {
   it("preserves the filename extension in the temp path", async () => {
     withExiftool(() => exifJson({ "EXIF:Make": "Canon" }));
     await inspectMetadata(Buffer.from("img"), "scan.tiff");
-    expect(operationArgs()[4].endsWith(".tiff")).toBe(true);
+    expect(operationArgs()[4]).toMatch(/exif-inspect-[0-9a-f-]+\.tiff$/);
   });
 
-  it("falls back to .jpg when the filename has no extension", async () => {
+  it("falls back to .jpg when the filename has no extension or is a dotfile", async () => {
     withExiftool(() => exifJson({ "EXIF:Make": "Canon" }));
     await inspectMetadata(Buffer.from("img"), "no-extension");
-    expect(operationArgs()[4].endsWith(".jpg")).toBe(true);
+    expect(operationArgs()[4]).toMatch(/exif-inspect-[0-9a-f-]+\.jpg$/);
+
+    mockExecFile.mockClear();
+    withExiftool(() => exifJson({ "EXIF:Make": "Canon" }));
+    await inspectMetadata(Buffer.from("img"), ".png");
+    expect(operationArgs()[4]).toMatch(/exif-inspect-[0-9a-f-]+\.jpg$/);
+  });
+
+  it("falls back to .jpg when the filename ends with a trailing dot (#3279)", async () => {
+    withExiftool(() => exifJson({ "EXIF:Make": "Canon" }));
+    await inspectMetadata(Buffer.from("img"), "DSCF0001.");
+    const tempPath = operationArgs()[4];
+    expect(tempPath).toMatch(/exif-inspect-[0-9a-f-]+\.jpg$/);
+    expect(mockWriteFile.mock.calls[0][0]).toBe(tempPath);
+    expect(mockRm.mock.calls[0][0]).toBe(tempPath);
+  });
+
+  it("strips non-alphanumeric characters while preserving uppercase and numeric extension characters (#3279)", async () => {
+    withExiftool(() => exifJson({ "EXIF:Make": "Canon" }));
+    await inspectMetadata(Buffer.from("img"), "photo.CR-2!");
+    const tempPath = operationArgs()[4];
+    expect(tempPath).toMatch(/exif-inspect-[0-9a-f-]+\.CR2$/);
+  });
+
+  it("falls back to .jpg when the extracted extension has only non-alphanumeric characters (#3279)", async () => {
+    withExiftool(() => exifJson({ "EXIF:Make": "Canon" }));
+    await inspectMetadata(Buffer.from("img"), "photo.---");
+    const tempPath = operationArgs()[4];
+    expect(tempPath).toMatch(/exif-inspect-[0-9a-f-]+\.jpg$/);
   });
 
   it("writes the buffer to disk and removes the temp file afterward", async () => {
@@ -427,14 +455,42 @@ describe("writeMetadata", () => {
   it("preserves the filename extension in the temp path", async () => {
     withExiftool(() => ({ stdout: "", stderr: "" }));
     await writeMetadata(Buffer.from("img"), "scan.png", ["-Artist=Bob"]);
-    expect(operationArgs()[operationArgs().length - 1].endsWith(".png")).toBe(true);
+    expect(operationArgs()[operationArgs().length - 1]).toMatch(/exif-write-[0-9a-f-]+\.png$/);
   });
 
-  it("falls back to .jpg when the filename has no extension", async () => {
+  it("falls back to .jpg when the filename has no extension or is a dotfile", async () => {
     withExiftool(() => ({ stdout: "", stderr: "" }));
     await writeMetadata(Buffer.from("img"), "noext", ["-Artist=Bob"]);
-    const last = operationArgs()[operationArgs().length - 1];
-    expect(last.endsWith(".jpg")).toBe(true);
+    expect(operationArgs()[operationArgs().length - 1]).toMatch(/exif-write-[0-9a-f-]+\.jpg$/);
+
+    mockExecFile.mockClear();
+    withExiftool(() => ({ stdout: "", stderr: "" }));
+    await writeMetadata(Buffer.from("img"), ".png", ["-Artist=Bob"]);
+    expect(operationArgs()[operationArgs().length - 1]).toMatch(/exif-write-[0-9a-f-]+\.jpg$/);
+  });
+
+  it("falls back to .jpg when the filename ends with a trailing dot (#3279)", async () => {
+    withExiftool(() => ({ stdout: "", stderr: "" }));
+    await writeMetadata(Buffer.from("img"), "DSCF0001.", ["-Artist=Bob"]);
+    const tempPath = operationArgs()[operationArgs().length - 1];
+    expect(tempPath).toMatch(/exif-write-[0-9a-f-]+\.jpg$/);
+    expect(mockWriteFile.mock.calls[0][0]).toBe(tempPath);
+    expect(mockReadFile.mock.calls[0][0]).toBe(tempPath);
+    expect(mockRm.mock.calls[0][0]).toBe(tempPath);
+  });
+
+  it("strips non-alphanumeric characters while preserving uppercase and numeric extension characters (#3279)", async () => {
+    withExiftool(() => ({ stdout: "", stderr: "" }));
+    await writeMetadata(Buffer.from("img"), "photo.CR_2!", ["-Artist=Bob"]);
+    const tempPath = operationArgs()[operationArgs().length - 1];
+    expect(tempPath).toMatch(/exif-write-[0-9a-f-]+\.CR2$/);
+  });
+
+  it("falls back to .jpg when the extracted extension has only non-alphanumeric characters (#3279)", async () => {
+    withExiftool(() => ({ stdout: "", stderr: "" }));
+    await writeMetadata(Buffer.from("img"), "photo.---", ["-Artist=Bob"]);
+    const tempPath = operationArgs()[operationArgs().length - 1];
+    expect(tempPath).toMatch(/exif-write-[0-9a-f-]+\.jpg$/);
   });
 
   it("throws a path-scrubbed error when exiftool fails, and cleans up the temp file", async () => {
