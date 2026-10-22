@@ -44,6 +44,7 @@ const putObjectStreamMock = vi.hoisted(() =>
 );
 const deleteObjectMock = vi.hoisted(() => vi.fn(async () => {}));
 const validatePdfPathMock = vi.hoisted(() => vi.fn(async () => {}));
+const getToolConfigSpy = vi.hoisted(() => vi.fn());
 
 // Mock DB
 vi.mock("../../../apps/api/src/db/index.js", () => ({
@@ -255,6 +256,20 @@ vi.mock("../../../apps/api/src/permissions.js", () => ({
   hasEffectiveToolAccess: vi.fn(async () => true),
   requirePermission: () => vi.fn(() => ({ id: "user-1", username: "test", role: "admin" })),
 }));
+
+vi.mock("../../../apps/api/src/routes/tool-factory.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/routes/tool-factory.js")>();
+  return {
+    ...actual,
+    getToolConfig: (toolId: string) => {
+      if (getToolConfigSpy.getMockImplementation()) {
+        return getToolConfigSpy(toolId);
+      }
+      return actual.getToolConfig(toolId);
+    },
+  };
+});
 
 import { autoOrient } from "../../../apps/api/src/lib/auto-orient.js";
 import { getFirstMissingBundleForTool } from "../../../apps/api/src/lib/feature-status.js";
@@ -645,6 +660,15 @@ describe("pipeline step error message formatting", () => {
     process: async () => {
       throw new Error("unused");
     },
+  });
+  registerToolProcessFn({
+    toolId: "resize",
+    settingsSchema: stepSettingsSchema,
+    process: async (buf: Buffer) => ({
+      buffer: buf,
+      filename: "out.png",
+      contentType: "image/png",
+    }),
   });
 
   it("formats unknown-tool 400 errors with 1-based step number and tool ID (#3346)", async () => {
@@ -1092,6 +1116,186 @@ describe("pipeline step error message formatting", () => {
       await app.close();
       vi.mocked(hasEffectiveToolAccess).mockReset().mockResolvedValue(true);
       envMock.MAX_PIPELINE_STEP_PIXELS = prevMaxPixels;
+    }
+  });
+
+  it("resolves resize with contentAware to content-aware-resize in /api/v1/pipeline/save and /api/v1/pipeline/batch (#3347)", async () => {
+    vi.clearAllMocks();
+
+    const app = Fastify({ logger: false });
+    registerErrorHandler(app);
+    await registerPipelineRoutes(app);
+    await app.ready();
+
+    try {
+      const batchUnregisteredContentAwareReply = await invokePipelineBatchRoute([
+        { type: "file", filename: "photo.png", content: Buffer.from("png-bytes") },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: "resize", settings: { contentAware: true, width: 200 } }],
+          }),
+        },
+      ]);
+      expect(batchUnregisteredContentAwareReply.statusCode).toBe(400);
+      expect(batchUnregisteredContentAwareReply.payload).toEqual({
+        error: "Step 1 (resize): Tool not found or not available",
+      });
+
+      const saveUnregisteredContentAwareRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/pipeline/save",
+        headers: { "content-type": "application/json" },
+        payload: {
+          name: "Seam Carve Unregistered",
+          steps: [{ toolId: "resize", settings: { contentAware: true, width: 200 } }],
+        },
+      });
+      expect(saveUnregisteredContentAwareRes.statusCode).toBe(400);
+      expect(saveUnregisteredContentAwareRes.json()).toEqual({
+        error: "Step 1 (resize): Tool not found or not available",
+      });
+      expect(insertValuesMock).not.toHaveBeenCalled();
+
+      const resizeConfig = getToolConfig("resize");
+      getToolConfigSpy.mockImplementation((toolId: string) =>
+        toolId === "content-aware-resize" || toolId === "resize" ? resizeConfig : undefined,
+      );
+
+      vi.mocked(hasEffectiveToolAccess).mockImplementation(
+        async (_user, toolId) => toolId !== "content-aware-resize",
+      );
+
+      const batchForbiddenContentAwareReply = await invokePipelineBatchRoute([
+        { type: "file", filename: "photo.png", content: Buffer.from("png-bytes") },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: "resize", settings: { contentAware: true, width: 200 } }],
+          }),
+        },
+      ]);
+      expect(batchForbiddenContentAwareReply.statusCode).toBe(403);
+      expect(batchForbiddenContentAwareReply.payload).toEqual({
+        error: "Step 1 (resize): You don't have permission to use this tool",
+      });
+
+      insertValuesMock.mockClear();
+      const saveForbiddenContentAwareRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/pipeline/save",
+        headers: { "content-type": "application/json" },
+        payload: {
+          name: "Seam Carve Forbidden",
+          steps: [{ toolId: "resize", settings: { contentAware: true, width: 200 } }],
+        },
+      });
+      expect(saveForbiddenContentAwareRes.statusCode).toBe(403);
+      expect(saveForbiddenContentAwareRes.json()).toEqual({
+        error: "Step 1 (resize): You don't have permission to use this tool",
+      });
+      expect(hasEffectiveToolAccess).toHaveBeenLastCalledWith(
+        expect.objectContaining({ id: "user-1" }),
+        "content-aware-resize",
+      );
+      expect(insertValuesMock).not.toHaveBeenCalled();
+
+      const saveAllowedPlainResizeRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/pipeline/save",
+        headers: { "content-type": "application/json" },
+        payload: {
+          name: "Plain Resize Allowed",
+          steps: [{ toolId: "resize", settings: { contentAware: false, width: 200 } }],
+        },
+      });
+      expect(saveAllowedPlainResizeRes.statusCode).toBe(201);
+      expect(hasEffectiveToolAccess).toHaveBeenLastCalledWith(
+        expect.objectContaining({ id: "user-1" }),
+        "resize",
+      );
+
+      vi.mocked(hasEffectiveToolAccess).mockImplementation(
+        async (_user, toolId) => toolId === "content-aware-resize",
+      );
+      const saveAllowedContentAwareRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/pipeline/save",
+        headers: { "content-type": "application/json" },
+        payload: {
+          name: "Seam Carve Allowed",
+          steps: [{ toolId: "resize", settings: { contentAware: true, width: 200 } }],
+        },
+      });
+      expect(saveAllowedContentAwareRes.statusCode).toBe(201);
+      expect(hasEffectiveToolAccess).toHaveBeenLastCalledWith(
+        expect.objectContaining({ id: "user-1" }),
+        "content-aware-resize",
+      );
+
+      insertValuesMock.mockClear();
+      const batchAllowedContentAwareReply = await invokePipelineBatchRoute([
+        { type: "file", filename: "photo.png", content: Buffer.from("png-bytes") },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: "resize", settings: { contentAware: true, width: 200 } }],
+          }),
+        },
+        { type: "field", fieldname: "clientJobId", value: "pipeline-batch-3347" },
+      ]);
+      expect(batchAllowedContentAwareReply.statusCode).toBe(202);
+      const stepInsert = insertValuesMock.mock.calls
+        .map((call) => call[0] as Record<string, unknown>)
+        .find((row) => row?.type === "pipeline-step");
+      expect(stepInsert).toEqual(
+        expect.objectContaining({
+          id: "pipeline-batch-3347-f0-s0",
+          toolId: "content-aware-resize",
+          type: "pipeline-step",
+        }),
+      );
+
+      reportErrorMock.mockClear();
+      const { decodeHeic } = await import("../../../apps/api/src/lib/heic-converter.js");
+      vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+        valid: true,
+        format: "heif",
+        width: 10,
+        height: 10,
+      });
+      vi.mocked(decodeHeic).mockRejectedValueOnce(
+        Object.assign(new Error("ENOSPC: open temp file"), {
+          code: "ENOSPC",
+          syscall: "open",
+        }),
+      );
+      const batchHeicFaultReply = await invokePipelineBatchRoute([
+        { type: "file", filename: "photo.heic", content: Buffer.from("heic-bytes") },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: "resize", settings: { contentAware: true, width: 200 } }],
+          }),
+        },
+      ]);
+      expect(batchHeicFaultReply.statusCode).toBe(503);
+      expect(reportErrorMock).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          source: "http",
+          toolId: "content-aware-resize",
+          statusCode: 503,
+        }),
+      );
+    } finally {
+      await app.close();
+      getToolConfigSpy.mockReset();
+      vi.mocked(hasEffectiveToolAccess).mockReset().mockResolvedValue(true);
     }
   });
 });

@@ -944,13 +944,14 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
       // Validate all tool IDs exist
       for (let i = 0; i < steps.length; i++) {
         const step = steps[i];
-        const toolConfig = getToolConfig(step.toolId);
+        const resolvedToolId = resolvePipelineStepToolId(step);
+        const toolConfig = getToolConfig(resolvedToolId);
         if (!toolConfig) {
           return reply.status(400).send({
             error: `Step ${i + 1} (${step.toolId}): Tool not found or not available`,
           });
         }
-        if (!(await hasEffectiveToolAccess(user, step.toolId))) {
+        if (!(await hasEffectiveToolAccess(user, resolvedToolId))) {
           return reply.status(403).send({
             error: `Step ${i + 1} (${step.toolId}): You don't have permission to use this tool`,
           });
@@ -1383,7 +1384,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           // audio, video, and document pipelines are not rejected by the image
           // validator.
           const batchModality =
-            TOOLS.find((t) => t.id === pipeline.steps[0]?.toolId)?.modality ?? "image";
+            TOOLS.find((t) => t.id === parsedSteps[0]?.resolvedToolId)?.modality ?? "image";
           const batchPipelinePool: Pool = MODALITY_POOL[batchModality];
           const pathBackedOcrPdf = parsedSteps[0]?.resolvedToolId === "ocr-pdf";
           for (let fi = 0; fi < files.length; fi++) {
@@ -1465,7 +1466,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                 if (err instanceof InputValidationError) {
                   reportEngineUnavailable(
                     err,
-                    pipeline.steps[0]?.toolId ?? "pipeline",
+                    parsedSteps[0]?.resolvedToolId ?? "pipeline",
                     request.log,
                   );
                   preFailures.push({
@@ -1500,7 +1501,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   if (err instanceof InputValidationError) {
                     reportEngineUnavailable(
                       err,
-                      pipeline.steps[0]?.toolId ?? "pipeline",
+                      parsedSteps[0]?.resolvedToolId ?? "pipeline",
                       request.log,
                     );
                     preFailures.push({
@@ -1535,7 +1536,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                       const unavailable = engineUnavailable(err);
                       reportEngineUnavailable(
                         unavailable,
-                        pipeline.steps[0]?.toolId ?? "pipeline",
+                        parsedSteps[0]?.resolvedToolId ?? "pipeline",
                         request.log,
                       );
                       preFailures.push({
@@ -1575,7 +1576,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                       const unavailable = engineUnavailable(decodeErr);
                       reportEngineUnavailable(
                         unavailable,
-                        pipeline.steps[0]?.toolId ?? "pipeline",
+                        parsedSteps[0]?.resolvedToolId ?? "pipeline",
                         request.log,
                       );
                       preFailures.push({
@@ -1594,7 +1595,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                         const unavailable = engineUnavailable(decodeErr);
                         reportEngineUnavailable(
                           unavailable,
-                          pipeline.steps[0]?.toolId ?? "pipeline",
+                          parsedSteps[0]?.resolvedToolId ?? "pipeline",
                           request.log,
                         );
                         preFailures.push({
@@ -1632,7 +1633,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                     processFilename,
                     {
                       scratchDir,
-                      lenient: getToolConfig(pipeline.steps[0]?.toolId ?? "")
+                      lenient: getToolConfig(parsedSteps[0]?.resolvedToolId ?? "")
                         ?.skipStructuralValidation,
                     },
                   );
@@ -1642,7 +1643,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   if (err instanceof InputValidationError) {
                     reportEngineUnavailable(
                       err,
-                      pipeline.steps[0]?.toolId ?? "pipeline",
+                      parsedSteps[0]?.resolvedToolId ?? "pipeline",
                       request.log,
                     );
                     preFailures.push({
