@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { inflateSync } from "node:zlib";
 import { expect, test } from "@playwright/test";
 
 // ─── Pipeline Chains ───────────────────────────────────────────────
@@ -32,6 +33,55 @@ const JPG_100x100 = fixture("test-100x100.jpg");
 const HEIC_200x150 = fixture("test-200x150.heic");
 const JPG_SAMPLE = formatFixture("sample.jpg");
 const JPG_WITH_EXIF = fixture("test-with-exif.jpg");
+const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+
+function readFirstPngPixelRgb(png: Buffer): [number, number, number] {
+  if (png.length < 33 || !png.subarray(0, 8).equals(PNG_SIGNATURE)) {
+    throw new Error("Expected a valid PNG buffer");
+  }
+  const idatChunks: Buffer[] = [];
+  let sawIhdr = false;
+  let offset = 8;
+  while (offset + 8 <= png.length) {
+    const length = png.readUInt32BE(offset);
+    const type = png.toString("ascii", offset + 4, offset + 8);
+    const dataStart = offset + 8;
+    const dataEnd = dataStart + length;
+    if (dataEnd + 4 > png.length) {
+      throw new Error(`Truncated PNG chunk: ${type}`);
+    }
+    if (type === "IHDR") {
+      if (length < 13) {
+        throw new Error("Truncated PNG IHDR chunk");
+      }
+      const bitDepth = png[dataStart + 8];
+      const colorType = png[dataStart + 9];
+      const interlace = png[dataStart + 12];
+      if (bitDepth !== 8 || (colorType !== 2 && colorType !== 6) || interlace !== 0) {
+        throw new Error(
+          `Unsupported PNG layout for first-pixel RGB read: bitDepth=${bitDepth} colorType=${colorType} interlace=${interlace}`,
+        );
+      }
+      sawIhdr = true;
+    } else if (type === "IDAT") {
+      idatChunks.push(png.subarray(dataStart, dataEnd));
+    } else if (type === "IEND") {
+      break;
+    }
+    offset = dataEnd + 4;
+  }
+  if (!sawIhdr || idatChunks.length === 0) {
+    throw new Error("PNG buffer is missing IHDR or IDAT chunks");
+  }
+  const raw = inflateSync(Buffer.concat(idatChunks));
+  if (raw.length < 4) {
+    throw new Error("Inflated PNG scanline is shorter than 1 RGB pixel");
+  }
+  if (raw[0] > 4) {
+    throw new Error(`Unexpected PNG row 0 filter type: ${raw[0]}`);
+  }
+  return [raw[1], raw[2], raw[3]];
+}
 
 // ─── Resize + Watermark + Optimize Chain ───────────────────────────
 
@@ -184,7 +234,7 @@ test.describe("Enhancement + Replace Color + Convert chain", () => {
             {
               toolId: "replace-color",
               settings: {
-                sourceColor: "#ffffff",
+                sourceColor: "#51fc3b",
                 targetColor: "#f0f0f0",
                 tolerance: 20,
               },
@@ -198,6 +248,28 @@ test.describe("Enhancement + Replace Color + Convert chain", () => {
     const body = await res.json();
     expect(body.downloadUrl).toBeTruthy();
     expect(body.downloadUrl).toContain(".avif");
+    const dlRes = await request.get(body.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const avifBuffer = Buffer.from(await dlRes.body());
+    const convRes = await request.post("/api/v1/tools/image/convert", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "replaced.avif", mimeType: "image/avif", buffer: avifBuffer },
+        settings: JSON.stringify({ format: "png" }),
+      },
+    });
+    expect(convRes.ok()).toBe(true);
+    const convBody = await convRes.json();
+    const pngRes = await request.get(convBody.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(pngRes.ok()).toBe(true);
+    const [r, g, b] = readFirstPngPixelRgb(Buffer.from(await pngRes.body()));
+    expect(r).toBeGreaterThan(225);
+    expect(g).toBeGreaterThan(225);
+    expect(b).toBeGreaterThan(225);
   });
 });
 

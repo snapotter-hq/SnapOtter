@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { inflateSync } from "node:zlib";
 import { expect, test } from "@playwright/test";
+import AdmZip from "adm-zip";
 
 // ─── Batch Extended ──────────────────────────────────────────────
 // Extended batch processing tests covering tool categories not yet
@@ -82,6 +84,87 @@ const JPG_100x100 = fixture("test-100x100.jpg");
 const WEBP_50x50 = fixture("test-50x50.webp");
 const HEIC_200x150 = fixture("test-200x150.heic");
 const JPG_SAMPLE = formatFixture("sample.jpg");
+const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+
+function readFirstPngPixelRgb(png: Buffer): [number, number, number] {
+  if (png.length < 33 || !png.subarray(0, 8).equals(PNG_SIGNATURE)) {
+    throw new Error("Expected a valid PNG buffer");
+  }
+  const idatChunks: Buffer[] = [];
+  let sawIhdr = false;
+  let offset = 8;
+  while (offset + 8 <= png.length) {
+    const length = png.readUInt32BE(offset);
+    const type = png.toString("ascii", offset + 4, offset + 8);
+    const dataStart = offset + 8;
+    const dataEnd = dataStart + length;
+    if (dataEnd + 4 > png.length) {
+      throw new Error(`Truncated PNG chunk: ${type}`);
+    }
+    if (type === "IHDR") {
+      if (length < 13) {
+        throw new Error("Truncated PNG IHDR chunk");
+      }
+      const bitDepth = png[dataStart + 8];
+      const colorType = png[dataStart + 9];
+      const interlace = png[dataStart + 12];
+      if (bitDepth !== 8 || (colorType !== 2 && colorType !== 6) || interlace !== 0) {
+        throw new Error(
+          `Unsupported PNG layout for first-pixel RGB read: bitDepth=${bitDepth} colorType=${colorType} interlace=${interlace}`,
+        );
+      }
+      sawIhdr = true;
+    } else if (type === "IDAT") {
+      idatChunks.push(png.subarray(dataStart, dataEnd));
+    } else if (type === "IEND") {
+      break;
+    }
+    offset = dataEnd + 4;
+  }
+  if (!sawIhdr || idatChunks.length === 0) {
+    throw new Error("PNG buffer is missing IHDR or IDAT chunks");
+  }
+  const raw = inflateSync(Buffer.concat(idatChunks));
+  if (raw.length < 4) {
+    throw new Error("Inflated PNG scanline is shorter than 1 RGB pixel");
+  }
+  if (raw[0] > 4) {
+    throw new Error(`Unexpected PNG row 0 filter type: ${raw[0]}`);
+  }
+  return [raw[1], raw[2], raw[3]];
+}
+
+async function readBatchZip(
+  res: import("@playwright/test").APIResponse,
+  request: import("@playwright/test").APIRequestContext,
+): Promise<AdmZip> {
+  expect(res.ok()).toBe(true);
+  const resContentType = res.headers()["content-type"] ?? "";
+  let zipBuffer: Buffer;
+  if (resContentType.includes("application/json")) {
+    const json = await res.json();
+    expect(json.downloadUrl).toBeTruthy();
+    const dlRes = await request.get(json.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    zipBuffer = Buffer.from(await dlRes.body());
+  } else {
+    zipBuffer = Buffer.from(await res.body());
+  }
+  expect(zipBuffer.length).toBeGreaterThan(0);
+  expect(zipBuffer[0]).toBe(0x50);
+  expect(zipBuffer[1]).toBe(0x4b);
+  return new AdmZip(zipBuffer);
+}
+
+function readZipEntry(zip: AdmZip, entryName: string): Buffer {
+  const entry = zip.getEntry(entryName);
+  if (!entry) {
+    throw new Error(`Missing ${entryName} in batch ZIP`);
+  }
+  return entry.getData();
+}
 
 // ─── Batch Color Blindness Simulation ────────────────────────────
 
@@ -236,7 +319,7 @@ test.describe("Batch vectorize", () => {
 // ─── Batch Replace Color (5+ images) ────────────────────────────
 
 test.describe("Batch replace-color (5+ images)", () => {
-  test("replace white with blue in 6 mixed-format images", async ({ request }) => {
+  test("replace orange with blue in 6 mixed-format images", async ({ request }) => {
     const portrait = contentFixture("portrait-color.jpg");
     const tiffSample = formatFixture("sample.tiff");
     const { body: reqBody, contentType } = buildMultipart(
@@ -252,7 +335,7 @@ test.describe("Batch replace-color (5+ images)", () => {
         {
           name: "settings",
           value: JSON.stringify({
-            sourceColor: "#FFFFFF",
+            sourceColor: "#ff6432",
             targetColor: "#3366FF",
             tolerance: 25,
           }),
@@ -263,7 +346,23 @@ test.describe("Batch replace-color (5+ images)", () => {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
-    await expectBatchSuccess(res);
+    const zip = await readBatchZip(res, request);
+    expect(zip.getEntries()).toHaveLength(6);
+    expect(readFirstPngPixelRgb(readZipEntry(zip, "a_replace-color.png"))).toEqual([51, 102, 255]);
+    const [r, g, b] = readFirstPngPixelRgb(readZipEntry(zip, "d_replace-color.png"));
+    expect(r).toBeLessThan(70);
+    expect(g).toBeGreaterThanOrEqual(95);
+    expect(g).toBeLessThanOrEqual(115);
+    expect(b).toBeGreaterThan(240);
+    for (const name of [
+      "b_replace-color.jpg",
+      "c_replace-color.webp",
+      "e_replace-color.jpg",
+      "f_replace-color.tiff",
+    ]) {
+      expect(readZipEntry(zip, name).length).toBeGreaterThan(0);
+    }
+    expect(readZipEntry(zip, "e_replace-color.jpg").equals(portrait)).toBe(false);
   });
 });
 
