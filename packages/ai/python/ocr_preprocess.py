@@ -85,3 +85,18 @@ def preprocess(input_path, output_path):
     if not cv2.imwrite(output_path, image):
         raise RuntimeError(f"Failed to write output image: {output_path}")
     return output_path
+
+
+def main():
+    try:
+        input_path = sys.argv[1]
+        output_path = sys.argv[2]
+        preprocess(input_path, output_path)
+        print(json.dumps({"success": True, "output_path": output_path}))
+    except Exception as e:
+        print(json.dumps({"success": False, "error": str(e).strip() or type(e).__name__}))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

@@ -519,16 +519,10 @@ describe("extractText error and progress behavior", () => {
     expect(result.text).toBe("こんにちは\n안녕하세요\n你好");
   });
 
-  describe.skipIf(!hasPython)("ocr_preprocess.py cv2.imwrite return check (issue #3087)", () => {
+  describe.skipIf(!hasPython)("ocr_preprocess.py sidecar script", () => {
     const here = dirname(fileURLToPath(import.meta.url));
     const pyDir = resolve(here, "../../../packages/ai/python");
-
-    it("raises RuntimeError when cv2.imwrite returns False in preprocess()", () => {
-      const res = spawnSync(
-        pythonBin as string,
-        [
-          "-c",
-          `
+    const fakeCv2Bootstrap = `
 import importlib.util, os, sys, types
 
 py_dir = ${JSON.stringify(pyDir)}
@@ -545,7 +539,7 @@ fake_cv2.COLOR_LAB2BGR = 56
 fake_cv2.ADAPTIVE_THRESH_GAUSSIAN_C = 1
 fake_cv2.THRESH_BINARY = 0
 fake_cv2.imread = lambda _p: FakeImg()
-fake_cv2.imwrite = lambda _p, _img: False
+fake_cv2.imwrite = lambda _p, _img: True
 fake_cv2.cvtColor = lambda img, _c: img
 fake_cv2.Canny = lambda _g, _a, _b, apertureSize=3: FakeImg()
 fake_cv2.HoughLinesP = lambda *_a, **_k: None
@@ -559,6 +553,15 @@ sys.modules["cv2"] = fake_cv2
 fake_np = types.ModuleType("numpy")
 fake_np.pi = 3.141592653589793
 sys.modules["numpy"] = fake_np
+`;
+
+    it("raises RuntimeError when cv2.imwrite returns False in preprocess() (issue #3087)", () => {
+      const res = spawnSync(
+        pythonBin as string,
+        [
+          "-c",
+          `${fakeCv2Bootstrap}
+fake_cv2.imwrite = lambda _p, _img: False
 
 spec = importlib.util.spec_from_file_location("ocr_preprocess_mod", os.path.join(py_dir, "ocr_preprocess.py"))
 mod = importlib.util.module_from_spec(spec)
@@ -581,6 +584,79 @@ print("OCR_PREPROCESS_3087_OK")
       );
       expect(res.status, res.stderr).toBe(0);
       expect(res.stdout).toContain("OCR_PREPROCESS_3087_OK");
+    });
+
+    it("executes main() on __main__ dispatch and returns JSON on success and failure (issue #3420)", () => {
+      const res = spawnSync(
+        pythonBin as string,
+        [
+          "-c",
+          `${fakeCv2Bootstrap}
+import io, json
+
+read_paths = []
+written_paths = []
+
+def _imread(p):
+    read_paths.append(p)
+    return FakeImg()
+
+def _imwrite(p, _img):
+    written_paths.append(p)
+    return True
+
+fake_cv2.imread = _imread
+fake_cv2.imwrite = _imwrite
+
+for mod_name in ("PIL", "mediapipe", "gpu", "rembg", "torchvision", "torchvision.transforms", "torchvision.transforms.functional_tensor"):
+    sys.modules[mod_name] = types.ModuleType(mod_name)
+
+os.environ.pop("DISPATCHER_PROFILE", None)
+import dispatcher
+assert "ocr_preprocess" in dispatcher.ALLOWED_SCRIPTS, dispatcher.ALLOWED_SCRIPTS
+
+# 1. Success via dispatcher._run_script_main using real ALLOWED_SCRIPTS
+out, code = dispatcher._run_script_main("ocr_preprocess", ["/tmp/in_ocr.png", "/tmp/out_ocr.png"])
+assert code == 0, f"expected exit 0, got {code}: {out}"
+payload = json.loads(out)
+assert payload == {"success": True, "output_path": "/tmp/out_ocr.png"}, payload
+assert read_paths == ["/tmp/in_ocr.png"], read_paths
+assert written_paths == ["/tmp/out_ocr.png"], written_paths
+
+# 2. Failure via dispatcher._run_script_main when preprocess raises
+fake_cv2.imread = lambda _p: None
+out_err, code_err = dispatcher._run_script_main("ocr_preprocess", ["/tmp/missing.png", "/tmp/out_ocr.png"])
+assert code_err == 1, f"expected exit 1, got {code_err}: {out_err}"
+payload_err = json.loads(out_err)
+assert payload_err == {"success": False, "error": "Cannot read image: /tmp/missing.png"}, payload_err
+
+# 3. Direct mod.main() call with empty-message exception falls back to class name
+spec = importlib.util.spec_from_file_location("ocr_preprocess_mod", os.path.join(py_dir, "ocr_preprocess.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+mod.preprocess = lambda _i, _o: (_ for _ in ()).throw(RuntimeError(""))
+buf = io.StringIO()
+old_stdout, old_argv = sys.stdout, sys.argv
+sys.stdout = buf
+sys.argv = ["ocr_preprocess.py", "/tmp/in.png", "/tmp/out.png"]
+try:
+    mod.main()
+except SystemExit as exc:
+    assert exc.code == 1, exc.code
+else:
+    raise AssertionError("Expected SystemExit(1)")
+finally:
+    sys.stdout = old_stdout
+    sys.argv = old_argv
+
+assert json.loads(buf.getvalue()) == {"success": False, "error": "RuntimeError"}, buf.getvalue()
+print("OCR_PREPROCESS_3420_OK")
+`,
+        ],
+        { encoding: "utf8", timeout: 30_000 },
+      );
+      expect(res.status, res.stderr).toBe(0);
+      expect(res.stdout).toContain("OCR_PREPROCESS_3420_OK");
     });
   });
 });

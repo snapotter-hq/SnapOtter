@@ -46,7 +46,7 @@ assert all(f == "zzz_wire_check.py" for f in files), files
 assert any(fr["func"] == "_inner" for fr in info["frames"]), info["frames"]
 
 # Bare MemoryError() has str(e) == "": confirm both the dispatcher uncaught path
-# and all 14 AI entrypoint scripts fall back to the exception class name rather
+# and all 15 AI entrypoint scripts fall back to the exception class name rather
 # than emitting an empty "error": "".
 with open(RAISER, "w") as f:
     f.write("raise MemoryError()\n")
@@ -71,6 +71,7 @@ AI_ENTRYPOINT_SCRIPTS = (
     "inpaint.py",
     "inpaint_hq.py",
     "noise_removal.py",
+    "ocr_preprocess.py",
     "outpaint.py",
     "red_eye_removal.py",
     "remove_bg.py",
