@@ -1635,16 +1635,19 @@ describe("useCollageStore", () => {
     expect(s.cellAssignments[1]).toBe(1);
   });
 
-  it("addImages appends to existing images", () => {
+  it("addImages appends to existing images and resets selectedCell (#3687)", () => {
     const file1 = new File(["a"], "a.png", { type: "image/png" });
     const file2 = new File(["b"], "b.png", { type: "image/png" });
     const file3 = new File(["c"], "c.png", { type: "image/png" });
     useCollageStore.getState().addImages([file1, file2]);
+    useCollageStore.getState().setTemplateId("3-h-equal");
+    useCollageStore.getState().setSelectedCell(2);
     useCollageStore.getState().addImages([file3]);
 
     const s = useCollageStore.getState();
     expect(s.images).toHaveLength(3);
     expect(s.templateId).toBe("3-h-equal");
+    expect(s.selectedCell).toBeNull();
   });
 
   it("removeImage removes image by index and revokes blob URL and previewBlobUrl once", async () => {
@@ -1991,9 +1994,10 @@ describe("useCollageStore", () => {
     expect(revokeObjectURL).toHaveBeenCalledTimes(2);
   });
 
-  it("setTemplateId changes template and rebuilds assignments", () => {
+  it("setTemplateId changes template, rebuilds assignments, and resets selectedCell (#3687)", () => {
     const file1 = new File(["a"], "a.png", { type: "image/png" });
     useCollageStore.getState().addImages([file1]);
+    useCollageStore.getState().setSelectedCell(1);
     useCollageStore.getState().setTemplateId("3-h-equal");
 
     const s = useCollageStore.getState();
@@ -2003,15 +2007,31 @@ describe("useCollageStore", () => {
     expect(s.cellAssignments[1]).toBe(-1);
     expect(s.cellAssignments[2]).toBe(-1);
     expect(s.cellTransforms).toEqual({});
+    expect(s.selectedCell).toBeNull();
+
+    // Shrinking from a 3-cell template to 2-h-equal while cell 2 is selected also resets selectedCell
+    const file2 = new File(["b"], "b.png", { type: "image/png" });
+    const file3 = new File(["c"], "c.png", { type: "image/png" });
+    useCollageStore.getState().addImages([file2, file3]);
+    useCollageStore.getState().setSelectedCell(2);
+    useCollageStore.getState().setTemplateId("2-h-equal");
+
+    const afterShrink = useCollageStore.getState();
+    expect(afterShrink.templateId).toBe("2-h-equal");
+    expect(afterShrink.cellAssignments).toEqual([0, 1]);
+    expect(afterShrink.cellTransforms).toEqual({});
+    expect(afterShrink.selectedCell).toBeNull();
   });
 
   it("setTemplateId ignores unknown template IDs without canceling active runs or clearing results", () => {
     const abort = vi.fn();
     const run = beginCollageRun(abort);
+    useCollageStore.getState().setSelectedCell(1);
     useCollageStore.getState().setResult("blob:result", 5000, 10000, "job-123");
     useCollageStore.getState().setTemplateId("nonexistent");
     const s = useCollageStore.getState();
     expect(s.templateId).toBe("2-h-equal");
+    expect(s.selectedCell).toBe(1);
     expect(s.phase).toBe("result");
     expect(s.resultUrl).toBe("blob:result");
     expect(abort).not.toHaveBeenCalled();
