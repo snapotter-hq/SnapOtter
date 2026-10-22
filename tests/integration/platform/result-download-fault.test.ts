@@ -45,13 +45,13 @@ async function download(jobId: string, filename: string, headers: Record<string,
 }
 
 describe("tool-result download fault classification (local mode)", () => {
-  it("falls through to the uploads/ prefix when outputs/ has no object", async () => {
+  it("does not fall through to the uploads/ prefix when outputs/ has no object", async () => {
     const jobId = "resfault-up";
     await putObject(`uploads/${jobId}/original.png`, PNG);
     try {
       const res = await download(jobId, "original.png");
-      expect(res.statusCode).toBe(200);
-      expect(Buffer.compare(res.rawPayload, PNG)).toBe(0);
+      expect(res.statusCode).toBe(404);
+      expect(JSON.parse(res.body)).toEqual({ error: "File not found" });
     } finally {
       await deletePrefix(`uploads/${jobId}`);
     }
@@ -284,7 +284,6 @@ describe("tool-result download fault classification (local mode)", () => {
       expect(JSON.parse(vanishedRes.body).error).not.toMatch(/not found/i);
       expect(seenRequests).toEqual([
         "HEAD /test-bucket/outputs/resfault-s3-996/result.png",
-        "HEAD /test-bucket/uploads/resfault-s3-996/result.png",
         "HEAD /test-bucket/",
       ]);
 
@@ -295,7 +294,6 @@ describe("tool-result download fault classification (local mode)", () => {
       expect(JSON.parse(missingKeyRes.body)).toEqual({ error: "File not found" });
       expect(seenRequests).toEqual([
         "HEAD /test-bucket/outputs/resfault-s3-996/never-existed.png",
-        "HEAD /test-bucket/uploads/resfault-s3-996/never-existed.png",
         "HEAD /test-bucket/",
       ]);
     } finally {

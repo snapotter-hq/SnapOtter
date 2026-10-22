@@ -19,6 +19,19 @@ const localMissing = (err: unknown) => (err as NodeJS.ErrnoException)?.code === 
 const isMissingObjectError = vi.fn(localMissing);
 const isStorageServiceFault = vi.fn<(_err: unknown) => boolean>(() => false);
 
+const dbInsertValues = vi.fn();
+
+vi.mock("../../../apps/api/src/db/index.js", () => ({
+  db: {
+    insert: () => ({
+      values: (...args: unknown[]) => dbInsertValues(...args),
+    }),
+  },
+  schema: {
+    jobs: {},
+  },
+}));
+
 vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>();
@@ -558,6 +571,35 @@ describe("json-bodied routes", () => {
     });
     expect(res.statusCode).toBe(400);
     expect(getObjectBuffer).not.toHaveBeenCalled();
+  });
+
+  it("passport-photo generate writes output under a fresh jobId rather than the client-supplied jobId", async () => {
+    getObjectBuffer.mockImplementation(bgRemoved);
+    putObject.mockResolvedValue(undefined);
+    app = await buildApp(registerPassportPhoto);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/passport-photo/generate",
+      payload: passportBody,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.jobId).toBeTruthy();
+    expect(body.jobId).not.toBe(passportBody.jobId);
+    expect(body.downloadUrl).toBe(`/api/v1/download/${body.jobId}/face_passport.jpg`);
+    expect(putObject).toHaveBeenCalledWith(
+      `outputs/${body.jobId}/face_passport.jpg`,
+      expect.any(Buffer),
+    );
+    // The fresh prefix gets its own row so the S3 TTL sweep can expire it.
+    expect(dbInsertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: body.jobId,
+        toolId: "passport-photo",
+        status: "completed",
+        outputRefs: [`outputs/${body.jobId}/face_passport.jpg`],
+      }),
+    );
   });
 
   it("html-to-image answers a storage fault that mentions a timeout as storage, not a slow page", async () => {

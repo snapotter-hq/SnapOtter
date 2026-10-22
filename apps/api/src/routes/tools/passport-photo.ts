@@ -14,6 +14,7 @@ import {
   PRINT_LAYOUTS,
   ToolInputError,
 } from "@snapotter/shared";
+import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp, { type OverlayOptions } from "sharp";
 import { z } from "zod";
@@ -40,6 +41,7 @@ import {
 import { isUniqueViolation } from "../../lib/pg-errors.js";
 import { withRouteScratch } from "../../lib/route-scratch.js";
 import { InputValidationError } from "../../modality/contract.js";
+import { hasEffectivePermission } from "../../permissions.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { updateSingleFileProgress } from "../progress.js";
 import { registerToolProcessFn } from "../tool-factory.js";
@@ -326,9 +328,21 @@ export function registerPassportPhoto(app: FastifyInstance) {
 
         const preview = previewBuffer.data.toString("base64");
 
-        // Save bg-removed image to object storage for generate phase
+        // Save bg-removed image to object storage for generate phase and record
+        // job ownership so Phase 2 can verify the caller owns this analysis.
         const bgRemovedFilename = `${filename.replace(/\.[^.]+$/, "")}_nobg.png`;
-        await putObject(`outputs/${jobId}/${bgRemovedFilename}`, bgRemovedBuffer);
+        const bgRemovedKey = `outputs/${jobId}/${bgRemovedFilename}`;
+        await putObject(bgRemovedKey, bgRemovedBuffer);
+        await db.insert(schema.jobs).values({
+          id: jobId,
+          userId: getAuthUser(request)?.id ?? null,
+          toolId: "passport-photo",
+          type: "single",
+          status: "completed",
+          inputRefs: [],
+          outputRefs: [bgRemovedKey],
+          completedAt: new Date(),
+        });
 
         if (clientJobId) {
           await updateSingleFileProgress({
@@ -481,6 +495,18 @@ export function registerPassportPhoto(app: FastifyInstance) {
       if (!isValidObjectKey(bgRemovedKey)) {
         return reply.status(400).send({ error: "Invalid jobId or filename" });
       }
+      // The jobId comes from the client, so only the user who ran Phase 1 (or
+      // a files:all holder) may read its outputs. 404 hides whether it exists.
+      const user = getAuthUser(request);
+      if (user) {
+        const [job] = await db
+          .select({ userId: schema.jobs.userId })
+          .from(schema.jobs)
+          .where(eq(schema.jobs.id, jobId));
+        if (job?.userId !== user.id && !(await hasEffectivePermission(user, "files:all"))) {
+          return reply.status(404).send({ error: "Job not found" });
+        }
+      }
       let bgRemovedBuffer: Buffer;
       try {
         bgRemovedBuffer = await getObjectBuffer(bgRemovedKey);
@@ -610,13 +636,16 @@ export function registerPassportPhoto(app: FastifyInstance) {
           }
         }
 
-        // Save output
+        // Save output under a fresh server-generated jobId so Phase 2 never
+        // writes into a client-selected prefix or exposes the Phase 1 jobId.
+        const outputJobId = randomUUID();
         const outputFilename = `${filename.replace(/\.[^.]+$/, "")}_passport.jpg`;
-        await putObject(`outputs/${jobId}/${outputFilename}`, cropped);
+        const outputRefs = [`outputs/${outputJobId}/${outputFilename}`];
+        await putObject(outputRefs[0], cropped);
 
         const response: Record<string, unknown> = {
-          jobId,
-          downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
+          jobId: outputJobId,
+          downloadUrl: `/api/v1/download/${outputJobId}/${encodeURIComponent(outputFilename)}`,
           dimensions: {
             widthMm: docSpec.width,
             heightMm: docSpec.height,
@@ -643,10 +672,25 @@ export function registerPassportPhoto(app: FastifyInstance) {
 
           if (printBuffer) {
             const printFilename = `${filename.replace(/\.[^.]+$/, "")}_passport_print_${printLayout}.jpg`;
-            await putObject(`outputs/${jobId}/${printFilename}`, printBuffer);
-            response.printDownloadUrl = `/api/v1/download/${jobId}/${encodeURIComponent(printFilename)}`;
+            const printKey = `outputs/${outputJobId}/${printFilename}`;
+            await putObject(printKey, printBuffer);
+            outputRefs.push(printKey);
+            response.printDownloadUrl = `/api/v1/download/${outputJobId}/${encodeURIComponent(printFilename)}`;
           }
         }
+
+        // The row gives the output an owner and lets the storage TTL sweep
+        // expire it on S3, which skips rowless prefixes.
+        await db.insert(schema.jobs).values({
+          id: outputJobId,
+          userId: getAuthUser(request)?.id ?? null,
+          toolId: "passport-photo",
+          type: "single",
+          status: "completed",
+          inputRefs: [],
+          outputRefs,
+          completedAt: new Date(),
+        });
 
         return reply.send(response);
       } catch (err) {

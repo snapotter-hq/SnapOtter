@@ -11,8 +11,10 @@ import {
   isToolInputError,
   TOOL_BUNDLE_MAP,
 } from "@snapotter/shared";
+import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
+import { db, schema } from "../../db/index.js";
 import { registerAiJobHandler } from "../../jobs/ai-handlers.js";
 import { enqueueToolJob, insertToolJobAlias } from "../../jobs/enqueue.js";
 import { autoSaveToLibrary } from "../../jobs/postprocess.js";
@@ -57,6 +59,7 @@ import {
 } from "../../lib/upload-cleanup.js";
 import { receiveUpload } from "../../lib/upload-stream.js";
 import { InputValidationError } from "../../modality/contract.js";
+import { hasEffectivePermission } from "../../permissions.js";
 import { getAuthUser } from "../../plugins/auth.js";
 import { buildAsyncAcceptedPayload } from "../async-response.js";
 import { registerToolProcessFn } from "../tool-factory.js";
@@ -532,6 +535,18 @@ export function registerRemoveBackground(app: FastifyInstance) {
       if (!isValidObjectKey(maskKey) || !isValidObjectKey(originalKey)) {
         return reply.status(400).send({ error: "Invalid jobId or filename" });
       }
+      // The jobId comes from the client, so only the user who ran Phase 1 (or
+      // a files:all holder) may read its outputs. 404 hides whether it exists.
+      const user = getAuthUser(request);
+      if (user) {
+        const [job] = await db
+          .select({ userId: schema.jobs.userId })
+          .from(schema.jobs)
+          .where(eq(schema.jobs.id, jobId));
+        if (job?.userId !== user.id && !(await hasEffectivePermission(user, "files:all"))) {
+          return reply.status(404).send({ error: "Job not found" });
+        }
+      }
 
       // Read what the earlier removal stored outside the processing catch below,
       // which answers 422 for anything (#2119). A missing object means the
@@ -620,9 +635,25 @@ export function registerRemoveBackground(app: FastifyInstance) {
           throw err;
         }
 
-        // Save the final output
+        // Save the final output under a fresh server-generated jobId so
+        // Phase 2 never writes into a client-selected prefix or exposes
+        // Phase 1's _original.png and _mask.png in the final downloadUrl.
+        const outputJobId = randomUUID();
         const outputFilename = `${baseName}_nobg.${fmt}`;
-        await putObject(`outputs/${jobId}/${outputFilename}`, resultBuffer);
+        const outputKey = `outputs/${outputJobId}/${outputFilename}`;
+        await putObject(outputKey, resultBuffer);
+        // The row gives the output an owner and lets the storage TTL sweep
+        // expire it on S3, which skips rowless prefixes.
+        await db.insert(schema.jobs).values({
+          id: outputJobId,
+          userId: getAuthUser(request)?.id ?? null,
+          toolId: "remove-background",
+          type: "single",
+          status: "completed",
+          inputRefs: [],
+          outputRefs: [outputKey],
+          completedAt: new Date(),
+        });
 
         // Auto-save the composited result (not the Phase 1 transparent
         // intermediate) to the library when the run referenced a library file.
@@ -634,13 +665,13 @@ export function registerRemoveBackground(app: FastifyInstance) {
           outName: outputFilename,
           contentType: BG_FORMAT_CONTENT_TYPES[fmt],
           toolId: "remove-background",
-          jobId,
+          jobId: outputJobId,
         });
         const savedFileId = autoSaveResult.fileId;
 
         return reply.send({
-          jobId,
-          downloadUrl: `/api/v1/download/${jobId}/${encodeURIComponent(outputFilename)}`,
+          jobId: outputJobId,
+          downloadUrl: `/api/v1/download/${outputJobId}/${encodeURIComponent(outputFilename)}`,
           processedSize: resultBuffer.length,
           savedFileId,
           autoSaveError: autoSaveResult.error,

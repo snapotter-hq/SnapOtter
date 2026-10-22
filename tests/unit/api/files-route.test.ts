@@ -504,14 +504,9 @@ describe("files route logic", () => {
       expect(classifyError(outputsErr, "http")).toBe("operational");
       expect(mocks.verifyS3Bucket).not.toHaveBeenCalled();
 
-      // 2. outputs/ misses (404), uploads/ size probe fails with AccessDenied
-      const notFound = Object.assign(new Error("NotFound"), {
-        name: "NotFound",
-        $metadata: { httpStatusCode: 404 },
-      });
-      mocks.isStorageServiceFault.mockImplementation((e: unknown) => e !== notFound);
-      mocks.getObjectSize.mockRejectedValueOnce(notFound).mockRejectedValueOnce(accessDenied);
-      const uploadsErr = await downloadHandler(
+      // 2. outputs/ size probe fails with AccessDenied
+      mocks.getObjectSize.mockRejectedValueOnce(accessDenied);
+      const accessDeniedErr = await downloadHandler(
         {
           params: { jobId: "job-1", filename: "input.png" },
           headers: {},
@@ -522,14 +517,14 @@ describe("files route logic", () => {
         () => null,
         (e: unknown) => e,
       );
-      expect(uploadsErr).toMatchObject({
+      expect(accessDeniedErr).toMatchObject({
         isSafeMessage: true,
         kind: "operational",
         code: "storage-unavailable",
         statusCode: 503,
         cause: accessDenied,
       });
-      expect(classifyError(uploadsErr, "http")).toBe("operational");
+      expect(classifyError(accessDeniedErr, "http")).toBe("operational");
       expect(mocks.verifyS3Bucket).not.toHaveBeenCalled();
 
       // 3. getObjectStream fails with SlowDown
@@ -633,37 +628,7 @@ describe("files route logic", () => {
         expect(reply.send).not.toHaveBeenCalled();
       }
 
-      // 2. outputs/ misses with ENOENT, uploads/ size probe fails with non-syscall local error -> rethrows
-      const enoent = Object.assign(new Error("ENOENT: no such file or directory, stat"), {
-        code: "ENOENT",
-        syscall: "stat",
-      });
-      for (const { err: localFault, expectedKind } of nonMissingLocalErrors) {
-        mocks.getObjectSize.mockClear();
-        mocks.verifyS3Bucket.mockClear();
-        mocks.getObjectSize.mockRejectedValueOnce(enoent).mockRejectedValueOnce(localFault);
-        const warn = vi.fn();
-        const reply = makeDownloadReply();
-        const caught = await downloadHandler(
-          {
-            params: { jobId: "job-1", filename: "result.png" },
-            headers: {},
-            log: { warn, error: vi.fn() },
-          },
-          reply,
-        ).then(
-          () => null,
-          (e: unknown) => e,
-        );
-        expect(caught).toBe(localFault);
-        expect(classifyError(caught, "http")).toBe(expectedKind);
-        expect(mocks.getObjectSize).toHaveBeenCalledTimes(2);
-        expect(mocks.verifyS3Bucket).not.toHaveBeenCalled();
-        expect(warn).not.toHaveBeenCalled();
-        expect(reply.send).not.toHaveBeenCalled();
-      }
-
-      // 3. getObjectStream fails with non-syscall local error -> rethrows instead of 404
+      // 2. getObjectStream fails with non-syscall local error -> rethrows instead of 404
       for (const { err: localFault, expectedKind } of nonMissingLocalErrors) {
         mocks.getObjectSize.mockResolvedValueOnce(128);
         mocks.getObjectStream.mockRejectedValueOnce(localFault);
@@ -686,25 +651,34 @@ describe("files route logic", () => {
         expect(reply.send).not.toHaveBeenCalled();
       }
 
-      // 4. ENOENT, ENAMETOOLONG, and S3 NoSuchKey at getObjectStream still map to 404
+      // 3. ENOENT, ENAMETOOLONG, and S3 NoSuchKey map to 404 without probing uploads/
+      const enoent = Object.assign(new Error("ENOENT: no such file or directory, stat"), {
+        code: "ENOENT",
+        syscall: "stat",
+      });
       const enametoolong = Object.assign(new Error("ENAMETOOLONG: name too long, stat"), {
         code: "ENAMETOOLONG",
         syscall: "stat",
       });
-      mocks.getObjectSize.mockRejectedValueOnce(enoent).mockRejectedValueOnce(enametoolong);
-      const warnMiss = vi.fn();
-      const missReply = makeDownloadReply();
-      await downloadHandler(
-        {
-          params: { jobId: "job-1", filename: "missing.png" },
-          headers: {},
-          log: { warn: warnMiss, error: vi.fn() },
-        },
-        missReply,
-      );
-      expect(missReply.statusCode).toBe(404);
-      expect(missReply.payload).toEqual({ error: "File not found" });
-      expect(warnMiss).toHaveBeenCalledTimes(1);
+      for (const missErr of [enoent, enametoolong]) {
+        mocks.getObjectSize.mockClear();
+        mocks.getObjectSize.mockRejectedValueOnce(missErr);
+        const warnMiss = vi.fn();
+        const missReply = makeDownloadReply();
+        await downloadHandler(
+          {
+            params: { jobId: "job-1", filename: "missing.png" },
+            headers: {},
+            log: { warn: warnMiss, error: vi.fn() },
+          },
+          missReply,
+        );
+        expect(missReply.statusCode).toBe(404);
+        expect(missReply.payload).toEqual({ error: "File not found" });
+        expect(mocks.getObjectSize).toHaveBeenCalledTimes(1);
+        expect(mocks.getObjectSize).toHaveBeenCalledWith("outputs/job-1/missing.png");
+        expect(warnMiss).toHaveBeenCalledTimes(1);
+      }
 
       const s3StreamNoSuchKey = Object.assign(new Error("NoSuchKey"), {
         name: "NoSuchKey",
@@ -727,7 +701,7 @@ describe("files route logic", () => {
       expect(warnS3StreamMiss).toHaveBeenCalledTimes(1);
     });
 
-    it("verifies S3 bucket existence only when both outputs/ and uploads/ size probes miss (#996)", async () => {
+    it("never falls back to uploads/ when outputs/ misses, and verifies S3 bucket existence on miss (#996)", async () => {
       const notFound = Object.assign(new Error("NotFound"), {
         name: "NotFound",
         $metadata: { httpStatusCode: 404 },
@@ -746,20 +720,9 @@ describe("files route logic", () => {
       );
       expect(mocks.verifyS3Bucket).not.toHaveBeenCalled();
 
-      // 2. outputs/ misses, uploads/ hits -> verifyS3Bucket not called
-      mocks.getObjectSize.mockRejectedValueOnce(notFound).mockResolvedValueOnce(5);
-      await downloadHandler(
-        {
-          params: { jobId: "job-1", filename: "input.png" },
-          headers: {},
-          log: { warn: vi.fn(), error: vi.fn() },
-        },
-        makeDownloadReply(),
-      );
-      expect(mocks.verifyS3Bucket).not.toHaveBeenCalled();
-
-      // 3. both miss and bucket exists -> verifyS3Bucket called once, warns and returns 404
-      mocks.getObjectSize.mockRejectedValueOnce(notFound).mockRejectedValueOnce(notFound);
+      // 2. outputs/ misses and bucket exists -> does not probe uploads/, verifies bucket once, warns and returns 404
+      mocks.getObjectSize.mockClear();
+      mocks.getObjectSize.mockRejectedValueOnce(notFound);
       const warnOnMiss = vi.fn();
       const missReply = makeDownloadReply();
       await downloadHandler(
@@ -770,12 +733,14 @@ describe("files route logic", () => {
         },
         missReply,
       );
+      expect(mocks.getObjectSize).toHaveBeenCalledTimes(1);
+      expect(mocks.getObjectSize).toHaveBeenCalledWith("outputs/job-1/missing.png");
       expect(mocks.verifyS3Bucket).toHaveBeenCalledTimes(1);
       expect(warnOnMiss).toHaveBeenCalledTimes(1);
       expect(missReply.statusCode).toBe(404);
       expect(missReply.payload).toEqual({ error: "File not found" });
 
-      // 4. both miss because bucket vanished -> verifyS3Bucket rejects with 503 before 404 warn
+      // 3. outputs/ misses because bucket vanished -> verifyS3Bucket rejects with 503 before 404 warn
       const { SafeError } = await import("@snapotter/shared");
       const bucketFault = new SafeError("The server's storage service is unavailable.", {
         kind: "operational",
@@ -783,7 +748,7 @@ describe("files route logic", () => {
         statusCode: 503,
       });
       mocks.verifyS3Bucket.mockRejectedValueOnce(bucketFault);
-      mocks.getObjectSize.mockRejectedValueOnce(notFound).mockRejectedValueOnce(notFound);
+      mocks.getObjectSize.mockRejectedValueOnce(notFound);
       const warnOnVanishedBucket = vi.fn();
       const vanishedReply = makeDownloadReply();
       const caught = await downloadHandler(
@@ -1116,7 +1081,7 @@ describe("files route logic", () => {
       expect(mocks.dbDeleteWhere).not.toHaveBeenCalled();
     });
 
-    it("keeps uploaded files when all parts succeed", async () => {
+    it("keeps uploaded files under outputs/<jobId>/ when all parts succeed", async () => {
       const req = makeRequest([
         filePart("first.txt", Buffer.from("hello")),
         filePart("second.txt", Buffer.from("world")),
@@ -1127,6 +1092,17 @@ describe("files route logic", () => {
 
       expect(reply.statusCode).toBe(200);
       expect(mocks.putObject).toHaveBeenCalledTimes(2);
+      const { jobId } = reply.payload as { jobId: string };
+      expect(mocks.putObject).toHaveBeenNthCalledWith(
+        1,
+        `outputs/${jobId}/first.txt`,
+        Buffer.from("hello"),
+      );
+      expect(mocks.putObject).toHaveBeenNthCalledWith(
+        2,
+        `outputs/${jobId}/second.txt`,
+        Buffer.from("world"),
+      );
       expect(mocks.deletePrefix).not.toHaveBeenCalled();
     });
 

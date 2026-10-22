@@ -132,7 +132,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
         let prefixDeleted = true;
         if (wroteUpload) {
           wroteUpload = false;
-          await deletePrefix(`uploads/${jobId}/`).catch((err) => {
+          await deletePrefix(`outputs/${jobId}/`).catch((err) => {
             prefixDeleted = false;
             request.log.warn({ err, jobId }, "failed to discard a rejected request's uploads");
           });
@@ -226,7 +226,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
 
           // Record a completed jobs row before the first write so the S3 TTL
           // sweep can expire the prefix (#3624).
-          const uploadKey = `uploads/${jobId}/${safeName}`;
+          const uploadKey = `outputs/${jobId}/${safeName}`;
           if (!recordedJob) {
             await recordCompletedToolJob({
               jobId,
@@ -237,7 +237,8 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
             recordedJob = true;
           }
 
-          // Write to object storage uploads prefix
+          // Write to the outputs prefix: /api/v1/download serves outputs/ only,
+          // never the raw tool inputs under uploads/.
           wroteUpload = true;
           await putObject(uploadKey, safeBuffer);
 
@@ -303,22 +304,17 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
         throw e;
       };
 
-      // Resolve from object storage: outputs/ first, then uploads/
-      let key = `outputs/${jobId}/${filename}`;
+      // Resolve from object storage outputs/ only: never fall back to uploads/,
+      // which holds raw unprocessed tool inputs under the same jobId.
+      const key = `outputs/${jobId}/${filename}`;
       let size: number;
       try {
         size = await getObjectSize(key);
       } catch (outputsErr) {
         rethrowIfStorageFault(outputsErr);
-        key = `uploads/${jobId}/${filename}`;
-        try {
-          size = await getObjectSize(key);
-        } catch (uploadsErr) {
-          rethrowIfStorageFault(uploadsErr);
-          await verifyS3Bucket();
-          request.log.warn({ jobId, filename }, "result download: object missing in storage");
-          return reply.status(404).send({ error: "File not found" });
-        }
+        await verifyS3Bucket();
+        request.log.warn({ jobId, filename }, "result download: object missing in storage");
+        return reply.status(404).send({ error: "File not found" });
       }
 
       const ext = extname(filename).toLowerCase().replace(/^\./, "");

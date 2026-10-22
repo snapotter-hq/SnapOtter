@@ -399,6 +399,15 @@ describe("POST /api/v1/tools/image/passport-photo/analyze cleanup and progress s
     expect(existsSync(observedScratchDir)).toBe(false);
     expect(putObject).toHaveBeenCalledTimes(1);
     expect(putObject).toHaveBeenCalledWith(`outputs/${body.jobId}/portrait_nobg.png`, validPng);
+    expect(dbInsertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: body.jobId,
+        toolId: "passport-photo",
+        type: "single",
+        status: "completed",
+        outputRefs: [`outputs/${body.jobId}/portrait_nobg.png`],
+      }),
+    );
     expect(updateSingleFileProgress).toHaveBeenCalledWith({
       jobId: "client-job-ok",
       phase: "complete",

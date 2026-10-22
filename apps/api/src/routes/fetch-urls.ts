@@ -208,7 +208,7 @@ export async function registerFetchUrlsRoute(app: FastifyInstance): Promise<void
         let prefixDeleted = true;
         if (wroteUpload) {
           wroteUpload = false;
-          await deletePrefix(`uploads/${jobId}/`).catch((err) => {
+          await deletePrefix(`outputs/${jobId}/`).catch((err) => {
             prefixDeleted = false;
             request.log.warn({ err, jobId }, "failed to discard a rejected request's uploads");
           });
@@ -389,13 +389,13 @@ async function fetchSingleUrl(
     if (hooks?.isAborted?.()) {
       return { success: false, url, error: "Request aborted" };
     }
-    const uploadKey = `uploads/${jobId}/${filename}`;
+    const uploadKey = `outputs/${jobId}/${filename}`;
     await hooks?.beforeWrite?.(uploadKey);
     if (hooks?.isAborted?.()) {
       return { success: false, url, error: "Request aborted" };
     }
 
-    // Save to object storage uploads prefix (raw fetched files)
+    // Save to the outputs prefix: /api/v1/download serves outputs/ only.
     try {
       hooks?.markWrote?.();
       await putObject(uploadKey, safeBuffer);
@@ -501,7 +501,7 @@ async function fetchSingleUrl(
         const previewBuffer = await sharp(decodedBuffer).webp({ quality: 80 }).toBuffer();
         if (!hooks?.isAborted?.()) {
           const previewFilename = `preview-${filename.replace(/\.[^.]+$/, "")}.webp`;
-          await putObject(`uploads/${jobId}/${previewFilename}`, previewBuffer);
+          await putObject(`outputs/${jobId}/${previewFilename}`, previewBuffer);
           previewUrl = `/api/v1/download/${jobId}/${encodeURIComponent(previewFilename)}`;
         }
       } catch (err) {

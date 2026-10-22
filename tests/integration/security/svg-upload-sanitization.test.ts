@@ -183,7 +183,7 @@ describe("an SVG over the element cap is rejected, not stored", () => {
 });
 
 function uploadDirs(): Set<string> {
-  const root = path.join(env.WORKSPACE_PATH, "uploads");
+  const root = path.join(env.WORKSPACE_PATH, "outputs");
   try {
     return new Set(readdirSync(root));
   } catch {
@@ -220,7 +220,7 @@ describe("failed multi-file standalone upload cleans up earlier parts (#1210)", 
 
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).error).toMatch(/element count/i);
-    expect(hooks.writtenKeys).toEqual([expect.stringMatching(/^uploads\/[^/]+\/first\.png$/)]);
+    expect(hooks.writtenKeys).toEqual([expect.stringMatching(/^outputs\/[^/]+\/first\.png$/)]);
     expect([...uploadDirs()].filter((dir) => !before.has(dir))).toEqual([]);
   });
 
@@ -244,7 +244,7 @@ describe("failed multi-file standalone upload cleans up earlier parts (#1210)", 
     });
 
     expect(res.statusCode).toBe(413);
-    expect(hooks.writtenKeys).toEqual([expect.stringMatching(/^uploads\/[^/]+\/first\.png$/)]);
+    expect(hooks.writtenKeys).toEqual([expect.stringMatching(/^outputs\/[^/]+\/first\.png$/)]);
     expect([...uploadDirs()].filter((dir) => !before.has(dir))).toEqual([]);
   });
 
@@ -278,7 +278,7 @@ describe("failed multi-file standalone upload cleans up earlier parts (#1210)", 
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).error).toMatch(/52428800|larger than/i);
     expect(hooks.reportError).not.toHaveBeenCalled();
-    expect(hooks.writtenKeys).toEqual([expect.stringMatching(/^uploads\/[^/]+\/first\.png$/)]);
+    expect(hooks.writtenKeys).toEqual([expect.stringMatching(/^outputs\/[^/]+\/first\.png$/)]);
     expect([...uploadDirs()].filter((dir) => !before.has(dir))).toEqual([]);
   });
 });

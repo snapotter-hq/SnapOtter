@@ -23,6 +23,19 @@ const localMissing = (err: unknown) => (err as NodeJS.ErrnoException)?.code === 
 const isMissingObjectError = vi.fn(localMissing);
 const isStorageServiceFault = vi.fn<(_err: unknown) => boolean>(() => false);
 
+const dbInsertValues = vi.fn();
+
+vi.mock("../../../apps/api/src/db/index.js", () => ({
+  db: {
+    insert: () => ({
+      values: (...args: unknown[]) => dbInsertValues(...args),
+    }),
+  },
+  schema: {
+    jobs: {},
+  },
+}));
+
 vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>();
@@ -267,7 +280,7 @@ describe("remove-background effects: reading the stored mask and original", () =
     expect(getObjectBuffer).not.toHaveBeenCalled();
   });
 
-  it("still composites and stores the result when both objects are there", async () => {
+  it("still composites and stores the result under a fresh jobId when both objects are there", async () => {
     getObjectBuffer.mockImplementation(async (key: string) =>
       key.endsWith("_mask.png")
         ? sharp(await png(3))
@@ -282,8 +295,24 @@ describe("remove-background effects: reading the stored mask and original", () =
       effectsRequest({ ...settings, backgroundType: "color", backgroundColor: "#ff0000" }),
     );
     expect(res.statusCode).toBe(200);
-    expect(res.json().downloadUrl).toContain("/api/v1/download/job/");
+    const body = res.json();
+    expect(body.jobId).toBeTruthy();
+    expect(body.jobId).not.toBe(settings.jobId);
+    expect(body.downloadUrl).toBe(`/api/v1/download/${body.jobId}/cat_nobg.png`);
     expect(putObject).toHaveBeenCalledTimes(1);
+    expect(putObject).toHaveBeenCalledWith(
+      `outputs/${body.jobId}/cat_nobg.png`,
+      expect.any(Buffer),
+    );
+    // The fresh prefix gets its own row so the S3 TTL sweep can expire it.
+    expect(dbInsertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: body.jobId,
+        toolId: "remove-background",
+        status: "completed",
+        outputRefs: [`outputs/${body.jobId}/cat_nobg.png`],
+      }),
+    );
   });
 
   it("answers 400 Invalid background image when backgroundImage fails validateImageBuffer (#2827)", async () => {
@@ -367,7 +396,8 @@ describe("remove-background effects: reading the stored mask and original", () =
       ),
     );
     expect(res.statusCode).toBe(200);
-    expect(res.json().downloadUrl).toContain("/api/v1/download/job/");
+    expect(res.json().jobId).not.toBe(settings.jobId);
+    expect(res.json().downloadUrl).toBe(`/api/v1/download/${res.json().jobId}/cat_nobg.png`);
     expect(putObject).toHaveBeenCalledTimes(1);
     const savedBuf = putObject.mock.calls[0]?.[1] as Buffer;
     const { data } = await sharp(savedBuf)

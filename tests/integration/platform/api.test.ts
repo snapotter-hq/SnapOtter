@@ -3946,12 +3946,12 @@ describe("Workspace integrity", () => {
     });
     expect(outputRes.statusCode).toBe(200);
 
-    // Input file is also saved in workspace (from tool-factory.ts)
+    // Raw input file in uploads/ is not publicly downloadable via /api/v1/download
     const inputRes = await app.inject({
       method: "GET",
       url: `/api/v1/download/${jobId}/ws-tool.png`,
     });
-    expect(inputRes.statusCode).toBe(200);
+    expect(inputRes.statusCode).toBe(404);
   });
 
   it("each job gets a unique workspace (no cross-contamination)", async () => {

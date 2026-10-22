@@ -146,9 +146,6 @@ export function registerContentAwareResize(app: FastifyInstance) {
         await mkdir(scratchDir, { recursive: true });
 
         try {
-          // Save input to object storage
-          await putObject(`uploads/${jobId}/${filename}`, fileBuffer);
-
           // Process with caire
           let result: Awaited<ReturnType<typeof seamCarve>>;
           try {

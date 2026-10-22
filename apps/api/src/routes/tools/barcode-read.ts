@@ -343,9 +343,6 @@ export function registerBarcodeRead(app: FastifyInstance) {
         storing = true;
         const jobId = randomUUID();
 
-        // Save original input
-        await putObject(`uploads/${jobId}/${filename}`, fileBuffer);
-
         // Build SVG overlay with bounding boxes
         const overlaySvg = buildOverlaySvg(width, height, barcodes);
 
