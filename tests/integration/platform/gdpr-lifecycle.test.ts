@@ -767,11 +767,35 @@ describe("GDPR purge role hierarchy", () => {
     const prevTimeout = activeEnv.GDPR_EXPORT_TIMEOUT_MS;
     activeEnv.GDPR_EXPORT_TIMEOUT_MS = 100;
 
+    // Hold the 100ms export deadline open until execution enters readStoredFile
+    // so the four initial Postgres metadata queries and archiver setup cannot
+    // consume the budget under container or worker contention (#3093).
+    const realTimeout = AbortSignal.timeout.bind(AbortSignal);
+    let timeoutController: AbortController | undefined;
+    const timeoutSpy = vi.spyOn(AbortSignal, "timeout").mockImplementation((ms: number) => {
+      if (ms === 100 && !timeoutController) {
+        timeoutController = new AbortController();
+        return timeoutController.signal;
+      }
+      return realTimeout(ms);
+    });
+
     let observedSignal: AbortSignal | undefined;
     const readSpy = vi
       .spyOn(fileStorage, "readStoredFile")
       .mockImplementationOnce((_name, opts) => {
         observedSignal = opts instanceof AbortSignal ? opts : opts?.signal;
+        if (!timeoutController) {
+          throw new Error(
+            "Expected AbortSignal.timeout(100) to have been called before readStoredFile()",
+          );
+        }
+        const target = timeoutController;
+        queueMicrotask(() => {
+          target.abort(
+            new DOMException("The operation was aborted due to timeout", "TimeoutError"),
+          );
+        });
         // Hang indefinitely unless the export deadline aborts the read.
         return new Promise<Buffer>(() => {});
       });
@@ -794,6 +818,7 @@ describe("GDPR purge role hierarchy", () => {
       });
       const failedExportJob = await systemQueue.getJob(exportJobId);
       expect(failedExportJob?.failedReason).toMatch(/GDPR export timed out after 100ms/);
+      expect(timeoutSpy).toHaveBeenCalledWith(100);
       expect(observedSignal).toBeInstanceOf(AbortSignal);
       expect(observedSignal?.aborted).toBe(true);
       expect(await objectExists(`outputs/${exportJobId}/gdpr-export.zip`)).toBe(false);
@@ -805,6 +830,7 @@ describe("GDPR purge role hierarchy", () => {
       });
     } finally {
       activeEnv.GDPR_EXPORT_TIMEOUT_MS = prevTimeout;
+      timeoutSpy.mockRestore();
       readSpy.mockRestore();
       await systemQueue.remove(exportJobId).catch(() => {});
       await systemQueue.remove(followUpJobId).catch(() => {});
