@@ -691,7 +691,7 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
           settings: expect.objectContaining({
             flowChildCount: 1,
             fileIndexMap: [1],
-            preFailureFaults: [{ error: "File is empty" }],
+            preFailureFaults: [{ filename: "empty.png", error: "File is empty" }],
           }),
         }),
       }),
@@ -1153,6 +1153,16 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
             settings: expect.objectContaining({
               flowChildCount: 2,
               fileIndexMap: [0, 3],
+              preFailureFaults: [
+                {
+                  filename: "bad.svgz",
+                  error: "SVGZ file does not contain valid SVG content after decompression",
+                },
+                {
+                  filename: "too-many.svg",
+                  error: "SVG exceeds maximum element count of 5000",
+                },
+              ],
             }),
           }),
         }),
@@ -1654,6 +1664,54 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
       }
     },
   );
+
+  it("includes filename alongside statusCode, code, and details in preFailureFaults when a 5xx pre-failure is paired with a valid upload (#3150)", async () => {
+    vi.clearAllMocks();
+    const { InputValidationError } = await import("../../../apps/api/src/modality/contract.js");
+    validatePdfPathMock
+      .mockRejectedValueOnce(
+        new InputValidationError(
+          "PDF engine is not available",
+          503,
+          "qpdf is not installed",
+          "ENGINE_UNAVAILABLE",
+        ),
+      )
+      .mockResolvedValueOnce(undefined);
+
+    const reply = await invokePipelineBatchRoute([
+      { type: "file", filename: "broken.pdf", content: Buffer.alloc(42, 0x25) },
+      { type: "file", filename: "ok.pdf", content: Buffer.alloc(42, 0x25) },
+      {
+        type: "field",
+        fieldname: "pipeline",
+        value: JSON.stringify({
+          steps: [{ toolId: "ocr-pdf", settings: { quality: "fast", pages: "1" } }],
+        }),
+      },
+    ]);
+
+    expect(reply.statusCode).toBe(202);
+    expect(flowAddMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          settings: expect.objectContaining({
+            flowChildCount: 1,
+            fileIndexMap: [1],
+            preFailureFaults: [
+              {
+                filename: "broken.pdf",
+                error: "PDF engine is not available",
+                statusCode: 503,
+                code: "ENGINE_UNAVAILABLE",
+                details: "qpdf is not installed",
+              },
+            ],
+          }),
+        }),
+      }),
+    );
+  });
 });
 
 describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {

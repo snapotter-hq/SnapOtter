@@ -2342,9 +2342,7 @@ function resolveBatchErrors(
     return counterErrors;
   }
 
-  const preFaults = Array.isArray(preFailureFaults)
-    ? (preFailureFaults as Array<BatchFault & { filename?: string }>)
-    : [];
+  const preFaults = Array.isArray(preFailureFaults) ? (preFailureFaults as BatchFault[]) : [];
   const flowUploadSet = fileIndexMap ? new Set(fileIndexMap) : null;
   const preFailedUploadIndices: number[] = [];
   if (flowUploadSet) {

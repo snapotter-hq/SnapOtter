@@ -752,7 +752,8 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                 // So the finalize weighs every file when deciding whether one
                 // engine fault failed them all (#1627).
                 preFailureFaults: preFailures.map(
-                  ({ error, statusCode, code, details }): BatchFault => ({
+                  ({ filename, error, statusCode, code, details }): BatchFault => ({
+                    filename,
                     error,
                     ...(statusCode !== undefined && { statusCode }),
                     ...(code && { code }),

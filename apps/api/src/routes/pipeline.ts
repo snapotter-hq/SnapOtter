@@ -1744,7 +1744,8 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                 fileIndexMap,
                 // Every file's fault, for the finalize's all-failed verdict (#1627).
                 preFailureFaults: preFailures.map(
-                  ({ error, statusCode, code, details }): BatchFault => ({
+                  ({ filename, error, statusCode, code, details }): BatchFault => ({
+                    filename,
                     error,
                     ...(statusCode !== undefined && { statusCode }),
                     ...(code && { code }),

@@ -2565,25 +2565,29 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
         toolId: "resize",
         userId: null,
         pool: "system",
-        totalFiles: 2,
+        totalFiles: 3,
         inputRefs: [],
         filename: "",
         settings: {
           flowChildCount: 1,
           fileIndexMap: [0],
-          preFailureFaults: [{ error: "File is empty" }],
+          preFailureFaults: [
+            { filename: "empty.png", error: "File is empty" },
+            { error: "File is empty" },
+          ],
         },
       },
     });
 
     expect(failBatchJobMock).toHaveBeenCalledWith({
       jobId: "batch-3",
-      totalFiles: 2,
-      completedFiles: 2,
-      failedFiles: 2,
+      totalFiles: 3,
+      completedFiles: 3,
+      failedFiles: 3,
       message: "File is empty",
       errors: [
-        { filename: "file-1", error: "File is empty" },
+        { filename: "empty.png", error: "File is empty" },
+        { filename: "file-2", error: "File is empty" },
         { filename: "a.png", error: "File is empty" },
         { filename: "", error: "File is empty" },
       ],
@@ -2625,6 +2629,7 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
       },
       counterErrors: [
         { filename: "empty.png", error: "File is empty" },
+        { filename: "legacy-empty.png", error: "File is empty" },
         { filename: "first.png", error: "Step 1: kaboom" },
       ],
     });
@@ -2638,13 +2643,16 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
         toolId: "pipeline-batch",
         userId: null,
         pool: "system",
-        totalFiles: 4,
+        totalFiles: 5,
         inputRefs: [],
         filename: "",
         settings: {
           flowChildCount: 3,
-          fileIndexMap: [1, 2, 3],
-          preFailureFaults: [{ error: "File is empty" }],
+          fileIndexMap: [2, 3, 4],
+          preFailureFaults: [
+            { filename: "empty.png", error: "File is empty" },
+            { error: "File is empty" },
+          ],
         },
       },
     })) as { resultPayload?: { manifest?: unknown } };
@@ -2656,12 +2664,13 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
     ]);
     expect(fail1).toHaveBeenCalledWith({
       jobId: "batch-dedup",
-      totalFiles: 4,
-      completedFiles: 4,
-      failedFiles: 4,
+      totalFiles: 5,
+      completedFiles: 5,
+      failedFiles: 5,
       message: "All files failed processing",
       errors: [
         { filename: "empty.png", error: "File is empty" },
+        { filename: "legacy-empty.png", error: "File is empty" },
         { filename: "first.png", error: "Step 1: kaboom" },
         { filename: "second.png", error: "Step 1: other" },
         { filename: "third.png", error: "Step 1: third-err" },

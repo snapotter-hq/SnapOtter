@@ -607,6 +607,18 @@ describe("batch route spooled multipart ingress (#1239)", () => {
       "empty.png",
       "File is empty",
     );
+    expect(mocks.flowAdd).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          totalFiles: 2,
+          settings: expect.objectContaining({
+            flowChildCount: 1,
+            fileIndexMap: [1],
+            preFailureFaults: [{ filename: "empty.png", error: "File is empty" }],
+          }),
+        }),
+      }),
+    );
   });
 
   it("keeps ocr-pdf batches on storeValidatedOcrPdf without reading the PDF into a Buffer", async () => {
@@ -1005,6 +1017,16 @@ describe("batch route spooled multipart ingress (#1239)", () => {
           settings: expect.objectContaining({
             flowChildCount: 1,
             fileIndexMap: [2],
+            preFailureFaults: [
+              {
+                filename: "bad.svgz",
+                error: "SVGZ file does not contain valid SVG content after decompression",
+              },
+              {
+                filename: "too-many.svg",
+                error: "SVG exceeds maximum element count of 5000",
+              },
+            ],
           }),
         }),
       }),
@@ -1356,4 +1378,45 @@ describe("batch route spooled multipart ingress (#1239)", () => {
       }
     },
   );
+
+  it("includes filename alongside statusCode, code, and details in preFailureFaults when a 5xx pre-failure is paired with a valid upload (#3150)", async () => {
+    const { InputValidationError } = await import("../../../apps/api/src/modality/contract.js");
+    mocks.storeValidatedOcrPdf.mockRejectedValueOnce(
+      new InputValidationError(
+        "PDF engine is not available",
+        503,
+        "qpdf is not installed",
+        "ENGINE_UNAVAILABLE",
+      ),
+    );
+    const reply = await invokeBatchRoute({
+      section: "pdf",
+      toolId: "ocr-pdf",
+      parts: [
+        { type: "file", filename: "broken.pdf", content: Buffer.from("%PDF-1.4") },
+        { type: "file", filename: "ok.pdf", content: Buffer.from("%PDF-1.4") },
+        { type: "field", fieldname: "settings", value: '{"quality":"fast","pages":"1"}' },
+      ],
+    });
+    expect(reply.statusCode).toBe(202);
+    expect(mocks.flowAdd).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          settings: expect.objectContaining({
+            flowChildCount: 1,
+            fileIndexMap: [1],
+            preFailureFaults: [
+              {
+                filename: "broken.pdf",
+                error: "PDF engine is not available",
+                statusCode: 503,
+                code: "ENGINE_UNAVAILABLE",
+                details: "qpdf is not installed",
+              },
+            ],
+          }),
+        }),
+      }),
+    );
+  });
 });

@@ -71,6 +71,7 @@ export function sendInputValidationError(
  * worker-side failure both reduce to this, so they can be judged together.
  */
 export interface BatchFault {
+  filename?: string;
   error: string;
   statusCode?: number;
   code?: string;
