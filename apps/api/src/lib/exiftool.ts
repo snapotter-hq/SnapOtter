@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { open, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { promisify } from "node:util";
@@ -85,6 +86,29 @@ async function findExiftool(): Promise<string> {
 }
 
 /**
+ * Write a buffer to a temp file exclusively (O_CREAT | O_EXCL | O_WRONLY).
+ * Prevents symlink / race-condition attacks on predictable temp paths.
+ */
+async function writeTempExclusive(filePath: string, buffer: Buffer): Promise<void> {
+  try {
+    const fh = await open(filePath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY);
+    let fileWriteErr: unknown;
+    try {
+      await fh.writeFile(buffer);
+    } catch (err) {
+      fileWriteErr = err;
+      throw err;
+    } finally {
+      await fh.close().catch((closeErr: unknown) => {
+        if (fileWriteErr === undefined) throw closeErr;
+      });
+    }
+  } catch (err) {
+    throw normalizeOperationalWriteError(err);
+  }
+}
+
+/**
  * Read all metadata from an image buffer using ExifTool.
  * Returns grouped metadata sections (EXIF, IPTC, XMP, GPS, etc.)
  */
@@ -96,7 +120,7 @@ export async function inspectMetadata(buffer: Buffer, filename: string): Promise
   const tempPath = join(tmpdir(), `exif-inspect-${id}${suffix}`);
 
   try {
-    await writeFile(tempPath, buffer);
+    await writeTempExclusive(tempPath, buffer);
     const { stdout } = await execFileAsync(bin, ["-json", "-G", "-struct", "-n", tempPath], {
       timeout: 60_000,
       maxBuffer: 10 * 1024 * 1024,
@@ -177,7 +201,7 @@ export async function writeMetadata(
   const tempPath = join(tmpdir(), `exif-write-${id}${suffix}`);
 
   try {
-    await writeFile(tempPath, buffer);
+    await writeTempExclusive(tempPath, buffer);
     await execFileAsync(bin, ["-overwrite_original", ...tags, tempPath], {
       timeout: 60_000,
       maxBuffer: 10 * 1024 * 1024,
@@ -210,9 +234,7 @@ export async function readImageDimensions(
   const tempPath = join(tmpdir(), `exif-dim-${id}${suffix}`);
 
   try {
-    await writeFile(tempPath, buffer).catch((writeErr: unknown) => {
-      throw normalizeOperationalWriteError(writeErr);
-    });
+    await writeTempExclusive(tempPath, buffer);
     const { stdout } = await execFileAsync(
       bin,
       ["-json", "-ImageWidth", "-ImageHeight", tempPath],

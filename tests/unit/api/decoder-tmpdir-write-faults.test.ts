@@ -33,6 +33,8 @@ const handleCloseFailure = { next: null as Error | null };
 const readFileFailure = { next: null as Error | null };
 const infoExifPaths: string[] = [];
 const infoExifOpenFlags: Array<number | string | undefined> = [];
+const exiftoolPaths: string[] = [];
+const exiftoolOpenFlags: Array<number | string | undefined> = [];
 const uploadedBuffers = new Map<string, Buffer>();
 
 vi.mock("node:fs/promises", async (importOriginal) => {
@@ -40,9 +42,14 @@ vi.mock("node:fs/promises", async (importOriginal) => {
   return {
     ...actual,
     open: (async (path: unknown, flags?: unknown, ...rest: unknown[]) => {
-      if (/info-exif-/.test(String(path))) {
-        infoExifPaths.push(String(path));
-        infoExifOpenFlags.push(flags as number | string | undefined);
+      if (/(?:info-exif|exif-inspect|exif-write|exif-dim)-/.test(String(path))) {
+        if (/info-exif-/.test(String(path))) {
+          infoExifPaths.push(String(path));
+          infoExifOpenFlags.push(flags as number | string | undefined);
+        } else {
+          exiftoolPaths.push(String(path));
+          exiftoolOpenFlags.push(flags as number | string | undefined);
+        }
         if (writeFileFailure.next) {
           const err = writeFileFailure.next;
           writeFileFailure.next = null;
@@ -73,16 +80,6 @@ vi.mock("node:fs/promises", async (importOriginal) => {
       }
       return (actual.open as (...args: unknown[]) => unknown)(path, flags, ...rest);
     }) as typeof actual.open,
-    writeFile: (async (path: unknown, ...rest: unknown[]) => {
-      if (/(?:exif-inspect|exif-write)-/.test(String(path))) {
-        if (writeFileFailure.next) {
-          const err = writeFileFailure.next;
-          writeFileFailure.next = null;
-          throw err;
-        }
-      }
-      return (actual.writeFile as (...args: unknown[]) => unknown)(path, ...rest);
-    }) as typeof actual.writeFile,
     readFile: (async (path: unknown, ...rest: unknown[]) => {
       if (/exif-write-/.test(String(path)) && readFileFailure.next) {
         const err = readFileFailure.next;
@@ -449,6 +446,8 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
     readFileFailure.next = null;
     infoExifPaths.length = 0;
     infoExifOpenFlags.length = 0;
+    exiftoolPaths.length = 0;
+    exiftoolOpenFlags.length = 0;
   });
 
   describe.each(ROUTES)("$name", (route) => {
@@ -914,9 +913,9 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
     );
   });
 
-  describe("edit-metadata and edit-metadata/inspect exiftool tmpdir faults (#3548)", () => {
+  describe("edit-metadata and edit-metadata/inspect exiftool tmpdir faults (#3548, #3630)", () => {
     it.each(WRITE_ERRNOS)(
-      "answers 503 %s (%s) on POST /api/v1/tools/image/edit-metadata/inspect when inspectMetadata fails writing to tmpdir",
+      "answers 503 %s (%s) on POST /api/v1/tools/image/edit-metadata/inspect when inspectMetadata fails opening or writing to tmpdir",
       async (errno, expectedCode) => {
         writeFileFailure.next = errnoError(errno);
         const res = await app.inject({
@@ -926,11 +925,27 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
         });
         expect(res.statusCode, res.body).toBe(503);
         expect(res.json()).toMatchObject({ code: expectedCode });
+
+        handleWriteFailure.next = errnoError(errno, "write");
+        const handleRes = await app.inject({
+          method: "POST",
+          url: "/api/v1/tools/image/edit-metadata/inspect",
+          ...multipartBody([{ filename: "photo.png", contentType: "image/png", content: PNG }]),
+        });
+        expect(handleRes.statusCode, handleRes.body).toBe(503);
+        expect(handleRes.json()).toMatchObject({ code: expectedCode });
+        const expectedFlags = constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY;
+        expect(exiftoolOpenFlags).toEqual([expectedFlags, expectedFlags]);
+        for (const p of exiftoolPaths) {
+          expect(existsSync(p)).toBe(false);
+        }
+        exiftoolPaths.length = 0;
+        exiftoolOpenFlags.length = 0;
       },
     );
 
     it.each(WRITE_ERRNOS)(
-      "answers 503 %s (%s) on POST /api/v1/tools/image/edit-metadata when writeMetadata fails writing or reading tmpdir",
+      "answers 503 %s (%s) on POST /api/v1/tools/image/edit-metadata when writeMetadata fails opening, writing, or reading tmpdir",
       async (errno, expectedCode) => {
         writeFileFailure.next = errnoError(errno);
         const writeRes = await app.inject({
@@ -943,6 +958,17 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
         expect(writeRes.statusCode, writeRes.body).toBe(503);
         expect(writeRes.json()).toMatchObject({ code: expectedCode });
 
+        handleWriteFailure.next = errnoError(errno, "write");
+        const handleWriteRes = await app.inject({
+          method: "POST",
+          url: apiToolPath("edit-metadata"),
+          ...multipartBody([{ filename: "photo.png", contentType: "image/png", content: PNG }], {
+            artist: "Ada",
+          }),
+        });
+        expect(handleWriteRes.statusCode, handleWriteRes.body).toBe(503);
+        expect(handleWriteRes.json()).toMatchObject({ code: expectedCode });
+
         readFileFailure.next = errnoError(errno, "read");
         const readRes = await app.inject({
           method: "POST",
@@ -953,8 +979,45 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
         });
         expect(readRes.statusCode, readRes.body).toBe(503);
         expect(readRes.json()).toMatchObject({ code: expectedCode });
+        const expectedFlags = constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY;
+        expect(exiftoolOpenFlags).toEqual([expectedFlags, expectedFlags, expectedFlags]);
+        for (const p of exiftoolPaths) {
+          expect(existsSync(p)).toBe(false);
+        }
+        exiftoolPaths.length = 0;
+        exiftoolOpenFlags.length = 0;
       },
     );
+
+    it("preserves a primary fh.writeFile ENOSPC fault when fh.close also rejects on edit-metadata and edit-metadata/inspect (#3630)", async () => {
+      handleWriteFailure.next = errnoError("ENOSPC", "write");
+      handleCloseFailure.next = Object.assign(new Error("EIO: close failed"), {
+        code: "EIO",
+        syscall: "close",
+      });
+      const inspectRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/edit-metadata/inspect",
+        ...multipartBody([{ filename: "photo.png", contentType: "image/png", content: PNG }]),
+      });
+      expect(inspectRes.statusCode, inspectRes.body).toBe(503);
+      expect(inspectRes.json()).toMatchObject({ code: "storage-full" });
+
+      handleWriteFailure.next = errnoError("ENOSPC", "write");
+      handleCloseFailure.next = Object.assign(new Error("EIO: close failed"), {
+        code: "EIO",
+        syscall: "close",
+      });
+      const editRes = await app.inject({
+        method: "POST",
+        url: apiToolPath("edit-metadata"),
+        ...multipartBody([{ filename: "photo.png", contentType: "image/png", content: PNG }], {
+          artist: "Ada",
+        }),
+      });
+      expect(editRes.statusCode, editRes.body).toBe(503);
+      expect(editRes.json()).toMatchObject({ code: "storage-full" });
+    });
 
     it("answers 503 ENGINE_UNAVAILABLE on POST /api/v1/tools/image/edit-metadata and /inspect when exiftool or readFile hits an ENGINE_UNAVAILABLE fault", async () => {
       readFileFailure.next = new RangeError("Array buffer allocation failed");
@@ -979,7 +1042,7 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
     });
 
     it.each(WRITE_ERRNOS)(
-      "surfaces 503 %s (%s) from the edit-metadata registered process function when writeMetadata hits a tmpdir write or read fault",
+      "surfaces 503 %s (%s) from the edit-metadata registered process function when writeMetadata hits a tmpdir open, write, or read fault",
       async (errno, expectedCode) => {
         const cfg = getToolConfig("edit-metadata");
         expect(cfg).toBeDefined();
@@ -990,11 +1053,24 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
           code: expectedCode,
         });
 
+        handleWriteFailure.next = errnoError(errno, "write");
+        await expect(cfg?.process(PNG, { artist: "Ada" }, "photo.png")).rejects.toMatchObject({
+          statusCode: 503,
+          code: expectedCode,
+        });
+
         readFileFailure.next = errnoError(errno, "read");
         await expect(cfg?.process(PNG, { artist: "Ada" }, "photo.png")).rejects.toMatchObject({
           statusCode: 503,
           code: expectedCode,
         });
+        const expectedFlags = constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY;
+        expect(exiftoolOpenFlags).toEqual([expectedFlags, expectedFlags, expectedFlags]);
+        for (const p of exiftoolPaths) {
+          expect(existsSync(p)).toBe(false);
+        }
+        exiftoolPaths.length = 0;
+        exiftoolOpenFlags.length = 0;
       },
     );
   });

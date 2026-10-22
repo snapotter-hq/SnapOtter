@@ -1,3 +1,6 @@
+import { constants, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mutation-focused coverage for apps/api/src/lib/exiftool.ts, the metadata
@@ -11,19 +14,41 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // `Object.keys().length > 0 ? x : null` gate is caught. Only the child_process
 // / util / fs boundary is mocked; all parsing and argv logic runs for real.
 
-const { mockExecFile, mockWriteFile, mockReadFile, mockRm } = vi.hoisted(() => ({
-  mockExecFile: vi.fn(),
-  mockWriteFile: vi.fn().mockResolvedValue(undefined),
-  mockReadFile: vi.fn().mockResolvedValue(Buffer.from("readback-bytes")),
-  mockRm: vi.fn().mockResolvedValue(undefined),
-}));
+const {
+  mockExecFile,
+  mockOpen,
+  mockHandleWriteFile,
+  mockHandleClose,
+  mockWriteFile,
+  mockReadFile,
+  mockRm,
+  realFsRef,
+} = vi.hoisted(() => {
+  const handleWriteFile = vi.fn().mockResolvedValue(undefined);
+  const handleClose = vi.fn().mockResolvedValue(undefined);
+  return {
+    mockExecFile: vi.fn(),
+    mockOpen: vi.fn().mockImplementation(async () => ({
+      writeFile: handleWriteFile,
+      close: handleClose,
+    })),
+    mockHandleWriteFile: handleWriteFile,
+    mockHandleClose: handleClose,
+    mockWriteFile: vi.fn().mockResolvedValue(undefined),
+    mockReadFile: vi.fn().mockResolvedValue(Buffer.from("readback-bytes")),
+    mockRm: vi.fn().mockResolvedValue(undefined),
+    realFsRef: { open: null as typeof import("node:fs/promises").open | null },
+  };
+});
 
 vi.mock("node:child_process", () => ({ execFile: mockExecFile }));
 vi.mock("node:util", () => ({ promisify: () => mockExecFile }));
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
+  realFsRef.open = actual.open;
   return {
     ...actual,
+    open: mockOpen,
     writeFile: mockWriteFile,
     readFile: mockReadFile,
     rm: mockRm,
@@ -83,6 +108,12 @@ function exifJson(record: Record<string, unknown>): ExecResult {
 
 beforeEach(() => {
   mockExecFile.mockReset();
+  mockOpen.mockReset().mockImplementation(async () => ({
+    writeFile: mockHandleWriteFile,
+    close: mockHandleClose,
+  }));
+  mockHandleWriteFile.mockReset().mockResolvedValue(undefined);
+  mockHandleClose.mockReset().mockResolvedValue(undefined);
   mockWriteFile.mockClear();
   mockReadFile.mockClear();
   mockRm.mockClear();
@@ -111,6 +142,10 @@ async function loadFreshExiftool(exec: ReturnType<typeof vi.fn>): Promise<Exifto
     const actual = await importOriginal<typeof import("node:fs/promises")>();
     return {
       ...actual,
+      open: vi.fn().mockResolvedValue({
+        writeFile: vi.fn().mockResolvedValue(undefined),
+        close: vi.fn().mockResolvedValue(undefined),
+      }),
       writeFile: vi.fn().mockResolvedValue(undefined),
       readFile: vi.fn().mockResolvedValue(Buffer.from("readback-bytes")),
       rm: vi.fn().mockResolvedValue(undefined),
@@ -251,7 +286,10 @@ describe("inspectMetadata argv and options", () => {
     await inspectMetadata(Buffer.from("img"), "DSCF0001.");
     const tempPath = operationArgs()[4];
     expect(tempPath).toMatch(/exif-inspect-[0-9a-f-]+\.jpg$/);
-    expect(mockWriteFile.mock.calls[0][0]).toBe(tempPath);
+    expect(mockOpen).toHaveBeenCalledWith(
+      tempPath,
+      constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY,
+    );
     expect(mockRm.mock.calls[0][0]).toBe(tempPath);
   });
 
@@ -269,12 +307,20 @@ describe("inspectMetadata argv and options", () => {
     expect(tempPath).toMatch(/exif-inspect-[0-9a-f-]+\.jpg$/);
   });
 
-  it("writes the buffer to disk and removes the temp file afterward", async () => {
+  it("opens the temp file with O_CREAT | O_EXCL | O_WRONLY, writes the buffer, closes the handle, and removes the temp file afterward (#3630)", async () => {
     withExiftool(() => exifJson({ "EXIF:Make": "Canon" }));
     const buf = Buffer.from("the-image-bytes");
     await inspectMetadata(buf, "photo.jpg");
-    expect(mockWriteFile).toHaveBeenCalledTimes(1);
-    expect(mockWriteFile.mock.calls[0][1]).toBe(buf);
+    const tempPath = operationArgs()[4];
+    expect(mockOpen).toHaveBeenCalledTimes(1);
+    expect(mockOpen).toHaveBeenCalledWith(
+      tempPath,
+      constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY,
+    );
+    expect(mockHandleWriteFile).toHaveBeenCalledTimes(1);
+    expect(mockHandleWriteFile).toHaveBeenCalledWith(buf);
+    expect(mockHandleClose).toHaveBeenCalledTimes(1);
+    expect(mockWriteFile).not.toHaveBeenCalled();
     expect(mockRm).toHaveBeenCalledTimes(1);
     expect(mockRm.mock.calls[0][1]).toEqual({ force: true });
   });
@@ -470,24 +516,73 @@ describe("inspectMetadata error handling", () => {
     ["EPERM", "storage-not-writable"],
     ["EROFS", "storage-not-writable"],
   ] as const)(
-    "preserves 503 %s (%s) when writeFile fails on tmpdir in inspectMetadata (#3548)",
+    "preserves 503 %s (%s) when open or fh.writeFile fails on tmpdir in inspectMetadata (#3548, #3630)",
     async (errno, expectedCode) => {
       withExiftool(() => exifJson({ "EXIF:Make": "Canon" }));
-      const fsErr = Object.assign(new Error(`${errno}: temp write failed`), {
+      const openErr = Object.assign(new Error(`${errno}: temp open failed`), {
         code: errno,
         syscall: "open",
       });
-      mockWriteFile.mockRejectedValueOnce(fsErr);
+      mockOpen.mockRejectedValueOnce(openErr);
       await expect(inspectMetadata(Buffer.from("img"), "photo.jpg")).rejects.toMatchObject({
         isSafeMessage: true,
         kind: "operational",
         statusCode: 503,
         code: expectedCode,
-        cause: fsErr,
+        cause: openErr,
       });
       expect(mockRm).toHaveBeenCalledTimes(1);
+
+      const writeErr = Object.assign(new Error(`${errno}: temp write failed`), {
+        code: errno,
+        syscall: "write",
+      });
+      mockHandleWriteFile.mockRejectedValueOnce(writeErr);
+      await expect(inspectMetadata(Buffer.from("img"), "photo.jpg")).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        statusCode: 503,
+        code: expectedCode,
+        cause: writeErr,
+      });
+      expect(mockHandleClose).toHaveBeenCalledTimes(1);
+      expect(mockRm).toHaveBeenCalledTimes(2);
     },
   );
+
+  it("preserves a primary fh.writeFile fault when fh.close also rejects, and surfaces fh.close faults when fh.writeFile succeeds in inspectMetadata (#3630)", async () => {
+    withExiftool(() => exifJson({ "EXIF:Make": "Canon" }));
+    const writeErr = Object.assign(new Error("ENOSPC: temp write failed"), {
+      code: "ENOSPC",
+      syscall: "write",
+    });
+    const closeErr = Object.assign(new Error("EIO: close failed"), {
+      code: "EIO",
+      syscall: "close",
+    });
+    mockHandleWriteFile.mockRejectedValueOnce(writeErr);
+    mockHandleClose.mockRejectedValueOnce(closeErr);
+    await expect(inspectMetadata(Buffer.from("img"), "photo.jpg")).rejects.toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      statusCode: 503,
+      code: "storage-full",
+      cause: writeErr,
+    });
+
+    const closeEnospc = Object.assign(new Error("ENOSPC: close flush failed"), {
+      code: "ENOSPC",
+      syscall: "close",
+    });
+    mockHandleClose.mockRejectedValueOnce(closeEnospc);
+    await expect(inspectMetadata(Buffer.from("img"), "photo.jpg")).rejects.toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      statusCode: 503,
+      code: "storage-full",
+      cause: closeEnospc,
+    });
+  });
 
   it("preserves 503 DecoderOutOfMemoryError when exiftool is killed by SIGKILL in inspectMetadata (#3548)", async () => {
     const oomErr = Object.assign(new Error("Command failed: exiftool"), {
@@ -537,6 +632,7 @@ describe("writeMetadata", () => {
     const out = await writeMetadata(buf, "photo.jpg", []);
     expect(out).toBe(buf);
     expect(mockExecFile).not.toHaveBeenCalled();
+    expect(mockOpen).not.toHaveBeenCalled();
     expect(mockWriteFile).not.toHaveBeenCalled();
   });
 
@@ -586,10 +682,17 @@ describe("writeMetadata", () => {
 
   it("falls back to .jpg when the filename ends with a trailing dot (#3279)", async () => {
     withExiftool(() => ({ stdout: "", stderr: "" }));
-    await writeMetadata(Buffer.from("img"), "DSCF0001.", ["-Artist=Bob"]);
+    const buf = Buffer.from("img");
+    await writeMetadata(buf, "DSCF0001.", ["-Artist=Bob"]);
     const tempPath = operationArgs()[operationArgs().length - 1];
     expect(tempPath).toMatch(/exif-write-[0-9a-f-]+\.jpg$/);
-    expect(mockWriteFile.mock.calls[0][0]).toBe(tempPath);
+    expect(mockOpen).toHaveBeenCalledWith(
+      tempPath,
+      constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY,
+    );
+    expect(mockHandleWriteFile).toHaveBeenCalledWith(buf);
+    expect(mockHandleClose).toHaveBeenCalledTimes(1);
+    expect(mockWriteFile).not.toHaveBeenCalled();
     expect(mockReadFile.mock.calls[0][0]).toBe(tempPath);
     expect(mockRm.mock.calls[0][0]).toBe(tempPath);
   });
@@ -626,14 +729,30 @@ describe("writeMetadata", () => {
     ["EPERM", "storage-not-writable"],
     ["EROFS", "storage-not-writable"],
   ] as const)(
-    "preserves 503 %s (%s) when writeFile or readFile fails on tmpdir in writeMetadata (#3548)",
+    "preserves 503 %s (%s) when open, fh.writeFile, or readFile fails on tmpdir in writeMetadata (#3548, #3630)",
     async (errno, expectedCode) => {
       withExiftool(() => ({ stdout: "", stderr: "" }));
-      const writeErr = Object.assign(new Error(`${errno}: temp write failed`), {
+      const openErr = Object.assign(new Error(`${errno}: temp open failed`), {
         code: errno,
         syscall: "open",
       });
-      mockWriteFile.mockRejectedValueOnce(writeErr);
+      mockOpen.mockRejectedValueOnce(openErr);
+      await expect(
+        writeMetadata(Buffer.from("img"), "photo.png", ["-Artist=Bob"]),
+      ).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        statusCode: 503,
+        code: expectedCode,
+        cause: openErr,
+      });
+      expect(mockRm).toHaveBeenCalledTimes(1);
+
+      const writeErr = Object.assign(new Error(`${errno}: temp write failed`), {
+        code: errno,
+        syscall: "write",
+      });
+      mockHandleWriteFile.mockRejectedValueOnce(writeErr);
       await expect(
         writeMetadata(Buffer.from("img"), "photo.png", ["-Artist=Bob"]),
       ).rejects.toMatchObject({
@@ -643,6 +762,8 @@ describe("writeMetadata", () => {
         code: expectedCode,
         cause: writeErr,
       });
+      expect(mockHandleClose).toHaveBeenCalledTimes(1);
+      expect(mockRm).toHaveBeenCalledTimes(2);
 
       const readErr = Object.assign(new Error(`${errno}: temp read failed`), {
         code: errno,
@@ -658,8 +779,48 @@ describe("writeMetadata", () => {
         code: expectedCode,
         cause: readErr,
       });
+      expect(mockHandleClose).toHaveBeenCalledTimes(2);
+      expect(mockRm).toHaveBeenCalledTimes(3);
     },
   );
+
+  it("preserves a primary fh.writeFile fault when fh.close also rejects, and surfaces fh.close faults when fh.writeFile succeeds in writeMetadata (#3630)", async () => {
+    withExiftool(() => ({ stdout: "", stderr: "" }));
+    const writeErr = Object.assign(new Error("ENOSPC: temp write failed"), {
+      code: "ENOSPC",
+      syscall: "write",
+    });
+    const closeErr = Object.assign(new Error("EIO: close failed"), {
+      code: "EIO",
+      syscall: "close",
+    });
+    mockHandleWriteFile.mockRejectedValueOnce(writeErr);
+    mockHandleClose.mockRejectedValueOnce(closeErr);
+    await expect(
+      writeMetadata(Buffer.from("img"), "photo.png", ["-Artist=Bob"]),
+    ).rejects.toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      statusCode: 503,
+      code: "storage-full",
+      cause: writeErr,
+    });
+
+    const closeEnospc = Object.assign(new Error("ENOSPC: close flush failed"), {
+      code: "ENOSPC",
+      syscall: "close",
+    });
+    mockHandleClose.mockRejectedValueOnce(closeEnospc);
+    await expect(
+      writeMetadata(Buffer.from("img"), "photo.png", ["-Artist=Bob"]),
+    ).rejects.toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      statusCode: 503,
+      code: "storage-full",
+      cause: closeEnospc,
+    });
+  });
 
   it("preserves 503 DecoderOutOfMemoryError when exiftool is killed by SIGKILL or readFile hits V8 OOM in writeMetadata (#3548)", async () => {
     const oomErr = Object.assign(new Error("Command failed: exiftool"), {
@@ -725,11 +886,19 @@ describe("readImageDimensions", () => {
       stdout: JSON.stringify([{ ImageWidth: 800, ImageHeight: 600 }]),
       stderr: "",
     }));
-    await readImageDimensions(Buffer.from("img"), "jpg");
+    const buf = Buffer.from("img");
+    await readImageDimensions(buf, "jpg");
     const args = operationArgs();
     expect(args.slice(0, 3)).toEqual(["-json", "-ImageWidth", "-ImageHeight"]);
     expect(args).toHaveLength(4);
     expect(operationOpts().timeout).toBe(10_000);
+    expect(mockOpen).toHaveBeenCalledWith(
+      args[3],
+      constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY,
+    );
+    expect(mockHandleWriteFile).toHaveBeenCalledWith(buf);
+    expect(mockHandleClose).toHaveBeenCalledTimes(1);
+    expect(mockWriteFile).not.toHaveBeenCalled();
   });
 
   it("returns the parsed width and height", async () => {
@@ -875,27 +1044,79 @@ describe("readImageDimensions", () => {
     ["EPERM", "storage-not-writable"],
     ["EROFS", "storage-not-writable"],
   ] as const)(
-    "rethrows 503 %s (%s) when writeFile fails on tmpdir in readImageDimensions (#3548)",
+    "rethrows 503 %s (%s) when open or fh.writeFile fails on tmpdir in readImageDimensions (#3548, #3630)",
     async (errno, expectedCode) => {
       withExiftool(() => ({
         stdout: JSON.stringify([{ ImageWidth: 10, ImageHeight: 10 }]),
         stderr: "",
       }));
-      const fsErr = Object.assign(new Error(`${errno}: temp write failed`), {
+      const openErr = Object.assign(new Error(`${errno}: temp open failed`), {
         code: errno,
         syscall: "open",
       });
-      mockWriteFile.mockRejectedValueOnce(fsErr);
+      mockOpen.mockRejectedValueOnce(openErr);
       await expect(readImageDimensions(Buffer.from("img"), "jpg")).rejects.toMatchObject({
         isSafeMessage: true,
         kind: "operational",
         statusCode: 503,
         code: expectedCode,
-        cause: fsErr,
+        cause: openErr,
       });
       expect(mockRm).toHaveBeenCalledTimes(1);
+
+      const writeErr = Object.assign(new Error(`${errno}: temp write failed`), {
+        code: errno,
+        syscall: "write",
+      });
+      mockHandleWriteFile.mockRejectedValueOnce(writeErr);
+      await expect(readImageDimensions(Buffer.from("img"), "jpg")).rejects.toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        statusCode: 503,
+        code: expectedCode,
+        cause: writeErr,
+      });
+      expect(mockHandleClose).toHaveBeenCalledTimes(1);
+      expect(mockRm).toHaveBeenCalledTimes(2);
     },
   );
+
+  it("preserves a primary fh.writeFile fault when fh.close also rejects, and surfaces fh.close faults when fh.writeFile succeeds in readImageDimensions (#3630)", async () => {
+    withExiftool(() => ({
+      stdout: JSON.stringify([{ ImageWidth: 10, ImageHeight: 10 }]),
+      stderr: "",
+    }));
+    const writeErr = Object.assign(new Error("ENOSPC: temp write failed"), {
+      code: "ENOSPC",
+      syscall: "write",
+    });
+    const closeErr = Object.assign(new Error("EIO: close failed"), {
+      code: "EIO",
+      syscall: "close",
+    });
+    mockHandleWriteFile.mockRejectedValueOnce(writeErr);
+    mockHandleClose.mockRejectedValueOnce(closeErr);
+    await expect(readImageDimensions(Buffer.from("img"), "jpg")).rejects.toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      statusCode: 503,
+      code: "storage-full",
+      cause: writeErr,
+    });
+
+    const closeEnospc = Object.assign(new Error("ENOSPC: close flush failed"), {
+      code: "ENOSPC",
+      syscall: "close",
+    });
+    mockHandleClose.mockRejectedValueOnce(closeEnospc);
+    await expect(readImageDimensions(Buffer.from("img"), "jpg")).rejects.toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      statusCode: 503,
+      code: "storage-full",
+      cause: closeEnospc,
+    });
+  });
 
   it("rethrows 503 DecoderOutOfMemoryError when exiftool is killed by SIGKILL in readImageDimensions (#3548)", async () => {
     const oomErr = Object.assign(new Error("Command failed: exiftool"), {
@@ -926,6 +1147,53 @@ describe("readImageDimensions", () => {
     });
     await expect(readImageDimensions(Buffer.from("img"), "jpg")).resolves.toBeNull();
     expect(mockRm).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses to overwrite a pre-existing symlink or file at the temp path in inspectMetadata, writeMetadata, and readImageDimensions (#3630)", async () => {
+    withExiftool(() => ({
+      stdout: JSON.stringify([{ ImageWidth: 10, ImageHeight: 10 }]),
+      stderr: "",
+    }));
+    const sandbox = mkdtempSync(join(tmpdir(), "exiftool-oexcl-repro-"));
+    try {
+      const victimPath = join(sandbox, "victim.txt");
+      writeFileSync(victimPath, "do-not-overwrite");
+
+      const plantSymlinkAndOpen = async (path: unknown, flags?: unknown) => {
+        rmSync(String(path), { force: true });
+        symlinkSync(victimPath, String(path));
+        if (!realFsRef.open) throw new Error("realFsRef.open not initialized");
+        return realFsRef.open(String(path), flags as number);
+      };
+      const plantSymlinkAndWrite = async (path: unknown, data: unknown) => {
+        rmSync(String(path), { force: true });
+        symlinkSync(victimPath, String(path));
+        writeFileSync(String(path), data as Buffer);
+      };
+
+      mockOpen.mockImplementationOnce(plantSymlinkAndOpen);
+      mockWriteFile.mockImplementationOnce(plantSymlinkAndWrite);
+      await expect(
+        inspectMetadata(Buffer.from("overwritten-by-inspect"), "photo.jpg"),
+      ).rejects.toThrow(/EEXIST/);
+      expect(readFileSync(victimPath, "utf8")).toBe("do-not-overwrite");
+
+      mockOpen.mockImplementationOnce(plantSymlinkAndOpen);
+      mockWriteFile.mockImplementationOnce(plantSymlinkAndWrite);
+      await expect(
+        writeMetadata(Buffer.from("overwritten-by-write"), "photo.jpg", ["-Artist=Bob"]),
+      ).rejects.toThrow(/EEXIST/);
+      expect(readFileSync(victimPath, "utf8")).toBe("do-not-overwrite");
+
+      mockOpen.mockImplementationOnce(plantSymlinkAndOpen);
+      mockWriteFile.mockImplementationOnce(plantSymlinkAndWrite);
+      await expect(
+        readImageDimensions(Buffer.from("overwritten-by-dim"), "jpg"),
+      ).resolves.toBeNull();
+      expect(readFileSync(victimPath, "utf8")).toBe("do-not-overwrite");
+    } finally {
+      rmSync(sandbox, { recursive: true, force: true });
+    }
   });
 });
 
