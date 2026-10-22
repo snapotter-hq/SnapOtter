@@ -69,7 +69,7 @@ export function registerCompressPdf(app: FastifyInstance) {
           if (hit) return hit;
           const { dpi, qFactor } = paramsForQuality(key);
           const path = join(ctx.scratchDir, `cand-q${key}.pdf`);
-          await gsCompressPdfTuned(inPath, path, dpi, qFactor);
+          await gsCompressPdfTuned(inPath, path, dpi, qFactor, { signal: ctx.signal });
           await scrubPdfProducerFile(path, { signal: ctx.signal });
           const entry = { path, size: (await stat(path)).size };
           cache.set(key, entry);
@@ -108,7 +108,7 @@ export function registerCompressPdf(app: FastifyInstance) {
       } else {
         ctx.report(10, "Compressing");
         const { dpi, qFactor } = paramsForQuality(settings.quality ?? 75);
-        await gsCompressPdfTuned(inPath, outPath, dpi, qFactor);
+        await gsCompressPdfTuned(inPath, outPath, dpi, qFactor, { signal: ctx.signal });
         await scrubPdfProducerFile(outPath, { signal: ctx.signal });
         // A "Compress" tool must never enlarge the file.
         if ((await stat(outPath)).size >= input.buffer.length) {

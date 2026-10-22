@@ -31,19 +31,46 @@ function qpdfSpawnFailure(
   });
 }
 
+export interface QpdfOptions {
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}
+
 /** @internal Shared qpdf CLI runner for doc-engine modules; not part of the public package API. */
-export function runQpdf(args: string[], timeoutMs = 30_000): Promise<string> {
+export function runQpdf(
+  args: string[],
+  timeoutOrOpts: number | QpdfOptions = 30_000,
+  opts?: QpdfOptions,
+): Promise<string> {
+  const resolvedOpts: QpdfOptions =
+    typeof timeoutOrOpts === "number"
+      ? { ...opts, timeoutMs: opts?.timeoutMs ?? timeoutOrOpts }
+      : timeoutOrOpts;
+  if (resolvedOpts.signal?.aborted) {
+    return Promise.reject(new Error("Canceled"));
+  }
   const bin = resolveQpdf();
   if (!bin) throw new Error("qpdf binary not found (set QPDF_PATH or install qpdf)");
+  const timeoutMs = resolvedOpts.timeoutMs ?? 30_000;
+  const abortSignal = resolvedOpts.signal;
   return new Promise<string>((resolvePromise, reject) => {
     const [limBin, limArgs] = wrapWithMemoryLimit(bin, args);
     const child = spawn(limBin, limArgs, { stdio: ["ignore", "pipe", "pipe"] });
     let out = "";
     let err = "";
     let settled = false;
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      abortSignal?.removeEventListener("abort", onAbort);
+      child.kill("SIGKILL");
+      reject(new Error("Canceled"));
+    };
     const timer = setTimeout(() => {
       if (settled) return;
       settled = true;
+      abortSignal?.removeEventListener("abort", onAbort);
       child.kill("SIGKILL");
       reject(new QpdfTimeoutError(`qpdf timed out after ${Math.round(timeoutMs / 1000)}s`));
     }, timeoutMs);
@@ -57,12 +84,14 @@ export function runQpdf(args: string[], timeoutMs = 30_000): Promise<string> {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      abortSignal?.removeEventListener("abort", onAbort);
       reject(e);
     });
     child.on("close", (code, signal) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      abortSignal?.removeEventListener("abort", onAbort);
       // qpdf exit codes: 0 = success, 2 = errors (real failure),
       // 3 = warnings only (file processed successfully despite minor
       // structural quirks common in web-generated and scanned PDFs).
@@ -77,12 +106,13 @@ export function runQpdf(args: string[], timeoutMs = 30_000): Promise<string> {
       }
       reject(new Error(`qpdf exited ${code}: ${detail}`));
     });
+    abortSignal?.addEventListener("abort", onAbort, { once: true });
   });
 }
 
 /** Structural check; throws with qpdf's diagnostics on damage. */
-export async function qpdfCheck(filePath: string): Promise<void> {
-  await runQpdf(["--check", filePath]);
+export async function qpdfCheck(filePath: string, opts?: QpdfOptions): Promise<void> {
+  await runQpdf(["--check", filePath], opts);
 }
 
 /**
@@ -97,9 +127,16 @@ export async function qpdfCheck(filePath: string): Promise<void> {
  *   encrypted + correct pw     -> exit 3
  *   encrypted + wrong pw       -> exit 0
  */
-export async function qpdfRequiresPassword(filePath: string): Promise<boolean> {
+export async function qpdfRequiresPassword(
+  filePath: string,
+  opts: QpdfOptions = {},
+): Promise<boolean> {
+  if (opts.signal?.aborted) {
+    throw new Error("Canceled");
+  }
   const bin = resolveQpdf();
   if (!bin) throw new Error("qpdf binary not found (set QPDF_PATH or install qpdf)");
+  const timeoutMs = opts.timeoutMs ?? 30_000;
   return new Promise<boolean>((resolvePromise, reject) => {
     const [limBin, limArgs] = wrapWithMemoryLimit(bin, ["--requires-password", filePath]);
     const child = spawn(limBin, limArgs, {
@@ -107,12 +144,21 @@ export async function qpdfRequiresPassword(filePath: string): Promise<boolean> {
     });
     let err = "";
     let settled = false;
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      opts.signal?.removeEventListener("abort", onAbort);
+      child.kill("SIGKILL");
+      reject(new Error("Canceled"));
+    };
     const timer = setTimeout(() => {
       if (settled) return;
       settled = true;
+      opts.signal?.removeEventListener("abort", onAbort);
       child.kill("SIGKILL");
-      reject(new QpdfTimeoutError("qpdf timed out after 30s"));
-    }, 30_000);
+      reject(new QpdfTimeoutError(`qpdf timed out after ${Math.round(timeoutMs / 1000)}s`));
+    }, timeoutMs);
     child.stderr.on("data", (c: Buffer) => {
       err = (err + c.toString("utf8")).slice(-4096);
     });
@@ -120,12 +166,14 @@ export async function qpdfRequiresPassword(filePath: string): Promise<boolean> {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      opts.signal?.removeEventListener("abort", onAbort);
       reject(e);
     });
     child.on("close", (code, signal) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      opts.signal?.removeEventListener("abort", onAbort);
       if (code === 0) {
         resolvePromise(true);
         return;
@@ -140,11 +188,12 @@ export async function qpdfRequiresPassword(filePath: string): Promise<boolean> {
       }
       reject(new Error(`qpdf exited ${code}: ${err.slice(-1000)}`));
     });
+    opts.signal?.addEventListener("abort", onAbort, { once: true });
   });
 }
 
-export async function qpdfPageCount(filePath: string): Promise<number> {
-  const out = await runQpdf(["--show-npages", filePath]);
+export async function qpdfPageCount(filePath: string, opts?: QpdfOptions): Promise<number> {
+  const out = await runQpdf(["--show-npages", filePath], opts);
   const n = Number(out.trim());
   if (!Number.isFinite(n)) throw new Error(`qpdf returned a non-numeric page count: ${out.trim()}`);
   return n;

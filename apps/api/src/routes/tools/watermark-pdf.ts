@@ -43,6 +43,7 @@ export function registerWatermarkPdf(app: FastifyInstance) {
           rotation: settings.rotation,
         },
         outPath,
+        { signal: ctx.signal },
       );
       ctx.report(90, "Done");
 

@@ -30,7 +30,7 @@ export function registerOrganizePdf(app: FastifyInstance) {
 
       const outPath = join(ctx.scratchDir, `${base}_organized.pdf`);
       ctx.report(10, "Reordering pages");
-      await qpdfPagesSpec(inPath, settings.order, outPath);
+      await qpdfPagesSpec(inPath, settings.order, outPath, { signal: ctx.signal });
       ctx.report(90, "Done");
 
       return {

@@ -39,6 +39,7 @@ export function registerProtectPdf(app: FastifyInstance) {
         settings.userPassword,
         settings.ownerPassword ?? settings.userPassword,
         outPath,
+        { signal: ctx.signal },
       );
       ctx.report(90, "Done");
 

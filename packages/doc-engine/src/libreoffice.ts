@@ -9,6 +9,7 @@ import { resolveSoffice } from "./binaries.js";
 
 export interface ConvertOptions {
   timeoutMs?: number; // default 120s, spec 4.7 hard kill
+  signal?: AbortSignal;
 }
 
 /**
@@ -42,6 +43,9 @@ export async function convertDocument(
   target: string,
   opts: ConvertOptions = {},
 ): Promise<string> {
+  if (opts.signal?.aborted) {
+    throw new Error("Canceled");
+  }
   const bin = resolveSoffice();
   if (!bin) throw new Error("soffice binary not found (set SOFFICE_PATH or install LibreOffice)");
   const timeoutMs = opts.timeoutMs ?? 120_000;
@@ -64,9 +68,18 @@ export async function convertDocument(
       const child = spawn(limBin, limArgs, { stdio: ["ignore", "pipe", "pipe"] });
       let err = "";
       let settled = false;
+      const onAbort = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        opts.signal?.removeEventListener("abort", onAbort);
+        child.kill("SIGKILL");
+        reject(new Error("Canceled"));
+      };
       const timer = setTimeout(() => {
         if (settled) return;
         settled = true;
+        opts.signal?.removeEventListener("abort", onAbort);
         child.kill("SIGKILL");
         reject(new Error(`LibreOffice timed out after ${Math.round(timeoutMs / 1000)}s`));
       }, timeoutMs);
@@ -77,15 +90,18 @@ export async function convertDocument(
         if (settled) return;
         settled = true;
         clearTimeout(timer);
+        opts.signal?.removeEventListener("abort", onAbort);
         reject(e);
       });
       child.on("close", (code, signal) => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
+        opts.signal?.removeEventListener("abort", onAbort);
         if (code === 0) resolvePromise();
         else reject(new Error(`LibreOffice exited ${code ?? signal}: ${err.slice(-1000)}`));
       });
+      opts.signal?.addEventListener("abort", onAbort, { once: true });
     });
     const expected = `${basename(inputPath, extname(inputPath))}.${ext}`;
     const produced = (await readdir(outDir)).find((f) => f === expected);

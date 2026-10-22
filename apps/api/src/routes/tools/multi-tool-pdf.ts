@@ -88,7 +88,7 @@ export function registerMultiToolPdf(app: FastifyInstance) {
         const safeName = ctx.inputs[i].filename.replace(/[^A-Za-z0-9._-]/g, "_");
         const docPath = join(ctx.scratchDir, `doc-${i}-${safeName}`);
         await writeFile(docPath, ctx.inputs[i].buffer);
-        if ((await qpdfPageCount(docPath)) !== settings.pageCounts[i]) {
+        if ((await qpdfPageCount(docPath, { signal: ctx.signal })) !== settings.pageCounts[i]) {
           throw new InputValidationError(`Page count does not match document ${i + 1}`);
         }
         docPaths.push(docPath);
@@ -104,8 +104,10 @@ export function registerMultiToolPdf(app: FastifyInstance) {
         item.rot === undefined ? [] : [{ page: i + 1, angle: item.rot }],
       );
       const assembled = rotations.length ? join(ctx.scratchDir, "assembled.pdf") : outPath;
-      await qpdfAssemblePages(docPaths, settings.items, assembled);
-      if (rotations.length) await qpdfRotatePages(assembled, rotations, outPath);
+      await qpdfAssemblePages(docPaths, settings.items, assembled, { signal: ctx.signal });
+      if (rotations.length) {
+        await qpdfRotatePages(assembled, rotations, outPath, { signal: ctx.signal });
+      }
       ctx.report(90, "Done");
 
       return {

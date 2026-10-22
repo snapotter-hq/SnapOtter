@@ -38,8 +38,15 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
 }));
 
 vi.mock("@snapotter/doc-engine", () => ({
+  convertDocument: vi.fn(),
   gsCompressPdfTuned: vi.fn(),
+  gsGrayscalePdf: vi.fn(),
+  gsPdfaConvert: vi.fn(),
   htmlToPdfPy: vi.fn(),
+  pdfcpuBooklet: vi.fn(),
+  pdfcpuCropMargin: vi.fn(),
+  pdfcpuNup: vi.fn(),
+  pdfcpuTextStamp: vi.fn(),
   pdfFlattenPy: vi.fn(),
   pdfMetadataGetPy: vi.fn(async () => ({ Title: "Updated" })),
   pdfMetadataSetPy: vi.fn(),
@@ -48,9 +55,20 @@ vi.mock("@snapotter/doc-engine", () => ({
   pdfSignPy: vi.fn(async () => ({ placed: 1 })),
   pdfTextPy: vi.fn(async () => ({ chars: 12, hasText: true })),
   pdfToWordPy: vi.fn(),
+  qpdfAssemblePages: vi.fn(),
   qpdfAvailable: vi.fn(() => false),
   qpdfCheck: vi.fn(),
+  qpdfDecrypt: vi.fn(),
+  qpdfEncrypt: vi.fn(),
+  qpdfLinearize: vi.fn(),
+  qpdfMerge: vi.fn(),
   qpdfPageCount: vi.fn(),
+  qpdfPagesSpec: vi.fn(),
+  qpdfPagesSpecUnchecked: vi.fn(),
+  qpdfRepair: vi.fn(),
+  qpdfRotate: vi.fn(),
+  qpdfRotatePages: vi.fn(),
+  qpdfSplitRanges: vi.fn(),
   resolveGs: vi.fn(() => null),
   resolveQpdf: vi.fn(() => null),
   resolveSoffice: vi.fn(() => null),
@@ -60,8 +78,15 @@ vi.mock("@snapotter/doc-engine", () => ({
 
 import { writeFile } from "node:fs/promises";
 import {
+  convertDocument,
   gsCompressPdfTuned,
+  gsGrayscalePdf,
+  gsPdfaConvert,
   htmlToPdfPy,
+  pdfcpuBooklet,
+  pdfcpuCropMargin,
+  pdfcpuNup,
+  pdfcpuTextStamp,
   pdfFlattenPy,
   pdfMetadataGetPy,
   pdfMetadataSetPy,
@@ -70,6 +95,18 @@ import {
   pdfSignPy,
   pdfTextPy,
   pdfToWordPy,
+  qpdfAssemblePages,
+  qpdfDecrypt,
+  qpdfEncrypt,
+  qpdfLinearize,
+  qpdfMerge,
+  qpdfPageCount,
+  qpdfPagesSpec,
+  qpdfPagesSpecUnchecked,
+  qpdfRepair,
+  qpdfRotate,
+  qpdfRotatePages,
+  qpdfSplitRanges,
   runPandoc,
 } from "@snapotter/doc-engine";
 import type { FastifyInstance } from "fastify";
@@ -77,17 +114,41 @@ import { runAiToolJob } from "../../../apps/api/src/jobs/ai-handlers.js";
 import type { ToolJobData } from "../../../apps/api/src/jobs/types.js";
 import { getObjectBuffer } from "../../../apps/api/src/lib/object-storage.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
+import { registerBookletPdf } from "../../../apps/api/src/routes/tools/booklet-pdf.js";
 import { registerCompressPdf } from "../../../apps/api/src/routes/tools/compress-pdf.js";
+import { registerConvertDocument } from "../../../apps/api/src/routes/tools/convert-document.js";
+import { registerConvertPresentation } from "../../../apps/api/src/routes/tools/convert-presentation.js";
+import { registerConvertSpreadsheet } from "../../../apps/api/src/routes/tools/convert-spreadsheet.js";
+import { registerCropPdf } from "../../../apps/api/src/routes/tools/crop-pdf.js";
 import { registerEpubConvert } from "../../../apps/api/src/routes/tools/epub-convert.js";
+import { registerExcelToPdf } from "../../../apps/api/src/routes/tools/excel-to-pdf.js";
+import { registerExtractPages } from "../../../apps/api/src/routes/tools/extract-pages.js";
 import { registerFlattenPdf } from "../../../apps/api/src/routes/tools/flatten-pdf.js";
+import { registerGrayscalePdf } from "../../../apps/api/src/routes/tools/grayscale-pdf.js";
 import { registerHtmlToPdf } from "../../../apps/api/src/routes/tools/html-to-pdf.js";
+import { registerLinearizePdf } from "../../../apps/api/src/routes/tools/linearize-pdf.js";
 import { registerMarkdownToPdf } from "../../../apps/api/src/routes/tools/markdown-to-pdf.js";
+import { registerMergePdf } from "../../../apps/api/src/routes/tools/merge-pdf.js";
+import { registerMultiToolPdf } from "../../../apps/api/src/routes/tools/multi-tool-pdf.js";
+import { registerNupPdf } from "../../../apps/api/src/routes/tools/nup-pdf.js";
+import { registerOrganizePdf } from "../../../apps/api/src/routes/tools/organize-pdf.js";
 import { registerPdfMetadata } from "../../../apps/api/src/routes/tools/pdf-metadata.js";
+import { registerPdfPageNumbers } from "../../../apps/api/src/routes/tools/pdf-page-numbers.js";
 import { registerPdfToText } from "../../../apps/api/src/routes/tools/pdf-to-text.js";
 import { registerPdfToWord } from "../../../apps/api/src/routes/tools/pdf-to-word.js";
+import { registerPdfaConvert } from "../../../apps/api/src/routes/tools/pdfa-convert.js";
+import { registerPowerpointToPdf } from "../../../apps/api/src/routes/tools/powerpoint-to-pdf.js";
+import { registerProtectPdf } from "../../../apps/api/src/routes/tools/protect-pdf.js";
 import { registerRedactPdf } from "../../../apps/api/src/routes/tools/redact-pdf.js";
+import { registerRemovePages } from "../../../apps/api/src/routes/tools/remove-pages.js";
+import { registerRepairPdf } from "../../../apps/api/src/routes/tools/repair-pdf.js";
+import { registerRotatePdf } from "../../../apps/api/src/routes/tools/rotate-pdf.js";
 import "../../../apps/api/src/routes/tools/sign-pdf.js";
+import { registerSplitPdf } from "../../../apps/api/src/routes/tools/split-pdf.js";
 import { registerToEpub } from "../../../apps/api/src/routes/tools/to-epub.js";
+import { registerUnlockPdf } from "../../../apps/api/src/routes/tools/unlock-pdf.js";
+import { registerWatermarkPdf } from "../../../apps/api/src/routes/tools/watermark-pdf.js";
+import { registerWordToPdf } from "../../../apps/api/src/routes/tools/word-to-pdf.js";
 import { pairwise } from "../../helpers/pairwise.js";
 import { pairwiseSettingsFor } from "../../helpers/tool-default-settings.js";
 import { compactCase, deriveAxes } from "../../helpers/zod-pict.js";
@@ -897,11 +958,19 @@ describe("compress-pdf route processor (#1373)", () => {
       });
       await config?.processV2?.(qualityCtx);
       const expectedOut = join(scratchDir, "doc_compressed.pdf");
+      expect(gsCompressPdfTuned).toHaveBeenCalledWith(
+        join(scratchDir, "in-doc.pdf"),
+        expectedOut,
+        expect.any(Number),
+        expect.any(Number),
+        { signal: qualityCtx.signal },
+      );
       expect(pdfScrubProducerPy).toHaveBeenCalledWith(expectedOut, `${expectedOut}.scrub.pdf`, {
         signal: qualityCtx.signal,
       });
     });
 
+    vi.mocked(gsCompressPdfTuned).mockClear();
     vi.mocked(pdfScrubProducerPy).mockClear();
 
     await withScratch(async (scratchDir) => {
@@ -912,6 +981,13 @@ describe("compress-pdf route processor (#1373)", () => {
       });
       await config?.processV2?.(targetCtx);
       const expectedCand = join(scratchDir, "cand-q51.pdf");
+      expect(gsCompressPdfTuned).toHaveBeenCalledWith(
+        join(scratchDir, "in-doc.pdf"),
+        expectedCand,
+        expect.any(Number),
+        expect.any(Number),
+        { signal: targetCtx.signal },
+      );
       expect(pdfScrubProducerPy).toHaveBeenCalledWith(expectedCand, `${expectedCand}.scrub.pdf`, {
         signal: targetCtx.signal,
       });
@@ -1017,6 +1093,356 @@ describe("compress-pdf route processor (#1373)", () => {
       await expect(config?.processV2?.(ctx)).rejects.toBe(abortErr);
       expect(gsCompressPdfTuned).not.toHaveBeenCalled();
       expect(pdfScrubProducerPy).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("ghostscript, libreoffice, pdfcpu, and qpdf route signal forwarding (#3305)", () => {
+  it("forwards ctx.signal in grayscale-pdf and pdfa-convert", async () => {
+    registerGrayscalePdf(createMockApp());
+    registerPdfaConvert(createMockApp());
+
+    await withScratch(async (scratchDir) => {
+      const grayCtx = createCtx(scratchDir, "scan.pdf");
+      await getToolConfig("grayscale-pdf")?.processV2?.(grayCtx);
+      expect(gsGrayscalePdf).toHaveBeenCalledWith(
+        join(scratchDir, "in-scan.pdf"),
+        join(scratchDir, "scan_grayscale.pdf"),
+        { signal: grayCtx.signal },
+      );
+
+      const pdfaCtx = createCtx(scratchDir, "archive.pdf");
+      await getToolConfig("pdfa-convert")?.processV2?.(pdfaCtx);
+      expect(gsPdfaConvert).toHaveBeenCalledWith(
+        join(scratchDir, "in-archive.pdf"),
+        join(scratchDir, "archive_pdfa.pdf"),
+        { signal: pdfaCtx.signal },
+      );
+    });
+  });
+
+  it("forwards ctx.signal and timeoutMs in LibreOffice conversion routes", async () => {
+    registerConvertDocument(createMockApp());
+    registerConvertPresentation(createMockApp());
+    registerConvertSpreadsheet(createMockApp());
+    registerWordToPdf(createMockApp());
+    registerExcelToPdf(createMockApp());
+    registerPowerpointToPdf(createMockApp());
+
+    await withScratch(async (scratchDir) => {
+      vi.mocked(convertDocument).mockResolvedValue(join(scratchDir, "out.pdf"));
+
+      const docCtx = { ...createCtx(scratchDir, "memo.odt"), settings: { format: "docx" } };
+      await getToolConfig("convert-document")?.processV2?.(docCtx);
+      expect(convertDocument).toHaveBeenLastCalledWith(
+        join(scratchDir, "in-memo.odt"),
+        scratchDir,
+        "docx",
+        { timeoutMs: 120_000, signal: docCtx.signal },
+      );
+
+      const presCtx = { ...createCtx(scratchDir, "deck.odp"), settings: { format: "pptx" } };
+      await getToolConfig("convert-presentation")?.processV2?.(presCtx);
+      expect(convertDocument).toHaveBeenLastCalledWith(
+        join(scratchDir, "in-deck.odp"),
+        scratchDir,
+        "pptx",
+        { timeoutMs: 120_000, signal: presCtx.signal },
+      );
+
+      const sheetCtx = { ...createCtx(scratchDir, "data.ods"), settings: { format: "xlsx" } };
+      await getToolConfig("convert-spreadsheet")?.processV2?.(sheetCtx);
+      expect(convertDocument).toHaveBeenLastCalledWith(
+        join(scratchDir, "in-data.ods"),
+        scratchDir,
+        "xlsx",
+        { timeoutMs: 120_000, signal: sheetCtx.signal },
+      );
+
+      const wordCtx = createCtx(scratchDir, "letter.docx");
+      await getToolConfig("word-to-pdf")?.processV2?.(wordCtx);
+      expect(convertDocument).toHaveBeenLastCalledWith(
+        join(scratchDir, "in-letter.docx"),
+        scratchDir,
+        "pdf",
+        { timeoutMs: 120_000, signal: wordCtx.signal },
+      );
+
+      const excelCtx = createCtx(scratchDir, "budget.xlsx");
+      await getToolConfig("excel-to-pdf")?.processV2?.(excelCtx);
+      expect(convertDocument).toHaveBeenLastCalledWith(
+        join(scratchDir, "in-budget.xlsx"),
+        scratchDir,
+        "pdf",
+        { timeoutMs: 120_000, signal: excelCtx.signal },
+      );
+
+      const pptCtx = createCtx(scratchDir, "slides.pptx");
+      await getToolConfig("powerpoint-to-pdf")?.processV2?.(pptCtx);
+      expect(convertDocument).toHaveBeenLastCalledWith(
+        join(scratchDir, "in-slides.pptx"),
+        scratchDir,
+        "pdf",
+        { timeoutMs: 120_000, signal: pptCtx.signal },
+      );
+    });
+  });
+
+  it("forwards ctx.signal in pdfcpu routes (crop, nup, booklet, watermark, page-numbers)", async () => {
+    registerCropPdf(createMockApp());
+    registerNupPdf(createMockApp());
+    registerBookletPdf(createMockApp());
+    registerWatermarkPdf(createMockApp());
+    registerPdfPageNumbers(createMockApp());
+
+    await withScratch(async (scratchDir) => {
+      const cropCtx = { ...createCtx(scratchDir, "doc.pdf"), settings: { margin: 18 } };
+      await getToolConfig("crop-pdf")?.processV2?.(cropCtx);
+      expect(pdfcpuCropMargin).toHaveBeenCalledWith(
+        join(scratchDir, "in-doc.pdf"),
+        18,
+        join(scratchDir, "doc_cropped.pdf"),
+        { signal: cropCtx.signal },
+      );
+
+      const nupCtx = { ...createCtx(scratchDir, "doc.pdf"), settings: { perSheet: 4 } };
+      await getToolConfig("nup-pdf")?.processV2?.(nupCtx);
+      expect(pdfcpuNup).toHaveBeenCalledWith(
+        join(scratchDir, "in-doc.pdf"),
+        4,
+        join(scratchDir, "doc_nup.pdf"),
+        { signal: nupCtx.signal },
+      );
+
+      const bookletCtx = { ...createCtx(scratchDir, "doc.pdf"), settings: { perSheet: 2 } };
+      await getToolConfig("booklet-pdf")?.processV2?.(bookletCtx);
+      expect(pdfcpuBooklet).toHaveBeenCalledWith(
+        join(scratchDir, "in-doc.pdf"),
+        2,
+        join(scratchDir, "doc_booklet.pdf"),
+        { signal: bookletCtx.signal },
+      );
+
+      const wmCtx = { ...createCtx(scratchDir, "doc.pdf"), settings: { text: "DRAFT" } };
+      await getToolConfig("watermark-pdf")?.processV2?.(wmCtx);
+      expect(pdfcpuTextStamp).toHaveBeenLastCalledWith(
+        join(scratchDir, "in-doc.pdf"),
+        { text: "DRAFT", position: "c", fontSize: 48, opacity: 0.3, rotation: 45 },
+        join(scratchDir, "doc_watermarked.pdf"),
+        { signal: wmCtx.signal },
+      );
+
+      const numCtx = { ...createCtx(scratchDir, "doc.pdf"), settings: {} };
+      await getToolConfig("pdf-page-numbers")?.processV2?.(numCtx);
+      expect(pdfcpuTextStamp).toHaveBeenLastCalledWith(
+        join(scratchDir, "in-doc.pdf"),
+        { text: "Page %p of %P", position: "bc", fontSize: 10, opacity: 1, rotation: 0 },
+        join(scratchDir, "doc_numbered.pdf"),
+        { signal: numCtx.signal },
+      );
+    });
+  });
+
+  it("forwards ctx.signal across all qpdf routes", async () => {
+    registerMergePdf(createMockApp());
+    registerSplitPdf(createMockApp());
+    registerRotatePdf(createMockApp());
+    registerProtectPdf(createMockApp());
+    registerUnlockPdf(createMockApp());
+    registerRepairPdf(createMockApp());
+    registerLinearizePdf(createMockApp());
+    registerOrganizePdf(createMockApp());
+    registerExtractPages(createMockApp());
+    registerRemovePages(createMockApp());
+    registerMultiToolPdf(createMockApp());
+
+    await withScratch(async (scratchDir) => {
+      const mergeCtx = {
+        ...createCtx(scratchDir, "a.pdf"),
+        inputs: [
+          { buffer: Buffer.from("a"), filename: "a.pdf", ref: "r0" },
+          { buffer: Buffer.from("b"), filename: "b.pdf", ref: "r1" },
+        ],
+      };
+      await getToolConfig("merge-pdf")?.processV2?.(mergeCtx);
+      expect(qpdfMerge).toHaveBeenCalledWith(
+        [join(scratchDir, "in-0.pdf"), join(scratchDir, "in-1.pdf")],
+        join(scratchDir, "merged.pdf"),
+        { signal: mergeCtx.signal },
+      );
+
+      const splitRangeCtx = {
+        ...createCtx(scratchDir, "doc.pdf"),
+        settings: { mode: "range", range: "1-2" },
+      };
+      await getToolConfig("split-pdf")?.processV2?.(splitRangeCtx);
+      expect(qpdfSplitRanges).toHaveBeenLastCalledWith(
+        join(scratchDir, "in-doc.pdf"),
+        "1-2",
+        join(scratchDir, "doc_pages.pdf"),
+        { signal: splitRangeCtx.signal },
+      );
+
+      vi.mocked(qpdfPageCount).mockResolvedValueOnce(2);
+      vi.mocked(qpdfSplitRanges).mockImplementationOnce(
+        async (_in: string, _range: string, out: string) => {
+          await writeFile(out, Buffer.from("%PDF-part"));
+        },
+      );
+      const splitEveryCtx = {
+        ...createCtx(scratchDir, "doc.pdf"),
+        settings: { mode: "every", everyN: 2 },
+      };
+      await getToolConfig("split-pdf")?.processV2?.(splitEveryCtx);
+      expect(qpdfPageCount).toHaveBeenLastCalledWith(join(scratchDir, "in-doc.pdf"), {
+        signal: splitEveryCtx.signal,
+      });
+      expect(qpdfSplitRanges).toHaveBeenLastCalledWith(
+        join(scratchDir, "in-doc.pdf"),
+        "1-2",
+        join(scratchDir, "part-1.pdf"),
+        { signal: splitEveryCtx.signal },
+      );
+
+      const rotateCtx = { ...createCtx(scratchDir, "doc.pdf"), settings: { angle: 90 } };
+      await getToolConfig("rotate-pdf")?.processV2?.(rotateCtx);
+      expect(qpdfRotate).toHaveBeenCalledWith(
+        join(scratchDir, "in-doc.pdf"),
+        90,
+        "1-z",
+        join(scratchDir, "doc_rotated.pdf"),
+        { signal: rotateCtx.signal },
+      );
+
+      const protectCtx = {
+        ...createCtx(scratchDir, "doc.pdf"),
+        settings: { userPassword: "secret" },
+      };
+      await getToolConfig("protect-pdf")?.processV2?.(protectCtx);
+      expect(qpdfEncrypt).toHaveBeenCalledWith(
+        join(scratchDir, "in-doc.pdf"),
+        "secret",
+        "secret",
+        join(scratchDir, "doc_protected.pdf"),
+        { signal: protectCtx.signal },
+      );
+
+      const unlockCtx = { ...createCtx(scratchDir, "doc.pdf"), settings: { password: "secret" } };
+      await getToolConfig("unlock-pdf")?.processV2?.(unlockCtx);
+      expect(qpdfDecrypt).toHaveBeenCalledWith(
+        join(scratchDir, "in-doc.pdf"),
+        "secret",
+        join(scratchDir, "doc_unlocked.pdf"),
+        { signal: unlockCtx.signal },
+      );
+
+      const repairCtx = createCtx(scratchDir, "doc.pdf");
+      await getToolConfig("repair-pdf")?.processV2?.(repairCtx);
+      expect(qpdfRepair).toHaveBeenCalledWith(
+        join(scratchDir, "in-doc.pdf"),
+        join(scratchDir, "doc_repaired.pdf"),
+        { signal: repairCtx.signal },
+      );
+
+      const linCtx = createCtx(scratchDir, "doc.pdf");
+      await getToolConfig("linearize-pdf")?.processV2?.(linCtx);
+      expect(qpdfLinearize).toHaveBeenCalledWith(
+        join(scratchDir, "in-doc.pdf"),
+        join(scratchDir, "doc_linearized.pdf"),
+        { signal: linCtx.signal },
+      );
+
+      const orgCtx = { ...createCtx(scratchDir, "doc.pdf"), settings: { order: "2,1" } };
+      await getToolConfig("organize-pdf")?.processV2?.(orgCtx);
+      expect(qpdfPagesSpec).toHaveBeenLastCalledWith(
+        join(scratchDir, "in-doc.pdf"),
+        "2,1",
+        join(scratchDir, "doc_organized.pdf"),
+        { signal: orgCtx.signal },
+      );
+
+      const extCtx = { ...createCtx(scratchDir, "doc.pdf"), settings: { range: "1-2" } };
+      await getToolConfig("extract-pages")?.processV2?.(extCtx);
+      expect(qpdfPagesSpec).toHaveBeenLastCalledWith(
+        join(scratchDir, "in-doc.pdf"),
+        "1-2",
+        join(scratchDir, "doc_extracted.pdf"),
+        { signal: extCtx.signal },
+      );
+
+      vi.mocked(qpdfPageCount).mockResolvedValueOnce(3);
+      const remCtx = { ...createCtx(scratchDir, "doc.pdf"), settings: { pages: "2" } };
+      await getToolConfig("remove-pages")?.processV2?.(remCtx);
+      expect(qpdfPageCount).toHaveBeenLastCalledWith(join(scratchDir, "in-doc.pdf"), {
+        signal: remCtx.signal,
+      });
+      expect(qpdfPagesSpecUnchecked).toHaveBeenCalledWith(
+        join(scratchDir, "in-doc.pdf"),
+        "1,3",
+        join(scratchDir, "doc_removed.pdf"),
+        { signal: remCtx.signal },
+      );
+
+      vi.mocked(qpdfPageCount).mockResolvedValueOnce(2);
+      const multiCtx = {
+        ...createCtx(scratchDir, "doc.pdf"),
+        settings: {
+          items: [{ doc: 0, page: 1, rot: 90 }],
+          pageCounts: [2],
+        },
+      };
+      await getToolConfig("multi-tool-pdf")?.processV2?.(multiCtx);
+      expect(qpdfPageCount).toHaveBeenLastCalledWith(join(scratchDir, "doc-0-doc.pdf"), {
+        signal: multiCtx.signal,
+      });
+      expect(qpdfAssemblePages).toHaveBeenCalledWith(
+        [join(scratchDir, "doc-0-doc.pdf")],
+        [{ doc: 0, page: 1, rot: 90 }],
+        join(scratchDir, "assembled.pdf"),
+        { signal: multiCtx.signal },
+      );
+      expect(qpdfRotatePages).toHaveBeenCalledWith(
+        join(scratchDir, "assembled.pdf"),
+        [{ page: 1, angle: 90 }],
+        join(scratchDir, "output.pdf"),
+        { signal: multiCtx.signal },
+      );
+    });
+  });
+
+  it("stops multi-step qpdf routes immediately when an earlier step rejects on abort", async () => {
+    registerSplitPdf(createMockApp());
+    registerMultiToolPdf(createMockApp());
+
+    await withScratch(async (scratchDir) => {
+      vi.mocked(qpdfPageCount).mockResolvedValueOnce(4);
+      vi.mocked(qpdfSplitRanges).mockRejectedValueOnce(new Error("Canceled"));
+      const splitEveryCtx = {
+        ...createCtx(scratchDir, "doc.pdf"),
+        settings: { mode: "every", everyN: 2 },
+      };
+      await expect(getToolConfig("split-pdf")?.processV2?.(splitEveryCtx)).rejects.toThrow(
+        "Canceled",
+      );
+      expect(qpdfSplitRanges).toHaveBeenCalledTimes(1);
+      expect(splitEveryCtx.report).not.toHaveBeenCalledWith(85, "Creating archive");
+
+      vi.clearAllMocks();
+      vi.mocked(qpdfPageCount).mockResolvedValueOnce(2);
+      vi.mocked(qpdfAssemblePages).mockRejectedValueOnce(new Error("Canceled"));
+      const multiCtx = {
+        ...createCtx(scratchDir, "doc.pdf"),
+        settings: {
+          items: [{ doc: 0, page: 1, rot: 90 }],
+          pageCounts: [2],
+        },
+      };
+      await expect(getToolConfig("multi-tool-pdf")?.processV2?.(multiCtx)).rejects.toThrow(
+        "Canceled",
+      );
+      expect(qpdfAssemblePages).toHaveBeenCalledTimes(1);
+      expect(qpdfRotatePages).not.toHaveBeenCalled();
+      expect(multiCtx.report).not.toHaveBeenCalledWith(90, "Done");
     });
   });
 });

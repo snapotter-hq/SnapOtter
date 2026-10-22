@@ -105,4 +105,71 @@ describe("qpdf exit and signal handling (#1331, #2920)", () => {
       signal: "SIGTERM",
     });
   });
+
+  it("kills spawned ghostscript, libreoffice, pdfcpu, and qpdf child processes when signal aborts (#3305)", async () => {
+    const savedGsPath = process.env.GS_PATH;
+    const savedSofficePath = process.env.SOFFICE_PATH;
+    const savedPdfcpuPath = process.env.PDFCPU_PATH;
+    const gsStub = join(dir, "gs");
+    const sofficeStub = join(dir, "soffice");
+    const pdfcpuStub = join(dir, "pdfcpu");
+    const pidFile = join(dir, "spawned.pid");
+    // Write $$ and exec sleep 30 so /bin/sh replaces its process image with
+    // sleep under the same PID; SIGKILL from onAbort then terminates sleep
+    // directly instead of leaving an orphaned child process.
+    const sleepStub = `#!/bin/sh\necho $$ > "${pidFile}"\nexec sleep 30\n`;
+    for (const p of [stubPath, gsStub, sofficeStub, pdfcpuStub]) {
+      writeFileSync(p, sleepStub);
+      chmodSync(p, 0o755);
+    }
+    process.env.GS_PATH = gsStub;
+    process.env.SOFFICE_PATH = sofficeStub;
+    process.env.PDFCPU_PATH = pdfcpuStub;
+    vi.resetModules();
+
+    try {
+      const { existsSync, readFileSync } = await import("node:fs");
+      const {
+        convertDocument,
+        gsGrayscalePdf,
+        pdfcpuCropMargin,
+        qpdfCheck,
+        qpdfLinearize,
+        qpdfRequiresPassword,
+      } = await import("@snapotter/doc-engine");
+
+      const runners = [
+        (signal: AbortSignal) => gsGrayscalePdf(pdfPath, join(dir, "gs-out.pdf"), { signal }),
+        (signal: AbortSignal) => convertDocument(pdfPath, dir, "pdf", { signal }),
+        (signal: AbortSignal) =>
+          pdfcpuCropMargin(pdfPath, 10, join(dir, "crop-out.pdf"), { signal }),
+        (signal: AbortSignal) => qpdfCheck(pdfPath, { signal }),
+        (signal: AbortSignal) => qpdfRequiresPassword(pdfPath, { signal }),
+        (signal: AbortSignal) => qpdfLinearize(pdfPath, join(dir, "lin-out.pdf"), { signal }),
+      ];
+
+      for (const run of runners) {
+        rmSync(pidFile, { force: true });
+        const ac = new AbortController();
+        const pending = run(ac.signal);
+        await vi.waitFor(() => {
+          expect(existsSync(pidFile)).toBe(true);
+        });
+        const pid = Number(readFileSync(pidFile, "utf8").trim());
+        expect(Number.isInteger(pid) && pid > 0).toBe(true);
+        ac.abort();
+        await expect(pending).rejects.toThrow("Canceled");
+        await vi.waitFor(() => {
+          expect(() => process.kill(pid, 0)).toThrow();
+        });
+      }
+    } finally {
+      if (savedGsPath === undefined) delete process.env.GS_PATH;
+      else process.env.GS_PATH = savedGsPath;
+      if (savedSofficePath === undefined) delete process.env.SOFFICE_PATH;
+      else process.env.SOFFICE_PATH = savedSofficePath;
+      if (savedPdfcpuPath === undefined) delete process.env.PDFCPU_PATH;
+      else process.env.PDFCPU_PATH = savedPdfcpuPath;
+    }
+  });
 });

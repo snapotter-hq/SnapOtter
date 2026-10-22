@@ -264,4 +264,68 @@ describe("convertDocument timeout", () => {
       vi.useRealTimers();
     }
   });
+
+  it("rejects immediately with Canceled without spawning when signal is already aborted", async () => {
+    const mod = await import("../src/libreoffice.js");
+    const ac = new AbortController();
+    ac.abort();
+    await expect(
+      mod.convertDocument("/docs/report.docx", "/outdir", "pdf", { signal: ac.signal }),
+    ).rejects.toThrow("Canceled");
+    expect(mockSpawn).not.toHaveBeenCalled();
+    expect(readdir).not.toHaveBeenCalled();
+  });
+
+  it("kills the child with SIGKILL, cleans up the profile dir, and rejects with Canceled when signal aborts mid-run", async () => {
+    const mod = await import("../src/libreoffice.js");
+    const child = nextManual();
+    const ac = new AbortController();
+    const pending = mod.convertDocument("/docs/report.docx", "/outdir", "pdf", {
+      signal: ac.signal,
+    });
+    ac.abort();
+    await expect(pending).rejects.toThrow("Canceled");
+    expect(child.killSignals).toContain("SIGKILL");
+    expect(readdir).not.toHaveBeenCalled();
+    expect(rm).toHaveBeenCalledWith("/tmp/snapotter-lo-FIXED-UUID", {
+      recursive: true,
+      force: true,
+    });
+  });
+
+  it("removes the abort listener on close, error, and timeout", async () => {
+    const mod = await import("../src/libreoffice.js");
+    const acClose = new AbortController();
+    const removeClose = vi.spyOn(acClose.signal, "removeEventListener");
+    nextClose({ code: 0 });
+    readdir.mockResolvedValueOnce(["report.pdf"]);
+    await mod.convertDocument("/docs/report.docx", "/outdir", "pdf", { signal: acClose.signal });
+    expect(removeClose).toHaveBeenCalledWith("abort", expect.any(Function));
+
+    const acErr = new AbortController();
+    const removeErr = vi.spyOn(acErr.signal, "removeEventListener");
+    nextError(new Error("spawn soffice ENOENT"));
+    await expect(
+      mod.convertDocument("/docs/report.docx", "/outdir", "pdf", { signal: acErr.signal }),
+    ).rejects.toThrow("spawn soffice ENOENT");
+    expect(removeErr).toHaveBeenCalledWith("abort", expect.any(Function));
+
+    vi.useFakeTimers();
+    try {
+      const acTimeout = new AbortController();
+      const removeTimeout = vi.spyOn(acTimeout.signal, "removeEventListener");
+      nextManual();
+      const settled = expect(
+        mod.convertDocument("/docs/report.docx", "/outdir", "pdf", {
+          timeoutMs: 3_000,
+          signal: acTimeout.signal,
+        }),
+      ).rejects.toThrow("LibreOffice timed out after 3s");
+      await vi.advanceTimersByTimeAsync(3_000);
+      await settled;
+      expect(removeTimeout).toHaveBeenCalledWith("abort", expect.any(Function));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

@@ -2,14 +2,23 @@ import { spawn } from "node:child_process";
 import { wrapWithMemoryLimit } from "@snapotter/shared";
 import { resolvePdfcpu } from "./binaries.js";
 
+export interface PdfcpuOptions {
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}
+
 /**
  * Shared pdfcpu CLI runner. Mirrors runQpdf's spawn/settled/(code, signal)
  * shape. The `-c disable` flag prevents config-dir writes on read-only
  * container filesystems.
  */
-function runPdfcpu(args: string[], timeoutMs = 60_000): Promise<string> {
+function runPdfcpu(args: string[], opts: PdfcpuOptions = {}): Promise<string> {
+  if (opts.signal?.aborted) {
+    return Promise.reject(new Error("Canceled"));
+  }
   const bin = resolvePdfcpu();
   if (!bin) throw new Error("pdfcpu binary not found (set PDFCPU_PATH or install pdfcpu)");
+  const timeoutMs = opts.timeoutMs ?? 60_000;
   return new Promise<string>((resolvePromise, reject) => {
     const [limBin, limArgs] = wrapWithMemoryLimit(bin, ["-c", "disable", ...args]);
     const child = spawn(limBin, limArgs, {
@@ -18,9 +27,18 @@ function runPdfcpu(args: string[], timeoutMs = 60_000): Promise<string> {
     let out = "";
     let err = "";
     let settled = false;
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      opts.signal?.removeEventListener("abort", onAbort);
+      child.kill("SIGKILL");
+      reject(new Error("Canceled"));
+    };
     const timer = setTimeout(() => {
       if (settled) return;
       settled = true;
+      opts.signal?.removeEventListener("abort", onAbort);
       child.kill("SIGKILL");
       reject(new Error(`pdfcpu timed out after ${Math.round(timeoutMs / 1000)}s`));
     }, timeoutMs);
@@ -34,18 +52,21 @@ function runPdfcpu(args: string[], timeoutMs = 60_000): Promise<string> {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      opts.signal?.removeEventListener("abort", onAbort);
       reject(e);
     });
     child.on("close", (code, signal) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      opts.signal?.removeEventListener("abort", onAbort);
       if (code === 0) resolvePromise(out);
       else
         reject(
           new Error(`pdfcpu exited ${code ?? signal}: ${err.slice(-1000) || out.slice(-1000)}`),
         );
     });
+    opts.signal?.addEventListener("abort", onAbort, { once: true });
   });
 }
 
@@ -64,11 +85,12 @@ export async function pdfcpuCropMargin(
   inputPath: string,
   marginPoints: number,
   outPath: string,
+  opts?: PdfcpuOptions,
 ): Promise<void> {
   if (!Number.isFinite(marginPoints) || marginPoints < 0 || marginPoints > 2000) {
     throw new Error("Crop margin must be 0-2000 points");
   }
-  await runPdfcpu(["crop", String(marginPoints), inputPath, outPath]);
+  await runPdfcpu(["crop", String(marginPoints), inputPath, outPath], opts);
 }
 
 /** Valid n-up values per pdfcpu v0.13.0 help. */
@@ -83,11 +105,16 @@ const VALID_NUP = new Set<number>([2, 3, 4, 8, 9, 12, 16]);
  *   pdfcpu nup outFile n inFile
  * Note: outFile comes BEFORE n and inFile.
  */
-export async function pdfcpuNup(inputPath: string, n: NupValue, outPath: string): Promise<void> {
+export async function pdfcpuNup(
+  inputPath: string,
+  n: NupValue,
+  outPath: string,
+  opts?: PdfcpuOptions,
+): Promise<void> {
   if (!VALID_NUP.has(n)) {
     throw new Error(`Invalid n-up value: ${n}. Must be one of: 2, 3, 4, 8, 9, 12, 16`);
   }
-  await runPdfcpu(["nup", outPath, String(n), inputPath]);
+  await runPdfcpu(["nup", outPath, String(n), inputPath], opts);
 }
 
 /** Valid booklet values per pdfcpu v0.13.0 help. */
@@ -106,11 +133,12 @@ export async function pdfcpuBooklet(
   inputPath: string,
   n: BookletValue,
   outPath: string,
+  opts?: PdfcpuOptions,
 ): Promise<void> {
   if (!VALID_BOOKLET.has(n)) {
     throw new Error(`Invalid booklet value: ${n}. Must be one of: 2, 4, 6, 8`);
   }
-  await runPdfcpu(["booklet", outPath, String(n), inputPath]);
+  await runPdfcpu(["booklet", outPath, String(n), inputPath], opts);
 }
 
 const STAMP_POSITIONS = new Set(["tl", "tc", "tr", "l", "c", "r", "bl", "bc", "br"]);
@@ -159,6 +187,7 @@ export async function pdfcpuTextStamp(
   inputPath: string,
   opts: TextStampOptions,
   outPath: string,
+  runOpts?: PdfcpuOptions,
 ): Promise<void> {
   if (opts.text.length === 0 || opts.text.length > 200) {
     throw new Error("Stamp text must be 1-200 characters");
@@ -178,13 +207,8 @@ export async function pdfcpuTextStamp(
     throw new Error("Rotation must be -180..180");
   }
   const desc = `pos:${opts.position}, points:${opts.fontSize}, op:${opts.opacity}, rotation:${opts.rotation}`;
-  await runPdfcpu([
-    "stamp",
-    "add",
-    "--",
-    escapePdfcpuStampText(opts.text),
-    desc,
-    inputPath,
-    outPath,
-  ]);
+  await runPdfcpu(
+    ["stamp", "add", "--", escapePdfcpuStampText(opts.text), desc, inputPath, outPath],
+    runOpts,
+  );
 }

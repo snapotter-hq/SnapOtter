@@ -9,6 +9,7 @@ export {
   sofficeAvailable,
 } from "./binaries.js";
 export {
+  type GsOptions,
   gsCompressPdf,
   gsCompressPdfTuned,
   gsGrayscalePdf,
@@ -36,6 +37,7 @@ export {
 export {
   type BookletValue,
   type NupValue,
+  type PdfcpuOptions,
   pdfcpuBooklet,
   pdfcpuCropMargin,
   pdfcpuNup,
@@ -55,4 +57,10 @@ export {
   pdfTextPy,
   pdfToWordPy,
 } from "./python-docs.js";
-export { QpdfTimeoutError, qpdfCheck, qpdfPageCount, qpdfRequiresPassword } from "./qpdf.js";
+export {
+  type QpdfOptions,
+  QpdfTimeoutError,
+  qpdfCheck,
+  qpdfPageCount,
+  qpdfRequiresPassword,
+} from "./qpdf.js";

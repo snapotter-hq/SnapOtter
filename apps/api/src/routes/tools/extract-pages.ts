@@ -30,7 +30,7 @@ export function registerExtractPages(app: FastifyInstance) {
 
       const outPath = join(ctx.scratchDir, `${base}_extracted.pdf`);
       ctx.report(10, "Extracting pages");
-      await qpdfPagesSpec(inPath, settings.range, outPath);
+      await qpdfPagesSpec(inPath, settings.range, outPath, { signal: ctx.signal });
       ctx.report(90, "Done");
 
       return {
