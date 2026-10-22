@@ -34,6 +34,52 @@ interface ImageInfoData {
   }>;
 }
 
+function isHistogramEntry(value: unknown): value is ImageInfoData["histogram"][number] {
+  if (!value || typeof value !== "object") return false;
+  const ch = value as Record<string, unknown>;
+  return (
+    typeof ch.channel === "string" &&
+    ch.channel.length > 0 &&
+    typeof ch.min === "number" &&
+    Number.isFinite(ch.min) &&
+    typeof ch.max === "number" &&
+    Number.isFinite(ch.max) &&
+    typeof ch.mean === "number" &&
+    Number.isFinite(ch.mean)
+  );
+}
+
+function isImageInfoData(value: unknown): value is ImageInfoData {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return (
+    typeof data.format === "string" &&
+    data.format.length > 0 &&
+    typeof data.width === "number" &&
+    Number.isFinite(data.width) &&
+    data.width >= 0 &&
+    typeof data.height === "number" &&
+    Number.isFinite(data.height) &&
+    data.height >= 0 &&
+    typeof data.fileSize === "number" &&
+    Number.isFinite(data.fileSize) &&
+    data.fileSize >= 0 &&
+    typeof data.channels === "number" &&
+    Number.isFinite(data.channels) &&
+    data.channels >= 0 &&
+    typeof data.colorSpace === "string" &&
+    data.colorSpace.length > 0 &&
+    (data.density === undefined ||
+      data.density === null ||
+      (typeof data.density === "number" && Number.isFinite(data.density))) &&
+    typeof data.pages === "number" &&
+    Number.isFinite(data.pages) &&
+    data.pages >= 0 &&
+    Array.isArray(data.histogram) &&
+    data.histogram.every(isHistogramEntry)
+  );
+}
+
 export function InfoSettings() {
   const { t } = useTranslation();
   const { files, processing, error, setProcessing, setError } = useFileStore();
@@ -85,9 +131,15 @@ export function InfoSettings() {
           throw new Error(failedAnswerMessage(t, body, res.status, `Failed: ${res.status}`));
         }
 
-        const data: ImageInfoData = await res.json();
+        const data = await res.json().catch((err: unknown) => {
+          if (err instanceof SyntaxError) return null;
+          throw err;
+        });
         const state = useFileStore.getState();
         if (!autoFetchRef.current || !state.entries.some((e) => e.id === entryId)) return;
+        if (!isImageInfoData(data)) {
+          throw new Error(t.errors.invalidServerResponse);
+        }
         cacheRef.current.set(entryId, data);
         if (!controller.signal.aborted && state.entries[state.selectedIndex]?.id === entryId) {
           setInfo(data);

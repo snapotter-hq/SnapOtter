@@ -15,6 +15,29 @@ interface ExtractedPalette {
   hexColors: string[];
 }
 
+interface ColorPaletteResponse {
+  colors: string[];
+  hex: string[];
+}
+
+function isNonEmptyStringArray(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((item) => typeof item === "string" && item.length > 0)
+  );
+}
+
+function isColorPaletteResponse(value: unknown): value is ColorPaletteResponse {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return (
+    isNonEmptyStringArray(data.colors) &&
+    isNonEmptyStringArray(data.hex) &&
+    data.colors.length === data.hex.length
+  );
+}
+
 const FALLBACK_ENTRY_KEY = "__default__";
 
 export function ColorPaletteSettings() {
@@ -94,8 +117,14 @@ export function ColorPaletteSettings() {
         throw new Error(failedAnswerMessage(t, body, res.status, `Failed: ${res.status}`));
       }
 
-      const data = await res.json();
+      const data = await res.json().catch((err: unknown) => {
+        if (err instanceof SyntaxError) return null;
+        throw err;
+      });
       if (controller.signal.aborted || storeReset) return;
+      if (!isColorPaletteResponse(data)) {
+        throw new Error(t.errors.invalidServerResponse);
+      }
       setPalettesByEntry((prev) => ({
         ...prev,
         [targetEntryKey]: { colors: data.colors, hexColors: data.hex },

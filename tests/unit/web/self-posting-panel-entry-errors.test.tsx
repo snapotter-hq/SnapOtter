@@ -25,8 +25,10 @@ vi.mock("@/contexts/i18n-context", async (importOriginal) => {
 });
 
 import { BeautifySettings } from "@/components/tools/beautify-settings";
+import { ColorPaletteSettings } from "@/components/tools/color-palette-settings";
 import { CompareSettings } from "@/components/tools/compare-settings";
 import { ComposeSettings } from "@/components/tools/compose-settings";
+import { InfoSettings } from "@/components/tools/info-settings";
 import { StitchSettings } from "@/components/tools/stitch-settings";
 import { WatermarkImageSettings } from "@/components/tools/watermark-image-settings";
 import { useFileStore } from "@/stores/file-store";
@@ -378,6 +380,272 @@ describe("self-posting tool panels: failed entry status and scoped error banners
         useFileStore.getState().setSelectedIndex(0);
       });
       expect(screen.queryByText("Stitch send threw")).not.toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it("rejects non-JSON and malformed 2xx payloads with invalidServerResponse across color-palette, info, compare, compose, and watermark-image (#3155)", async () => {
+    // 1. ColorPaletteSettings
+    for (const badBody of [
+      "<html>gateway</html>",
+      "{}",
+      JSON.stringify({ colors: [], hex: [] }),
+      JSON.stringify({ colors: [""], hex: ["#ff0000"] }),
+      JSON.stringify({ colors: ["#ff0000", "#00ff00"], hex: ["#ff0000"] }),
+    ]) {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("a.png")]);
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(badBody, { status: 200 })),
+      );
+
+      const { unmount } = render(<ColorPaletteSettings />);
+      fireEvent.click(screen.getByTestId("color-palette-submit"));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+      expect(useFileStore.getState().error).toBe(en.errors.invalidServerResponse);
+      expect(screen.getByText(en.errors.invalidServerResponse)).toBeInTheDocument();
+      expect(screen.queryByTestId("color-palette-strip")).not.toBeInTheDocument();
+      unmount();
+    }
+
+    // 2. InfoSettings
+    for (const badBody of [
+      "<html>gateway</html>",
+      "{}",
+      JSON.stringify({
+        filename: "a.png",
+        fileSize: 100,
+        width: 10,
+        height: 10,
+        format: "png",
+        channels: 3,
+        colorSpace: "srgb",
+        density: null,
+        pages: 1,
+        histogram: [null],
+      }),
+      JSON.stringify({
+        filename: "a.png",
+        fileSize: 100,
+        width: 10,
+        height: 10,
+        format: "png",
+        channels: 3,
+        colorSpace: "srgb",
+        density: null,
+        pages: 1,
+        histogram: [{ channel: "", min: 0, max: 255, mean: 128 }],
+      }),
+      JSON.stringify({
+        filename: "a.png",
+        fileSize: 100,
+        width: 10,
+        height: 10,
+        format: "png",
+        channels: 3,
+        colorSpace: "",
+        density: null,
+        pages: 1,
+        histogram: [],
+      }),
+      JSON.stringify({
+        filename: "a.png",
+        fileSize: 100,
+        width: 10,
+        height: 10,
+        format: "png",
+        channels: 3,
+        colorSpace: "srgb",
+        density: "invalid",
+        pages: 1,
+        histogram: [],
+      }),
+    ]) {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("a.png")]);
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(badBody, { status: 200 })),
+      );
+
+      const { unmount } = render(<InfoSettings />);
+      fireEvent.click(screen.getByTestId("info-submit"));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+      expect(useFileStore.getState().error).toBe(en.errors.invalidServerResponse);
+      expect(screen.getByText(en.errors.invalidServerResponse)).toBeInTheDocument();
+      unmount();
+    }
+
+    // 3. CompareSettings
+    for (const badBody of [
+      "<html>gateway</html>",
+      "{}",
+      JSON.stringify({ similarity: 95.0, downloadUrl: "" }),
+      JSON.stringify({ downloadUrl: "/api/v1/download/j/diff.png" }),
+      JSON.stringify({ similarity: "95.0", downloadUrl: "/api/v1/download/j/diff.png" }),
+    ]) {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("a.png")]);
+      vi.mocked(URL.createObjectURL).mockClear();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(badBody, { status: 200 })),
+      );
+
+      const { container, unmount } = render(<CompareSettings />);
+      chooseSecondaryFile(container, image("second.png"));
+      fireEvent.click(screen.getByTestId("compare-submit"));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+      const entry = useFileStore.getState().entries[0];
+      expect(entry.status).toBe("failed");
+      expect(entry.processedUrl).toBeNull();
+      expect(entry.error).toBe(en.errors.invalidServerResponse);
+      expect(URL.createObjectURL).not.toHaveBeenCalled();
+      expect(screen.getByText(en.errors.invalidServerResponse)).toBeInTheDocument();
+      expect(screen.queryByTestId("compare-download")).not.toBeInTheDocument();
+      unmount();
+    }
+
+    // 4. ComposeSettings
+    for (const badBody of [
+      "<html>gateway</html>",
+      "{}",
+      JSON.stringify({ downloadUrl: "" }),
+      JSON.stringify({ downloadUrl: "/api/v1/download/j/out.png", originalSize: -1 }),
+      JSON.stringify({ downloadUrl: "/api/v1/download/j/out.png", previewUrl: "" }),
+    ]) {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("a.png")]);
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(badBody, { status: 200 })),
+      );
+
+      const { container, unmount } = render(<ComposeSettings />);
+      chooseSecondaryFile(container, image("overlay.png"));
+      fireEvent.click(screen.getByTestId("compose-submit"));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+      const entry = useFileStore.getState().entries[0];
+      expect(entry.status).toBe("failed");
+      expect(entry.processedUrl).toBeNull();
+      expect(entry.error).toBe(en.errors.invalidServerResponse);
+      expect(screen.getByText(en.errors.invalidServerResponse)).toBeInTheDocument();
+      expect(screen.queryByTestId("compose-download")).not.toBeInTheDocument();
+      unmount();
+    }
+
+    // ComposeSettings also accepts a minimal 200 response with only downloadUrl and rethrows non-SyntaxError body read failures.
+    {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("a.png")]);
+      let composeCall = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          composeCall++;
+          if (composeCall === 1) {
+            return new Response(JSON.stringify({ downloadUrl: "/api/v1/download/j/minimal.png" }), {
+              status: 200,
+            });
+          }
+          return {
+            ok: true,
+            status: 200,
+            json: () => Promise.reject(new TypeError("Stream disconnected")),
+          } as unknown as Response;
+        }),
+      );
+
+      const { container, unmount } = render(<ComposeSettings />);
+      chooseSecondaryFile(container, image("overlay.png"));
+      fireEvent.click(screen.getByTestId("compose-submit"));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+      expect(useFileStore.getState().entries[0].status).toBe("completed");
+      expect(useFileStore.getState().entries[0].processedUrl).toBe(
+        "/api/v1/download/j/minimal.png",
+      );
+      expect(useFileStore.getState().entries[0].processedSize).toBeNull();
+
+      fireEvent.click(screen.getByTestId("compose-submit"));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+      expect(useFileStore.getState().entries[0].status).toBe("failed");
+      expect(useFileStore.getState().entries[0].error).toBe("Stream disconnected");
+      unmount();
+    }
+
+    // 5. WatermarkImageSettings (single-file and multi-file batch branches)
+    for (const badBody of [
+      "<html>gateway</html>",
+      "{}",
+      JSON.stringify({ downloadUrl: "" }),
+      JSON.stringify({ downloadUrl: "/api/v1/download/j/out.png", processedSize: -5 }),
+      JSON.stringify({ downloadUrl: "/api/v1/download/j/out.png", previewUrl: "" }),
+    ]) {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("a.png")]);
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(badBody, { status: 200 })),
+      );
+
+      const { container, unmount } = render(<WatermarkImageSettings />);
+      chooseSecondaryFile(container, image("mark.png"));
+      fireEvent.click(screen.getByTestId("watermark-image-submit"));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+      const entry = useFileStore.getState().entries[0];
+      expect(entry.status).toBe("failed");
+      expect(entry.processedUrl).toBeNull();
+      expect(entry.error).toBe(en.errors.invalidServerResponse);
+      expect(screen.getByText(en.errors.invalidServerResponse)).toBeInTheDocument();
+      expect(screen.queryByTestId("watermark-image-download")).not.toBeInTheDocument();
+      unmount();
+    }
+
+    {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("a.png"), image("b.png"), image("c.png")]);
+      let batchCall = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          batchCall++;
+          if (batchCall === 1) {
+            return new Response("{}", { status: 200 });
+          }
+          if (batchCall === 2) {
+            return new Response(
+              JSON.stringify({
+                downloadUrl: "/api/v1/download/j/b.png",
+              }),
+              { status: 200 },
+            );
+          }
+          return new Response("<html>gateway</html>", { status: 200 });
+        }),
+      );
+
+      const { container, unmount } = render(<WatermarkImageSettings />);
+      chooseSecondaryFile(container, image("mark.png"));
+      fireEvent.click(screen.getByTestId("watermark-image-submit"));
+      await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+
+      const { entries } = useFileStore.getState();
+      expect(entries[0].status).toBe("failed");
+      expect(entries[0].processedUrl).toBeNull();
+      expect(entries[0].error).toBe(en.errors.invalidServerResponse);
+      expect(entries[1].status).toBe("completed");
+      expect(entries[1].processedUrl).toBe("/api/v1/download/j/b.png");
+      expect(entries[1].processedSize).toBeNull();
+      expect(entries[1].error).toBeNull();
+      expect(entries[2].status).toBe("failed");
+      expect(entries[2].processedUrl).toBeNull();
+      expect(entries[2].error).toBe(en.errors.invalidServerResponse);
       unmount();
     }
   });

@@ -14,6 +14,38 @@ interface ComposeEntryResult {
   processedSize: number | null;
 }
 
+interface ComposeResponse {
+  jobId?: string | null;
+  downloadUrl: string;
+  previewUrl?: string | null;
+  originalSize?: number | null;
+  processedSize?: number | null;
+}
+
+function isOptionalUrl(value: unknown): value is string | null | undefined {
+  return value === undefined || value === null || (typeof value === "string" && value.length > 0);
+}
+
+function isOptionalSize(value: unknown): value is number | null | undefined {
+  return (
+    value === undefined ||
+    value === null ||
+    (typeof value === "number" && Number.isFinite(value) && value >= 0)
+  );
+}
+
+function isComposeResponse(value: unknown): value is ComposeResponse {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return (
+    typeof data.downloadUrl === "string" &&
+    data.downloadUrl.length > 0 &&
+    isOptionalUrl(data.previewUrl) &&
+    isOptionalSize(data.originalSize) &&
+    isOptionalSize(data.processedSize)
+  );
+}
+
 export function ComposeSettings() {
   const { t } = useTranslation();
   const { files, currentEntry, processing, error, setProcessing, setError, setJobId } =
@@ -112,16 +144,25 @@ export function ComposeSettings() {
         );
       }
 
-      const result = resolveServerUrls(await res.json());
+      const raw = await res.json().catch((err: unknown) => {
+        if (err instanceof SyntaxError) return null;
+        throw err;
+      });
       if (controller.signal.aborted || storeReset) return;
-      setJobId(result.jobId);
+      const result = resolveServerUrls(raw);
+      if (!isComposeResponse(result)) {
+        throw new Error(t.errors.invalidServerResponse);
+      }
+      if (typeof result.jobId === "string" && result.jobId) {
+        setJobId(result.jobId);
+      }
       useFileStore.getState().updateEntryById(entryId, {
         processedUrl: result.downloadUrl,
         processedPreviewUrl: result.previewUrl ?? null,
         processedFilename: null,
         status: "completed",
-        originalSize: result.originalSize,
-        processedSize: result.processedSize,
+        originalSize: result.originalSize ?? undefined,
+        processedSize: result.processedSize ?? null,
       });
       setResultsByEntry((prev) => ({
         ...prev,

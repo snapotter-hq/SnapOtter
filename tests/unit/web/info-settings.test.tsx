@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
+import { en } from "@snapotter/shared";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -388,6 +389,53 @@ describe("InfoSettings (#2688)", () => {
     act(() => {
       useFileStore.getState().addFiles([imageFile("c.webp", "image/webp")]);
     });
+    expect(useFileStore.getState().error).toBeNull();
+  });
+
+  it("rejects malformed or non-JSON 2xx responses without caching them (#3155)", async () => {
+    let call = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (!String(input).endsWith(INFO_URL)) {
+          return new Response("{}", { status: 200 });
+        }
+        call++;
+        if (call === 1) {
+          return new Response("{}", { status: 200 });
+        }
+        if (call === 2) {
+          return new Response("<html>proxy ok</html>", { status: 200 });
+        }
+        return new Response(
+          JSON.stringify(makeInfo({ filename: "a.png", width: 640, height: 480, format: "png" })),
+          { status: 200 },
+        );
+      }),
+    );
+
+    useFileStore.getState().setFiles([imageFile("a.png", "image/png")]);
+    render(
+      <I18nProvider>
+        <InfoSettings />
+      </I18nProvider>,
+    );
+
+    fireEvent.click(screen.getByTestId("info-submit"));
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+    expect(useFileStore.getState().error).toBe(en.errors.invalidServerResponse);
+    expect(screen.getByText(en.errors.invalidServerResponse)).toBeInTheDocument();
+
+    // Because the malformed payload was not cached, clicking submit again re-fetches.
+    fireEvent.click(screen.getByTestId("info-submit"));
+    await waitFor(() => expect(useFileStore.getState().processing).toBe(false));
+    expect(call).toBe(2);
+    expect(useFileStore.getState().error).toBe(en.errors.invalidServerResponse);
+
+    // Third click receives valid metadata and renders it.
+    fireEvent.click(screen.getByTestId("info-submit"));
+    await waitFor(() => expect(screen.getByText("640 x 480")).toBeInTheDocument());
+    expect(call).toBe(3);
     expect(useFileStore.getState().error).toBeNull();
   });
 });

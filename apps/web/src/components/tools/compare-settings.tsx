@@ -13,6 +13,17 @@ interface CompareEntryResult {
   downloadUrl: string;
 }
 
+function isCompareResponse(value: unknown): value is CompareEntryResult {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return (
+    typeof data.downloadUrl === "string" &&
+    data.downloadUrl.length > 0 &&
+    typeof data.similarity === "number" &&
+    Number.isFinite(data.similarity)
+  );
+}
+
 export function CompareSettings() {
   const { t } = useTranslation();
   const { files, currentEntry, processing, error, setProcessing, setError } = useFileStore();
@@ -105,8 +116,15 @@ export function CompareSettings() {
         );
       }
 
-      const result = resolveServerUrls(await res.json());
+      const raw = await res.json().catch((err: unknown) => {
+        if (err instanceof SyntaxError) return null;
+        throw err;
+      });
       if (controller.signal.aborted || storeReset) return;
+      const result = resolveServerUrls(raw);
+      if (!isCompareResponse(result)) {
+        throw new Error(t.errors.invalidServerResponse);
+      }
       // Show the second image in the slider (not the diff) so the user can
       // visually compare their two originals. The diff is still downloadable.
       const currentTarget = useFileStore.getState().entries.find((entry) => entry.id === entryId);

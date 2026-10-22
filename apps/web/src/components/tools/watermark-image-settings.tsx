@@ -18,6 +18,38 @@ interface WatermarkImageEntryResult {
   processedSize: number | null;
 }
 
+interface WatermarkImageResponse {
+  jobId?: string | null;
+  downloadUrl: string;
+  previewUrl?: string | null;
+  originalSize?: number | null;
+  processedSize?: number | null;
+}
+
+function isOptionalUrl(value: unknown): value is string | null | undefined {
+  return value === undefined || value === null || (typeof value === "string" && value.length > 0);
+}
+
+function isOptionalSize(value: unknown): value is number | null | undefined {
+  return (
+    value === undefined ||
+    value === null ||
+    (typeof value === "number" && Number.isFinite(value) && value >= 0)
+  );
+}
+
+function isWatermarkImageResponse(value: unknown): value is WatermarkImageResponse {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const data = value as Record<string, unknown>;
+  return (
+    typeof data.downloadUrl === "string" &&
+    data.downloadUrl.length > 0 &&
+    isOptionalUrl(data.previewUrl) &&
+    isOptionalSize(data.originalSize) &&
+    isOptionalSize(data.processedSize)
+  );
+}
+
 export function WatermarkImageSettings() {
   const { t } = useTranslation();
   const { files, currentEntry, processing, error, setProcessing, setError, setJobId } =
@@ -188,16 +220,25 @@ export function WatermarkImageSettings() {
           );
         }
 
-        const result = resolveServerUrls(await res.json());
+        const raw = await res.json().catch((err: unknown) => {
+          if (err instanceof SyntaxError) return null;
+          throw err;
+        });
         if (controller.signal.aborted || storeReset) return;
-        setJobId(result.jobId);
+        const result = resolveServerUrls(raw);
+        if (!isWatermarkImageResponse(result)) {
+          throw new Error(t.errors.invalidServerResponse);
+        }
+        if (typeof result.jobId === "string" && result.jobId) {
+          setJobId(result.jobId);
+        }
         useFileStore.getState().updateEntryById(entryId, {
           processedUrl: result.downloadUrl,
           processedPreviewUrl: result.previewUrl ?? null,
           processedFilename: null,
           status: "completed",
-          originalSize: result.originalSize,
-          processedSize: result.processedSize,
+          originalSize: result.originalSize ?? undefined,
+          processedSize: result.processedSize ?? null,
         });
         setResultsByEntry((prev) => ({
           ...prev,
@@ -293,16 +334,23 @@ export function WatermarkImageSettings() {
               continue;
             }
 
-            const result = resolveServerUrls(await res.json());
+            const raw = await res.json().catch((err: unknown) => {
+              if (err instanceof SyntaxError) return null;
+              throw err;
+            });
             if (controller.signal.aborted || storeReset) break;
             if (entryController.signal.aborted || !isEntryPresent(entryId, file)) continue;
+            const result = resolveServerUrls(raw);
+            if (!isWatermarkImageResponse(result)) {
+              throw new Error(t.errors.invalidServerResponse);
+            }
             store.updateEntryById(entryId, {
               processedUrl: result.downloadUrl,
               processedPreviewUrl: result.previewUrl ?? null,
               processedFilename: null,
               status: "completed",
-              originalSize: result.originalSize,
-              processedSize: result.processedSize,
+              originalSize: result.originalSize ?? undefined,
+              processedSize: result.processedSize ?? null,
             });
             setResultsByEntry((prev) => ({
               ...prev,
