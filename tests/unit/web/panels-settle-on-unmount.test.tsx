@@ -1145,6 +1145,173 @@ describe("own-store tool handlers abort and ignore late completions on store res
     expect(useSplitStore.getState().tiles).toEqual([]);
   });
 
+  it("split: aborts in-flight fetch, revokes intermediate tile blob URLs, and ignores late completion when a setting mutator is called mid-run (#3492)", async () => {
+    const AdmZip = (await import("adm-zip")).default;
+    const zip = new AdmZip();
+    zip.addFile("tile_r0_c0.png", Buffer.from([1, 2, 3]));
+    const zipBytes = new Uint8Array(zip.toBuffer());
+
+    let callCount = 0;
+    let resolveSecond: (res: Response) => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init?: RequestInit) => {
+        callCount++;
+        fetchSignals.push(init?.signal ?? undefined);
+        if (callCount === 1) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            blob: async () => zipBytes as unknown as Blob,
+          } as Response);
+        }
+        return new Promise<Response>((resolve) => {
+          resolveSecond = resolve;
+        });
+      }),
+    );
+
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    render(<SplitSettings />);
+    fireEvent.click(screen.getByTestId("split-submit"));
+    await vi.waitFor(() => expect(fetchSignals).toHaveLength(2));
+    expect(useSplitStore.getState().processing).toBe(true);
+
+    vi.mocked(URL.revokeObjectURL).mockClear();
+    act(() => {
+      useSplitStore.getState().setColumns(4);
+    });
+
+    expect(fetchSignals[1]?.aborted).toBe(true);
+    expect(useSplitStore.getState().processing).toBe(false);
+    expect(useSplitStore.getState().columns).toBe(4);
+    expect(useSplitStore.getState().tiles).toEqual([]);
+    expect(useSplitStore.getState().zipBlobUrl).toBeNull();
+
+    await act(async () => {
+      resolveSecond({
+        ok: true,
+        status: 200,
+        blob: async () => zipBytes as unknown as Blob,
+      } as Response);
+    });
+
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:mock");
+    expect(useSplitStore.getState().tiles).toEqual([]);
+    expect(useSplitStore.getState().zipBlobUrl).toBeNull();
+    expect(useSplitStore.getState().processing).toBe(false);
+    expect(useSplitStore.getState().error).toBeNull();
+
+    // Start a second run, cancel it mid-flight via setOutputFormat, immediately start a third run,
+    // and confirm the canceled second run's late HTTP 500 neither sets error nor clears third run's processing
+    let resolveRun2: (res: Response) => void = () => {};
+    let resolveRun3: (res: Response) => void = () => {};
+    let postCancelCall = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => {
+        postCancelCall++;
+        if (postCancelCall === 1) {
+          return new Promise<Response>((resolve) => {
+            resolveRun2 = resolve;
+          });
+        }
+        return new Promise<Response>((resolve) => {
+          resolveRun3 = resolve;
+        });
+      }),
+    );
+
+    useFileStore.getState().setFiles([image("one.png")]);
+    fireEvent.click(screen.getByTestId("split-submit"));
+    await vi.waitFor(() => expect(postCancelCall).toBe(1));
+    expect(useSplitStore.getState().processing).toBe(true);
+
+    act(() => {
+      useSplitStore.getState().setOutputFormat("webp");
+    });
+    expect(useSplitStore.getState().processing).toBe(false);
+
+    fireEvent.click(screen.getByTestId("split-submit"));
+    await vi.waitFor(() => expect(postCancelCall).toBe(2));
+    expect(useSplitStore.getState().processing).toBe(true);
+
+    await act(async () => {
+      resolveRun2({
+        ok: false,
+        status: 500,
+        json: async () => ({ error: "server exploded" }),
+      } as Response);
+    });
+
+    expect(useSplitStore.getState().error).toBeNull();
+    expect(useSplitStore.getState().processing).toBe(true);
+
+    await act(async () => {
+      resolveRun3({
+        ok: true,
+        status: 200,
+        blob: async () => zipBytes as unknown as Blob,
+      } as Response);
+    });
+
+    await vi.waitFor(() => expect(useSplitStore.getState().processing).toBe(false));
+    expect(useSplitStore.getState().tiles).toHaveLength(1);
+    expect(useSplitStore.getState().error).toBeNull();
+  });
+
+  it("split: clears rendered tiles and zipBlobUrl and revokes blob URLs when outputFormat or quality is changed after a completed run (#3492)", async () => {
+    const AdmZip = (await import("adm-zip")).default;
+    const zip = new AdmZip();
+    zip.addFile("tile_r0_c0.png", Buffer.from([1, 2, 3]));
+    const zipBytes = new Uint8Array(zip.toBuffer());
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          blob: async () => zipBytes as unknown as Blob,
+        } as Response),
+      ),
+    );
+
+    useFileStore.getState().setFiles([image("one.png")]);
+    render(<SplitSettings />);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("split-submit"));
+    });
+    await vi.waitFor(() => expect(useSplitStore.getState().tiles).toHaveLength(1));
+    expect(useSplitStore.getState().zipBlobUrl).toBe("blob:mock");
+
+    fireEvent.click(screen.getByRole("button", { name: /output format/i }));
+    vi.mocked(URL.revokeObjectURL).mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "WebP" }));
+
+    expect(useSplitStore.getState().outputFormat).toBe("webp");
+    expect(useSplitStore.getState().tiles).toEqual([]);
+    expect(useSplitStore.getState().zipBlobUrl).toBeNull();
+    expect(useSplitStore.getState().runFileCount).toBe(0);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:mock");
+
+    // Run again under WebP, then change quality slider and confirm tiles/zip clear again
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("split-submit"));
+    });
+    await vi.waitFor(() => expect(useSplitStore.getState().tiles).toHaveLength(1));
+    expect(useSplitStore.getState().zipBlobUrl).toBe("blob:mock");
+
+    vi.mocked(URL.revokeObjectURL).mockClear();
+    fireEvent.change(screen.getByLabelText(/quality/i), { target: { value: "65" } });
+
+    expect(useSplitStore.getState().quality).toBe(65);
+    expect(useSplitStore.getState().tiles).toEqual([]);
+    expect(useSplitStore.getState().zipBlobUrl).toBeNull();
+    expect(useSplitStore.getState().runFileCount).toBe(0);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:mock");
+  });
+
   it("image-to-base64: aborts in-flight fetch on useBase64Store.reset() or useFileStore.reset() and stops looping", async () => {
     let resolveFirst: (res: Response) => void = () => {};
     vi.stubGlobal(

@@ -255,10 +255,11 @@ describe("encodeQrData expanded", () => {
 // ---------------------------------------------------------------------------
 // Split Store expanded
 // ---------------------------------------------------------------------------
-import { useSplitStore } from "@/stores/split-store";
+import { beginSplitRun, useSplitStore } from "@/stores/split-store";
 
 describe("useSplitStore expanded", () => {
   beforeEach(() => {
+    useSplitStore.getState().reset();
     revokeObjectURL.mockClear();
     useSplitStore.setState({
       mode: "grid",
@@ -378,29 +379,45 @@ describe("useSplitStore expanded", () => {
     ["setRows", () => useSplitStore.getState().setRows(5)],
     ["setTileWidth", () => useSplitStore.getState().setTileWidth(300)],
     ["setTileHeight", () => useSplitStore.getState().setTileHeight(400)],
+    ["setOutputFormat", () => useSplitStore.getState().setOutputFormat("webp")],
+    ["setQuality", () => useSplitStore.getState().setQuality(75)],
     ["applyPreset", () => useSplitStore.getState().applyPreset(2, 2)],
-  ])("%s revokes previous tile and zip blob URLs and resets runFileCount", (_name, act) => {
-    useSplitStore.setState({
-      tiles: [
-        { row: 0, col: 0, label: "1", width: 100, height: 100, blobUrl: "blob:tile-1" },
-        { row: 0, col: 1, label: "2", width: 100, height: 100, blobUrl: "blob:tile-2" },
-        { row: 1, col: 0, label: "3", width: 100, height: 100, blobUrl: null },
-      ],
-      runFileCount: 2,
-      zipBlobUrl: "blob:zip-1",
-    });
-    revokeObjectURL.mockClear();
+  ])(
+    "%s revokes previous tile and zip blob URLs, resets runFileCount, and cancels in-flight runs (#3184, #3492)",
+    (_name, act) => {
+      const abort = vi.fn();
+      const run = beginSplitRun(abort);
+      useSplitStore.setState({
+        processing: true,
+        tiles: [
+          { row: 0, col: 0, label: "1", width: 100, height: 100, blobUrl: "blob:tile-1" },
+          { row: 0, col: 1, label: "2", width: 100, height: 100, blobUrl: "blob:tile-2" },
+          { row: 1, col: 0, label: "3", width: 100, height: 100, blobUrl: null },
+        ],
+        runFileCount: 2,
+        zipBlobUrl: "blob:zip-1",
+      });
+      revokeObjectURL.mockClear();
 
-    act();
+      act();
 
-    expect(revokeObjectURL).toHaveBeenCalledWith("blob:zip-1");
-    expect(revokeObjectURL).toHaveBeenCalledWith("blob:tile-1");
-    expect(revokeObjectURL).toHaveBeenCalledWith("blob:tile-2");
-    expect(revokeObjectURL).toHaveBeenCalledTimes(3);
-    expect(useSplitStore.getState().tiles).toEqual([]);
-    expect(useSplitStore.getState().zipBlobUrl).toBeNull();
-    expect(useSplitStore.getState().runFileCount).toBe(0);
-  });
+      expect(abort).toHaveBeenCalledTimes(1);
+      expect(run.isCurrent()).toBe(false);
+      expect(useSplitStore.getState().processing).toBe(false);
+      expect(revokeObjectURL).toHaveBeenCalledWith("blob:zip-1");
+      expect(revokeObjectURL).toHaveBeenCalledWith("blob:tile-1");
+      expect(revokeObjectURL).toHaveBeenCalledWith("blob:tile-2");
+      expect(revokeObjectURL).toHaveBeenCalledTimes(3);
+      expect(useSplitStore.getState().tiles).toEqual([]);
+      expect(useSplitStore.getState().zipBlobUrl).toBeNull();
+      expect(useSplitStore.getState().runFileCount).toBe(0);
+
+      // Calling a second mutator after the active run was already canceled does not re-invoke abort
+      abort.mockClear();
+      useSplitStore.getState().setColumns(2);
+      expect(abort).not.toHaveBeenCalled();
+    },
+  );
 
   it("setTiles revokes removed tile blob URLs without revoking retained tiles or zipBlobUrl", () => {
     useSplitStore.setState({

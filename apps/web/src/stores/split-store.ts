@@ -78,6 +78,13 @@ export function beginSplitRun(abort: () => void): {
   };
 }
 
+function cancelActiveSplitRun(): void {
+  splitRunId++;
+  const abort = activeSplitAbort;
+  activeSplitAbort = null;
+  abort?.();
+}
+
 function revokeRemovedTileUrls(prevTiles: TileInfo[], nextTiles: TileInfo[] = []): void {
   const keep = new Set<string>();
   for (const t of nextTiles) {
@@ -96,10 +103,12 @@ function clearSplitResult(prev: Pick<SplitState, "tiles" | "zipBlobUrl">): {
   tiles: TileInfo[];
   runFileCount: number;
   zipBlobUrl: null;
+  processing: false;
 } {
+  cancelActiveSplitRun();
   if (prev.zipBlobUrl) URL.revokeObjectURL(prev.zipBlobUrl);
   revokeRemovedTileUrls(prev.tiles);
-  return { tiles: [], runFileCount: 0, zipBlobUrl: null };
+  return { tiles: [], runFileCount: 0, zipBlobUrl: null, processing: false };
 }
 
 export const useSplitStore = create<SplitState>((set, get) => ({
@@ -125,8 +134,8 @@ export const useSplitStore = create<SplitState>((set, get) => ({
     set({ tileWidth: Math.max(10, tileWidth), ...clearSplitResult(get()) }),
   setTileHeight: (tileHeight) =>
     set({ tileHeight: Math.max(10, tileHeight), ...clearSplitResult(get()) }),
-  setOutputFormat: (outputFormat) => set({ outputFormat }),
-  setQuality: (quality) => set({ quality }),
+  setOutputFormat: (outputFormat) => set({ outputFormat, ...clearSplitResult(get()) }),
+  setQuality: (quality) => set({ quality, ...clearSplitResult(get()) }),
   setImageDimensions: (imageDimensions) => set({ imageDimensions }),
   setProcessing: (processing) => set({ processing }),
   setError: (error) => set({ error }),
@@ -144,13 +153,8 @@ export const useSplitStore = create<SplitState>((set, get) => ({
     set({ mode: "grid", columns: cols, rows, ...clearSplitResult(get()), error: null }),
 
   reset: () => {
-    splitRunId++;
-    const abort = activeSplitAbort;
-    activeSplitAbort = null;
-    abort?.();
     set({
       ...clearSplitResult(get()),
-      processing: false,
       error: null,
       imageDimensions: null,
     });
