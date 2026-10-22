@@ -16,6 +16,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
+import { loadEnv } from "../../../apps/api/src/lib/env.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 import { parseExternalUrl, SSO_DEPLOYMENTS } from "./sso-deployments.js";
 
@@ -497,6 +498,45 @@ describe("Config endpoint with OIDC enabled", () => {
     expect(body).not.toHaveProperty("issuerUrl");
     expect(body).not.toHaveProperty("oidcIssuerUrl");
   });
+
+  it("passes trimmed OIDC_PROVIDER_NAME from loadEnv to /api/v1/config/auth and falls back to null when blank (#3302)", async () => {
+    const prevProviderName = env.OIDC_PROVIDER_NAME;
+    try {
+      const configured = loadEnv({
+        ...process.env,
+        OIDC_PROVIDER_NAME: " Keycloak \n",
+      });
+      env.OIDC_PROVIDER_NAME = configured.OIDC_PROVIDER_NAME;
+
+      const trimmedRes = await oidcApp.app.inject({
+        method: "GET",
+        url: "/api/v1/config/auth",
+      });
+      expect(trimmedRes.statusCode).toBe(200);
+      expect(trimmedRes.json()).toMatchObject({
+        oidcEnabled: true,
+        oidcProviderName: "Keycloak",
+      });
+
+      const blankProvider = loadEnv({
+        ...process.env,
+        OIDC_PROVIDER_NAME: "   ",
+      });
+      env.OIDC_PROVIDER_NAME = blankProvider.OIDC_PROVIDER_NAME;
+
+      const fallbackRes = await oidcApp.app.inject({
+        method: "GET",
+        url: "/api/v1/config/auth",
+      });
+      expect(fallbackRes.statusCode).toBe(200);
+      expect(fallbackRes.json()).toMatchObject({
+        oidcEnabled: true,
+        oidcProviderName: null,
+      });
+    } finally {
+      env.OIDC_PROVIDER_NAME = prevProviderName;
+    }
+  });
 });
 
 // =====================================================================
@@ -710,6 +750,61 @@ describe("OIDC login redirect", () => {
     expect(cookieStr).toContain("oidc-state=");
     expect(cookieStr).toContain("HttpOnly");
     expect(cookieStr).toContain("SameSite=Lax");
+  });
+
+  it("passes trimmed OIDC_ISSUER_URL, OIDC_CLIENT_ID, and OIDC_SCOPES from loadEnv to login redirect and falls back when OIDC_SCOPES is blank (#3302)", async () => {
+    const { resetOidcDiscoveryCacheForTests } = await import(
+      "../../../apps/api/src/plugins/oidc.js"
+    );
+    const prevIssuerUrl = env.OIDC_ISSUER_URL;
+    const prevClientId = env.OIDC_CLIENT_ID;
+    const prevClientSecret = env.OIDC_CLIENT_SECRET;
+    const prevScopes = env.OIDC_SCOPES;
+    try {
+      const configured = loadEnv({
+        ...process.env,
+        OIDC_ENABLED: "true",
+        EXTERNAL_URL: env.EXTERNAL_URL,
+        OIDC_ISSUER_URL: ` http://localhost:${mockPort}\n`,
+        OIDC_CLIENT_ID: " trimmed-client-id \n",
+        OIDC_CLIENT_SECRET: " trimmed-client-secret\n",
+        OIDC_SCOPES: " openid email \n",
+      });
+      env.OIDC_ISSUER_URL = configured.OIDC_ISSUER_URL;
+      env.OIDC_CLIENT_ID = configured.OIDC_CLIENT_ID;
+      env.OIDC_CLIENT_SECRET = configured.OIDC_CLIENT_SECRET;
+      env.OIDC_SCOPES = configured.OIDC_SCOPES;
+      resetOidcDiscoveryCacheForTests();
+
+      const res = await oidcApp.app.inject({
+        method: "GET",
+        url: "/api/auth/oidc/login",
+      });
+      expect(res.statusCode).toBe(302);
+      const redirectUrl = new URL(res.headers.location as string);
+      expect(redirectUrl.searchParams.get("client_id")).toBe("trimmed-client-id");
+      expect(redirectUrl.searchParams.get("scope")).toBe("openid email");
+
+      const blankScopes = loadEnv({
+        ...process.env,
+        OIDC_SCOPES: "   ",
+      });
+      env.OIDC_SCOPES = blankScopes.OIDC_SCOPES;
+
+      const fallbackRes = await oidcApp.app.inject({
+        method: "GET",
+        url: "/api/auth/oidc/login",
+      });
+      expect(fallbackRes.statusCode).toBe(302);
+      const fallbackUrl = new URL(fallbackRes.headers.location as string);
+      expect(fallbackUrl.searchParams.get("scope")).toBe("openid profile email");
+    } finally {
+      env.OIDC_ISSUER_URL = prevIssuerUrl;
+      env.OIDC_CLIENT_ID = prevClientId;
+      env.OIDC_CLIENT_SECRET = prevClientSecret;
+      env.OIDC_SCOPES = prevScopes;
+      resetOidcDiscoveryCacheForTests();
+    }
   });
 
   describe.each(SSO_DEPLOYMENTS)("deployment at '%s', EXTERNAL_URL %s", (basePath, typed) => {

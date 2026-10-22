@@ -171,10 +171,14 @@ const envSchema = z
       .enum(["true", "false"])
       .default("false")
       .transform((v) => v === "true"),
-    OIDC_ISSUER_URL: z.string().default(""),
-    OIDC_CLIENT_ID: z.string().default(""),
-    OIDC_CLIENT_SECRET: z.string().default(""),
-    OIDC_SCOPES: z.string().default("openid profile email"),
+    OIDC_ISSUER_URL: z.string().trim().default(""),
+    OIDC_CLIENT_ID: z.string().trim().default(""),
+    OIDC_CLIENT_SECRET: z.string().trim().default(""),
+    OIDC_SCOPES: z
+      .string()
+      .trim()
+      .default("openid profile email")
+      .transform((v) => v || "openid profile email"),
     OIDC_AUTO_CREATE_USERS: z
       .enum(["true", "false"])
       .default("true")
@@ -188,9 +192,13 @@ const envSchema = z
       .enum(["true", "false"])
       .default("false")
       .transform((v) => v === "true"),
-    OIDC_PROVIDER_NAME: z.string().default(""),
+    OIDC_PROVIDER_NAME: z.string().trim().default(""),
     OIDC_CLOCK_TOLERANCE: z.coerce.number().min(0).max(300).default(30),
-    OIDC_USERNAME_CLAIM: z.string().default("preferred_username"),
+    OIDC_USERNAME_CLAIM: z
+      .string()
+      .trim()
+      .default("preferred_username")
+      .transform((v) => v || "preferred_username"),
     SAML_ENABLED: z
       .enum(["true", "false"])
       .default("false")

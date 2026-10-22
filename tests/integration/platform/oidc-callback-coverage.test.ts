@@ -104,6 +104,7 @@ vi.resetModules();
 
 const { env } = await import("../../../apps/api/src/config.js");
 const { db, schema } = await import("../../../apps/api/src/db/index.js");
+const { loadEnv } = await import("../../../apps/api/src/lib/env.js");
 const { sanitizeUsername, UsernameRaceExhaustedError } = await import(
   "../../../apps/api/src/lib/external-auth-resolver.js"
 );
@@ -1097,6 +1098,42 @@ describe("OIDC callback claim handling and resolver outcomes", () => {
     expect(res.headers.location).toBe("/");
     const user = await findUserByExternalId(sub);
     expect(user?.username).toBe(sanitizeUsername(raw));
+  });
+
+  it("extracts username claim when OIDC_USERNAME_CLAIM has surrounding whitespace or falls back when blank (#3302)", async () => {
+    const configured = loadEnv({
+      ...process.env,
+      OIDC_USERNAME_CLAIM: " custom_login \n",
+    });
+    env.OIDC_USERNAME_CLAIM = configured.OIDC_USERNAME_CLAIM;
+
+    const sub = `sub-trimclaim-${Math.random().toString(36).slice(2, 10)}`;
+    const raw = `TrimCustom-${Math.random().toString(36).slice(2, 8)}`;
+    const res = await callbackWithClaims({
+      sub,
+      custom_login: raw,
+      preferred_username: "should-be-ignored",
+    });
+    expect(res.statusCode).toBe(302);
+    const user = await findUserByExternalId(sub);
+    expect(user?.username).toBe(sanitizeUsername(raw));
+
+    const blankClaim = loadEnv({
+      ...process.env,
+      OIDC_USERNAME_CLAIM: "   ",
+    });
+    env.OIDC_USERNAME_CLAIM = blankClaim.OIDC_USERNAME_CLAIM;
+
+    const fallbackSub = `sub-blankclaim-${Math.random().toString(36).slice(2, 10)}`;
+    const fallbackRaw = `FallbackPref-${Math.random().toString(36).slice(2, 8)}`;
+    const fallbackRes = await callbackWithClaims({
+      sub: fallbackSub,
+      preferred_username: fallbackRaw,
+      "   ": "wrong-claim",
+    });
+    expect(fallbackRes.statusCode).toBe(302);
+    const fallbackUser = await findUserByExternalId(fallbackSub);
+    expect(fallbackUser?.username).toBe(sanitizeUsername(fallbackRaw));
   });
 
   it("falls back to the display name when no username or email-with-@ claim is present", async () => {

@@ -80,6 +80,23 @@ describe("loadEnv edge validation", () => {
     );
   });
 
+  it.each(["", "   ", "\t\n "])(
+    "rejects enabled OIDC when OIDC_ISSUER_URL is blank %j (#3302)",
+    (issuerUrl) => {
+      expectLoadEnvError(
+        {
+          OIDC_ENABLED: "true",
+          OIDC_ISSUER_URL: issuerUrl,
+          OIDC_CLIENT_ID: "client",
+          OIDC_CLIENT_SECRET: "secret",
+          EXTERNAL_URL: "http://snapotter.lan:1349",
+        },
+        "OIDC_ISSUER_URL is required when OIDC_ENABLED=true",
+        ["OIDC_ISSUER_URL"],
+      );
+    },
+  );
+
   it.each([
     "keycloak.lan:8080/realms/x",
     "localhost:8080/realms/x",
@@ -89,7 +106,6 @@ describe("loadEnv edge validation", () => {
     "javascript:alert(1)",
     "http://",
     "https://",
-    "   ",
   ])("rejects enabled OIDC when OIDC_ISSUER_URL is %j (#1912)", (issuerUrl) => {
     expectLoadEnvError(
       {
@@ -100,36 +116,151 @@ describe("loadEnv edge validation", () => {
         EXTERNAL_URL: "http://snapotter.lan:1349",
       },
       "OIDC_ISSUER_URL must be an http(s) URL such as https://auth.example.com/realms/myrealm",
+      ["OIDC_ISSUER_URL"],
     );
   });
 
   it.each([
-    "https://auth.example.com/realms/myrealm",
-    "http://keycloak.lan:8080/realms/x",
-    "HTTP://Keycloak.lan:8080/realms/x",
-    " https://auth.example.com/realms/myrealm\n",
-  ])("accepts enabled OIDC when OIDC_ISSUER_URL is %j (#1912)", (issuerUrl) => {
-    restoreEnv();
-    const env = loadEnv({
-      ...process.env,
-      OIDC_ENABLED: "true",
-      OIDC_ISSUER_URL: issuerUrl,
-      OIDC_CLIENT_ID: "client",
-      OIDC_CLIENT_SECRET: "secret",
-      EXTERNAL_URL: "http://snapotter.lan:1349",
-    });
-    expect(env.OIDC_ISSUER_URL).toBe(issuerUrl);
-  });
+    ["https://auth.example.com/realms/myrealm", "https://auth.example.com/realms/myrealm"],
+    ["http://keycloak.lan:8080/realms/x", "http://keycloak.lan:8080/realms/x"],
+    ["HTTP://Keycloak.lan:8080/realms/x", "HTTP://Keycloak.lan:8080/realms/x"],
+    [" https://auth.example.com/realms/myrealm\n", "https://auth.example.com/realms/myrealm"],
+    ["\thttps://auth.example.com/realms/myrealm ", "https://auth.example.com/realms/myrealm"],
+  ])(
+    "accepts and trims OIDC_ISSUER_URL %j to %j when OIDC is enabled (#1912, #3302)",
+    (issuerUrl, expected) => {
+      restoreEnv();
+      const env = loadEnv({
+        ...process.env,
+        OIDC_ENABLED: "true",
+        OIDC_ISSUER_URL: issuerUrl,
+        OIDC_CLIENT_ID: "client",
+        OIDC_CLIENT_SECRET: "secret",
+        EXTERNAL_URL: "http://snapotter.lan:1349",
+      });
+      expect(env.OIDC_ISSUER_URL).toBe(expected);
+    },
+  );
 
-  it("leaves OIDC_ISSUER_URL unchecked when OIDC_ENABLED is false (#1912)", () => {
+  it("leaves OIDC_ISSUER_URL unchecked when OIDC_ENABLED is false (#1912, #3302)", () => {
     restoreEnv();
     const env = loadEnv({
       ...process.env,
       OIDC_ENABLED: "false",
-      OIDC_ISSUER_URL: "keycloak.lan:8080/realms/x",
+      OIDC_ISSUER_URL: " keycloak.lan:8080/realms/x\n",
     });
     expect(env.OIDC_ISSUER_URL).toBe("keycloak.lan:8080/realms/x");
   });
+
+  it.each(["", "   ", "\t\n "])(
+    "rejects enabled OIDC when OIDC_CLIENT_ID is blank %j (#3302)",
+    (clientId) => {
+      expectLoadEnvError(
+        {
+          OIDC_ENABLED: "true",
+          OIDC_ISSUER_URL: "https://auth.example.com/realms/myrealm",
+          OIDC_CLIENT_ID: clientId,
+          OIDC_CLIENT_SECRET: "secret",
+          EXTERNAL_URL: "http://snapotter.lan:1349",
+        },
+        "OIDC_CLIENT_ID is required when OIDC_ENABLED=true",
+        ["OIDC_CLIENT_ID"],
+      );
+    },
+  );
+
+  it.each(["", "   ", "\t\n "])(
+    "rejects enabled OIDC when OIDC_CLIENT_SECRET is blank %j (#3302)",
+    (clientSecret) => {
+      expectLoadEnvError(
+        {
+          OIDC_ENABLED: "true",
+          OIDC_ISSUER_URL: "https://auth.example.com/realms/myrealm",
+          OIDC_CLIENT_ID: "client",
+          OIDC_CLIENT_SECRET: clientSecret,
+          EXTERNAL_URL: "http://snapotter.lan:1349",
+        },
+        "OIDC_CLIENT_SECRET is required when OIDC_ENABLED=true",
+        ["OIDC_CLIENT_SECRET"],
+      );
+    },
+  );
+
+  it.each([
+    [" snapotter-client \n", "snapotter-client", " secret-from-file\n", "secret-from-file"],
+    ["\tclient-id ", "client-id", "\tclient-secret\r\n", "client-secret"],
+  ])(
+    "trims OIDC_CLIENT_ID %j to %j and OIDC_CLIENT_SECRET %j to %j (#3302)",
+    (clientId, expectedId, clientSecret, expectedSecret) => {
+      restoreEnv();
+      const env = loadEnv({
+        ...process.env,
+        OIDC_ENABLED: "true",
+        OIDC_ISSUER_URL: "https://auth.example.com/realms/myrealm",
+        OIDC_CLIENT_ID: clientId,
+        OIDC_CLIENT_SECRET: clientSecret,
+        EXTERNAL_URL: "http://snapotter.lan:1349",
+      });
+      expect(env.OIDC_CLIENT_ID).toBe(expectedId);
+      expect(env.OIDC_CLIENT_SECRET).toBe(expectedSecret);
+    },
+  );
+
+  it.each([
+    [undefined, "openid profile email"],
+    ["", "openid profile email"],
+    ["   ", "openid profile email"],
+    ["\t\n ", "openid profile email"],
+    [" openid email \n", "openid email"],
+    ["\topenid profile email offline_access ", "openid profile email offline_access"],
+  ])("trims OIDC_SCOPES %j and falls back to %j when blank (#3302)", (scopes, expected) => {
+    restoreEnv();
+    const rawEnv: NodeJS.ProcessEnv = { ...process.env };
+    if (scopes === undefined) {
+      delete rawEnv.OIDC_SCOPES;
+    } else {
+      rawEnv.OIDC_SCOPES = scopes;
+    }
+    const env = loadEnv(rawEnv);
+    expect(env.OIDC_SCOPES).toBe(expected);
+  });
+
+  it.each([
+    ["", ""],
+    ["   ", ""],
+    ["\t\n ", ""],
+    [" Keycloak \n", "Keycloak"],
+    ["\tOkta SSO ", "Okta SSO"],
+  ])("trims OIDC_PROVIDER_NAME %j to %j (#3302)", (providerName, expected) => {
+    restoreEnv();
+    const env = loadEnv({
+      ...process.env,
+      OIDC_PROVIDER_NAME: providerName,
+    });
+    expect(env.OIDC_PROVIDER_NAME).toBe(expected);
+  });
+
+  it.each([
+    [undefined, "preferred_username"],
+    ["", "preferred_username"],
+    ["   ", "preferred_username"],
+    ["\t\n ", "preferred_username"],
+    [" uid \n", "uid"],
+    ["\tcustom_login ", "custom_login"],
+  ])(
+    "trims OIDC_USERNAME_CLAIM %j and falls back to %j when blank (#3302)",
+    (usernameClaim, expected) => {
+      restoreEnv();
+      const rawEnv: NodeJS.ProcessEnv = { ...process.env };
+      if (usernameClaim === undefined) {
+        delete rawEnv.OIDC_USERNAME_CLAIM;
+      } else {
+        rawEnv.OIDC_USERNAME_CLAIM = usernameClaim;
+      }
+      const env = loadEnv(rawEnv);
+      expect(env.OIDC_USERNAME_CLAIM).toBe(expected);
+    },
+  );
 
   it.each([
     [undefined, "user"],
