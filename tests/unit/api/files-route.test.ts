@@ -1405,6 +1405,27 @@ describe("files route logic", () => {
       expect(mocks.readImageDimensions).toHaveBeenCalledWith(rafMagic, "raf");
     });
 
+    it("keeps Sharp decoded dimensions in X-Original-Width/Height when readImageDimensions returns null (#3343)", async () => {
+      const rafMagic = Buffer.from("FUJIFILMCCD-RAW 0201", "ascii");
+      mocks.decodeToSharpCompat.mockResolvedValueOnce(PNG_1X1);
+      mocks.readImageDimensions.mockResolvedValueOnce(null);
+
+      const req = {
+        log: { warn: vi.fn(), error: vi.fn() },
+        file: async () => ({
+          filename: "DSCF0001.RAF",
+          toBuffer: async () => rafMagic,
+        }),
+      };
+      const reply = makePreviewReply();
+
+      await previewHandler(req, reply);
+
+      expect(reply.statusCode).toBe(200);
+      expect(reply.headers["X-Original-Width"]).toBe("1");
+      expect(reply.headers["X-Original-Height"]).toBe("1");
+    });
+
     it("answers 503 ENGINE_UNAVAILABLE when decodeToSharpCompat throws DecoderUnavailableError on a TIFF-headed RAW (CR2) whose header Sharp reads (#2801)", async () => {
       const cr2Bytes = readFileSync(
         resolve(process.cwd(), "tests/fixtures/image/formats/sample.cr2"),

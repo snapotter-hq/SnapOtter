@@ -219,7 +219,16 @@ export async function readImageDimensions(
       { timeout: 10_000 },
     );
     const [data] = JSON.parse(stdout);
-    if (!data?.ImageWidth || !data?.ImageHeight) return null;
+    if (
+      typeof data?.ImageWidth !== "number" ||
+      !Number.isFinite(data.ImageWidth) ||
+      data.ImageWidth <= 0 ||
+      typeof data?.ImageHeight !== "number" ||
+      !Number.isFinite(data.ImageHeight) ||
+      data.ImageHeight <= 0
+    ) {
+      return null;
+    }
     return { width: data.ImageWidth, height: data.ImageHeight };
   } catch (rawErr) {
     const err = asDecoderOutOfMemory(rawErr);

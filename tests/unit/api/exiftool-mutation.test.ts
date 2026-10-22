@@ -811,6 +811,40 @@ describe("readImageDimensions", () => {
     expect(dims).toBeNull();
   });
 
+  it("returns null when ImageHeight is zero (#3343)", async () => {
+    withExiftool(() => ({
+      stdout: JSON.stringify([{ ImageWidth: 640, ImageHeight: 0 }]),
+      stderr: "",
+    }));
+    const dims = await readImageDimensions(Buffer.from("img"), "jpg");
+    expect(dims).toBeNull();
+  });
+
+  it("accepts 1x1 positive boundary dimensions (#3343)", async () => {
+    withExiftool(() => ({
+      stdout: JSON.stringify([{ ImageWidth: 1, ImageHeight: 1 }]),
+      stderr: "",
+    }));
+    const dims = await readImageDimensions(Buffer.from("img"), "dng");
+    expect(dims).toEqual({ width: 1, height: 1 });
+  });
+
+  it.each([
+    ["negative ImageWidth", JSON.stringify([{ ImageWidth: -10, ImageHeight: 200 }])],
+    ["negative ImageHeight", JSON.stringify([{ ImageWidth: 200, ImageHeight: -10 }])],
+    ["string '0' dimensions", JSON.stringify([{ ImageWidth: "0", ImageHeight: "0" }])],
+    ["numeric string ImageWidth", JSON.stringify([{ ImageWidth: "100", ImageHeight: 200 }])],
+    ["numeric string ImageHeight", JSON.stringify([{ ImageWidth: 100, ImageHeight: "200" }])],
+    ["formatted string ImageWidth", JSON.stringify([{ ImageWidth: "100x200", ImageHeight: 200 }])],
+    ["null ImageWidth", JSON.stringify([{ ImageWidth: null, ImageHeight: 200 }])],
+    ["Infinity ImageWidth", '[{"ImageWidth":1e309,"ImageHeight":200}]'],
+    ["Infinity ImageHeight", '[{"ImageWidth":200,"ImageHeight":1e309}]'],
+  ] as const)("returns null when exiftool emits %s (#3343)", async (_label, stdout) => {
+    withExiftool(() => ({ stdout, stderr: "" }));
+    const dims = await readImageDimensions(Buffer.from("img"), "dng");
+    expect(dims).toBeNull();
+  });
+
   it("returns null when the record itself is absent (empty result array)", async () => {
     withExiftool(() => ({ stdout: "[]", stderr: "" }));
     const dims = await readImageDimensions(Buffer.from("img"), "jpg");
