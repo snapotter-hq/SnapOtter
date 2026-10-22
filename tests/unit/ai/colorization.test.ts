@@ -315,4 +315,153 @@ print("COLORIZE_3087_OK")
       expect(res.stdout).toContain("COLORIZE_3087_OK");
     });
   });
+
+  describe.skipIf(!hasPython)("colorize.py DDColor failure messages (issue #3610)", () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const pyDir = resolve(here, "../../../packages/ai/python");
+
+    it("distinguishes OOMs, missing models/modules, and broken runtime installs in ddcolor_failure_message and main()", () => {
+      const res = spawnSync(
+        pythonBin as string,
+        [
+          "-c",
+          `
+import contextlib, errno, importlib.util, io, json, os, sys, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+
+class FakeImg:
+    shape = (64, 64, 3)
+
+fake_cv2 = types.ModuleType("cv2")
+fake_cv2.IMREAD_COLOR = 1
+fake_cv2.imread = lambda _p, _f: FakeImg()
+fake_cv2.imwrite = lambda _p, _img: True
+sys.modules["cv2"] = fake_cv2
+sys.modules["numpy"] = types.ModuleType("numpy")
+fake_pil = types.ModuleType("PIL")
+fake_pil.Image = types.SimpleNamespace()
+sys.modules["PIL"] = fake_pil
+
+spec = importlib.util.spec_from_file_location("colorize_mod", os.path.join(py_dir, "colorize.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+# 1) Direct unit checks on is_oom_error and ddcolor_failure_message
+for oom_err in (
+    MemoryError("Out of host memory"),
+    MemoryError(),
+    RuntimeError("DefaultCPUAllocator: not enough memory"),
+    RuntimeError("CUDA out of memory"),
+    RuntimeError("Unable to allocate 1.86 GiB for an array"),
+    RuntimeError("Failed to allocate memory for requested buffer"),
+    RuntimeError("cudaErrorMemoryAllocation"),
+    RuntimeError("CUBLAS_STATUS_ALLOC_FAILED"),
+    RuntimeError("std::bad_alloc"),
+    OSError(errno.ENOMEM, "Cannot allocate memory"),
+    OSError(errno.ENOMEM, "Nicht genügend Hauptspeicher verfügbar"),
+):
+    assert mod.is_oom_error(oom_err) is True, f"expected is_oom_error({oom_err!r}) to be True"
+    oom_msg = mod.ddcolor_failure_message(oom_err)
+    assert oom_msg.startswith("DDColor ran out of memory:"), oom_msg
+    assert "Try a smaller image or use model=opencv for basic colorization." in oom_msg, oom_msg
+    assert "Install the colorize feature" not in oom_msg, oom_msg
+    assert "Reinstall" not in oom_msg, oom_msg
+    assert "Reset AI Environment" not in oom_msg, oom_msg
+
+assert mod.is_oom_error(RuntimeError("ONNX Runtime failed to load session")) is False
+assert mod.is_oom_error(OSError(errno.EACCES, "Permission denied")) is False
+
+# Empty / whitespace-only exception messages fall back to exception class name
+assert mod.ddcolor_failure_message(MemoryError()).startswith("DDColor ran out of memory: MemoryError.")
+assert mod.ddcolor_failure_message(RuntimeError("   ")).startswith("DDColor is not available: RuntimeError.")
+
+# 2) Missing module or missing weights -> install guidance
+for missing_err in (
+    FileNotFoundError("DDColor model not found: /opt/models/ddcolor/ddcolor.onnx"),
+    ModuleNotFoundError("No module named 'onnxruntime'"),
+):
+    msg = mod.ddcolor_failure_message(missing_err)
+    assert msg.startswith("DDColor is not available:"), msg
+    assert "Install the colorize feature, or use model=opencv for basic colorization." in msg, msg
+    assert "Reinstall" not in msg, msg
+
+# 3) Broken runtime / dependency conflict -> repair guidance rather than install
+for broken_err in (
+    ImportError("cannot import name 'InferenceSession' from 'onnxruntime'"),
+    RuntimeError("InvalidProtobuf: Protobuf parsing failed"),
+    OSError(errno.EACCES, "Permission denied"),
+):
+    msg = mod.ddcolor_failure_message(broken_err)
+    assert msg.startswith("DDColor is not available:"), msg
+    assert "Install the colorize feature" not in msg, msg
+    assert "Reinstall it from Settings > AI Features" in msg, msg
+    assert "Reset AI Environment" in msg, msg
+    assert "use model=opencv for basic colorization." in msg, msg
+
+# 4) End-to-end main() behavior for OOM, missing model, and runtime failure
+def run_main_expecting_exit1(model_choice="ddcolor"):
+    sys.argv = ["colorize.py", "/tmp/in.png", "/tmp/out_colorize.png", json.dumps({"model": model_choice})]
+    out_buf, err_buf = io.StringIO(), io.StringIO()
+    try:
+        with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+            mod.main()
+    except SystemExit as exc:
+        assert exc.code == 1, exc.code
+        return json.loads(out_buf.getvalue().strip())
+    raise AssertionError(f"Expected SystemExit(1), got stdout={out_buf.getvalue()!r}")
+
+mod.DDCOLOR_MODEL_PATH = os.path.join(py_dir, "colorize.py")
+mod.colorize_ddcolor = lambda _img, _intensity: (_ for _ in ()).throw(
+    RuntimeError("DefaultCPUAllocator: not enough memory")
+)
+oom_payload = run_main_expecting_exit1("auto")
+assert oom_payload == {
+    "success": False,
+    "error": (
+        "DDColor ran out of memory: DefaultCPUAllocator: not enough memory. "
+        "Try a smaller image or use model=opencv for basic colorization."
+    ),
+}, oom_payload
+
+mod.colorize_ddcolor = lambda _img, _intensity: (_ for _ in ()).throw(
+    RuntimeError("InvalidGraph: node input missing")
+)
+broken_payload = run_main_expecting_exit1("ddcolor")
+assert broken_payload["success"] is False
+assert broken_payload["error"].startswith("DDColor is not available: InvalidGraph: node input missing."), broken_payload
+assert "Install the colorize feature" not in broken_payload["error"], broken_payload
+assert "Reinstall it from Settings > AI Features" in broken_payload["error"], broken_payload
+
+mod.DDCOLOR_MODEL_PATH = "/tmp/nonexistent-ddcolor-weights-3610.onnx"
+missing_payload = run_main_expecting_exit1("auto")
+assert missing_payload["success"] is False
+assert "Install the colorize feature" in missing_payload["error"], missing_payload
+
+# 5) Deferred _IMPORT_ERROR guard in main()
+mod._IMPORT_ERROR = ImportError("libGL.so.1: cannot open shared object file")
+libgl_payload = run_main_expecting_exit1("ddcolor")
+assert libgl_payload == {
+    "success": False,
+    "error": "Missing dependency: libGL.so.1: cannot open shared object file. Fix with: apt-get install -y libgl1",
+}, libgl_payload
+
+mod._IMPORT_ERROR = ImportError("No module named 'cv2'")
+cv2_payload = run_main_expecting_exit1("ddcolor")
+assert cv2_payload == {
+    "success": False,
+    "error": "Missing dependency: No module named 'cv2'. Install opencv-python-headless, numpy, and Pillow.",
+}, cv2_payload
+mod._IMPORT_ERROR = None
+
+print("COLORIZE_3610_OK")
+`,
+        ],
+        { encoding: "utf8", timeout: 30_000 },
+      );
+      expect(res.status, res.stderr).toBe(0);
+      expect(res.stdout).toContain("COLORIZE_3610_OK");
+    });
+  });
 });

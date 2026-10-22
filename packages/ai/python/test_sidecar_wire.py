@@ -86,11 +86,13 @@ for script_file in AI_ENTRYPOINT_SCRIPTS:
     assert '"error": str(e)}' not in src, f"{script_file} still formats caught exception with bare str(e)"
     assert "type(e).__name__" in src, f"{script_file} does not fall back to type(e).__name__"
 
+import colorize  # noqa: E402
 import gif_remove_bg  # noqa: E402
 import gpu  # noqa: E402
 import remove_bg  # noqa: E402
 import restore  # noqa: E402
 import upscale  # noqa: E402
+assert colorize._OOM_MARKERS == gif_remove_bg._OOM_MARKERS
 assert remove_bg._OOM_MARKERS == gif_remove_bg._OOM_MARKERS
 assert restore._OOM_MARKERS == gif_remove_bg._OOM_MARKERS
 assert gpu._OOM_MARKERS == gif_remove_bg._OOM_MARKERS
@@ -98,6 +100,7 @@ assert upscale.OOM_ERROR_PATTERNS == gif_remove_bg._OOM_MARKERS
 assert remove_bg._HOST_OOM_MARKERS == gif_remove_bg._HOST_OOM_MARKERS
 assert gpu._HOST_OOM_MARKERS == gif_remove_bg._HOST_OOM_MARKERS
 for oom_mod, oom_fn in (
+    (colorize, colorize.is_oom_error),
     (gif_remove_bg, gif_remove_bg._is_oom),
     (remove_bg, remove_bg._is_oom),
     (restore, restore._is_oom),
