@@ -5200,6 +5200,7 @@ export const ptBR: TranslationKeys = {
       removeScopingLabel: "Remover restrição de permissões",
       restrictPermissionsLabel: "Restringir permissões (opcional)",
       expiresLabel: "Expira:",
+      expiresInPast: "A data de expiração deve estar no futuro.",
       clearButton: "Limpar",
       copyTitle: "Copiar",
       keyWarning: "Guarde esta chave em local seguro. Ela não será exibida novamente.",

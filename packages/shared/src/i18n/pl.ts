@@ -5201,6 +5201,7 @@ export const pl: TranslationKeys = {
       removeScopingLabel: "Usuń ograniczenie uprawnień",
       restrictPermissionsLabel: "Ogranicz uprawnienia (opcjonalnie)",
       expiresLabel: "Wygasa:",
+      expiresInPast: "Data wygaśnięcia musi być w przyszłości.",
       clearButton: "Wyczyść",
       copyTitle: "Kopiuj",
       keyWarning: "Przechowuj ten klucz w bezpiecznym miejscu. Nie będzie ponownie wyświetlony.",

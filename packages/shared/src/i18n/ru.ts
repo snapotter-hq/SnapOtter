@@ -5195,6 +5195,7 @@ export const ru: TranslationKeys = {
       removeScopingLabel: "Убрать ограничение прав",
       restrictPermissionsLabel: "Ограничить права (необязательно)",
       expiresLabel: "Истекает:",
+      expiresInPast: "Дата истечения должна быть в будущем.",
       clearButton: "Очистить",
       copyTitle: "Копировать",
       keyWarning: "Сохраните этот ключ в безопасном месте. Он больше не будет показан.",

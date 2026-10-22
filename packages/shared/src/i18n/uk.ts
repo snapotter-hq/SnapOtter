@@ -5196,6 +5196,7 @@ export const uk: TranslationKeys = {
       removeScopingLabel: "Прибрати обмеження прав",
       restrictPermissionsLabel: "Обмежити права (необов'язково)",
       expiresLabel: "Спливає:",
+      expiresInPast: "Дата закінчення дії має бути в майбутньому.",
       clearButton: "Очистити",
       copyTitle: "Копіювати",
       keyWarning: "Збережіть цей ключ у безпечному місці. Він більше не буде показаний.",

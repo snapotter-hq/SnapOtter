@@ -5185,6 +5185,7 @@ export const sv: TranslationKeys = {
       removeScopingLabel: "Ta bort behörighetsavgränsning",
       restrictPermissionsLabel: "Begränsa behörigheter (valfritt)",
       expiresLabel: "Går ut:",
+      expiresInPast: "Utgångsdatumet måste ligga i framtiden.",
       clearButton: "Rensa",
       copyTitle: "Kopiera",
       keyWarning: "Förvara denna nyckel säkert. Den visas inte igen.",

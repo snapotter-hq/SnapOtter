@@ -5220,6 +5220,7 @@ export const de: TranslationKeys = {
       removeScopingLabel: "Berechtigungsbeschränkung entfernen",
       restrictPermissionsLabel: "Berechtigungen einschränken (optional)",
       expiresLabel: "Läuft ab:",
+      expiresInPast: "Das Ablaufdatum muss in der Zukunft liegen.",
       clearButton: "Leeren",
       copyTitle: "Kopieren",
       keyWarning: "Bewahren Sie diesen Schlüssel sicher auf. Er wird nicht erneut angezeigt.",

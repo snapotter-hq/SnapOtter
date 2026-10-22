@@ -920,6 +920,32 @@ describe("API keys (#2713)", () => {
     await expectShown(expected);
   });
 
+  it("maps 400 VALIDATION_ERROR to expiresInPast when an expiration date was submitted, and falls back when none was set (#3214)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      vi.setSystemTime(new Date("2026-07-15T12:30:45.000Z"));
+      renderDe(<ApiKeysSection />);
+      const generateBtn = await screen.findByRole("button", { name: s.apiKeys.generateButton });
+
+      // Without expiresAt, a server 400 VALIDATION_ERROR is not an expiry error.
+      const nonExpiryErr = apiError(400, "VALIDATION_ERROR");
+      apiPost.mockRejectedValueOnce(nonExpiryErr);
+      fireEvent.click(generateBtn);
+      await expectShown(de.common.somethingWentWrong);
+      expect(console.warn).toHaveBeenCalledWith(expect.any(String), nonExpiryErr);
+
+      // With a future expiresAt that the server rejects for clock skew, show expiresInPast.
+      const expiresInput = screen.getByLabelText(s.apiKeys.expiresLabel);
+      const minVal = expiresInput.getAttribute("min") ?? "";
+      fireEvent.change(expiresInput, { target: { value: minVal } });
+      apiPost.mockRejectedValueOnce(apiError(400, "VALIDATION_ERROR"));
+      fireEvent.click(generateBtn);
+      await expectShown(s.apiKeys.expiresInPast);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it.each([
     reject(401, "AUTH_REQUIRED", de.errors.sessionEnded),
     reject(403, "FORBIDDEN", de.errors.forbidden),
@@ -955,10 +981,10 @@ describe("API keys (#2713)", () => {
   });
 
   it.each([
-    ["ahead of UTC (UTC+4)", "2026-07-15T22:30:45.000Z", -240, "2026-07-16T02:30"],
-    ["behind UTC (UTC-5)", "2026-07-15T02:30:45.000Z", 300, "2026-07-14T21:30"],
+    ["ahead of UTC (UTC+4)", "2026-07-15T22:30:45.000Z", -240, "2026-07-16T02:31"],
+    ["behind UTC (UTC-5)", "2026-07-15T02:30:45.000Z", 300, "2026-07-14T21:31"],
   ])(
-    "formats the expiration datetime-local min in local wall-clock time when %s (#3201)",
+    "formats the expiration datetime-local min as the next local minute when %s (#3201, #3214)",
     async (_label, isoNow, tzOffsetMinutes, expectedMin) => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       try {
@@ -972,6 +998,95 @@ describe("API keys (#2713)", () => {
       }
     },
   );
+
+  it("rejects a past or current-minute expiration date before calling the server, and recovers on retry (#3214)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      vi.setSystemTime(new Date("2026-07-15T12:30:45.000Z"));
+      renderDe(<ApiKeysSection />);
+      const expiresInput = await screen.findByLabelText(s.apiKeys.expiresLabel);
+      const generateBtn = screen.getByRole("button", { name: s.apiKeys.generateButton });
+
+      // Current local minute (truncates seconds to :30:00.000, 45s in the past).
+      const currentLocalMinute = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000)
+        .toISOString()
+        .slice(0, 16);
+      fireEvent.change(expiresInput, { target: { value: currentLocalMinute } });
+      fireEvent.click(generateBtn);
+      await expectShown(s.apiKeys.expiresInPast);
+      expect(apiPost).not.toHaveBeenCalled();
+      expect(generateBtn).not.toBeDisabled();
+
+      // Explicitly typed past date.
+      fireEvent.change(expiresInput, { target: { value: "2020-01-01T00:00" } });
+      fireEvent.click(generateBtn);
+      await expectShown(s.apiKeys.expiresInPast);
+      expect(apiPost).not.toHaveBeenCalled();
+
+      // Clearing the expiration date and retrying succeeds and clears the error banner.
+      apiPost.mockResolvedValueOnce({ key: "si_recovered" });
+      fireEvent.click(screen.getByRole("button", { name: s.apiKeys.clearButton }));
+      fireEvent.click(generateBtn);
+      await expectShown("si_recovered");
+      expect(screen.queryByText(s.apiKeys.expiresInPast)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("rejects an expiration minute that reached or passed Date.now() while the dialog stayed open (#3214)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      vi.setSystemTime(new Date("2026-07-15T12:30:45.000Z"));
+      renderDe(<ApiKeysSection />);
+      const expiresInput = await screen.findByLabelText(s.apiKeys.expiresLabel);
+      const minVal = expiresInput.getAttribute("min") ?? "";
+      fireEvent.change(expiresInput, { target: { value: minVal } });
+
+      // Advance to the exact start of the selected minute (parsedExpiry.getTime() === Date.now()).
+      vi.setSystemTime(new Date("2026-07-15T12:31:00.000Z"));
+      fireEvent.click(screen.getByRole("button", { name: s.apiKeys.generateButton }));
+
+      await expectShown(s.apiKeys.expiresInPast);
+      expect(apiPost).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("rejects an unparseable expiration date without throwing or calling the server (#3214)", async () => {
+    renderDe(<ApiKeysSection />);
+    const expiresInput = (await screen.findByLabelText(s.apiKeys.expiresLabel)) as HTMLInputElement;
+    // Bypass jsdom's datetime-local value sanitization to reach the NaN guard in generateKey.
+    expiresInput.type = "text";
+    fireEvent.change(expiresInput, { target: { value: "not-a-date" } });
+    fireEvent.click(screen.getByRole("button", { name: s.apiKeys.generateButton }));
+
+    await expectShown(s.apiKeys.expiresInPast);
+    expect(apiPost).not.toHaveBeenCalled();
+    expect(console.warn).not.toHaveBeenCalled();
+  });
+
+  it("selecting the earliest allowed min minute submits a timestamp strictly in the future (#3214)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const now = new Date("2026-07-15T12:30:45.000Z");
+      vi.setSystemTime(now);
+      apiPost.mockResolvedValueOnce({ key: "si_future" });
+      renderDe(<ApiKeysSection />);
+      const expiresInput = await screen.findByLabelText(s.apiKeys.expiresLabel);
+      const minVal = expiresInput.getAttribute("min") ?? "";
+      fireEvent.change(expiresInput, { target: { value: minVal } });
+      fireEvent.click(screen.getByRole("button", { name: s.apiKeys.generateButton }));
+
+      await expectShown("si_future");
+      expect(apiPost).toHaveBeenCalledTimes(1);
+      const sentExpiresAt = (apiPost.mock.calls[0][1] as { expiresAt: string }).expiresAt;
+      expect(new Date(sentExpiresAt).getTime()).toBeGreaterThan(now.getTime());
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("Tools: save disabled tools (#2713)", () => {

@@ -5116,6 +5116,7 @@ export const th: TranslationKeys = {
       removeScopingLabel: "ลบการจำกัดสิทธิ์",
       restrictPermissionsLabel: "จำกัดสิทธิ์ (ไม่บังคับ)",
       expiresLabel: "หมดอายุ:",
+      expiresInPast: "วันหมดอายุต้องเป็นเวลาในอนาคต",
       clearButton: "ล้าง",
       copyTitle: "คัดลอก",
       keyWarning: "เก็บคีย์นี้ไว้อย่างปลอดภัย จะไม่แสดงอีก",

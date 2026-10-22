@@ -4894,6 +4894,7 @@ export const zhCN: TranslationKeys = {
       removeScopingLabel: "移除权限范围限制",
       restrictPermissionsLabel: "限制权限（可选）",
       expiresLabel: "过期时间：",
+      expiresInPast: "过期时间必须是未来的时间。",
       clearButton: "清除",
       copyTitle: "复制",
       keyWarning: "请妥善保管此密钥。它将不再显示。",

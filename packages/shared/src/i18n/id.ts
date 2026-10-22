@@ -5185,6 +5185,7 @@ export const id: TranslationKeys = {
       removeScopingLabel: "Hapus pembatasan izin",
       restrictPermissionsLabel: "Batasi izin (opsional)",
       expiresLabel: "Kedaluwarsa:",
+      expiresInPast: "Tanggal kedaluwarsa harus di masa mendatang.",
       clearButton: "Hapus",
       copyTitle: "Salin",
       keyWarning: "Simpan kunci ini dengan aman. Kunci tidak akan ditampilkan lagi.",

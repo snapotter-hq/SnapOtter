@@ -5108,6 +5108,7 @@ export const ko: TranslationKeys = {
       removeScopingLabel: "권한 범위 해제",
       restrictPermissionsLabel: "권한 제한 (선택)",
       expiresLabel: "만료:",
+      expiresInPast: "만료일은 미래의 날짜여야 합니다.",
       clearButton: "지우기",
       copyTitle: "복사",
       keyWarning: "이 키를 안전하게 보관하세요. 다시 표시되지 않습니다.",

@@ -5178,6 +5178,7 @@ export const vi: TranslationKeys = {
       removeScopingLabel: "Bỏ giới hạn quyền",
       restrictPermissionsLabel: "Hạn chế quyền (tùy chọn)",
       expiresLabel: "Hết hạn:",
+      expiresInPast: "Ngày hết hạn phải ở trong tương lai.",
       clearButton: "Xóa",
       copyTitle: "Sao chép",
       keyWarning: "Lưu trữ khóa này an toàn. Khóa sẽ không được hiển thị lại.",

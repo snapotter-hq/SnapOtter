@@ -2386,16 +2386,25 @@ export function ApiKeysSection() {
   }, [loadKeys]);
 
   const generateKey = useCallback(async () => {
-    setGenerating(true);
     setNewKey(null);
     setError(null);
+    let expiresAtIso: string | undefined;
+    if (expiresAt) {
+      const parsedExpiry = new Date(expiresAt);
+      if (Number.isNaN(parsedExpiry.getTime()) || parsedExpiry.getTime() <= Date.now()) {
+        setError(t.settings.apiKeys.expiresInPast);
+        return;
+      }
+      expiresAtIso = parsedExpiry.toISOString();
+    }
+    setGenerating(true);
     try {
       const payload: Record<string, unknown> = { name: keyName || "default" };
       if (showScoping && scopedPerms.length > 0) {
         payload.permissions = scopedPerms;
       }
-      if (expiresAt) {
-        payload.expiresAt = new Date(expiresAt).toISOString();
+      if (expiresAtIso) {
+        payload.expiresAt = expiresAtIso;
       }
       const data = await apiPost<{ key: string }>("/v1/api-keys", payload);
       setNewKey(data.key);
@@ -2407,7 +2416,18 @@ export function ApiKeysSection() {
       setExpiresAt("");
       await loadKeys();
     } catch (err) {
-      setError(apiErrorMessage(t, err, {}, t.common.somethingWentWrong));
+      setError(
+        apiErrorMessage(
+          t,
+          err,
+          {
+            ...(expiresAtIso && {
+              VALIDATION_ERROR: t.settings.apiKeys.expiresInPast,
+            }),
+          },
+          t.common.somethingWentWrong,
+        ),
+      );
     } finally {
       setGenerating(false);
     }
@@ -2527,7 +2547,7 @@ export function ApiKeysSection() {
             value={expiresAt}
             onChange={(e) => setExpiresAt(e.target.value)}
             className="px-2 py-1 rounded border border-border bg-background text-xs text-foreground"
-            min={new Date(Date.now() - new Date().getTimezoneOffset() * 60_000)
+            min={new Date(Date.now() + 60_000 - new Date().getTimezoneOffset() * 60_000)
               .toISOString()
               .slice(0, 16)}
           />

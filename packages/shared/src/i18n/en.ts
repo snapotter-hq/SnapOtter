@@ -5120,6 +5120,7 @@ export const en = {
       removeScopingLabel: "Remove permission scoping",
       restrictPermissionsLabel: "Restrict permissions (optional)",
       expiresLabel: "Expires:",
+      expiresInPast: "Expiration date must be in the future.",
       clearButton: "Clear",
       copyTitle: "Copy",
       keyWarning: "Store this key securely. It will not be shown again.",

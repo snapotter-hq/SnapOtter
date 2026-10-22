@@ -5205,6 +5205,7 @@ export const nl: TranslationKeys = {
       removeScopingLabel: "Rechtenbegrenzing verwijderen",
       restrictPermissionsLabel: "Rechten beperken (optioneel)",
       expiresLabel: "Verloopt:",
+      expiresInPast: "De vervaldatum moet in de toekomst liggen.",
       clearButton: "Wissen",
       copyTitle: "Kopiëren",
       keyWarning: "Bewaar deze sleutel veilig. Hij wordt niet opnieuw getoond.",

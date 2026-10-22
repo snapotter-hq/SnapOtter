@@ -5137,6 +5137,7 @@ export const ja: TranslationKeys = {
       removeScopingLabel: "権限スコープを解除",
       restrictPermissionsLabel: "権限を制限（任意）",
       expiresLabel: "有効期限：",
+      expiresInPast: "有効期限は将来の日時を指定してください。",
       clearButton: "クリア",
       copyTitle: "コピー",
       keyWarning: "このキーは安全に保管してください。再表示されません。",

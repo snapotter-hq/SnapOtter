@@ -4893,6 +4893,7 @@ export const zhTW: TranslationKeys = {
       removeScopingLabel: "移除權限範圍",
       restrictPermissionsLabel: "限制權限（選填）",
       expiresLabel: "到期時間：",
+      expiresInPast: "到期時間必須是未來的時間。",
       clearButton: "清除",
       copyTitle: "複製",
       keyWarning: "請安全保存此金鑰。它將不會再次顯示。",

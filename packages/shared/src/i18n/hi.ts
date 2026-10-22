@@ -4978,6 +4978,7 @@ export const hi: TranslationKeys = {
       removeScopingLabel: "अनुमति स्कोपिंग हटाएं",
       restrictPermissionsLabel: "अनुमतियां प्रतिबंधित करें (वैकल्पिक)",
       expiresLabel: "समाप्ति:",
+      expiresInPast: "समाप्ति तिथि भविष्य में होनी चाहिए।",
       clearButton: "साफ करें",
       copyTitle: "कॉपी",
       keyWarning: "इस कुंजी को सुरक्षित रखें। यह दोबारा नहीं दिखाई जाएगी।",

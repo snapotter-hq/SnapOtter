@@ -5195,6 +5195,7 @@ export const tr: TranslationKeys = {
       removeScopingLabel: "İzin kapsamını kaldır",
       restrictPermissionsLabel: "İzinleri kısıtla (isteğe bağlı)",
       expiresLabel: "Son kullanma:",
+      expiresInPast: "Son kullanma tarihi gelecekte olmalıdır.",
       clearButton: "Temizle",
       copyTitle: "Kopyala",
       keyWarning: "Bu anahtarı güvenli bir yerde saklayın. Bir daha gösterilmeyecektir.",

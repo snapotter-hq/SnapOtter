@@ -5147,6 +5147,7 @@ export const ar: TranslationKeys = {
       removeScopingLabel: "إزالة تحديد الصلاحيات",
       restrictPermissionsLabel: "تقييد الصلاحيات (اختياري)",
       expiresLabel: "ينتهي:",
+      expiresInPast: "يجب أن يكون تاريخ الانتهاء في المستقبل.",
       clearButton: "مسح",
       copyTitle: "نسخ",
       keyWarning: "احفظ هذا المفتاح بأمان. لن يظهر مرة أخرى.",
