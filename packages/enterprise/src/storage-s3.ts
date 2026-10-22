@@ -132,12 +132,9 @@ export async function checkConnection(): Promise<void> {
   } catch (err) {
     // HEAD responses carry no body, so the SDK deserializes a missing-bucket
     // 404 from HeadBucket as NotFound rather than NoSuchBucket. HeadBucket has
-    // no object key, so any 404 here means the bucket itself is gone (#996).
-    if (
-      typeof err === "object" &&
-      err !== null &&
-      (err as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404
-    ) {
+    // no object key, so any missing-object 404 shape here means the bucket
+    // itself is gone (#996).
+    if (isMissingObjectError(err)) {
       (err as { name?: string }).name = "NoSuchBucket";
     }
     throw err;

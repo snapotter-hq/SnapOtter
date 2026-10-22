@@ -682,8 +682,9 @@ describe("S3Client stalled endpoint timeout (#2755)", () => {
 describe("checkConnection missing-bucket normalization (#996)", () => {
   it("normalizes a HeadBucket 404 NotFound into NoSuchBucket so isMissingObjectError rejects it", async () => {
     let statusToReturn = 404;
+    let headersToReturn: Record<string, string> = {};
     const server = http.createServer((_req, res) => {
-      res.writeHead(statusToReturn);
+      res.writeHead(statusToReturn, headersToReturn);
       res.end();
     });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -710,6 +711,19 @@ describe("checkConnection missing-bucket normalization (#996)", () => {
         $metadata: { httpStatusCode: 404 },
       });
       expect(s3.isMissingObjectError(missingBucketErr)).toBe(false);
+
+      headersToReturn = { "Content-Type": "text/html; charset=utf-8" };
+      const htmlProxy404Err = await s3.checkConnection().then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(htmlProxy404Err).toBeInstanceOf(Error);
+      expect(htmlProxy404Err).toMatchObject({
+        name: "NotFound",
+        $metadata: { httpStatusCode: 404 },
+      });
+      expect(s3.isMissingObjectError(htmlProxy404Err)).toBe(false);
+      headersToReturn = {};
 
       statusToReturn = 403;
       const forbiddenErr = await s3.checkConnection().then(

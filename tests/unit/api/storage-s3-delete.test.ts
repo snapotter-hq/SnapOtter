@@ -28,6 +28,7 @@ vi.mock("@aws-sdk/client-s3", async (importOriginal) => {
 const {
   S3_CONNECTION_TIMEOUT_MS,
   S3_SOCKET_TIMEOUT_MS,
+  checkConnection,
   configureS3,
   deleteGenericObject,
   deleteGenericPrefix,
@@ -701,6 +702,63 @@ describe("getGenericObjectStream (#2850)", () => {
       Bucket: "b",
       Key: "tenant-a/outputs/job-1/result.png",
       Range: "bytes=64-",
+    });
+  });
+});
+
+describe("checkConnection error name preservation (#3534)", () => {
+  it("relabels a genuine HeadBucket 404 NotFound to NoSuchBucket", async () => {
+    send.mockRejectedValueOnce(s3Error("NotFound", 404));
+    await expect(checkConnection()).rejects.toMatchObject({
+      name: "NoSuchBucket",
+      $metadata: { httpStatusCode: 404 },
+    });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]?.[0]?.input).toEqual({ Bucket: "b" });
+  });
+
+  it("preserves TimeoutError, AbortError, socket reset, and HTML proxy 404 names on HTTP 404 rejections", async () => {
+    const timeoutErr = Object.assign(new Error("Request timed out"), {
+      name: "TimeoutError",
+      $metadata: { httpStatusCode: 404 },
+    });
+    send.mockRejectedValueOnce(timeoutErr);
+    await expect(checkConnection()).rejects.toMatchObject({
+      name: "TimeoutError",
+      $metadata: { httpStatusCode: 404 },
+    });
+
+    const abortErr = Object.assign(new Error("The operation was aborted"), {
+      name: "AbortError",
+      $metadata: { httpStatusCode: 404 },
+    });
+    send.mockRejectedValueOnce(abortErr);
+    await expect(checkConnection()).rejects.toMatchObject({
+      name: "AbortError",
+      $metadata: { httpStatusCode: 404 },
+    });
+
+    const resetErr = Object.assign(new Error("read ECONNRESET"), {
+      name: "Error",
+      code: "ECONNRESET",
+      $metadata: { httpStatusCode: 404 },
+    });
+    send.mockRejectedValueOnce(resetErr);
+    await expect(checkConnection()).rejects.toMatchObject({
+      name: "Error",
+      code: "ECONNRESET",
+      $metadata: { httpStatusCode: 404 },
+    });
+
+    const htmlProxyErr = Object.assign(new Error("UnknownError"), {
+      name: "NotFound",
+      $metadata: { httpStatusCode: 404 },
+      $response: { headers: { "content-type": "text/html; charset=utf-8" } },
+    });
+    send.mockRejectedValueOnce(htmlProxyErr);
+    await expect(checkConnection()).rejects.toMatchObject({
+      name: "NotFound",
+      $metadata: { httpStatusCode: 404 },
     });
   });
 });
