@@ -1820,6 +1820,80 @@ describe("useCollageStore", () => {
     expect(run.isCurrent()).toBe(false);
   });
 
+  it("removeImage with out-of-bounds index is a no-op and does not cancel active runs or mutate state (#3557)", async () => {
+    const imagePreview = await import("@/lib/image-preview");
+    const revokePreviewMock = vi.mocked(imagePreview.revokePreviewUrl);
+
+    // 1. Empty images list: user-configured settings and active runs must be preserved
+    useCollageStore.setState({
+      gap: 16,
+      cornerRadius: 12,
+      backgroundColor: "#123456",
+      bgPreset: "custom",
+      aspectRatio: "16:9",
+      outputFormat: "webp",
+      quality: 75,
+      templateId: "3-h-equal",
+    });
+    const abortEmpty = vi.fn();
+    const emptyRun = beginCollageRun(abortEmpty);
+
+    useCollageStore.getState().removeImage(0);
+    useCollageStore.getState().removeImage(-1);
+
+    const afterEmpty = useCollageStore.getState();
+    expect(afterEmpty.images).toEqual([]);
+    expect(afterEmpty.gap).toBe(16);
+    expect(afterEmpty.cornerRadius).toBe(12);
+    expect(afterEmpty.backgroundColor).toBe("#123456");
+    expect(afterEmpty.bgPreset).toBe("custom");
+    expect(afterEmpty.aspectRatio).toBe("16:9");
+    expect(afterEmpty.outputFormat).toBe("webp");
+    expect(afterEmpty.quality).toBe(75);
+    expect(afterEmpty.templateId).toBe("3-h-equal");
+    expect(abortEmpty).not.toHaveBeenCalled();
+    expect(emptyRun.isCurrent()).toBe(true);
+    emptyRun.end();
+
+    // 2. Non-empty images list: out-of-bounds indices (-1, >= length) must be a no-op
+    useCollageStore.getState().reset();
+    const file1 = new File(["a"], "a.png", { type: "image/png" });
+    const file2 = new File(["b"], "b.png", { type: "image/png" });
+    useCollageStore.getState().addImages([file1, file2]);
+    useCollageStore.getState().setTemplateId("3-h-equal");
+    useCollageStore.getState().setCellTransform(0, { zoom: 2 });
+    useCollageStore.getState().setSelectedCell(1);
+    useCollageStore.getState().setResult("blob:result", 5000, 10000, "job-123");
+    useCollageStore.setState({ error: "Previous warning" });
+
+    revokeObjectURL.mockClear();
+    revokePreviewMock.mockClear();
+    const abortActive = vi.fn();
+    const activeRun = beginCollageRun(abortActive);
+
+    useCollageStore.getState().removeImage(2);
+    useCollageStore.getState().removeImage(99);
+    useCollageStore.getState().removeImage(-1);
+
+    const afterNonEmpty = useCollageStore.getState();
+    expect(afterNonEmpty.images).toHaveLength(2);
+    expect(afterNonEmpty.templateId).toBe("3-h-equal");
+    expect(afterNonEmpty.cellAssignments).toEqual([0, 1, -1]);
+    expect(afterNonEmpty.cellTransforms[0]?.zoom).toBe(2);
+    expect(afterNonEmpty.selectedCell).toBe(1);
+    expect(afterNonEmpty.phase).toBe("result");
+    expect(afterNonEmpty.resultUrl).toBe("blob:result");
+    expect(afterNonEmpty.resultSize).toBe(5000);
+    expect(afterNonEmpty.originalSize).toBe(10000);
+    expect(afterNonEmpty.jobId).toBe("job-123");
+    expect(afterNonEmpty.error).toBe("Previous warning");
+    expect(abortActive).not.toHaveBeenCalled();
+    expect(activeRun.isCurrent()).toBe(true);
+    expect(revokeObjectURL).not.toHaveBeenCalled();
+    expect(revokePreviewMock).not.toHaveBeenCalled();
+    activeRun.end();
+  });
+
   it("addImages triggers async preview loading for HEIC files", async () => {
     // Override the mocked needsServerPreview to return true for this test
     const imagePreview = await import("@/lib/image-preview");

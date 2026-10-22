@@ -215,17 +215,16 @@ export const useCollageStore = create<CollageState>((set, get) => ({
 
   removeImage: (index) => {
     const state = get();
+    const img = state.images[index];
+    if (!img) return;
     const newImages = state.images.filter((_, i) => i !== index);
     if (newImages.length === 0) {
       get().reset();
       return;
     }
     cancelActiveCollageRun();
-    const img = state.images[index];
-    if (img) {
-      URL.revokeObjectURL(img.blobUrl);
-      if (img.previewBlobUrl) revokePreviewUrl(img.previewBlobUrl);
-    }
+    URL.revokeObjectURL(img.blobUrl);
+    if (img.previewBlobUrl) revokePreviewUrl(img.previewBlobUrl);
     const template = getDefaultTemplate(newImages.length);
     const assignments = buildDefaultAssignments(newImages.length, template.cells.length);
     set({
