@@ -2004,6 +2004,78 @@ async function buildBatchZip(
   }
 }
 
+type JobErrorPayload = {
+  message?: string;
+  code?: string;
+  details?: string;
+  httpStatus?: number;
+};
+
+/**
+ * Reconstruct a pipeline-batch child's error and cancel state from its
+ * `${childId}-s<step>` rows when the child `pipeline-finalize` row's terminal
+ * DB write rolled back or never ran (#3189). Mirrors processPipelineFinalize's
+ * step scan so manifest, childFaults, and canceledChildren match a committed
+ * child finalize row.
+ */
+async function fallbackPipelineChildError(
+  childId: string,
+  stepCount?: number,
+): Promise<{
+  error: JobErrorPayload | null;
+  canceled: boolean;
+  step0InputRef?: string;
+}> {
+  const maxSteps =
+    typeof stepCount === "number" && stepCount > 0
+      ? stepCount
+      : env.MAX_PIPELINE_STEPS > 0
+        ? env.MAX_PIPELINE_STEPS
+        : 20;
+  let step0InputRef: string | undefined;
+  for (let s = 0; s < maxSteps; s++) {
+    const [stepRow] = await db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, `${childId}-s${s}`));
+    if (!stepRow) {
+      if (typeof stepCount === "number" && stepCount > 0) {
+        return {
+          error: { message: `Step ${s + 1}: Step ${s + 1} row not found` },
+          canceled: false,
+          step0InputRef,
+        };
+      }
+      break;
+    }
+    if (s === 0) {
+      step0InputRef = stepRow.inputRefs?.[0];
+    }
+    if (stepRow.status !== "completed") {
+      if (stepRow.status === "canceled") {
+        return {
+          error: { message: "Canceled" },
+          canceled: true,
+          step0InputRef,
+        };
+      }
+      const stepError = stepRow.error as JobErrorPayload | null;
+      const failError = stepError?.message ?? `Step ${s + 1} failed`;
+      return {
+        error: {
+          message: `Step ${s + 1}: ${friendlyError(failError)}`,
+          ...(stepError?.code && { code: stepError.code }),
+          ...(stepError?.details && { details: stepError.details }),
+          ...(stepError?.httpStatus !== undefined && { httpStatus: stepError.httpStatus }),
+        },
+        canceled: false,
+        step0InputRef,
+      };
+    }
+  }
+  return { error: null, canceled: false, step0InputRef };
+}
+
 /**
  * Assembles the ordered manifest from child DB rows after all batch
  * children have completed, packages the successful outputs into a durable
@@ -2021,6 +2093,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
   const settings = (data.settings ?? {}) as {
     flowChildCount?: number;
     fileIndexMap?: number[];
+    stepCount?: number;
     preFailureFaults?: unknown;
   };
   const flowChildCount = settings.flowChildCount ?? data.totalFiles ?? 0;
@@ -2045,6 +2118,7 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
   const childFaults: BatchFault[] = [];
 
   let canceledChildren = 0;
+  let parentStepCount: number | undefined | null = null;
   for (let i = 0; i < flowChildCount; i++) {
     const childId = `${data.jobId}-f${i}`;
     const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, childId));
@@ -2068,16 +2142,28 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
         ...(notes ? { notes } : {}),
       });
     } else {
-      if (row.status === "canceled") canceledChildren++;
-      const rowError = row.error as {
-        message?: string;
-        code?: string;
-        details?: string;
-        httpStatus?: number;
-      } | null;
+      let rowError = row.error as JobErrorPayload | null;
+      let stepFallback: Awaited<ReturnType<typeof fallbackPipelineChildError>> | null = null;
+      if (!rowError && row.type === "pipeline-finalize") {
+        let childStepCount =
+          (row.settings as { stepCount?: number } | null)?.stepCount ?? settings.stepCount;
+        if (childStepCount === undefined) {
+          if (parentStepCount === null) {
+            const [parentRow] = await db
+              .select({ settings: schema.jobs.settings })
+              .from(schema.jobs)
+              .where(eq(schema.jobs.id, data.jobId));
+            parentStepCount = (parentRow?.settings as { stepCount?: number } | null)?.stepCount;
+          }
+          childStepCount = parentStepCount;
+        }
+        stepFallback = await fallbackPipelineChildError(childId, childStepCount);
+        rowError = stepFallback.error;
+      }
+      if (row.status === "canceled" || stepFallback?.canceled) canceledChildren++;
       const errorMsg = rowError?.message ?? "Processing failed";
-      let inputRef = row.inputRefs?.[0];
-      if (!inputRef && row.type === "pipeline-finalize") {
+      let inputRef = row.inputRefs?.[0] ?? stepFallback?.step0InputRef;
+      if (!inputRef && row.type === "pipeline-finalize" && !stepFallback) {
         const [step0] = await db
           .select({ inputRefs: schema.jobs.inputRefs })
           .from(schema.jobs)

@@ -2908,6 +2908,238 @@ describe("processBatchFinalize durable error recovery (#2629)", () => {
       ],
     });
   });
+
+  it("reconstructs step error, fault code, and cancel state from pipeline-step rows when a pipeline-batch child's terminal DB write rolled back (#3189)", async () => {
+    // 1. Single-file pipeline-batch where child pipeline-finalize row stayed queued/error:null
+    // after a 503 ENGINE_UNAVAILABLE on step 0, including internal path stripping via friendlyError.
+    const { processor: p1, failBatchJobMock: fail1 } = await setupSystemProcessor({
+      rowsById: {
+        "bp-fault-f0": {
+          id: "bp-fault-f0",
+          type: "pipeline-finalize",
+          status: "queued",
+          inputRefs: ["uploads/bp-fault-f0-s0/doc.pdf"],
+          error: null,
+        },
+        "bp-fault-f0-s0": {
+          id: "bp-fault-f0-s0",
+          type: "pipeline-step",
+          status: "failed",
+          inputRefs: ["uploads/bp-fault-f0-s0/doc.pdf"],
+          error: {
+            message: "qpdf failed on /data/workspace/uploads/bp-fault-f0-s0/doc.pdf",
+            code: "ENGINE_UNAVAILABLE",
+            details: "Check QPDF_PATH",
+            httpStatus: 503,
+          },
+        },
+      },
+      counterErrors: [],
+    });
+
+    const res1 = (await p1({
+      id: "bp-fault",
+      name: "batch-finalize",
+      data: {
+        kind: "batch-finalize",
+        jobId: "bp-fault",
+        toolId: "pipeline-batch",
+        userId: null,
+        pool: "system",
+        totalFiles: 1,
+        inputRefs: [],
+        filename: "",
+        settings: { flowChildCount: 1, fileIndexMap: [0] },
+      },
+    })) as { resultPayload?: Record<string, unknown> };
+
+    expect(res1.resultPayload).toEqual({
+      manifest: [
+        {
+          index: 0,
+          filename: "doc.pdf",
+          error: "Step 1: qpdf failed on [internal]",
+          code: "ENGINE_UNAVAILABLE",
+        },
+      ],
+      allFailed: true,
+      fault: {
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        error: "Step 1: qpdf failed on [internal]",
+        details: "Check QPDF_PATH",
+      },
+    });
+    expect(fail1).toHaveBeenCalledWith({
+      jobId: "bp-fault",
+      totalFiles: 1,
+      completedFiles: 1,
+      failedFiles: 1,
+      message: "Step 1: qpdf failed on [internal]",
+      code: "ENGINE_UNAVAILABLE",
+      details: "Check QPDF_PATH",
+      errors: [
+        { filename: "doc.pdf", error: "Step 1: qpdf failed on [internal]" },
+        { filename: "", error: "Step 1: qpdf failed on [internal]: Check QPDF_PATH" },
+      ],
+    });
+
+    // 2. Multi-step failure (step 0 completed with inputRefs, step 1 failed without message),
+    // missing step row resolved via parent batch row's settings.stepCount when child row has
+    // settings: {}, and partial counterErrors deduplication in resolveBatchErrors.
+    const { processor: p2, failBatchJobMock: fail2 } = await setupSystemProcessor({
+      rowsById: {
+        "bp-multi": {
+          id: "bp-multi",
+          type: "batch",
+          toolId: "pipeline-batch",
+          status: "queued",
+          settings: { flowChildCount: 2, fileIndexMap: [0, 1], stepCount: 2 },
+        },
+        "bp-multi-f0": {
+          id: "bp-multi-f0",
+          type: "pipeline-finalize",
+          status: "queued",
+          inputRefs: [],
+          settings: {},
+          error: null,
+        },
+        "bp-multi-f0-s0": {
+          id: "bp-multi-f0-s0",
+          type: "pipeline-step",
+          status: "completed",
+          inputRefs: ["uploads/bp-multi-f0-s0/first.pdf"],
+          outputRefs: ["outputs/bp-multi-f0-s0/first.pdf"],
+        },
+        "bp-multi-f0-s1": {
+          id: "bp-multi-f0-s1",
+          type: "pipeline-step",
+          status: "failed",
+          inputRefs: [],
+          error: null,
+        },
+        "bp-multi-f1": {
+          id: "bp-multi-f1",
+          type: "pipeline-finalize",
+          status: "queued",
+          inputRefs: ["uploads/bp-multi-f1-s0/second.pdf"],
+          settings: {},
+          error: null,
+        },
+        "bp-multi-f1-s0": {
+          id: "bp-multi-f1-s0",
+          type: "pipeline-step",
+          status: "completed",
+          inputRefs: ["uploads/bp-multi-f1-s0/second.pdf"],
+          outputRefs: ["outputs/bp-multi-f1-s0/second.pdf"],
+        },
+      },
+      counterErrors: [{ filename: "first.pdf", error: "Step 2: Step 2 failed" }],
+    });
+
+    const res2 = (await p2({
+      id: "bp-multi",
+      name: "batch-finalize",
+      data: {
+        kind: "batch-finalize",
+        jobId: "bp-multi",
+        toolId: "pipeline-batch",
+        userId: null,
+        pool: "system",
+        totalFiles: 2,
+        inputRefs: [],
+        filename: "",
+        settings: { flowChildCount: 2, fileIndexMap: [0, 1] },
+      },
+    })) as { resultPayload?: { manifest?: unknown } };
+
+    expect(res2.resultPayload?.manifest).toEqual([
+      { index: 0, filename: "first.pdf", error: "Step 2: Step 2 failed" },
+      { index: 1, filename: "second.pdf", error: "Step 2: Step 2 row not found" },
+    ]);
+    expect(fail2).toHaveBeenCalledWith({
+      jobId: "bp-multi",
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 2,
+      message: "All files failed processing",
+      errors: [
+        { filename: "first.pdf", error: "Step 2: Step 2 failed" },
+        { filename: "second.pdf", error: "Step 2: Step 2 row not found" },
+      ],
+    });
+
+    // 3. Canceled step row and all-completed step rows when child pipeline-finalize write faulted.
+    const { processor: p3, cancelBatchJobMock: cancel3 } = await setupSystemProcessor({
+      rowsById: {
+        "bp-cancel-f0": {
+          id: "bp-cancel-f0",
+          type: "pipeline-finalize",
+          status: "queued",
+          inputRefs: ["uploads/bp-cancel-f0-s0/canceled.pdf"],
+          error: null,
+        },
+        "bp-cancel-f0-s0": {
+          id: "bp-cancel-f0-s0",
+          type: "pipeline-step",
+          status: "canceled",
+          inputRefs: ["uploads/bp-cancel-f0-s0/canceled.pdf"],
+          error: { message: "Canceled" },
+        },
+        "bp-cancel-f1": {
+          id: "bp-cancel-f1",
+          type: "pipeline-finalize",
+          status: "queued",
+          inputRefs: ["uploads/bp-cancel-f1-s0/done-steps.pdf"],
+          error: null,
+        },
+        "bp-cancel-f1-s0": {
+          id: "bp-cancel-f1-s0",
+          type: "pipeline-step",
+          status: "completed",
+          inputRefs: ["uploads/bp-cancel-f1-s0/done-steps.pdf"],
+          outputRefs: ["outputs/bp-cancel-f1-s0/done-steps.pdf"],
+        },
+      },
+      counterErrors: [],
+    });
+
+    const res3 = (await p3({
+      id: "bp-cancel",
+      name: "batch-finalize",
+      data: {
+        kind: "batch-finalize",
+        jobId: "bp-cancel",
+        toolId: "pipeline-batch",
+        userId: null,
+        pool: "system",
+        totalFiles: 2,
+        inputRefs: [],
+        filename: "",
+        settings: { flowChildCount: 2, fileIndexMap: [0, 1] },
+      },
+    })) as { resultPayload?: Record<string, unknown> };
+
+    expect(res3.resultPayload).toEqual({
+      manifest: [
+        { index: 0, filename: "canceled.pdf", error: "Canceled" },
+        { index: 1, filename: "done-steps.pdf", error: "Processing failed" },
+      ],
+      canceled: true,
+      allFailed: true,
+    });
+    expect(cancel3).toHaveBeenCalledWith({
+      jobId: "bp-cancel",
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 2,
+      errors: [
+        { filename: "", error: "Canceled" },
+        { filename: "canceled.pdf", error: "Canceled" },
+        { filename: "done-steps.pdf", error: "Processing failed" },
+      ],
+    });
+  });
 });
 
 describe("processPipelineFinalize (#3167, #2703)", () => {
