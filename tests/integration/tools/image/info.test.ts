@@ -1222,4 +1222,36 @@ describe("Info", () => {
       }
     },
   );
+
+  it("answers 503 ENGINE_UNAVAILABLE when exiftool is killed by SIGKILL during RAW metadata enrichment (#3458)", async () => {
+    const DNG = readFixture(fixtures.image.formats("dng"));
+    const originalPath = process.env.PATH;
+    const shimDir = mkdtempSync(join(tmpdir(), "info-exiftool-oom-"));
+    try {
+      const shimPath = join(shimDir, "exiftool");
+      writeFileSync(shimPath, '#!/bin/sh\nif [ "$1" = "-j" ]; then\n  kill -9 $$\nfi\nexit 1\n');
+      chmodSync(shimPath, 0o755);
+      process.env.PATH = `${shimDir}:${originalPath ?? ""}`;
+
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "sample.dng", contentType: "image/x-adobe-dng", content: DNG },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/info",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      });
+
+      expect(res.statusCode, res.body).toBe(503);
+      expect(JSON.parse(res.body)).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+    } finally {
+      process.env.PATH = originalPath;
+      rmSync(shimDir, { recursive: true, force: true });
+    }
+  });
 });

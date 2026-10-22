@@ -1,5 +1,7 @@
 import { execFile } from "node:child_process";
-import { rm, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { constants } from "node:fs";
+import { open, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { promisify } from "node:util";
@@ -10,6 +12,7 @@ import { stripInternalPaths } from "../../lib/errors.js";
 import { isRawExtension, validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import {
+  asDecoderOutOfMemory,
   DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
@@ -196,11 +199,24 @@ function positiveDimension(value: unknown): number | null {
 async function readExifToolMeta(buffer: Buffer, ext?: string): Promise<ExifMeta | null> {
   const safeExt = ext?.toLowerCase().replace(/[^a-z0-9]/g, "");
   const suffix = safeExt && isRawExtension(safeExt) ? `.${safeExt}` : ".dng";
-  const tmpPath = join(tmpdir(), `info-exif-${Date.now()}${suffix}`);
+  const tmpPath = join(tmpdir(), `info-exif-${randomUUID()}${suffix}`);
   try {
-    await writeFile(tmpPath, buffer).catch((writeErr: unknown) => {
+    try {
+      const fh = await open(tmpPath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY);
+      let fileWriteErr: unknown;
+      try {
+        await fh.writeFile(buffer);
+      } catch (err) {
+        fileWriteErr = err;
+        throw err;
+      } finally {
+        await fh.close().catch((closeErr: unknown) => {
+          if (fileWriteErr === undefined) throw closeErr;
+        });
+      }
+    } catch (writeErr) {
       throw normalizeOperationalWriteError(writeErr);
-    });
+    }
     const { stdout } = await execFileAsync(
       "exiftool",
       [
@@ -232,8 +248,9 @@ async function readExifToolMeta(buffer: Buffer, ext?: string): Promise<ExifMeta 
       hasIcc: !!data.ICCProfileName,
       hasXmp: !!data.XMPToolkit,
     };
-  } catch (err) {
-    if (hasServerErrorStatus(err)) throw err;
+  } catch (rawErr) {
+    const err = asDecoderOutOfMemory(rawErr);
+    if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
     return null;
   } finally {
     await rm(tmpPath, { force: true }).catch(() => {});

@@ -6,7 +6,15 @@
  * Sharp's native TIFF header read on DNG inputs.
  */
 
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  constants,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import multipart from "@fastify/multipart";
@@ -20,19 +28,53 @@ const deletePrefix = vi.fn();
 const decodeHeic = vi.fn();
 const decodeToSharpCompat = vi.fn();
 const writeFileFailure = { next: null as Error | null };
+const handleWriteFailure = { next: null as Error | null };
+const handleCloseFailure = { next: null as Error | null };
 const readFileFailure = { next: null as Error | null };
 const infoExifPaths: string[] = [];
+const infoExifOpenFlags: Array<number | string | undefined> = [];
 const uploadedBuffers = new Map<string, Buffer>();
 
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
   return {
     ...actual,
-    writeFile: (async (path: unknown, ...rest: unknown[]) => {
-      if (/(?:info-exif|exif-inspect|exif-write)-/.test(String(path))) {
-        if (/info-exif-/.test(String(path))) {
-          infoExifPaths.push(String(path));
+    open: (async (path: unknown, flags?: unknown, ...rest: unknown[]) => {
+      if (/info-exif-/.test(String(path))) {
+        infoExifPaths.push(String(path));
+        infoExifOpenFlags.push(flags as number | string | undefined);
+        if (writeFileFailure.next) {
+          const err = writeFileFailure.next;
+          writeFileFailure.next = null;
+          throw err;
         }
+        const fh = await (
+          actual.open as (
+            ...args: unknown[]
+          ) => Promise<typeof actual.open extends (...a: never[]) => Promise<infer R> ? R : never>
+        )(path, flags, ...rest);
+        if (handleWriteFailure.next) {
+          const err = handleWriteFailure.next;
+          handleWriteFailure.next = null;
+          fh.writeFile = async () => {
+            throw err;
+          };
+        }
+        if (handleCloseFailure.next) {
+          const closeErr = handleCloseFailure.next;
+          handleCloseFailure.next = null;
+          const origClose = fh.close.bind(fh);
+          fh.close = async () => {
+            await origClose().catch(() => {});
+            throw closeErr;
+          };
+        }
+        return fh;
+      }
+      return (actual.open as (...args: unknown[]) => unknown)(path, flags, ...rest);
+    }) as typeof actual.open,
+    writeFile: (async (path: unknown, ...rest: unknown[]) => {
+      if (/(?:exif-inspect|exif-write)-/.test(String(path))) {
         if (writeFileFailure.next) {
           const err = writeFileFailure.next;
           writeFileFailure.next = null;
@@ -402,8 +444,11 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
     decodeHeic.mockReset().mockResolvedValue(PNG);
     decodeToSharpCompat.mockReset().mockResolvedValue(PNG);
     writeFileFailure.next = null;
+    handleWriteFailure.next = null;
+    handleCloseFailure.next = null;
     readFileFailure.next = null;
     infoExifPaths.length = 0;
+    infoExifOpenFlags.length = 0;
   });
 
   describe.each(ROUTES)("$name", (route) => {
@@ -610,7 +655,194 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
         expect(res.statusCode, res.body).toBe(200);
         expect(decodeToSharpCompat).toHaveBeenCalledWith(rafMagic, "raw", expectedExt);
         expect(infoExifPaths).toHaveLength(1);
-        expect(infoExifPaths[0]).toMatch(new RegExp(`info-exif-\\d+\\${expectedSuffix}$`));
+        expect(infoExifPaths[0]).toMatch(
+          new RegExp(
+            `info-exif-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\${expectedSuffix}$`,
+          ),
+        );
+        expect(infoExifOpenFlags).toEqual([
+          constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY,
+        ]);
+      },
+    );
+
+    it.each([
+      ["SIGKILL (kernel OOM killer)", "kill -9 $$\n"],
+      [
+        "libgomp thread creation failure",
+        'printf "%s\\n" "libgomp: Thread creation failed: Resource temporarily unavailable" >&2\nexit 1\n',
+      ],
+      [
+        "std::system_error thread abort (SIGABRT)",
+        'printf "%s\\n" "terminate called after throwing an instance of \'std::system_error\'  what():  Resource temporarily unavailable" >&2\nkill -6 $$\n',
+      ],
+    ] as const)(
+      "answers 503 ENGINE_UNAVAILABLE on DNG when exiftool fails in readExifToolMeta with %s (#3458)",
+      async (_label, scriptBody) => {
+        const originalPath = process.env.PATH;
+        const shimDir = mkdtempSync(join(tmpdir(), "info-exiftool-oom-"));
+        try {
+          const shimPath = join(shimDir, "exiftool");
+          writeFileSync(shimPath, `#!/bin/sh\n${scriptBody}`);
+          chmodSync(shimPath, 0o755);
+          process.env.PATH = `${shimDir}:${originalPath ?? ""}`;
+
+          const res = await app.inject({
+            method: "POST",
+            url: apiToolPath("info"),
+            ...multipartBody([
+              { filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG },
+            ]),
+          });
+
+          expect(res.statusCode, res.body).toBe(503);
+          expect(res.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+          expect(infoExifPaths).toHaveLength(1);
+          expect(existsSync(infoExifPaths[0])).toBe(false);
+        } finally {
+          process.env.PATH = originalPath;
+          rmSync(shimDir, { recursive: true, force: true });
+        }
+      },
+    );
+
+    it("writes distinct O_EXCL UUID temp files when two RAW uploads arrive in the same millisecond (#3458)", async () => {
+      const dateSpy = vi.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
+      const originalPath = process.env.PATH;
+      const shimDir = mkdtempSync(join(tmpdir(), "info-exiftool-race-"));
+      try {
+        const shimPath = join(shimDir, "exiftool");
+        writeFileSync(
+          shimPath,
+          '#!/bin/sh\nfor last; do :; done\nw=$(wc -c < "$last" | tr -d " ")\nprintf \'[{"FileType":"RAF","ImageWidth":%s,"ImageHeight":300}]\\n\' "$w"\n',
+        );
+        chmodSync(shimPath, 0o755);
+        process.env.PATH = `${shimDir}:${originalPath ?? ""}`;
+
+        const rafA = Buffer.concat([
+          Buffer.from("FUJIFILMCCD-RAW 0201", "ascii"),
+          Buffer.alloc(100, 0x41),
+        ]);
+        const rafB = Buffer.concat([
+          Buffer.from("FUJIFILMCCD-RAW 0201", "ascii"),
+          Buffer.alloc(250, 0x42),
+        ]);
+
+        const [resA, resB] = await Promise.all([
+          app.inject({
+            method: "POST",
+            url: apiToolPath("info"),
+            ...multipartBody([
+              { filename: "a.raf", contentType: "application/octet-stream", content: rafA },
+            ]),
+          }),
+          app.inject({
+            method: "POST",
+            url: apiToolPath("info"),
+            ...multipartBody([
+              { filename: "b.raf", contentType: "application/octet-stream", content: rafB },
+            ]),
+          }),
+        ]);
+
+        expect(resA.statusCode, resA.body).toBe(200);
+        expect(resB.statusCode, resB.body).toBe(200);
+        expect(resA.json().width).toBe(rafA.length);
+        expect(resB.json().width).toBe(rafB.length);
+        expect(infoExifPaths).toHaveLength(2);
+        expect(new Set(infoExifPaths).size).toBe(2);
+        const expectedFlags = constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY;
+        expect(infoExifOpenFlags).toEqual([expectedFlags, expectedFlags]);
+        for (const p of infoExifPaths) {
+          expect(existsSync(p)).toBe(false);
+        }
+      } finally {
+        dateSpy.mockRestore();
+        process.env.PATH = originalPath;
+        rmSync(shimDir, { recursive: true, force: true });
+      }
+    });
+
+    it.each(WRITE_ERRNOS)(
+      "answers 503 %s (%s) and removes the created temp file when fh.writeFile fails after open in readExifToolMeta (#3458)",
+      async (errno, expectedCode) => {
+        handleWriteFailure.next = errnoError(errno, "write");
+        const res = await app.inject({
+          method: "POST",
+          url: apiToolPath("info"),
+          ...multipartBody([
+            { filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG },
+          ]),
+        });
+        expect(res.statusCode, res.body).toBe(503);
+        expect(res.json()).toMatchObject({ code: expectedCode });
+        expect(infoExifPaths).toHaveLength(1);
+        expect(existsSync(infoExifPaths[0])).toBe(false);
+      },
+    );
+
+    it("preserves a primary fh.writeFile ENOSPC fault when fh.close also rejects, and surfaces 503 on V8 RangeError in readExifToolMeta (#3458)", async () => {
+      handleWriteFailure.next = errnoError("ENOSPC", "write");
+      handleCloseFailure.next = Object.assign(new Error("EIO: close failed"), {
+        code: "EIO",
+        syscall: "close",
+      });
+      const closeRes = await app.inject({
+        method: "POST",
+        url: apiToolPath("info"),
+        ...multipartBody([
+          { filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG },
+        ]),
+      });
+      expect(closeRes.statusCode, closeRes.body).toBe(503);
+      expect(closeRes.json()).toMatchObject({ code: "storage-full" });
+
+      handleWriteFailure.next = new RangeError("Array buffer allocation failed");
+      const oomRes = await app.inject({
+        method: "POST",
+        url: apiToolPath("info"),
+        ...multipartBody([
+          { filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG },
+        ]),
+      });
+      expect(oomRes.statusCode, oomRes.body).toBe(503);
+      expect(oomRes.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+    });
+
+    it.each([
+      ["non-zero exit", "exit 1\n"],
+      ["empty JSON array", "printf '[]\\n'\n"],
+    ] as const)(
+      "falls back to Sharp metadata on DNG when exiftool in readExifToolMeta ends with %s (#3458)",
+      async (_label, scriptBody) => {
+        const originalPath = process.env.PATH;
+        const shimDir = mkdtempSync(join(tmpdir(), "info-exiftool-fallback-"));
+        try {
+          const shimPath = join(shimDir, "exiftool");
+          writeFileSync(shimPath, `#!/bin/sh\n${scriptBody}`);
+          chmodSync(shimPath, 0o755);
+          process.env.PATH = `${shimDir}:${originalPath ?? ""}`;
+
+          const res = await app.inject({
+            method: "POST",
+            url: apiToolPath("info"),
+            ...multipartBody([
+              { filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG },
+            ]),
+          });
+
+          expect(res.statusCode, res.body).toBe(200);
+          expect(res.json()).toMatchObject({
+            filename: "photo.dng",
+            width: 200,
+            height: 150,
+          });
+          expect(infoExifPaths).toHaveLength(1);
+          expect(existsSync(infoExifPaths[0])).toBe(false);
+        } finally {
+          process.env.PATH = originalPath;
+          rmSync(shimDir, { recursive: true, force: true });
+        }
       },
     );
 
