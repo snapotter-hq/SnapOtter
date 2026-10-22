@@ -1725,5 +1725,581 @@ describe("Dropzone", () => {
         expect(result.current.entries).toEqual([]);
       },
     );
+
+    it("retries a failed entry in UrlImportModal under React 19 batching after partial-add index shift and adds it on second click (#3514)", async () => {
+      let fetchUrlsCalls = 0;
+      let downloadBCalls = 0;
+      const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("/api/v1/fetch-urls")) {
+          fetchUrlsCalls += 1;
+          const body = JSON.parse(String(init?.body ?? "{}")) as { urls: string[] };
+          if (fetchUrlsCalls === 1) {
+            return Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  results: [
+                    {
+                      success: true,
+                      url: "https://example.com/a.png",
+                      filename: "a.png",
+                      size: 8,
+                      downloadUrl: "https://example.com/dl/a.png",
+                    },
+                    {
+                      success: true,
+                      url: "https://example.com/b.png",
+                      filename: "b.png",
+                      size: 16,
+                      downloadUrl: "https://example.com/dl/b.png",
+                    },
+                  ],
+                }),
+                { status: 200, headers: { "Content-Type": "application/json" } },
+              ),
+            );
+          }
+          expect(body.urls).toEqual(["https://example.com/b.png"]);
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                results: [
+                  {
+                    success: true,
+                    url: "https://example.com/b.png",
+                    filename: "b.png",
+                    size: 16,
+                    downloadUrl: "https://example.com/dl/b.png",
+                  },
+                ],
+              }),
+              { status: 200, headers: { "Content-Type": "application/json" } },
+            ),
+          );
+        }
+        if (url.endsWith("/dl/a.png")) {
+          return Promise.resolve(
+            new Response("png-a", { status: 200, headers: { "Content-Type": "image/png" } }),
+          );
+        }
+        downloadBCalls += 1;
+        if (downloadBCalls === 1) {
+          return Promise.resolve(new Response("Not found", { status: 404 }));
+        }
+        return Promise.resolve(
+          new Response("png-b", { status: 200, headers: { "Content-Type": "image/png" } }),
+        );
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const onImport = vi.fn();
+      const onClose = vi.fn();
+      render(<UrlImportModal onClose={onClose} onImport={onImport} />);
+
+      const dialog = screen.getByRole("dialog");
+      fireEvent.change(within(dialog).getByRole("textbox"), {
+        target: { value: "https://example.com/a.png\nhttps://example.com/b.png" },
+      });
+      fireEvent.click(within(dialog).getByRole("button", { name: en.urlImport.importButton }));
+
+      // First Add: a.png succeeds and is removed; b.png fails download and shifts from index 1 to 0.
+      const firstAddBtn = await within(dialog).findByRole("button", { name: "Add 2 Files" });
+      fireEvent.click(firstAddBtn);
+
+      const retryBtn = await within(dialog).findByTitle(en.urlImport.retryButton);
+      expect(onImport).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+
+      fireEvent.click(retryBtn);
+
+      await waitFor(() => {
+        expect(fetchUrlsCalls).toBe(2);
+        expect(within(dialog).getByText("1 ready")).toBeDefined();
+      });
+      expect(within(dialog).queryByTitle(en.urlImport.retryButton)).toBeNull();
+      const secondAddBtn = within(dialog).getByRole("button", {
+        name: "Add 1 Files",
+      }) as HTMLButtonElement;
+      expect(secondAddBtn.disabled).toBe(false);
+
+      fireEvent.click(secondAddBtn);
+      await waitFor(() => {
+        expect(onImport).toHaveBeenCalledTimes(2);
+        expect(onClose).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it("updates the matching entry by URL when removeEntries shifts indices while retryUrl is in flight (#3514)", async () => {
+      let resolveRetry: ((res: Response) => void) | undefined;
+      let fetchUrlsCalls = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.endsWith("/api/v1/fetch-urls")) {
+            fetchUrlsCalls += 1;
+            if (fetchUrlsCalls === 1) {
+              return Promise.resolve(
+                new Response(
+                  JSON.stringify({
+                    results: [
+                      {
+                        success: true,
+                        url: "https://example.com/a.png",
+                        filename: "a.png",
+                        size: 8,
+                        downloadUrl: "https://example.com/dl/a.png",
+                      },
+                      {
+                        success: false,
+                        url: "https://example.com/b.png",
+                        error: "Initial error",
+                      },
+                      {
+                        success: true,
+                        url: "https://example.com/c.png",
+                        filename: "c.png",
+                        size: 8,
+                        downloadUrl: "https://example.com/dl/c.png",
+                      },
+                    ],
+                  }),
+                  { status: 200, headers: { "Content-Type": "application/json" } },
+                ),
+              );
+            }
+            return new Promise<Response>((resolve) => {
+              resolveRetry = resolve;
+            });
+          }
+          return Promise.resolve(new Response("ok", { status: 200 }));
+        }),
+      );
+
+      const { result } = renderHook(() => useUrlImport());
+      await act(async () => {
+        await result.current.importUrls([
+          "https://example.com/a.png",
+          "https://example.com/b.png",
+          "https://example.com/c.png",
+        ]);
+      });
+
+      let retryPromise!: Promise<void>;
+      act(() => {
+        retryPromise = result.current.retryUrl(1);
+      });
+      expect(result.current.entries[1]?.status).toBe("fetching");
+
+      // Shift indices by removing index 0 (a.png) while retry for b.png (now index 0) is in flight.
+      act(() => {
+        result.current.removeEntries([0]);
+      });
+      expect(result.current.entries.map((e: { url: string }) => e.url)).toEqual([
+        "https://example.com/b.png",
+        "https://example.com/c.png",
+      ]);
+
+      await act(async () => {
+        resolveRetry?.(
+          new Response(
+            JSON.stringify({
+              results: [
+                {
+                  success: true,
+                  url: "https://example.com/b.png",
+                  filename: "b.png",
+                  size: 12,
+                  downloadUrl: "https://example.com/dl/b.png",
+                },
+              ],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+        await retryPromise;
+      });
+
+      expect(result.current.entries).toEqual([
+        expect.objectContaining({
+          url: "https://example.com/b.png",
+          status: "ready",
+          filename: "b.png",
+          size: 12,
+        }),
+        expect.objectContaining({
+          url: "https://example.com/c.png",
+          status: "ready",
+          filename: "c.png",
+        }),
+      ]);
+    });
+
+    it.each(["cancel", "reset", "importUrls"] as const)(
+      "aborts in-flight retryUrl requests and ignores late settlements when %s is called (#3514)",
+      async (action) => {
+        let resolveRetry: ((res: Response) => void) | undefined;
+        let retrySignal: AbortSignal | null | undefined;
+        let fetchUrlsCalls = 0;
+        vi.stubGlobal(
+          "fetch",
+          vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+            fetchUrlsCalls += 1;
+            if (fetchUrlsCalls === 1) {
+              return Promise.resolve(
+                new Response(
+                  JSON.stringify({
+                    results: [
+                      {
+                        success: false,
+                        url: "https://example.com/b.png",
+                        error: "Initial error",
+                      },
+                    ],
+                  }),
+                  { status: 200, headers: { "Content-Type": "application/json" } },
+                ),
+              );
+            }
+            if (fetchUrlsCalls === 2) {
+              retrySignal = init?.signal;
+              return new Promise<Response>((resolve) => {
+                resolveRetry = resolve;
+              });
+            }
+            return Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  results: [
+                    {
+                      success: true,
+                      url: "https://example.com/c.png",
+                      filename: "c.png",
+                      size: 8,
+                      downloadUrl: "https://example.com/dl/c.png",
+                    },
+                  ],
+                }),
+                { status: 200, headers: { "Content-Type": "application/json" } },
+              ),
+            );
+          }),
+        );
+
+        const { result } = renderHook(() => useUrlImport());
+        await act(async () => {
+          await result.current.importUrls(["https://example.com/b.png"]);
+        });
+
+        let retryPromise!: Promise<void>;
+        act(() => {
+          retryPromise = result.current.retryUrl(0);
+        });
+        expect(retrySignal).toBeInstanceOf(AbortSignal);
+        expect(retrySignal?.aborted).toBe(false);
+
+        await act(async () => {
+          if (action === "importUrls") {
+            await result.current.importUrls(["https://example.com/c.png"]);
+          } else {
+            result.current[action]();
+          }
+        });
+        expect(retrySignal?.aborted).toBe(true);
+
+        await act(async () => {
+          resolveRetry?.(
+            new Response(
+              JSON.stringify({
+                results: [
+                  {
+                    success: true,
+                    url: "https://example.com/b.png",
+                    filename: "b.png",
+                    size: 16,
+                    downloadUrl: "https://example.com/dl/b.png",
+                  },
+                ],
+              }),
+              { status: 200, headers: { "Content-Type": "application/json" } },
+            ),
+          );
+          await retryPromise;
+        });
+
+        if (action === "importUrls") {
+          expect(result.current.entries).toEqual([
+            expect.objectContaining({
+              url: "https://example.com/c.png",
+              status: "ready",
+            }),
+          ]);
+        } else {
+          expect(result.current.entries).toEqual([]);
+        }
+      },
+    );
+
+    it("disables retry buttons in UrlImportModal while addReadyFiles is in flight (#3514)", async () => {
+      let resolveDownload: ((res: Response) => void) | undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.endsWith("/api/v1/fetch-urls")) {
+            return Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  results: [
+                    {
+                      success: true,
+                      url: "https://example.com/a.png",
+                      filename: "a.png",
+                      size: 8,
+                      downloadUrl: "https://example.com/dl/a.png",
+                    },
+                    {
+                      success: false,
+                      url: "https://example.com/b.png",
+                      error: "Failed",
+                    },
+                  ],
+                }),
+                { status: 200, headers: { "Content-Type": "application/json" } },
+              ),
+            );
+          }
+          return new Promise<Response>((resolve) => {
+            resolveDownload = resolve;
+          });
+        }),
+      );
+
+      render(<UrlImportModal onClose={vi.fn()} onImport={vi.fn()} />);
+      const dialog = screen.getByRole("dialog");
+      fireEvent.change(within(dialog).getByRole("textbox"), {
+        target: { value: "https://example.com/a.png\nhttps://example.com/b.png" },
+      });
+      fireEvent.click(within(dialog).getByRole("button", { name: en.urlImport.importButton }));
+
+      const addBtn = await within(dialog).findByRole("button", { name: "Add 1 Files" });
+      const retryBtn = within(dialog).getByTitle(en.urlImport.retryButton) as HTMLButtonElement;
+      expect(retryBtn.disabled).toBe(false);
+
+      fireEvent.click(addBtn);
+      expect(retryBtn.disabled).toBe(true);
+
+      await act(async () => {
+        resolveDownload?.(
+          new Response("png-a", { status: 200, headers: { "Content-Type": "image/png" } }),
+        );
+      });
+    });
+
+    it("marks the retried entry failed by URL when retryUrl throws after an index shift (#3514)", async () => {
+      let rejectRetry: ((err: Error) => void) | undefined;
+      let fetchUrlsCalls = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.endsWith("/api/v1/fetch-urls")) {
+            fetchUrlsCalls += 1;
+            if (fetchUrlsCalls === 1) {
+              return Promise.resolve(
+                new Response(
+                  JSON.stringify({
+                    results: [
+                      {
+                        success: true,
+                        url: "https://example.com/a.png",
+                        filename: "a.png",
+                        size: 8,
+                        downloadUrl: "https://example.com/dl/a.png",
+                      },
+                      {
+                        success: false,
+                        url: "https://example.com/b.png",
+                        error: "Initial error",
+                      },
+                      {
+                        success: true,
+                        url: "https://example.com/c.png",
+                        filename: "c.png",
+                        size: 8,
+                        downloadUrl: "https://example.com/dl/c.png",
+                      },
+                    ],
+                  }),
+                  { status: 200, headers: { "Content-Type": "application/json" } },
+                ),
+              );
+            }
+            return new Promise<Response>((_resolve, reject) => {
+              rejectRetry = reject;
+            });
+          }
+          return Promise.resolve(new Response("ok", { status: 200 }));
+        }),
+      );
+
+      const { result } = renderHook(() => useUrlImport());
+      await act(async () => {
+        await result.current.importUrls([
+          "https://example.com/a.png",
+          "https://example.com/b.png",
+          "https://example.com/c.png",
+        ]);
+      });
+
+      let retryPromise!: Promise<void>;
+      act(() => {
+        retryPromise = result.current.retryUrl(1);
+      });
+      act(() => {
+        result.current.removeEntries([0]);
+      });
+
+      await act(async () => {
+        rejectRetry?.(new Error("Retry network failure"));
+        await retryPromise;
+      });
+
+      expect(result.current.entries).toEqual([
+        expect.objectContaining({
+          url: "https://example.com/b.png",
+          status: "failed",
+          error: "Retry network failure",
+        }),
+        expect.objectContaining({
+          url: "https://example.com/c.png",
+          status: "ready",
+          filename: "c.png",
+        }),
+      ]);
+    });
+
+    it("marks the retried entry failed when retryUrl receives an empty results array and ignores out-of-bounds indices (#3514)", async () => {
+      let fetchUrlsCalls = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() => {
+          fetchUrlsCalls += 1;
+          if (fetchUrlsCalls === 1) {
+            return Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  results: [
+                    {
+                      success: false,
+                      url: "https://example.com/b.png",
+                      error: "Initial error",
+                    },
+                  ],
+                }),
+                { status: 200, headers: { "Content-Type": "application/json" } },
+              ),
+            );
+          }
+          return Promise.resolve(
+            new Response(JSON.stringify({ results: [] }), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }),
+          );
+        }),
+      );
+
+      const { result } = renderHook(() => useUrlImport());
+      await act(async () => {
+        await result.current.importUrls(["https://example.com/b.png"]);
+      });
+
+      await act(async () => {
+        await result.current.retryUrl(99);
+      });
+      expect(fetchUrlsCalls).toBe(1);
+
+      await act(async () => {
+        await result.current.retryUrl(0);
+      });
+      expect(fetchUrlsCalls).toBe(2);
+      expect(result.current.entries).toEqual([
+        expect.objectContaining({
+          url: "https://example.com/b.png",
+          status: "failed",
+          error: en.urlImport.failedStatus,
+        }),
+      ]);
+    });
+
+    it("aborts a prior in-flight retry for the same URL and ignores AbortError rejection without clearing the replacement controller (#3514)", async () => {
+      const retrySignals: Array<AbortSignal | null | undefined> = [];
+      const retryRejects: Array<(err: Error) => void> = [];
+      let fetchUrlsCalls = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+          fetchUrlsCalls += 1;
+          if (fetchUrlsCalls === 1) {
+            return Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  results: [
+                    {
+                      success: false,
+                      url: "https://example.com/b.png",
+                      error: "Initial error",
+                    },
+                  ],
+                }),
+                { status: 200, headers: { "Content-Type": "application/json" } },
+              ),
+            );
+          }
+          retrySignals.push(init?.signal);
+          return new Promise<Response>((_resolve, reject) => {
+            retryRejects.push(reject);
+          });
+        }),
+      );
+
+      const { result } = renderHook(() => useUrlImport());
+      await act(async () => {
+        await result.current.importUrls(["https://example.com/b.png"]);
+      });
+
+      let firstRetry!: Promise<void>;
+      let secondRetry!: Promise<void>;
+      act(() => {
+        firstRetry = result.current.retryUrl(0);
+      });
+      act(() => {
+        secondRetry = result.current.retryUrl(0);
+      });
+
+      expect(retrySignals).toHaveLength(2);
+      expect(retrySignals[0]?.aborted).toBe(true);
+      expect(retrySignals[1]?.aborted).toBe(false);
+
+      // First retry rejects with AbortError; entry stays in "fetching" for the second retry.
+      await act(async () => {
+        retryRejects[0]?.(Object.assign(new Error("Aborted"), { name: "AbortError" }));
+        await firstRetry;
+      });
+      expect(result.current.entries[0]?.status).toBe("fetching");
+
+      // Second controller is still registered in retryAbortRef and aborted by cancel().
+      act(() => {
+        result.current.cancel();
+      });
+      expect(retrySignals[1]?.aborted).toBe(true);
+
+      await act(async () => {
+        retryRejects[1]?.(Object.assign(new Error("Aborted"), { name: "AbortError" }));
+        await secondRetry;
+      });
+      expect(result.current.entries).toEqual([]);
+    });
   });
 });

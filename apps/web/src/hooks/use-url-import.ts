@@ -44,11 +44,21 @@ interface FetchUrlsResponse {
 export function useUrlImport() {
   const [entries, setEntries] = useState<UrlImportEntry[]>([]);
   const [importing, setImporting] = useState(false);
+  const entriesRef = useRef<UrlImportEntry[]>(entries);
+  entriesRef.current = entries;
   const abortRef = useRef<AbortController | null>(null);
   const downloadAbortRef = useRef<AbortController | null>(null);
+  const retryAbortRef = useRef<Map<string, AbortController>>(new Map());
   const { t } = useTranslation();
 
   // -- helpers --
+
+  const abortRetries = useCallback(() => {
+    for (const controller of retryAbortRef.current.values()) {
+      controller.abort();
+    }
+    retryAbortRef.current.clear();
+  }, []);
 
   const fetchUrls = useCallback(
     async (urls: string[], signal?: AbortSignal): Promise<FetchUrlsResponse> => {
@@ -108,6 +118,7 @@ export function useUrlImport() {
       abortRef.current?.abort();
       downloadAbortRef.current?.abort();
       downloadAbortRef.current = null;
+      abortRetries();
       const controller = new AbortController();
       abortRef.current = controller;
 
@@ -136,7 +147,7 @@ export function useUrlImport() {
         }
       }
     },
-    [fetchUrls, resultToEntry],
+    [fetchUrls, resultToEntry, abortRetries],
   );
 
   const importSingleUrl = useCallback(
@@ -224,31 +235,52 @@ export function useUrlImport() {
 
   const retryUrl = useCallback(
     async (index: number) => {
-      let url: string | undefined;
-      setEntries((prev) => {
-        url = prev[index]?.url;
-        if (!url) return prev;
-        return prev.map((e, i) =>
-          i === index ? { ...e, status: "fetching" as const, error: undefined } : e,
-        );
-      });
-      if (!url) return;
+      const targetUrl = entriesRef.current[index]?.url;
+      if (!targetUrl) return;
+
+      retryAbortRef.current.get(targetUrl)?.abort();
+      const controller = new AbortController();
+      retryAbortRef.current.set(targetUrl, controller);
+
+      setEntries((prev) =>
+        prev.map((e) =>
+          e.url === targetUrl ? { ...e, status: "fetching" as const, error: undefined } : e,
+        ),
+      );
 
       try {
-        const { results } = await fetchUrls([url]);
+        const { results } = await fetchUrls([targetUrl], controller.signal);
+        if (controller.signal.aborted) return;
         const result = results[0];
-        if (!result) return;
+        if (!result) {
+          setEntries((prev) =>
+            prev.map((e) =>
+              e.url === targetUrl
+                ? { ...e, status: "failed" as const, error: t.urlImport.failedStatus }
+                : e,
+            ),
+          );
+          return;
+        }
 
-        setEntries((prev) => prev.map((e, i) => (i === index ? resultToEntry(result) : e)));
+        setEntries((prev) => prev.map((e) => (e.url === targetUrl ? resultToEntry(result) : e)));
       } catch (err) {
+        if (controller.signal.aborted || (err instanceof Error && err.name === "AbortError")) {
+          return;
+        }
+        const message = err instanceof Error ? err.message : String(err);
         setEntries((prev) =>
-          prev.map((e, i) =>
-            i === index ? { ...e, status: "failed" as const, error: (err as Error).message } : e,
+          prev.map((e) =>
+            e.url === targetUrl ? { ...e, status: "failed" as const, error: message } : e,
           ),
         );
+      } finally {
+        if (retryAbortRef.current.get(targetUrl) === controller) {
+          retryAbortRef.current.delete(targetUrl);
+        }
       }
     },
-    [fetchUrls, resultToEntry],
+    [fetchUrls, resultToEntry, t.urlImport.failedStatus],
   );
 
   const cancel = useCallback(() => {
@@ -256,16 +288,20 @@ export function useUrlImport() {
     abortRef.current = null;
     downloadAbortRef.current?.abort();
     downloadAbortRef.current = null;
+    abortRetries();
     setEntries([]);
     setImporting(false);
-  }, []);
+  }, [abortRetries]);
 
   const reset = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
     downloadAbortRef.current?.abort();
     downloadAbortRef.current = null;
+    abortRetries();
     setEntries([]);
     setImporting(false);
-  }, []);
+  }, [abortRetries]);
 
   // -- derived counts --
 

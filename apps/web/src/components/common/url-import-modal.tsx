@@ -167,7 +167,8 @@ export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
                     <button
                       type="button"
                       onClick={() => retryUrl(i)}
-                      className="p-1 rounded hover:bg-muted text-muted-foreground"
+                      disabled={adding}
+                      className="p-1 rounded hover:bg-muted text-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                       title={t.urlImport.retryButton}
                     >
                       <RotateCw className="h-3.5 w-3.5" />
