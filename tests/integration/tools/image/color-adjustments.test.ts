@@ -226,6 +226,16 @@ describe("Effects", () => {
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
     expect(result.downloadUrl).toBeDefined();
+
+    const dl = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(dl.statusCode).toBe(200);
+    const { data, info } = await sharp(dl.rawPayload).raw().toBuffer({ resolveWithObject: true });
+    expect(info.channels).toBe(4);
+    expect([data[0], data[1], data[2], data[3]]).toEqual([0, 155, 205, 255]);
   });
 });
 

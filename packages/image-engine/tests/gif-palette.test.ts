@@ -335,6 +335,7 @@ describe("TIFF LZW alpha preservation (#2607)", () => {
 
     const floatOps = [
       { type: "sepia", options: {} },
+      { type: "invert", options: {} },
       { type: "color-channels", options: { red: 120, green: 80, blue: 100 } },
       { type: "color-blindness", options: { type: "protanopia" } },
       { type: "sharpen-advanced", options: { method: "high-pass", strength: 50, kernelSize: 3 } },

@@ -229,6 +229,17 @@ describe("adjust-colors combined recomb matrices (#2608)", () => {
     expect(await firstPixel(tempTintInverted)).toEqual([151, 203, 237]);
     // [100 * 1.04 * 1.2, 50 * 1.05 * 0.8, 20 * 0.92 * 1.0] = [124, 42, 18] -> inverted: [131, 213, 237]
     expect(await firstPixel(chainedInverted)).toEqual([131, 213, 237]);
+
+    const rgbaSample = await makeSolidPng(100, 50, 20, 1);
+    const rgbaPlainInverted = await runAdjustColors(rgbaSample, { effect: "invert" });
+    const rgbaRecombInverted = await runAdjustColors(rgbaSample, {
+      red: 120,
+      green: 80,
+      blue: 100,
+      effect: "invert",
+    });
+    expect(await firstPixel(rgbaPlainInverted)).toEqual([155, 205, 235, 255]);
+    expect(await firstPixel(rgbaRecombInverted)).toEqual([135, 215, 235, 255]);
   });
 
   it("brightens midtones when positive exposure is combined with temperature/tint, channels, or sepia (#3120)", async () => {

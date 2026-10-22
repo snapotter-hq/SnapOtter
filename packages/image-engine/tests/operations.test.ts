@@ -294,6 +294,17 @@ describe("invert", () => {
     const buf = await result.toBuffer();
     expect(buf.length).toBeGreaterThan(0);
   });
+
+  it("should preserve alpha on 4-channel RGBA input (#3132)", async () => {
+    const rgbaBuf = await sharp({
+      create: { width: 2, height: 2, channels: 4, background: { r: 100, g: 50, b: 20, alpha: 1 } },
+    })
+      .png()
+      .toBuffer();
+    const result = await invert(sharp(rgbaBuf));
+    const { data } = await result.raw().toBuffer({ resolveWithObject: true });
+    expect([data[0], data[1], data[2], data[3]]).toEqual([155, 205, 235, 255]);
+  });
 });
 
 describe("brightness", () => {

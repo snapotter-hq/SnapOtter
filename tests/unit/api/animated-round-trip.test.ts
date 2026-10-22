@@ -217,6 +217,67 @@ describe.each([
       pageHeight: still.pageHeight,
     });
   });
+
+  it("adjust-colors with effect=invert preserves all frames and opaque alpha (#3132)", async () => {
+    const config = getToolConfig("adjust-colors");
+    if (!config) throw new Error("adjust-colors must be registered");
+    const source = await load();
+    const stillIn = await firstFrameOnly(source, format);
+    const settings = config.settingsSchema.parse({ effect: "invert" });
+
+    const animatedOut = (await config.process(source, settings, filename)).buffer;
+    const stillOut = (await config.process(stillIn, settings, filename)).buffer;
+    const animated = await frameShape(animatedOut);
+    const still = await frameShape(stillOut);
+
+    expect(animated).toEqual({
+      pages: 3,
+      width: still.width,
+      pageHeight: still.pageHeight,
+    });
+
+    const { data, info } = await sharp(animatedOut, { animated: true })
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    expect(data[3]).toBe(255);
+    expect(info.height).toBe(still.pageHeight * 3);
+  });
+});
+
+describe("adjust-colors invert preserves animated.gif frames and inverted RGB (#3132)", () => {
+  it("inverts all 3 frames of animated.gif without negating alpha into a 1-frame transparent GIF", async () => {
+    const config = getToolConfig("adjust-colors");
+    if (!config) throw new Error("adjust-colors must be registered");
+    const source = readFixture(fixtures.image.animated.gif);
+    const settings = config.settingsSchema.parse({ effect: "invert" });
+
+    const { buffer } = await config.process(source, settings, "animated.gif");
+    expect(await frameShape(buffer)).toEqual({ pages: 3, width: 100, pageHeight: 100 });
+
+    const { data, info } = await sharp(buffer, { animated: true })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const stride = 100 * 100 * info.channels;
+    expect([...data.slice(0, 4)]).toEqual([0, 255, 255, 255]);
+    expect([...data.slice(stride, stride + 4)]).toEqual([255, 0, 255, 255]);
+    expect([...data.slice(stride * 2, stride * 2 + 4)]).toEqual([255, 255, 0, 255]);
+
+    const recombInverted = (
+      await config.process(
+        source,
+        config.settingsSchema.parse({ red: 50, effect: "invert" }),
+        "animated.gif",
+      )
+    ).buffer;
+    expect(await frameShape(recombInverted)).toEqual({ pages: 3, width: 100, pageHeight: 100 });
+    const recombRaw = await sharp(recombInverted, { animated: true })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    expect([...recombRaw.data.slice(0, 4)]).toEqual([127, 255, 255, 255]);
+    expect([...recombRaw.data.slice(stride, stride + 4)]).toEqual([255, 0, 255, 255]);
+    expect([...recombRaw.data.slice(stride * 2, stride * 2 + 4)]).toEqual([255, 255, 0, 255]);
+  });
 });
 
 describe("neighbourhood operators do not read across the frame seam (#1083)", () => {

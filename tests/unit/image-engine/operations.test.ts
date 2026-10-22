@@ -1411,6 +1411,31 @@ describe("invert", () => {
     expect(meta.width).toBe(200);
     expect(meta.height).toBe(150);
   });
+
+  it("inverts RGB channels while preserving the alpha band on RGBA images (#3132)", async () => {
+    const rawIn = Buffer.from([100, 50, 20, 255, 100, 50, 20, 128, 100, 50, 20, 0]);
+    const rgbaPng = await sharp(rawIn, {
+      raw: { width: 3, height: 1, channels: 4 },
+    })
+      .png()
+      .toBuffer();
+
+    const result = await invert(sharp(rgbaPng));
+    const { data, info } = await result.raw().toBuffer({ resolveWithObject: true });
+
+    expect(info.channels).toBe(4);
+    expect([...data]).toEqual([155, 205, 235, 255, 155, 205, 235, 128, 155, 205, 235, 0]);
+
+    const gaPng = await sharp(Buffer.from([100, 200]), {
+      raw: { width: 1, height: 1, channels: 2 },
+    })
+      .png()
+      .toBuffer();
+    const gaResult = await invert(sharp(gaPng));
+    const gaRaw = await gaResult.raw().toBuffer({ resolveWithObject: true });
+    expect(gaRaw.info.channels).toBe(2);
+    expect([...gaRaw.data]).toEqual([155, 200]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1500,8 +1525,8 @@ describe("processImage", () => {
     ]);
     expect(result.buffer.length).toBeGreaterThan(0);
     const pngRaw = await sharp(result.buffer).raw().toBuffer();
-    // png200x150 first pixel is [255, 100, 50, 255] -> inverted RGB [0, 155, 205] -> sepia [157, 140, 109]
-    expect([pngRaw[0], pngRaw[1], pngRaw[2]]).toEqual([157, 140, 109]);
+    // png200x150 first pixel is [255, 100, 50, 255] -> inverted RGB [0, 155, 205] -> sepia [157, 140, 109], alpha 255
+    expect([pngRaw[0], pngRaw[1], pngRaw[2], pngRaw[3]]).toEqual([157, 140, 109, 255]);
 
     const sample = await sharp({
       create: { width: 8, height: 8, channels: 3, background: { r: 100, g: 50, b: 20 } },
