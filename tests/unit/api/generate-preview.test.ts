@@ -53,7 +53,7 @@ vi.mock("../../../apps/api/src/lib/engine-unavailable.js", async (importOriginal
   };
 });
 
-import { IMAGE_EXT_TO_MIME } from "@snapotter/shared";
+import { CAMERA_RAW_INPUTS, IMAGE_EXT_TO_MIME, IMAGE_MIME_TO_EXT } from "@snapotter/shared";
 import { buildOutputName, generatePreview } from "../../../apps/api/src/jobs/postprocess.js";
 import * as formatDecoders from "../../../apps/api/src/lib/format-decoders.js";
 import {
@@ -202,6 +202,178 @@ describe("generatePreview honesty (#746)", () => {
     }
   });
 
+  it("decodes every camera RAW MIME type in IMAGE_EXT_TO_MIME (plus image/x-dcraw) via decodeToSharpCompat('raw', ext) before encoding preview.webp (#3224)", async () => {
+    const decodedPng = await sharp({
+      create: { width: 12, height: 12, channels: 3, background: { r: 30, g: 60, b: 90 } },
+    })
+      .png()
+      .toBuffer();
+    const decodeSpy = vi.spyOn(formatDecoders, "decodeToSharpCompat").mockResolvedValue(decodedPng);
+
+    try {
+      for (const dotExt of CAMERA_RAW_INPUTS) {
+        const ext = dotExt.slice(1);
+        const contentType = IMAGE_EXT_TO_MIME[ext];
+        expect(contentType, `missing IMAGE_EXT_TO_MIME for .${ext}`).toBeDefined();
+        if (!contentType) continue;
+        expect(IMAGE_MIME_TO_EXT[contentType]).toBe(ext);
+
+        putObjectMock.mockReset();
+        decodeSpy.mockClear();
+        const rawBuf = Buffer.from(`raw-${ext}-payload`);
+        const key = await generatePreview(rawBuf, contentType, JOB_ID, "edit-metadata");
+
+        expect(decodeSpy).toHaveBeenCalledWith(rawBuf, "raw", ext);
+        expect(key).toBe(`outputs/${JOB_ID}/preview.webp`);
+        expect(putObjectMock).toHaveBeenCalledOnce();
+        const [, previewBytes] = putObjectMock.mock.calls[0] as [string, Buffer];
+        const meta = await sharp(previewBytes).metadata();
+        expect(meta.format).toBe("webp");
+        expect(meta.width).toBe(12);
+        expect(meta.height).toBe(12);
+      }
+
+      putObjectMock.mockReset();
+      decodeSpy.mockClear();
+      const dcrawBuf = Buffer.from("raw-dcraw-payload");
+      const dcrawKey = await generatePreview(dcrawBuf, "image/x-dcraw", JOB_ID, "edit-metadata");
+      expect(decodeSpy).toHaveBeenCalledWith(dcrawBuf, "raw", undefined);
+      expect(dcrawKey).toBe(`outputs/${JOB_ID}/preview.webp`);
+      expect(putObjectMock).toHaveBeenCalledOnce();
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+    } finally {
+      decodeSpy.mockRestore();
+    }
+  });
+
+  it("falls back to Sharp on TIFF-headed DNG in generatePreview when decodeToSharpCompat throws DecoderUnavailableError, and still reports ENGINE_UNAVAILABLE on CR2 or OOM/503 write faults (#3224)", async () => {
+    const tiffHeadedDng = await sharp({
+      create: { width: 12, height: 12, channels: 3, background: { r: 40, g: 80, b: 120 } },
+    })
+      .tiff()
+      .toBuffer();
+    const cr2Buffer = readFixture(fixtures.image.formats("cr2"));
+
+    const decodeSpy = vi
+      .spyOn(formatDecoders, "decodeToSharpCompat")
+      .mockRejectedValueOnce(new DecoderUnavailableError("No LibRaw found."));
+    try {
+      const key = await generatePreview(
+        tiffHeadedDng,
+        "image/x-adobe-dng",
+        JOB_ID,
+        "edit-metadata",
+      );
+      expect(decodeSpy).toHaveBeenCalledWith(tiffHeadedDng, "raw", "dng");
+      expect(key).toBe(`outputs/${JOB_ID}/preview.webp`);
+      expect(putObjectMock).toHaveBeenCalledOnce();
+      expect(reportEngineUnavailableMock).not.toHaveBeenCalled();
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+    } finally {
+      decodeSpy.mockRestore();
+    }
+
+    putObjectMock.mockReset();
+    reportEngineUnavailableMock.mockReset();
+    loggerMock.warn.mockReset();
+    const cr2Spy = vi
+      .spyOn(formatDecoders, "decodeToSharpCompat")
+      .mockRejectedValueOnce(new DecoderUnavailableError("No LibRaw found."));
+    try {
+      const cr2Key = await generatePreview(cr2Buffer, "image/x-canon-cr2", JOB_ID, "edit-metadata");
+      expect(cr2Spy).toHaveBeenCalledWith(cr2Buffer, "raw", "cr2");
+      expect(cr2Key).toBeUndefined();
+      expect(putObjectMock).not.toHaveBeenCalled();
+      expect(reportEngineUnavailableMock).toHaveBeenCalledOnce();
+      expect(reportEngineUnavailableMock.mock.calls[0]?.[1]).toBe("edit-metadata");
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+    } finally {
+      cr2Spy.mockRestore();
+    }
+
+    putObjectMock.mockReset();
+    reportEngineUnavailableMock.mockReset();
+    loggerMock.warn.mockReset();
+    const corruptErr = new Error("corrupt cr2");
+    const corruptCr2Spy = vi
+      .spyOn(formatDecoders, "decodeToSharpCompat")
+      .mockRejectedValueOnce(corruptErr);
+    try {
+      const corruptKey = await generatePreview(
+        Buffer.from("not-a-valid-raw-or-tiff"),
+        "image/x-canon-cr2",
+        JOB_ID,
+        "edit-metadata",
+      );
+      expect(corruptKey).toBeUndefined();
+      expect(putObjectMock).not.toHaveBeenCalled();
+      expect(reportEngineUnavailableMock).not.toHaveBeenCalled();
+      expect(loggerMock.warn).toHaveBeenCalledOnce();
+      expect(loggerMock.warn).toHaveBeenCalledWith(
+        { err: corruptErr, jobId: JOB_ID, contentType: "image/x-canon-cr2" },
+        "preview generation failed; result has no renderable preview",
+      );
+    } finally {
+      corruptCr2Spy.mockRestore();
+    }
+
+    putObjectMock.mockReset();
+    reportEngineUnavailableMock.mockReset();
+    loggerMock.warn.mockReset();
+    const oomSpy = vi
+      .spyOn(formatDecoders, "decodeToSharpCompat")
+      .mockRejectedValueOnce(new DecoderOutOfMemoryError("raw", new Error("SIGKILL")))
+      .mockRejectedValueOnce(
+        Object.assign(new Error("dcraw_emu exited SIGKILL"), { signal: "SIGKILL" }),
+      );
+    try {
+      for (let i = 0; i < 2; i++) {
+        reportEngineUnavailableMock.mockReset();
+        const oomKey = await generatePreview(
+          tiffHeadedDng,
+          "image/x-adobe-dng",
+          JOB_ID,
+          "edit-metadata",
+        );
+        expect(oomKey).toBeUndefined();
+        expect(putObjectMock).not.toHaveBeenCalled();
+        expect(reportEngineUnavailableMock).toHaveBeenCalledOnce();
+        expect(reportEngineUnavailableMock.mock.calls[0]?.[0]).toMatchObject({
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+        });
+        expect(loggerMock.warn).not.toHaveBeenCalled();
+      }
+    } finally {
+      oomSpy.mockRestore();
+    }
+
+    putObjectMock.mockReset();
+    reportEngineUnavailableMock.mockReset();
+    loggerMock.warn.mockReset();
+    const enospcSpy = vi
+      .spyOn(formatDecoders, "decodeToSharpCompat")
+      .mockRejectedValueOnce(writeErrnoError("ENOSPC"));
+    try {
+      const enospcKey = await generatePreview(
+        tiffHeadedDng,
+        "image/x-adobe-dng",
+        JOB_ID,
+        "edit-metadata",
+      );
+      expect(enospcKey).toBeUndefined();
+      expect(putObjectMock).not.toHaveBeenCalled();
+      expect(reportEngineUnavailableMock).toHaveBeenCalledOnce();
+      expect(reportEngineUnavailableMock.mock.calls[0]?.[0]).toMatchObject({
+        statusCode: 503,
+        code: "storage-full",
+      });
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+    } finally {
+      enospcSpy.mockRestore();
+    }
+  });
+
   it("reports a missing CLI decoder through reportEngineUnavailable and stays non-fatal (#2704)", async () => {
     const decodeSpy = vi
       .spyOn(formatDecoders, "decodeToSharpCompat")
@@ -293,8 +465,15 @@ describe("generatePreview honesty (#746)", () => {
       expect(loggerMock.warn).not.toHaveBeenCalled();
 
       reportEngineUnavailableMock.mockReset();
+      const tiffHeadedDng = await sharp({
+        create: { width: 8, height: 8, channels: 3, background: { r: 40, g: 80, b: 120 } },
+      })
+        .tiff()
+        .toBuffer();
       const decodeSpy = vi
         .spyOn(formatDecoders, "decodeToSharpCompat")
+        .mockRejectedValueOnce(normalizeOperationalWriteError(writeErrnoError(errnoCode)))
+        .mockRejectedValueOnce(writeErrnoError(errnoCode))
         .mockRejectedValueOnce(normalizeOperationalWriteError(writeErrnoError(errnoCode)))
         .mockRejectedValueOnce(writeErrnoError(errnoCode));
       try {
@@ -328,6 +507,25 @@ describe("generatePreview honesty (#746)", () => {
         });
         expect(reportEngineUnavailableMock.mock.calls[0]?.[1]).toBe("convert");
         expect(loggerMock.warn).not.toHaveBeenCalled();
+
+        for (let i = 0; i < 2; i++) {
+          reportEngineUnavailableMock.mockReset();
+          const dngKey = await generatePreview(
+            tiffHeadedDng,
+            "image/x-adobe-dng",
+            JOB_ID,
+            "edit-metadata",
+          );
+          expect(dngKey).toBeUndefined();
+          expect(putObjectMock).not.toHaveBeenCalled();
+          expect(reportEngineUnavailableMock).toHaveBeenCalledOnce();
+          expect(reportEngineUnavailableMock.mock.calls[0]?.[0]).toMatchObject({
+            statusCode: 503,
+            code: expectedCode,
+          });
+          expect(reportEngineUnavailableMock.mock.calls[0]?.[1]).toBe("edit-metadata");
+          expect(loggerMock.warn).not.toHaveBeenCalled();
+        }
       } finally {
         decodeSpy.mockRestore();
       }

@@ -6,7 +6,8 @@
  * tool-factory.ts during the job-spine refactor to apps/api/src/jobs/postprocess.ts.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { IMAGE_EXT_TO_MIME } from "../../../packages/shared/src/image-mime.js";
+import { IMAGE_EXT_TO_MIME, IMAGE_MIME_TO_EXT } from "../../../packages/shared/src/image-mime.js";
+import { CAMERA_RAW_INPUTS } from "../../../packages/shared/src/modality.js";
 
 // Minimal mocks so the module loads without Postgres/Redis/sharp
 const parentLookupMock = vi.hoisted(() => vi.fn());
@@ -456,6 +457,232 @@ describe("generatePreview", () => {
       expect(loggerWarnMock).not.toHaveBeenCalled();
     },
   );
+
+  it.each([
+    ...CAMERA_RAW_INPUTS.map((dotExt) => {
+      const ext = dotExt.slice(1);
+      const mime = IMAGE_EXT_TO_MIME[ext];
+      return [mime, ext] as const;
+    }),
+    ["image/x-dcraw", undefined] as const,
+  ])(
+    "decodes camera RAW %s via decodeToSharpCompat('raw', %s) before passing to Sharp (#3224)",
+    async (contentType, expectedExt) => {
+      const decoded = Buffer.from(`decoded-raw-${expectedExt ?? "dcraw"}`);
+      const webpOut = Buffer.from(`webp-raw-${expectedExt ?? "dcraw"}`);
+      decodeToSharpCompatMock.mockResolvedValueOnce(decoded);
+      sharpMock.mockReturnValueOnce({
+        webp: () => ({ toBuffer: async () => webpOut }),
+      });
+
+      const rawBuf = Buffer.from(`raw-bytes-${expectedExt ?? "dcraw"}`);
+      const key = await generatePreview(rawBuf, contentType, "job-raw", "edit-metadata");
+
+      expect(IMAGE_MIME_TO_EXT[contentType]).toBe(expectedExt);
+      expect(decodeToSharpCompatMock).toHaveBeenCalledWith(rawBuf, "raw", expectedExt);
+      expect(sharpMock).toHaveBeenCalledWith(decoded);
+      expect(putObjectMock).toHaveBeenCalledWith("outputs/job-raw/preview.webp", webpOut);
+      expect(key).toBe("outputs/job-raw/preview.webp");
+      expect(loggerWarnMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it("falls back to Sharp on TIFF-headed DNG when decodeToSharpCompat rejects with DecoderUnavailableError (#3224)", async () => {
+    const { DecoderUnavailableError } = await import(
+      "../../../apps/api/src/lib/format-decoders.js"
+    );
+    const webpOut = Buffer.from("webp-dng-fallback");
+    decodeToSharpCompatMock.mockRejectedValueOnce(new DecoderUnavailableError("No LibRaw found."));
+    sharpMock
+      .mockReturnValueOnce({
+        metadata: async () => ({ width: 16, height: 16, format: "tiff" }),
+      })
+      .mockReturnValueOnce({
+        resize: () => ({ raw: () => ({ toBuffer: async () => Buffer.from([1, 2, 3]) }) }),
+      })
+      .mockReturnValueOnce({
+        webp: () => ({ toBuffer: async () => webpOut }),
+      });
+
+    const dngBuf = Buffer.from("tiff-headed-dng");
+    const key = await generatePreview(
+      dngBuf,
+      "image/x-adobe-dng",
+      "job-dng-fallback",
+      "edit-metadata",
+    );
+
+    expect(decodeToSharpCompatMock).toHaveBeenCalledWith(dngBuf, "raw", "dng");
+    expect(sharpMock).toHaveBeenCalledTimes(3);
+    expect(sharpMock).toHaveBeenNthCalledWith(1, dngBuf);
+    expect(sharpMock).toHaveBeenNthCalledWith(2, dngBuf);
+    expect(sharpMock).toHaveBeenNthCalledWith(3, dngBuf);
+    expect(putObjectMock).toHaveBeenCalledWith("outputs/job-dng-fallback/preview.webp", webpOut);
+    expect(key).toBe("outputs/job-dng-fallback/preview.webp");
+    expect(loggerWarnMock).not.toHaveBeenCalled();
+  });
+
+  it("reports engine unavailable on camera RAW when the Sharp fallback fails or when decodeToSharpCompat rejects with OOM or a 503 write fault (#3224)", async () => {
+    const { DecoderOutOfMemoryError, DecoderUnavailableError } = await import(
+      "../../../apps/api/src/lib/format-decoders.js"
+    );
+
+    decodeToSharpCompatMock.mockRejectedValueOnce(new DecoderUnavailableError("No LibRaw found."));
+    sharpMock
+      .mockReturnValueOnce({
+        metadata: async () => ({ width: 16, height: 16, format: "tiff" }),
+      })
+      .mockReturnValueOnce({
+        resize: () => ({
+          raw: () => ({
+            toBuffer: async () => {
+              throw new Error("tiffload_buffer: unsupported compression");
+            },
+          }),
+        }),
+      });
+
+    const cr2Buf = Buffer.from("cr2-bytes");
+    const cr2Key = await generatePreview(
+      cr2Buf,
+      "image/x-canon-cr2",
+      "job-cr2-missing",
+      "edit-metadata-cr2",
+    );
+    expect(cr2Key).toBeUndefined();
+    expect(putObjectMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: "ENGINE_UNAVAILABLE",
+        cause: "DecoderUnavailableError",
+        toolId: "edit-metadata-cr2",
+      }),
+      "Tool engine unavailable during input preparation",
+    );
+
+    loggerWarnMock.mockReset();
+    sharpMock.mockReset();
+    decodeToSharpCompatMock.mockRejectedValueOnce(new DecoderUnavailableError("No LibRaw found."));
+    sharpMock.mockReturnValueOnce({
+      metadata: async () => {
+        throw new Error("Input buffer contains unsupported image format");
+      },
+    });
+    const cr3Key = await generatePreview(
+      Buffer.from("cr3-bytes"),
+      "image/x-canon-cr3",
+      "job-cr3-missing",
+      "edit-metadata-cr3",
+    );
+    expect(cr3Key).toBeUndefined();
+    expect(sharpMock).toHaveBeenCalledOnce();
+    expect(putObjectMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: "ENGINE_UNAVAILABLE",
+        cause: "DecoderUnavailableError",
+        toolId: "edit-metadata-cr3",
+      }),
+      "Tool engine unavailable during input preparation",
+    );
+
+    loggerWarnMock.mockReset();
+    sharpMock.mockReset();
+    decodeToSharpCompatMock.mockRejectedValueOnce(
+      new DecoderOutOfMemoryError("raw", new Error("SIGKILL")),
+    );
+    const oomKey = await generatePreview(
+      Buffer.from("dng-bytes"),
+      "image/x-adobe-dng",
+      "job-dng-oom",
+      "edit-metadata-oom",
+    );
+    expect(oomKey).toBeUndefined();
+    expect(sharpMock).not.toHaveBeenCalled();
+    expect(putObjectMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: "ENGINE_UNAVAILABLE",
+        cause: "DecoderOutOfMemoryError",
+        toolId: "edit-metadata-oom",
+      }),
+      "Tool engine unavailable during input preparation",
+    );
+
+    loggerWarnMock.mockReset();
+    sharpMock.mockReset();
+    decodeToSharpCompatMock.mockRejectedValueOnce(
+      Object.assign(new Error("dcraw_emu exited SIGKILL"), { signal: "SIGKILL" }),
+    );
+    const sigkillKey = await generatePreview(
+      Buffer.from("dng-bytes"),
+      "image/x-adobe-dng",
+      "job-dng-sigkill",
+      "edit-metadata-sigkill",
+    );
+    expect(sigkillKey).toBeUndefined();
+    expect(sharpMock).not.toHaveBeenCalled();
+    expect(putObjectMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: "ENGINE_UNAVAILABLE",
+        cause: "DecoderOutOfMemoryError",
+        toolId: "edit-metadata-sigkill",
+      }),
+      "Tool engine unavailable during input preparation",
+    );
+
+    loggerWarnMock.mockReset();
+    sharpMock.mockReset();
+    const enospc = Object.assign(new Error("ENOSPC: no space left on device"), {
+      code: "ENOSPC",
+      syscall: "open",
+    });
+    decodeToSharpCompatMock.mockRejectedValueOnce(enospc);
+    const enospcKey = await generatePreview(
+      Buffer.from("dng-bytes"),
+      "image/x-adobe-dng",
+      "job-dng-enospc",
+      "edit-metadata-enospc",
+    );
+    expect(enospcKey).toBeUndefined();
+    expect(sharpMock).not.toHaveBeenCalled();
+    expect(putObjectMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: "storage-full",
+        cause: "SafeError",
+        toolId: "edit-metadata-enospc",
+      }),
+      "Tool engine unavailable during input preparation",
+    );
+  });
+
+  it("logs a warning with the original decode error when decodeToSharpCompat rejects with a non-503 error on camera RAW and Sharp fallback also fails (#3224)", async () => {
+    const rawErr = new Error("corrupt cr2");
+    decodeToSharpCompatMock.mockRejectedValueOnce(rawErr);
+    sharpMock.mockReturnValueOnce({
+      metadata: async () => {
+        throw new Error("Input buffer contains unsupported image format");
+      },
+    });
+
+    const key = await generatePreview(
+      Buffer.from("bad-cr2"),
+      "image/x-canon-cr2",
+      "job-cr2-corrupt",
+      "edit-metadata",
+    );
+
+    expect(key).toBeUndefined();
+    expect(sharpMock).toHaveBeenCalledOnce();
+    expect(putObjectMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledOnce();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      { err: rawErr, jobId: "job-cr2-corrupt", contentType: "image/x-canon-cr2" },
+      "preview generation failed; result has no renderable preview",
+    );
+  });
 
   it("logs a warning and returns undefined when decodeToSharpCompat rejects with a non-503 error (#2704)", async () => {
     const err = new Error("corrupt psd");

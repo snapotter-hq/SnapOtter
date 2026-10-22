@@ -14,6 +14,7 @@ import { probeMedia } from "@snapotter/media-engine";
 import {
   hasServerErrorStatus,
   IMAGE_EXT_TO_MIME,
+  IMAGE_MIME_TO_EXT,
   type LibrarySaveMode,
   SafeError,
 } from "@snapotter/shared";
@@ -24,6 +25,7 @@ import { reportEngineUnavailable } from "../lib/engine-unavailable.js";
 import { reportError } from "../lib/error-report.js";
 import {
   asDecoderOutOfMemory,
+  DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
 } from "../lib/format-decoders.js";
@@ -154,6 +156,30 @@ const CLI_DECODE_FORMAT_BY_MIME: Readonly<Record<string, string>> = {
   "image/fits": "fits",
   "image/x-eps": "eps",
   "application/postscript": "eps",
+  "image/x-dcraw": "raw",
+  "image/x-adobe-dng": "raw",
+  "image/x-canon-cr2": "raw",
+  "image/x-canon-cr3": "raw",
+  "image/x-nikon-nef": "raw",
+  "image/x-nikon-nrw": "raw",
+  "image/x-sony-arw": "raw",
+  "image/x-olympus-orf": "raw",
+  "image/x-panasonic-rw2": "raw",
+  "image/x-fuji-raf": "raw",
+  "image/x-pentax-pef": "raw",
+  "image/x-hasselblad-3fr": "raw",
+  "image/x-phaseone-iiq": "raw",
+  "image/x-samsung-srw": "raw",
+  "image/x-sigma-x3f": "raw",
+  "image/x-leica-rwl": "raw",
+  "image/x-gopro-gpr": "raw",
+  "image/x-hasselblad-fff": "raw",
+  "image/x-minolta-mrw": "raw",
+  "image/x-mamiya-mef": "raw",
+  "image/x-kodak-kdc": "raw",
+  "image/x-kodak-dcr": "raw",
+  "image/x-epson-erf": "raw",
+  "image/x-pentax-ptx": "raw",
 };
 
 /**
@@ -204,6 +230,30 @@ export async function generatePreview(
       if (contentType === "image/heic" || contentType === "image/heif") {
         const { decodeHeic } = await import("../lib/heic-converter.js");
         previewInput = await decodeHeic(buffer);
+      } else if (cliFormat === "raw") {
+        try {
+          previewInput = await decodeToSharpCompat(
+            buffer,
+            cliFormat,
+            IMAGE_MIME_TO_EXT[contentType],
+          );
+        } catch (rawDecodeErr) {
+          const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
+          if (
+            decodeErr instanceof DecoderOutOfMemoryError ||
+            (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+          ) {
+            throw decodeErr;
+          }
+          // Sharp reads some TIFF-headed RAW files (such as .dng) itself;
+          // only surface a CLI decode failure if Sharp cannot read it either.
+          try {
+            await sharp(buffer).metadata();
+            await sharp(buffer).resize(1).raw().toBuffer();
+          } catch {
+            throw decodeErr;
+          }
+        }
       } else if (cliFormat) {
         previewInput = await decodeToSharpCompat(buffer, cliFormat);
       }
