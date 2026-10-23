@@ -1007,6 +1007,17 @@ describe("beautify route and processBeautify validation & backgroundImage prepar
           settings: { backgroundType: "image" },
         }),
       ).rejects.toBe(unexpectedDecompressErr);
+
+      const v8Oom = new RangeError("Array buffer allocation failed");
+      decompressFaultSpy.mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      await expect(
+        invokeBeautify({
+          file: { filename: "valid.svgz", content: validSvgz },
+          settings: {},
+        }),
+      ).rejects.toBe(v8Oom);
     } finally {
       decompressFaultSpy.mockRestore();
     }

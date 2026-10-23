@@ -602,6 +602,17 @@ describe("ImageInputHandler SVG sanitization abort signal (#2830)", () => {
         signal: new AbortController().signal,
       }),
     ).rejects.toBe(decompressFault);
+
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    mocks.decompressSvgz.mockImplementationOnce(() => {
+      throw v8Oom;
+    });
+    await expect(
+      new ImageInputHandler().prepare(RAW, "icon.svgz", {
+        scratchDir: "/tmp/in",
+        signal: new AbortController().signal,
+      }),
+    ).rejects.toBe(v8Oom);
   });
 });
 

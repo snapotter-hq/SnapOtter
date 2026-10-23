@@ -367,6 +367,21 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         invokeRoute(handler, [{ type: "file", filename: "icon.svgz", content: XMP_SVGZ }]),
       ).rejects.toThrow(decompressFault);
 
+      const v8Oom = new RangeError("Array buffer allocation failed");
+      mocks.decompressSvgz.mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      await expect(
+        invokeRoute(handler, [{ type: "file", filename: "icon.svgz", content: XMP_SVGZ }]),
+      ).rejects.toThrow(v8Oom);
+
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      await expect(
+        invokeRoute(handler, [{ type: "file", filename: "icon.svg", content: XMP_SVG }]),
+      ).rejects.toThrow(v8Oom);
+
       expect(mocks.inspectMetadata).not.toHaveBeenCalled();
     });
   });
@@ -508,6 +523,27 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         ]),
       ).rejects.toThrow(decompressFault);
 
+      const v8Oom = new RangeError("Array buffer allocation failed");
+      mocks.decompressSvgz.mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      await expect(
+        invokeRoute(handler, [
+          { type: "file", filename: "icon.svgz", content: DIRTY_SVGZ },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ]),
+      ).rejects.toThrow(v8Oom);
+
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      await expect(
+        invokeRoute(handler, [
+          { type: "file", filename: "dirty.svg", content: DIRTY_SVG },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ]),
+      ).rejects.toThrow(v8Oom);
+
       expect(mocks.writeMetadata).not.toHaveBeenCalled();
       expect(mocks.putObject).not.toHaveBeenCalled();
     });
@@ -643,6 +679,21 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
       await expect(
         invokeRoute(handler, [{ type: "file", filename: "icon.svgz", content: SCRIPT_LT_SVGZ }]),
       ).rejects.toThrow(decompressFault);
+
+      const v8Oom = new RangeError("Array buffer allocation failed");
+      mocks.decompressSvgz.mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      await expect(
+        invokeRoute(handler, [{ type: "file", filename: "icon.svgz", content: SCRIPT_LT_SVGZ }]),
+      ).rejects.toThrow(v8Oom);
+
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      await expect(
+        invokeRoute(handler, [{ type: "file", filename: "icon.svg", content: SCRIPT_LT_SVG }]),
+      ).rejects.toThrow(v8Oom);
     });
   });
 
@@ -787,6 +838,21 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
       await expect(
         invokeRoute(handler, [{ type: "file", filename: "icon.svgz", content: SCRIPT_LT_SVGZ }]),
       ).rejects.toThrow(decompressFault);
+
+      const v8Oom = new RangeError("Array buffer allocation failed");
+      mocks.decompressSvgz.mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      await expect(
+        invokeRoute(handler, [{ type: "file", filename: "icon.svgz", content: SCRIPT_LT_SVGZ }]),
+      ).rejects.toThrow(v8Oom);
+
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      await expect(
+        invokeRoute(handler, [{ type: "file", filename: "icon.svg", content: SCRIPT_LT_SVG }]),
+      ).rejects.toThrow(v8Oom);
     });
 
     it("propagates DecoderOutOfMemoryError when validateImageBuffer hits a V8 allocation RangeError (#3717)", async () => {
@@ -945,6 +1011,14 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         });
         await expect(invokeRoute(routeHandler, makeParts("icon.svgz", DIRTY_SVGZ))).rejects.toThrow(
           decompressFault,
+        );
+
+        const v8Oom = new RangeError("Array buffer allocation failed");
+        mocks.decompressSvgz.mockImplementationOnce(() => {
+          throw v8Oom;
+        });
+        await expect(invokeRoute(routeHandler, makeParts("icon.svgz", DIRTY_SVGZ))).rejects.toThrow(
+          v8Oom,
         );
 
         expect(mocks.putObject).not.toHaveBeenCalled();

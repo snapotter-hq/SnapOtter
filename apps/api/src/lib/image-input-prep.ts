@@ -151,7 +151,7 @@ export async function prepareRouteImage(
         validationErr.cause = err;
         throw validationErr;
       }
-      throw err;
+      throw asDecoderOutOfMemory(err);
     }
     if (opts.rasterizeSvg || opts.rasterizeToPng) {
       try {

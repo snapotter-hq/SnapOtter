@@ -399,7 +399,7 @@ describe("decompressSvgz", () => {
 });
 
 describe("isSvgzClientError", () => {
-  it("recognizes statusCode 400, Z_DATA_ERROR, Z_BUF_ERROR, and RangeError as client errors", () => {
+  it("recognizes statusCode 400, Z_DATA_ERROR, Z_BUF_ERROR, ERR_BUFFER_TOO_LARGE, and non-OOM RangeError as client errors", () => {
     expect(isSvgzClientError(Object.assign(new Error("over cap"), { statusCode: 400 }))).toBe(true);
     expect(isSvgzClientError(Object.assign(new Error("corrupt"), { code: "Z_DATA_ERROR" }))).toBe(
       true,
@@ -407,12 +407,16 @@ describe("isSvgzClientError", () => {
     expect(isSvgzClientError(Object.assign(new Error("truncated"), { code: "Z_BUF_ERROR" }))).toBe(
       true,
     );
+    expect(
+      isSvgzClientError(Object.assign(new Error("buffer cap"), { code: "ERR_BUFFER_TOO_LARGE" })),
+    ).toBe(true);
     expect(isSvgzClientError(new RangeError("Cannot create a Buffer larger than 52428800"))).toBe(
       true,
     );
   });
 
   it("rejects non-client errors and non-objects", () => {
+    expect(isSvgzClientError(new RangeError("Array buffer allocation failed"))).toBe(false);
     expect(isSvgzClientError(new Error("unexpected sanitizer crash"))).toBe(false);
     expect(isSvgzClientError(Object.assign(new Error("server error"), { statusCode: 500 }))).toBe(
       false,
@@ -433,6 +437,9 @@ describe("isSvgClientError (#3580)", () => {
     expect(isSvgClientError(Object.assign(new Error("truncated"), { code: "Z_BUF_ERROR" }))).toBe(
       true,
     );
+    expect(
+      isSvgClientError(Object.assign(new Error("buffer cap"), { code: "ERR_BUFFER_TOO_LARGE" })),
+    ).toBe(true);
     expect(isSvgClientError(new RangeError("Cannot create a Buffer larger than 52428800"))).toBe(
       true,
     );
@@ -444,6 +451,7 @@ describe("isSvgClientError (#3580)", () => {
   });
 
   it("rejects unexpected runtime faults and non-client errors", () => {
+    expect(isSvgClientError(new RangeError("Array buffer allocation failed"))).toBe(false);
     expect(isSvgClientError(new TypeError("unexpected sanitizer fault"))).toBe(false);
     expect(isSvgClientError(new Error("unexpected sanitizer crash"))).toBe(false);
     expect(isSvgClientError(Object.assign(new Error("server error"), { statusCode: 500 }))).toBe(

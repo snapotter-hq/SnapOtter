@@ -383,6 +383,21 @@ describe("custom AI image routes input decode, fileExt, SVG prep, and error logg
 
         expect(badReply.statusCode).toBe(400);
         expect(badReq.log.error).not.toHaveBeenCalled();
+
+        // V8 buffer allocation RangeError in decompressSvgz/sanitizeSvg surfaces DecoderOutOfMemoryError (#3675)
+        const v8Oom = new RangeError("Array buffer allocation failed");
+        sanitizeSpy.mockImplementationOnce(() => {
+          throw v8Oom;
+        });
+        mocks.getObjectBuffer.mockResolvedValueOnce(svgz);
+        const oomReq = makeRequest([
+          { type: "file", fieldname: "file", filename: "icon.svgz", file: {} },
+          ...extraFields,
+        ]);
+        const oomReply = makeReply();
+        await expect(handlers[path](oomReq, oomReply)).rejects.toBeInstanceOf(
+          formatDecoders.DecoderOutOfMemoryError,
+        );
       } finally {
         sanitizeSpy.mockRestore();
         orientSpy.mockRestore();
@@ -734,6 +749,16 @@ describe("custom AI image routes input decode, fileExt, SVG prep, and error logg
         const badSvgz = gzipSync(Buffer.from("<html>not svg</html>"));
         const svgErr = await config.process(badSvgz, settings, "bad.svgz").catch((e: unknown) => e);
         expect(svgErr).toBeInstanceOf(InputValidationError);
+
+        const v8Oom = new RangeError("Array buffer allocation failed");
+        sanitizeSpy.mockImplementationOnce(() => {
+          throw v8Oom;
+        });
+        const oomErr = await config
+          .process(svgz, settings, "graphic.svgz")
+          .catch((e: unknown) => e);
+        expect(oomErr).toBeInstanceOf(formatDecoders.DecoderOutOfMemoryError);
+        expect((oomErr as { cause?: unknown }).cause).toBe(v8Oom);
       } finally {
         sanitizeSpy.mockRestore();
       }

@@ -190,7 +190,8 @@ export function decompressSvgz(buffer: Buffer): Buffer {
  * input rejection (400) rather than an unexpected sanitizer crash (500):
  *  - statusCode === 400 from sanitizeSvg() size/element caps
  *  - Z_DATA_ERROR / Z_BUF_ERROR from malformed or truncated gzip streams
- *  - RangeError (ERR_BUFFER_TOO_LARGE) when gunzipSync hits MAX_SVGZ_DECOMPRESSED_SIZE
+ *  - RangeError (ERR_BUFFER_TOO_LARGE) when gunzipSync hits MAX_SVGZ_DECOMPRESSED_SIZE,
+ *    excluding V8 "Array buffer allocation failed" OOMs (#3675)
  */
 export function isSvgzClientError(err: unknown): boolean {
   if (!err || typeof err !== "object") return false;
@@ -198,7 +199,8 @@ export function isSvgzClientError(err: unknown): boolean {
     (err as { statusCode?: number }).statusCode === 400 ||
     (err as { code?: string }).code === "Z_DATA_ERROR" ||
     (err as { code?: string }).code === "Z_BUF_ERROR" ||
-    err instanceof RangeError
+    (err as { code?: string }).code === "ERR_BUFFER_TOO_LARGE" ||
+    (err instanceof RangeError && !err.message.startsWith("Array buffer allocation failed"))
   );
 }
 
