@@ -148,9 +148,8 @@ test.describe("Collage", () => {
           name: "settings",
           value: JSON.stringify({
             templateId: "2-h-equal",
-            width: 400,
-            height: 200,
-            format: "png",
+            aspectRatio: "16:9",
+            outputFormat: "png",
           }),
         },
       ],
@@ -162,7 +161,16 @@ test.describe("Collage", () => {
     expect(res.ok()).toBe(true);
     const json = await res.json();
     expect(json.downloadUrl).toBeTruthy();
+    expect(json.downloadUrl).toContain(".png");
     expect(json.processedSize).toBeGreaterThan(0);
+    const dlRes = await request.get(json.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const pngBuf = Buffer.from(await dlRes.body());
+    expect(readFirstPngPixelRgb(pngBuf)).toEqual([255, 255, 255]);
+    expect(pngBuf.readUInt32BE(16)).toBe(2400);
+    expect(pngBuf.readUInt32BE(20)).toBe(1350);
   });
 
   test("collage API with 2 images", async ({ request }) => {
@@ -193,6 +201,14 @@ test.describe("Collage", () => {
     expect(res.ok()).toBe(true);
     const json = await res.json();
     expect(json.downloadUrl).toBeTruthy();
+    const dlRes = await request.get(json.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const pngBuf = Buffer.from(await dlRes.body());
+    expect(readFirstPngPixelRgb(pngBuf)).toEqual([255, 255, 255]);
+    expect(pngBuf.readUInt32BE(16)).toBe(2400);
+    expect(pngBuf.readUInt32BE(20)).toBe(1800);
   });
 });
 
@@ -683,7 +699,7 @@ test.describe("Auth failure", () => {
       [
         {
           name: "settings",
-          value: JSON.stringify({ templateId: "2-h-equal", width: 400 }),
+          value: JSON.stringify({ templateId: "2-h-equal", aspectRatio: "1:1" }),
         },
       ],
     );

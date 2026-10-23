@@ -138,9 +138,8 @@ test.describe("Collage — extended", () => {
           name: "settings",
           value: JSON.stringify({
             templateId: "3-v-equal",
-            width: 400,
-            height: 600,
-            format: "png",
+            aspectRatio: "4:5",
+            outputFormat: "png",
           }),
         },
       ],
@@ -152,7 +151,16 @@ test.describe("Collage — extended", () => {
     expect(res.ok()).toBe(true);
     const json = await res.json();
     expect(json.downloadUrl).toBeTruthy();
+    expect(json.downloadUrl).toContain(".png");
     expect(json.processedSize).toBeGreaterThan(0);
+    const dlRes = await request.get(json.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const pngBuf = Buffer.from(await dlRes.body());
+    expect(readFirstPngPixelRgb(pngBuf)).toEqual([255, 255, 255]);
+    expect(pngBuf.readUInt32BE(16)).toBe(1920);
+    expect(pngBuf.readUInt32BE(20)).toBe(2400);
   });
 
   test("collage with wide gap and dark background", async ({ request }) => {
@@ -180,6 +188,76 @@ test.describe("Collage — extended", () => {
     expect(res.ok()).toBe(true);
     const json = await res.json();
     expect(json.downloadUrl).toBeTruthy();
+    expect(json.downloadUrl).toContain(".jpg");
+    const dlRes = await request.get(json.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const jpgBuf = Buffer.from(await dlRes.body());
+    const convRes = await request.post("/api/v1/tools/image/convert", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "collage.jpg", mimeType: "image/jpeg", buffer: jpgBuf },
+        settings: JSON.stringify({ format: "png" }),
+      },
+    });
+    expect(convRes.ok()).toBe(true);
+    const convBody = await convRes.json();
+    const pngRes = await request.get(convBody.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(pngRes.ok()).toBe(true);
+    const pngBuf = Buffer.from(await pngRes.body());
+    const [r, g, b] = readFirstPngPixelRgb(pngBuf);
+    expect(r).toBeGreaterThanOrEqual(22);
+    expect(r).toBeLessThanOrEqual(30);
+    expect(g).toBeGreaterThanOrEqual(22);
+    expect(g).toBeLessThanOrEqual(30);
+    expect(b).toBeGreaterThanOrEqual(22);
+    expect(b).toBeLessThanOrEqual(30);
+    expect(pngBuf.readUInt32BE(16)).toBe(2400);
+    expect(pngBuf.readUInt32BE(20)).toBe(1800);
+    // At (20, 20), past the default 8px gap, pixel is still #1a1a1a gap background under gap=30
+    const gapCropRes = await request.post("/api/v1/tools/image/crop", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "collage.png", mimeType: "image/png", buffer: pngBuf },
+        settings: JSON.stringify({ left: 20, top: 20, width: 10, height: 10 }),
+      },
+    });
+    expect(gapCropRes.ok()).toBe(true);
+    const gapCropBody = await gapCropRes.json();
+    const gapCropDl = await request.get(gapCropBody.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(gapCropDl.ok()).toBe(true);
+    const [gr, gg, gb] = readFirstPngPixelRgb(Buffer.from(await gapCropDl.body()));
+    expect(gr).toBeGreaterThanOrEqual(22);
+    expect(gr).toBeLessThanOrEqual(30);
+    expect(gg).toBeGreaterThanOrEqual(22);
+    expect(gg).toBeLessThanOrEqual(30);
+    expect(gb).toBeGreaterThanOrEqual(22);
+    expect(gb).toBeLessThanOrEqual(30);
+    // Cell 0 (PNG_200x150 #ff6432) starts at (30, 30); sample at (40, 40) past JPEG 8x8 block ringing
+    const cellCropRes = await request.post("/api/v1/tools/image/crop", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "collage.png", mimeType: "image/png", buffer: pngBuf },
+        settings: JSON.stringify({ left: 40, top: 40, width: 10, height: 10 }),
+      },
+    });
+    expect(cellCropRes.ok()).toBe(true);
+    const cellCropBody = await cellCropRes.json();
+    const cellCropDl = await request.get(cellCropBody.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(cellCropDl.ok()).toBe(true);
+    const [cr, cg, cb] = readFirstPngPixelRgb(Buffer.from(await cellCropDl.body()));
+    expect(cr).toBeGreaterThanOrEqual(245);
+    expect(cg).toBeGreaterThanOrEqual(95);
+    expect(cg).toBeLessThanOrEqual(105);
+    expect(cb).toBeGreaterThanOrEqual(45);
+    expect(cb).toBeLessThanOrEqual(55);
   });
 
   test("collage with 4 images", async ({ request }) => {
@@ -195,10 +273,9 @@ test.describe("Collage — extended", () => {
           name: "settings",
           value: JSON.stringify({
             templateId: "4-grid",
-            width: 800,
-            height: 800,
+            aspectRatio: "1:1",
             gap: 5,
-            format: "png",
+            outputFormat: "png",
           }),
         },
       ],
@@ -210,6 +287,15 @@ test.describe("Collage — extended", () => {
     expect(res.ok()).toBe(true);
     const json = await res.json();
     expect(json.downloadUrl).toBeTruthy();
+    expect(json.downloadUrl).toContain(".png");
+    const dlRes = await request.get(json.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const pngBuf = Buffer.from(await dlRes.body());
+    expect(readFirstPngPixelRgb(pngBuf)).toEqual([255, 255, 255]);
+    expect(pngBuf.readUInt32BE(16)).toBe(2400);
+    expect(pngBuf.readUInt32BE(20)).toBe(2400);
   });
 
   test("collage with zero gap", async ({ request }) => {
@@ -236,6 +322,15 @@ test.describe("Collage — extended", () => {
     expect(res.ok()).toBe(true);
     const json = await res.json();
     expect(json.downloadUrl).toBeTruthy();
+    const dlRes = await request.get(json.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const pngBuf = Buffer.from(await dlRes.body());
+    // With gap=0, cell 0 starts at (0, 0) so the first pixel is PNG_200x150 (#ff6432) rather than the #FFFFFF background
+    expect(readFirstPngPixelRgb(pngBuf)).toEqual([255, 100, 50]);
+    expect(pngBuf.readUInt32BE(16)).toBe(2400);
+    expect(pngBuf.readUInt32BE(20)).toBe(1800);
   });
 
   test("collage with single image still succeeds", async ({ request }) => {
@@ -244,7 +339,7 @@ test.describe("Collage — extended", () => {
       [
         {
           name: "settings",
-          value: JSON.stringify({ templateId: "2-h-equal", width: 400 }),
+          value: JSON.stringify({ templateId: "2-h-equal", aspectRatio: "1:1" }),
         },
       ],
     );
@@ -255,6 +350,14 @@ test.describe("Collage — extended", () => {
     expect(res.ok()).toBe(true);
     const json = await res.json();
     expect(json.downloadUrl).toBeTruthy();
+    const dlRes = await request.get(json.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const pngBuf = Buffer.from(await dlRes.body());
+    expect(readFirstPngPixelRgb(pngBuf)).toEqual([255, 255, 255]);
+    expect(pngBuf.readUInt32BE(16)).toBe(2400);
+    expect(pngBuf.readUInt32BE(20)).toBe(2400);
   });
 });
 
@@ -626,7 +729,7 @@ test.describe("Collage — output verification", () => {
           name: "settings",
           value: JSON.stringify({
             templateId: "2-h-equal",
-            width: 400,
+            aspectRatio: "3:2",
             outputFormat: "png",
           }),
         },
@@ -647,6 +750,9 @@ test.describe("Collage — output verification", () => {
     expect(dlRes.ok()).toBe(true);
     const buffer = Buffer.from(await dlRes.body());
     expect(buffer.length).toBeGreaterThan(0);
+    expect(readFirstPngPixelRgb(buffer)).toEqual([255, 255, 255]);
+    expect(buffer.readUInt32BE(16)).toBe(2400);
+    expect(buffer.readUInt32BE(20)).toBe(1600);
   });
 
   test("collage with HEIC images", async ({ request }) => {
@@ -660,7 +766,7 @@ test.describe("Collage — output verification", () => {
           name: "settings",
           value: JSON.stringify({
             templateId: "2-h-equal",
-            width: 400,
+            aspectRatio: "16:9",
             outputFormat: "png",
           }),
         },
@@ -673,6 +779,34 @@ test.describe("Collage — output verification", () => {
     expect(res.ok()).toBe(true);
     const json = await res.json();
     expect(json.downloadUrl).toBeTruthy();
+    const dlRes = await request.get(json.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const pngBuf = Buffer.from(await dlRes.body());
+    expect(readFirstPngPixelRgb(pngBuf)).toEqual([255, 255, 255]);
+    expect(pngBuf.readUInt32BE(16)).toBe(2400);
+    expect(pngBuf.readUInt32BE(20)).toBe(1350);
+    // Verify cell 0 rendered the decoded HEIC image (#ff6433) past the 8px gap
+    const cellCropRes = await request.post("/api/v1/tools/image/crop", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "collage.png", mimeType: "image/png", buffer: pngBuf },
+        settings: JSON.stringify({ left: 10, top: 10, width: 10, height: 10 }),
+      },
+    });
+    expect(cellCropRes.ok()).toBe(true);
+    const cellCropBody = await cellCropRes.json();
+    const cellCropDl = await request.get(cellCropBody.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(cellCropDl.ok()).toBe(true);
+    const [hr, hg, hb] = readFirstPngPixelRgb(Buffer.from(await cellCropDl.body()));
+    expect(hr).toBeGreaterThanOrEqual(250);
+    expect(hg).toBeGreaterThanOrEqual(95);
+    expect(hg).toBeLessThanOrEqual(105);
+    expect(hb).toBeGreaterThanOrEqual(45);
+    expect(hb).toBeLessThanOrEqual(55);
   });
 });
 
@@ -768,7 +902,7 @@ test.describe("Collage -- template types", () => {
     { id: "2-h-equal", images: 2, label: "2-horizontal-equal" },
     { id: "2-v-equal", images: 2, label: "2-vertical-equal" },
     { id: "3-v-equal", images: 3, label: "3-vertical-equal" },
-    { id: "3-h-1big-2small", images: 3, label: "3-horizontal-1big-2small" },
+    { id: "3-left-large", images: 3, label: "3-left-large" },
     { id: "4-grid", images: 4, label: "4-grid" },
   ] as const;
 
@@ -787,8 +921,7 @@ test.describe("Collage -- template types", () => {
           name: "settings",
           value: JSON.stringify({
             templateId: tmpl.id,
-            width: 600,
-            height: 600,
+            aspectRatio: "1:1",
             gap: 5,
             outputFormat: "png",
           }),
@@ -802,6 +935,14 @@ test.describe("Collage -- template types", () => {
       const json = await res.json();
       expect(json.downloadUrl).toBeTruthy();
       expect(json.processedSize).toBeGreaterThan(0);
+      const dlRes = await request.get(json.downloadUrl, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(dlRes.ok()).toBe(true);
+      const pngBuf = Buffer.from(await dlRes.body());
+      expect(readFirstPngPixelRgb(pngBuf)).toEqual([255, 255, 255]);
+      expect(pngBuf.readUInt32BE(16)).toBe(2400);
+      expect(pngBuf.readUInt32BE(20)).toBe(2400);
     });
   }
 });
@@ -810,6 +951,12 @@ test.describe("Collage -- template types", () => {
 
 test.describe("Collage -- background colors", () => {
   const bgColors = ["#FFFFFF", "#000000", "#FF0000", "#1a1a2e"] as const;
+  const expectedBgRgb: Record<(typeof bgColors)[number], [number, number, number]> = {
+    "#FFFFFF": [255, 255, 255],
+    "#000000": [0, 0, 0],
+    "#FF0000": [255, 0, 0],
+    "#1a1a2e": [26, 26, 46],
+  };
 
   for (const bg of bgColors) {
     test(`collage with background ${bg}`, async ({ request }) => {
@@ -837,6 +984,14 @@ test.describe("Collage -- background colors", () => {
       expect(res.ok(), `collage with bg=${bg} should succeed`).toBe(true);
       const json = await res.json();
       expect(json.downloadUrl).toBeTruthy();
+      const dlRes = await request.get(json.downloadUrl, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(dlRes.ok()).toBe(true);
+      const pngBuf = Buffer.from(await dlRes.body());
+      expect(readFirstPngPixelRgb(pngBuf)).toEqual(expectedBgRgb[bg]);
+      expect(pngBuf.readUInt32BE(16)).toBe(2400);
+      expect(pngBuf.readUInt32BE(20)).toBe(1800);
     });
   }
 });
@@ -1153,7 +1308,7 @@ test.describe("Auth failure", () => {
       [
         {
           name: "settings",
-          value: JSON.stringify({ templateId: "2-h-equal", width: 400 }),
+          value: JSON.stringify({ templateId: "2-h-equal", aspectRatio: "1:1" }),
         },
       ],
     );
