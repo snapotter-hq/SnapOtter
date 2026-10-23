@@ -263,13 +263,27 @@ def main():
 
         elif model_choice == "opencv":
             try:
-                if not (os.path.exists(OPENCV_PROTO_PATH) and os.path.exists(OPENCV_MODEL_PATH)):
-                    raise FileNotFoundError(f"OpenCV colorize models not found: {OPENCV_PROTO_PATH}")
+                missing_opencv_paths = [
+                    p
+                    for p in (OPENCV_PROTO_PATH, OPENCV_MODEL_PATH, OPENCV_POINTS_PATH)
+                    if not os.path.exists(p)
+                ]
+                if missing_opencv_paths:
+                    raise FileNotFoundError(
+                        f"OpenCV colorize models not found: {', '.join(missing_opencv_paths)}"
+                    )
                 result_bgr, method = colorize_opencv(img_bgr, intensity)
             except Exception as e:
                 import traceback
-                print(f"[colorize] OpenCV failed: {e}", file=sys.stderr, flush=True)
+                detail = str(e).strip() or type(e).__name__
+                print(f"[colorize] OpenCV failed: {detail}", file=sys.stderr, flush=True)
                 traceback.print_exc(file=sys.stderr)
+                if is_oom_error(e):
+                    print(json.dumps({
+                        "success": False,
+                        "error": f"OpenCV colorizer ran out of memory: {detail}. Try a smaller image.",
+                    }))
+                    sys.exit(1)
                 raise
 
         else:

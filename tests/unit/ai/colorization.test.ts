@@ -169,6 +169,32 @@ describe("colorize", () => {
       );
     });
 
+    it("classifies OpenCV colorizer OOM error as operational SafeError", async () => {
+      vi.mocked(parseStdoutJson).mockReturnValue({
+        success: false,
+        error:
+          "OpenCV colorizer ran out of memory: [Errno 12] Nicht genügend Hauptspeicher verfügbar. Try a smaller image.",
+      });
+
+      await expect(colorize(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toMatchObject({
+        message:
+          "OpenCV colorizer ran out of memory: [Errno 12] Nicht genügend Hauptspeicher verfügbar. Try a smaller image.",
+        kind: "operational",
+      });
+    });
+
+    it("classifies non-OOM OpenCV colorizer error as bug SafeError", async () => {
+      vi.mocked(parseStdoutJson).mockReturnValue({
+        success: false,
+        error: "OpenCV colorize models not found: /opt/models/colorize-opencv/pts_in_hull.npy",
+      });
+
+      await expect(colorize(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toMatchObject({
+        message: "OpenCV colorize models not found: /opt/models/colorize-opencv/pts_in_hull.npy",
+        kind: "bug",
+      });
+    });
+
     it("throws fallback error when success: false and no error string", async () => {
       vi.mocked(parseStdoutJson).mockReturnValue({ success: false });
 
@@ -464,4 +490,157 @@ print("COLORIZE_3610_OK")
       expect(res.stdout).toContain("COLORIZE_3610_OK");
     });
   });
+
+  describe.skipIf(!hasPython)(
+    "colorize.py model=opencv preflight and OOM messages (issue #3617)",
+    () => {
+      const here = dirname(fileURLToPath(import.meta.url));
+      const pyDir = resolve(here, "../../../packages/ai/python");
+
+      it("checks OPENCV_POINTS_PATH in preflight and formats OpenCV OOMs as operational out-of-memory errors", () => {
+        const res = spawnSync(
+          pythonBin as string,
+          [
+            "-c",
+            `
+import contextlib, errno, importlib.util, io, json, os, sys, tempfile, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+
+class FakeImg:
+    shape = (64, 64, 3)
+
+fake_cv2 = types.ModuleType("cv2")
+fake_cv2.IMREAD_COLOR = 1
+fake_cv2.imread = lambda _p, _f: FakeImg()
+fake_cv2.imwrite = lambda _p, _img: True
+fake_cv2.dnn = types.SimpleNamespace(readNetFromCaffe=lambda _p, _m: None)
+sys.modules["cv2"] = fake_cv2
+
+fake_np = types.ModuleType("numpy")
+def fake_np_load(path):
+    open(path, "rb").close()
+    raise AssertionError("unexpected")
+fake_np.load = fake_np_load
+sys.modules["numpy"] = fake_np
+
+fake_pil = types.ModuleType("PIL")
+fake_pil.Image = types.SimpleNamespace()
+sys.modules["PIL"] = fake_pil
+
+spec = importlib.util.spec_from_file_location("colorize_mod", os.path.join(py_dir, "colorize.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+def run_opencv_expecting_exit1():
+    sys.argv = ["colorize.py", "/tmp/in.png", "/tmp/out_colorize.png", json.dumps({"model": "opencv"})]
+    out_buf, err_buf = io.StringIO(), io.StringIO()
+    try:
+        with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+            mod.main()
+    except SystemExit as exc:
+        assert exc.code == 1, exc.code
+        return json.loads(out_buf.getvalue().strip()), err_buf.getvalue()
+    raise AssertionError(f"Expected SystemExit(1), got stdout={out_buf.getvalue()!r}")
+
+with tempfile.TemporaryDirectory() as tmpdir:
+    proto = os.path.join(tmpdir, "colorization_deploy_v2.prototxt")
+    model = os.path.join(tmpdir, "colorization_release_v2.caffemodel")
+    points = os.path.join(tmpdir, "pts_in_hull.npy")
+
+    # 1) Proto and caffemodel exist, but pts_in_hull.npy is missing
+    open(proto, "wb").close()
+    open(model, "wb").close()
+    mod.OPENCV_PROTO_PATH = proto
+    mod.OPENCV_MODEL_PATH = model
+    mod.OPENCV_POINTS_PATH = points
+
+    missing_pts_payload, _ = run_opencv_expecting_exit1()
+    assert missing_pts_payload == {
+        "success": False,
+        "error": f"OpenCV colorize models not found: {points}",
+    }, missing_pts_payload
+
+    # 1b) Proto and pts_in_hull.npy exist, but caffemodel is missing (does not falsely blame proto)
+    os.remove(model)
+    open(points, "wb").close()
+    missing_model_payload, _ = run_opencv_expecting_exit1()
+    assert missing_model_payload == {
+        "success": False,
+        "error": f"OpenCV colorize models not found: {model}",
+    }, missing_model_payload
+
+    # 2) All three missing -> lists all three in order
+    os.remove(proto)
+    os.remove(points)
+    missing_all_payload, _ = run_opencv_expecting_exit1()
+    assert missing_all_payload == {
+        "success": False,
+        "error": f"OpenCV colorize models not found: {proto}, {model}, {points}",
+    }, missing_all_payload
+
+    # 3) All three present; localized ENOMEM and bare MemoryError() format as OpenCV colorizer OOM
+    for p in (proto, model, points):
+        open(p, "wb").close()
+
+    localized_enomem = OSError(errno.ENOMEM, "Nicht genügend Hauptspeicher verfügbar")
+    mod.colorize_opencv = lambda _img, _intensity: (_ for _ in ()).throw(localized_enomem)
+    enomem_payload, enomem_stderr = run_opencv_expecting_exit1()
+    assert enomem_payload == {
+        "success": False,
+        "error": f"OpenCV colorizer ran out of memory: {localized_enomem}. Try a smaller image.",
+    }, enomem_payload
+    assert "[colorize] OpenCV failed:" in enomem_stderr, enomem_stderr
+
+    mod.colorize_opencv = lambda _img, _intensity: (_ for _ in ()).throw(MemoryError())
+    mem_payload, _ = run_opencv_expecting_exit1()
+    assert mem_payload == {
+        "success": False,
+        "error": "OpenCV colorizer ran out of memory: MemoryError. Try a smaller image.",
+    }, mem_payload
+
+    # 4) Non-OOM exception preserves error message (or exception type when message is blank)
+    mod.colorize_opencv = lambda _img, _intensity: (_ for _ in ()).throw(
+        RuntimeError("OpenCV DNN failed to parse Caffe prototxt")
+    )
+    non_oom_payload, _ = run_opencv_expecting_exit1()
+    assert non_oom_payload == {
+        "success": False,
+        "error": "OpenCV DNN failed to parse Caffe prototxt",
+    }, non_oom_payload
+
+    mod.colorize_opencv = lambda _img, _intensity: (_ for _ in ()).throw(RuntimeError("   "))
+    blank_non_oom_payload, blank_stderr = run_opencv_expecting_exit1()
+    assert blank_non_oom_payload == {
+        "success": False,
+        "error": "RuntimeError",
+    }, blank_non_oom_payload
+    assert "[colorize] OpenCV failed: RuntimeError" in blank_stderr, blank_stderr
+
+    # 5) Happy path when all three files exist
+    mod.colorize_opencv = lambda img, _intensity: (img, "opencv")
+    sys.argv = ["colorize.py", "/tmp/in.png", "/tmp/out_colorize.png", json.dumps({"model": "opencv"})]
+    out_ok, err_ok = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(out_ok), contextlib.redirect_stderr(err_ok):
+        mod.main()
+    ok_payload = json.loads(out_ok.getvalue().strip())
+    assert ok_payload == {
+        "success": True,
+        "width": 64,
+        "height": 64,
+        "method": "opencv",
+        "output_path": "/tmp/out_colorize.png",
+    }, ok_payload
+
+print("COLORIZE_3617_OK")
+`,
+          ],
+          { encoding: "utf8", timeout: 30_000 },
+        );
+        expect(res.status, res.stderr).toBe(0);
+        expect(res.stdout).toContain("COLORIZE_3617_OK");
+      });
+    },
+  );
 });
