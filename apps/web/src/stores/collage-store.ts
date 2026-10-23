@@ -286,11 +286,22 @@ export const useCollageStore = create<CollageState>((set, get) => ({
     [newAssignments[a], newAssignments[b]] = [newAssignments[b], newAssignments[a]];
     // Swap transforms
     const tmpT = newTransforms[a];
-    newTransforms[a] = newTransforms[b];
-    newTransforms[b] = tmpT;
+    if (newTransforms[b] !== undefined) {
+      newTransforms[a] = newTransforms[b];
+    } else {
+      delete newTransforms[a];
+    }
+    if (tmpT !== undefined) {
+      newTransforms[b] = tmpT;
+    } else {
+      delete newTransforms[b];
+    }
+    const selectedCell =
+      state.selectedCell === a ? b : state.selectedCell === b ? a : state.selectedCell;
     set({
       cellAssignments: newAssignments,
       cellTransforms: newTransforms,
+      selectedCell,
       ...clearCollageResult(state),
     });
   },

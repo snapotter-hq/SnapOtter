@@ -249,15 +249,9 @@ function CollageCanvas({ template }: { template: CollageTemplate }) {
       const toCell = over.data.current?.cellIndex as number;
       if (fromCell == null || toCell == null || fromCell === toCell) return;
 
-      const toImgIdx = cellAssignments[toCell] ?? -1;
-      if (toImgIdx >= 0) {
-        store.swapCells(fromCell, toCell);
-      } else {
-        const fromImgIdx = cellAssignments[fromCell];
-        if (fromImgIdx == null || fromImgIdx < 0) return;
-        store.setCellAssignment(toCell, fromImgIdx);
-        store.setCellAssignment(fromCell, -1);
-      }
+      const fromImgIdx = cellAssignments[fromCell];
+      if (fromImgIdx == null || fromImgIdx < 0) return;
+      store.swapCells(fromCell, toCell);
     },
     [cellAssignments, store],
   );

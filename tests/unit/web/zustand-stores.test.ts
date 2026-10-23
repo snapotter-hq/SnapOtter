@@ -2171,19 +2171,48 @@ describe("useCollageStore", () => {
     expect(useCollageStore.getState().resultUrl).toBeNull();
   });
 
-  it("swapCells swaps assignments and transforms between two cells", () => {
+  it("swapCells swaps assignments, transforms, and selectedCell without leaving undefined transform keys (#3700)", () => {
     const file1 = new File(["a"], "a.png", { type: "image/png" });
     const file2 = new File(["b"], "b.png", { type: "image/png" });
     useCollageStore.getState().addImages([file1, file2]);
+    useCollageStore.getState().setTemplateId("3-h-equal");
 
     useCollageStore.getState().setCellTransform(0, { zoom: 2 });
+    useCollageStore.getState().setSelectedCell(0);
 
+    // Swap cell 0 (has transform, selected) with cell 1 (no transform)
     useCollageStore.getState().swapCells(0, 1);
 
-    const s = useCollageStore.getState();
-    expect(s.cellAssignments[0]).toBe(1);
-    expect(s.cellAssignments[1]).toBe(0);
+    let s = useCollageStore.getState();
+    expect(s.cellAssignments).toEqual([1, 0, -1]);
     expect(s.cellTransforms[1]?.zoom).toBe(2);
+    expect(s.cellTransforms[0]).toBeUndefined();
+    expect(Object.hasOwn(s.cellTransforms, 0)).toBe(false);
+    expect(s.selectedCell).toBe(1);
+
+    // Swap (0, 1) again when cell 1 is selected and has transform, cell 0 has none
+    useCollageStore.getState().swapCells(0, 1);
+    s = useCollageStore.getState();
+    expect(s.cellAssignments).toEqual([0, 1, -1]);
+    expect(s.cellTransforms[0]?.zoom).toBe(2);
+    expect(s.cellTransforms[1]).toBeUndefined();
+    expect(Object.hasOwn(s.cellTransforms, 1)).toBe(false);
+    expect(s.selectedCell).toBe(0);
+
+    // Unrelated selectedCell (2) and null selectedCell remain unchanged; swapping two
+    // populated transforms exchanges both entries cleanly
+    useCollageStore.getState().setCellTransform(1, { zoom: 1.5, objectFit: "contain" });
+    useCollageStore.getState().setSelectedCell(2);
+    useCollageStore.getState().swapCells(0, 1);
+    s = useCollageStore.getState();
+    expect(s.cellTransforms[0]?.zoom).toBe(1.5);
+    expect(s.cellTransforms[0]?.objectFit).toBe("contain");
+    expect(s.cellTransforms[1]?.zoom).toBe(2);
+    expect(s.selectedCell).toBe(2);
+
+    useCollageStore.getState().setSelectedCell(null);
+    useCollageStore.getState().swapCells(0, 1);
+    expect(useCollageStore.getState().selectedCell).toBeNull();
   });
 
   it("setCellTransform creates and merges transforms", () => {

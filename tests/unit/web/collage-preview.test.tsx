@@ -136,8 +136,10 @@ describe("CollagePreview touch and mouse cell reordering (#2596)", () => {
     await waitFor(() => {
       expect(useCollageStore.getState().cellAssignments).toEqual([1, 0]);
     });
+    expect(useCollageStore.getState().selectedCell).toBe(1);
     expect(useCollageStore.getState().cellTransforms[0]).toBeUndefined();
     expect(useCollageStore.getState().cellTransforms[1]).toBeUndefined();
+    expect(Object.keys(useCollageStore.getState().cellTransforms)).toHaveLength(0);
     expect(grip.className).toContain("select-none");
     expect(grip.className).toContain("[-webkit-touch-callout:none]");
   });
@@ -200,13 +202,17 @@ describe("CollagePreview touch and mouse cell reordering (#2596)", () => {
     await waitFor(() => {
       expect(useCollageStore.getState().cellAssignments).toEqual([1, 0]);
     });
+    expect(useCollageStore.getState().selectedCell).toBe(1);
     expect(useCollageStore.getState().cellTransforms[0]).toBeUndefined();
   });
 
-  it("moves a populated cell into an empty cell when dragged on touch", async () => {
+  it("moves a populated cell with its transform and selection into an empty cell when dragged (#3700)", async () => {
     const { grip } = renderSelectedCellGrid();
     act(() => {
       useCollageStore.getState().setCellAssignment(1, -1);
+      useCollageStore
+        .getState()
+        .setCellTransform(0, { zoom: 2.2, panX: 15, panY: -10, objectFit: "contain" });
     });
     expect(useCollageStore.getState().cellAssignments).toEqual([0, -1]);
 
@@ -243,6 +249,59 @@ describe("CollagePreview touch and mouse cell reordering (#2596)", () => {
     await waitFor(() => {
       expect(useCollageStore.getState().cellAssignments).toEqual([-1, 0]);
     });
+    const state = useCollageStore.getState();
+    expect(state.selectedCell).toBe(1);
+    expect(state.cellTransforms[0]).toBeUndefined();
+    expect(Object.hasOwn(state.cellTransforms, 0)).toBe(false);
+    expect(state.cellTransforms[1]).toEqual({
+      zoom: 2.2,
+      panX: 15,
+      panY: -10,
+      objectFit: "contain",
+    });
+  });
+
+  it("ignores drag-end when the source cell becomes empty mid-drag", async () => {
+    const { grip } = renderSelectedCellGrid();
+    act(() => {
+      useCollageStore.getState().setCellTransform(1, { zoom: 1.8 });
+    });
+
+    act(() => {
+      fireEvent.pointerDown(grip, {
+        pointerId: 1,
+        pointerType: "touch",
+        isPrimary: true,
+        button: 0,
+        buttons: 1,
+        clientX: 160,
+        clientY: 20,
+      });
+      fireEvent.touchStart(grip, touchInit(160, 20));
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(350);
+    });
+
+    act(() => {
+      fireEvent.pointerCancel(grip, { pointerId: 1, pointerType: "touch", isPrimary: true });
+      fireEvent.touchMove(grip, touchInit(280, 90));
+      useCollageStore.getState().setCellAssignment(0, -1);
+    });
+
+    await act(async () => {
+      fireEvent.touchEnd(grip, {
+        touches: [],
+        targetTouches: [],
+        changedTouches: [{ identifier: 0, clientX: 280, clientY: 90 }],
+      });
+    });
+
+    const state = useCollageStore.getState();
+    expect(state.cellAssignments).toEqual([-1, 1]);
+    expect(state.cellTransforms[1]?.zoom).toBe(1.8);
+    expect(state.selectedCell).toBe(0);
   });
 
   it("still pans the image when dragging the selected cell body outside the toolbar", () => {
