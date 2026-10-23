@@ -275,6 +275,17 @@ export const useCollageStore = create<CollageState>((set, get) => ({
     const state = get();
     const newAssignments = [...state.cellAssignments];
     newAssignments[cellIndex] = imageIndex;
+    if (imageIndex < 0) {
+      const newTransforms = { ...state.cellTransforms };
+      delete newTransforms[cellIndex];
+      set({
+        cellAssignments: newAssignments,
+        cellTransforms: newTransforms,
+        selectedCell: state.selectedCell === cellIndex ? null : state.selectedCell,
+        ...clearCollageResult(state),
+      });
+      return;
+    }
     set({ cellAssignments: newAssignments, ...clearCollageResult(state) });
   },
 

@@ -207,14 +207,16 @@ describe("CollagePreview touch and mouse cell reordering (#2596)", () => {
   });
 
   it("moves a populated cell with its transform and selection into an empty cell when dragged (#3700)", async () => {
-    const { grip } = renderSelectedCellGrid();
+    const { cell1, cell2, grip } = renderSelectedCellGrid();
     act(() => {
+      useCollageStore.getState().setCellTransform(1, { zoom: 3, objectFit: "contain" });
       useCollageStore.getState().setCellAssignment(1, -1);
       useCollageStore
         .getState()
         .setCellTransform(0, { zoom: 2.2, panX: 15, panY: -10, objectFit: "contain" });
     });
     expect(useCollageStore.getState().cellAssignments).toEqual([0, -1]);
+    expect(cell2.style.backgroundColor).toBe("");
 
     act(() => {
       fireEvent.pointerDown(grip, {
@@ -253,6 +255,7 @@ describe("CollagePreview touch and mouse cell reordering (#2596)", () => {
     expect(state.selectedCell).toBe(1);
     expect(state.cellTransforms[0]).toBeUndefined();
     expect(Object.hasOwn(state.cellTransforms, 0)).toBe(false);
+    expect(cell1.style.backgroundColor).toBe("");
     expect(state.cellTransforms[1]).toEqual({
       zoom: 2.2,
       panX: 15,
@@ -301,7 +304,7 @@ describe("CollagePreview touch and mouse cell reordering (#2596)", () => {
     const state = useCollageStore.getState();
     expect(state.cellAssignments).toEqual([-1, 1]);
     expect(state.cellTransforms[1]?.zoom).toBe(1.8);
-    expect(state.selectedCell).toBe(0);
+    expect(state.selectedCell).toBeNull();
   });
 
   it("still pans the image when dragging the selected cell body outside the toolbar", () => {

@@ -2171,6 +2171,49 @@ describe("useCollageStore", () => {
     expect(useCollageStore.getState().resultUrl).toBeNull();
   });
 
+  it("setCellAssignment clears cellTransforms and resets matching selectedCell when vacating a cell (#3795)", () => {
+    const file1 = new File(["a"], "a.png", { type: "image/png" });
+    const file2 = new File(["b"], "b.png", { type: "image/png" });
+    useCollageStore.getState().addImages([file1, file2]);
+
+    useCollageStore.getState().setCellTransform(0, { zoom: 1.5 });
+    useCollageStore.getState().setCellTransform(1, { zoom: 2, objectFit: "contain" });
+    useCollageStore.getState().setSelectedCell(1);
+
+    // Reassigning to a valid image index keeps cellTransforms and selectedCell intact
+    useCollageStore.getState().setCellAssignment(1, 0);
+    let s = useCollageStore.getState();
+    expect(s.cellAssignments[1]).toBe(0);
+    expect(s.cellTransforms[1]?.zoom).toBe(2);
+    expect(s.selectedCell).toBe(1);
+
+    // Clearing the selected cell deletes its transform key and resets selectedCell to null
+    useCollageStore.getState().setCellAssignment(1, -1);
+    s = useCollageStore.getState();
+    expect(s.cellAssignments[1]).toBe(-1);
+    expect(s.cellTransforms[1]).toBeUndefined();
+    expect(Object.hasOwn(s.cellTransforms, 1)).toBe(false);
+    expect(s.cellTransforms[0]?.zoom).toBe(1.5);
+    expect(s.selectedCell).toBeNull();
+
+    // Clearing a non-selected cell preserves selectedCell on another cell
+    useCollageStore.getState().setCellAssignment(1, 1);
+    useCollageStore.getState().setCellTransform(1, { panX: 25 });
+    useCollageStore.getState().setSelectedCell(0);
+    useCollageStore.getState().setCellAssignment(1, -1);
+    s = useCollageStore.getState();
+    expect(Object.hasOwn(s.cellTransforms, 1)).toBe(false);
+    expect(s.selectedCell).toBe(0);
+
+    // Swapping with the cleared cell does not transfer a stale transform onto cell 0
+    useCollageStore.getState().swapCells(0, 1);
+    s = useCollageStore.getState();
+    expect(s.cellAssignments).toEqual([-1, 0]);
+    expect(s.cellTransforms[0]).toBeUndefined();
+    expect(Object.hasOwn(s.cellTransforms, 0)).toBe(false);
+    expect(s.cellTransforms[1]?.zoom).toBe(1.5);
+  });
+
   it("swapCells swaps assignments, transforms, and selectedCell without leaving undefined transform keys (#3700)", () => {
     const file1 = new File(["a"], "a.png", { type: "image/png" });
     const file2 = new File(["b"], "b.png", { type: "image/png" });
