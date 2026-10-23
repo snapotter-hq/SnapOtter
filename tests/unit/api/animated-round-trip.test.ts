@@ -1,7 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
-import { beforeAll, describe, expect, it } from "vitest";
-import { isAnimated, readAnimationFor } from "../../../apps/api/src/lib/animated-image.js";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  isAnimated,
+  readAnimationFor,
+  runPerFrame,
+} from "../../../apps/api/src/lib/animated-image.js";
+import { DecoderOutOfMemoryError } from "../../../apps/api/src/lib/format-decoders.js";
+import { logger } from "../../../apps/api/src/lib/logger.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerColorAdjustments } from "../../../apps/api/src/routes/tools/adjust-colors.js";
 import { registerBorder } from "../../../apps/api/src/routes/tools/border.js";
@@ -972,4 +978,105 @@ describe("animation detection inspects buffer format, not filename extension or 
       expect(await frameShape(result.buffer)).toEqual(expectedShape);
     },
   );
+});
+
+describe("readAnimation rethrows DecoderOutOfMemoryError on metadata() OOM (#3836)", () => {
+  it("rethrows DecoderOutOfMemoryError without logging warn when sharp.metadata() hits V8 OOM or libheif allocation failure", async () => {
+    const source = await gifSource();
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      for (const buildErr of [
+        () => new RangeError("Array buffer allocation failed"),
+        () =>
+          new Error(
+            "heif: Memory allocation error: Unspecified: Allocating 4147215 bytes failed (4.1000)",
+          ),
+      ]) {
+        const metaSpy = vi.spyOn(sharp.prototype, "metadata");
+        try {
+          for (const call of [
+            () => readAnimationFor(source, "gif"),
+            () => readAnimationFor(source, "webp"),
+            () => isAnimated(source),
+            () => runPerFrame(source, "gif", async (frame) => frame),
+          ]) {
+            const oomErr = buildErr();
+            metaSpy.mockRejectedValueOnce(oomErr);
+            const thrown = await call().catch((e: unknown) => e);
+            expect(thrown).toBeInstanceOf(DecoderOutOfMemoryError);
+            expect(thrown).toMatchObject({
+              name: "DecoderOutOfMemoryError",
+              statusCode: 503,
+              code: "ENGINE_UNAVAILABLE",
+              cause: oomErr,
+            });
+          }
+          expect(warnSpy).not.toHaveBeenCalled();
+        } finally {
+          metaSpy.mockRestore();
+        }
+      }
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("propagates DecoderOutOfMemoryError from strip-metadata instead of silently dropping frames past frame 1 when readAnimationFor hits OOM", async () => {
+    const source = await gifSource();
+    const stripConfig = getToolConfig("strip-metadata");
+    if (!stripConfig) throw new Error("strip-metadata must be registered");
+    const settings = stripConfig.settingsSchema.parse({});
+
+    const origMetadata = sharp.prototype.metadata;
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    let callCount = 0;
+    const metaSpy = vi.spyOn(sharp.prototype, "metadata").mockImplementation(function (
+      this: sharp.Sharp,
+    ) {
+      callCount++;
+      // Call 1 is strip-metadata reading the input format; call 2 is readAnimationFor.
+      if (callCount === 2) {
+        return Promise.reject(v8Oom);
+      }
+      return origMetadata.call(this);
+    });
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      const thrown = await stripConfig
+        .process(source, settings, "frames.gif")
+        .catch((e: unknown) => e);
+      expect(thrown).toBeInstanceOf(DecoderOutOfMemoryError);
+      expect(thrown).toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: v8Oom,
+      });
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      metaSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("still logs a warning and returns STILL when sharp.metadata() rejects with a non-OOM error", async () => {
+    const source = await gifSource();
+    const secLimitErr = new Error(
+      "heif: Memory allocation error: Security limit exceeded: Allocating 2147483648 bytes exceeds the security limit of 536870912 bytes",
+    );
+    const metaSpy = vi.spyOn(sharp.prototype, "metadata").mockRejectedValueOnce(secLimitErr);
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      expect(await readAnimationFor(source, "gif")).toEqual({
+        animated: false,
+        pages: 1,
+        pageHeight: 0,
+        width: 0,
+      });
+      expect(warnSpy).toHaveBeenCalledOnce();
+    } finally {
+      metaSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+  });
 });
