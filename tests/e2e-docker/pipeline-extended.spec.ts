@@ -121,7 +121,7 @@ test.describe("5-step full photo preparation", () => {
         pipeline: JSON.stringify({
           steps: [
             { toolId: "strip-metadata", settings: {} },
-            { toolId: "resize", settings: { width: 1200, fit: "contain" } },
+            { toolId: "resize", settings: { width: 600, fit: "contain" } },
             { toolId: "image-enhancement", settings: { mode: "auto" } },
             {
               toolId: "watermark-text",
@@ -141,8 +141,27 @@ test.describe("5-step full photo preparation", () => {
     expect(res.ok()).toBe(true);
     const body = await res.json();
     expect(body.downloadUrl).toBeTruthy();
+    expect(body.originalSize).toBe(JPG_SAMPLE.length);
     expect(body.processedSize).toBeGreaterThan(0);
     expect(body.processedSize).toBeLessThan(body.originalSize);
+
+    const dlRes = await request.get(body.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const buffer = Buffer.from(await dlRes.body());
+    expect(buffer.length).toBe(body.processedSize);
+
+    const infoRes = await request.post("/api/v1/tools/image/info", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "prepared.jpg", mimeType: "image/jpeg", buffer },
+      },
+    });
+    expect(infoRes.ok()).toBe(true);
+    const infoBody = await infoRes.json();
+    expect(infoBody.width).toBe(600);
+    expect(infoBody.height).toBe(399);
   });
 });
 

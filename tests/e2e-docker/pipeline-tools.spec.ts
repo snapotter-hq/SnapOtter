@@ -531,7 +531,7 @@ test.describe("Pipeline edge cases", () => {
                 position: "bottom-right",
               },
             },
-            { toolId: "compress", settings: { quality: 80 } },
+            { toolId: "compress", settings: { quality: 70 } },
           ],
         }),
       },
@@ -539,9 +539,28 @@ test.describe("Pipeline edge cases", () => {
     expect(res.ok()).toBe(true);
     const body = await res.json();
     expect(body.downloadUrl).toBeTruthy();
+    expect(body.originalSize).toBe(JPG_SAMPLE.length);
     expect(body.processedSize).toBeGreaterThan(0);
     // Full pipeline should produce a smaller file than original
     expect(body.processedSize).toBeLessThan(body.originalSize);
+
+    const dlRes = await request.get(body.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const buffer = Buffer.from(await dlRes.body());
+    expect(buffer.length).toBe(body.processedSize);
+
+    const infoRes = await request.post("/api/v1/tools/image/info", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "processed.jpg", mimeType: "image/jpeg", buffer },
+      },
+    });
+    expect(infoRes.ok()).toBe(true);
+    const infoBody = await infoRes.json();
+    expect(infoBody.width).toBe(600);
+    expect(infoBody.height).toBe(399);
   });
 });
 
