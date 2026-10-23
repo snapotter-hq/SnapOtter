@@ -13,6 +13,14 @@ import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// The route's permission gate is covered by
+// tests/integration/security/upload-preview-authorization.test.ts; these cases
+// are about fetching and decoding, so every caller passes it.
+vi.mock("../../../apps/api/src/permissions.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/api/src/permissions.js")>()),
+  requireFileAccess: async (request: { user?: unknown }) =>
+    request.user ?? { id: "test-user", role: "user" },
+}));
 vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {
     insert: () => ({ values: async () => {} }),
