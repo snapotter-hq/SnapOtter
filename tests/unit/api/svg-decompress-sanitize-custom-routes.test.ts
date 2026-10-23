@@ -20,6 +20,7 @@ function defaultInspectMetadata(buf: Buffer, filename: string): InspectResult {
 
 const mocks = vi.hoisted(() => ({
   putObject: vi.fn<(key: string, data: Buffer | string) => Promise<void>>(async () => {}),
+  failBatchJob: vi.fn<(opts: unknown) => Promise<boolean>>(async () => true),
   inspectMetadata: vi.fn<(buf: Buffer, filename: string) => Promise<InspectResult>>(),
   writeMetadata: vi.fn<(buf: Buffer, filename: string, tags: string[]) => Promise<Buffer>>(
     async (buf: Buffer) => buf,
@@ -68,12 +69,39 @@ vi.mock("../../../apps/api/src/routes/tool-factory.js", () => ({
   registerToolProcessFn: vi.fn(),
 }));
 
+vi.mock("../../../apps/api/src/db/index.js", () => ({
+  db: {
+    insert: () => ({
+      values: vi.fn(async () => undefined),
+    }),
+  },
+  schema: { jobs: {} },
+}));
+
+vi.mock("../../../apps/api/src/routes/progress.js", () => ({
+  failBatchJob: (opts: unknown) => mocks.failBatchJob(opts),
+  updateJobProgress: vi.fn(async () => undefined),
+}));
+
+vi.mock("../../../apps/api/src/permissions.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/permissions.js")>();
+  return { ...actual, requireToolAccess: async () => ({ id: "user-1" }) };
+});
+
 import sharp from "sharp";
 import { env } from "../../../apps/api/src/config.js";
 import { DecoderOutOfMemoryError } from "../../../apps/api/src/lib/format-decoders.js";
+import { registerBarcodeRead } from "../../../apps/api/src/routes/tools/barcode-read.js";
+import { registerCollage } from "../../../apps/api/src/routes/tools/collage.js";
+import { registerColorPalette } from "../../../apps/api/src/routes/tools/color-palette.js";
 import { registerEditMetadata } from "../../../apps/api/src/routes/tools/edit-metadata.js";
+import { registerImageToPdf } from "../../../apps/api/src/routes/tools/image-to-pdf.js";
 import { registerInfo } from "../../../apps/api/src/routes/tools/info.js";
+import { registerMemeGenerator } from "../../../apps/api/src/routes/tools/meme-generator.js";
+import { registerSplit } from "../../../apps/api/src/routes/tools/split.js";
+import { registerStitch } from "../../../apps/api/src/routes/tools/stitch.js";
 import { registerStripMetadata } from "../../../apps/api/src/routes/tools/strip-metadata.js";
+import { registerSvgToRaster } from "../../../apps/api/src/routes/tools/svg-to-raster.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 
 type RouteHandler = (req: unknown, rep: unknown) => Promise<unknown>;
@@ -88,6 +116,14 @@ function buildRoutes() {
   registerEditMetadata(fakeApp as never);
   registerStripMetadata(fakeApp as never);
   registerInfo(fakeApp as never);
+  registerSvgToRaster(fakeApp as never);
+  registerStitch(fakeApp as never);
+  registerBarcodeRead(fakeApp as never);
+  registerSplit(fakeApp as never);
+  registerMemeGenerator(fakeApp as never);
+  registerColorPalette(fakeApp as never);
+  registerCollage(fakeApp as never);
+  registerImageToPdf(fakeApp as never);
   return routes;
 }
 
@@ -100,7 +136,7 @@ async function invokeRoute(
 ) {
   if (!handler) throw new Error("Route handler not registered");
   const request = {
-    headers: {},
+    headers: { "content-type": "multipart/form-data; boundary=---test" },
     log: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
     parts: async function* () {
       for (const p of parts) {
@@ -120,6 +156,7 @@ async function invokeRoute(
   const reply = {
     statusCode: 200,
     payload: undefined as unknown,
+    raw: { headersSent: false, destroy: vi.fn() },
     status(code: number) {
       this.statusCode = code;
       return this;
@@ -169,6 +206,8 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
 
   beforeEach(() => {
     mocks.putObject.mockClear();
+    mocks.failBatchJob.mockClear();
+    mocks.failBatchJob.mockResolvedValue(true);
     mocks.inspectMetadata.mockClear();
     mocks.inspectMetadata.mockImplementation(async (buf: Buffer, filename: string) =>
       defaultInspectMetadata(buf, filename),
@@ -786,6 +825,182 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
       } finally {
         metaSpy.mockRestore();
       }
+    });
+  });
+
+  describe("custom SVG tool routes rethrow unexpected sanitizer faults while returning 400/batch-skip on client SVG errors (#3580)", () => {
+    it.each([
+      {
+        name: "POST /api/v1/tools/image/svg-to-raster",
+        url: "/api/v1/tools/image/svg-to-raster",
+        makeParts: (filename: string, content: Buffer) => [
+          { type: "file" as const, filename, content },
+          { type: "field" as const, fieldname: "settings", value: "{}" },
+        ],
+      },
+      {
+        name: "POST /api/v1/tools/image/stitch",
+        url: "/api/v1/tools/image/stitch",
+        makeParts: (filename: string, content: Buffer) => [
+          { type: "file" as const, filename, content },
+          { type: "file" as const, filename: "second.svg", content: DIRTY_SVG },
+          { type: "field" as const, fieldname: "settings", value: "{}" },
+        ],
+      },
+      {
+        name: "POST /api/v1/tools/image/barcode-read",
+        url: "/api/v1/tools/image/barcode-read",
+        makeParts: (filename: string, content: Buffer) => [
+          { type: "file" as const, filename, content },
+          { type: "field" as const, fieldname: "settings", value: "{}" },
+        ],
+      },
+      {
+        name: "POST /api/v1/tools/image/split",
+        url: "/api/v1/tools/image/split",
+        makeParts: (filename: string, content: Buffer) => [
+          { type: "file" as const, filename, content },
+          { type: "field" as const, fieldname: "settings", value: "{}" },
+        ],
+      },
+      {
+        name: "POST /api/v1/tools/image/meme-generator",
+        url: "/api/v1/tools/image/meme-generator",
+        makeParts: (filename: string, content: Buffer) => [
+          { type: "file" as const, filename, content },
+          { type: "field" as const, fieldname: "settings", value: "{}" },
+        ],
+      },
+      {
+        name: "POST /api/v1/tools/image/color-palette",
+        url: "/api/v1/tools/image/color-palette",
+        makeParts: (filename: string, content: Buffer) => [
+          { type: "file" as const, filename, content },
+          { type: "field" as const, fieldname: "settings", value: "{}" },
+        ],
+      },
+      {
+        name: "POST /api/v1/tools/image/collage",
+        url: "/api/v1/tools/image/collage",
+        makeParts: (filename: string, content: Buffer) => [
+          { type: "file" as const, filename, content },
+          { type: "file" as const, filename: "second.svg", content: DIRTY_SVG },
+          { type: "field" as const, fieldname: "settings", value: "{}" },
+        ],
+      },
+      {
+        name: "POST /api/v1/tools/image/image-to-pdf",
+        url: "/api/v1/tools/image/image-to-pdf",
+        makeParts: (filename: string, content: Buffer) => [
+          { type: "file" as const, filename, content },
+          { type: "file" as const, filename: "second.svg", content: DIRTY_SVG },
+          { type: "field" as const, fieldname: "settings", value: "{}" },
+        ],
+      },
+    ])(
+      "$name returns 400 on client SVG/SVGZ errors and rethrows unexpected TypeError faults (#3580)",
+      async ({ url, makeParts }) => {
+        const routeHandler = routes.get(url);
+
+        const overCapReply = await invokeRoute(
+          routeHandler,
+          makeParts("too-many.svg", OVER_ELEMENT_SVG),
+        );
+        expect(overCapReply.statusCode).toBe(400);
+        expect((overCapReply.payload as { error?: string })?.error).toContain(
+          "SVG exceeds maximum element count of 5000",
+        );
+
+        const nonSvgReply = await invokeRoute(routeHandler, makeParts("bad.svgz", NOT_SVG_SVGZ));
+        expect(nonSvgReply.statusCode).toBe(400);
+        expect((nonSvgReply.payload as { error?: string })?.error).toContain(
+          "SVGZ file does not contain valid SVG content after decompression",
+        );
+
+        const sanitizeFault = new TypeError("unexpected sanitizer fault");
+        mocks.sanitizeSvg.mockImplementationOnce(() => {
+          throw sanitizeFault;
+        });
+        await expect(invokeRoute(routeHandler, makeParts("icon.svg", DIRTY_SVG))).rejects.toThrow(
+          sanitizeFault,
+        );
+
+        const decompressFault = new TypeError("unexpected gunzip fault");
+        mocks.decompressSvgz.mockImplementationOnce(() => {
+          throw decompressFault;
+        });
+        await expect(invokeRoute(routeHandler, makeParts("icon.svgz", DIRTY_SVGZ))).rejects.toThrow(
+          decompressFault,
+        );
+
+        expect(mocks.putObject).not.toHaveBeenCalled();
+      },
+    );
+
+    it("POST /api/v1/tools/image/svg-to-raster/batch records per-file errors on client SVG/SVGZ rejections and settles failBatchJob before rethrowing unexpected TypeError faults (#3580)", async () => {
+      const batchHandler = routes.get("/api/v1/tools/image/svg-to-raster/batch");
+
+      const clientFailReply = await invokeRoute(batchHandler, [
+        { type: "file", filename: "bad.svgz", content: NOT_SVG_SVGZ },
+        { type: "file", filename: "too-many.svg", content: OVER_ELEMENT_SVG },
+        { type: "field", fieldname: "settings", value: "{}" },
+      ]);
+      expect(clientFailReply.statusCode).toBe(422);
+      expect(clientFailReply.payload).toMatchObject({
+        error: "All files failed processing",
+        errors: [
+          {
+            filename: "bad.svgz",
+            error: "SVGZ file does not contain valid SVG content after decompression",
+          },
+          {
+            filename: "too-many.svg",
+            error: "SVG exceeds maximum element count of 5000",
+          },
+        ],
+      });
+
+      mocks.failBatchJob.mockClear();
+      const sanitizeFault = new TypeError("unexpected sanitizer fault");
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw sanitizeFault;
+      });
+      await expect(
+        invokeRoute(batchHandler, [
+          { type: "file", filename: "icon.svg", content: SCRIPT_LT_SVG },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ]),
+      ).rejects.toThrow(sanitizeFault);
+      expect(mocks.failBatchJob).toHaveBeenCalledWith(
+        expect.objectContaining({
+          totalFiles: 1,
+          completedFiles: 1,
+          failedFiles: 1,
+          message: "Internal server error",
+          errors: [{ filename: "", error: "Internal server error" }],
+        }),
+      );
+
+      mocks.failBatchJob.mockClear();
+      const decompressFault = new TypeError("unexpected gunzip fault");
+      mocks.decompressSvgz.mockImplementationOnce(() => {
+        throw decompressFault;
+      });
+      await expect(
+        invokeRoute(batchHandler, [
+          { type: "file", filename: "icon.svgz", content: SCRIPT_LT_SVGZ },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ]),
+      ).rejects.toThrow(decompressFault);
+      expect(mocks.failBatchJob).toHaveBeenCalledWith(
+        expect.objectContaining({
+          totalFiles: 1,
+          completedFiles: 1,
+          failedFiles: 1,
+          message: "Internal server error",
+          errors: [{ filename: "", error: "Internal server error" }],
+        }),
+      );
     });
   });
 });

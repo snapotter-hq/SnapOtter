@@ -19,7 +19,7 @@ import { decodeHeic } from "../../lib/heic-converter.js";
 import { asInputErrorIfUndecodable } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
-import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
 import { InputValidationError } from "../../modality/contract.js";
 
 // ── Template definitions (mirrors the frontend) ─────────────────────
@@ -521,9 +521,12 @@ export function registerCollage(app: FastifyInstance) {
           file.buffer = decompressSvgz(file.buffer);
           file.buffer = sanitizeSvg(file.buffer);
         } catch (err) {
-          return reply.status(400).send({
-            error: `Invalid SVG "${file.filename}": ${err instanceof Error ? err.message : "Unknown error"}`,
-          });
+          if (isSvgClientError(err)) {
+            return reply.status(400).send({
+              error: `Invalid SVG "${file.filename}": ${err instanceof Error ? err.message : "Unknown error"}`,
+            });
+          }
+          throw err;
         }
       }
       file.buffer = await autoOrient(file.buffer);

@@ -936,12 +936,7 @@ describe("beautify route and processBeautify validation & backgroundImage prepar
       expect(faultErr).not.toBeInstanceOf(InputValidationError);
       expect((faultErr as { cause?: unknown }).cause).toBe(unexpectedErr);
 
-      const resRouteFault = await invokeMemeMultipart("valid.svg", validSvg);
-      expect(resRouteFault.statusCode).toBe(422);
-      expect(resRouteFault.requestLog.error).toHaveBeenCalledWith(
-        { err: unexpectedErr, toolId: "meme-generator" },
-        "Meme generation failed",
-      );
+      await expect(invokeMemeMultipart("valid.svg", validSvg)).rejects.toBe(unexpectedErr);
     } finally {
       sanitizeFaultSpy.mockRestore();
     }

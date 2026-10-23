@@ -20,7 +20,7 @@ import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/ima
 import { renderMemeTextSvg } from "../../lib/meme-text-renderer.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
-import { decompressSvgz, isSvgzClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
@@ -122,10 +122,7 @@ function sanitizeSvgInput(buf: Buffer): Buffer {
     const decompressed = decompressSvgz(buf);
     return sanitizeSvg(decompressed);
   } catch (err) {
-    if (
-      isSvgzClientError(err) ||
-      (err instanceof Error && err.message.includes("SVGZ file does not contain"))
-    ) {
+    if (isSvgClientError(err)) {
       const validationErr = new InputValidationError(
         err instanceof Error ? err.message : "Invalid SVG",
       );
@@ -380,13 +377,27 @@ export function registerMemeGenerator(app: FastifyInstance) {
     }
 
     // ── Process ─────────────────────────────────────────────────────
+    if (!imageBuffer) {
+      return reply.status(400).send({ error: "No image provided" });
+    }
     try {
-      // Normalize the image for Sharp compatibility
-      if (!imageBuffer) {
-        return reply.status(400).send({ error: "No image provided" });
-      }
       imageBuffer = await prepareMemeImage(imageBuffer, filename, request.log);
+    } catch (err) {
+      if (err instanceof InputValidationError) {
+        return reply.status(400).send({
+          error: err.message,
+        });
+      }
+      if (isToolInputError(err)) {
+        return reply.status(422).send({
+          error: "Processing failed",
+          details: stripInternalPaths(err.message),
+        });
+      }
+      throw err;
+    }
 
+    try {
       const output = await processMeme(imageBuffer, settings, filename, templateTextBoxes);
 
       const jobId = randomUUID();

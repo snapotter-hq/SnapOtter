@@ -15,7 +15,7 @@ import {
 import { decodeHeic } from "../lib/heic-converter.js";
 import { logger } from "../lib/logger.js";
 import { normalizeOperationalWriteError } from "../lib/object-storage.js";
-import { decompressSvgz, sanitizeSvg } from "../lib/svg-sanitize.js";
+import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { type InputHandler, InputValidationError, type PreparedInput } from "./contract.js";
 
 /**
@@ -137,7 +137,10 @@ export class ImageInputHandler implements InputHandler {
         opts.signal?.throwIfAborted();
       } catch (err) {
         opts.signal?.throwIfAborted();
-        throw new InputValidationError(err instanceof Error ? err.message : "Invalid SVG");
+        if (isSvgClientError(err)) {
+          throw new InputValidationError(err instanceof Error ? err.message : "Invalid SVG");
+        }
+        throw err;
       }
     }
 

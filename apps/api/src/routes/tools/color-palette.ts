@@ -15,7 +15,7 @@ import {
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
-import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
 const settingsSchema = z
   .object({
@@ -201,11 +201,25 @@ export function registerColorPalette(app: FastifyInstance) {
       });
     }
 
-    try {
-      const validation = await validateImageBuffer(fileBuffer, filename);
-      if (!validation.valid) {
-        return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
+    const validation = await validateImageBuffer(fileBuffer, filename);
+    if (!validation.valid) {
+      return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
+    }
+    if (validation.format === "svg") {
+      try {
+        fileBuffer = decompressSvgz(fileBuffer);
+        fileBuffer = sanitizeSvg(fileBuffer);
+      } catch (err) {
+        if (isSvgClientError(err)) {
+          return reply.status(400).send({
+            error: err instanceof Error ? err.message : "Invalid SVG",
+          });
+        }
+        throw err;
       }
+    }
+
+    try {
       if (validation.format === "heif") {
         try {
           fileBuffer = await decodeHeic(fileBuffer);
@@ -240,16 +254,6 @@ export function registerColorPalette(app: FastifyInstance) {
               details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
             });
           }
-        }
-      }
-      if (validation.format === "svg") {
-        try {
-          fileBuffer = decompressSvgz(fileBuffer);
-          fileBuffer = sanitizeSvg(fileBuffer);
-        } catch (err) {
-          return reply.status(400).send({
-            error: err instanceof Error ? err.message : "Invalid SVG",
-          });
         }
       }
 

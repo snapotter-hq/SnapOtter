@@ -55,10 +55,14 @@ vi.mock("../../../apps/api/src/lib/logger.js", () => ({
   logger: mocks.logger,
 }));
 
-vi.mock("../../../apps/api/src/lib/svg-sanitize.js", () => ({
-  decompressSvgz: mocks.decompressSvgz,
-  sanitizeSvg: mocks.sanitizeSvg,
-}));
+vi.mock("../../../apps/api/src/lib/svg-sanitize.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/svg-sanitize.js")>();
+  return {
+    ...actual,
+    decompressSvgz: mocks.decompressSvgz,
+    sanitizeSvg: mocks.sanitizeSvg,
+  };
+});
 
 import {
   DecoderOutOfMemoryError,
@@ -504,15 +508,17 @@ describe("ImageInputHandler SVG sanitization abort signal (#2830)", () => {
     expect(err).toMatchObject({ name: "AbortError" });
   });
 
-  it("still wraps non-abort SVG sanitization failures in InputValidationError", async () => {
+  it("still wraps client SVG/SVGZ sanitization rejections in InputValidationError", async () => {
     mocks.validateImageBuffer.mockResolvedValue({
       valid: true,
       format: "svg",
       width: 100,
       height: 100,
     });
-    mocks.sanitizeSvg.mockImplementation(() => {
-      throw new Error("SVG contains prohibited <script> element");
+    mocks.sanitizeSvg.mockImplementationOnce(() => {
+      throw Object.assign(new Error("SVG exceeds maximum element count of 5000"), {
+        statusCode: 400,
+      });
     });
 
     await expect(
@@ -523,19 +529,34 @@ describe("ImageInputHandler SVG sanitization abort signal (#2830)", () => {
     ).rejects.toMatchObject({
       name: "InputValidationError",
       statusCode: 400,
-      message: "SVG contains prohibited <script> element",
+      message: "SVG exceeds maximum element count of 5000",
+    });
+
+    mocks.decompressSvgz.mockImplementationOnce(() => {
+      throw new Error("SVGZ file does not contain valid SVG content after decompression");
+    });
+
+    await expect(
+      new ImageInputHandler().prepare(RAW, "icon.svgz", {
+        scratchDir: "/tmp/in",
+        signal: new AbortController().signal,
+      }),
+    ).rejects.toMatchObject({
+      name: "InputValidationError",
+      statusCode: 400,
+      message: "SVGZ file does not contain valid SVG content after decompression",
     });
   });
 
-  it("falls back to Invalid SVG when a non-Error value is thrown without an abort", async () => {
+  it("falls back to Invalid SVG when a non-Error client rejection object is thrown without an abort", async () => {
     mocks.validateImageBuffer.mockResolvedValue({
       valid: true,
       format: "svg",
       width: 100,
       height: 100,
     });
-    mocks.sanitizeSvg.mockImplementation(() => {
-      throw "malformed-xml";
+    mocks.sanitizeSvg.mockImplementationOnce(() => {
+      throw { statusCode: 400 };
     });
 
     await expect(
@@ -548,6 +569,37 @@ describe("ImageInputHandler SVG sanitization abort signal (#2830)", () => {
       statusCode: 400,
       message: "Invalid SVG",
     });
+  });
+
+  it("rethrows unexpected faults from decompressSvgz or sanitizeSvg instead of wrapping in InputValidationError (#3580)", async () => {
+    mocks.validateImageBuffer.mockResolvedValue({
+      valid: true,
+      format: "svg",
+      width: 100,
+      height: 100,
+    });
+
+    const sanitizeFault = new TypeError("unexpected sanitizer fault");
+    mocks.sanitizeSvg.mockImplementationOnce(() => {
+      throw sanitizeFault;
+    });
+    await expect(
+      new ImageInputHandler().prepare(RAW, "icon.svg", {
+        scratchDir: "/tmp/in",
+        signal: new AbortController().signal,
+      }),
+    ).rejects.toBe(sanitizeFault);
+
+    const decompressFault = new TypeError("unexpected gunzip fault");
+    mocks.decompressSvgz.mockImplementationOnce(() => {
+      throw decompressFault;
+    });
+    await expect(
+      new ImageInputHandler().prepare(RAW, "icon.svgz", {
+        scratchDir: "/tmp/in",
+        signal: new AbortController().signal,
+      }),
+    ).rejects.toBe(decompressFault);
   });
 });
 

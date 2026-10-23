@@ -8,6 +8,7 @@ vi.mock("../../../apps/api/src/config.js", () => ({
 import {
   decompressSvgz,
   isSvgBuffer,
+  isSvgClientError,
   isSvgzClientError,
   sanitizeSvg,
 } from "../../../apps/api/src/lib/svg-sanitize.js";
@@ -420,5 +421,38 @@ describe("isSvgzClientError", () => {
     expect(isSvgzClientError(null)).toBe(false);
     expect(isSvgzClientError(undefined)).toBe(false);
     expect(isSvgzClientError("string error")).toBe(false);
+  });
+});
+
+describe("isSvgClientError (#3580)", () => {
+  it("recognizes isSvgzClientError matches plus non-SVG SVGZ content errors", () => {
+    expect(isSvgClientError(Object.assign(new Error("over cap"), { statusCode: 400 }))).toBe(true);
+    expect(isSvgClientError(Object.assign(new Error("corrupt"), { code: "Z_DATA_ERROR" }))).toBe(
+      true,
+    );
+    expect(isSvgClientError(Object.assign(new Error("truncated"), { code: "Z_BUF_ERROR" }))).toBe(
+      true,
+    );
+    expect(isSvgClientError(new RangeError("Cannot create a Buffer larger than 52428800"))).toBe(
+      true,
+    );
+    expect(
+      isSvgClientError(
+        new Error("SVGZ file does not contain valid SVG content after decompression"),
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects unexpected runtime faults and non-client errors", () => {
+    expect(isSvgClientError(new TypeError("unexpected sanitizer fault"))).toBe(false);
+    expect(isSvgClientError(new Error("unexpected sanitizer crash"))).toBe(false);
+    expect(isSvgClientError(Object.assign(new Error("server error"), { statusCode: 500 }))).toBe(
+      false,
+    );
+    expect(isSvgClientError(Object.assign(new Error("ENOSPC"), { code: "ENOSPC" }))).toBe(false);
+    expect(isSvgClientError({})).toBe(false);
+    expect(isSvgClientError(null)).toBe(false);
+    expect(isSvgClientError(undefined)).toBe(false);
+    expect(isSvgClientError("string error")).toBe(false);
   });
 });

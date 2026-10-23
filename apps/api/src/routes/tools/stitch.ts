@@ -19,7 +19,7 @@ import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
-import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
 const settingsSchema = z.object({
   direction: z.enum(["horizontal", "vertical", "grid"]).default("horizontal"),
@@ -135,9 +135,12 @@ export function registerStitch(app: FastifyInstance) {
           file.buffer = decompressSvgz(file.buffer);
           file.buffer = sanitizeSvg(file.buffer);
         } catch (err) {
-          return reply.status(400).send({
-            error: `Invalid SVG "${file.filename}": ${err instanceof Error ? err.message : "Unknown error"}`,
-          });
+          if (isSvgClientError(err)) {
+            return reply.status(400).send({
+              error: `Invalid SVG "${file.filename}": ${err instanceof Error ? err.message : "Unknown error"}`,
+            });
+          }
+          throw err;
         }
       }
 

@@ -27,7 +27,7 @@ import {
   putObject,
 } from "../../lib/object-storage.js";
 import { scrubPdfProducer } from "../../lib/pdf-producer.js";
-import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
 const targetSizeSchema = z.object({
   value: z.number().positive(),
@@ -210,6 +210,70 @@ export function registerImageToPdfRoute(
       }
     }
 
+    const preparedBuffers: Buffer[] = [];
+    for (const file of files) {
+      let buf = file.buffer;
+
+      const validation = await validateImageBuffer(buf, file.filename);
+      if (!validation.valid) {
+        return reply.status(400).send({
+          error: `Invalid image "${file.filename}": ${validation.reason}`,
+        });
+      }
+
+      if (validation.format === "heif") {
+        try {
+          buf = await decodeHeic(buf);
+        } catch (rawErr) {
+          const err = normalizeOperationalWriteError(rawErr);
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+          return reply.status(422).send({
+            error: `Failed to decode HEIC file "${file.filename}"`,
+            details: err instanceof Error ? err.message : String(err),
+          });
+        }
+      } else if (needsCliDecode(validation.format)) {
+        try {
+          const fileExt = extname(file.filename).toLowerCase().replace(/^\./, "") || undefined;
+          buf = await decodeToSharpCompat(buf, validation.format, fileExt);
+        } catch (rawDecodeErr) {
+          const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+          if (
+            decodeErr instanceof DecoderOutOfMemoryError ||
+            (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+          ) {
+            throw decodeErr;
+          }
+          try {
+            await sharp(buf).metadata();
+            await sharp(buf).resize(1).raw().toBuffer();
+          } catch (err) {
+            if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
+              throw decodeErr;
+            }
+            return reply.status(422).send({
+              error: `Failed to decode ${validation.format.toUpperCase()} file "${file.filename}"`,
+              details: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+      } else if (validation.format === "svg") {
+        try {
+          buf = decompressSvgz(buf);
+          buf = sanitizeSvg(buf);
+        } catch (err) {
+          if (isSvgClientError(err)) {
+            return reply.status(400).send({
+              error: `Invalid SVG "${file.filename}": ${err instanceof Error ? err.message : "unknown error"}`,
+            });
+          }
+          throw err;
+        }
+      }
+
+      preparedBuffers.push(await autoOrient(buf));
+    }
+
     const jobId = randomUUID();
     let wroteOutput = false;
     try {
@@ -222,67 +286,6 @@ export function registerImageToPdfRoute(
       const margin = settings.margin;
       const contentW = pageW - margin * 2;
       const contentH = pageH - margin * 2;
-
-      const preparedBuffers: Buffer[] = [];
-      for (const file of files) {
-        let buf = file.buffer;
-
-        const validation = await validateImageBuffer(buf, file.filename);
-        if (!validation.valid) {
-          return reply.status(400).send({
-            error: `Invalid image "${file.filename}": ${validation.reason}`,
-          });
-        }
-
-        if (validation.format === "heif") {
-          try {
-            buf = await decodeHeic(buf);
-          } catch (rawErr) {
-            const err = normalizeOperationalWriteError(rawErr);
-            if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
-            return reply.status(422).send({
-              error: `Failed to decode HEIC file "${file.filename}"`,
-              details: err instanceof Error ? err.message : String(err),
-            });
-          }
-        } else if (needsCliDecode(validation.format)) {
-          try {
-            const fileExt = extname(file.filename).toLowerCase().replace(/^\./, "") || undefined;
-            buf = await decodeToSharpCompat(buf, validation.format, fileExt);
-          } catch (rawDecodeErr) {
-            const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
-            if (
-              decodeErr instanceof DecoderOutOfMemoryError ||
-              (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
-            ) {
-              throw decodeErr;
-            }
-            try {
-              await sharp(buf).metadata();
-              await sharp(buf).resize(1).raw().toBuffer();
-            } catch (err) {
-              if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
-                throw decodeErr;
-              }
-              return reply.status(422).send({
-                error: `Failed to decode ${validation.format.toUpperCase()} file "${file.filename}"`,
-                details: err instanceof Error ? err.message : String(err),
-              });
-            }
-          }
-        } else if (validation.format === "svg") {
-          try {
-            buf = decompressSvgz(buf);
-            buf = sanitizeSvg(buf);
-          } catch (err) {
-            return reply.status(400).send({
-              error: `Invalid SVG "${file.filename}": ${err instanceof Error ? err.message : "unknown error"}`,
-            });
-          }
-        }
-
-        preparedBuffers.push(await autoOrient(buf));
-      }
 
       let imageBuffers: Buffer[];
       let compression:

@@ -1033,6 +1033,64 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     );
   });
 
+  it("rethrows unexpected faults from decompressSvgz or sanitizeSvg and settles failBatchJob instead of recording a preFailure (#3580)", async () => {
+    const svgSanitize = await import("../../../apps/api/src/lib/svg-sanitize.js");
+    mocks.validateImageBuffer.mockResolvedValue({ valid: true, format: "svg" });
+
+    const sanitizeFault = new TypeError("unexpected sanitizer fault");
+    const sanitizeSpy = vi.spyOn(svgSanitize, "sanitizeSvg").mockImplementationOnce(() => {
+      throw sanitizeFault;
+    });
+    const decompressFault = new TypeError("unexpected gunzip fault");
+    const decompressSpy = vi.spyOn(svgSanitize, "decompressSvgz");
+
+    try {
+      await expect(
+        invokeBatchRoute({
+          section: "image",
+          toolId: "resize",
+          parts: [
+            { type: "file", filename: "icon.svg", content: Buffer.from("<svg/>") },
+            { type: "field", fieldname: "settings", value: "{}" },
+            { type: "field", fieldname: "clientJobId", value: "batch-svg-sanitize-fault" },
+          ],
+        }),
+      ).rejects.toBe(sanitizeFault);
+      expect(mocks.failBatchJob).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jobId: "batch-svg-sanitize-fault",
+          message: "Internal server error",
+        }),
+      );
+
+      mocks.failBatchJob.mockClear();
+      decompressSpy.mockImplementationOnce(() => {
+        throw decompressFault;
+      });
+      await expect(
+        invokeBatchRoute({
+          section: "image",
+          toolId: "resize",
+          parts: [
+            { type: "file", filename: "icon.svgz", content: Buffer.from("<svg/>") },
+            { type: "field", fieldname: "settings", value: "{}" },
+            { type: "field", fieldname: "clientJobId", value: "batch-svg-decompress-fault" },
+          ],
+        }),
+      ).rejects.toBe(decompressFault);
+      expect(mocks.failBatchJob).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jobId: "batch-svg-decompress-fault",
+          message: "Internal server error",
+        }),
+      );
+    } finally {
+      sanitizeSpy.mockRestore();
+      decompressSpy.mockRestore();
+      mocks.validateImageBuffer.mockResolvedValue({ valid: true, format: "png" });
+    }
+  });
+
   it("preserves earlier preFailures in failBatchJob when a later file or flow enqueue faults (#3289)", async () => {
     const workspaceCap = new SafeError("Workspace storage limit reached", {
       statusCode: 503,

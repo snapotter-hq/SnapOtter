@@ -1994,6 +1994,75 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
     }
   });
 
+  it("rethrows unexpected faults from decompressSvgz or sanitizeSvg and settles failBatchJob on /api/v1/pipeline/batch (#3580)", async () => {
+    vi.clearAllMocks();
+    const svgSanitize = await import("../../../apps/api/src/lib/svg-sanitize.js");
+    vi.mocked(validateImageBuffer).mockResolvedValue({
+      valid: true,
+      format: "svg",
+      width: 100,
+      height: 100,
+    });
+
+    try {
+      const sanitizeFault = new TypeError("unexpected sanitizer fault");
+      vi.mocked(svgSanitize.sanitizeSvg).mockImplementationOnce(() => {
+        throw sanitizeFault;
+      });
+      await expect(
+        invokePipelineBatchRoute([
+          { type: "file", filename: "icon.svg", content: Buffer.from("<svg/>") },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: [{ toolId: batchTestToolId, settings: {} }],
+            }),
+          },
+          { type: "field", fieldname: "clientJobId", value: "pipeline-batch-svg-sanitize-fault" },
+        ]),
+      ).rejects.toBe(sanitizeFault);
+      expect(failBatchJobMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jobId: "pipeline-batch-svg-sanitize-fault",
+          message: "Internal server error",
+        }),
+      );
+
+      failBatchJobMock.mockClear();
+      const decompressFault = new TypeError("unexpected gunzip fault");
+      vi.mocked(svgSanitize.decompressSvgz).mockImplementationOnce(() => {
+        throw decompressFault;
+      });
+      await expect(
+        invokePipelineBatchRoute([
+          { type: "file", filename: "icon.svgz", content: Buffer.from("<svg/>") },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: [{ toolId: batchTestToolId, settings: {} }],
+            }),
+          },
+          { type: "field", fieldname: "clientJobId", value: "pipeline-batch-svg-decompress-fault" },
+        ]),
+      ).rejects.toBe(decompressFault);
+      expect(failBatchJobMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jobId: "pipeline-batch-svg-decompress-fault",
+          message: "Internal server error",
+        }),
+      );
+    } finally {
+      vi.mocked(validateImageBuffer).mockResolvedValue({
+        valid: true,
+        format: "png",
+        width: 100,
+        height: 100,
+      });
+    }
+  });
+
   it("stamps inputRefs on each per-file pipeline-finalize row so batch-finalize preserves filenames (#3141)", async () => {
     vi.clearAllMocks();
 
@@ -3016,6 +3085,41 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
         error: "SVG exceeds maximum element count of 5000",
       });
       expect(putObjectMock).not.toHaveBeenCalled();
+
+      const svgSanitize = await import("../../../apps/api/src/lib/svg-sanitize.js");
+      const sanitizeFault = new TypeError("unexpected sanitizer fault");
+      vi.mocked(svgSanitize.sanitizeSvg).mockImplementationOnce(() => {
+        throw sanitizeFault;
+      });
+      await expect(
+        invokePipelineExecuteRoute([
+          { type: "file", filename: "icon.svg", content: Buffer.from("<svg/>") },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: [{ toolId: executeTestToolId, settings: {} }],
+            }),
+          },
+        ]),
+      ).rejects.toBe(sanitizeFault);
+
+      const decompressFault = new TypeError("unexpected gunzip fault");
+      vi.mocked(svgSanitize.decompressSvgz).mockImplementationOnce(() => {
+        throw decompressFault;
+      });
+      await expect(
+        invokePipelineExecuteRoute([
+          { type: "file", filename: "icon.svgz", content: Buffer.from("<svg/>") },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: [{ toolId: executeTestToolId, settings: {} }],
+            }),
+          },
+        ]),
+      ).rejects.toBe(decompressFault);
     } finally {
       vi.mocked(validateImageBuffer).mockResolvedValue({
         valid: true,

@@ -202,6 +202,19 @@ export function isSvgzClientError(err: unknown): boolean {
   );
 }
 
+/**
+ * True when an error thrown from decompressSvgz() or sanitizeSvg() on an image
+ * intake path is a client SVG/SVGZ rejection (400) rather than an unexpected
+ * runtime fault (500), including a gzip stream whose decompressed payload is
+ * not SVG content.
+ */
+export function isSvgClientError(err: unknown): boolean {
+  return (
+    isSvgzClientError(err) ||
+    (err instanceof Error && err.message.includes("SVGZ file does not contain"))
+  );
+}
+
 const SVG_PROLOG_COMMENT = /^<!--[\s\S]*?-->\s*/;
 const SVG_PROLOG_PI = /^<\?[\s\S]*?\?>\s*/;
 const SVG_PROLOG_DOCTYPE = new RegExp(`^${DOCTYPE_SOURCE}\\s*`, "i");

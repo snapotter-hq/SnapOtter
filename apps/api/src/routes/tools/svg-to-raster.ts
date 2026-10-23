@@ -28,7 +28,12 @@ import { decodeHeic, encodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 import { isUniqueViolation } from "../../lib/pg-errors.js";
-import { decompressSvgz, isSvgBuffer, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import {
+  decompressSvgz,
+  isSvgBuffer,
+  isSvgClientError,
+  sanitizeSvg,
+} from "../../lib/svg-sanitize.js";
 import { engineUnavailable } from "../../modality/image-input.js";
 import { requireToolAccess } from "../../permissions.js";
 import { failBatchJob, updateJobProgress } from "../progress.js";
@@ -277,6 +282,7 @@ export function registerSvgToRasterRoute(
         try {
           decompressed = decompressSvgz(file.buffer);
         } catch (err) {
+          if (!isSvgClientError(err)) throw err;
           errors.push({
             filename: file.filename,
             error: err instanceof Error ? err.message : "Invalid SVGZ file",
@@ -311,6 +317,7 @@ export function registerSvgToRasterRoute(
         try {
           sanitized = sanitizeSvg(decompressed);
         } catch (err) {
+          if (!isSvgClientError(err)) throw err;
           errors.push({
             filename: file.filename,
             error: err instanceof Error ? err.message : "Invalid SVG",
@@ -366,7 +373,32 @@ export function registerSvgToRasterRoute(
       }),
     );
 
-    await Promise.all(tasks);
+    try {
+      await Promise.all(tasks);
+    } catch (err) {
+      queue.clear();
+      const applied = await failBatchJob({
+        jobId,
+        totalFiles: files.length,
+        completedFiles: files.length,
+        failedFiles: files.length,
+        errors: [
+          ...errors.map(({ filename, error }) => ({ filename, error })),
+          { filename: "", error: "Internal server error" },
+        ],
+        message: "Internal server error",
+      }).catch((settleErr) => {
+        request.log.error({ err: settleErr, jobId }, "failed to settle a faulted SVG batch");
+        return null;
+      });
+      if (applied === false) {
+        request.log.warn(
+          { jobId },
+          "faulted SVG batch progress row was missing or already terminal; no terminal frame announced",
+        );
+      }
+      throw err;
+    }
 
     if (errors.length === files.length) {
       const fault = allFailedFault([], 0, faults, files.length);
@@ -599,9 +631,12 @@ export function registerSvgToRasterRoute(
     try {
       fileBuffer = decompressSvgz(fileBuffer);
     } catch (err) {
-      return reply.status(400).send({
-        error: err instanceof Error ? err.message : "Invalid SVGZ file",
-      });
+      if (isSvgClientError(err)) {
+        return reply.status(400).send({
+          error: err instanceof Error ? err.message : "Invalid SVGZ file",
+        });
+      }
+      throw err;
     }
 
     if (!isSvgBuffer(fileBuffer)) {
@@ -613,9 +648,12 @@ export function registerSvgToRasterRoute(
     try {
       fileBuffer = sanitizeSvg(fileBuffer);
     } catch (err) {
-      return reply.status(400).send({
-        error: err instanceof Error ? err.message : "Invalid SVG",
-      });
+      if (isSvgClientError(err)) {
+        return reply.status(400).send({
+          error: err instanceof Error ? err.message : "Invalid SVG",
+        });
+      }
+      throw err;
     }
 
     let settings: z.infer<typeof settingsSchema>;

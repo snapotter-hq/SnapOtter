@@ -84,7 +84,7 @@ import { resolveCanonicalToolId, resolveToolPool } from "../lib/pool.js";
 import { withRouteScratch } from "../lib/route-scratch.js";
 import { settledFailureResponse } from "../lib/settled-failure.js";
 import { toStorableJson } from "../lib/storable-json.js";
-import { decompressSvgz, sanitizeSvg } from "../lib/svg-sanitize.js";
+import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../lib/svg-sanitize.js";
 import { InputValidationError } from "../modality/contract.js";
 import { engineUnavailable } from "../modality/image-input.js";
 import { inputHandlerFor } from "../modality/input-handler.js";
@@ -597,12 +597,15 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                     processBuffer = decompressSvgz(processBuffer);
                     processBuffer = sanitizeSvg(processBuffer);
                   } catch (err) {
-                    preFailures.push({
-                      originalIndex: i,
-                      filename: file.filename,
-                      error: err instanceof Error ? err.message : "Invalid SVG",
-                    });
-                    continue;
+                    if (isSvgClientError(err)) {
+                      preFailures.push({
+                        originalIndex: i,
+                        filename: file.filename,
+                        error: err instanceof Error ? err.message : "Invalid SVG",
+                      });
+                      continue;
+                    }
+                    throw err;
                   }
                 } else if (!skipPreprocess) {
                   processBuffer = await autoOrient(processBuffer);
