@@ -1352,8 +1352,11 @@ describe("createToolRoute", () => {
       });
     });
 
-    it("reports statusReadErr via reportError and still answers 422 with canceled: true when the first status read fails transiently on a canceled job (#3792)", async () => {
-      const statusReadErr = new Error("transient status read timeout");
+    it("reports statusReadErr via reportError and still answers 422 with canceled: true when the first status read fails transiently on a canceled job (#3792, #3807)", async () => {
+      const statusReadErr = Object.assign(new Error("read ECONNRESET"), {
+        code: "ECONNRESET",
+        syscall: "read",
+      });
       vi.mocked(waitForJob).mockRejectedValueOnce(new Error("Canceled"));
       vi.mocked(reportError).mockClear();
       jobRows.rows = [{ status: "canceled", error: { message: "Canceled" } }];
@@ -1393,6 +1396,7 @@ describe("createToolRoute", () => {
         method: "POST",
         jobId,
       });
+      expect(classifyError(statusReadErr, "http")).toBe("operational");
       expect(req.log.error).not.toHaveBeenCalled();
       expect(reply.status).toHaveBeenCalledWith(422);
       expect(reply.send).toHaveBeenCalledWith({
@@ -1401,8 +1405,11 @@ describe("createToolRoute", () => {
       });
     });
 
-    it("logs, reports via reportError, and rethrows when reading failed job error column fails (#3698)", async () => {
-      const errorReadErr = new Error("db error read timeout");
+    it("logs, reports via reportError, and rethrows when reading failed job error column fails (#3698, #3807)", async () => {
+      const errorReadErr = Object.assign(new Error("read ECONNRESET"), {
+        code: "ECONNRESET",
+        syscall: "read",
+      });
       const workerErr = new Error("The server's storage service is unavailable.");
       vi.mocked(waitForJob).mockRejectedValueOnce(workerErr);
       vi.mocked(reportError).mockClear();
@@ -1439,6 +1446,7 @@ describe("createToolRoute", () => {
         method: "POST",
         jobId,
       });
+      expect(classifyError(errorReadErr, "http")).toBe("operational");
       expect(classifyError(workerErr, "http")).toBe("expected");
       const { logAndReportRequestError } = await import(
         "../../../apps/api/src/plugins/error-handler.js"

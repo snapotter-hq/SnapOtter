@@ -1039,16 +1039,14 @@ describe("pipeline step error message formatting", () => {
       await expect(invokePipelineBatchRoute(parts)).rejects.toBe(batchRedisResetErr);
       expect(classifyError(batchRedisResetErr, "http")).toBe("operational");
 
-      // When reading schema.jobs.error rejects, warn, report via reportError, and rethrow the waitForJob rejection (#3479, #3792, #3697).
+      // When reading schema.jobs.error rejects, warn, report via reportError, and rethrow the waitForJob rejection (#3479, #3792, #3697, #3807).
       const redisDownErr = Object.assign(new Error("read ECONNRESET"), {
         code: "ECONNRESET",
         syscall: "read",
       });
-      const dbReadErr = Object.assign(new Error("Failed query: select error from jobs"), {
-        cause: Object.assign(new Error("read ECONNRESET"), {
-          code: "ECONNRESET",
-          syscall: "read",
-        }),
+      const dbReadErr = Object.assign(new Error("read ECONNRESET"), {
+        code: "ECONNRESET",
+        syscall: "read",
       });
       reportErrorMock.mockClear();
       waitForJobMock.mockRejectedValueOnce(redisDownErr);
@@ -1067,6 +1065,23 @@ describe("pipeline step error message formatting", () => {
         method: "POST",
         jobId: expect.any(String),
       });
+
+      // getFlowProducer().add bare ECONNRESET rejections on /execute and /batch are tagged with markUpstreamError (#3807)
+      const executeFlowResetErr = Object.assign(new Error("read ECONNRESET"), {
+        code: "ECONNRESET",
+        syscall: "read",
+      });
+      flowAddMock.mockRejectedValueOnce(executeFlowResetErr);
+      await expect(invokePipelineExecuteRoute(parts)).rejects.toBe(executeFlowResetErr);
+      expect(classifyError(executeFlowResetErr, "http")).toBe("operational");
+
+      const batchFlowResetErr = Object.assign(new Error("read ECONNRESET"), {
+        code: "ECONNRESET",
+        syscall: "read",
+      });
+      flowAddMock.mockRejectedValueOnce(batchFlowResetErr);
+      await expect(invokePipelineBatchRoute(parts)).rejects.toBe(batchFlowResetErr);
+      expect(classifyError(batchFlowResetErr, "http")).toBe("operational");
     } finally {
       selectWhereMock.mockReset().mockResolvedValue([]);
       waitForJobMock.mockReset();

@@ -11,7 +11,8 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("drizzle-orm", () => ({ eq: () => ({}) }));
-vi.mock("../../../apps/api/src/lib/error-report.js", () => ({
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>()),
   reportError: state.reportError,
 }));
 vi.mock("../../../apps/api/src/db/index.js", () => ({
@@ -31,6 +32,7 @@ vi.mock("../../../apps/api/src/db/index.js", () => ({
   schema: { jobs: { id: "id" } },
 }));
 
+import { classifyError, isUpstreamError } from "../../../apps/api/src/lib/error-report.js";
 import { STORAGE_FAULT_CODES } from "../../../apps/api/src/lib/object-storage.js";
 import { settledFailureResponse } from "../../../apps/api/src/lib/settled-failure.js";
 
@@ -144,8 +146,11 @@ describe("settledFailureResponse (#2180)", () => {
     expect((await settledFailureResponse("parent", log))?.body.errors).toEqual([]);
   });
 
-  it("logs, reports via reportError, and answers null when the row can't be read, so the caller keeps its own error (#3792)", async () => {
-    const dbErr = new Error("connection reset");
+  it("logs, reports via reportError, and answers null when the row can't be read, so the caller keeps its own error (#3792, #3807)", async () => {
+    const dbErr = Object.assign(new Error("read ECONNRESET"), {
+      code: "ECONNRESET",
+      syscall: "read",
+    });
     state.result = dbErr;
 
     expect(await settledFailureResponse("parent", log)).toBeNull();
@@ -155,5 +160,7 @@ describe("settledFailureResponse (#2180)", () => {
       source: "http",
       jobId: "parent",
     });
+    expect(isUpstreamError(dbErr)).toBe(true);
+    expect(classifyError(dbErr, "http")).toBe("operational");
   });
 });

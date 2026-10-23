@@ -42,7 +42,7 @@ import {
   reportEngineUnavailable,
   sharedServerFault,
 } from "../lib/engine-unavailable.js";
-import { markQueueEventsJobFailure, reportError } from "../lib/error-report.js";
+import { markQueueEventsJobFailure, markUpstreamError, reportError } from "../lib/error-report.js";
 import {
   formatZodErrors,
   friendlyError,
@@ -841,7 +841,11 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           injectTraceContextIntoFlow(tree);
 
           // Add the flow to BullMQ
-          await getFlowProducer().add(tree);
+          try {
+            await getFlowProducer().add(tree);
+          } catch (err) {
+            throw markUpstreamError(err);
+          }
           uncommittedUploadKey = undefined;
 
           // Wait for the finalize job (pipelines block to completion). When the
@@ -861,7 +865,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               .then((rows) => rows[0]?.error ?? null)
               .catch((readErr) => {
                 request.log.warn({ err: readErr, jobId }, "failed pipeline job row read failed");
-                void reportError(readErr, {
+                void reportError(markUpstreamError(readErr), {
                   source: "http",
                   route: request.routeOptions?.url,
                   method: request.method,
@@ -1834,7 +1838,11 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           // Inject OTel trace context into every node of the batch flow tree
           injectTraceContextIntoFlow(batchTree);
 
-          await getFlowProducer().add(batchTree);
+          try {
+            await getFlowProducer().add(batchTree);
+          } catch (err) {
+            throw markUpstreamError(err);
+          }
           uncommittedOcrKeys.clear();
           stagedBatch = null;
 

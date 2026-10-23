@@ -10,6 +10,7 @@ const queueEventClose = vi.hoisted(() => vi.fn());
 const queueEventRun = vi.hoisted(() => vi.fn());
 const queueEventOn = vi.hoisted(() => vi.fn());
 const queueEventsCtor = vi.hoisted(() => vi.fn());
+const flowProducerAdd = vi.hoisted(() => vi.fn());
 const flowProducerClose = vi.hoisted(() => vi.fn());
 const flowProducerOn = vi.hoisted(() => vi.fn());
 const assertAiJobQuotaMock = vi.hoisted(() => vi.fn());
@@ -51,6 +52,7 @@ async function loadEnqueueModule(
   queueAdd.mockReset();
   getJob.mockReset();
   queueEventClose.mockReset();
+  flowProducerAdd.mockReset();
   flowProducerClose.mockReset();
   flowProducerOn.mockReset();
   assertAiJobQuotaMock.mockReset();
@@ -91,6 +93,7 @@ async function loadEnqueueModule(
   // run() resolves only when the consumer is closing; a never-settling promise
   // is the honest stand-in for a loop that stays up for the process's life.
   queueEventRun.mockReturnValue(new Promise(() => {}));
+  flowProducerAdd.mockImplementation(async (flow: unknown) => ({ job: flow }));
   flowProducerClose.mockResolvedValue(undefined);
   assertAiJobQuotaMock.mockResolvedValue(undefined);
   isFeatureEnabledMock.mockReturnValue(options.teamRetentionEnabled ?? false);
@@ -122,6 +125,7 @@ async function loadEnqueueModule(
       };
     }),
     FlowProducer: vi.fn(() => ({
+      add: flowProducerAdd,
       close: flowProducerClose,
       on: flowProducerOn,
     })),
@@ -485,6 +489,19 @@ describe("job enqueue helpers", () => {
     const boom = new Error("flow redis blip");
     handler(boom);
     expect(errorSpy).toHaveBeenCalledWith("[flow-producer] connection error", boom);
+
+    const { classifyError } = await import("../../../../apps/api/src/lib/error-report.js");
+    const flow = { name: "parent", queueName: "snapotter-system", data: {} };
+    await expect(a.add(flow)).resolves.toEqual({ job: flow });
+    expect(flowProducerAdd).toHaveBeenCalledWith(flow);
+
+    const flowResetErr = Object.assign(new Error("read ECONNRESET"), {
+      code: "ECONNRESET",
+      syscall: "read",
+    });
+    flowProducerAdd.mockRejectedValueOnce(flowResetErr);
+    await expect(a.add(flow)).rejects.toBe(flowResetErr);
+    expect(classifyError(flowResetErr, "http")).toBe("operational");
   });
 
   it("closeFlowProducer is a no-op when no producer was created", async () => {

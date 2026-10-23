@@ -101,12 +101,21 @@ let _flowProducer: FlowProducer | null = null;
 
 export function getFlowProducer(): FlowProducer {
   if (!_flowProducer) {
-    _flowProducer = new FlowProducer({
+    const fp = new FlowProducer({
       connection: createBullMQConnection(),
     });
-    _flowProducer.on("error", (err) => {
+    const rawAdd = fp.add.bind(fp);
+    fp.add = async (...args: Parameters<FlowProducer["add"]>) => {
+      try {
+        return await rawAdd(...args);
+      } catch (err: unknown) {
+        throw markUpstreamError(err);
+      }
+    };
+    fp.on("error", (err) => {
       console.error("[flow-producer] connection error", err);
     });
+    _flowProducer = fp;
   }
   return _flowProducer;
 }

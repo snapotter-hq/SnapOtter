@@ -43,7 +43,7 @@ import {
   reportEngineUnavailable,
   sharedServerFault,
 } from "../lib/engine-unavailable.js";
-import { markQueueEventsJobFailure } from "../lib/error-report.js";
+import { markQueueEventsJobFailure, markUpstreamError } from "../lib/error-report.js";
 import {
   formatZodErrors,
   friendlyError,
@@ -795,7 +795,11 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
           // Inject OTel trace context into every node of the batch flow tree
           injectTraceContextIntoFlow(batchTree);
 
-          await getFlowProducer().add(batchTree);
+          try {
+            await getFlowProducer().add(batchTree);
+          } catch (err) {
+            throw markUpstreamError(err);
+          }
           uncommittedKeys.clear();
           stagedBatch = null;
 

@@ -1630,5 +1630,22 @@ describe("batch route spooled multipart ingress (#1239)", () => {
       }),
     ).rejects.toBe(redisResetBatchErr);
     expect(classifyError(redisResetBatchErr, "http")).toBe("operational");
+
+    const flowAddResetErr = Object.assign(new Error("read ECONNRESET"), {
+      code: "ECONNRESET",
+      syscall: "read",
+    });
+    mocks.flowAdd.mockRejectedValueOnce(flowAddResetErr);
+    await expect(
+      invokeBatchRoute({
+        section: "image",
+        toolId: "resize",
+        parts: [
+          { type: "file", filename: "a.png", content: Buffer.from("valid-png") },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ],
+      }),
+    ).rejects.toBe(flowAddResetErr);
+    expect(classifyError(flowAddResetErr, "http")).toBe("operational");
   });
 });

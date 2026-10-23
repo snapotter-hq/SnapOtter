@@ -906,9 +906,18 @@ describe("pre-enqueue S3 getObjectBuffer fault normalization and sign-pdf waitFo
       details: "Canceled",
     });
 
-    // 5. DB read failure when checking canceled and failed job row reports readErr on both reads and rethrows (#3698, #3792)
+    // 5. DB read failure when checking canceled and failed job row reports readErr on both reads and rethrows (#3698, #3792, #3807)
     mocks.reportError.mockClear();
-    jobRows.error = new Error("db read timeout");
+    const statusReadReset = Object.assign(new Error("read ECONNRESET"), {
+      code: "ECONNRESET",
+      syscall: "read",
+    });
+    const rowReadReset = Object.assign(new Error("read ECONNRESET"), {
+      code: "ECONNRESET",
+      syscall: "read",
+    });
+    jobRows.statusError = statusReadReset;
+    jobRows.error = rowReadReset;
     const cancelErr = new Error("Canceled");
     mocks.waitForJob.mockRejectedValueOnce(cancelErr);
     const reqDbErr = Object.assign(makeRequest(validPartsFor("sign-pdf")), {
@@ -916,36 +925,46 @@ describe("pre-enqueue S3 getObjectBuffer fault normalization and sign-pdf waitFo
       routeOptions: { url: "/api/v1/tools/pdf/sign-pdf" },
     });
     const replyDbErr = makeReply();
-    await expect(handlers["/api/v1/tools/pdf/sign-pdf"](reqDbErr, replyDbErr)).rejects.toBe(
-      cancelErr,
-    );
+    try {
+      await expect(handlers["/api/v1/tools/pdf/sign-pdf"](reqDbErr, replyDbErr)).rejects.toBe(
+        cancelErr,
+      );
+    } finally {
+      jobRows.statusError = null;
+    }
     expect(replyDbErr.payload).toBeUndefined();
     expect(reqDbErr.log.warn).toHaveBeenCalledWith(
-      expect.objectContaining({ err: jobRows.error }),
+      expect.objectContaining({ err: statusReadReset }),
       "canceled job status read failed",
     );
     expect(reqDbErr.log.warn).toHaveBeenCalledWith(
-      expect.objectContaining({ err: jobRows.error }),
+      expect.objectContaining({ err: rowReadReset }),
       "failed job row read failed",
     );
     expect(mocks.reportError).toHaveBeenCalledTimes(2);
-    expect(mocks.reportError).toHaveBeenNthCalledWith(1, jobRows.error, {
+    expect(mocks.reportError).toHaveBeenNthCalledWith(1, statusReadReset, {
       source: "http",
       route: "/api/v1/tools/pdf/sign-pdf",
       method: "POST",
       jobId: expect.any(String),
     });
-    expect(mocks.reportError).toHaveBeenNthCalledWith(2, jobRows.error, {
+    expect(mocks.reportError).toHaveBeenNthCalledWith(2, rowReadReset, {
       source: "http",
       route: "/api/v1/tools/pdf/sign-pdf",
       method: "POST",
       jobId: expect.any(String),
     });
+    expect(classifyError(statusReadReset, "http")).toBe("operational");
+    expect(classifyError(rowReadReset, "http")).toBe("operational");
 
-    // 5b. Transient failure on the first status query still reports readErr and answers 422 canceled: true when the second row read sees status === "canceled" (#3792)
+    // 5b. Transient failure on the first status query still reports readErr and answers 422 canceled: true when the second row read sees status === "canceled" (#3792, #3807)
     mocks.reportError.mockClear();
     jobRows.error = null;
-    jobRows.statusError = new Error("transient status read timeout");
+    const transientStatusReset = Object.assign(new Error("read ECONNRESET"), {
+      code: "ECONNRESET",
+      syscall: "read",
+    });
+    jobRows.statusError = transientStatusReset;
     jobRows.rows = [{ status: "canceled", error: { message: "Canceled" } }];
     mocks.waitForJob.mockRejectedValueOnce(new Error("Canceled"));
     const reqTransientCancel = Object.assign(makeRequest(validPartsFor("sign-pdf")), {
@@ -965,20 +984,18 @@ describe("pre-enqueue S3 getObjectBuffer fault normalization and sign-pdf waitFo
     });
     expect(reqTransientCancel.log.warn).toHaveBeenCalledWith(
       expect.objectContaining({
-        err: expect.objectContaining({ message: "transient status read timeout" }),
+        err: transientStatusReset,
       }),
       "canceled job status read failed",
     );
     expect(mocks.reportError).toHaveBeenCalledTimes(1);
-    expect(mocks.reportError).toHaveBeenCalledWith(
-      expect.objectContaining({ message: "transient status read timeout" }),
-      {
-        source: "http",
-        route: "/api/v1/tools/pdf/sign-pdf",
-        method: "POST",
-        jobId: expect.any(String),
-      },
-    );
+    expect(mocks.reportError).toHaveBeenCalledWith(transientStatusReset, {
+      source: "http",
+      route: "/api/v1/tools/pdf/sign-pdf",
+      method: "POST",
+      jobId: expect.any(String),
+    });
+    expect(classifyError(transientStatusReset, "http")).toBe("operational");
     expect(reqTransientCancel.log.error).not.toHaveBeenCalled();
 
     // 6. Sanitizes Python traceback via friendlyError and prefers failure.message when present (#3667)

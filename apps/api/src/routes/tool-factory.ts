@@ -24,7 +24,7 @@ import {
   type ToolJobData,
 } from "../jobs/types.js";
 import { reportEngineUnavailable } from "../lib/engine-unavailable.js";
-import { markQueueEventsJobFailure, reportError } from "../lib/error-report.js";
+import { markQueueEventsJobFailure, markUpstreamError, reportError } from "../lib/error-report.js";
 import { formatZodErrors, friendlyError } from "../lib/errors.js";
 import { getFirstMissingBundleForTool, isToolInstalled } from "../lib/feature-status.js";
 import { createUniqueNamer } from "../lib/filename.js";
@@ -722,7 +722,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
               .then((rows) => rows[0]?.status === "canceled")
               .catch((readErr) => {
                 request.log.warn({ err: readErr, jobId }, "canceled job status read failed");
-                void reportError(readErr, {
+                void reportError(markUpstreamError(readErr), {
                   source: "http",
                   route: request.routeOptions?.url,
                   method: request.method,
@@ -744,7 +744,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
             .then((rows) => rows[0] ?? null)
             .catch((readErr) => {
               request.log.warn({ err: readErr, jobId }, "failed job row read failed");
-              void reportError(readErr, {
+              void reportError(markUpstreamError(readErr), {
                 source: "http",
                 route: request.routeOptions?.url,
                 method: request.method,
