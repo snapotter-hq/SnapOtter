@@ -88,6 +88,14 @@ function unwrapUnrecoverable(err: unknown): unknown {
   return e?.name === "UnrecoverableError" && e.cause instanceof Error ? e.cause : err;
 }
 
+function isBullMqStallError(e: { name?: unknown; message?: unknown } | null): boolean {
+  return (
+    e?.name === "UnrecoverableError" ||
+    (typeof e?.message === "string" &&
+      /^(Missing lock for job |job (stalled|started) more than allowable limit)/.test(e.message))
+  );
+}
+
 export function classifyError(rawErr: unknown, source?: ReportContext["source"]): ErrorClass {
   const err = unwrapUnrecoverable(rawErr);
   if (isToolInputError(err)) return "expected";
@@ -120,11 +128,13 @@ export function classifyError(rawErr: unknown, source?: ReportContext["source"])
     if (e?.name === "ZodError") return "expected";
   }
   // BullMQ raises UnrecoverableError from its own worker run loop when a job
-  // loses its lock (a stall), e.g. a heavy upscale under CPU/memory pressure.
-  // We never throw it ourselves, so it always means the instance could not keep
-  // the job's lock alive: an environmental strain, not a defect in our code.
-  // Operational (one warning/hour) instead of bug spam (NODE-27).
-  if (e?.name === "UnrecoverableError") return "operational";
+  // loses its lock (a stall), e.g. a heavy upscale under CPU/memory pressure,
+  // and QueueEvents reconstructs failedReason as a plain Error on the
+  // waitForJob side (#3698). We never throw it ourselves, so it always means
+  // the instance could not keep the job's lock alive: an environmental strain,
+  // not a defect in our code. Operational (one warning/hour) instead of bug
+  // spam (NODE-27).
+  if (isBullMqStallError(e)) return "operational";
   if (connectivityClass(err)) return "operational";
   if (isEnvironmentalDbError(err)) return "operational";
   if (isOperationalErrno(err)) return "operational";
@@ -162,8 +172,14 @@ export function resetThrottleForTests(): void {
 
 export function errorSignature(rawErr: unknown): string {
   const err = unwrapUnrecoverable(rawErr);
-  const e = err as { name?: string; code?: string; stack?: string; cause?: unknown } | null;
-  const name = e?.name ?? "Unknown";
+  const e = err as {
+    name?: string;
+    message?: string;
+    code?: string;
+    stack?: string;
+    cause?: unknown;
+  } | null;
+  const name = isBullMqStallError(e) ? "UnrecoverableError" : (e?.name ?? "Unknown");
   const code = e?.code ?? "-";
   // A wrapper built in one place (engineUnavailable) carries the same name,
   // code, and frame whatever went wrong underneath, so without its cause a
@@ -260,7 +276,10 @@ export async function reportError(rawErr: unknown, ctx: ReportContext): Promise<
         // separate issue per call site/stack frame (the pg-auth flood showed up
         // as 5 issues). bug-class errors keep default per-frame grouping, where
         // distinct frames usually are distinct bugs.
-        scope.setFingerprint(["operational", code ?? (err as { name?: string }).name ?? "op"]);
+        const stallOrName = isBullMqStallError(err as { name?: unknown; message?: unknown } | null)
+          ? "UnrecoverableError"
+          : (err as { name?: string }).name;
+        scope.setFingerprint(["operational", code ?? stallOrName ?? "op"]);
       }
       if (cls === "bug" && ctx.settings !== undefined) {
         // Attach the knobs that triggered a bug (format, quality, mode, ...) so

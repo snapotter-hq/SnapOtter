@@ -193,17 +193,28 @@ describe("classifyError", () => {
     expect(classifyError(e, "http")).toBe("expected");
     expect(classifyError(e)).toBe("expected");
   });
-  it("operational: a BullMQ UnrecoverableError (stalled/lock-lost job) is a strained instance, not our bug", () => {
+  it("operational: a BullMQ UnrecoverableError or reconstructed stall/lock-loss Error is a strained instance, not our bug (#3698)", () => {
     // BullMQ raises UnrecoverableError from its own worker loop when a job loses
-    // its lock (a stall), e.g. a heavy `upscale` under CPU/memory pressure. We
-    // never throw it ourselves, so it always means the instance could not keep
-    // the job's lock alive -- environmental, worth one warning/hour not bug spam
-    // (NODE-27). A ReplyError (a real Redis command failure) stays a bug.
+    // its lock (a stall), e.g. a heavy `upscale` under CPU/memory pressure, and
+    // QueueEvents reconstructs failedReason as a plain Error on the waitForJob
+    // side. Both mean the instance could not keep the job's lock alive:
+    // environmental, worth one warning/hour not bug spam (NODE-27, #3698).
+    // A ReplyError (a real Redis command failure) stays a bug.
     const stalled = Object.assign(new Error("Missing lock for job 42. moveToFinished"), {
       name: "UnrecoverableError",
     });
     expect(classifyError(stalled, "worker")).toBe("operational");
     expect(classifyError(stalled)).toBe("operational");
+
+    for (const msg of [
+      "Missing lock for job 42. moveToFinished",
+      "Missing lock for job 1 moveToFinished",
+      "job stalled more than allowable limit",
+      "job started more than allowable limit",
+    ]) {
+      expect(classifyError(new Error(msg), "http")).toBe("operational");
+      expect(classifyError(new Error(msg), "worker")).toBe("operational");
+    }
   });
   it("looks through an UnrecoverableError with a cause so non-retryable worker errors keep their class (#1176)", () => {
     const wrap = (cause: Error) =>
@@ -358,6 +369,18 @@ describe("errorSignature", () => {
       cause: inner,
     });
     expect(errorSignature(wrapped)).toBe(errorSignature(inner));
+  });
+  it("normalizes reconstructed BullMQ stall Errors to UnrecoverableError in the signature (#3698)", () => {
+    const reconstructed = new Error("Missing lock for job 42. moveToFinished");
+    reconstructed.stack =
+      "Error: Missing lock for job 42. moveToFinished\n  at Job.onFailed (bullmq/job.js:913:1)";
+    const workerStall = Object.assign(new Error("Missing lock for job 42. moveToFinished"), {
+      name: "UnrecoverableError",
+      stack:
+        "UnrecoverableError: Missing lock for job 42. moveToFinished\n  at Worker.processJob (bullmq/worker.js:594:1)",
+    });
+    expect(errorSignature(reconstructed)).toBe("UnrecoverableError:-:-");
+    expect(errorSignature(reconstructed)).toBe(errorSignature(workerStall));
   });
 });
 

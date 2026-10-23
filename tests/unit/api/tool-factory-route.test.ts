@@ -105,6 +105,11 @@ vi.mock("../../../apps/api/src/lib/auto-orient.js", () => ({
   autoOrient: vi.fn((buf: Buffer) => Promise.resolve(buf)),
 }));
 
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>()),
+  reportError: vi.fn(),
+}));
+
 vi.mock("../../../apps/api/src/lib/file-validation.js", () => ({
   validateImageBuffer: vi.fn(() =>
     Promise.resolve({ valid: true, format: "png", width: 100, height: 100 }),
@@ -174,7 +179,7 @@ import {
 } from "../../../apps/api/src/jobs/enqueue.js";
 import { auditFromRequest, isToolAuditEnabled } from "../../../apps/api/src/lib/audit.js";
 import { autoOrient } from "../../../apps/api/src/lib/auto-orient.js";
-import { classifyError } from "../../../apps/api/src/lib/error-report.js";
+import { classifyError, reportError } from "../../../apps/api/src/lib/error-report.js";
 import {
   getFirstMissingBundleForTool,
   isToolInstalled,
@@ -1222,6 +1227,7 @@ describe("createToolRoute", () => {
 
     it("returns 422 when waitForJob rejects", async () => {
       vi.mocked(waitForJob).mockRejectedValueOnce(new Error("Sharp exploded"));
+      jobRows.rows = [{ status: "failed", error: { message: "Sharp exploded" } }];
       const app = createMockApp();
       const id = "resize";
       createToolRoute(app as never, makeMockConfig(id));
@@ -1232,7 +1238,11 @@ describe("createToolRoute", () => {
         settings: JSON.stringify({}),
       });
 
-      await handler(req, reply);
+      try {
+        await handler(req, reply);
+      } finally {
+        jobRows.rows = [];
+      }
 
       expect(reply.status).toHaveBeenCalledWith(422);
       expect(reply.send).toHaveBeenCalledWith(
@@ -1269,7 +1279,7 @@ describe("createToolRoute", () => {
 
     it("falls through to the generic 422 path without logging a status-read warning when waitForJob rejects with Canceled but the job row status is failed", async () => {
       vi.mocked(waitForJob).mockRejectedValueOnce(new Error("Canceled"));
-      jobRows.rows = [{ status: "failed", error: null }];
+      jobRows.rows = [{ status: "failed", error: { message: "Canceled" } }];
       const app = createMockApp();
       const id = "resize";
       createToolRoute(app as never, makeMockConfig(id));
@@ -1294,6 +1304,7 @@ describe("createToolRoute", () => {
     it("logs a warning on request.log and falls through when reading canceled job status fails (#3527)", async () => {
       const statusReadErr = new Error("db read timeout");
       vi.mocked(waitForJob).mockRejectedValueOnce(new Error("Canceled"));
+      jobRows.rows = [{ status: "failed", error: { message: "Canceled" } }];
       const select = vi.mocked(db.select);
       const original = select.getMockImplementation();
       select.mockImplementation(((fields?: Record<string, unknown>) =>
@@ -1311,6 +1322,7 @@ describe("createToolRoute", () => {
         await app.routes[apiToolPath(id)](req, reply);
       } finally {
         select.mockImplementation(original as never);
+        jobRows.rows = [];
       }
 
       const jobId = vi.mocked(enqueueToolJob).mock.calls[0][0].jobId;
@@ -1330,9 +1342,11 @@ describe("createToolRoute", () => {
       });
     });
 
-    it("logs a warning on request.log when reading failed job error column fails", async () => {
+    it("logs, reports via reportError, and rethrows when reading failed job error column fails (#3698)", async () => {
       const errorReadErr = new Error("db error read timeout");
-      vi.mocked(waitForJob).mockRejectedValueOnce(new Error("Sharp exploded"));
+      const workerErr = new Error("The server's storage service is unavailable.");
+      vi.mocked(waitForJob).mockRejectedValueOnce(workerErr);
+      vi.mocked(reportError).mockClear();
       const select = vi.mocked(db.select);
       const original = select.getMockImplementation();
       select.mockImplementation(((fields?: Record<string, unknown>) =>
@@ -1344,10 +1358,13 @@ describe("createToolRoute", () => {
       const id = "resize";
       createToolRoute(app as never, makeMockConfig(id));
       const reply = createMockReply();
-      const req = createMockRequest({ fileBuffer: Buffer.from("png-data"), settings: "{}" });
+      const req = Object.assign(
+        createMockRequest({ fileBuffer: Buffer.from("png-data"), settings: "{}" }),
+        { method: "POST", routeOptions: { url: apiToolPath(id) } },
+      );
 
       try {
-        await app.routes[apiToolPath(id)](req, reply);
+        await expect(app.routes[apiToolPath(id)](req, reply)).rejects.toBe(workerErr);
       } finally {
         select.mockImplementation(original as never);
       }
@@ -1357,11 +1374,14 @@ describe("createToolRoute", () => {
         { err: errorReadErr, jobId },
         "failed job row read failed",
       );
-      expect(reply.status).toHaveBeenCalledWith(422);
-      expect(reply.send).toHaveBeenCalledWith({
-        error: "Processing failed",
-        details: "Sharp exploded",
+      expect(reportError).toHaveBeenCalledWith(errorReadErr, {
+        source: "http",
+        route: apiToolPath(id),
+        method: "POST",
+        jobId,
       });
+      expect(reply.status).not.toHaveBeenCalled();
+      expect(req.log.error).not.toHaveBeenCalled();
     });
 
     it("answers the status the worker recorded for rejected input", async () => {
@@ -1481,13 +1501,13 @@ describe("createToolRoute", () => {
       });
     });
 
-    it("rethrows Redis connectivity and ReplyError faults from waitForJob when failure is null (#3667)", async () => {
+    it("rethrows Redis, stall, and unsettled-row faults from waitForJob when failure is null (#3667, #3698)", async () => {
       const app = createMockApp();
       const id = "resize";
       createToolRoute(app as never, makeMockConfig(id));
       const handler = app.routes[apiToolPath(id)];
 
-      for (const redisFault of [
+      for (const operationalFault of [
         Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:6379"), { code: "ECONNREFUSED" }),
         Object.assign(new Error("connect ETIMEDOUT 127.0.0.1:6379"), { code: "ETIMEDOUT" }),
         Object.assign(new Error("Reached the max retries per request limit"), {
@@ -1496,25 +1516,45 @@ describe("createToolRoute", () => {
         Object.assign(new Error("OOM command not allowed when used memory > 'maxmemory'."), {
           name: "ReplyError",
         }),
+        new Error("Missing lock for job 1 moveToFinished"),
+        new Error("job stalled more than allowable limit"),
       ]) {
         vi.mocked(deletePrefix).mockClear();
         jobRows.rows = [{ error: null }];
-        vi.mocked(waitForJob).mockRejectedValueOnce(redisFault);
+        vi.mocked(waitForJob).mockRejectedValueOnce(operationalFault);
         const reply = createMockReply();
         const req = createMockRequest({ fileBuffer: Buffer.from("png-data"), settings: "{}" });
 
         try {
-          await expect(handler(req, reply)).rejects.toBe(redisFault);
+          await expect(handler(req, reply)).rejects.toBe(operationalFault);
         } finally {
           jobRows.rows = [];
         }
-        expect(classifyError(redisFault, "http")).toBe("operational");
+        expect(classifyError(operationalFault, "http")).toBe("operational");
         expect(reply.status).not.toHaveBeenCalled();
         expect(req.log.error).not.toHaveBeenCalled();
         expect(deletePrefix).not.toHaveBeenCalled();
       }
 
-      // Also rethrows Redis fault when reading schema.jobs.error itself rejects
+      // Worker 503 fault whose terminal DB write failed leaves schema.jobs.error null (#3698)
+      const unsettled503 = new Error("The server's storage service is unavailable.");
+      jobRows.rows = [{ status: "processing", error: null }];
+      vi.mocked(waitForJob).mockRejectedValueOnce(unsettled503);
+      const unsettledReply = createMockReply();
+      const unsettledReq = createMockRequest({
+        fileBuffer: Buffer.from("png-data"),
+        settings: "{}",
+      });
+      try {
+        await expect(handler(unsettledReq, unsettledReply)).rejects.toBe(unsettled503);
+      } finally {
+        jobRows.rows = [];
+      }
+      expect(unsettledReply.status).not.toHaveBeenCalled();
+      expect(unsettledReq.log.error).not.toHaveBeenCalled();
+
+      // Also rethrows fault and reports readErr when reading schema.jobs.error itself rejects
+      vi.mocked(reportError).mockClear();
       const errorReadErr = new Error("db error read timeout");
       const redisDownErr = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:6379"), {
         code: "ECONNREFUSED",
@@ -1536,6 +1576,10 @@ describe("createToolRoute", () => {
       expect(dbReq.log.warn).toHaveBeenCalledWith(
         expect.objectContaining({ err: errorReadErr }),
         "failed job row read failed",
+      );
+      expect(reportError).toHaveBeenCalledWith(
+        errorReadErr,
+        expect.objectContaining({ source: "http" }),
       );
       expect(dbReq.log.error).not.toHaveBeenCalled();
     });

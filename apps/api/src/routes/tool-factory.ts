@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import {
   apiToolPath,
-  connectivityClass,
   FEATURE_BUNDLES,
   isToolInputError,
   type Section,
@@ -25,6 +24,7 @@ import {
   type ToolJobData,
 } from "../jobs/types.js";
 import { reportEngineUnavailable } from "../lib/engine-unavailable.js";
+import { reportError } from "../lib/error-report.js";
 import { formatZodErrors, friendlyError } from "../lib/errors.js";
 import { getFirstMissingBundleForTool, isToolInstalled } from "../lib/feature-status.js";
 import { createUniqueNamer } from "../lib/filename.js";
@@ -738,6 +738,12 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
             .then((rows) => rows[0]?.error ?? null)
             .catch((readErr) => {
               request.log.warn({ err: readErr, jobId }, "failed job row read failed");
+              void reportError(readErr, {
+                source: "http",
+                route: request.routeOptions?.url,
+                method: request.method,
+                jobId,
+              });
               return null;
             });
           if (typeof failure?.httpStatus === "number") {
@@ -751,12 +757,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
             if (failure.code) body.code = failure.code;
             return reply.status(failure.httpStatus).send(body);
           }
-          if (
-            failure === null &&
-            (connectivityClass(err) !== null ||
-              (err as { name?: string })?.name === "ReplyError" ||
-              (err as { name?: string })?.name === "MaxRetriesPerRequestError")
-          ) {
+          if (failure === null) {
             throw err;
           }
           // Keep the full error (incl. raw ffmpeg/tool stderr) in server logs,

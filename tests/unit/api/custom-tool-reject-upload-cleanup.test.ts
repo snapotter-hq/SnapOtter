@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   isToolInstalled: vi.fn(),
   putObject: vi.fn(),
   receiveUpload: vi.fn(),
+  reportError: vi.fn(),
   waitForJob: vi.fn(),
 }));
 
@@ -72,6 +73,11 @@ vi.mock("../../../apps/api/src/plugins/auth.js", () => ({
   requireToolAccess: vi.fn(() =>
     Promise.resolve({ id: "user-1", username: "test", role: "admin" }),
   ),
+}));
+
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>()),
+  reportError: mocks.reportError,
 }));
 
 import { classifyError } from "../../../apps/api/src/lib/error-report.js";
@@ -895,17 +901,19 @@ describe("pre-enqueue S3 getObjectBuffer fault normalization and sign-pdf waitFo
       details: "Canceled",
     });
 
-    // 5. DB read failure when checking canceled and failed job row falls back to 422 with warnings
+    // 5. DB read failure when checking canceled and failed job row reports readErr and rethrows (#3698)
     jobRows.error = new Error("db read timeout");
-    mocks.waitForJob.mockRejectedValueOnce(new Error("Canceled"));
-    const reqDbErr = makeRequest(validPartsFor("sign-pdf"));
-    const replyDbErr = makeReply();
-    await handlers["/api/v1/tools/pdf/sign-pdf"](reqDbErr, replyDbErr);
-    expect(replyDbErr.statusCode).toBe(422);
-    expect(replyDbErr.payload).toEqual({
-      error: "Processing failed",
-      details: "Canceled",
+    const cancelErr = new Error("Canceled");
+    mocks.waitForJob.mockRejectedValueOnce(cancelErr);
+    const reqDbErr = Object.assign(makeRequest(validPartsFor("sign-pdf")), {
+      method: "POST",
+      routeOptions: { url: "/api/v1/tools/pdf/sign-pdf" },
     });
+    const replyDbErr = makeReply();
+    await expect(handlers["/api/v1/tools/pdf/sign-pdf"](reqDbErr, replyDbErr)).rejects.toBe(
+      cancelErr,
+    );
+    expect(replyDbErr.payload).toBeUndefined();
     expect(reqDbErr.log.warn).toHaveBeenCalledWith(
       expect.objectContaining({ err: jobRows.error }),
       "canceled job status read failed",
@@ -914,6 +922,12 @@ describe("pre-enqueue S3 getObjectBuffer fault normalization and sign-pdf waitFo
       expect.objectContaining({ err: jobRows.error }),
       "failed job row read failed",
     );
+    expect(mocks.reportError).toHaveBeenCalledWith(jobRows.error, {
+      source: "http",
+      route: "/api/v1/tools/pdf/sign-pdf",
+      method: "POST",
+      jobId: expect.any(String),
+    });
 
     // 6. Sanitizes Python traceback via friendlyError and prefers failure.message when present (#3667)
     jobRows.error = null;
@@ -949,7 +963,7 @@ describe("pre-enqueue S3 getObjectBuffer fault normalization and sign-pdf waitFo
       details: "Processing failed. The file may be in an unsupported or corrupted format.",
     });
 
-    jobRows.rows = [];
+    jobRows.rows = [{ error: { message: "" } }];
     mocks.waitForJob.mockRejectedValueOnce("non-error string failure");
     const reqStringErr = makeRequest(validPartsFor("sign-pdf"));
     const replyStringErr = makeReply();
@@ -960,8 +974,8 @@ describe("pre-enqueue S3 getObjectBuffer fault normalization and sign-pdf waitFo
       details: "non-error string failure",
     });
 
-    // 7. Rethrows Redis connectivity and ReplyError faults when failure === null (#3667)
-    for (const redisFault of [
+    // 7. Rethrows Redis, stall, and unsettled-row faults when failure === null (#3667, #3698)
+    for (const operationalFault of [
       Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:6379"), { code: "ECONNREFUSED" }),
       Object.assign(new Error("connect ETIMEDOUT 127.0.0.1:6379"), { code: "ETIMEDOUT" }),
       Object.assign(new Error("Reached the max retries per request limit"), {
@@ -970,22 +984,37 @@ describe("pre-enqueue S3 getObjectBuffer fault normalization and sign-pdf waitFo
       Object.assign(new Error("OOM command not allowed when used memory > 'maxmemory'."), {
         name: "ReplyError",
       }),
+      new Error("Missing lock for job 1 moveToFinished"),
+      new Error("job stalled more than allowable limit"),
     ]) {
       mocks.deletePrefix.mockClear();
       jobRows.rows = [{ error: null }];
-      mocks.waitForJob.mockRejectedValueOnce(redisFault);
+      mocks.waitForJob.mockRejectedValueOnce(operationalFault);
       const reqRedis = makeRequest(validPartsFor("sign-pdf"));
       const replyRedis = makeReply();
       await expect(handlers["/api/v1/tools/pdf/sign-pdf"](reqRedis, replyRedis)).rejects.toBe(
-        redisFault,
+        operationalFault,
       );
-      expect(classifyError(redisFault, "http")).toBe("operational");
+      expect(classifyError(operationalFault, "http")).toBe("operational");
       expect(replyRedis.payload).toBeUndefined();
       expect(reqRedis.log.error).not.toHaveBeenCalled();
       expect(mocks.deletePrefix).not.toHaveBeenCalled();
     }
 
-    // Also rethrows Redis fault when reading schema.jobs.error itself rejects
+    // Worker 503 fault whose terminal DB write failed leaves schema.jobs.error null (#3698)
+    const unsettled503 = new Error("The server's storage service is unavailable.");
+    jobRows.rows = [{ status: "processing", error: null }];
+    mocks.waitForJob.mockRejectedValueOnce(unsettled503);
+    const reqUnsettled = makeRequest(validPartsFor("sign-pdf"));
+    const replyUnsettled = makeReply();
+    await expect(handlers["/api/v1/tools/pdf/sign-pdf"](reqUnsettled, replyUnsettled)).rejects.toBe(
+      unsettled503,
+    );
+    expect(replyUnsettled.payload).toBeUndefined();
+    expect(reqUnsettled.log.error).not.toHaveBeenCalled();
+
+    // Also rethrows fault and reports readErr when reading schema.jobs.error itself rejects
+    mocks.reportError.mockClear();
     jobRows.error = new Error("db error read timeout");
     const redisAndDbFault = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:6379"), {
       code: "ECONNREFUSED",
@@ -999,6 +1028,10 @@ describe("pre-enqueue S3 getObjectBuffer fault normalization and sign-pdf waitFo
     expect(reqRedisDb.log.warn).toHaveBeenCalledWith(
       expect.objectContaining({ err: jobRows.error }),
       "failed job row read failed",
+    );
+    expect(mocks.reportError).toHaveBeenCalledWith(
+      jobRows.error,
+      expect.objectContaining({ source: "http" }),
     );
     expect(reqRedisDb.log.error).not.toHaveBeenCalled();
     jobRows.error = null;

@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pdfSignPy } from "@snapotter/doc-engine";
-import { connectivityClass, type SignPlacement } from "@snapotter/shared";
+import type { SignPlacement } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -18,6 +18,7 @@ import {
   type ToolJobData,
 } from "../../jobs/types.js";
 import { reportEngineUnavailable } from "../../lib/engine-unavailable.js";
+import { reportError } from "../../lib/error-report.js";
 import { friendlyError, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { createUniqueNamer } from "../../lib/filename.js";
@@ -274,6 +275,12 @@ export function registerSignPdf(app: FastifyInstance) {
         .then((rows) => rows[0]?.error ?? null)
         .catch((readErr) => {
           request.log.warn({ err: readErr, jobId }, "failed job row read failed");
+          void reportError(readErr, {
+            source: "http",
+            route: request.routeOptions?.url,
+            method: request.method,
+            jobId,
+          });
           return null;
         });
       if (typeof failure?.httpStatus === "number") {
@@ -287,12 +294,7 @@ export function registerSignPdf(app: FastifyInstance) {
         if (failure.code) body.code = failure.code;
         return reply.status(failure.httpStatus).send(body);
       }
-      if (
-        failure === null &&
-        (connectivityClass(err) !== null ||
-          (err as { name?: string })?.name === "ReplyError" ||
-          (err as { name?: string })?.name === "MaxRetriesPerRequestError")
-      ) {
+      if (failure === null) {
         throw err;
       }
       request.log.error({ err, toolId: TOOL_ID }, "sign-pdf processing failed");

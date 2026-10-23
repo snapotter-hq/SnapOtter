@@ -65,14 +65,16 @@ vi.mock("../../../apps/api/src/jobs/enqueue.js", async (importOriginal) => {
       }
       const message = enqueueMock.throwByPool.get(args[0]);
       if (message) {
-        if (enqueueMock.markCanceled) {
-          const { db, schema } = await import("../../../apps/api/src/db/index.js");
-          const { eq } = await import("drizzle-orm");
-          await db
-            .update(schema.jobs)
-            .set({ status: "canceled", completedAt: new Date() })
-            .where(eq(schema.jobs.id, args[1]));
-        }
+        const { db, schema } = await import("../../../apps/api/src/db/index.js");
+        const { eq } = await import("drizzle-orm");
+        await db
+          .update(schema.jobs)
+          .set(
+            enqueueMock.markCanceled
+              ? { status: "canceled", completedAt: new Date() }
+              : { status: "failed", completedAt: new Date(), error: { message } },
+          )
+          .where(eq(schema.jobs.id, args[1]));
         throw new Error(message);
       }
       return actual.waitForJob(...args);
