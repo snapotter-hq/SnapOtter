@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { createUniqueNamer, sanitizeFilename } from "../../../apps/api/src/lib/filename.js";
 import { isValidObjectKey } from "../../../apps/api/src/lib/object-storage.js";
 
+type WellFormable = string & { isWellFormed(): boolean };
+
 describe("createUniqueNamer", () => {
   it("treats names that differ only in case as a collision, keeping the casing", () => {
     const unique = createUniqueNamer();
@@ -158,6 +160,7 @@ describe("sanitizeFilename", () => {
     const longUnicode = `${"\u{1F600}".repeat(100)}.png`;
     const result = sanitizeFilename(longUnicode);
     expect(new TextEncoder().encode(result).length).toBeLessThanOrEqual(200);
+    expect((result as WellFormable).isWellFormed()).toBe(true);
     expect(result).toMatch(/\.png$/);
   });
 
@@ -274,5 +277,37 @@ describe("sanitizeFilename", () => {
     expect(trailingDotAfterDrop).toBe("a".repeat(199));
     expect(new TextEncoder().encode(trailingDotAfterDrop).length).toBe(199);
     expect(isValidObjectKey(`uploads/job/${trailingDotAfterDrop}`)).toBe(true);
+  });
+
+  it("drops whole surrogate pairs during 200-byte truncation without leaving lone surrogates (#3705)", () => {
+    const emojiAtCut = sanitizeFilename(`${"a".repeat(193)}\u{1F600}.png`);
+    expect(emojiAtCut).toBe(`${"a".repeat(193)}.png`);
+    expect((emojiAtCut as WellFormable).isWellFormed()).toBe(true);
+    expect(new TextEncoder().encode(emojiAtCut).length).toBe(197);
+    expect(isValidObjectKey(`uploads/job/${emojiAtCut}`)).toBe(true);
+
+    const dotBeforeEmojiAtCut = sanitizeFilename(`${"a".repeat(192)}.\u{1F600}.png`);
+    expect(dotBeforeEmojiAtCut).toBe(`${"a".repeat(192)}.png`);
+    expect((dotBeforeEmojiAtCut as WellFormable).isWellFormed()).toBe(true);
+    expect(new TextEncoder().encode(dotBeforeEmojiAtCut).length).toBe(196);
+    expect(isValidObjectKey(`uploads/job/${dotBeforeEmojiAtCut}`)).toBe(true);
+
+    const emojiFitsWithTrailingTrim = sanitizeFilename(`${"a".repeat(192)}\u{1F600}b.png`);
+    expect(emojiFitsWithTrailingTrim).toBe(`${"a".repeat(192)}\u{1F600}.png`);
+    expect((emojiFitsWithTrailingTrim as WellFormable).isWellFormed()).toBe(true);
+    expect(new TextEncoder().encode(emojiFitsWithTrailingTrim).length).toBe(200);
+    expect(isValidObjectKey(`uploads/job/${emojiFitsWithTrailingTrim}`)).toBe(true);
+
+    const noExtEmojiAtCut = sanitizeFilename(`${"a".repeat(197)}\u{1F600}`);
+    expect(noExtEmojiAtCut).toBe("a".repeat(197));
+    expect((noExtEmojiAtCut as WellFormable).isWellFormed()).toBe(true);
+    expect(new TextEncoder().encode(noExtEmojiAtCut).length).toBe(197);
+    expect(isValidObjectKey(`uploads/job/${noExtEmojiAtCut}`)).toBe(true);
+
+    const oversizedExtEmojiAtCut = sanitizeFilename(`a.${"b".repeat(195)}\u{1F600}`);
+    expect(oversizedExtEmojiAtCut).toBe(`a.${"b".repeat(195)}`);
+    expect((oversizedExtEmojiAtCut as WellFormable).isWellFormed()).toBe(true);
+    expect(new TextEncoder().encode(oversizedExtEmojiAtCut).length).toBe(197);
+    expect(isValidObjectKey(`uploads/job/${oversizedExtEmojiAtCut}`)).toBe(true);
   });
 });
