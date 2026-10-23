@@ -3424,5 +3424,60 @@ describe("Dropzone", () => {
         }),
       );
     });
+
+    it("delegates opening the bulk URL modal via onBulkModalOpenChange and pauses error auto-clear while bulkModalOpen is true (#3751)", () => {
+      vi.useFakeTimers();
+      try {
+        const onBulkModalOpenChange = vi.fn();
+        const { rerender } = render(
+          <Dropzone
+            onUrlImport={vi.fn()}
+            fileFilter={isImageFile}
+            bulkModalOpen={false}
+            onBulkModalOpenChange={onBulkModalOpenChange}
+          />,
+        );
+
+        const zone = screen.getByRole("region", { name: en.a11y.fileDropZone });
+        fireEvent.drop(zone, {
+          dataTransfer: { files: [new File(["txt"], "notes.txt", { type: "text/plain" })] },
+        });
+        expect(screen.getByText(en.dropzone.unsupportedFileType)).toBeDefined();
+
+        fireEvent.click(screen.getByRole("button", { name: en.dropzone.importMultipleUrls }));
+        expect(onBulkModalOpenChange).toHaveBeenCalledTimes(1);
+        expect(onBulkModalOpenChange).toHaveBeenCalledWith(true);
+        // Controlled Dropzone does not render an internal UrlImportModal of its own.
+        expect(screen.queryByRole("dialog")).toBeNull();
+
+        rerender(
+          <Dropzone
+            onUrlImport={vi.fn()}
+            fileFilter={isImageFile}
+            bulkModalOpen={true}
+            onBulkModalOpenChange={onBulkModalOpenChange}
+          />,
+        );
+        act(() => {
+          vi.advanceTimersByTime(10_000);
+        });
+        expect(screen.getByText(en.dropzone.unsupportedFileType)).toBeDefined();
+
+        rerender(
+          <Dropzone
+            onUrlImport={vi.fn()}
+            fileFilter={isImageFile}
+            bulkModalOpen={false}
+            onBulkModalOpenChange={onBulkModalOpenChange}
+          />,
+        );
+        act(() => {
+          vi.advanceTimersByTime(5000);
+        });
+        expect(screen.queryByText(en.dropzone.unsupportedFileType)).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });

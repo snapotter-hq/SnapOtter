@@ -32,7 +32,8 @@ import { LibrarySaveModeSelector } from "@/components/common/library-save-mode-s
 import { ReviewPanel } from "@/components/common/review-panel";
 import { SideBySideComparison } from "@/components/common/side-by-side-comparison";
 import { ThumbnailStrip } from "@/components/common/thumbnail-strip";
-import { ToolDropzone } from "@/components/common/tool-dropzone";
+import { formatToolAcceptedInputs, ToolDropzone } from "@/components/common/tool-dropzone";
+import { UrlImportModal } from "@/components/common/url-import-modal";
 import { FeatureInstallPrompt } from "@/components/features/feature-install-prompt";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog";
 import { AppLayout } from "@/components/layout/app-layout";
@@ -493,6 +494,14 @@ function ToolPageContent({
   );
   const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
   const [failedFeedbackOpen, setFailedFeedbackOpen] = useState(false);
+  const [bulkModalToolId, setBulkModalToolId] = useState<string | null>(null);
+  const bulkModalOpen = Boolean(tool && bulkModalToolId === tool.id);
+  const handleBulkModalOpenChange = useCallback(
+    (open: boolean) => {
+      setBulkModalToolId(open && tool ? tool.id : null);
+    },
+    [tool],
+  );
   const [previewTransform, setPreviewTransform] = useState<PreviewTransform | null>(null);
   const [previewFilter, setPreviewFilter] = useState<string>("");
   const [imageWrapperStyle, setImageWrapperStyle] = useState<React.CSSProperties | null>(null);
@@ -624,6 +633,7 @@ function ToolPageContent({
     setEraserSliderInitPos(null);
     setSignStaleEntryId(null);
     setMobileSettingsOpen(false);
+    setBulkModalToolId(null);
   }, [toolId]);
 
   const toolAccept = registryEntry?.accept ?? (tool?.acceptedInputs?.join(",") || undefined);
@@ -652,6 +662,10 @@ function ToolPageContent({
           })
         : undefined,
     [toolAcceptExts, t.toolPage.acceptDescription],
+  );
+  const toolFormatsDisplay = useMemo(
+    () => formatToolAcceptedInputs(tool?.acceptedInputs, t.toolPage.andMore),
+    [tool?.acceptedInputs, t.toolPage.andMore],
   );
 
   // Drops and pastes are turned away, with a message, while a run is in flight (#2108).
@@ -1214,6 +1228,8 @@ function ToolPageContent({
             fileFilter={toolFileFilter}
             acceptDescription={toolAcceptDescription}
             enablePaste={false}
+            bulkModalOpen={bulkModalOpen}
+            onBulkModalOpenChange={handleBulkModalOpenChange}
           />
         );
       const ResultsPanel = registryEntry.ResultsPanel;
@@ -1487,6 +1503,8 @@ function ToolPageContent({
         fileFilter={toolFileFilter}
         acceptDescription={toolAcceptDescription}
         enablePaste={false}
+        bulkModalOpen={bulkModalOpen}
+        onBulkModalOpenChange={handleBulkModalOpenChange}
       />
     );
   }
@@ -1614,6 +1632,22 @@ function ToolPageContent({
     );
   }
 
+  const urlImportModal = bulkModalOpen ? (
+    <UrlImportModal
+      key={tool.id}
+      onClose={() => handleBulkModalOpenChange(false)}
+      fileFilter={toolFileFilter ?? (() => true)}
+      unsupportedMessage={toolFormatsDisplay || t.dropzone.unsupportedFileType}
+      onImport={(importedFiles) => {
+        for (const file of importedFiles) {
+          if (handleUrlImport(file) === false) {
+            return false;
+          }
+        }
+      }}
+    />
+  ) : null;
+
   // Mobile layout: full-height image area with BottomSheet for settings
   if (isMobile) {
     // Full-width dropzone when no file is loaded (non-generator tools)
@@ -1629,9 +1663,12 @@ function ToolPageContent({
                 multiple
                 onFiles={handleFiles}
                 onUrlImport={handleUrlImport}
+                bulkModalOpen={bulkModalOpen}
+                onBulkModalOpenChange={handleBulkModalOpenChange}
               />
             </div>
           </div>
+          {urlImportModal}
         </AppLayout>
       );
     }
@@ -1746,6 +1783,7 @@ function ToolPageContent({
             onClose={() => setFailedFeedbackOpen(false)}
           />
         </div>
+        {urlImportModal}
       </AppLayout>
     );
   }
@@ -1763,9 +1801,12 @@ function ToolPageContent({
               multiple
               onFiles={handleFiles}
               onUrlImport={handleUrlImport}
+              bulkModalOpen={bulkModalOpen}
+              onBulkModalOpenChange={handleBulkModalOpenChange}
             />
           </div>
         </div>
+        {urlImportModal}
       </AppLayout>
     );
   }
@@ -1850,6 +1891,7 @@ function ToolPageContent({
           onClose={() => setFailedFeedbackOpen(false)}
         />
       </div>
+      {urlImportModal}
     </AppLayout>
   );
 }

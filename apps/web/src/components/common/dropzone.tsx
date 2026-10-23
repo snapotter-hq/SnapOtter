@@ -99,6 +99,10 @@ interface DropzoneProps {
   cameraCapture?: boolean;
   /** Attach a document-level paste listener while mounted. Defaults to true. */
   enablePaste?: boolean;
+  /** Controlled open state for the bulk URL import modal. */
+  bulkModalOpen?: boolean;
+  /** Controlled open-state change handler for the bulk URL import modal. */
+  onBulkModalOpenChange?: (open: boolean) => void;
 }
 
 // Browsers may not map certain formats (HEIC, JXL, RAW, etc.) to image/* in file pickers.
@@ -119,6 +123,8 @@ export function Dropzone({
   acceptDescription,
   cameraCapture = false,
   enablePaste = true,
+  bulkModalOpen,
+  onBulkModalOpenChange,
 }: DropzoneProps) {
   const { t } = useTranslation();
   // When no explicit filter is given, accept any file: the file picker still
@@ -134,7 +140,9 @@ export function Dropzone({
   const [urlLoading, setUrlLoading] = useState(false);
   const urlLoadingRef = useRef(false);
   const [urlError, setUrlError] = useState<string | null>(null);
-  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [uncontrolledBulkModal, setUncontrolledBulkModal] = useState(false);
+  const bulkModalControlled = onBulkModalOpenChange !== undefined;
+  const showBulkModal = bulkModalControlled ? Boolean(bulkModalOpen) : uncontrolledBulkModal;
   const onUrlImportRef = useRef(onUrlImport);
   onUrlImportRef.current = onUrlImport;
 
@@ -394,7 +402,11 @@ export function Dropzone({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                setShowBulkModal(true);
+                if (bulkModalControlled) {
+                  onBulkModalOpenChange(true);
+                } else {
+                  setUncontrolledBulkModal(true);
+                }
               }}
               className="text-xs text-primary-ink hover:text-primary-ink-strong"
             >
@@ -424,9 +436,9 @@ export function Dropzone({
         )}
       </div>
 
-      {showBulkModal && (
+      {!bulkModalControlled && showBulkModal && (
         <UrlImportModal
-          onClose={() => setShowBulkModal(false)}
+          onClose={() => setUncontrolledBulkModal(false)}
           fileFilter={checkFile}
           unsupportedMessage={unsupportedMessage}
           onImport={(files) => {

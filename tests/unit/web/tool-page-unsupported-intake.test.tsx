@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { en } from "@snapotter/shared";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { Link, MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const toastErrorSpy = vi.hoisted(() => vi.fn());
@@ -29,7 +29,7 @@ vi.mock("@/lib/image-preview", () => ({
 import { I18nProvider } from "@/contexts/i18n-context";
 import { ToolPage } from "@/pages/tool-page";
 import { useFeaturesStore } from "@/stores/features-store";
-import { useFileStore } from "@/stores/file-store";
+import { type FileEntry, useFileStore } from "@/stores/file-store";
 import { useSettingsStore } from "@/stores/settings-store";
 
 const storageMap = new Map<string, string>();
@@ -48,6 +48,9 @@ function renderToolPage(path = "/image/resize") {
   return render(
     <I18nProvider>
       <MemoryRouter initialEntries={[path]}>
+        <Link to="/pdf/merge-pdf" data-testid="switch-tool">
+          Switch tool
+        </Link>
         <Routes>
           <Route path="/:section/:toolId" element={<ToolPage />} />
         </Routes>
@@ -733,5 +736,235 @@ describe("ToolPage handleAddMore unsupported file intake (#2842)", () => {
 
     expect(toastErrorSpy).not.toHaveBeenCalled();
     expect(useFileStore.getState().files).toEqual([initialPng, secondPng]);
+  });
+});
+
+describe("ToolPage partial batch URL import (#3751)", () => {
+  it.each(["desktop", "mobile"] as const)(
+    "keeps UrlImportModal mounted with failed and fileFilter-rejected entries when a valid sibling URL transitions ToolPage from !hasFile to hasFile on %s (#3751)",
+    async (viewport) => {
+      if (viewport === "mobile") {
+        vi.spyOn(window, "innerWidth", "get").mockReturnValue(375);
+      }
+      let fetchUrlsCalls = 0;
+      let bDownloadCalls = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.endsWith("/api/v1/fetch-urls")) {
+            fetchUrlsCalls += 1;
+            if (fetchUrlsCalls === 1) {
+              return Promise.resolve(
+                new Response(
+                  JSON.stringify({
+                    results: [
+                      {
+                        success: true,
+                        url: "https://example.com/a.png",
+                        filename: "a.png",
+                        size: 16,
+                        downloadUrl: "https://example.com/dl/a.png",
+                      },
+                      {
+                        success: true,
+                        url: "https://example.com/b.png",
+                        filename: "b.png",
+                        size: 16,
+                        downloadUrl: "https://example.com/dl/b.png",
+                      },
+                      {
+                        success: true,
+                        url: "https://example.com/notes.txt",
+                        filename: "notes.txt",
+                        size: 12,
+                        downloadUrl: "https://example.com/dl/notes.txt",
+                      },
+                    ],
+                  }),
+                  { status: 200, headers: { "Content-Type": "application/json" } },
+                ),
+              );
+            }
+            return Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  results: [
+                    {
+                      success: true,
+                      url: "https://example.com/b.png",
+                      filename: "b.png",
+                      size: 16,
+                      downloadUrl: "https://example.com/dl/b.png",
+                    },
+                  ],
+                }),
+                { status: 200, headers: { "Content-Type": "application/json" } },
+              ),
+            );
+          }
+          if (url.endsWith("/dl/a.png")) {
+            return Promise.resolve(
+              new Response("png-a", { status: 200, headers: { "Content-Type": "image/png" } }),
+            );
+          }
+          if (url.endsWith("/dl/b.png")) {
+            bDownloadCalls += 1;
+            if (bDownloadCalls === 1) {
+              return Promise.resolve(new Response("Not found", { status: 404 }));
+            }
+            return Promise.resolve(
+              new Response("png-b", { status: 200, headers: { "Content-Type": "image/png" } }),
+            );
+          }
+          if (url.endsWith("/dl/notes.txt")) {
+            return Promise.resolve(
+              new Response("hello", { status: 200, headers: { "Content-Type": "text/plain" } }),
+            );
+          }
+          return Promise.resolve(
+            new Response(JSON.stringify({ authEnabled: false }), { status: 200 }),
+          );
+        }),
+      );
+
+      renderToolPage("/image/resize");
+
+      fireEvent.click(screen.getByRole("button", { name: en.dropzone.importMultipleUrls }));
+      const dialog = screen.getByRole("dialog");
+      fireEvent.change(within(dialog).getByRole("textbox"), {
+        target: {
+          value:
+            "https://example.com/a.png\nhttps://example.com/b.png\nhttps://example.com/notes.txt",
+        },
+      });
+      fireEvent.click(within(dialog).getByRole("button", { name: en.urlImport.importButton }));
+
+      const firstAddBtn = await within(dialog).findByRole("button", { name: "Add 3 Files" });
+      fireEvent.click(firstAddBtn);
+
+      await waitFor(() => {
+        expect(useFileStore.getState().entries.map((e: FileEntry) => e.file.name)).toEqual([
+          "a.png",
+        ]);
+      });
+
+      // ToolPage transitioned to the loaded workspace, while the same UrlImportModal instance stays mounted.
+      expect(screen.getByLabelText(en.a11y.imageArea)).toBeTruthy();
+      expect(screen.getByRole("dialog")).toBe(dialog);
+      expect(within(dialog).queryByText("a.png")).toBeNull();
+      expect(within(dialog).getByText("b.png")).toBeTruthy();
+      expect(within(dialog).getByText("Download failed: 404")).toBeTruthy();
+      expect(within(dialog).getByText("notes.txt")).toBeTruthy();
+      expect(
+        within(dialog).getByText("JPG, JPEG, PNG, WEBP, GIF, BMP, TIFF, TIF and 45 more"),
+      ).toBeTruthy();
+
+      // Retry b.png inside the still-open modal and import it alongside a.png.
+      const retryButtons = within(dialog).getAllByTitle(en.urlImport.retryButton);
+      expect(retryButtons).toHaveLength(2);
+      fireEvent.click(retryButtons[0]);
+
+      const secondAddBtn = await within(dialog).findByRole("button", { name: "Add 1 Files" });
+      fireEvent.click(secondAddBtn);
+
+      await waitFor(() => {
+        expect(useFileStore.getState().entries.map((e: FileEntry) => e.file.name)).toEqual([
+          "a.png",
+          "b.png",
+        ]);
+      });
+
+      // notes.txt remains visible as failed in the modal until closed or navigated away.
+      expect(screen.getByRole("dialog")).toBe(dialog);
+      expect(within(dialog).queryByText("b.png")).toBeNull();
+      expect(within(dialog).getByText("notes.txt")).toBeTruthy();
+      expect(
+        within(dialog).getByText("JPG, JPEG, PNG, WEBP, GIF, BMP, TIFF, TIF and 45 more"),
+      ).toBeTruthy();
+
+      // Navigating to another tool closes the modal.
+      fireEvent.click(screen.getByTestId("switch-tool"));
+      expect(screen.queryByRole("dialog")).toBeNull();
+    },
+  );
+
+  it("closes UrlImportModal automatically on ToolPage when all remaining failed entries succeed on retry (#3751)", async () => {
+    let bDownloadCalls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("/api/v1/fetch-urls")) {
+          const { urls = [] } = JSON.parse(String(init?.body ?? "{}")) as { urls?: string[] };
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                results: urls.map((u) => {
+                  const filename = u.split("/").pop() ?? "file.txt";
+                  return {
+                    success: true,
+                    url: u,
+                    filename,
+                    size: 10,
+                    downloadUrl: `https://example.com/dl/${filename}`,
+                  };
+                }),
+              }),
+              { status: 200, headers: { "Content-Type": "application/json" } },
+            ),
+          );
+        }
+        if (url.endsWith("/dl/a.txt")) {
+          return Promise.resolve(
+            new Response("txt-a", { status: 200, headers: { "Content-Type": "text/plain" } }),
+          );
+        }
+        if (url.endsWith("/dl/b.txt")) {
+          bDownloadCalls += 1;
+          if (bDownloadCalls === 1) {
+            return Promise.resolve(new Response("Not found", { status: 404 }));
+          }
+          return Promise.resolve(
+            new Response("txt-b", { status: 200, headers: { "Content-Type": "text/plain" } }),
+          );
+        }
+        return Promise.resolve(
+          new Response(JSON.stringify({ authEnabled: false }), { status: 200 }),
+        );
+      }),
+    );
+
+    renderToolPage("/files/create-zip");
+
+    fireEvent.click(screen.getByRole("button", { name: en.dropzone.importMultipleUrls }));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.change(within(dialog).getByRole("textbox"), {
+      target: { value: "https://example.com/a.txt\nhttps://example.com/b.txt" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: en.urlImport.importButton }));
+
+    const firstAddBtn = await within(dialog).findByRole("button", { name: "Add 2 Files" });
+    fireEvent.click(firstAddBtn);
+
+    await waitFor(() => {
+      expect(useFileStore.getState().entries.map((e: FileEntry) => e.file.name)).toEqual(["a.txt"]);
+    });
+
+    expect(screen.getByRole("dialog")).toBe(dialog);
+    expect(within(dialog).getByText("b.txt")).toBeTruthy();
+    expect(within(dialog).getByText("Download failed: 404")).toBeTruthy();
+
+    fireEvent.click(within(dialog).getByTitle(en.urlImport.retryButton));
+    const secondAddBtn = await within(dialog).findByRole("button", { name: "Add 1 Files" });
+    fireEvent.click(secondAddBtn);
+
+    await waitFor(() => {
+      expect(useFileStore.getState().entries.map((e: FileEntry) => e.file.name)).toEqual([
+        "a.txt",
+        "b.txt",
+      ]);
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
