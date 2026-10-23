@@ -1258,11 +1258,11 @@ describe("Barcode Read server-side failures", () => {
   it.skipIf(process.getuid?.() === 0 || process.env.STORAGE_MODE === "s3")(
     "answers 503, not 422, when the result can't be stored",
     async () => {
-      // Local storage writes under WORKSPACE_PATH/uploads; make it read-only.
-      const uploads = path.join(process.env.WORKSPACE_PATH as string, "uploads");
-      mkdirSync(uploads, { recursive: true });
-      const mode = statSync(uploads).mode & 0o777;
-      chmodSync(uploads, 0o500);
+      // The annotated result goes under WORKSPACE_PATH/outputs; make it read-only.
+      const outputs = path.join(process.env.WORKSPACE_PATH as string, "outputs");
+      mkdirSync(outputs, { recursive: true });
+      const mode = statSync(outputs).mode & 0o777;
+      chmodSync(outputs, 0o500);
       try {
         // The error now propagates instead of being caught as a 422. putObject
         // names a read-only volume as a 503 "storage not writable" (#2120). The
@@ -1271,7 +1271,7 @@ describe("Barcode Read server-side failures", () => {
         const res = await readQr();
         expect(res.statusCode).toBe(503);
       } finally {
-        chmodSync(uploads, mode);
+        chmodSync(outputs, mode);
       }
     },
   );
