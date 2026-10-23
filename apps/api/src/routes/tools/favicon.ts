@@ -22,7 +22,7 @@ import { encodeMultiIco, hasMagick } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
-import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
 const settingsSchema = z.object({
   background: z
@@ -136,6 +136,21 @@ export function registerFavicon(app: FastifyInstance) {
       let buf = file.buffer;
       const fileExt = extname(file.filename).toLowerCase().replace(/^\./, "") || undefined;
 
+      // Sanitize SVG input
+      if (validation.format === "svg") {
+        try {
+          buf = decompressSvgz(buf);
+          buf = sanitizeSvg(buf);
+        } catch (err) {
+          if (!isSvgClientError(err)) throw err;
+          const reason = err instanceof Error ? err.message : "Unknown decode error";
+          skippedFiles.push({ filename: file.filename, reason });
+          continue;
+        }
+        decodedFiles.push({ buffer: buf, filename: file.filename });
+        continue;
+      }
+
       try {
         // Decode HEIC/HEIF via system decoder
         if (validation.format === "heif") {
@@ -166,23 +181,13 @@ export function registerFavicon(app: FastifyInstance) {
           }
         }
 
-        // Sanitize SVG input
-        if (validation.format === "svg") {
-          buf = decompressSvgz(buf);
-          buf = sanitizeSvg(buf);
-        }
-
-        // Auto-orient EXIF rotation (skip for SVG)
-        if (validation.format !== "svg") {
-          buf = await autoOrient(buf);
-        }
+        // Auto-orient EXIF rotation
+        buf = await autoOrient(buf);
 
         // Force a full pixel decode now. Header validation alone lets
         // truncated files through, and a decode failure after reply.hijack()
         // cannot be turned into an error response anymore.
-        if (validation.format !== "svg") {
-          await sharp(buf).stats();
-        }
+        await sharp(buf).stats();
 
         decodedFiles.push({ buffer: buf, filename: file.filename });
       } catch (rawErr) {

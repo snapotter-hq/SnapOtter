@@ -15,7 +15,7 @@ import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
-import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
 const settingsSchema = z.object({
   outputFormat: z.enum(["original", "jpeg", "png", "webp", "avif", "jxl"]).default("original"),
@@ -115,6 +115,17 @@ export function registerImageToBase64(app: FastifyInstance) {
       const errors: FileError[] = [];
 
       for (const { buffer, filename } of files) {
+        let unexpectedSvgFault = false;
+        const sanitizeSvgBuffer = (buf: Buffer): Buffer => {
+          try {
+            return sanitizeSvg(decompressSvgz(buf));
+          } catch (err) {
+            if (!isSvgClientError(err)) {
+              unexpectedSvgFault = true;
+            }
+            throw err;
+          }
+        };
         try {
           const originalSize = buffer.length;
 
@@ -154,8 +165,7 @@ export function registerImageToBase64(app: FastifyInstance) {
           }
           let isSvg = validation.format === "svg";
           if (isSvg) {
-            decoded = decompressSvgz(decoded);
-            decoded = sanitizeSvg(decoded);
+            decoded = sanitizeSvgBuffer(decoded);
           }
           let pipeline = sharp(decoded);
 
@@ -163,8 +173,7 @@ export function registerImageToBase64(app: FastifyInstance) {
           const metadata = await pipeline.metadata();
           if (!isSvg && metadata.format === "svg") {
             isSvg = true;
-            decoded = decompressSvgz(decoded);
-            decoded = sanitizeSvg(decoded);
+            decoded = sanitizeSvgBuffer(decoded);
             pipeline = sharp(decoded);
           }
           let width = metadata.width ?? 0;
@@ -256,6 +265,7 @@ export function registerImageToBase64(app: FastifyInstance) {
             dataUri: `data:${mimeType};base64,${base64}`,
           });
         } catch (rawErr) {
+          if (unexpectedSvgFault) throw rawErr;
           const err = normalizeOperationalWriteError(rawErr);
           if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
           errors.push({

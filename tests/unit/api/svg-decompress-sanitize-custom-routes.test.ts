@@ -95,6 +95,9 @@ import { registerBarcodeRead } from "../../../apps/api/src/routes/tools/barcode-
 import { registerCollage } from "../../../apps/api/src/routes/tools/collage.js";
 import { registerColorPalette } from "../../../apps/api/src/routes/tools/color-palette.js";
 import { registerEditMetadata } from "../../../apps/api/src/routes/tools/edit-metadata.js";
+import { registerFavicon } from "../../../apps/api/src/routes/tools/favicon.js";
+import { registerFindDuplicates } from "../../../apps/api/src/routes/tools/find-duplicates.js";
+import { registerImageToBase64 } from "../../../apps/api/src/routes/tools/image-to-base64.js";
 import { registerImageToPdf } from "../../../apps/api/src/routes/tools/image-to-pdf.js";
 import { registerInfo } from "../../../apps/api/src/routes/tools/info.js";
 import { registerMemeGenerator } from "../../../apps/api/src/routes/tools/meme-generator.js";
@@ -124,6 +127,9 @@ function buildRoutes() {
   registerColorPalette(fakeApp as never);
   registerCollage(fakeApp as never);
   registerImageToPdf(fakeApp as never);
+  registerFavicon(fakeApp as never);
+  registerFindDuplicates(fakeApp as never);
+  registerImageToBase64(fakeApp as never);
   return routes;
 }
 
@@ -897,6 +903,14 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
           { type: "field" as const, fieldname: "settings", value: "{}" },
         ],
       },
+      {
+        name: "POST /api/v1/tools/image/favicon",
+        url: "/api/v1/tools/image/favicon",
+        makeParts: (filename: string, content: Buffer) => [
+          { type: "file" as const, filename, content },
+          { type: "field" as const, fieldname: "settings", value: "{}" },
+        ],
+      },
     ])(
       "$name returns 400 on client SVG/SVGZ errors and rethrows unexpected TypeError faults (#3580)",
       async ({ url, makeParts }) => {
@@ -1001,6 +1015,194 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
           errors: [{ filename: "", error: "Internal server error" }],
         }),
       );
+    });
+
+    it("POST /api/v1/tools/image/find-duplicates skips client SVG/SVGZ rejections and rethrows unexpected TypeError faults (#3733)", async () => {
+      const findDuplicatesHandler = routes.get("/api/v1/tools/image/find-duplicates");
+
+      const clientSkipReply = await invokeRoute(findDuplicatesHandler, [
+        { type: "file", filename: "bad.svgz", content: NOT_SVG_SVGZ },
+        { type: "file", filename: "too-many.svg", content: OVER_ELEMENT_SVG },
+        { type: "field", fieldname: "settings", value: "{}" },
+      ]);
+      expect(clientSkipReply.statusCode).toBe(400);
+      expect(clientSkipReply.payload).toMatchObject({
+        error: "No supported images found",
+        skippedFiles: [
+          { filename: "bad.svgz", reason: "Invalid SVG" },
+          { filename: "too-many.svg", reason: "Invalid SVG" },
+        ],
+      });
+
+      const sanitizeFault = new TypeError("unexpected sanitizer fault");
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw sanitizeFault;
+      });
+      await expect(
+        invokeRoute(findDuplicatesHandler, [
+          { type: "file", filename: "first.svg", content: DIRTY_SVG },
+          { type: "file", filename: "second.svg", content: DIRTY_SVG },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ]),
+      ).rejects.toThrow(sanitizeFault);
+
+      // Mixed batch: valid SVGs succeed while a client-rejected SVG is skipped.
+      const mixedReply = await invokeRoute(findDuplicatesHandler, [
+        { type: "file", filename: "first.svg", content: DIRTY_SVG },
+        { type: "file", filename: "too-many.svg", content: OVER_ELEMENT_SVG },
+        { type: "file", filename: "second.svg", content: DIRTY_SVG },
+        { type: "field", fieldname: "settings", value: "{}" },
+      ]);
+      expect(mixedReply.statusCode).toBe(200);
+      expect(mixedReply.payload).toMatchObject({
+        totalImages: 2,
+        skippedFiles: [{ filename: "too-many.svg", reason: "Invalid SVG" }],
+      });
+
+      // Second-file fault after a valid first SVG still rethrows out of the route.
+      mocks.sanitizeSvg
+        .mockImplementationOnce((buf) => buf)
+        .mockImplementationOnce(() => {
+          throw sanitizeFault;
+        });
+      await expect(
+        invokeRoute(findDuplicatesHandler, [
+          { type: "file", filename: "first.svg", content: DIRTY_SVG },
+          { type: "file", filename: "second.svg", content: DIRTY_SVG },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ]),
+      ).rejects.toThrow(sanitizeFault);
+
+      const decompressFault = new TypeError("unexpected gunzip fault");
+      mocks.decompressSvgz.mockImplementationOnce(() => {
+        throw decompressFault;
+      });
+      await expect(
+        invokeRoute(findDuplicatesHandler, [
+          { type: "file", filename: "first.svgz", content: DIRTY_SVGZ },
+          { type: "file", filename: "second.svg", content: DIRTY_SVG },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ]),
+      ).rejects.toThrow(decompressFault);
+    });
+
+    it("POST /api/v1/tools/image/favicon returns skipped list when multiple SVGs fail client validation and rethrows when a second SVG faults (#3733)", async () => {
+      const faviconHandler = routes.get("/api/v1/tools/image/favicon");
+
+      const multiSkipReply = await invokeRoute(faviconHandler, [
+        { type: "file", filename: "bad.svgz", content: NOT_SVG_SVGZ },
+        { type: "file", filename: "too-many.svg", content: OVER_ELEMENT_SVG },
+        { type: "field", fieldname: "settings", value: "{}" },
+      ]);
+      expect(multiSkipReply.statusCode).toBe(400);
+      expect(multiSkipReply.payload).toEqual({
+        error: "No images could be decoded",
+        skipped: [
+          {
+            filename: "bad.svgz",
+            reason: "SVGZ file does not contain valid SVG content after decompression",
+          },
+          {
+            filename: "too-many.svg",
+            reason: "SVG exceeds maximum element count of 5000",
+          },
+        ],
+      });
+
+      const sanitizeFault = new TypeError("unexpected sanitizer fault on second file");
+      mocks.sanitizeSvg
+        .mockImplementationOnce((buf) => buf)
+        .mockImplementationOnce(() => {
+          throw sanitizeFault;
+        });
+      await expect(
+        invokeRoute(faviconHandler, [
+          { type: "file", filename: "first.svg", content: DIRTY_SVG },
+          { type: "file", filename: "second.svg", content: DIRTY_SVG },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ]),
+      ).rejects.toThrow(sanitizeFault);
+    });
+
+    it("POST /api/v1/tools/image/image-to-base64 records per-file errors on client SVG/SVGZ rejections and rethrows unexpected TypeError faults (#3733)", async () => {
+      const base64Handler = routes.get("/api/v1/tools/image/image-to-base64");
+
+      const commentPaddedOverCapSvg = Buffer.from(
+        `<!-- ${"x".repeat(4500)} --><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">${"<rect/>".repeat(5001)}</svg>`,
+        "utf-8",
+      );
+      const clientFailReply = await invokeRoute(base64Handler, [
+        { type: "file", filename: "bad.svgz", content: NOT_SVG_SVGZ },
+        { type: "file", filename: "too-many.svg", content: OVER_ELEMENT_SVG },
+        { type: "file", filename: "padded-too-many.apng", content: commentPaddedOverCapSvg },
+        { type: "field", fieldname: "settings", value: "{}" },
+      ]);
+      expect(clientFailReply.statusCode).toBe(200);
+      expect(clientFailReply.payload).toMatchObject({
+        results: [],
+        errors: [
+          {
+            filename: "bad.svgz",
+            error: "SVGZ file does not contain valid SVG content after decompression",
+          },
+          {
+            filename: "too-many.svg",
+            error: "SVG exceeds maximum element count of 5000",
+          },
+          {
+            filename: "padded-too-many.apng",
+            error: "SVG exceeds maximum element count of 5000",
+          },
+        ],
+      });
+
+      const sanitizeFault = new TypeError("unexpected sanitizer fault");
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw sanitizeFault;
+      });
+      await expect(
+        invokeRoute(base64Handler, [
+          { type: "file", filename: "icon.svg", content: DIRTY_SVG },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ]),
+      ).rejects.toThrow(sanitizeFault);
+
+      const decompressFault = new TypeError("unexpected gunzip fault");
+      mocks.decompressSvgz.mockImplementationOnce(() => {
+        throw decompressFault;
+      });
+      await expect(
+        invokeRoute(base64Handler, [
+          { type: "file", filename: "icon.svgz", content: DIRTY_SVGZ },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ]),
+      ).rejects.toThrow(decompressFault);
+
+      // Also cover the fallback SVG path (comment-padded SVG with .apng extension
+      // where validation.format is "png" and Sharp metadata detects format === "svg").
+      const commentPaddedSvg = Buffer.from(
+        `<!-- ${"x".repeat(4500)} --><svg xmlns="http://www.w3.org/2000/svg" width="25" height="25"><rect width="25" height="25"/></svg>`,
+        "utf-8",
+      );
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw sanitizeFault;
+      });
+      await expect(
+        invokeRoute(base64Handler, [
+          { type: "file", filename: "padded.apng", content: commentPaddedSvg },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ]),
+      ).rejects.toThrow(sanitizeFault);
+
+      mocks.decompressSvgz.mockImplementationOnce(() => {
+        throw decompressFault;
+      });
+      await expect(
+        invokeRoute(base64Handler, [
+          { type: "file", filename: "padded.apng", content: commentPaddedSvg },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ]),
+      ).rejects.toThrow(decompressFault);
     });
   });
 });

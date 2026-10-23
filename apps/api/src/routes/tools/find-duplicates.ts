@@ -19,7 +19,7 @@ import { asInputErrorIfUndecodable } from "../../lib/image-error.js";
 import { logger } from "../../lib/logger.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
-import { decompressSvgz, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
 
 const settingsSchema = z.object({
   threshold: z.number().min(0).max(20).default(8),
@@ -168,103 +168,104 @@ export function registerFindDuplicates(app: FastifyInstance) {
         .send({ error: "At least 2 images are required for duplicate detection" });
     }
 
-    try {
-      const skippedFiles: Array<{ filename: string; reason: string }> = [];
-      const processableFiles: FileData[] = [];
+    const skippedFiles: Array<{ filename: string; reason: string }> = [];
+    const processableFiles: FileData[] = [];
 
-      for (const file of files) {
-        const validation = await validateImageBuffer(file.buffer, file.filename);
-        if (!validation.valid) {
-          skippedFiles.push({ filename: file.filename, reason: validation.reason });
+    for (const file of files) {
+      const validation = await validateImageBuffer(file.buffer, file.filename);
+      if (!validation.valid) {
+        skippedFiles.push({ filename: file.filename, reason: validation.reason });
+        continue;
+      }
+      if (validation.format === "heif") {
+        try {
+          file.buffer = await decodeHeic(file.buffer);
+        } catch (rawErr) {
+          // A missing decoder or storage write fault is the operator's
+          // problem, not this file's: rethrow it so the request answers
+          // 503 (#2800).
+          const err = normalizeOperationalWriteError(rawErr);
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+          logger.warn(
+            { err, filename: file.filename, format: validation.format },
+            "find-duplicates: skipping file, HEIC decode failed",
+          );
+          skippedFiles.push({ filename: file.filename, reason: "Failed to decode HEIC" });
           continue;
         }
-        if (validation.format === "heif") {
-          try {
-            file.buffer = await decodeHeic(file.buffer);
-          } catch (rawErr) {
-            // A missing decoder or storage write fault is the operator's
-            // problem, not this file's: the outer catch rethrows it so the
-            // request answers 503 (#2800).
-            const err = normalizeOperationalWriteError(rawErr);
-            if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
-            logger.warn(
-              { err, filename: file.filename, format: validation.format },
-              "find-duplicates: skipping file, HEIC decode failed",
-            );
-            skippedFiles.push({ filename: file.filename, reason: "Failed to decode HEIC" });
-            continue;
+      }
+      if (needsCliDecode(validation.format)) {
+        try {
+          const fileExt = extname(file.filename).toLowerCase().replace(/^\./, "") || undefined;
+          file.buffer = await decodeToSharpCompat(file.buffer, validation.format, fileExt);
+        } catch (rawDecodeErr) {
+          const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+          if (
+            decodeErr instanceof DecoderOutOfMemoryError ||
+            (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+          ) {
+            throw decodeErr;
           }
-        }
-        if (needsCliDecode(validation.format)) {
+          // Sharp reads some of these formats itself (DNG is a TIFF), so the
+          // decoder's failure only matters once that fallback fails too.
           try {
-            const fileExt = extname(file.filename).toLowerCase().replace(/^\./, "") || undefined;
-            file.buffer = await decodeToSharpCompat(file.buffer, validation.format, fileExt);
-          } catch (rawDecodeErr) {
-            const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
-            if (
-              decodeErr instanceof DecoderOutOfMemoryError ||
-              (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
-            ) {
+            await sharp(file.buffer).metadata();
+            await sharp(file.buffer).resize(1).raw().toBuffer();
+          } catch (err) {
+            if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
               throw decodeErr;
             }
-            // Sharp reads some of these formats itself (DNG is a TIFF), so the
-            // decoder's failure only matters once that fallback fails too.
-            try {
-              await sharp(file.buffer).metadata();
-              await sharp(file.buffer).resize(1).raw().toBuffer();
-            } catch (err) {
-              if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
-                throw decodeErr;
-              }
-              // pino serializes only the `err` key as an Error, so the decoder's
-              // failure goes in as its message or it would land as `{}`.
-              logger.warn(
-                {
-                  err,
-                  decodeErr: decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
-                  filename: file.filename,
-                  format: validation.format,
-                },
-                "find-duplicates: skipping file, decode failed",
-              );
-              skippedFiles.push({
-                filename: file.filename,
-                reason: `Failed to decode ${validation.format.toUpperCase()}`,
-              });
-              continue;
-            }
-          }
-        }
-        if (validation.format === "svg") {
-          try {
-            file.buffer = decompressSvgz(file.buffer);
-            file.buffer = sanitizeSvg(file.buffer);
-          } catch (err) {
+            // pino serializes only the `err` key as an Error, so the decoder's
+            // failure goes in as its message or it would land as `{}`.
             logger.warn(
-              { err, filename: file.filename, format: validation.format },
-              "find-duplicates: skipping file, SVG sanitize failed",
+              {
+                err,
+                decodeErr: decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
+                filename: file.filename,
+                format: validation.format,
+              },
+              "find-duplicates: skipping file, decode failed",
             );
-            skippedFiles.push({ filename: file.filename, reason: "Invalid SVG" });
+            skippedFiles.push({
+              filename: file.filename,
+              reason: `Failed to decode ${validation.format.toUpperCase()}`,
+            });
             continue;
           }
         }
-        // autoOrient never throws: it logs and returns the input when the
-        // rotation fails, and the hash step below is what rejects a buffer
-        // Sharp can't decode.
-        file.buffer = await autoOrient(file.buffer);
-        processableFiles.push(file);
       }
-
-      if (processableFiles.length < 2) {
-        return reply.status(400).send({
-          error:
-            processableFiles.length === 0
-              ? "No supported images found"
-              : "At least 2 processable images are required for duplicate detection",
-          skippedFiles,
-        });
+      if (validation.format === "svg") {
+        try {
+          file.buffer = decompressSvgz(file.buffer);
+          file.buffer = sanitizeSvg(file.buffer);
+        } catch (err) {
+          if (!isSvgClientError(err)) throw err;
+          logger.warn(
+            { err, filename: file.filename, format: validation.format },
+            "find-duplicates: skipping file, SVG sanitize failed",
+          );
+          skippedFiles.push({ filename: file.filename, reason: "Invalid SVG" });
+          continue;
+        }
       }
+      // autoOrient never throws: it logs and returns the input when the
+      // rotation fails, and the hash step below is what rejects a buffer
+      // Sharp can't decode.
+      file.buffer = await autoOrient(file.buffer);
+      processableFiles.push(file);
+    }
 
+    if (processableFiles.length < 2) {
+      return reply.status(400).send({
+        error:
+          processableFiles.length === 0
+            ? "No supported images found"
+            : "At least 2 processable images are required for duplicate detection",
+        skippedFiles,
+      });
+    }
+
+    try {
       // Extract metadata, thumbnails, and compute hashes
       const fileInfos: FileInfo[] = [];
       for (const file of processableFiles) {
