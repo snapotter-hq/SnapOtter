@@ -941,4 +941,74 @@ describe("beautify route and processBeautify validation & backgroundImage prepar
       sanitizeFaultSpy.mockRestore();
     }
   });
+
+  it("rethrows unexpected sanitizeSvg and decompressSvgz faults on beautify route and registry process (#3736)", async () => {
+    const beautifyConfig = getToolConfig("beautify");
+    if (!beautifyConfig) throw new Error("beautify missing from toolRegistry");
+
+    const validSvg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="blue"/></svg>',
+    );
+    const validSvgz = gzipSync(validSvg);
+
+    const unexpectedSanitizeErr = new TypeError("unexpected sanitizer fault");
+    const sanitizeFaultSpy = vi.spyOn(svgSanitize, "sanitizeSvg").mockImplementation(() => {
+      throw unexpectedSanitizeErr;
+    });
+    try {
+      const regSanitizeErr = await beautifyConfig.process(validSvg, {}, "valid.svg").then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(regSanitizeErr).not.toBeInstanceOf(InputValidationError);
+      expect((regSanitizeErr as { cause?: unknown }).cause).toBe(unexpectedSanitizeErr);
+
+      await expect(
+        invokeBeautify({
+          file: { filename: "valid.svg", content: validSvg },
+          settings: {},
+        }),
+      ).rejects.toBe(unexpectedSanitizeErr);
+
+      await expect(
+        invokeBeautify({
+          file: { filename: "main.png", content: PNG_200 },
+          backgroundImage: { filename: "bg.svg", content: validSvg },
+          settings: { backgroundType: "image" },
+        }),
+      ).rejects.toBe(unexpectedSanitizeErr);
+    } finally {
+      sanitizeFaultSpy.mockRestore();
+    }
+
+    const unexpectedDecompressErr = new TypeError("unexpected gunzip fault");
+    const decompressFaultSpy = vi.spyOn(svgSanitize, "decompressSvgz").mockImplementation(() => {
+      throw unexpectedDecompressErr;
+    });
+    try {
+      const regDecompressErr = await beautifyConfig.process(validSvgz, {}, "valid.svgz").then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(regDecompressErr).not.toBeInstanceOf(InputValidationError);
+      expect((regDecompressErr as { cause?: unknown }).cause).toBe(unexpectedDecompressErr);
+
+      await expect(
+        invokeBeautify({
+          file: { filename: "valid.svgz", content: validSvgz },
+          settings: {},
+        }),
+      ).rejects.toBe(unexpectedDecompressErr);
+
+      await expect(
+        invokeBeautify({
+          file: { filename: "main.png", content: PNG_200 },
+          backgroundImage: { filename: "bg.svgz", content: validSvgz },
+          settings: { backgroundType: "image" },
+        }),
+      ).rejects.toBe(unexpectedDecompressErr);
+    } finally {
+      decompressFaultSpy.mockRestore();
+    }
+  });
 });
