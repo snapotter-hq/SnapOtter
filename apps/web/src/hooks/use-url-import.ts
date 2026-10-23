@@ -22,6 +22,11 @@ export type AddReadyFilesResult = File[] & {
   fulfilledIndices: number[];
 };
 
+export interface UseUrlImportOptions {
+  fileFilter?: (file: File) => boolean;
+  unsupportedMessage?: string;
+}
+
 interface FetchUrlResult {
   success: boolean;
   url: string;
@@ -41,11 +46,15 @@ interface FetchUrlsResponse {
 
 // ── Hook ───────────────────────────────────────────────────────
 
-export function useUrlImport() {
+export function useUrlImport(options?: UseUrlImportOptions) {
   const [entries, setEntries] = useState<UrlImportEntry[]>([]);
   const [importing, setImporting] = useState(false);
   const entriesRef = useRef<UrlImportEntry[]>(entries);
   entriesRef.current = entries;
+  const fileFilterRef = useRef(options?.fileFilter);
+  fileFilterRef.current = options?.fileFilter;
+  const unsupportedMessageRef = useRef(options?.unsupportedMessage);
+  unsupportedMessageRef.current = options?.unsupportedMessage;
   const abortRef = useRef<AbortController | null>(null);
   const singleAbortRef = useRef<AbortController | null>(null);
   const downloadAbortRef = useRef<AbortController | null>(null);
@@ -215,13 +224,19 @@ export function useUrlImport() {
     const files: File[] = [];
     const fulfilledIndices: number[] = [];
     const failedByIndex = new Map<number, string>();
+    const checkFile = fileFilterRef.current;
+    const unsupportedError = unsupportedMessageRef.current || t.dropzone.unsupportedFileType;
 
     for (let i = 0; i < settled.length; i++) {
       const outcome = settled[i];
       const { index } = readyWithIndex[i];
       if (outcome.status === "fulfilled") {
-        files.push(outcome.value);
-        fulfilledIndices.push(index);
+        if (checkFile && !checkFile(outcome.value)) {
+          failedByIndex.set(index, unsupportedError);
+        } else {
+          files.push(outcome.value);
+          fulfilledIndices.push(index);
+        }
       } else {
         const reason = outcome.reason;
         const message = reason instanceof Error ? reason.message : String(reason);
@@ -242,7 +257,7 @@ export function useUrlImport() {
       failedCount: failedByIndex.size,
       fulfilledIndices,
     });
-  }, [entries, downloadAsFile]);
+  }, [entries, downloadAsFile, t.dropzone.unsupportedFileType]);
 
   const removeEntries = useCallback((indices: ReadonlySet<number> | readonly number[]) => {
     const toRemove = indices instanceof Set ? indices : new Set(indices);

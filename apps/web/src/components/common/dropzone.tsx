@@ -427,18 +427,15 @@ export function Dropzone({
       {showBulkModal && (
         <UrlImportModal
           onClose={() => setShowBulkModal(false)}
+          fileFilter={checkFile}
+          unsupportedMessage={unsupportedMessage}
           onImport={(files) => {
-            const validFiles = files.filter(checkFile);
-            if (validFiles.length > 0) {
-              for (const file of validFiles) {
-                if (onUrlImportRef.current?.(file) === false) {
-                  return false;
-                }
+            for (const file of files) {
+              if (onUrlImportRef.current?.(file) === false) {
+                return false;
               }
-              setError(null);
-            } else if (files.length > 0) {
-              setError(unsupportedMessage);
             }
+            setError(null);
           }}
         />
       )}

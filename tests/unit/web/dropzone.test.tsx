@@ -962,8 +962,70 @@ describe("Dropzone", () => {
       fireEvent.click(addBtn);
 
       await waitFor(() => {
-        expect(screen.getByText(en.dropzone.unsupportedFileType)).toBeDefined();
+        expect(within(dialog).getByText(en.dropzone.unsupportedFileType)).toBeDefined();
       });
+      expect(within(dialog).getByText("notes.txt")).toBeDefined();
+      expect(within(dialog).getByTitle(en.urlImport.retryButton)).toBeDefined();
+      expect(within(dialog).getByText("0 ready")).toBeDefined();
+      expect(onUrlImport).not.toHaveBeenCalled();
+    });
+
+    it("forwards acceptDescription from Dropzone to UrlImportModal when a bulk-imported URL fails fileFilter (#3731)", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.endsWith("/api/v1/fetch-urls")) {
+            return Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  results: [
+                    {
+                      success: true,
+                      url: "https://example.com/notes.txt",
+                      filename: "notes.txt",
+                      size: 12,
+                      downloadUrl: "https://example.com/dl/notes.txt",
+                    },
+                  ],
+                }),
+                { status: 200, headers: { "Content-Type": "application/json" } },
+              ),
+            );
+          }
+          return Promise.resolve(
+            new Response("hello world", {
+              status: 200,
+              headers: { "Content-Type": "text/plain" },
+            }),
+          );
+        }),
+      );
+
+      const onUrlImport = vi.fn();
+      render(
+        <Dropzone
+          onUrlImport={onUrlImport}
+          fileFilter={isImageFile}
+          acceptDescription="PNG, JPG"
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: en.dropzone.importMultipleUrls }));
+      const dialog = screen.getByRole("dialog");
+      fireEvent.change(within(dialog).getByRole("textbox"), {
+        target: { value: "https://example.com/notes.txt" },
+      });
+      fireEvent.click(within(dialog).getByRole("button", { name: en.urlImport.importButton }));
+
+      const addBtn = await within(dialog).findByRole("button", { name: "Add 1 Files" });
+      fireEvent.click(addBtn);
+
+      await waitFor(() => {
+        expect(within(dialog).getByText("PNG, JPG")).toBeDefined();
+      });
+      expect(within(dialog).getByText("notes.txt")).toBeDefined();
+      expect(within(dialog).getByTitle(en.urlImport.retryButton)).toBeDefined();
       expect(onUrlImport).not.toHaveBeenCalled();
     });
 
@@ -1034,6 +1096,13 @@ describe("Dropzone", () => {
         expect(onUrlImport).toHaveBeenCalledTimes(1);
       });
       expect(onUrlImport.mock.calls[0][0].name).toBe("photo.png");
+      expect(within(dialog).queryByText("photo.png")).toBeNull();
+      expect(within(dialog).getByText("notes.txt")).toBeDefined();
+      expect(within(dialog).getByText(en.dropzone.unsupportedFileType)).toBeDefined();
+      expect(screen.getAllByText(en.dropzone.unsupportedFileType)).toHaveLength(1);
+
+      fireEvent.click(within(dialog).getByRole("button", { name: en.common.close }));
+      expect(screen.queryByRole("dialog")).toBeNull();
       expect(screen.queryByText(en.dropzone.unsupportedFileType)).toBeNull();
     });
 
@@ -2952,13 +3021,6 @@ describe("Dropzone", () => {
                   results: [
                     {
                       success: true,
-                      url: "https://example.com/notes.txt",
-                      filename: "notes.txt",
-                      size: 12,
-                      downloadUrl: "https://example.com/dl/notes.txt",
-                    },
-                    {
-                      success: true,
                       url: "https://example.com/photo.png",
                       filename: "photo.png",
                       size: 16,
@@ -2970,14 +3032,6 @@ describe("Dropzone", () => {
               ),
             );
           }
-          if (url.endsWith("/dl/notes.txt")) {
-            return Promise.resolve(
-              new Response("hello world", {
-                status: 200,
-                headers: { "Content-Type": "text/plain" },
-              }),
-            );
-          }
           return Promise.resolve(new Response("Not found", { status: 404 }));
         }),
       );
@@ -2985,22 +3039,26 @@ describe("Dropzone", () => {
       const onUrlImport = vi.fn();
       render(<Dropzone onUrlImport={onUrlImport} fileFilter={isImageFile} />);
 
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      pasteViaFiles([makeFile("notes.txt", "text/plain")]);
+      expect(screen.getByText(en.dropzone.unsupportedFileType)).toBeDefined();
+
       fireEvent.click(screen.getByRole("button", { name: en.dropzone.importMultipleUrls }));
       const dialog = screen.getByRole("dialog");
       fireEvent.change(within(dialog).getByRole("textbox"), {
-        target: { value: "https://example.com/notes.txt\nhttps://example.com/photo.png" },
+        target: { value: "https://example.com/photo.png" },
       });
-      fireEvent.click(within(dialog).getByRole("button", { name: en.urlImport.importButton }));
+      await act(async () => {
+        fireEvent.click(within(dialog).getByRole("button", { name: en.urlImport.importButton }));
+      });
 
-      const addBtn = await within(dialog).findByRole("button", { name: "Add 2 Files" });
-      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      const addBtn = within(dialog).getByRole("button", { name: "Add 1 Files" });
       await act(async () => {
         fireEvent.click(addBtn);
       });
 
       expect(within(dialog).getByTitle(en.urlImport.retryButton)).toBeDefined();
       expect(onUrlImport).not.toHaveBeenCalled();
-      expect(within(dialog).queryByText("notes.txt")).toBeNull();
       expect(within(dialog).getByText("photo.png")).toBeDefined();
       expect(screen.getByText(en.dropzone.unsupportedFileType)).toBeDefined();
 
@@ -3040,6 +3098,331 @@ describe("Dropzone", () => {
         vi.advanceTimersByTime(1);
       });
       expect(screen.queryByText(en.dropzone.unsupportedFileType)).toBeNull();
+    });
+
+    it("marks fileFilter-rejected entries as failed in UrlImportModal and preserves their error when a failed sibling URL is retried and imported (#3731)", async () => {
+      let fetchUrlsCalls = 0;
+      let photoDownloadCalls = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+          const url = String(input);
+          if (url.endsWith("/api/v1/fetch-urls")) {
+            fetchUrlsCalls += 1;
+            const body = JSON.parse(String(init?.body ?? "{}")) as { urls: string[] };
+            if (fetchUrlsCalls === 1) {
+              return Promise.resolve(
+                new Response(
+                  JSON.stringify({
+                    results: [
+                      {
+                        success: true,
+                        url: "https://example.com/notes.txt",
+                        filename: "notes.txt",
+                        size: 12,
+                        downloadUrl: "https://example.com/dl/notes.txt",
+                      },
+                      {
+                        success: true,
+                        url: "https://example.com/photo.png",
+                        filename: "photo.png",
+                        size: 16,
+                        downloadUrl: "https://example.com/dl/photo.png",
+                      },
+                    ],
+                  }),
+                  { status: 200, headers: { "Content-Type": "application/json" } },
+                ),
+              );
+            }
+            expect(body.urls).toEqual(["https://example.com/photo.png"]);
+            return Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  results: [
+                    {
+                      success: true,
+                      url: "https://example.com/photo.png",
+                      filename: "photo.png",
+                      size: 16,
+                      downloadUrl: "https://example.com/dl/photo.png",
+                    },
+                  ],
+                }),
+                { status: 200, headers: { "Content-Type": "application/json" } },
+              ),
+            );
+          }
+          if (url.endsWith("/dl/notes.txt")) {
+            return Promise.resolve(
+              new Response("hello world", {
+                status: 200,
+                headers: { "Content-Type": "text/plain" },
+              }),
+            );
+          }
+          photoDownloadCalls += 1;
+          if (photoDownloadCalls === 1) {
+            return Promise.resolve(new Response("Not found", { status: 404 }));
+          }
+          return Promise.resolve(
+            new Response("png-data", {
+              status: 200,
+              headers: { "Content-Type": "image/png" },
+            }),
+          );
+        }),
+      );
+
+      const onUrlImport = vi.fn();
+      render(<Dropzone onUrlImport={onUrlImport} fileFilter={isImageFile} />);
+
+      fireEvent.click(screen.getByRole("button", { name: en.dropzone.importMultipleUrls }));
+      const dialog = screen.getByRole("dialog");
+      fireEvent.change(within(dialog).getByRole("textbox"), {
+        target: { value: "https://example.com/notes.txt\nhttps://example.com/photo.png" },
+      });
+      fireEvent.click(within(dialog).getByRole("button", { name: en.urlImport.importButton }));
+
+      // Step 2: First click of Add 2 Files: notes.txt downloads (200 text/plain) and fails checkFile;
+      // photo.png fails download (404). Both stay in UrlImportModal as failed with their errors.
+      const firstAddBtn = await within(dialog).findByRole("button", { name: "Add 2 Files" });
+      fireEvent.click(firstAddBtn);
+
+      await waitFor(() => {
+        expect(within(dialog).getAllByTitle(en.urlImport.retryButton)).toHaveLength(2);
+      });
+      expect(onUrlImport).not.toHaveBeenCalled();
+      expect(within(dialog).getByText("notes.txt")).toBeDefined();
+      expect(within(dialog).getByText(en.dropzone.unsupportedFileType)).toBeDefined();
+      expect(within(dialog).getByText("photo.png")).toBeDefined();
+      expect(within(dialog).getByText("Download failed: 404")).toBeDefined();
+      expect(within(dialog).getByText("0 ready")).toBeDefined();
+
+      // Step 3: Retry photo.png (index 1), then click Add 1 Files.
+      const retryButtons = within(dialog).getAllByTitle(en.urlImport.retryButton);
+      fireEvent.click(retryButtons[1]);
+
+      const secondAddBtn = (await within(dialog).findByRole("button", {
+        name: "Add 1 Files",
+      })) as HTMLButtonElement;
+      expect(secondAddBtn.disabled).toBe(false);
+      // notes.txt error is still displayed before clicking Add 1 Files.
+      expect(within(dialog).getByText("notes.txt")).toBeDefined();
+      expect(within(dialog).getByText(en.dropzone.unsupportedFileType)).toBeDefined();
+
+      fireEvent.click(secondAddBtn);
+
+      await waitFor(() => {
+        expect(onUrlImport).toHaveBeenCalledTimes(1);
+      });
+      expect(onUrlImport.mock.calls[0][0].name).toBe("photo.png");
+
+      // Modal stays open; photo.png is removed while notes.txt and its unsupported error remain visible.
+      expect(screen.getByRole("dialog")).toBe(dialog);
+      expect(within(dialog).queryByText("photo.png")).toBeNull();
+      expect(within(dialog).getByText("notes.txt")).toBeDefined();
+      expect(within(dialog).getByText(en.dropzone.unsupportedFileType)).toBeDefined();
+      expect(within(dialog).getAllByTitle(en.urlImport.retryButton)).toHaveLength(1);
+    });
+
+    it("uses latest fileFilter and unsupportedMessage props in UrlImportModal when updated while addReadyFiles is in flight (#3731)", async () => {
+      let resolveDownload: ((res: Response) => void) | undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.endsWith("/api/v1/fetch-urls")) {
+            return Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  results: [
+                    {
+                      success: true,
+                      url: "https://example.com/notes.txt",
+                      filename: "notes.txt",
+                      size: 12,
+                      downloadUrl: "https://example.com/dl/notes.txt",
+                    },
+                  ],
+                }),
+                { status: 200, headers: { "Content-Type": "application/json" } },
+              ),
+            );
+          }
+          return new Promise<Response>((resolve) => {
+            resolveDownload = resolve;
+          });
+        }),
+      );
+
+      const onImport = vi.fn();
+      const onClose = vi.fn();
+      const { rerender } = render(
+        <UrlImportModal
+          onClose={onClose}
+          onImport={onImport}
+          fileFilter={() => true}
+          unsupportedMessage="Initial message"
+        />,
+      );
+
+      const dialog = screen.getByRole("dialog");
+      fireEvent.change(within(dialog).getByRole("textbox"), {
+        target: { value: "https://example.com/notes.txt" },
+      });
+      fireEvent.click(within(dialog).getByRole("button", { name: en.urlImport.importButton }));
+
+      const addBtn = await within(dialog).findByRole("button", { name: "Add 1 Files" });
+      fireEvent.click(addBtn);
+      expect(resolveDownload).toBeTypeOf("function");
+
+      // Update fileFilter and unsupportedMessage while download is in flight.
+      rerender(
+        <UrlImportModal
+          onClose={onClose}
+          onImport={onImport}
+          fileFilter={isImageFile}
+          unsupportedMessage="SVG files only"
+        />,
+      );
+
+      await act(async () => {
+        resolveDownload?.(
+          new Response("hello world", {
+            status: 200,
+            headers: { "Content-Type": "text/plain" },
+          }),
+        );
+      });
+
+      await waitFor(() => {
+        expect(within(dialog).getByText("SVG files only")).toBeDefined();
+      });
+      expect(onImport).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it("filters downloaded files in useUrlImport.addReadyFiles with custom or fallback unsupportedMessage and preserves non-contiguous indices (#3731)", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.endsWith("/api/v1/fetch-urls")) {
+            return Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  results: [
+                    {
+                      success: true,
+                      url: "https://example.com/notes.txt",
+                      filename: "notes.txt",
+                      size: 12,
+                      downloadUrl: "https://example.com/dl/notes.txt",
+                    },
+                    {
+                      success: true,
+                      url: "https://example.com/photo.png",
+                      filename: "photo.png",
+                      size: 16,
+                      downloadUrl: "https://example.com/dl/photo.png",
+                    },
+                    {
+                      success: true,
+                      url: "https://example.com/missing.png",
+                      filename: "missing.png",
+                      size: 16,
+                      downloadUrl: "https://example.com/dl/missing.png",
+                    },
+                  ],
+                }),
+                { status: 200, headers: { "Content-Type": "application/json" } },
+              ),
+            );
+          }
+          if (url.endsWith("/dl/notes.txt")) {
+            return Promise.resolve(
+              new Response("hello world", {
+                status: 200,
+                headers: { "Content-Type": "text/plain" },
+              }),
+            );
+          }
+          if (url.endsWith("/dl/photo.png")) {
+            return Promise.resolve(
+              new Response("png-data", {
+                status: 200,
+                headers: { "Content-Type": "image/png" },
+              }),
+            );
+          }
+          return Promise.resolve(new Response("Not found", { status: 404 }));
+        }),
+      );
+
+      const { result, rerender } = renderHook(
+        (props: { unsupportedMessage?: string }) =>
+          useUrlImport({
+            fileFilter: isImageFile,
+            unsupportedMessage: props.unsupportedMessage,
+          }),
+        { initialProps: { unsupportedMessage: "" } },
+      );
+
+      await act(async () => {
+        await result.current.importUrls([
+          "https://example.com/notes.txt",
+          "https://example.com/photo.png",
+          "https://example.com/missing.png",
+        ]);
+      });
+
+      let files!: AddReadyFilesResult;
+      await act(async () => {
+        files = await result.current.addReadyFiles();
+      });
+
+      expect(files.map((f: File) => f.name)).toEqual(["photo.png"]);
+      expect(files.fulfilledIndices).toEqual([1]);
+      expect(files.failedCount).toBe(2);
+      expect(result.current.entries).toEqual([
+        expect.objectContaining({
+          url: "https://example.com/notes.txt",
+          status: "failed",
+          error: en.dropzone.unsupportedFileType,
+        }),
+        expect.objectContaining({
+          url: "https://example.com/photo.png",
+          status: "ready",
+          filename: "photo.png",
+        }),
+        expect.objectContaining({
+          url: "https://example.com/missing.png",
+          status: "failed",
+          error: "Download failed: 404",
+        }),
+      ]);
+
+      // Retry notes.txt with a custom unsupportedMessage and verify the custom message is recorded.
+      rerender({ unsupportedMessage: "PNG, JPG" });
+      await act(async () => {
+        await result.current.retryUrl(0);
+      });
+      act(() => {
+        result.current.removeEntries(files.fulfilledIndices);
+      });
+      await act(async () => {
+        files = await result.current.addReadyFiles();
+      });
+      expect(files).toHaveLength(0);
+      expect(files.failedCount).toBe(1);
+      expect(result.current.entries[0]).toEqual(
+        expect.objectContaining({
+          url: "https://example.com/notes.txt",
+          status: "failed",
+          error: "PNG, JPG",
+        }),
+      );
     });
   });
 });

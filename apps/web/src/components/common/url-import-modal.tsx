@@ -11,6 +11,8 @@ import { extractUrls } from "@/lib/url-parser";
 interface UrlImportModalProps {
   onClose: () => void;
   onImport: (files: File[]) => boolean | undefined;
+  fileFilter?: (file: File) => boolean;
+  unsupportedMessage?: string;
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -44,7 +46,12 @@ function filenameFromUrl(url: string): string {
 
 // ── Component ──────────────────────────────────────────────────
 
-export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
+export function UrlImportModal({
+  onClose,
+  onImport,
+  fileFilter,
+  unsupportedMessage,
+}: UrlImportModalProps) {
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDivElement>(null);
   useFocusTrap(dialogRef, true);
@@ -65,7 +72,7 @@ export function UrlImportModal({ onClose, onImport }: UrlImportModalProps) {
     cancel,
     reset,
     readyCount,
-  } = useUrlImport();
+  } = useUrlImport({ fileFilter, unsupportedMessage });
 
   const hasResults = entries.length > 0;
   const retrying = entries.some((entry) => entry.status === "fetching");
