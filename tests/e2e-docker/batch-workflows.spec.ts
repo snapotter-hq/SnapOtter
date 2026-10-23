@@ -328,13 +328,25 @@ test.describe("Adjustment: batch color adjustments", () => {
         { name: "file", filename: "d.heic", contentType: "image/heic", buffer: HEIC_200x150 },
         { name: "file", filename: "e.avif", contentType: "image/avif", buffer: avifSample },
       ],
-      [{ name: "settings", value: JSON.stringify({ grayscale: true }) }],
+      [{ name: "settings", value: JSON.stringify({ effect: "grayscale" }) }],
     );
     const res = await request.post("/api/v1/tools/image/adjust-colors/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
-    await expectBatchSuccess(res);
+    const zip = await readBatchZip(res, request);
+    expect(zip.getEntries()).toHaveLength(5);
+    const [ar, ag, ab] = readFirstPngPixelRgb(readZipEntry(zip, "a_adjust-colors.png"));
+    expect(ar).toBe(150);
+    expect(ar).toBe(ag);
+    expect(ag).toBe(ab);
+    const [dr, dg, db] = readFirstPngPixelRgb(readZipEntry(zip, "d_adjust-colors.png"));
+    expect(dr).toBe(150);
+    expect(dr).toBe(dg);
+    expect(dg).toBe(db);
+    for (const name of ["b_adjust-colors.jpg", "c_adjust-colors.webp", "e_adjust-colors.avif"]) {
+      expect(readZipEntry(zip, name).length).toBeGreaterThan(0);
+    }
   });
 
   test("batch negative brightness on 3 images", async ({ request }) => {
@@ -712,7 +724,7 @@ test.describe("Format: batch convert to TIFF", () => {
 // ─── Adjustment: Batch Enhance ────────────────────────────────────
 
 test.describe("Adjustment: batch enhance", () => {
-  test("enhance 4 images with vivid preset", async ({ request }) => {
+  test("enhance 4 images with landscape mode", async ({ request }) => {
     const { body: reqBody, contentType } = buildMultipart(
       [
         { name: "file", filename: "a.png", contentType: "image/png", buffer: PNG_200x150 },
@@ -720,13 +732,28 @@ test.describe("Adjustment: batch enhance", () => {
         { name: "file", filename: "c.webp", contentType: "image/webp", buffer: WEBP_50x50 },
         { name: "file", filename: "d.jpg", contentType: "image/jpeg", buffer: JPG_SAMPLE },
       ],
-      [{ name: "settings", value: JSON.stringify({ preset: "vivid" }) }],
+      [{ name: "settings", value: JSON.stringify({ mode: "landscape" }) }],
     );
     const res = await request.post("/api/v1/tools/image/image-enhancement/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
-    await expectBatchSuccess(res);
+    const zip = await readBatchZip(res, request);
+    expect(zip.getEntries()).toHaveLength(4);
+    const [r, g, b] = readFirstPngPixelRgb(readZipEntry(zip, "a_image-enhancement.png"));
+    expect(r).toBeGreaterThanOrEqual(240);
+    expect(r).toBeLessThanOrEqual(248);
+    expect(g).toBeGreaterThanOrEqual(113);
+    expect(g).toBeLessThanOrEqual(120);
+    expect(b).toBeGreaterThanOrEqual(66);
+    expect(b).toBeLessThanOrEqual(75);
+    for (const name of [
+      "b_image-enhancement.jpg",
+      "c_image-enhancement.webp",
+      "d_image-enhancement.jpg",
+    ]) {
+      expect(readZipEntry(zip, name).length).toBeGreaterThan(0);
+    }
   });
 });
 

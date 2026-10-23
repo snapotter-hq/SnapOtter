@@ -393,13 +393,37 @@ test.describe("Batch Color Adjustments", () => {
         { name: "file", filename: "a.png", contentType: "image/png", buffer: PNG_200x150 },
         { name: "file", filename: "b.jpg", contentType: "image/jpeg", buffer: JPG_100x100 },
       ],
-      [{ name: "settings", value: JSON.stringify({ grayscale: true }) }],
+      [{ name: "settings", value: JSON.stringify({ effect: "grayscale" }) }],
     );
     const res = await request.post("/api/v1/tools/image/adjust-colors/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
-    expect(res.ok()).toBe(true);
+    const zip = await readBatchZip(res, request);
+    expect(zip.getEntries()).toHaveLength(2);
+    const [r, g, b] = readFirstPngPixelRgb(readZipEntry(zip, "a_adjust-colors.png"));
+    expect(r).toBe(150);
+    expect(r).toBe(g);
+    expect(g).toBe(b);
+    const jpgEntryBuffer = readZipEntry(zip, "b_adjust-colors.jpg");
+    const convRes = await request.post("/api/v1/tools/image/convert", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "b_adjust-colors.jpg", mimeType: "image/jpeg", buffer: jpgEntryBuffer },
+        settings: JSON.stringify({ format: "png" }),
+      },
+    });
+    expect(convRes.ok()).toBe(true);
+    const convBody = await convRes.json();
+    const pngRes = await request.get(convBody.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(pngRes.ok()).toBe(true);
+    const [jr, jg, jb] = readFirstPngPixelRgb(Buffer.from(await pngRes.body()));
+    expect(jr).toBeGreaterThan(210);
+    expect(jr).toBeLessThan(230);
+    expect(jr).toBe(jg);
+    expect(jg).toBe(jb);
   });
 });
 
@@ -614,14 +638,14 @@ test.describe("Batch Replace Color", () => {
 // ─── Batch Enhancement ─────────────────────────────────────────────
 
 test.describe("Batch Enhancement", () => {
-  test("batch enhance 3 images with auto preset", async ({ request }) => {
+  test("batch enhance 3 images with auto mode", async ({ request }) => {
     const { body: reqBody, contentType } = buildMultipart(
       [
         { name: "file", filename: "a.png", contentType: "image/png", buffer: PNG_200x150 },
         { name: "file", filename: "b.jpg", contentType: "image/jpeg", buffer: JPG_100x100 },
         { name: "file", filename: "c.webp", contentType: "image/webp", buffer: WEBP_50x50 },
       ],
-      [{ name: "settings", value: JSON.stringify({ preset: "auto" }) }],
+      [{ name: "settings", value: JSON.stringify({ mode: "auto" }) }],
     );
     const res = await request.post("/api/v1/tools/image/image-enhancement/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
@@ -1157,7 +1181,7 @@ test.describe("Batch Compress -- 5+ images", () => {
 // ─── Batch Enhancement -- 5+ Images ──────────────────────────────
 
 test.describe("Batch Enhancement -- 5+ images", () => {
-  test("batch enhance 5 images with auto preset", async ({ request }) => {
+  test("batch enhance 5 images with auto mode", async ({ request }) => {
     const { body: reqBody, contentType } = buildMultipart(
       [
         { name: "file", filename: "a.png", contentType: "image/png", buffer: PNG_200x150 },
@@ -1171,7 +1195,7 @@ test.describe("Batch Enhancement -- 5+ images", () => {
           buffer: formatFixture("sample.jpg"),
         },
       ],
-      [{ name: "settings", value: JSON.stringify({ preset: "auto" }) }],
+      [{ name: "settings", value: JSON.stringify({ mode: "auto" }) }],
     );
     const res = await request.post("/api/v1/tools/image/image-enhancement/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },

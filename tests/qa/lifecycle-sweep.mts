@@ -343,7 +343,7 @@ async function checkBatch(): Promise<void> {
 async function checkPipeline(): Promise<void> {
   const steps = [
     { toolId: "resize", settings: { width: 120 } },
-    { toolId: "adjust-colors", settings: { grayscale: true } },
+    { toolId: "adjust-colors", settings: { effect: "grayscale" } },
     { toolId: "convert", settings: { format: "jpeg" } },
   ];
   const outcome = await client.submit({
@@ -367,9 +367,13 @@ async function checkPipeline(): Promise<void> {
     return;
   }
   const facts = await inspectOutput(bytes, "pipeline.jpg", "image/jpeg");
+  const sharpMod = await import(
+    join(REPO, "apps", "api", "node_modules", "sharp", "dist", "index.mjs")
+  );
+  const raw = await sharpMod.default(bytes).raw().toBuffer();
   const widthOk = facts.image?.width === 120;
   const formatOk = facts.image?.format === "jpeg";
-  const grayOk = (facts.image?.channels ?? 0) <= 3;
+  const grayOk = raw.length >= 3 && raw[0] === raw[1] && raw[1] === raw[2];
   report(
     "pipeline-multistep",
     widthOk && formatOk && grayOk ? "pass" : "fail",

@@ -128,7 +128,7 @@ test.describe("Crop + Enhance + Convert chain", () => {
         pipeline: JSON.stringify({
           steps: [
             { toolId: "crop", settings: { left: 10, top: 10, width: 200, height: 200 } },
-            { toolId: "image-enhancement", settings: { preset: "auto" } },
+            { toolId: "image-enhancement", settings: { mode: "auto" } },
             { toolId: "convert", settings: { format: "webp" } },
           ],
         }),
@@ -230,13 +230,13 @@ test.describe("Enhancement + Replace Color + Convert chain", () => {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
         pipeline: JSON.stringify({
           steps: [
-            { toolId: "image-enhancement", settings: { preset: "vivid" } },
+            { toolId: "image-enhancement", settings: { mode: "landscape" } },
             {
               toolId: "replace-color",
               settings: {
-                sourceColor: "#51fc3b",
+                sourceColor: "#66fb4a",
                 targetColor: "#f0f0f0",
-                tolerance: 20,
+                tolerance: 10,
               },
             },
             { toolId: "convert", settings: { format: "avif" } },
@@ -302,7 +302,7 @@ test.describe("HEIC pipeline chains", () => {
         file: { name: "test.heic", mimeType: "image/heic", buffer: HEIC_200x150 },
         pipeline: JSON.stringify({
           steps: [
-            { toolId: "image-enhancement", settings: { preset: "auto" } },
+            { toolId: "image-enhancement", settings: { mode: "auto" } },
             {
               toolId: "watermark-text",
               settings: {
@@ -334,7 +334,7 @@ test.describe("Grayscale + Sharpen + Text Overlay chain", () => {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
         pipeline: JSON.stringify({
           steps: [
-            { toolId: "adjust-colors", settings: { grayscale: true } },
+            { toolId: "adjust-colors", settings: { effect: "grayscale" } },
             { toolId: "sharpening", settings: { sigma: 2.0 } },
             {
               toolId: "text-overlay",
@@ -354,6 +354,32 @@ test.describe("Grayscale + Sharpen + Text Overlay chain", () => {
     expect(res.ok()).toBe(true);
     const body = await res.json();
     expect(body.downloadUrl).toBeTruthy();
+    const dlRes = await request.get(body.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const convRes = await request.post("/api/v1/tools/image/convert", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: {
+          name: "out.jpg",
+          mimeType: "image/jpeg",
+          buffer: Buffer.from(await dlRes.body()),
+        },
+        settings: JSON.stringify({ format: "png" }),
+      },
+    });
+    expect(convRes.ok()).toBe(true);
+    const convBody = await convRes.json();
+    const pngRes = await request.get(convBody.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(pngRes.ok()).toBe(true);
+    const [r, g, b] = readFirstPngPixelRgb(Buffer.from(await pngRes.body()));
+    expect(r).toBeGreaterThan(130);
+    expect(r).toBeLessThan(160);
+    expect(r).toBe(g);
+    expect(g).toBe(b);
   });
 });
 
@@ -368,7 +394,7 @@ test.describe("Social media optimization chain", () => {
         pipeline: JSON.stringify({
           steps: [
             { toolId: "resize", settings: { width: 1080, height: 1080, fit: "cover" } },
-            { toolId: "image-enhancement", settings: { preset: "vivid" } },
+            { toolId: "image-enhancement", settings: { mode: "landscape" } },
             {
               toolId: "watermark-text",
               settings: {

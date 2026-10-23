@@ -122,7 +122,7 @@ test.describe("5-step full photo preparation", () => {
           steps: [
             { toolId: "strip-metadata", settings: {} },
             { toolId: "resize", settings: { width: 1200, fit: "contain" } },
-            { toolId: "image-enhancement", settings: { preset: "auto" } },
+            { toolId: "image-enhancement", settings: { mode: "auto" } },
             {
               toolId: "watermark-text",
               settings: {
@@ -157,7 +157,7 @@ test.describe("4-step eCommerce product workflow", () => {
         pipeline: JSON.stringify({
           steps: [
             { toolId: "crop", settings: { left: 20, top: 20, width: 300, height: 300 } },
-            { toolId: "image-enhancement", settings: { preset: "vivid" } },
+            { toolId: "image-enhancement", settings: { mode: "landscape" } },
             { toolId: "border", settings: { size: 5, color: "#ffffff" } },
             { toolId: "optimize-for-web", settings: { maxWidth: 800, quality: 85 } },
           ],
@@ -180,7 +180,7 @@ test.describe("4-step grayscale print preparation", () => {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
         pipeline: JSON.stringify({
           steps: [
-            { toolId: "adjust-colors", settings: { grayscale: true } },
+            { toolId: "adjust-colors", settings: { effect: "grayscale" } },
             { toolId: "sharpening", settings: { sigma: 1.5 } },
             { toolId: "border", settings: { size: 30, color: "#ffffff" } },
             { toolId: "convert", settings: { format: "tiff" } },
@@ -192,6 +192,37 @@ test.describe("4-step grayscale print preparation", () => {
     const body = await res.json();
     expect(body.downloadUrl).toBeTruthy();
     expect(body.downloadUrl).toContain(".tiff");
+    const dlRes = await request.get(body.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const probeRes = await request.post("/api/v1/pipeline/execute", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: {
+          name: "out.tiff",
+          mimeType: "image/tiff",
+          buffer: Buffer.from(await dlRes.body()),
+        },
+        pipeline: JSON.stringify({
+          steps: [
+            { toolId: "crop", settings: { left: 40, top: 40, width: 50, height: 50 } },
+            { toolId: "convert", settings: { format: "png" } },
+          ],
+        }),
+      },
+    });
+    expect(probeRes.ok()).toBe(true);
+    const probeBody = await probeRes.json();
+    const pngRes = await request.get(probeBody.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(pngRes.ok()).toBe(true);
+    const [r, g, b] = readFirstPngPixelRgb(Buffer.from(await pngRes.body()));
+    expect(r).toBeGreaterThan(100);
+    expect(r).toBeLessThan(140);
+    expect(r).toBe(g);
+    expect(g).toBe(b);
   });
 });
 
@@ -214,7 +245,7 @@ test.describe("5-step color correction workflow", () => {
                 tolerance: 10,
               },
             },
-            { toolId: "image-enhancement", settings: { preset: "soft" } },
+            { toolId: "image-enhancement", settings: { mode: "portrait" } },
             {
               toolId: "text-overlay",
               settings: {
@@ -237,11 +268,11 @@ test.describe("5-step color correction workflow", () => {
     });
     expect(dlRes.ok()).toBe(true);
     const [r, g, b] = readFirstPngPixelRgb(Buffer.from(await dlRes.body()));
-    expect(r).toBeGreaterThan(240);
+    expect(r).toBeGreaterThanOrEqual(254);
     expect(g).toBeGreaterThan(180);
     expect(g).toBeLessThan(215);
     expect(b).toBeGreaterThan(155);
-    expect(b).toBeLessThan(190);
+    expect(b).toBeLessThanOrEqual(169);
   });
 });
 
@@ -282,7 +313,7 @@ test.describe("6-step blog post hero image", () => {
           steps: [
             { toolId: "strip-metadata", settings: {} },
             { toolId: "resize", settings: { width: 1280, fit: "contain" } },
-            { toolId: "image-enhancement", settings: { preset: "vivid" } },
+            { toolId: "image-enhancement", settings: { mode: "landscape" } },
             { toolId: "adjust-colors", settings: { contrast: 5, saturation: 10 } },
             {
               toolId: "watermark-text",
@@ -351,7 +382,7 @@ test.describe("5-step avatar generation", () => {
           steps: [
             { toolId: "crop", settings: { left: 50, top: 50, width: 200, height: 200 } },
             { toolId: "resize", settings: { width: 128, height: 128, fit: "cover" } },
-            { toolId: "image-enhancement", settings: { preset: "portrait" } },
+            { toolId: "image-enhancement", settings: { mode: "portrait" } },
             { toolId: "border", settings: { size: 3, color: "#cccccc" } },
             { toolId: "convert", settings: { format: "png" } },
           ],
@@ -362,6 +393,34 @@ test.describe("5-step avatar generation", () => {
     const body = await res.json();
     expect(body.downloadUrl).toBeTruthy();
     expect(body.downloadUrl).toContain(".png");
+    const dlRes = await request.get(body.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const cropRes = await request.post("/api/v1/tools/image/crop", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: {
+          name: "avatar.png",
+          mimeType: "image/png",
+          buffer: Buffer.from(await dlRes.body()),
+        },
+        settings: JSON.stringify({ left: 20, top: 20, width: 50, height: 50 }),
+      },
+    });
+    expect(cropRes.ok()).toBe(true);
+    const cropBody = await cropRes.json();
+    const croppedPngRes = await request.get(cropBody.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(croppedPngRes.ok()).toBe(true);
+    const [r, g, b] = readFirstPngPixelRgb(Buffer.from(await croppedPngRes.body()));
+    expect(r).toBeGreaterThanOrEqual(54);
+    expect(r).toBeLessThanOrEqual(65);
+    expect(g).toBeGreaterThanOrEqual(40);
+    expect(g).toBeLessThanOrEqual(50);
+    expect(b).toBeGreaterThanOrEqual(14);
+    expect(b).toBeLessThanOrEqual(25);
   });
 });
 
@@ -429,7 +488,7 @@ test.describe("Pipeline with exotic format input", () => {
         file: { name: "sample.avif", mimeType: "image/avif", buffer: avif },
         pipeline: JSON.stringify({
           steps: [
-            { toolId: "image-enhancement", settings: { preset: "auto" } },
+            { toolId: "image-enhancement", settings: { mode: "auto" } },
             { toolId: "border", settings: { size: 10, color: "#1a1a1a" } },
             { toolId: "compress", settings: { quality: 70 } },
           ],

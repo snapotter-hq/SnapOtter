@@ -127,12 +127,20 @@ test.describe("Color Adjustments", () => {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.png", mimeType: "image/png", buffer: PNG_200x150 },
-        settings: JSON.stringify({ grayscale: true }),
+        settings: JSON.stringify({ effect: "grayscale" }),
       },
     });
     expect(res.ok()).toBe(true);
     const body = await res.json();
     expect(body.downloadUrl).toBeTruthy();
+    const dlRes = await request.get(body.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const [r, g, b] = readFirstPngPixelRgb(Buffer.from(await dlRes.body()));
+    expect(r).toBe(150);
+    expect(r).toBe(g);
+    expect(g).toBe(b);
   });
 
   test("multiple adjustments at once", async ({ request }) => {
@@ -444,7 +452,7 @@ test.describe("Image Enhancement", () => {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
-        settings: JSON.stringify({ preset: "auto" }),
+        settings: JSON.stringify({ mode: "auto" }),
       },
     });
     expect(res.ok()).toBe(true);
@@ -453,17 +461,44 @@ test.describe("Image Enhancement", () => {
     expect(body.processedSize).toBeGreaterThan(0);
   });
 
-  test("vivid enhancement preset", async ({ request }) => {
+  test("landscape enhancement mode", async ({ request }) => {
     const res = await request.post("/api/v1/tools/image/image-enhancement", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
-        settings: JSON.stringify({ preset: "vivid" }),
+        settings: JSON.stringify({ mode: "landscape" }),
       },
     });
     expect(res.ok()).toBe(true);
     const body = await res.json();
     expect(body.downloadUrl).toBeTruthy();
+    const dlRes = await request.get(body.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const convRes = await request.post("/api/v1/tools/image/convert", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: {
+          name: "enhanced.jpg",
+          mimeType: "image/jpeg",
+          buffer: Buffer.from(await dlRes.body()),
+        },
+        settings: JSON.stringify({ format: "png" }),
+      },
+    });
+    expect(convRes.ok()).toBe(true);
+    const convBody = await convRes.json();
+    const pngRes = await request.get(convBody.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(pngRes.ok()).toBe(true);
+    const [r, g, b] = readFirstPngPixelRgb(Buffer.from(await pngRes.body()));
+    expect(r).toBeGreaterThanOrEqual(95);
+    expect(r).toBeLessThanOrEqual(115);
+    expect(g).toBeGreaterThan(245);
+    expect(b).toBeGreaterThanOrEqual(65);
+    expect(b).toBeLessThanOrEqual(85);
   });
 
   test("enhancement changes the image", async ({ request }) => {
@@ -471,7 +506,7 @@ test.describe("Image Enhancement", () => {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: { name: "sample.jpg", mimeType: "image/jpeg", buffer: JPG_SAMPLE },
-        settings: JSON.stringify({ preset: "auto" }),
+        settings: JSON.stringify({ mode: "auto" }),
       },
     });
     expect(res.ok()).toBe(true);

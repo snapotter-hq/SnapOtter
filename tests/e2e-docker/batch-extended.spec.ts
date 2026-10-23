@@ -396,7 +396,7 @@ test.describe("Batch favicon", () => {
 // ─── Batch Image Enhancement (5+ images) ─────────────────────────
 
 test.describe("Batch image-enhancement (5+ images)", () => {
-  test("enhance 6 images with auto preset", async ({ request }) => {
+  test("enhance 6 images with auto mode", async ({ request }) => {
     const portrait = contentFixture("portrait-color.jpg");
     const avifSample = formatFixture("sample.avif");
     const { body: reqBody, contentType } = buildMultipart(
@@ -408,7 +408,7 @@ test.describe("Batch image-enhancement (5+ images)", () => {
         { name: "file", filename: "e.jpg", contentType: "image/jpeg", buffer: portrait },
         { name: "file", filename: "f.avif", contentType: "image/avif", buffer: avifSample },
       ],
-      [{ name: "settings", value: JSON.stringify({ preset: "auto" }) }],
+      [{ name: "settings", value: JSON.stringify({ mode: "auto" }) }],
     );
     const res = await request.post("/api/v1/tools/image/image-enhancement/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },

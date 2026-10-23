@@ -335,7 +335,7 @@ test.describe("Pipeline with format change mid-chain", () => {
         pipeline: JSON.stringify({
           steps: [
             { toolId: "convert", settings: { format: "jpg", quality: 90 } },
-            { toolId: "image-enhancement", settings: { preset: "auto" } },
+            { toolId: "image-enhancement", settings: { mode: "auto" } },
             { toolId: "convert", settings: { format: "avif" } },
           ],
         }),
@@ -459,7 +459,7 @@ test.describe("Deep pipelines (6+ steps)", () => {
           steps: [
             { toolId: "strip-metadata", settings: {} },
             { toolId: "resize", settings: { width: 600, fit: "contain" } },
-            { toolId: "adjust-colors", settings: { grayscale: true } },
+            { toolId: "adjust-colors", settings: { effect: "grayscale" } },
             { toolId: "sharpening", settings: { sigma: 1.5 } },
             { toolId: "border", settings: { size: 8, color: "#ffffff" } },
             { toolId: "convert", settings: { format: "webp" } },
@@ -471,6 +471,37 @@ test.describe("Deep pipelines (6+ steps)", () => {
     const body = await res.json();
     expect(body.downloadUrl).toBeTruthy();
     expect(body.downloadUrl).toContain(".webp");
+    const dlRes = await request.get(body.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const probeRes = await request.post("/api/v1/pipeline/execute", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: {
+          name: "out.webp",
+          mimeType: "image/webp",
+          buffer: Buffer.from(await dlRes.body()),
+        },
+        pipeline: JSON.stringify({
+          steps: [
+            { toolId: "crop", settings: { left: 20, top: 20, width: 50, height: 50 } },
+            { toolId: "convert", settings: { format: "png" } },
+          ],
+        }),
+      },
+    });
+    expect(probeRes.ok()).toBe(true);
+    const probeBody = await probeRes.json();
+    const pngRes = await request.get(probeBody.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(pngRes.ok()).toBe(true);
+    const [r, g, b] = readFirstPngPixelRgb(Buffer.from(await pngRes.body()));
+    expect(r).toBeGreaterThan(100);
+    expect(r).toBeLessThan(150);
+    expect(r).toBe(g);
+    expect(g).toBe(b);
   });
 });
 
@@ -486,7 +517,7 @@ test.describe("Workflow: e-commerce product pipeline", () => {
           steps: [
             { toolId: "crop", settings: { left: 50, top: 50, width: 400, height: 350 } },
             { toolId: "resize", settings: { width: 800, height: 800, fit: "contain" } },
-            { toolId: "image-enhancement", settings: { preset: "vivid" } },
+            { toolId: "image-enhancement", settings: { mode: "landscape" } },
             {
               toolId: "watermark-text",
               settings: {
@@ -657,7 +688,7 @@ test.describe("Enhancement + Border + Convert pipeline", () => {
         file: { name: "test.jpg", mimeType: "image/jpeg", buffer: JPG_100x100 },
         pipeline: JSON.stringify({
           steps: [
-            { toolId: "image-enhancement", settings: { preset: "auto" } },
+            { toolId: "image-enhancement", settings: { mode: "auto" } },
             { toolId: "border", settings: { size: 10, color: "#333333" } },
             { toolId: "convert", settings: { format: "webp" } },
           ],
@@ -690,7 +721,7 @@ test.describe("Pipeline with multiple color operations", () => {
                 tolerance: 25,
               },
             },
-            { toolId: "adjust-colors", settings: { grayscale: true } },
+            { toolId: "adjust-colors", settings: { effect: "grayscale" } },
           ],
         }),
       },
@@ -703,12 +734,9 @@ test.describe("Pipeline with multiple color operations", () => {
     });
     expect(dlRes.ok()).toBe(true);
     const [r, g, b] = readFirstPngPixelRgb(Buffer.from(await dlRes.body()));
-    expect(r).toBeGreaterThan(220);
-    expect(r).toBeLessThanOrEqual(245);
-    expect(g).toBeGreaterThan(220);
-    expect(g).toBeLessThanOrEqual(245);
-    expect(b).toBeGreaterThan(210);
-    expect(b).toBeLessThanOrEqual(245);
+    expect(r).toBe(239);
+    expect(r).toBe(g);
+    expect(g).toBe(b);
   });
 });
 

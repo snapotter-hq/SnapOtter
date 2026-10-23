@@ -514,7 +514,7 @@ test.describe("Pipeline edge cases", () => {
         pipeline: JSON.stringify({
           steps: [
             { toolId: "resize", settings: { width: 600, fit: "contain" } },
-            { toolId: "image-enhancement", settings: { preset: "auto" } },
+            { toolId: "image-enhancement", settings: { mode: "auto" } },
             { toolId: "sharpening", settings: { sigma: 1.0 } },
             {
               toolId: "watermark-text",
@@ -945,7 +945,7 @@ test.describe("Pipeline: 4+ step chains", () => {
         pipeline: JSON.stringify({
           steps: [
             { toolId: "resize", settings: { width: 800, fit: "contain" } },
-            { toolId: "image-enhancement", settings: { preset: "auto" } },
+            { toolId: "image-enhancement", settings: { mode: "auto" } },
             { toolId: "adjust-colors", settings: { brightness: 3, contrast: 5 } },
             { toolId: "sharpening", settings: { sigma: 0.5 } },
             { toolId: "strip-metadata", settings: {} },

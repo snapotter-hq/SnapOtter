@@ -292,9 +292,9 @@ async function main() {
   await test("Compress (webp q50)", "compress", { quality: 50 });
   await test("Convert (to PNG)", "convert", { format: "png" });
   await test("Convert (to JPEG)", "convert", { format: "jpg", quality: 85 });
-  await test("Image Enhancement (auto)", "image-enhancement", { preset: "auto" });
+  await test("Image Enhancement (auto)", "image-enhancement", { mode: "auto" });
   // color-adjustments is part of image-enhancement, not a separate tool
-  await test("Image Enhancement (vivid)", "image-enhancement", { preset: "vivid" });
+  await test("Image Enhancement (landscape)", "image-enhancement", { mode: "landscape" });
   await test("Sharpening", "sharpening", { sigma: 1.5, amount: 1.0 });
   await test("Border", "border", { size: 20, color: "#ff0000" });
   await test("Replace Color", "replace-color", {
