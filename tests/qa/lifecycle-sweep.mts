@@ -227,7 +227,13 @@ async function checkCancellation(): Promise<void> {
     }
     if (waitMs) await sleep(waitMs);
     const response = await client.raw(`/api/v1/jobs/${jobId}/cancel`, { method: "POST" }, 20_000);
-    const body = (await response.json().catch(() => ({}))) as { canceled?: boolean };
+    const rawBody = await response.text().catch(() => "");
+    let body: { canceled?: boolean } = {};
+    try {
+      body = JSON.parse(rawBody) as { canceled?: boolean };
+    } catch {
+      // Non-JSON response leaves body.canceled undefined so the verdict fails below.
+    }
 
     // Poll the row until it settles or a bounded deadline passes.
     let state = "";
@@ -236,11 +242,20 @@ async function checkCancellation(): Promise<void> {
       if (state && !["queued", "processing", "pending", "active"].includes(state)) break;
       await sleep(2_000);
     }
-    const terminal = ["cancelled", "canceled", "failed", "completed"].includes(state);
+    const canceledState = ["cancelled", "canceled"].includes(state);
+    const terminal =
+      id === "cancel-before-start"
+        ? body.canceled === true && canceledState
+        : (body.canceled === true && canceledState) ||
+          (body.canceled === false && state === "completed");
+    const canceledDetail =
+      typeof body.canceled === "boolean"
+        ? String(body.canceled)
+        : `invalid(${rawBody.slice(0, 80)})`;
     report(
       id,
       response.status === 200 && terminal ? "pass" : "fail",
-      `cancel returned ${response.status} canceled=${body.canceled}; job settled to "${state}"`,
+      `cancel returned ${response.status} canceled=${canceledDetail}; job settled to "${state}"`,
     );
   }
 }
@@ -339,7 +354,7 @@ async function checkBatch(): Promise<void> {
   );
 }
 
-/** A pipeline that crosses modalities must run every step and emit one artifact. */
+/** A 3-step image pipeline must run every step and emit one artifact. */
 async function checkPipeline(): Promise<void> {
   const steps = [
     { toolId: "resize", settings: { width: 120 } },
