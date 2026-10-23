@@ -1,9 +1,11 @@
 import { MAX_RESIZE_OUTPUT_DIMENSION } from "@snapotter/image-engine";
-import { ToolInputError } from "@snapotter/shared";
+import { hasServerErrorStatus, ToolInputError } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { zipSync } from "fflate";
 import sharp from "sharp";
 import { z } from "zod";
+import { sendInputValidationError } from "../../lib/engine-unavailable.js";
+import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
 import {
   assertGifWorkload,
   MAX_GIF_TOTAL_PIXELS,
@@ -11,6 +13,8 @@ import {
 } from "../../lib/gif-limits.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
+import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
+import { engineUnavailable } from "../../modality/image-input.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -110,7 +114,11 @@ export function registerGifTools(app: FastifyInstance) {
           fileSize: fileBuffer.length,
           duration: delay.reduce((sum: number, d: number) => sum + d, 0),
         });
-      } catch {
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+          return sendInputValidationError(reply, engineUnavailable(err), "gif-tools", request.log);
+        }
         return reply.status(422).send({ error: "Could not read image metadata" });
       }
     },

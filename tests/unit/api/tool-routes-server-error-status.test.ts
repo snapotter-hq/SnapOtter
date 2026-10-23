@@ -52,6 +52,7 @@ vi.mock("../../../apps/api/src/lib/browser-service.js", () => ({
   capturePage: async () => Buffer.from("png"),
 }));
 
+import * as engineUnavailableMod from "../../../apps/api/src/lib/engine-unavailable.js";
 import * as exiftoolMod from "../../../apps/api/src/lib/exiftool.js";
 import {
   DecoderOutOfMemoryError,
@@ -62,6 +63,7 @@ import * as heicConverter from "../../../apps/api/src/lib/heic-converter.js";
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
 import { registerCompare } from "../../../apps/api/src/routes/tools/compare.js";
 import { registerEditMetadata } from "../../../apps/api/src/routes/tools/edit-metadata.js";
+import { registerGifTools } from "../../../apps/api/src/routes/tools/gif-tools.js";
 import { registerHtmlToImage } from "../../../apps/api/src/routes/tools/html-to-image.js";
 import { registerPassportPhoto } from "../../../apps/api/src/routes/tools/passport-photo.js";
 import { registerQrGenerate } from "../../../apps/api/src/routes/tools/qr-generate.js";
@@ -656,5 +658,100 @@ describe("json-bodied routes", () => {
     });
     expect(res.statusCode).toBe(503);
     expect(res.json().code).toBe("STORAGE_UNAVAILABLE");
+  });
+});
+
+describe("gif-tools /info (#3772)", () => {
+  it("surfaces 503 ENGINE_UNAVAILABLE and reports once per window when sharp.metadata() hits V8 buffer allocation OOM or a 5xx fault, and keeps 422 on ordinary errors (#3772)", async () => {
+    const oomMessage =
+      "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+    const gif = await sharp({
+      create: { width: 8, height: 8, channels: 4, background: { r: 255, g: 0, b: 0, alpha: 1 } },
+    })
+      .gif()
+      .toBuffer();
+    const logLines: string[] = [];
+    const app = Fastify({
+      logger: { level: "warn", stream: { write: (line: string) => void logLines.push(line) } },
+    });
+    await app.register(multipart);
+    registerErrorHandler(app);
+    registerGifTools(app);
+    await app.ready();
+
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 95 * 60_000);
+    const sendSpy = vi.spyOn(engineUnavailableMod, "sendInputValidationError");
+    const metaSpy = vi
+      .spyOn(sharp.prototype, "metadata")
+      .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"))
+      .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"))
+      .mockRejectedValueOnce(
+        Object.assign(new Error("ENOSPC: no space left on device, write"), { code: "ENOSPC" }),
+      )
+      .mockRejectedValueOnce(new RangeError("Invalid parameter"))
+      .mockRejectedValueOnce(new Error("Input buffer contains unsupported image format"));
+
+    try {
+      const sendInfo = () =>
+        app.inject({
+          method: "POST",
+          url: "/api/v1/tools/image/gif-tools/info",
+          ...multipartBody([{ name: "test.gif", type: "image/gif", data: gif }]),
+        });
+
+      const firstOom = await sendInfo();
+      expect(firstOom.statusCode).toBe(503);
+      expect(firstOom.json()).toEqual({
+        error: oomMessage,
+        code: "ENGINE_UNAVAILABLE",
+      });
+
+      const secondOom = await sendInfo();
+      expect(secondOom.statusCode).toBe(503);
+      expect(secondOom.json()).toEqual({
+        error: oomMessage,
+        code: "ENGINE_UNAVAILABLE",
+      });
+
+      const enospcRes = await sendInfo();
+      expect(enospcRes.statusCode).toBe(503);
+      expect(enospcRes.json()).toEqual({
+        error: "The server's storage is full.",
+        code: "storage-full",
+      });
+
+      for (let i = 0; i < 2; i++) {
+        const badRes = await sendInfo();
+        expect(badRes.statusCode).toBe(422);
+        expect(badRes.json()).toEqual({
+          error: "Could not read image metadata",
+        });
+      }
+
+      expect(sendSpy).toHaveBeenCalledTimes(3);
+      expect(sendSpy).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ statusCode: 503, code: "ENGINE_UNAVAILABLE" }),
+        "gif-tools",
+        expect.anything(),
+      );
+      expect(sendSpy).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ statusCode: 503, code: "storage-full" }),
+        "gif-tools",
+        expect.anything(),
+      );
+      expect(
+        logLines.filter((line) =>
+          line.includes("Tool engine unavailable during input preparation"),
+        ),
+      ).toHaveLength(2);
+      expect(logLines.some((line) => line.includes("Unhandled request error"))).toBe(false);
+    } finally {
+      metaSpy.mockRestore();
+      sendSpy.mockRestore();
+      nowSpy.mockRestore();
+      await app.close();
+    }
   });
 });

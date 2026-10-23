@@ -1232,7 +1232,7 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
       }
     });
 
-    it("edit-metadata, image-to-pdf, and pdf-to-image single-file, preview, and batch routes surface 503 ENGINE_UNAVAILABLE on V8 buffer allocation OOM and encoder faults (#3646, #3763)", async () => {
+    it("edit-metadata, gif-tools /info, image-to-pdf, and pdf-to-image single-file, preview, and batch routes surface 503 ENGINE_UNAVAILABLE on V8 buffer allocation OOM and encoder faults (#3646, #3763, #3772)", async () => {
       const sharpMod = (await import("sharp")).default;
       const exiftoolMod = await import("../../../apps/api/src/lib/exiftool.js");
       const formatEncoders = await import("../../../apps/api/src/lib/format-encoders.js");
@@ -1306,6 +1306,33 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
         expect(pdfPreviewRes.json()).toMatchObject({
           code: "ENGINE_UNAVAILABLE",
         });
+
+        const gifMetaSpy = vi
+          .spyOn(sharpMod.prototype, "metadata")
+          .mockImplementation(() =>
+            Promise.reject(new RangeError("Array buffer allocation failed")),
+          );
+        try {
+          const gifInfoRes = await post("/api/v1/tools/image/gif-tools/info", [
+            {
+              name: "file",
+              filename: "animated.gif",
+              contentType: "image/gif",
+              content: readFixture(fixtures.image.animated.gif),
+            },
+          ]);
+          expect(gifInfoRes.statusCode, gifInfoRes.body).toBe(503);
+          expect(gifInfoRes.json()).toMatchObject({
+            code: "ENGINE_UNAVAILABLE",
+          });
+          const gifReports = engineReports("gif-tools");
+          expect(gifReports).toHaveLength(1);
+          expect((gifReports[0]?.[0] as { cause?: { name?: string } })?.cause?.name).toBe(
+            "DecoderOutOfMemoryError",
+          );
+        } finally {
+          gifMetaSpy.mockRestore();
+        }
 
         const clientJobId = randomUUID();
         const pdfBatchRes = await post("/api/v1/tools/pdf/pdf-to-image/batch", [
