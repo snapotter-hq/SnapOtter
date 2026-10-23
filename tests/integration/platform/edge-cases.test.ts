@@ -5,7 +5,8 @@
  * extreme filenames, missing/empty settings, and unknown fields.
  */
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import sharp from "sharp";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
   buildTestApp,
@@ -590,36 +591,75 @@ describe("Zero-byte file to info and border tools", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 describe("1x1 pixel image through rotate with flip", () => {
   it("rotates and flips a 1x1 image horizontally", async () => {
-    const { body, contentType } = createMultipartPayload([
-      { name: "file", filename: "tiny.png", content: PNG_1x1, contentType: "image/png" },
-      { name: "settings", content: JSON.stringify({ angle: 0, flipHorizontal: true }) },
-    ]);
+    const flopSpy = vi.spyOn(sharp.prototype, "flop");
+    try {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "tiny.png", content: PNG_1x1, contentType: "image/png" },
+        { name: "settings", content: JSON.stringify({ angle: 0, horizontal: true }) },
+      ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/rotate",
-      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
-      body,
-    });
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/rotate",
+        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        body,
+      });
 
-    // 0-degree rotation with flip is valid
-    expect([200, 400]).toContain(res.statusCode);
+      // 0-degree rotation with horizontal flip runs Sharp flop() and returns a valid 1x1 PNG
+      expect(res.statusCode).toBe(200);
+      expect(flopSpy).toHaveBeenCalledTimes(1);
+      const json = JSON.parse(res.body);
+      expect(json.downloadUrl).toContain(".png");
+
+      const downloadRes = await app.inject({
+        method: "GET",
+        url: json.downloadUrl,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(downloadRes.statusCode).toBe(200);
+      const meta = await sharp(downloadRes.rawPayload).metadata();
+      expect(meta.format).toBe("png");
+      expect(meta.width).toBe(1);
+      expect(meta.height).toBe(1);
+    } finally {
+      flopSpy.mockRestore();
+    }
   });
 
   it("rotates and flips a 1x1 image vertically", async () => {
-    const { body, contentType } = createMultipartPayload([
-      { name: "file", filename: "tiny.png", content: PNG_1x1, contentType: "image/png" },
-      { name: "settings", content: JSON.stringify({ angle: 0, flipVertical: true }) },
-    ]);
+    const flipSpy = vi.spyOn(sharp.prototype, "flip");
+    try {
+      const { body, contentType } = createMultipartPayload([
+        { name: "file", filename: "tiny.png", content: PNG_1x1, contentType: "image/png" },
+        { name: "settings", content: JSON.stringify({ angle: 0, vertical: true }) },
+      ]);
 
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/rotate",
-      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
-      body,
-    });
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/rotate",
+        headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+        body,
+      });
 
-    expect([200, 400]).toContain(res.statusCode);
+      // 0-degree rotation with vertical flip runs Sharp flip() and returns a valid 1x1 PNG
+      expect(res.statusCode).toBe(200);
+      expect(flipSpy).toHaveBeenCalledTimes(1);
+      const json = JSON.parse(res.body);
+      expect(json.downloadUrl).toContain(".png");
+
+      const downloadRes = await app.inject({
+        method: "GET",
+        url: json.downloadUrl,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(downloadRes.statusCode).toBe(200);
+      const meta = await sharp(downloadRes.rawPayload).metadata();
+      expect(meta.format).toBe("png");
+      expect(meta.width).toBe(1);
+      expect(meta.height).toBe(1);
+    } finally {
+      flipSpy.mockRestore();
+    }
   });
 });
 
