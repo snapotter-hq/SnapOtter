@@ -111,8 +111,10 @@ describe("1x1 pixel image handling", () => {
       body,
     });
 
-    // Should succeed or fail gracefully (not crash)
-    expect([200, 422]).toContain(res.statusCode);
+    // 0 + 1 <= 1 passes the crop bounds check and returns a 1x1 PNG
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toContain(".png");
   });
 
   it("rotates a 1x1 image gracefully", async () => {
@@ -247,8 +249,7 @@ describe("Extreme filenames", () => {
 // SETTINGS EDGE CASES
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Settings field edge cases", () => {
-  it("uses defaults when no settings field is provided", async () => {
-    // Resize without settings — should use Zod defaults or return 400
+  it("rejects resize with 400 when no settings field is provided", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", content: PNG_200x150, contentType: "image/png" },
     ]);
@@ -260,13 +261,15 @@ describe("Settings field edge cases", () => {
       body,
     });
 
-    // Resize with no width/height/percentage passes Zod validation (all fields
-    // are optional with defaults), but Sharp may fail at processing time (422).
-    // Either way, should not crash.
-    expect([200, 400, 422]).toContain(res.statusCode);
+    // Resize requires at least one of width, height, or percentage, so the
+    // default empty settings object is rejected by Zod validation with 400.
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toBe("Invalid settings");
+    expect(json.details).toContain("At least one of width, height, or percentage is required");
   });
 
-  it("uses defaults when settings is empty JSON object", async () => {
+  it("rejects resize with 400 when settings is an empty JSON object", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "test.png", content: PNG_200x150, contentType: "image/png" },
       { name: "settings", content: "{}" },
@@ -279,9 +282,12 @@ describe("Settings field edge cases", () => {
       body,
     });
 
-    // Empty settings should use Zod defaults — resize with no dimensions
-    // may still succeed (no-op) or fail gracefully
-    expect([200, 400, 422]).toContain(res.statusCode);
+    // Resize requires at least one of width, height, or percentage, so an
+    // empty settings object is rejected by Zod validation with 400.
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toBe("Invalid settings");
+    expect(json.details).toContain("At least one of width, height, or percentage is required");
   });
 
   it("handles null values in settings gracefully", async () => {
@@ -297,8 +303,11 @@ describe("Settings field edge cases", () => {
       body,
     });
 
-    // Zod should either strip nulls or reject them — should not crash
-    expect([200, 400, 422]).toContain(res.statusCode);
+    // width and height are optional numbers (not nullable), so Zod rejects null with 400.
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toBe("Invalid settings");
+    expect(json.details).toMatch(/width.*number/i);
   });
 
   it("strips or rejects extra unknown fields in settings", async () => {
@@ -778,13 +787,15 @@ describe("Settings with extreme values", () => {
       body,
     });
 
-    // May be rejected by validation (400), fail at processing (422), or
-    // even succeed if Sharp clamps — the key assertion is that it does not crash
-    expect([200, 400, 422]).toContain(res.statusCode);
+    // Rejected by Zod validation (400) because width exceeds MAX_RESIZE_OUTPUT_DIMENSION
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toBe("Invalid settings");
+    expect(json.details).toContain("16383");
   });
 
   it("handles deeply nested JSON in settings without crashing", async () => {
-    // Build 50-level deep object — should be rejected or flattened by Zod
+    // Build 50-level deep object; Zod strips unknown keys
     let nested: Record<string, unknown> = { width: 100 };
     for (let i = 0; i < 50; i++) {
       nested = { [`level${i}`]: nested };
@@ -802,9 +813,12 @@ describe("Settings with extreme values", () => {
       body,
     });
 
-    // Zod strips unknown keys; width is not present at top level so validation
-    // may fail or default to empty settings. Must not crash.
-    expect([200, 400, 422]).toContain(res.statusCode);
+    // Zod strips unknown keys; width is not present at top level so the
+    // dimension refinement rejects the payload with 400.
+    expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toBe("Invalid settings");
+    expect(json.details).toContain("At least one of width, height, or percentage is required");
   });
 
   it("handles settings with very large JSON string (100KB)", async () => {
