@@ -147,8 +147,15 @@ describe("surface Playwright harness isolation", () => {
       url: "http://127.0.0.1:44351",
     });
     expect(landing.webServer).not.toHaveProperty("port");
-    expect(landing.webServer.command).toContain("&& exec pnpm exec astro preview");
+    expect(landing.webServer.env).toMatchObject({ ASTRO_PREVIEW_BACKGROUND: "1" });
+    expect(landing.webServer.command).toContain(
+      "&& ASTRO_PREVIEW_BACKGROUND=1 exec pnpm exec astro preview",
+    );
     expect(landing.webServer.command).toContain("--host 127.0.0.1 --port 44351 --strictPort");
+    const astroConfig = (await import("../../apps/landing/astro.config.mjs")).default as {
+      vite?: { preview?: { strictPort?: boolean } };
+    };
+    expect(astroConfig.vite?.preview?.strictPort).toBe(true);
 
     const docs = await loadConfig("../../playwright.docs.config.js", {
       PLAYWRIGHT_DOCS_PORT: "44173",
