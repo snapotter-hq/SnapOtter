@@ -695,6 +695,83 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         invokeRoute(handler, [{ type: "file", filename: "icon.svg", content: SCRIPT_LT_SVG }]),
       ).rejects.toThrow(v8Oom);
     });
+
+    it("rethrows DecoderOutOfMemoryError when sharp.prototype.metadata hits a V8 or libheif allocation failure on raster or SVG input (#3727)", async () => {
+      const exifJpg = readFixture(fixtures.image.exifGps);
+      const v8Oom = new RangeError("Array buffer allocation failed");
+      const heifOom = new Error(
+        "heif: Memory allocation error: Unspecified: Allocating 4147215 bytes failed",
+      );
+      const heifSecurityLimit = new Error(
+        "heif: Memory allocation error: Security limit exceeded: Allocating 2147483648 bytes exceeds the security limit of 536870912 bytes",
+      );
+      const nonOomRangeError = new RangeError("Invalid count value");
+      const metaSpy = vi
+        .spyOn(sharp.prototype, "metadata")
+        .mockRejectedValueOnce(v8Oom)
+        .mockRejectedValueOnce(heifOom)
+        .mockRejectedValueOnce(v8Oom)
+        .mockRejectedValueOnce(heifSecurityLimit)
+        .mockRejectedValueOnce(nonOomRangeError)
+        .mockRejectedValueOnce(new Error("Input buffer contains unsupported image format"));
+      try {
+        await expect(
+          invokeRoute(handler, [{ type: "file", filename: "sample.jpg", content: exifJpg }]),
+        ).rejects.toMatchObject({
+          name: "DecoderOutOfMemoryError",
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          cause: v8Oom,
+        });
+
+        await expect(
+          invokeRoute(handler, [{ type: "file", filename: "sample.avif", content: exifJpg }]),
+        ).rejects.toMatchObject({
+          name: "DecoderOutOfMemoryError",
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          cause: heifOom,
+        });
+
+        await expect(
+          invokeRoute(handler, [{ type: "file", filename: "icon.svg", content: SCRIPT_LT_SVG }]),
+        ).rejects.toMatchObject({
+          name: "DecoderOutOfMemoryError",
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          cause: v8Oom,
+        });
+
+        const securityLimitReply = await invokeRoute(handler, [
+          { type: "file", filename: "sample.avif", content: exifJpg },
+        ]);
+        expect(securityLimitReply.statusCode).toBe(422);
+        expect(securityLimitReply.payload).toEqual({
+          error: "Failed to read image metadata",
+          details: heifSecurityLimit.message,
+        });
+
+        const rangeErrorReply = await invokeRoute(handler, [
+          { type: "file", filename: "sample.jpg", content: exifJpg },
+        ]);
+        expect(rangeErrorReply.statusCode).toBe(422);
+        expect(rangeErrorReply.payload).toEqual({
+          error: "Failed to read image metadata",
+          details: "Invalid count value",
+        });
+
+        const nonOomReply = await invokeRoute(handler, [
+          { type: "file", filename: "sample.jpg", content: exifJpg },
+        ]);
+        expect(nonOomReply.statusCode).toBe(422);
+        expect(nonOomReply.payload).toEqual({
+          error: "Failed to read image metadata",
+          details: "Input buffer contains unsupported image format",
+        });
+      } finally {
+        metaSpy.mockRestore();
+      }
+    });
   });
 
   describe("POST /api/v1/tools/image/info", () => {

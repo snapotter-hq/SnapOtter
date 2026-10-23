@@ -6,6 +6,7 @@ import { z } from "zod";
 import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
+import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import {
@@ -212,6 +213,12 @@ export function registerStripMetadata(app: FastifyInstance) {
 
         return reply.send(result);
       } catch (err) {
+        const oomErr = asDecoderOutOfMemory(
+          err instanceof Error && /\bAllocating \d+ bytes failed\b/.test(err.message)
+            ? Object.assign(err, { stderr: err.message })
+            : err,
+        );
+        if (isDecoderUnavailable(oomErr)) throw oomErr;
         return reply.status(422).send({
           error: "Failed to read image metadata",
           details: err instanceof Error ? err.message : "Unknown error",
