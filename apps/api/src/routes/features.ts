@@ -923,6 +923,7 @@ async function writeBoundedUpload(
 ): Promise<void> {
   const file = await open(path, "wx", 0o600);
   let total = 0;
+  let writeFailed = false;
   try {
     await options.beforeWrite?.(0);
     for await (const rawChunk of stream) {
@@ -940,10 +941,18 @@ async function writeBoundedUpload(
     }
     await file.sync();
   } catch (error) {
-    await rmAsync(path, { force: true });
+    writeFailed = true;
     throw error;
   } finally {
-    await file.close();
+    await file.close().catch(async (closeErr: unknown) => {
+      if (!writeFailed) {
+        await rmAsync(path, { force: true }).catch(() => {});
+        throw closeErr;
+      }
+    });
+    if (writeFailed) {
+      await rmAsync(path, { force: true }).catch(() => {});
+    }
   }
 }
 
