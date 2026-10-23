@@ -211,7 +211,7 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
 
     expect(useFileStore.getState().entries[0]).toMatchObject({
       status: "failed",
-      error: "Processing failed: 500",
+      error: en.errors.processingFailedWithStatus,
       errorCategory: null,
     });
     expect(useFileStore.getState().processing).toBe(false);
@@ -233,7 +233,7 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
 
     expect(useFileStore.getState().entries[0]).toMatchObject({
       status: "failed",
-      error: "Processing failed: 502",
+      error: en.errors.processingFailedWithStatus,
     });
     expect(useFileStore.getState().processing).toBe(false);
 
@@ -1114,7 +1114,7 @@ describe("useToolProcessor settles the entry after the run's teardown (#1698)", 
       "an error response whose body is not JSON",
       500,
       "<html>oops</html>",
-      "Processing failed: 500",
+      en.errors.processingFailedWithStatus,
     ],
     [
       "a 2xx body that does not parse",
@@ -1404,7 +1404,7 @@ describe("useToolProcessor ends a sync run whose error write throws (#1791)", ()
     [
       "an error response whose body is not JSON",
       respond(500, "<html>oops</html>"),
-      "Processing failed: 500",
+      en.errors.processingFailedWithStatus,
       null,
     ],
     [
@@ -1422,7 +1422,7 @@ describe("useToolProcessor ends a sync run whose error write throws (#1791)", ()
     [
       "a pre-upload 502 with a non-JSON body",
       respond(502, "<html>bad gateway</html>"),
-      "Processing failed: 502",
+      en.errors.processingFailedWithStatus,
       null,
     ],
     ["the socket dying mid-upload", () => xhrs[0].onerror?.(), INTERRUPTED, "upload_error"],

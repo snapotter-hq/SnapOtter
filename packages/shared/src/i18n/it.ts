@@ -1659,7 +1659,8 @@ export const it: TranslationKeys = {
       uploadingImages: "Caricamento immagini...",
       processingPages: "Elaborazione di {count} pagine...",
       parseResponseFailed: "Impossibile leggere la risposta del server",
-      creationFailedWithStatus: "Creazione del PDF non riuscita: {status}",
+      creationFailedWithStatus:
+        "Non è stato possibile creare il PDF. Controlla le immagini e riprova.",
       networkErrorCreation: "Errore di rete durante la creazione del PDF",
       requestTimedOut: "Richiesta scaduta: il server potrebbe essere sovraccarico",
     },
@@ -1722,7 +1723,7 @@ export const it: TranslationKeys = {
       submitPlural: "Genera Favicon ({count} immagini)",
       downloadZip: "Scarica ZIP dei Favicon",
       progressLabel: "Generazione Favicon",
-      generationFailed: "Generazione della favicon non riuscita: {status}",
+      generationFailed: "Non è stato possibile generare la favicon. Prova con un'altra immagine.",
       networkError: "Errore di rete durante la generazione della favicon",
       timeout: "Richiesta scaduta: il server potrebbe essere sovraccarico",
       uploadingImages: "Caricamento immagini...",
@@ -2404,9 +2405,10 @@ export const it: TranslationKeys = {
       dragToAdjust: "Trascina per regolare",
       scrollToZoom: "Scorri per ingrandire",
       photoGenerated: "Foto generata. Scaricala dal pannello sinistro.",
-      analysisFailedWithStatus: "Analisi non riuscita: {status}",
+      analysisFailedWithStatus:
+        "Non è stato possibile analizzare questa foto. Prova con una foto più nitida.",
       faceAnalysisFailed: "Analisi del volto non riuscita",
-      generationFailedWithStatus: "Generazione non riuscita: {status}",
+      generationFailedWithStatus: "Non è stato possibile generare la fototessera. Riprova.",
       photoGenerationFailed: "Generazione della foto non riuscita",
       analysisExpired:
         "L'analisi è scaduta, quindi la foto viene analizzata di nuovo. Generala quando ha finito.",
@@ -2797,7 +2799,8 @@ export const it: TranslationKeys = {
       barcodesFound: "{count} codice a barre trovato",
       barcodesFoundPlural: "{count} codici a barre trovati",
       scanningFile: "Scansione di {name}...",
-      scanningFailedWithStatus: "Scansione non riuscita: {status}",
+      scanningFailedWithStatus:
+        "Non è stato possibile scansionare questa immagine. Prova con un'altra immagine.",
       filesFailed: "{count} file su {total} non riusciti",
     },
     collage: {
@@ -3041,7 +3044,7 @@ export const it: TranslationKeys = {
       positionBottomLeft: "In basso a sinistra",
       positionBottomRight: "In basso a destra",
       processingFailed: "Elaborazione non riuscita",
-      processingFailedStatus: "Elaborazione non riuscita: {status}",
+      processingFailedStatus: "Non è stato possibile elaborare questa immagine. Riprova.",
     },
     "circle-crop": {
       border: "Bordo",
@@ -5669,7 +5672,8 @@ export const it: TranslationKeys = {
     networkError: "Errore di rete. Verifica la tua connessione.",
     invalidCredentials: "Nome utente o password non validi",
     connectionError: "Errore di connessione",
-    fileTooLarge: "Questo file supera il limite di dimensione di caricamento del server.",
+    fileTooLarge:
+      "Questo file è troppo grande per essere caricato. Prova con un file più piccolo o chiedi all'amministratore del server di aumentare il limite di caricamento.",
     featureNotInstalledForTool:
       '{tool} richiede la funzionalità "{feature}". Attivala in Impostazioni → Funzionalità AI.',
     featureNotInstalled:
@@ -5692,17 +5696,18 @@ export const it: TranslationKeys = {
     invalidSetting: "Valore non valido per {setting}.",
     network: "Errore di rete",
     invalidResponse: "Risposta non valida",
-    failedWithStatus: "Non riuscito: {status}",
-    processingFailedWithStatus: "Elaborazione non riuscita: {status}",
+    failedWithStatus: "Non è stato possibile completare la richiesta. Riprova.",
+    processingFailedWithStatus:
+      "Non è stato possibile elaborare questo file. Verifica che il file non sia danneggiato e riprova.",
     processingFailedNoDetail: "Elaborazione non riuscita",
     jobTrackingFailed:
       "Si è verificato un problema durante il monitoraggio di questa operazione. Riprova.",
     requestTimedOut: "Richiesta scaduta",
     runInterrupted: "L'elaborazione è stata interrotta. Eseguila di nuovo.",
-    requestFailedWithStatus: "Richiesta non riuscita: {status}",
+    requestFailedWithStatus: "Non è stato possibile completare la richiesta. Riprova.",
     invalidServerResponse: "Risposta non valida dal server",
     batchFailed: "Elaborazione in batch non riuscita",
-    batchFailedWithStatus: "Elaborazione in batch non riuscita: {status}",
+    batchFailedWithStatus: "Non è stato possibile completare l'elaborazione in batch. Riprova.",
     allFilesFailed: "Elaborazione di tutti i file non riuscita",
     filesFailedSuffix_one: " (1 file non riuscito)",
     filesFailedSuffix_other: " ({count} file non riusciti)",

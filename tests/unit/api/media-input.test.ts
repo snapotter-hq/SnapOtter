@@ -251,6 +251,29 @@ describe("MediaInputHandler AbortSignal handling (#3709)", () => {
     });
     expect(readdirSync(scratchDir)).toEqual([]);
   });
+
+  it("rejects missing video or audio streams with plain-language messages", async () => {
+    const input = Buffer.from("fake-media");
+    mediaEngine.probeMedia.mockResolvedValueOnce({
+      container: "mp3",
+      durationS: 1,
+      bitrateKbps: 128,
+      streams: [{ type: "audio", codec: "mp3" }],
+    });
+    await expect(
+      new MediaInputHandler("video").prepare(input, "audio-only.mp4", { scratchDir }),
+    ).rejects.toThrow(/no video track \(no video stream\)/i);
+
+    mediaEngine.probeMedia.mockResolvedValueOnce({
+      container: "mov,mp4",
+      durationS: 1,
+      bitrateKbps: 128,
+      streams: [{ type: "video", codec: "h264", width: 320, height: 240 }],
+    });
+    await expect(
+      new MediaInputHandler("audio").prepare(input, "silent.mp3", { scratchDir }),
+    ).rejects.toThrow(/no audio track \(no audio stream\)/i);
+  });
 });
 
 describe("ffprobe spawn failures (#3716)", () => {

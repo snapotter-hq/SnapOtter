@@ -94,6 +94,22 @@ describe("DocumentInputHandler password policy", () => {
     ).rejects.toThrow(/PDF header/i);
     expect(qpdf.requiresPassword).not.toHaveBeenCalled();
   });
+
+  it("rejects empty files and non-ZIP Office/EPUB files with plain-language messages", async () => {
+    const handler = new DocumentInputHandler();
+
+    await expect(handler.prepare(Buffer.alloc(0), "empty.pdf", { scratchDir })).rejects.toThrow(
+      /empty \(0 bytes\)/i,
+    );
+
+    const emptyPath = join(scratchDir, "zero.pdf");
+    writeFileSync(emptyPath, "");
+    await expect(validatePdfPath(emptyPath)).rejects.toThrow(/empty \(0 bytes\)/i);
+
+    await expect(
+      handler.prepare(Buffer.from("not a zip"), "report.docx", { scratchDir }),
+    ).rejects.toThrow(/couldn't be opened as an Office or EPUB document/i);
+  });
 });
 
 describe("path-backed PDF validation", () => {

@@ -116,13 +116,17 @@ export class MediaInputHandler implements InputHandler {
       }
 
       if (this.kind === "video" && !hasVideo) {
-        throw new InputValidationError("File contains no video stream");
+        throw new InputValidationError(
+          "This file has no video track (no video stream). Choose a video file and try again.",
+        );
       }
       if (this.kind === "video" && isStillImage) {
         throw new InputValidationError("File is a still image, not a video");
       }
       if (this.kind === "audio" && !hasAudio) {
-        throw new InputValidationError("File contains no audio stream");
+        throw new InputValidationError(
+          "This file has no audio track (no audio stream). Choose a file with audio and try again.",
+        );
       }
       const durationCap =
         this.kind === "video" ? env.MAX_VIDEO_DURATION_S : env.MAX_AUDIO_DURATION_S;

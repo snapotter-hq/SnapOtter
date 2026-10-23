@@ -1,4 +1,4 @@
-import type { TranslationKeys } from "@snapotter/shared";
+import { en, type TranslationKeys } from "@snapotter/shared";
 import { getDistinctId } from "@/lib/analytics";
 import { appUrl } from "@/lib/app-url";
 import { featureNotInstalledMessage } from "@/lib/bundle-i18n";
@@ -50,9 +50,14 @@ export function parseApiError(
   } else if (details) {
     detailsStr = JSON.stringify(details);
   }
-  // The API's error handler sends a 4xx's message as both fields.
-  if (!detailsStr || detailsStr === error) return error || message || fallback;
-  return error ? `${error}: ${detailsStr}` : detailsStr;
+  // The API's error handler sends a 4xx's message as both fields, and masks
+  // unhandled 5xx responses as "Internal server error".
+  const primary = error === "Internal server error" ? "" : error;
+  const cleanMessage = message === "Internal server error" ? "" : message;
+  if (!detailsStr || detailsStr === error || detailsStr === "Internal server error") {
+    return primary || cleanMessage || fallback;
+  }
+  return primary ? `${primary}: ${detailsStr}` : detailsStr;
 }
 
 /**
@@ -332,6 +337,7 @@ export async function apiGetFileDetails(id: string): Promise<UserFileDetail> {
 export function apiUploadUserFiles(
   files: File[],
   onProgress?: (percent: number) => void,
+  t: TranslationKeys = en,
 ): Promise<{ files: Array<{ id: string; originalName: string; size: number; version: number }> }> {
   return new Promise((resolve, reject) => {
     const formData = new FormData();
@@ -364,7 +370,27 @@ export function apiUploadUserFiles(
           reject(new Error("Invalid server response"));
         }
       } else {
-        reject(new Error(`Upload failed: ${xhr.status}`));
+        let body: Record<string, unknown> | null = null;
+        try {
+          const parsed: unknown = JSON.parse(xhr.responseText);
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            body = parsed as Record<string, unknown>;
+          }
+        } catch {
+          // non-JSON response
+        }
+        if (xhr.status === 413) {
+          const quotaMsg =
+            body?.code === "STORAGE_QUOTA_EXCEEDED" && typeof body.error === "string"
+              ? body.error
+              : "";
+          reject(new Error(quotaMsg || t.errors.fileTooLarge));
+          return;
+        }
+        const message = body
+          ? failedAnswerMessage(t, body, xhr.status, t.errors.failedWithStatus)
+          : t.errors.failedWithStatus;
+        reject(new Error(message));
       }
     };
 

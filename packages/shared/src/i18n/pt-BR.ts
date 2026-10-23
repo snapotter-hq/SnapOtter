@@ -1660,7 +1660,8 @@ export const ptBR: TranslationKeys = {
       uploadingImages: "Enviando imagens...",
       processingPages: "Processando {count} páginas...",
       parseResponseFailed: "Falha ao interpretar a resposta do servidor",
-      creationFailedWithStatus: "Falha ao criar o PDF: {status}",
+      creationFailedWithStatus:
+        "Não foi possível criar o PDF. Verifique suas imagens e tente novamente.",
       networkErrorCreation: "Erro de rede durante a criação do PDF",
       requestTimedOut: "A requisição expirou, o servidor pode estar sobrecarregado",
     },
@@ -1723,7 +1724,7 @@ export const ptBR: TranslationKeys = {
       submitPlural: "Gerar Favicons ({count} imagens)",
       downloadZip: "Baixar ZIP dos Favicons",
       progressLabel: "Gerando Favicons",
-      generationFailed: "Falha ao gerar o favicon: {status}",
+      generationFailed: "Não foi possível gerar o favicon. Tente outra imagem.",
       networkError: "Erro de rede durante a geração do favicon",
       timeout: "A requisição expirou, o servidor pode estar sobrecarregado",
       uploadingImages: "Enviando imagens...",
@@ -2405,9 +2406,9 @@ export const ptBR: TranslationKeys = {
       dragToAdjust: "Arraste para ajustar",
       scrollToZoom: "Role para dar zoom",
       photoGenerated: "Foto gerada. Baixe pelo painel esquerdo.",
-      analysisFailedWithStatus: "Falha na análise: {status}",
+      analysisFailedWithStatus: "Não foi possível analisar esta foto. Tente uma foto mais nítida.",
       faceAnalysisFailed: "Falha na análise facial",
-      generationFailedWithStatus: "Falha na geração: {status}",
+      generationFailedWithStatus: "Não foi possível gerar a foto de passaporte. Tente novamente.",
       photoGenerationFailed: "Falha ao gerar a foto",
       analysisExpired:
         "A análise expirou, então a foto está sendo analisada de novo. Gere quando terminar.",
@@ -2798,7 +2799,7 @@ export const ptBR: TranslationKeys = {
       barcodesFound: "{count} código de barras encontrado",
       barcodesFoundPlural: "{count} códigos de barras encontrados",
       scanningFile: "Lendo {name}...",
-      scanningFailedWithStatus: "Falha na leitura: {status}",
+      scanningFailedWithStatus: "Não foi possível ler os códigos desta imagem. Tente outra imagem.",
       filesFailed: "{count} de {total} arquivos falharam",
     },
     collage: {
@@ -3042,7 +3043,7 @@ export const ptBR: TranslationKeys = {
       positionBottomLeft: "Inferior esquerdo",
       positionBottomRight: "Inferior direito",
       processingFailed: "Falha no processamento",
-      processingFailedStatus: "Falha no processamento: {status}",
+      processingFailedStatus: "Não foi possível processar esta imagem. Tente novamente.",
     },
     "circle-crop": {
       border: "Borda",
@@ -5669,7 +5670,8 @@ export const ptBR: TranslationKeys = {
     networkError: "Erro de rede. Verifique sua conexão.",
     invalidCredentials: "Nome de usuário ou senha inválidos",
     connectionError: "Erro de conexão",
-    fileTooLarge: "Este arquivo excede o limite de tamanho de envio do servidor.",
+    fileTooLarge:
+      "Este arquivo é grande demais para ser enviado. Tente um arquivo menor ou peça ao administrador do servidor para aumentar o limite de envio.",
     featureNotInstalledForTool:
       '{tool} requer o recurso "{feature}". Ative-o em Configurações → Recursos de AI.',
     featureNotInstalled:
@@ -5692,16 +5694,18 @@ export const ptBR: TranslationKeys = {
     invalidSetting: "Valor inválido para {setting}.",
     network: "Erro de rede",
     invalidResponse: "Resposta inválida",
-    failedWithStatus: "Falha: {status}",
-    processingFailedWithStatus: "Falha no processamento: {status}",
+    failedWithStatus: "Não foi possível concluir essa solicitação. Tente novamente.",
+    processingFailedWithStatus:
+      "Não foi possível processar este arquivo. Verifique se ele não está corrompido e tente novamente.",
     processingFailedNoDetail: "Falha no processamento",
     jobTrackingFailed: "Algo deu errado ao acompanhar esta tarefa. Tente novamente.",
     requestTimedOut: "A requisição expirou",
     runInterrupted: "O processamento foi interrompido. Execute novamente.",
-    requestFailedWithStatus: "Falha na requisição: {status}",
+    requestFailedWithStatus: "Não foi possível concluir essa solicitação. Tente novamente.",
     invalidServerResponse: "Resposta inválida do servidor",
     batchFailed: "Falha no processamento em lote",
-    batchFailedWithStatus: "Falha no processamento em lote: {status}",
+    batchFailedWithStatus:
+      "Não foi possível concluir o processamento em lote. Tente executá-lo novamente.",
     allFilesFailed: "Falha ao processar todos os arquivos",
     filesFailedSuffix_one: " (1 arquivo falhou)",
     filesFailedSuffix_other: " ({count} arquivos falharam)",

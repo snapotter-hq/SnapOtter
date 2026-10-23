@@ -1667,7 +1667,7 @@ export const fr: TranslationKeys = {
       uploadingImages: "Import des images...",
       processingPages: "Traitement de {count} pages...",
       parseResponseFailed: "Impossible de lire la réponse du serveur",
-      creationFailedWithStatus: "Échec de la création du PDF : {status}",
+      creationFailedWithStatus: "Impossible de créer le PDF. Vérifiez vos images et réessayez.",
       networkErrorCreation: "Erreur réseau lors de la création du PDF",
       requestTimedOut: "Délai d'attente dépassé : le serveur est peut-être surchargé",
     },
@@ -1730,7 +1730,7 @@ export const fr: TranslationKeys = {
       submitPlural: "Générer les Favicons ({count} images)",
       downloadZip: "Télécharger le ZIP des Favicons",
       progressLabel: "Génération des Favicons",
-      generationFailed: "Échec de la génération du favicon : {status}",
+      generationFailed: "Impossible de générer le favicon. Essayez avec une autre image.",
       networkError: "Erreur réseau lors de la génération du favicon",
       timeout: "Délai d'attente dépassé : le serveur est peut-être surchargé",
       uploadingImages: "Import des images...",
@@ -2414,9 +2414,10 @@ export const fr: TranslationKeys = {
       dragToAdjust: "Glissez pour ajuster",
       scrollToZoom: "Faites défiler pour zoomer",
       photoGenerated: "Photo générée. Téléchargez-la depuis le panneau de gauche.",
-      analysisFailedWithStatus: "Échec de l'analyse : {status}",
+      analysisFailedWithStatus:
+        "Impossible d'analyser cette photo. Essayez avec une photo plus nette.",
       faceAnalysisFailed: "Échec de l'analyse du visage",
-      generationFailedWithStatus: "Échec de la génération : {status}",
+      generationFailedWithStatus: "Impossible de générer la photo d'identité. Veuillez réessayer.",
       photoGenerationFailed: "Échec de la génération de la photo",
       analysisExpired:
         "L'analyse a expiré, la photo est donc analysée à nouveau. Générez-la une fois l'analyse terminée.",
@@ -2809,7 +2810,7 @@ export const fr: TranslationKeys = {
       barcodesFound: "{count} code-barres trouvé",
       barcodesFoundPlural: "{count} codes-barres trouvés",
       scanningFile: "Analyse de {name}...",
-      scanningFailedWithStatus: "Échec de l'analyse : {status}",
+      scanningFailedWithStatus: "Impossible d'analyser cette image. Essayez avec une autre image.",
       filesFailed: "Échec pour {count} fichiers sur {total}",
     },
     collage: {
@@ -3053,7 +3054,7 @@ export const fr: TranslationKeys = {
       positionBottomLeft: "Bas gauche",
       positionBottomRight: "Bas droite",
       processingFailed: "Échec du traitement",
-      processingFailedStatus: "Échec du traitement : {status}",
+      processingFailedStatus: "Impossible de traiter cette image. Veuillez réessayer.",
     },
     "circle-crop": {
       border: "Bordure",
@@ -5689,7 +5690,8 @@ export const fr: TranslationKeys = {
     networkError: "Erreur réseau. Vérifiez votre connexion.",
     invalidCredentials: "Nom d'utilisateur ou mot de passe invalide",
     connectionError: "Erreur de connexion",
-    fileTooLarge: "Ce fichier dépasse la taille maximale d'envoi autorisée par le serveur.",
+    fileTooLarge:
+      "Ce fichier est trop volumineux pour être envoyé. Essayez avec un fichier plus léger ou demandez à l'administrateur du serveur d'augmenter la limite d'envoi.",
     featureNotInstalledForTool:
       "{tool} nécessite la fonctionnalité « {feature} ». Activez-la dans Paramètres → Fonctionnalités AI.",
     featureNotInstalled:
@@ -5712,16 +5714,18 @@ export const fr: TranslationKeys = {
     invalidSetting: "Valeur non valide pour {setting}.",
     network: "Erreur réseau",
     invalidResponse: "Réponse invalide",
-    failedWithStatus: "Échec : {status}",
-    processingFailedWithStatus: "Échec du traitement : {status}",
+    failedWithStatus: "Impossible de terminer cette requête. Veuillez réessayer.",
+    processingFailedWithStatus:
+      "Impossible de traiter ce fichier. Vérifiez qu'il n'est pas endommagé et réessayez.",
     processingFailedNoDetail: "Échec du traitement",
     jobTrackingFailed: "Un problème est survenu lors du suivi de cette tâche. Réessayez.",
     requestTimedOut: "Délai d'attente dépassé",
     runInterrupted: "Le traitement a été interrompu. Relancez-le.",
-    requestFailedWithStatus: "Échec de la requête : {status}",
+    requestFailedWithStatus: "Impossible de terminer cette requête. Veuillez réessayer.",
     invalidServerResponse: "Réponse invalide du serveur",
     batchFailed: "Le traitement par lots a échoué",
-    batchFailedWithStatus: "Le traitement par lots a échoué : {status}",
+    batchFailedWithStatus:
+      "Impossible de terminer le traitement par lots. Veuillez relancer le lot.",
     allFilesFailed: "Le traitement de tous les fichiers a échoué",
     filesFailedSuffix_one: " (1 fichier a échoué)",
     filesFailedSuffix_other: " ({count} fichiers ont échoué)",

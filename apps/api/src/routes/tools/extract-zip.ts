@@ -140,34 +140,42 @@ export function registerExtractZip(app: FastifyInstance) {
 
       // Guard: entry count
       if (fileEntries.length > MAX_ENTRIES) {
-        throw new InputValidationError("Too many entries");
+        throw new InputValidationError(
+          "This ZIP archive contains too many files to extract safely.",
+        );
       }
 
       // Guard: per-entry size, total size, path safety
       let totalUncompressed = 0;
       for (const entry of fileEntries) {
         if (entry.uncompressedSize > MAX_ENTRY_SIZE) {
-          throw new InputValidationError("Archive expands too large");
+          throw new InputValidationError("This ZIP archive is too large when unpacked.");
         }
         totalUncompressed += entry.uncompressedSize;
         if (totalUncompressed > MAX_TOTAL_SIZE) {
-          throw new InputValidationError("Archive expands too large");
+          throw new InputValidationError("This ZIP archive is too large when unpacked.");
         }
 
         // Path safety: reject absolute paths and ".." segments
         const name = entry.fileName;
         if (name.startsWith("/") || name.startsWith("\\")) {
-          throw new InputValidationError("Unsafe entry path");
+          throw new InputValidationError(
+            "This ZIP archive contains an unsafe entry path and cannot be extracted.",
+          );
         }
         const segments = name.split(/[/\\]/);
         if (segments.some((s) => s === "..")) {
-          throw new InputValidationError("Unsafe entry path");
+          throw new InputValidationError(
+            "This ZIP archive contains an unsafe entry path and cannot be extracted.",
+          );
         }
       }
 
       // Guard: compression ratio
       if (zipSize > 0 && totalUncompressed / zipSize > MAX_RATIO) {
-        throw new InputValidationError("Suspicious compression ratio");
+        throw new InputValidationError(
+          "This ZIP archive has a suspicious compression ratio and cannot be extracted.",
+        );
       }
 
       ctx.report(20, "Extracting files");

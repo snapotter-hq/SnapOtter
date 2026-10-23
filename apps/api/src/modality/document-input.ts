@@ -75,9 +75,15 @@ export async function validatePdfPath(
   try {
     const header = Buffer.alloc(5);
     const { bytesRead } = await handle.read(header, 0, header.length, 0);
-    if (bytesRead === 0) throw new InputValidationError("Empty file");
+    if (bytesRead === 0) {
+      throw new InputValidationError(
+        "This file is empty (0 bytes). Choose a valid file and try again.",
+      );
+    }
     if (bytesRead < header.length || header.toString() !== "%PDF-") {
-      throw new InputValidationError("File does not start with a PDF header");
+      throw new InputValidationError(
+        "This file isn't a valid PDF (missing PDF header). Choose a valid PDF file and try again.",
+      );
     }
   } finally {
     await handle.close();
@@ -190,13 +196,19 @@ export class DocumentInputHandler implements InputHandler {
     },
   ): Promise<PreparedInput> {
     opts.signal?.throwIfAborted();
-    if (raw.length === 0) throw new InputValidationError("Empty file");
+    if (raw.length === 0) {
+      throw new InputValidationError(
+        "This file is empty (0 bytes). Choose a valid file and try again.",
+      );
+    }
     const lower = filename.toLowerCase();
     // PDF-only consumers set rejectPasswordProtected. Do not let a misleading
     // client filename bypass their PDF magic and structural validation.
     if (opts.rejectPasswordProtected || lower.endsWith(".pdf")) {
       if (raw.subarray(0, 5).toString() !== "%PDF-") {
-        throw new InputValidationError("File does not start with a PDF header");
+        throw new InputValidationError(
+          "This file isn't a valid PDF (missing PDF header). Choose a valid PDF file and try again.",
+        );
       }
       // When lenient, skip qpdfCheck + page-cap (repair-pdf's input is
       // intentionally damaged). The %PDF- header check above still runs.
@@ -219,7 +231,9 @@ export class DocumentInputHandler implements InputHandler {
       [".docx", ".xlsx", ".pptx", ".epub", ".odt", ".ods", ".odp"].some((e) => lower.endsWith(e))
     ) {
       if (!raw.subarray(0, 2).equals(ZIP_MAGIC)) {
-        throw new InputValidationError("File is not a valid Office/EPUB container");
+        throw new InputValidationError(
+          "This file couldn't be opened as an Office or EPUB document. It may be damaged or in a different format.",
+        );
       }
     }
     return { buffer: raw, filename };

@@ -1654,7 +1654,7 @@ export const id: TranslationKeys = {
       uploadingImages: "Mengunggah gambar...",
       processingPages: "Memproses {count} halaman...",
       parseResponseFailed: "Gagal mengurai respons server",
-      creationFailedWithStatus: "Pembuatan PDF gagal: {status}",
+      creationFailedWithStatus: "Kami tidak dapat membuat PDF. Periksa gambar Anda dan coba lagi.",
       networkErrorCreation: "Kesalahan jaringan saat membuat PDF",
       requestTimedOut: "Permintaan habis waktu, server mungkin kelebihan beban",
     },
@@ -1717,7 +1717,7 @@ export const id: TranslationKeys = {
       submitPlural: "Buat Favicon ({count} gambar)",
       downloadZip: "Unduh Favicon ZIP",
       progressLabel: "Membuat Favicon",
-      generationFailed: "Pembuatan Favicon gagal: {status}",
+      generationFailed: "Kami tidak dapat membuat favicon. Coba gambar lain.",
       networkError: "Kesalahan jaringan saat membuat Favicon",
       timeout: "Permintaan habis waktu, server mungkin kelebihan beban",
       uploadingImages: "Mengunggah gambar...",
@@ -2396,9 +2396,10 @@ export const id: TranslationKeys = {
       dragToAdjust: "Seret untuk menyesuaikan",
       scrollToZoom: "Gulir untuk zoom",
       photoGenerated: "Foto telah dibuat. Unduh dari panel kiri.",
-      analysisFailedWithStatus: "Analisis gagal: {status}",
+      analysisFailedWithStatus:
+        "Kami tidak dapat menganalisis foto ini. Coba foto yang lebih jelas.",
       faceAnalysisFailed: "Analisis wajah gagal",
-      generationFailedWithStatus: "Pembuatan gagal: {status}",
+      generationFailedWithStatus: "Kami tidak dapat membuat foto paspor. Silakan coba lagi.",
       photoGenerationFailed: "Pembuatan foto gagal",
       analysisExpired:
         "Analisis sudah kedaluwarsa, jadi foto sedang dianalisis ulang. Buat setelah selesai.",
@@ -2791,7 +2792,7 @@ export const id: TranslationKeys = {
       barcodesFound: "{count} barcode ditemukan",
       barcodesFoundPlural: "{count} barcode ditemukan",
       scanningFile: "Memindai {name}...",
-      scanningFailedWithStatus: "Pemindaian gagal: {status}",
+      scanningFailedWithStatus: "Kami tidak dapat memindai gambar ini. Coba gambar lain.",
       filesFailed: "{count} dari {total} file gagal",
     },
     collage: {
@@ -3035,7 +3036,7 @@ export const id: TranslationKeys = {
       positionBottomLeft: "Kiri Bawah",
       positionBottomRight: "Kanan Bawah",
       processingFailed: "Pemrosesan gagal",
-      processingFailedStatus: "Pemrosesan gagal: {status}",
+      processingFailedStatus: "Kami tidak dapat memproses gambar ini. Silakan coba lagi.",
     },
     "circle-crop": {
       border: "Bingkai",
@@ -5652,7 +5653,8 @@ export const id: TranslationKeys = {
     networkError: "Kesalahan jaringan. Periksa koneksi Anda.",
     invalidCredentials: "Nama pengguna atau kata sandi salah",
     connectionError: "Kesalahan koneksi",
-    fileTooLarge: "File ini melebihi batas ukuran unggahan server.",
+    fileTooLarge:
+      "File ini terlalu besar untuk diunggah. Coba file yang lebih kecil, atau minta admin server Anda untuk menaikkan batas unggahan.",
     featureNotInstalledForTool:
       '{tool} memerlukan fitur "{feature}". Aktifkan di Pengaturan → Fitur AI.',
     featureNotInstalled: 'Fitur "{feature}" belum terpasang. Aktifkan di Pengaturan → Fitur AI.',
@@ -5674,16 +5676,19 @@ export const id: TranslationKeys = {
     invalidSetting: "Nilai tidak valid untuk {setting}.",
     network: "Kesalahan jaringan",
     invalidResponse: "Respons tidak valid",
-    failedWithStatus: "Gagal: {status}",
-    processingFailedWithStatus: "Pemrosesan gagal: {status}",
+    failedWithStatus: "Kami tidak dapat menyelesaikan permintaan tersebut. Silakan coba lagi.",
+    processingFailedWithStatus:
+      "Kami tidak dapat memproses file ini. Pastikan file tidak rusak dan coba lagi.",
     processingFailedNoDetail: "Pemrosesan gagal",
     jobTrackingFailed: "Terjadi kesalahan saat melacak pekerjaan ini. Coba lagi.",
     requestTimedOut: "Permintaan habis waktu",
     runInterrupted: "Pemrosesan terputus. Jalankan lagi.",
-    requestFailedWithStatus: "Permintaan gagal: {status}",
+    requestFailedWithStatus:
+      "Kami tidak dapat menyelesaikan permintaan tersebut. Silakan coba lagi.",
     invalidServerResponse: "Respons tidak valid dari server",
     batchFailed: "Pemrosesan batch gagal",
-    batchFailedWithStatus: "Pemrosesan batch gagal: {status}",
+    batchFailedWithStatus:
+      "Kami tidak dapat menyelesaikan pemrosesan file-file ini. Coba jalankan batch lagi.",
     allFilesFailed: "Gagal memproses semua file",
     filesFailedSuffix_one: " (1 file gagal)",
     filesFailedSuffix_other: " ({count} file gagal)",

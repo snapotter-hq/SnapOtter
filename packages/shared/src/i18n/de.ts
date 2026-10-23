@@ -1665,7 +1665,8 @@ export const de: TranslationKeys = {
       uploadingImages: "Bilder werden hochgeladen...",
       processingPages: "{count} Seiten werden verarbeitet...",
       parseResponseFailed: "Serverantwort konnte nicht verarbeitet werden",
-      creationFailedWithStatus: "PDF-Erstellung fehlgeschlagen: {status}",
+      creationFailedWithStatus:
+        "Das PDF konnte nicht erstellt werden. Prüfen Sie Ihre Bilder und versuchen Sie es erneut.",
       networkErrorCreation: "Netzwerkfehler bei der PDF-Erstellung",
       requestTimedOut: "Zeitüberschreitung der Anfrage: Der Server ist möglicherweise überlastet",
     },
@@ -1728,7 +1729,8 @@ export const de: TranslationKeys = {
       submitPlural: "Favicons generieren ({count} Bilder)",
       downloadZip: "Favicons-ZIP herunterladen",
       progressLabel: "Favicons werden generiert",
-      generationFailed: "Favicon-Erstellung fehlgeschlagen: {status}",
+      generationFailed:
+        "Das Favicon konnte nicht erstellt werden. Versuchen Sie es mit einem anderen Bild.",
       networkError: "Netzwerkfehler bei der Favicon-Erstellung",
       timeout: "Zeitüberschreitung der Anfrage: Der Server ist möglicherweise überlastet",
       uploadingImages: "Bilder werden hochgeladen...",
@@ -2413,9 +2415,11 @@ export const de: TranslationKeys = {
       dragToAdjust: "Ziehen zum Anpassen",
       scrollToZoom: "Scrollen zum Zoomen",
       photoGenerated: "Foto generiert. Laden Sie es im linken Bereich herunter.",
-      analysisFailedWithStatus: "Analyse fehlgeschlagen: {status}",
+      analysisFailedWithStatus:
+        "Dieses Foto konnte nicht analysiert werden. Versuchen Sie es mit einem schärferen Foto.",
       faceAnalysisFailed: "Gesichtsanalyse fehlgeschlagen",
-      generationFailedWithStatus: "Erstellung fehlgeschlagen: {status}",
+      generationFailedWithStatus:
+        "Das Passfoto konnte nicht erstellt werden. Bitte versuchen Sie es erneut.",
       photoGenerationFailed: "Fotoerstellung fehlgeschlagen",
       analysisExpired:
         "Die Analyse ist abgelaufen, daher wird das Foto erneut analysiert. Erstellen Sie es, sobald das erledigt ist.",
@@ -2809,7 +2813,8 @@ export const de: TranslationKeys = {
       barcodesFound: "{count} Barcode gefunden",
       barcodesFoundPlural: "{count} Barcodes gefunden",
       scanningFile: "{name} wird gescannt...",
-      scanningFailedWithStatus: "Scannen fehlgeschlagen: {status}",
+      scanningFailedWithStatus:
+        "Dieses Bild konnte nicht nach Barcodes durchsucht werden. Versuchen Sie es mit einem anderen Bild.",
       filesFailed: "{count} von {total} Dateien fehlgeschlagen",
     },
     collage: {
@@ -3053,7 +3058,8 @@ export const de: TranslationKeys = {
       positionBottomLeft: "Unten links",
       positionBottomRight: "Unten rechts",
       processingFailed: "Verarbeitung fehlgeschlagen",
-      processingFailedStatus: "Verarbeitung fehlgeschlagen: {status}",
+      processingFailedStatus:
+        "Dieses Bild konnte nicht verarbeitet werden. Bitte versuchen Sie es erneut.",
     },
     "circle-crop": {
       border: "Rand",
@@ -5698,7 +5704,8 @@ export const de: TranslationKeys = {
     networkError: "Netzwerkfehler. Überprüfen Sie Ihre Verbindung.",
     invalidCredentials: "Ungültiger Benutzername oder Passwort",
     connectionError: "Verbindungsfehler",
-    fileTooLarge: "Diese Datei überschreitet die Upload-Größenbeschränkung des Servers.",
+    fileTooLarge:
+      "Diese Datei ist zu groß zum Hochladen. Versuchen Sie es mit einer kleineren Datei oder bitten Sie Ihren Server-Administrator, das Upload-Limit zu erhöhen.",
     featureNotInstalledForTool:
       "{tool} benötigt die Funktion „{feature}“. Aktivieren Sie sie unter Einstellungen → AI-Funktionen.",
     featureNotInstalled:
@@ -5721,17 +5728,21 @@ export const de: TranslationKeys = {
     invalidSetting: "Ungültiger Wert für {setting}.",
     network: "Netzwerkfehler",
     invalidResponse: "Ungültige Antwort",
-    failedWithStatus: "Fehlgeschlagen: {status}",
-    processingFailedWithStatus: "Verarbeitung fehlgeschlagen: {status}",
+    failedWithStatus:
+      "Die Anfrage konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.",
+    processingFailedWithStatus:
+      "Diese Datei konnte nicht verarbeitet werden. Prüfen Sie, ob die Datei unbeschädigt ist, und versuchen Sie es erneut.",
     processingFailedNoDetail: "Verarbeitung fehlgeschlagen",
     jobTrackingFailed:
       "Beim Verfolgen dieses Auftrags ist ein Fehler aufgetreten. Versuchen Sie es erneut.",
     requestTimedOut: "Zeitüberschreitung der Anfrage",
     runInterrupted: "Die Verarbeitung wurde unterbrochen. Führen Sie sie erneut aus.",
-    requestFailedWithStatus: "Anfrage fehlgeschlagen: {status}",
+    requestFailedWithStatus:
+      "Die Anfrage konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.",
     invalidServerResponse: "Ungültige Antwort vom Server",
     batchFailed: "Stapelverarbeitung fehlgeschlagen",
-    batchFailedWithStatus: "Stapelverarbeitung fehlgeschlagen: {status}",
+    batchFailedWithStatus:
+      "Die Stapelverarbeitung konnte nicht abgeschlossen werden. Bitte starten Sie den Durchlauf erneut.",
     allFilesFailed: "Verarbeitung aller Dateien fehlgeschlagen",
     filesFailedSuffix_one: " (1 Datei fehlgeschlagen)",
     filesFailedSuffix_other: " ({count} Dateien fehlgeschlagen)",

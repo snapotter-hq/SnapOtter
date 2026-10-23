@@ -1658,7 +1658,8 @@ export const pl: TranslationKeys = {
       uploadingImages: "Przesyłanie obrazów...",
       processingPages: "Przetwarzanie {count} stron...",
       parseResponseFailed: "Nie udało się przetworzyć odpowiedzi serwera",
-      creationFailedWithStatus: "Tworzenie PDF nie powiodło się: {status}",
+      creationFailedWithStatus:
+        "Nie udało się utworzyć pliku PDF. Sprawdź obrazy i spróbuj ponownie.",
       networkErrorCreation: "Błąd sieci podczas tworzenia PDF",
       requestTimedOut: "Upłynął limit czasu żądania, serwer może być przeciążony",
     },
@@ -1721,7 +1722,7 @@ export const pl: TranslationKeys = {
       submitPlural: "Generuj Favicon ({count} obrazów)",
       downloadZip: "Pobierz ZIP z Favicon",
       progressLabel: "Generowanie Favicon",
-      generationFailed: "Generowanie Favicon nie powiodło się: {status}",
+      generationFailed: "Nie udało się wygenerować ikony Favicon. Spróbuj użyć innego obrazu.",
       networkError: "Błąd sieci podczas generowania Favicon",
       timeout: "Upłynął limit czasu żądania, serwer może być przeciążony",
       uploadingImages: "Przesyłanie obrazów...",
@@ -2404,9 +2405,11 @@ export const pl: TranslationKeys = {
       dragToAdjust: "Przeciągnij, aby dostosować",
       scrollToZoom: "Przewiń, aby powiększyć",
       photoGenerated: "Zdjęcie wygenerowane. Pobierz z lewego panelu.",
-      analysisFailedWithStatus: "Analiza nie powiodła się: {status}",
+      analysisFailedWithStatus:
+        "Nie udało się przeanalizować tego zdjęcia. Spróbuj użyć wyraźniejszego zdjęcia.",
       faceAnalysisFailed: "Analiza twarzy nie powiodła się",
-      generationFailedWithStatus: "Generowanie nie powiodło się: {status}",
+      generationFailedWithStatus:
+        "Nie udało się wygenerować zdjęcia paszportowego. Spróbuj ponownie.",
       photoGenerationFailed: "Generowanie zdjęcia nie powiodło się",
       analysisExpired:
         "Analiza wygasła, więc zdjęcie jest analizowane ponownie. Wygeneruj je, gdy się zakończy.",
@@ -2797,7 +2800,7 @@ export const pl: TranslationKeys = {
       barcodesFound: "Znaleziono {count} kod kreskowy",
       barcodesFoundPlural: "Znaleziono {count} kodów kreskowych",
       scanningFile: "Skanowanie {name}...",
-      scanningFailedWithStatus: "Skanowanie nie powiodło się: {status}",
+      scanningFailedWithStatus: "Nie udało się zeskanować tego obrazu. Spróbuj użyć innego obrazu.",
       filesFailed: "Niepowodzenie: {count} z {total} plików",
     },
     collage: {
@@ -3041,7 +3044,7 @@ export const pl: TranslationKeys = {
       positionBottomLeft: "Lewy dolny",
       positionBottomRight: "Prawy dolny",
       processingFailed: "Przetwarzanie nie powiodło się",
-      processingFailedStatus: "Przetwarzanie nie powiodło się: {status}",
+      processingFailedStatus: "Nie udało się przetworzyć tego obrazu. Spróbuj ponownie.",
     },
     "circle-crop": {
       border: "Ramka",
@@ -5671,7 +5674,8 @@ export const pl: TranslationKeys = {
     networkError: "Błąd sieci. Sprawdź połączenie.",
     invalidCredentials: "Nieprawidłowa nazwa użytkownika lub hasło",
     connectionError: "Błąd połączenia",
-    fileTooLarge: "Ten plik przekracza limit rozmiaru przesyłania na serwerze.",
+    fileTooLarge:
+      "Ten plik jest za duży, aby go przesłać. Spróbuj użyć mniejszego pliku lub poproś administratora serwera o zwiększenie limitu przesyłania.",
     featureNotInstalledForTool:
       '{tool} wymaga funkcji "{feature}". Włącz ją w Ustawienia → Funkcje AI.',
     featureNotInstalled:
@@ -5694,16 +5698,18 @@ export const pl: TranslationKeys = {
     invalidSetting: "Nieprawidłowa wartość: {setting}.",
     network: "Błąd sieci",
     invalidResponse: "Nieprawidłowa odpowiedź",
-    failedWithStatus: "Niepowodzenie: {status}",
-    processingFailedWithStatus: "Przetwarzanie nie powiodło się: {status}",
+    failedWithStatus: "Nie udało się zrealizować tego żądania. Spróbuj ponownie.",
+    processingFailedWithStatus:
+      "Nie udało się przetworzyć tego pliku. Sprawdź, czy plik nie jest uszkodzony, i spróbuj ponownie.",
     processingFailedNoDetail: "Przetwarzanie nie powiodło się",
     jobTrackingFailed: "Coś poszło nie tak podczas śledzenia tego zadania. Spróbuj ponownie.",
     requestTimedOut: "Upłynął limit czasu żądania",
     runInterrupted: "Przetwarzanie zostało przerwane. Uruchom je ponownie.",
-    requestFailedWithStatus: "Żądanie nie powiodło się: {status}",
+    requestFailedWithStatus: "Nie udało się zrealizować tego żądania. Spróbuj ponownie.",
     invalidServerResponse: "Nieprawidłowa odpowiedź serwera",
     batchFailed: "Przetwarzanie wsadowe nie powiodło się",
-    batchFailedWithStatus: "Przetwarzanie wsadowe nie powiodło się: {status}",
+    batchFailedWithStatus:
+      "Nie udało się ukończyć przetwarzania wsadowego. Spróbuj uruchomić je ponownie.",
     allFilesFailed: "Przetwarzanie wszystkich plików nie powiodło się",
     filesFailedSuffix_one: " (1 plik zakończony błędem)",
     filesFailedSuffix_other: " (nieudane pliki: {count})",

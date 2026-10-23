@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { FILE_NOTES_ALL_FILES } from "@snapotter/shared";
+import { en, FILE_NOTES_ALL_FILES } from "@snapotter/shared";
 import { act, renderHook } from "@testing-library/react";
 import AdmZip from "adm-zip";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -987,7 +987,7 @@ describe("useToolProcessor proxy 5xx degrade (#750)", () => {
       xhrs[0].onload?.();
     });
 
-    expect(useFileStore.getState().error).toBe("Processing failed: 502");
+    expect(useFileStore.getState().error).toBe(en.errors.processingFailedWithStatus);
     expect(useFileStore.getState().processing).toBe(false);
 
     unmount();

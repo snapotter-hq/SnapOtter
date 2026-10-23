@@ -1645,7 +1645,8 @@ export const es: TranslationKeys = {
       uploadingImages: "Subiendo imágenes...",
       processingPages: "Procesando {count} páginas...",
       parseResponseFailed: "No se pudo interpretar la respuesta del servidor",
-      creationFailedWithStatus: "Error al crear el PDF: {status}",
+      creationFailedWithStatus:
+        "No pudimos crear el PDF. Revisa tus imágenes e inténtalo de nuevo.",
       networkErrorCreation: "Error de red al crear el PDF",
       requestTimedOut:
         "La solicitud agotó el tiempo de espera: el servidor puede estar sobrecargado",
@@ -1709,7 +1710,7 @@ export const es: TranslationKeys = {
       submitPlural: "Generar Favicons ({count} imágenes)",
       downloadZip: "Descargar ZIP de Favicons",
       progressLabel: "Generando Favicons",
-      generationFailed: "Error al generar el favicon: {status}",
+      generationFailed: "No pudimos generar el favicon. Prueba con otra imagen.",
       networkError: "Error de red al generar el favicon",
       timeout: "La solicitud agotó el tiempo de espera: el servidor puede estar sobrecargado",
       uploadingImages: "Subiendo imágenes...",
@@ -2392,9 +2393,9 @@ export const es: TranslationKeys = {
       dragToAdjust: "Arrastra para ajustar",
       scrollToZoom: "Desplaza para hacer zoom",
       photoGenerated: "Foto generada. Descárgala desde el panel izquierdo.",
-      analysisFailedWithStatus: "Error en el análisis: {status}",
+      analysisFailedWithStatus: "No pudimos analizar esta foto. Prueba con una foto más clara.",
       faceAnalysisFailed: "Error en el análisis facial",
-      generationFailedWithStatus: "Error en la generación: {status}",
+      generationFailedWithStatus: "No pudimos generar la foto de pasaporte. Inténtalo de nuevo.",
       photoGenerationFailed: "Error al generar la foto",
       analysisExpired:
         "El análisis caducó, así que la foto se está analizando de nuevo. Genérala cuando termine.",
@@ -2786,7 +2787,7 @@ export const es: TranslationKeys = {
       barcodesFound: "{count} código de barras encontrado",
       barcodesFoundPlural: "{count} códigos de barras encontrados",
       scanningFile: "Escaneando {name}...",
-      scanningFailedWithStatus: "Error al escanear: {status}",
+      scanningFailedWithStatus: "No pudimos escanear esta imagen. Prueba con otra imagen.",
       filesFailed: "Fallaron {count} de {total} archivos",
     },
     collage: {
@@ -3030,7 +3031,7 @@ export const es: TranslationKeys = {
       positionBottomLeft: "Abajo izquierda",
       positionBottomRight: "Abajo derecha",
       processingFailed: "Error en el procesamiento",
-      processingFailedStatus: "Error en el procesamiento: {status}",
+      processingFailedStatus: "No pudimos procesar esta imagen. Inténtalo de nuevo.",
     },
     "circle-crop": {
       border: "Borde",
@@ -5665,7 +5666,8 @@ export const es: TranslationKeys = {
     networkError: "Error de red. Verifica tu conexión.",
     invalidCredentials: "Nombre de usuario o contraseña inválidos",
     connectionError: "Error de conexión",
-    fileTooLarge: "Este archivo supera el límite de tamaño de carga del servidor.",
+    fileTooLarge:
+      "Este archivo es demasiado grande para subirlo. Prueba con un archivo más pequeño o pide al administrador del servidor que aumente el límite de subida.",
     featureNotInstalledForTool:
       '{tool} necesita la función "{feature}". Actívala en Configuración → Funciones de AI.',
     featureNotInstalled:
@@ -5688,16 +5690,18 @@ export const es: TranslationKeys = {
     invalidSetting: "Valor no válido para {setting}.",
     network: "Error de red",
     invalidResponse: "Respuesta no válida",
-    failedWithStatus: "Error: {status}",
-    processingFailedWithStatus: "Error en el procesamiento: {status}",
+    failedWithStatus: "No pudimos completar esa solicitud. Inténtalo de nuevo.",
+    processingFailedWithStatus:
+      "No pudimos procesar este archivo. Comprueba que no esté dañado e inténtalo de nuevo.",
     processingFailedNoDetail: "Error en el procesamiento",
     jobTrackingFailed: "Algo salió mal al seguir esta tarea. Vuelve a intentarlo.",
     requestTimedOut: "La solicitud agotó el tiempo de espera",
     runInterrupted: "Se interrumpió el procesamiento. Ejecútalo de nuevo.",
-    requestFailedWithStatus: "Error en la solicitud: {status}",
+    requestFailedWithStatus: "No pudimos completar esa solicitud. Inténtalo de nuevo.",
     invalidServerResponse: "Respuesta no válida del servidor",
     batchFailed: "Error en el procesamiento por lotes",
-    batchFailedWithStatus: "Error en el procesamiento por lotes: {status}",
+    batchFailedWithStatus:
+      "No pudimos terminar de procesar estos archivos. Intenta ejecutar el lote de nuevo.",
     allFilesFailed: "Error al procesar todos los archivos",
     filesFailedSuffix_one: " (1 archivo fallido)",
     filesFailedSuffix_other: " ({count} archivos fallidos)",

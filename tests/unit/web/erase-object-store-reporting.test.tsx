@@ -684,7 +684,7 @@ describe("erase-object single file: every other way the request ends", () => {
 
     (await submit()).respondRaw(502, "<html>Bad Gateway</html>");
 
-    expect(screen.getByText("Processing failed: 502")).toBeInTheDocument();
+    expect(screen.getByText(en.errors.processingFailedWithStatus)).toBeInTheDocument();
     expect(useFileStore.getState().processing).toBe(false);
   });
 
@@ -1303,7 +1303,7 @@ describe("erase-object batch: every other way a file's request ends", () => {
   it("names the status when a failed request's body does not parse", async () => {
     await runFirstThenFinish((xhr) => xhr.respondRaw(502, "<html>Bad Gateway</html>"));
 
-    expect(entry(0).error).toBe("Processing failed: 502");
+    expect(entry(0).error).toBe(en.errors.processingFailedWithStatus);
   });
 
   it("fails the file on a network error", async () => {

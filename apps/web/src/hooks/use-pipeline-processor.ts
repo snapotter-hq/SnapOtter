@@ -989,6 +989,7 @@ export function usePipelineProcessor() {
             } catch {
               message = format(t.errors.processingFailedWithStatus, { status: xhr.status });
             }
+            if (xhr.status === 413) message = t.errors.fileTooLarge;
             failure = message;
           }
 
@@ -1508,7 +1509,8 @@ export function usePipelineProcessor() {
               ) {
                 // Show the first file's step-level error (all files typically fail at the same step)
                 const first = body.errors[0];
-                errorMsg = first.error;
+                errorMsg =
+                  first.error === "Internal server error" ? t.errors.batchFailed : first.error;
                 if (body.errors.length > 1) {
                   errorMsg += format(
                     plural(
@@ -1542,6 +1544,7 @@ export function usePipelineProcessor() {
               }
               errorMsg = format(t.errors.batchFailedWithStatus, { status: xhr.status });
             }
+            if (xhr.status === 413) errorMsg = t.errors.fileTooLarge;
             failRun(errorMsg);
           })();
         };

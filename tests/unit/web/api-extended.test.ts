@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { en } from "@snapotter/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Global mocks
@@ -81,6 +82,33 @@ describe("parseApiError", () => {
   it("returns fallback message when no error or message", () => {
     const result = parseApiError({}, 422);
     expect(result).toBe("Processing failed: 422");
+  });
+
+  it("falls back when the error is the generic 500 mask 'Internal server error'", () => {
+    expect(
+      parseApiError({ error: "Internal server error" }, 500, en.errors.processingFailedWithStatus),
+    ).toBe(en.errors.processingFailedWithStatus);
+    expect(
+      parseApiError(
+        { error: "Internal server error", details: "Internal server error" },
+        500,
+        en.errors.processingFailedWithStatus,
+      ),
+    ).toBe(en.errors.processingFailedWithStatus);
+    expect(
+      parseApiError(
+        { error: "Internal server error", message: "Internal server error" },
+        500,
+        en.errors.processingFailedWithStatus,
+      ),
+    ).toBe(en.errors.processingFailedWithStatus);
+    expect(
+      parseApiError(
+        { error: "Internal server error", details: "disk full" },
+        500,
+        en.errors.processingFailedWithStatus,
+      ),
+    ).toBe("disk full");
   });
 
   it("returns string details appended to error", () => {
@@ -240,7 +268,7 @@ describe("apiUploadUserFiles", () => {
     expect(result.files).toHaveLength(1);
   });
 
-  it("throws on non-ok response", async () => {
+  it("throws plain-language fileTooLarge message on 413 response", async () => {
     const file = new File(["content"], "img.png", { type: "image/png" });
 
     const promise = apiUploadUserFiles([file]);
@@ -249,7 +277,41 @@ describe("apiUploadUserFiles", () => {
     xhr.responseText = "";
     (xhr.onload as () => void)();
 
-    await expect(promise).rejects.toThrow("Upload failed: 413");
+    await expect(promise).rejects.toThrow(en.errors.fileTooLarge);
+  });
+
+  it("preserves STORAGE_QUOTA_EXCEEDED error on 413 response", async () => {
+    const file = new File(["content"], "img.png", { type: "image/png" });
+
+    const promise = apiUploadUserFiles([file]);
+    const xhr = xhrInstances[0];
+    xhr.status = 413;
+    xhr.responseText = JSON.stringify({
+      error: "Storage quota exceeded",
+      code: "STORAGE_QUOTA_EXCEEDED",
+    });
+    (xhr.onload as () => void)();
+
+    await expect(promise).rejects.toThrow("Storage quota exceeded");
+  });
+
+  it("parses JSON error details on non-413 failures and masks Internal server error", async () => {
+    const file = new File(["content"], "img.png", { type: "image/png" });
+
+    const p1 = apiUploadUserFiles([file]);
+    xhrInstances[0].status = 400;
+    xhrInstances[0].responseText = JSON.stringify({
+      error: "Unsupported file",
+      details: "corrupt header",
+    });
+    (xhrInstances[0].onload as () => void)();
+    await expect(p1).rejects.toThrow("Unsupported file: corrupt header");
+
+    const p2 = apiUploadUserFiles([file]);
+    xhrInstances[1].status = 500;
+    xhrInstances[1].responseText = JSON.stringify({ error: "Internal server error" });
+    (xhrInstances[1].onload as () => void)();
+    await expect(p2).rejects.toThrow(en.errors.failedWithStatus);
   });
 
   it("triggers disconnected on network error", async () => {

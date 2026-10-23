@@ -163,19 +163,38 @@ describe("feature-not-installed errors are translated (#1410)", () => {
 
   // format() leaves an unknown placeholder in the text, so a translated or
   // dropped token would show users a raw "{feature}" (repo-wide check: #934).
-  it("keeps exactly en's placeholders in every locale", async () => {
+  it("keeps exactly en's placeholders in every locale and omits {status} from status fallbacks", async () => {
     const tokens = (s: string) => (s.match(/\{\w+\}/g) ?? []).sort();
+    for (const key of [
+      "failedWithStatus",
+      "processingFailedWithStatus",
+      "requestFailedWithStatus",
+      "batchFailedWithStatus",
+    ] as const) {
+      expect(enErrors[key]).not.toContain("{status}");
+    }
     for (const locale of SUPPORTED_LOCALES) {
-      const errors = (await loadTranslations(locale.code)).errors as Record<string, string>;
+      const tr = await loadTranslations(locale.code);
+      const errors = tr.errors as Record<string, string>;
       for (const key of [
         "featureNotInstalledForTool",
         "featureNotInstalled",
+        "failedWithStatus",
         "processingFailedWithStatus",
+        "requestFailedWithStatus",
         "batchFailedWithStatus",
         "filesFailedSuffix_other",
       ]) {
         expect(tokens(errors[key]), `${locale.code} ${key}`).toEqual(tokens(enErrors[key]));
       }
+      expect(tr.toolSettings["image-to-pdf"].creationFailedWithStatus).not.toContain("{status}");
+      expect(tr.toolSettings.favicon.generationFailed).not.toContain("{status}");
+      expect(tr.toolSettings["passport-photo"].analysisFailedWithStatus).not.toContain("{status}");
+      expect(tr.toolSettings["passport-photo"].generationFailedWithStatus).not.toContain(
+        "{status}",
+      );
+      expect(tr.toolSettings["barcode-read"].scanningFailedWithStatus).not.toContain("{status}");
+      expect(tr.toolSettings.beautify.processingFailedStatus).not.toContain("{status}");
     }
   });
 

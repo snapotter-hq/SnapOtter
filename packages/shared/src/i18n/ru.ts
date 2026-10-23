@@ -1659,7 +1659,7 @@ export const ru: TranslationKeys = {
       uploadingImages: "Загрузка изображений...",
       processingPages: "Обработка {count} страниц...",
       parseResponseFailed: "Не удалось разобрать ответ сервера",
-      creationFailedWithStatus: "Ошибка создания PDF: {status}",
+      creationFailedWithStatus: "Не удалось создать PDF. Проверьте изображения и попробуйте снова.",
       networkErrorCreation: "Сетевая ошибка при создании PDF",
       requestTimedOut: "Время ожидания истекло: сервер может быть перегружен",
     },
@@ -1722,7 +1722,7 @@ export const ru: TranslationKeys = {
       submitPlural: "Сгенерировать Favicon ({count} изображений)",
       downloadZip: "Скачать ZIP с Favicon",
       progressLabel: "Генерация Favicon",
-      generationFailed: "Ошибка генерации Favicon: {status}",
+      generationFailed: "Не удалось создать Favicon. Попробуйте другое изображение.",
       networkError: "Сетевая ошибка при генерации Favicon",
       timeout: "Время ожидания истекло: сервер может быть перегружен",
       uploadingImages: "Загрузка изображений...",
@@ -2404,9 +2404,10 @@ export const ru: TranslationKeys = {
       dragToAdjust: "Перетащите для настройки",
       scrollToZoom: "Прокрутите для масштабирования",
       photoGenerated: "Фото создано. Скачайте с левой панели.",
-      analysisFailedWithStatus: "Ошибка анализа: {status}",
+      analysisFailedWithStatus: "Не удалось проанализировать фото. Попробуйте более чёткий снимок.",
       faceAnalysisFailed: "Ошибка анализа лица",
-      generationFailedWithStatus: "Ошибка создания: {status}",
+      generationFailedWithStatus:
+        "Не удалось создать фото на документы. Пожалуйста, попробуйте снова.",
       photoGenerationFailed: "Ошибка создания фото",
       analysisExpired:
         "Срок анализа истёк, поэтому фото анализируется заново. Создайте его, когда анализ завершится.",
@@ -2797,7 +2798,8 @@ export const ru: TranslationKeys = {
       barcodesFound: "Найден {count} штрихкод",
       barcodesFoundPlural: "Найдено {count} штрихкодов",
       scanningFile: "Сканирование {name}...",
-      scanningFailedWithStatus: "Ошибка сканирования: {status}",
+      scanningFailedWithStatus:
+        "Не удалось отсканировать изображение. Попробуйте другое изображение.",
       filesFailed: "Не удалось обработать файлов: {count} из {total}",
     },
     collage: {
@@ -3041,7 +3043,7 @@ export const ru: TranslationKeys = {
       positionBottomLeft: "Снизу слева",
       positionBottomRight: "Снизу справа",
       processingFailed: "Ошибка обработки",
-      processingFailedStatus: "Ошибка обработки: {status}",
+      processingFailedStatus: "Не удалось обработать изображение. Пожалуйста, попробуйте снова.",
     },
     "circle-crop": {
       border: "Рамка",
@@ -5663,7 +5665,8 @@ export const ru: TranslationKeys = {
     networkError: "Сетевая ошибка. Проверьте подключение.",
     invalidCredentials: "Неверное имя пользователя или пароль",
     connectionError: "Ошибка подключения",
-    fileTooLarge: "Этот файл превышает ограничение сервера на размер загрузки.",
+    fileTooLarge:
+      "Этот файл слишком большой для загрузки. Попробуйте файл меньшего размера или попросите администратора сервера увеличить лимит загрузки.",
     featureNotInstalledForTool:
       "Для «{tool}» нужна функция «{feature}». Включите её в Настройки → AI-функции.",
     featureNotInstalled:
@@ -5686,16 +5689,18 @@ export const ru: TranslationKeys = {
     invalidSetting: "Недопустимое значение параметра «{setting}».",
     network: "Сетевая ошибка",
     invalidResponse: "Некорректный ответ",
-    failedWithStatus: "Ошибка: {status}",
-    processingFailedWithStatus: "Ошибка обработки: {status}",
+    failedWithStatus: "Не удалось выполнить запрос. Пожалуйста, попробуйте снова.",
+    processingFailedWithStatus:
+      "Не удалось обработать этот файл. Убедитесь, что файл не повреждён, и попробуйте снова.",
     processingFailedNoDetail: "Ошибка обработки",
     jobTrackingFailed: "Что-то пошло не так при отслеживании этой задачи. Попробуйте снова.",
     requestTimedOut: "Время ожидания истекло",
     runInterrupted: "Обработка была прервана. Запустите её снова.",
-    requestFailedWithStatus: "Ошибка запроса: {status}",
+    requestFailedWithStatus: "Не удалось выполнить запрос. Пожалуйста, попробуйте снова.",
     invalidServerResponse: "Некорректный ответ от сервера",
     batchFailed: "Пакетная обработка завершилась с ошибкой",
-    batchFailedWithStatus: "Пакетная обработка завершилась с ошибкой: {status}",
+    batchFailedWithStatus:
+      "Не удалось завершить пакетную обработку. Попробуйте запустить её снова.",
     allFilesFailed: "Ошибка обработки всех файлов",
     filesFailedSuffix_one: " (1 файл с ошибкой)",
     filesFailedSuffix_other: " (файлов с ошибкой: {count})",

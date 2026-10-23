@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { en } from "@snapotter/shared";
 import { act, renderHook } from "@testing-library/react";
 import AdmZip from "adm-zip";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -1005,7 +1006,23 @@ describe("usePipelineProcessor single-run entry settle (#1352)", () => {
       xhrs[0].onload?.();
     });
 
-    expectEntryFailed("Processing failed: 500");
+    expectEntryFailed(en.errors.processingFailedWithStatus);
+    unmount();
+  });
+
+  it.each([
+    ["our API's JSON body", JSON.stringify({ error: "File exceeds the 10 MB upload limit" })],
+    ["a proxy's HTML page", "<html>413 Request Entity Too Large</html>"],
+  ])("shows the translated fileTooLarge message on a 413 response with %s", (_label, body) => {
+    const { unmount } = startSingleRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 413;
+      xhrs[0].responseText = body;
+      xhrs[0].onload?.();
+    });
+
+    expectEntryFailed(en.errors.fileTooLarge);
     unmount();
   });
 
@@ -2109,6 +2126,43 @@ describe("usePipelineProcessor batch entry settle (#1699)", () => {
     });
 
     await settled(() => expectBatchFailed("Batch processing failed"));
+    unmount();
+  });
+
+  it.each([
+    [
+      "our API's JSON body",
+      new Blob([JSON.stringify({ error: "File exceeds the 10 MB upload limit" })], {
+        type: "application/json",
+      }),
+    ],
+    ["a proxy's HTML page", "<html>413 Request Entity Too Large</html>"],
+  ])("shows the translated fileTooLarge message on a batch 413 with %s", async (_label, body) => {
+    const { unmount } = startBatchRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 413;
+      xhrs[0].response = body;
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => expectBatchFailed(en.errors.fileTooLarge));
+    unmount();
+  });
+
+  it("masks Internal server error in batch body.errors with batchFailed", async () => {
+    const { unmount } = startBatchRun();
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 500;
+      xhrs[0].response = new Blob(
+        [JSON.stringify({ errors: [{ filename: "", error: "Internal server error" }] })],
+        { type: "application/json" },
+      );
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => expectBatchFailed(en.errors.batchFailed));
     unmount();
   });
 

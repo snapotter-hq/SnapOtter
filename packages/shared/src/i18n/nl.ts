@@ -1662,7 +1662,8 @@ export const nl: TranslationKeys = {
       uploadingImages: "Afbeeldingen uploaden...",
       processingPages: "{count} pagina's verwerken...",
       parseResponseFailed: "Serverantwoord verwerken mislukt",
-      creationFailedWithStatus: "PDF maken mislukt: {status}",
+      creationFailedWithStatus:
+        "De PDF kon niet worden gemaakt. Controleer je afbeeldingen en probeer het opnieuw.",
       networkErrorCreation: "Netwerkfout tijdens het maken van de PDF",
       requestTimedOut: "Time-out van verzoek: de server is mogelijk overbelast",
     },
@@ -1725,7 +1726,7 @@ export const nl: TranslationKeys = {
       submitPlural: "Favicons genereren ({count} afbeeldingen)",
       downloadZip: "Favicons-ZIP downloaden",
       progressLabel: "Favicons genereren",
-      generationFailed: "Favicon genereren mislukt: {status}",
+      generationFailed: "De favicon kon niet worden gegenereerd. Probeer een andere afbeelding.",
       networkError: "Netwerkfout tijdens het genereren van de favicon",
       timeout: "Time-out van verzoek: de server is mogelijk overbelast",
       uploadingImages: "Afbeeldingen uploaden...",
@@ -2409,9 +2410,10 @@ export const nl: TranslationKeys = {
       dragToAdjust: "Sleep om aan te passen",
       scrollToZoom: "Scroll om te zoomen",
       photoGenerated: "Foto gegenereerd. Download via het linkerpaneel.",
-      analysisFailedWithStatus: "Analyse mislukt: {status}",
+      analysisFailedWithStatus:
+        "Deze foto kon niet worden geanalyseerd. Probeer een scherpere foto.",
       faceAnalysisFailed: "Gezichtsanalyse mislukt",
-      generationFailedWithStatus: "Genereren mislukt: {status}",
+      generationFailedWithStatus: "De pasfoto kon niet worden gegenereerd. Probeer het opnieuw.",
       photoGenerationFailed: "Foto genereren mislukt",
       analysisExpired:
         "De analyse is verlopen, dus de foto wordt opnieuw geanalyseerd. Genereer zodra dat klaar is.",
@@ -2804,7 +2806,8 @@ export const nl: TranslationKeys = {
       barcodesFound: "{count} barcode gevonden",
       barcodesFoundPlural: "{count} barcodes gevonden",
       scanningFile: "{name} scannen...",
-      scanningFailedWithStatus: "Scannen mislukt: {status}",
+      scanningFailedWithStatus:
+        "Deze afbeelding kon niet worden gescand. Probeer een andere afbeelding.",
       filesFailed: "{count} van {total} bestanden mislukt",
     },
     collage: {
@@ -3048,7 +3051,7 @@ export const nl: TranslationKeys = {
       positionBottomLeft: "Linksonder",
       positionBottomRight: "Rechtsonder",
       processingFailed: "Verwerking mislukt",
-      processingFailedStatus: "Verwerking mislukt: {status}",
+      processingFailedStatus: "Deze afbeelding kon niet worden verwerkt. Probeer het opnieuw.",
     },
     "circle-crop": {
       border: "Rand",
@@ -5673,7 +5676,8 @@ export const nl: TranslationKeys = {
     networkError: "Netwerkfout. Controleer je verbinding.",
     invalidCredentials: "Ongeldige gebruikersnaam of wachtwoord",
     connectionError: "Verbindingsfout",
-    fileTooLarge: "Dit bestand is groter dan de uploadlimiet van de server.",
+    fileTooLarge:
+      "Dit bestand is te groot om te uploaden. Probeer een kleiner bestand of vraag de serverbeheerder om de uploadlimiet te verhogen.",
     featureNotInstalledForTool:
       '{tool} heeft de functie "{feature}" nodig. Schakel deze in via Instellingen → AI-functies.',
     featureNotInstalled:
@@ -5696,16 +5700,17 @@ export const nl: TranslationKeys = {
     invalidSetting: "Ongeldige waarde voor {setting}.",
     network: "Netwerkfout",
     invalidResponse: "Ongeldig antwoord",
-    failedWithStatus: "Mislukt: {status}",
-    processingFailedWithStatus: "Verwerking mislukt: {status}",
+    failedWithStatus: "Het verzoek kon niet worden voltooid. Probeer het opnieuw.",
+    processingFailedWithStatus:
+      "Dit bestand kon niet worden verwerkt. Controleer of het bestand niet beschadigd is en probeer het opnieuw.",
     processingFailedNoDetail: "Verwerking mislukt",
     jobTrackingFailed: "Er ging iets mis bij het volgen van deze taak. Probeer het opnieuw.",
     requestTimedOut: "Time-out van verzoek",
     runInterrupted: "De verwerking is onderbroken. Voer het opnieuw uit.",
-    requestFailedWithStatus: "Verzoek mislukt: {status}",
+    requestFailedWithStatus: "Het verzoek kon niet worden voltooid. Probeer het opnieuw.",
     invalidServerResponse: "Ongeldig antwoord van server",
     batchFailed: "Batchverwerking mislukt",
-    batchFailedWithStatus: "Batchverwerking mislukt: {status}",
+    batchFailedWithStatus: "De batchverwerking kon niet worden voltooid. Probeer het opnieuw.",
     allFilesFailed: "Verwerking van alle bestanden is mislukt",
     filesFailedSuffix_one: " (1 bestand mislukt)",
     filesFailedSuffix_other: " ({count} bestanden mislukt)",
