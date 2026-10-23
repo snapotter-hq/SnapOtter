@@ -360,4 +360,62 @@ describe("BullMQ connection teardown (#3284)", () => {
     }
     expect(cleanupResults.filter((r) => r.status === "rejected")).toEqual([]);
   });
+
+  it("closeWorkers() resolves when worker blocking connections are in reconnecting state (#3604)", async () => {
+    const initSpy = vi.spyOn(RedisConnection.prototype, "init");
+
+    try {
+      await closeWorkers();
+      initSpy.mockClear();
+
+      startWorkers();
+      // 5 workers * 2 connections each (main + blocking) = 10 connections
+      expect(initSpy.mock.results).toHaveLength(POOLS.length * 2);
+      const workerClients = (await Promise.all(
+        initSpy.mock.results.map((r: { value: unknown }) => r.value),
+      )) as Array<{
+        status: string;
+        disconnect: (reconnect?: boolean) => void;
+        once: (event: string, listener: () => void) => void;
+      }>;
+
+      // Every odd-indexed client (1, 3, 5, 7, 9) is a worker's blockingConnection.
+      const blockingClients = workerClients.filter((_, idx) => idx % 2 === 1);
+      expect(blockingClients).toHaveLength(POOLS.length);
+
+      // Put every blocking connection into "reconnecting", mirroring BullMQ's
+      // waitForJob watchdog firing bclient.disconnect(true) after a >6s stall.
+      await Promise.all(
+        blockingClients.map(
+          (bclient) =>
+            new Promise<void>((resolve) => {
+              bclient.once("reconnecting", resolve);
+              bclient.disconnect(true);
+            }),
+        ),
+      );
+      for (const bclient of blockingClients) {
+        expect(bclient.status).toBe("reconnecting");
+      }
+
+      await expect(closeWorkers()).resolves.toBeUndefined();
+
+      for (const client of workerClients) {
+        expect(client.status).toBe("end");
+      }
+    } finally {
+      initSpy.mockRestore();
+      await closeWorkers();
+      startWorkers();
+      await warmQueueEvents();
+      await vi.waitFor(
+        async () => {
+          for (const pool of POOLS) {
+            expect(await getQueue(pool).getWorkersCount()).toBe(1);
+          }
+        },
+        { timeout: 2_000, interval: 25 },
+      );
+    }
+  });
 });

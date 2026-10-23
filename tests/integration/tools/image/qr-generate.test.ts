@@ -601,6 +601,16 @@ describe("QR Generate", () => {
     expect(res.statusCode).toBe(200);
     const result = JSON.parse(res.body);
     expect(result.processedSize).toBeGreaterThan(0);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: result.downloadUrl,
+    });
+    expect(dlRes.statusCode).toBe(200);
+    const meta = await sharp(dlRes.rawPayload).metadata();
+    expect(meta.format).toBe("png");
+    expect(meta.width).toBe(10000);
+    expect(meta.height).toBe(10000);
   });
 
   // ── Lowercase hex colors ───────────────────────────────────────

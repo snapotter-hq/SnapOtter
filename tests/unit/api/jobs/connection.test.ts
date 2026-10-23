@@ -361,6 +361,155 @@ describe("Redis connection factory", () => {
     expect(first).toBe(second);
     expect(RedisMock).toHaveBeenCalledTimes(1);
   });
+
+  it("ends an ioredis client and flushes its queues when disconnect(false) or quit() is called while reconnecting (#3604)", async () => {
+    const net = await import("node:net");
+    const actualIoredis = await vi.importActual<{ default: typeof import("ioredis").default }>(
+      "ioredis",
+    );
+    const RealRedis = actualIoredis.default;
+    const mod = await freshModule();
+    // Guard and idempotency checks on patchIoredisDisconnect
+    expect(() => mod.patchIoredisDisconnect(undefined)).not.toThrow();
+    expect(() => mod.patchIoredisDisconnect({})).not.toThrow();
+    mod.patchIoredisDisconnect(
+      RealRedis.prototype as unknown as Parameters<typeof mod.patchIoredisDisconnect>[0],
+    );
+    const patchedFn = RealRedis.prototype.disconnect;
+    mod.patchIoredisDisconnect(
+      RealRedis.prototype as unknown as Parameters<typeof mod.patchIoredisDisconnect>[0],
+    );
+    expect(RealRedis.prototype.disconnect).toBe(patchedFn);
+
+    const sockets = new Set<import("node:net").Socket>();
+    const server = net.createServer((socket) => {
+      sockets.add(socket);
+      socket.on("close", () => sockets.delete(socket));
+      socket.on("data", (d) => {
+        const str = d.toString();
+        for (const match of str.matchAll(/\*\d+\r\n\$\d+\r\n([a-zA-Z]+)/g)) {
+          const cmd = match[1].toUpperCase();
+          if (cmd === "INFO") {
+            socket.write("$19\r\nredis_version:7.2.0\r\n");
+          } else if (cmd === "BZPOPMIN") {
+            // hold blocking command open
+          } else if (cmd === "EVALSHA" || cmd === "EVAL") {
+            socket.write("*4\r\n$-1\r\n$-1\r\n:0\r\n:0\r\n");
+          } else {
+            socket.write("+OK\r\n");
+          }
+        }
+      });
+    });
+
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = (server.address() as import("node:net").AddressInfo).port;
+    const createdClients: Array<{ status: string; disconnect: (reconnect?: boolean) => void }> = [];
+    const createdWorkers: Array<{ close: (force?: boolean) => Promise<void> }> = [];
+
+    try {
+      const client = new RealRedis({
+        host: "127.0.0.1",
+        port,
+        maxRetriesPerRequest: null,
+        retryStrategy: () => 5_000,
+      });
+      createdClients.push(client);
+      client.on("error", () => {});
+      await new Promise<void>((resolve) => client.once("ready", resolve));
+
+      const pendingBz = client.bzpopmin("marker", 5);
+      await new Promise((resolve) => setTimeout(resolve, 30));
+
+      // Mirror BullMQ's waitForJob watchdog: disconnect(true) puts the client
+      // into "reconnecting" with a pending retry timer and unfulfilled command.
+      client.disconnect(true);
+      await new Promise<void>((resolve) => client.once("reconnecting", resolve));
+      expect(client.status).toBe("reconnecting");
+
+      // disconnect(true) while already reconnecting must NOT end the client.
+      client.disconnect(true);
+      expect(client.status).toBe("reconnecting");
+
+      // Simulate a reconnect attempt that called resetCommandQueue() so the
+      // unfulfilled command lives only in prevCommandQueue.
+      (client as unknown as { resetCommandQueue: () => void }).resetCommandQueue();
+
+      const connectorDisconnectSpy = vi.spyOn(
+        (client as unknown as { connector: { disconnect: () => void } }).connector,
+        "disconnect",
+      );
+      let endFired = false;
+      client.once("end", () => {
+        endFired = true;
+      });
+
+      // Manual disconnect(false) (what BullMQ's blockingConnection.disconnect(true) calls)
+      // must transition straight to "end", emit "end", and reject the pending command.
+      client.disconnect(false);
+      await expect(pendingBz).rejects.toThrow("Connection is closed.");
+      await new Promise<void>((resolve) => setImmediate(resolve));
+
+      expect(client.status).toBe("end");
+      expect(endFired).toBe(true);
+      expect(connectorDisconnectSpy).not.toHaveBeenCalled();
+
+      // Also verify quit() while reconnecting ends the client cleanly.
+      const quitClient = new RealRedis({
+        host: "127.0.0.1",
+        port,
+        maxRetriesPerRequest: null,
+        retryStrategy: () => 5_000,
+      });
+      createdClients.push(quitClient);
+      quitClient.on("error", () => {});
+      await new Promise<void>((resolve) => quitClient.once("ready", resolve));
+      quitClient.disconnect(true);
+      await new Promise<void>((resolve) => quitClient.once("reconnecting", resolve));
+      expect(quitClient.status).toBe("reconnecting");
+
+      let quitEndFired = false;
+      quitClient.once("end", () => {
+        quitEndFired = true;
+      });
+      await expect(quitClient.quit()).resolves.toBe("OK");
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(quitClient.status).toBe("end");
+      expect(quitEndFired).toBe(true);
+
+      // Also verify BullMQ Worker.close() resolves when blockingConnection is reconnecting.
+      const { Worker } = await import("bullmq");
+      const worker = new Worker("reconnecting-close-test", async () => {}, {
+        connection: {
+          host: "127.0.0.1",
+          port,
+          maxRetriesPerRequest: null,
+          retryStrategy: () => 5_000,
+        },
+        skipStalledCheck: true,
+        skipLockRenewal: true,
+        skipVersionCheck: true,
+      });
+      createdWorkers.push(worker);
+      worker.on("error", () => {});
+      await worker.waitUntilReady();
+      const bclient = await worker.blockingConnection.client;
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      bclient.disconnect(true);
+      await new Promise<void>((resolve) => bclient.once("reconnecting", resolve));
+      expect(bclient.status).toBe("reconnecting");
+
+      await expect(worker.close()).resolves.toBeUndefined();
+      expect(bclient.status).toBe("end");
+    } finally {
+      await Promise.allSettled(createdWorkers.map((w) => w.close(true)));
+      for (const c of createdClients) {
+        if (c.status !== "end") c.disconnect(false);
+      }
+      for (const s of sockets) s.destroy();
+      server.close();
+    }
+  });
 });
 
 describe("pingRedis", () => {

@@ -10,6 +10,76 @@ import type { ConnectionOptions } from "bullmq";
 import Redis from "ioredis";
 import { env } from "../config.js";
 
+const RECONNECTING_PATCHED = Symbol.for("snapotter.ioredis.reconnectingDisconnectPatched");
+
+/**
+ * Work around redis/ioredis#2245: calling disconnect(false) (or quit() with an
+ * empty offline queue) while the client is in "reconnecting" cancels
+ * reconnectTimeout and calls connector.disconnect() on the already-closed
+ * socket from the previous connection. Because a closed net.Socket never emits
+ * "close" a second time, closeHandler never runs, status stays "reconnecting"
+ * forever, pending commands in commandQueue/offlineQueue never reject, and
+ * "end" never fires, deadlocking BullMQ's Worker.close() inside
+ * blockingConnection.disconnect(true) (#3604).
+ */
+export function patchIoredisDisconnect(
+  proto:
+    | {
+        disconnect?: (reconnect?: boolean) => void;
+        [key: symbol]: unknown;
+      }
+    | undefined = Redis.prototype as unknown as {
+    disconnect?: (reconnect?: boolean) => void;
+    [key: symbol]: unknown;
+  },
+): void {
+  if (!proto || typeof proto.disconnect !== "function" || proto[RECONNECTING_PATCHED]) {
+    return;
+  }
+  const origDisconnect = proto.disconnect;
+  proto.disconnect = function (
+    this: {
+      status?: string;
+      reconnectTimeout?: ReturnType<typeof setTimeout> | null;
+      manuallyClosing?: boolean;
+      prevCommandQueue?: {
+        shift: () => { command?: { reject: (err: Error) => void } } | undefined;
+      } | null;
+      setStatus?: (status: string) => void;
+      flushQueue?: (err: Error) => void;
+    },
+    reconnect = false,
+  ) {
+    const drainPrevCommandQueue = (err: Error) => {
+      if (!this.prevCommandQueue) return;
+      for (let item = this.prevCommandQueue.shift(); item; item = this.prevCommandQueue.shift()) {
+        item.command?.reject(err);
+      }
+      this.prevCommandQueue = null;
+    };
+    if (this.status === "reconnecting" && !reconnect) {
+      if (this.reconnectTimeout) {
+        clearTimeout(this.reconnectTimeout);
+        this.reconnectTimeout = null;
+      }
+      this.manuallyClosing = false;
+      this.setStatus?.("end");
+      const closedErr = new Error("Connection is closed.");
+      this.flushQueue?.(closedErr);
+      drainPrevCommandQueue(closedErr);
+      return;
+    }
+    const result = origDisconnect.call(this, reconnect);
+    if (!reconnect) {
+      drainPrevCommandQueue(new Error("Connection is closed."));
+    }
+    return result;
+  };
+  proto[RECONNECTING_PATCHED] = true;
+}
+
+patchIoredisDisconnect();
+
 /**
  * How long a connection may hear nothing while it is waiting for a reply
  * before ioredis destroys the socket and reconnects.
