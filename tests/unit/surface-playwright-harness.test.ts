@@ -1,5 +1,7 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
+import net from "node:net";
+import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
@@ -168,8 +170,345 @@ describe("surface Playwright harness isolation", () => {
       url: "http://127.0.0.1:44173",
     });
     expect(docs.webServer).not.toHaveProperty("port");
-    expect(docs.webServer.command).toContain("&& exec pnpm exec vitepress preview");
+    expect(docs.webServer.command).toContain(
+      "&& exec node ../../tests/playwright-docs-preview.mjs .",
+    );
     expect(docs.webServer.command).toContain("--host 127.0.0.1 --port 44173 --strictPort");
+  });
+
+  test("docs preview command binds the requested IPv4 loopback host, fails fast on occupied ports, and preserves cleanUrls and 404.html", async () => {
+    const blocker = net.createServer();
+    await new Promise<void>((resolve, reject) => {
+      blocker.once("error", reject);
+      blocker.listen(0, "127.0.0.1", () => resolve());
+    });
+    const address = blocker.address();
+    if (!address || typeof address === "string") {
+      throw new Error("expected an IPv4 socket address");
+    }
+    const port = address.port;
+
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "snapotter-docs-preview-"));
+    const distDir = path.join(tmpRoot, ".vitepress", "dist");
+    fs.mkdirSync(path.join(distDir, "guide"), { recursive: true });
+    fs.mkdirSync(path.join(distDir, "assets"), { recursive: true });
+    fs.writeFileSync(path.join(distDir, "index.html"), "<!doctype html><h1>Docs Home</h1>");
+    fs.writeFileSync(
+      path.join(distDir, "guide", "getting-started.html"),
+      "<!doctype html><h1>Getting Started Guide</h1>",
+    );
+    fs.writeFileSync(path.join(distDir, "404.html"), "<!doctype html><h1>Custom Docs 404</h1>");
+
+    const docs = await loadConfig("../../playwright.docs.config.js", {
+      PLAYWRIGHT_DOCS_PORT: String(port),
+      PLAYWRIGHT_RUN_ID: "docs_preview_runtime",
+    });
+    const fullCommand = (docs.webServer as { command: string }).command;
+    const previewMatch = fullCommand.match(/&&\s*exec\s+(.+)$/);
+    expect(previewMatch, `unexpected docs webServer command: ${fullCommand}`).not.toBeNull();
+    const previewCommand = (previewMatch?.[1] ?? "").replace(
+      /\s+\.\s+--host\s+/,
+      ` ${JSON.stringify(tmpRoot)} --host `,
+    );
+
+    const runPreviewCommand = () =>
+      spawn("sh", ["-c", `exec ${previewCommand}`], {
+        cwd: path.join(root, "apps", "docs"),
+        env: process.env,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+
+    let collidingChild: ReturnType<typeof runPreviewCommand> | undefined;
+    let liveChild: ReturnType<typeof runPreviewCommand> | undefined;
+    try {
+      collidingChild = runPreviewCommand();
+      let collidingStdout = "";
+      let collidingStderr = "";
+      collidingChild.stdout?.on("data", (chunk) => {
+        collidingStdout += String(chunk);
+      });
+      collidingChild.stderr?.on("data", (chunk) => {
+        collidingStderr += String(chunk);
+      });
+
+      const collisionResult = await new Promise<{
+        code: number | null;
+        signal: NodeJS.Signals | null;
+        timedOut: boolean;
+      }>((resolve) => {
+        const timer = setTimeout(() => {
+          collidingChild?.kill("SIGTERM");
+          collidingChild?.once("exit", () => {
+            resolve({ code: null, signal: "SIGTERM", timedOut: true });
+          });
+        }, 4_000);
+        collidingChild?.once("exit", (code, signal) => {
+          clearTimeout(timer);
+          resolve({ code, signal, timedOut: false });
+        });
+      });
+
+      expect(
+        collisionResult.timedOut,
+        `docs preview stayed alive when 127.0.0.1:${port} was already bound (stdout=${JSON.stringify(collidingStdout)}, stderr=${JSON.stringify(collidingStderr)})`,
+      ).toBe(false);
+      expect(collisionResult.code).not.toBe(0);
+      expect(collidingStdout).not.toContain("Built site served at");
+      expect(collidingStderr).toMatch(/EADDRINUSE|already in use/i);
+
+      await new Promise<void>((resolve, reject) => {
+        blocker.close((error) => (error ? reject(error) : resolve()));
+      });
+
+      liveChild = runPreviewCommand();
+      let liveStderr = "";
+      liveChild.stderr?.on("data", (chunk) => {
+        liveStderr += String(chunk);
+      });
+
+      const baseUrl = `http://127.0.0.1:${port}`;
+      let ready = false;
+      let lastFailure = "no attempt made";
+      for (let attempt = 0; attempt < 50; attempt += 1) {
+        if (liveChild.exitCode !== null || liveChild.signalCode !== null) {
+          throw new Error(
+            `docs preview exited early with ${liveChild.exitCode ?? liveChild.signalCode}: ${liveStderr}`,
+          );
+        }
+        try {
+          const response = await fetch(baseUrl);
+          if (response.status === 200) {
+            ready = true;
+            break;
+          }
+          lastFailure = `HTTP ${response.status}`;
+        } catch (error) {
+          lastFailure = error instanceof Error ? error.message : String(error);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      expect(
+        ready,
+        `docs preview did not become ready on ${baseUrl} (lastFailure=${lastFailure}): ${liveStderr}`,
+      ).toBe(true);
+
+      // Verify the preview server actually owns 127.0.0.1:<port> rather than [::]:<port>.
+      const probe = net.createServer();
+      const probeError = await new Promise<NodeJS.ErrnoException | null>((resolve, reject) => {
+        probe.once("error", (error: NodeJS.ErrnoException) => resolve(error));
+        probe.listen({ port, host: "127.0.0.1", exclusive: true }, () => {
+          probe.close((closeError) => (closeError ? reject(closeError) : resolve(null)));
+        });
+      });
+      expect(probeError?.code).toBe("EADDRINUSE");
+
+      const homeResponse = await fetch(`${baseUrl}/`);
+      expect(homeResponse.status).toBe(200);
+      expect(await homeResponse.text()).toContain("Docs Home");
+
+      const cleanUrlResponse = await fetch(`${baseUrl}/guide/getting-started`);
+      expect(cleanUrlResponse.status).toBe(200);
+      expect(await cleanUrlResponse.text()).toContain("Getting Started Guide");
+
+      const notFoundPageResponse = await fetch(`${baseUrl}/guide/does-not-exist`);
+      expect(notFoundPageResponse.status).toBe(404);
+      expect(await notFoundPageResponse.text()).toContain("Custom Docs 404");
+
+      const notFoundAssetResponse = await fetch(`${baseUrl}/assets/missing.js`);
+      expect(notFoundAssetResponse.status).toBe(404);
+      expect(await notFoundAssetResponse.text()).toBe("");
+    } finally {
+      for (const child of [collidingChild, liveChild]) {
+        if (child && child.exitCode === null && child.signalCode === null) {
+          child.kill("SIGTERM");
+          await new Promise<void>((resolve) => {
+            const killTimer = setTimeout(() => {
+              child.kill("SIGKILL");
+              resolve();
+            }, 2_000);
+            child.once("exit", () => {
+              clearTimeout(killTimer);
+              resolve();
+            });
+          });
+        }
+      }
+      if (blocker.listening) {
+        await new Promise<void>((resolve, reject) => {
+          blocker.close((error) => (error ? reject(error) : resolve()));
+        });
+      }
+      fs.rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("docs preview helper validates CLI arguments, restores net.Server.prototype.listen, and binds both loopbacks under localhost", async () => {
+    const { parseDocsPreviewArgs, startDocsPreviewServer } = await import(
+      "../playwright-docs-preview.mjs"
+    );
+
+    expect(
+      parseDocsPreviewArgs(["apps/docs", "--host", "127.0.0.1", "--port", "44173", "--strictPort"]),
+    ).toEqual({
+      host: "127.0.0.1",
+      port: 44173,
+      root: "apps/docs",
+      strictPort: true,
+    });
+    expect(parseDocsPreviewArgs(["--host=localhost", "--port=44174", "--strictPort"])).toEqual({
+      host: "localhost",
+      port: 44174,
+      root: ".",
+      strictPort: true,
+    });
+
+    expect(() => parseDocsPreviewArgs(["--host", "127.0.0.1", "--port", "44173"])).toThrow(
+      /requires --strictPort/,
+    );
+    expect(() => parseDocsPreviewArgs(["--host", "--strictPort", "--port", "44173"])).toThrow(
+      /--host requires a value/,
+    );
+    expect(() => parseDocsPreviewArgs(["--host", "127.0.0.1", "--port", "--strictPort"])).toThrow(
+      /--port requires a value/,
+    );
+    expect(() =>
+      parseDocsPreviewArgs(["--host", "0.0.0.0", "--port", "44173", "--strictPort"]),
+    ).toThrow(/host must be "127.0.0.1" or "localhost"/);
+    expect(() =>
+      parseDocsPreviewArgs(["   ", "--host", "127.0.0.1", "--port", "44173", "--strictPort"]),
+    ).toThrow(/root must be a non-empty path/);
+    expect(() =>
+      parseDocsPreviewArgs(["--host", "127.0.0.1", "--port", "not-a-port", "--strictPort"]),
+    ).toThrow(/port must be an integer/);
+    expect(() =>
+      parseDocsPreviewArgs(["--host", "127.0.0.1", "--port", "1023", "--strictPort"]),
+    ).toThrow(/port must be between 1024 and 65535/);
+    expect(() =>
+      parseDocsPreviewArgs(["--host", "127.0.0.1", "--port", "65536", "--strictPort"]),
+    ).toThrow(/port must be between 1024 and 65535/);
+    expect(() =>
+      parseDocsPreviewArgs(["--host", "127.0.0.1", "--port", "44173", "--strictPort", "--bad"]),
+    ).toThrow(/Unknown docs preview flag/);
+    expect(() =>
+      parseDocsPreviewArgs([
+        "one",
+        "two",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "44173",
+        "--strictPort",
+      ]),
+    ).toThrow(/Unexpected positional argument/);
+
+    const origListen = net.Server.prototype.listen;
+    const blocker = net.createServer();
+    await new Promise<void>((resolve, reject) => {
+      blocker.once("error", reject);
+      blocker.listen(0, "127.0.0.1", () => resolve());
+    });
+    const address = blocker.address();
+    if (!address || typeof address === "string") {
+      throw new Error("expected an IPv4 socket address");
+    }
+    try {
+      await expect(
+        startDocsPreviewServer({
+          host: "localhost",
+          port: address.port,
+          root: ".",
+          strictPort: true,
+        }),
+      ).rejects.toMatchObject({ code: "EADDRINUSE" });
+      expect(net.Server.prototype.listen).toBe(origListen);
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        blocker.close((error) => (error ? reject(error) : resolve()));
+      });
+    }
+
+    // Also test IPv6 [::1] collision when IPv6 loopback is available on the host.
+    const ipv6Blocker = net.createServer();
+    const ipv6BoundPort = await new Promise<number | null>((resolve, reject) => {
+      ipv6Blocker.once("error", (error: NodeJS.ErrnoException) => {
+        if (error.code === "EADDRNOTAVAIL" || error.code === "EAFNOSUPPORT") {
+          resolve(null);
+          return;
+        }
+        reject(error);
+      });
+      ipv6Blocker.listen({ port: 0, host: "::1", exclusive: true }, () => {
+        const addr = ipv6Blocker.address();
+        resolve(addr && typeof addr !== "string" ? addr.port : null);
+      });
+    });
+    if (ipv6BoundPort !== null) {
+      try {
+        await expect(
+          startDocsPreviewServer({
+            host: "127.0.0.1",
+            port: ipv6BoundPort,
+            root: ".",
+            strictPort: true,
+          }),
+        ).rejects.toMatchObject({ code: "EADDRINUSE" });
+      } finally {
+        await new Promise<void>((resolve, reject) => {
+          ipv6Blocker.close((error) => (error ? reject(error) : resolve()));
+        });
+      }
+    }
+
+    // Verify startDocsPreviewServer({ host: "localhost" }) serves http://localhost:<port>
+    // and holds both 127.0.0.1:<port> and [::1]:<port> until closed.
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "snapotter-docs-localhost-"));
+    const distDir = path.join(tmpRoot, ".vitepress", "dist");
+    fs.mkdirSync(distDir, { recursive: true });
+    fs.writeFileSync(path.join(distDir, "index.html"), "<!doctype html><h1>Localhost Docs</h1>");
+    fs.writeFileSync(path.join(distDir, "404.html"), "<!doctype html><h1>Localhost 404</h1>");
+
+    const portFinder = net.createServer();
+    await new Promise<void>((resolve, reject) => {
+      portFinder.once("error", reject);
+      portFinder.listen(0, "127.0.0.1", () => resolve());
+    });
+    const freePort = (portFinder.address() as net.AddressInfo).port;
+    await new Promise<void>((resolve, reject) => {
+      portFinder.close((error) => (error ? reject(error) : resolve()));
+    });
+
+    let server: net.Server | undefined;
+    try {
+      server = await startDocsPreviewServer({
+        host: "localhost",
+        port: freePort,
+        root: tmpRoot,
+        strictPort: true,
+      });
+      expect(net.Server.prototype.listen).toBe(origListen);
+
+      const res = await fetch(`http://localhost:${freePort}/`);
+      expect(res.status).toBe(200);
+      expect(await res.text()).toContain("Localhost Docs");
+
+      if (ipv6BoundPort !== null) {
+        const v6Probe = net.createServer();
+        const v6Error = await new Promise<NodeJS.ErrnoException | null>((resolve, reject) => {
+          v6Probe.once("error", (error: NodeJS.ErrnoException) => resolve(error));
+          v6Probe.listen({ port: freePort, host: "::1", exclusive: true }, () => {
+            v6Probe.close((closeError) => (closeError ? reject(closeError) : resolve(null)));
+          });
+        });
+        expect(v6Error?.code).toBe("EADDRINUSE");
+      }
+    } finally {
+      if (server?.listening) {
+        await new Promise<void>((resolve, reject) => {
+          server?.close((error) => (error ? reject(error) : resolve()));
+        });
+      }
+      fs.rmSync(tmpRoot, { recursive: true, force: true });
+    }
   });
 
   test("demo builds and previews on an owned dynamic endpoint", async () => {
@@ -393,6 +732,15 @@ describe("surface Playwright harness isolation", () => {
     expect(process.env.PLAYWRIGHT_LANDING_PORT).toBe("28150");
     expect(process.env.PLAYWRIGHT_LANDING_URL).toBe("http://localhost:28150");
     expect(matchingPortAndUrlConfig.use?.baseURL).toBe("http://localhost:28150");
+
+    const docsLocalhostConfig = await loadConfig("../../playwright.docs.config.js", {
+      PLAYWRIGHT_DOCS_URL: "http://localhost:28152",
+    });
+    expect(process.env.PLAYWRIGHT_DOCS_PORT).toBe("28152");
+    expect(docsLocalhostConfig.use?.baseURL).toBe("http://localhost:28152");
+    expect(docsLocalhostConfig.webServer.command).toContain(
+      "--host localhost --port 28152 --strictPort",
+    );
 
     await expect(
       loadConfig("../../playwright.landing.config.js", { PLAYWRIGHT_LANDING_PORT: "not-a-port" }),
