@@ -9,6 +9,7 @@ import type {
 } from "../routes/tool-factory.js";
 import { isBinarySpawnFailure } from "./binary-overrides.js";
 import { isOperationalErrno } from "./error-report.js";
+import { asDecoderOutOfMemory, DecoderOutOfMemoryError } from "./format-decoders.js";
 import { logger } from "./logger.js";
 
 /** Short single-line messages so friendlyError() passes them to the client verbatim. */
@@ -153,6 +154,8 @@ export function withAiImageEncodeContext<T = unknown>(
  * uploading corrupt files.
  */
 export async function asInputErrorIfUndecodable(inputBuffer: Buffer, err: unknown): Promise<Error> {
+  const oom = asDecoderOutOfMemory(err);
+  if (oom instanceof DecoderOutOfMemoryError) return oom;
   const alreadyClassified =
     isPassthroughError(err) || (err instanceof Error && isOperationalErrno(err));
   if (alreadyClassified) return err as Error;
@@ -165,6 +168,10 @@ export async function asInputErrorIfUndecodable(inputBuffer: Buffer, err: unknow
       .raw()
       .toBuffer();
   } catch (probeErr) {
+    const probeOom = asDecoderOutOfMemory(probeErr);
+    if (probeOom instanceof DecoderOutOfMemoryError) {
+      return probeOom;
+    }
     if (probeErr instanceof Error && isOperationalErrno(probeErr)) {
       return err instanceof Error ? err : new Error(String(err));
     }

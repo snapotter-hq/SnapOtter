@@ -36,6 +36,7 @@ vi.mock("../../../apps/api/src/lib/format-decoders.js", async (importOriginal) =
   const actual =
     await importOriginal<typeof import("../../../apps/api/src/lib/format-decoders.js")>();
   return {
+    asDecoderOutOfMemory: actual.asDecoderOutOfMemory,
     DecoderUnavailableError: actual.DecoderUnavailableError,
     DecoderOutOfMemoryError: actual.DecoderOutOfMemoryError,
     isDecoderUnavailable: actual.isDecoderUnavailable,
@@ -727,6 +728,117 @@ describe("ImageInputHandler operational tmpdir write faults (#2800)", () => {
         name: "DecoderUnavailableError",
         cause: emfileErr,
       }),
+    });
+  });
+
+  it("surfaces 503 ENGINE_UNAVAILABLE with DecoderOutOfMemoryError cause when decodeHeic, decodeToSharpCompat, the DNG Sharp fallback probe, the AVIF probe/fallback, or the post-decode metadata check hits OOM (#3632)", async () => {
+    const v8Oom = () => new RangeError("Array buffer allocation failed");
+    const sigkillOom = () =>
+      Object.assign(new Error("decoder exited SIGKILL"), { signal: "SIGKILL" });
+
+    // 1. Raw OOM in decodeHeic and decodeToSharpCompat
+    for (const makeOom of [v8Oom, sigkillOom]) {
+      detected("heif");
+      mocks.decodeHeic.mockRejectedValueOnce(makeOom());
+      await expect(prepare("photo.heic")).rejects.toMatchObject({
+        name: "InputValidationError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: expect.any(DecoderOutOfMemoryError),
+      });
+
+      detected("raw");
+      mocks.decodeToSharpCompat.mockRejectedValueOnce(makeOom());
+      mocks.metadata.mockClear();
+      await expect(prepare("photo.dng")).rejects.toMatchObject({
+        name: "InputValidationError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: expect.any(DecoderOutOfMemoryError),
+      });
+      expect(mocks.metadata).not.toHaveBeenCalled();
+    }
+
+    // 2. DNG Sharp fallback probe hits V8 OOM when decodeToSharpCompat failed with DecoderUnavailableError or a client Error
+    for (const decodeFailure of [
+      new DecoderUnavailableError("No dcraw_emu found."),
+      new Error("corrupt dng"),
+    ]) {
+      detected("raw");
+      mocks.decodeToSharpCompat.mockRejectedValueOnce(decodeFailure);
+      mocks.toBuffer.mockRejectedValueOnce(v8Oom());
+
+      await expect(prepare("photo.dng")).rejects.toMatchObject({
+        name: "InputValidationError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: expect.any(DecoderOutOfMemoryError),
+      });
+
+      detected("raw");
+      mocks.decodeToSharpCompat.mockRejectedValueOnce(decodeFailure);
+      mocks.metadata.mockRejectedValueOnce(v8Oom());
+
+      await expect(prepare("photo.dng")).rejects.toMatchObject({
+        name: "InputValidationError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: expect.any(DecoderOutOfMemoryError),
+      });
+
+      detected("raw");
+      mocks.decodeToSharpCompat.mockRejectedValueOnce(decodeFailure);
+      mocks.toBuffer.mockRejectedValueOnce(new Error("Input image exceeds pixel limit"));
+
+      await expect(prepare("photo.dng")).rejects.toMatchObject({
+        name: "InputValidationError",
+        statusCode: 400,
+        message: "Input image exceeds pixel limit",
+      });
+    }
+
+    // 3. AVIF native probe hits V8 OOM directly (without trying the CLI decoder) or CLI fallback hits raw OOM
+    detected("avif");
+    mocks.decodeAnyFormat.mockClear();
+    mocks.toBuffer.mockRejectedValueOnce(v8Oom());
+    await expect(prepare("photo.avif")).rejects.toMatchObject({
+      name: "InputValidationError",
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: expect.any(DecoderOutOfMemoryError),
+    });
+    expect(mocks.decodeAnyFormat).not.toHaveBeenCalled();
+
+    for (const makeOom of [v8Oom, sigkillOom]) {
+      detected("avif");
+      mocks.toBuffer.mockRejectedValueOnce(new Error("heif: Unsupported bitstream"));
+      mocks.decodeAnyFormat.mockRejectedValueOnce(makeOom());
+      await expect(prepare("photo.avif")).rejects.toMatchObject({
+        name: "InputValidationError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: expect.any(DecoderOutOfMemoryError),
+      });
+    }
+
+    // 4. Post-decode metadata re-check hits V8 OOM when maxPixels is set
+    mocks.validateImageBuffer.mockResolvedValueOnce({
+      valid: true,
+      format: "jpeg",
+      width: 100,
+      height: 100,
+    });
+    mocks.metadata.mockRejectedValueOnce(v8Oom());
+    await expect(
+      new ImageInputHandler().prepare(RAW, "photo.jpg", {
+        scratchDir: "/tmp/in",
+        maxPixels: 40_000_000,
+      }),
+    ).rejects.toMatchObject({
+      name: "InputValidationError",
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: expect.any(DecoderOutOfMemoryError),
     });
   });
 });

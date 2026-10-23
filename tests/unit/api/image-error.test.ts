@@ -9,7 +9,7 @@ import {
 } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { runAiToolJob } from "../../../apps/api/src/jobs/ai-handlers.js";
 import { classifyError } from "../../../apps/api/src/lib/error-report.js";
 import {
@@ -508,6 +508,58 @@ describe("asInputErrorIfUndecodable", () => {
         path: "heif-enc",
       });
       expect(await asInputErrorIfUndecodable(truncatedJpg, spawnErr)).toBe(spawnErr);
+    }
+  });
+
+  it("converts OOM errors passed in or thrown during the Sharp fallback probe into DecoderOutOfMemoryError (#3632)", async () => {
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    const classifiedDirect = await asInputErrorIfUndecodable(truncatedJpg, v8Oom);
+    expect(classifiedDirect).toMatchObject({
+      name: "DecoderOutOfMemoryError",
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: v8Oom,
+    });
+    expect(isToolInputError(classifiedDirect)).toBe(false);
+
+    const sigkillOom = Object.assign(new Error("decoder exited SIGKILL"), { signal: "SIGKILL" });
+    const classifiedSigkill = await asInputErrorIfUndecodable(truncatedJpg, sigkillOom);
+    expect(classifiedSigkill).toMatchObject({
+      name: "DecoderOutOfMemoryError",
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: sigkillOom,
+    });
+
+    const decodable = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 10, g: 20, b: 30 } },
+    })
+      .png()
+      .toBuffer();
+    const probeV8Oom = new RangeError("Array buffer allocation failed");
+    const rawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
+      this: sharp.Sharp,
+    ) {
+      return {
+        toBuffer: async () => {
+          throw probeV8Oom;
+        },
+      } as unknown as sharp.Sharp;
+    });
+    try {
+      const classifiedProbe = await asInputErrorIfUndecodable(
+        decodable,
+        new Error("downstream decode failure"),
+      );
+      expect(classifiedProbe).toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: probeV8Oom,
+      });
+      expect(isToolInputError(classifiedProbe)).toBe(false);
+    } finally {
+      rawSpy.mockRestore();
     }
   });
 });

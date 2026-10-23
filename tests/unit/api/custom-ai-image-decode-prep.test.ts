@@ -964,6 +964,101 @@ describe("custom AI image routes input decode, fileExt, SVG prep, and error logg
       cliOomSpy.mockRestore();
     }
 
+    // 6b. Raw OOM in decodeHeic, decodeToSharpCompat, the DNG Sharp fallback probe, and SVG/non-SVG rasterizeToPng surfaces DecoderOutOfMemoryError (#3632)
+    for (const makeRawOom of [
+      () => new RangeError("Array buffer allocation failed"),
+      () => Object.assign(new Error("decoder exited SIGKILL"), { signal: "SIGKILL" }),
+    ]) {
+      const heicRawOomSpy = vi
+        .spyOn(heicConverter, "decodeHeic")
+        .mockRejectedValueOnce(makeRawOom());
+      try {
+        await expect(prepareRouteImage(HEIC, "photo.heic", "heif")).rejects.toBeInstanceOf(
+          formatDecoders.DecoderOutOfMemoryError,
+        );
+      } finally {
+        heicRawOomSpy.mockRestore();
+      }
+
+      const cliRawOomSpy = vi
+        .spyOn(formatDecoders, "decodeToSharpCompat")
+        .mockRejectedValueOnce(makeRawOom());
+      try {
+        await expect(prepareRouteImage(validPng, "photo.dng", "raw")).rejects.toBeInstanceOf(
+          formatDecoders.DecoderOutOfMemoryError,
+        );
+      } finally {
+        cliRawOomSpy.mockRestore();
+      }
+    }
+
+    for (const decodeFailure of [
+      new formatDecoders.DecoderUnavailableError("No dcraw_emu found."),
+      new Error("corrupt dng"),
+    ]) {
+      const dngCliSpy = vi
+        .spyOn(formatDecoders, "decodeToSharpCompat")
+        .mockRejectedValueOnce(decodeFailure);
+      const rawProbeOomSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
+        this: sharp.Sharp,
+      ) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Array buffer allocation failed");
+          },
+        } as unknown as sharp.Sharp;
+      });
+      try {
+        await expect(prepareRouteImage(validPng, "photo.dng", "raw")).rejects.toBeInstanceOf(
+          formatDecoders.DecoderOutOfMemoryError,
+        );
+      } finally {
+        rawProbeOomSpy.mockRestore();
+        dngCliSpy.mockRestore();
+      }
+    }
+
+    const validSvgBuf = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16"/></svg>',
+    );
+    const apngMetaOomSpy = vi
+      .spyOn(sharp.prototype, "metadata")
+      .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"));
+    try {
+      await expect(prepareRouteImage(validPng, "photo.apng", "png")).rejects.toBeInstanceOf(
+        formatDecoders.DecoderOutOfMemoryError,
+      );
+    } finally {
+      apngMetaOomSpy.mockRestore();
+    }
+
+    const pngOomSpy = vi
+      .spyOn(sharp.prototype, "png")
+      .mockImplementationOnce(function (this: sharp.Sharp) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Array buffer allocation failed");
+          },
+        } as unknown as sharp.Sharp;
+      })
+      .mockImplementationOnce(function (this: sharp.Sharp) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Array buffer allocation failed");
+          },
+        } as unknown as sharp.Sharp;
+      });
+    try {
+      await expect(
+        prepareRouteImage(validSvgBuf, "icon.svg", "svg", { rasterizeSvg: true }),
+      ).rejects.toBeInstanceOf(formatDecoders.DecoderOutOfMemoryError);
+      await expect(
+        prepareRouteImage(validPng, "photo.png", "png", { rasterizeToPng: true }),
+      ).rejects.toBeInstanceOf(formatDecoders.DecoderOutOfMemoryError);
+    } finally {
+      pngOomSpy.mockRestore();
+    }
+
     // 7. Corrupt .heic client decode failure returns 422 without request.log.error
     const heicCorruptSpy = vi
       .spyOn(heicConverter, "decodeHeic")

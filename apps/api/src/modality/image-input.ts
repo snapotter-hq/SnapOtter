@@ -6,6 +6,7 @@ import { autoOrient } from "../lib/auto-orient.js";
 import { stripInternalPaths } from "../lib/errors.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import {
+  asDecoderOutOfMemory,
   DecoderOutOfMemoryError,
   decodeAnyFormat,
   decodeToSharpCompat,
@@ -63,7 +64,7 @@ export class ImageInputHandler implements InputHandler {
         if (ext) name = `${name.slice(0, -ext.length)}.png`;
       } catch (rawErr) {
         opts.signal?.throwIfAborted();
-        const err = normalizeOperationalWriteError(rawErr);
+        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
         if (isPixelSafetyError(err)) {
           throw new InputValidationError(err instanceof Error ? err.message : String(err));
         }
@@ -92,7 +93,7 @@ export class ImageInputHandler implements InputHandler {
         opts.signal?.throwIfAborted();
       } catch (rawDecodeErr) {
         opts.signal?.throwIfAborted();
-        const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+        const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
         if (isPixelSafetyError(decodeErr)) {
           throw new InputValidationError(
             decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
@@ -111,6 +112,14 @@ export class ImageInputHandler implements InputHandler {
           await boundedSharp(fileBuffer, opts.maxPixels).metadata();
           await boundedSharp(fileBuffer, opts.maxPixels).resize(1).raw().toBuffer();
         } catch (err) {
+          opts.signal?.throwIfAborted();
+          const probeErr = asDecoderOutOfMemory(err);
+          if (probeErr instanceof DecoderOutOfMemoryError) {
+            throw engineUnavailable(probeErr);
+          }
+          if (isPixelSafetyError(err)) {
+            throw new InputValidationError(errorMessage(err));
+          }
           // Sharp reads some of these formats itself (DNG is a TIFF), so a
           // missing CLI decoder only matters once that fallback fails too.
           if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
@@ -153,6 +162,8 @@ export class ImageInputHandler implements InputHandler {
         await boundedSharp(fileBuffer, opts.maxPixels).resize(1).raw().toBuffer();
       } catch (probeErr) {
         opts.signal?.throwIfAborted();
+        const probeOom = asDecoderOutOfMemory(probeErr);
+        if (probeOom instanceof DecoderOutOfMemoryError) throw engineUnavailable(probeOom);
         // The safety cap tripping is not a decoder gap: answer 400 like the
         // HEIC and CLI branches do, and don't hand the file to ImageMagick.
         if (isPixelSafetyError(probeErr)) throw new InputValidationError(errorMessage(probeErr));
@@ -175,7 +186,7 @@ export class ImageInputHandler implements InputHandler {
           if (ext) name = `${name.slice(0, -ext.length)}.png`;
         } catch (rawFallbackErr) {
           opts.signal?.throwIfAborted();
-          const fallbackErr = normalizeOperationalWriteError(rawFallbackErr);
+          const fallbackErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawFallbackErr));
           if (isPixelSafetyError(fallbackErr)) {
             throw new InputValidationError(errorMessage(fallbackErr));
           }
@@ -205,6 +216,8 @@ export class ImageInputHandler implements InputHandler {
       } catch (err) {
         opts.signal?.throwIfAborted();
         if (err instanceof InputValidationError) throw err;
+        const oom = asDecoderOutOfMemory(err);
+        if (oom instanceof DecoderOutOfMemoryError) throw engineUnavailable(oom);
         throw new InputValidationError(
           "Image exceeds the decoded image safety limits",
           400,

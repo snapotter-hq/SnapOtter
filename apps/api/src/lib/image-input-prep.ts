@@ -5,6 +5,7 @@ import sharp from "sharp";
 import { InputValidationError } from "../modality/contract.js";
 import { autoOrient } from "./auto-orient.js";
 import {
+  asDecoderOutOfMemory,
   DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
@@ -83,7 +84,7 @@ export async function prepareRouteImage(
       buf = await decodeHeic(buf);
       convertedToPng = true;
     } catch (rawErr) {
-      const err = normalizeOperationalWriteError(rawErr);
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
       throw err instanceof Error ? markToolInputError(err) : new ToolInputError(String(err));
     }
@@ -96,7 +97,7 @@ export async function prepareRouteImage(
       buf = await decodeToSharpCompat(buf, format, fileExt);
       convertedToPng = true;
     } catch (rawDecodeErr) {
-      const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+      const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
       if (
         decodeErr instanceof DecoderOutOfMemoryError ||
         (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
@@ -110,6 +111,10 @@ export async function prepareRouteImage(
           await sharp(buf).resize(1).raw().toBuffer();
         }
       } catch (err) {
+        const probeErr = asDecoderOutOfMemory(err);
+        if (probeErr instanceof DecoderOutOfMemoryError) {
+          throw probeErr;
+        }
         if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
           throw decodeErr;
         }
@@ -122,7 +127,11 @@ export async function prepareRouteImage(
   if (!isSvg && format === "png" && filename.toLowerCase().endsWith(".apng")) {
     const meta = await sharp(buf)
       .metadata()
-      .catch(() => null);
+      .catch((err: unknown) => {
+        const oom = asDecoderOutOfMemory(err);
+        if (oom instanceof DecoderOutOfMemoryError) throw oom;
+        return null;
+      });
     if (meta?.format === "svg") isSvg = true;
   }
 
@@ -149,7 +158,7 @@ export async function prepareRouteImage(
         buf = await sharp(buf).png().toBuffer();
         convertedToPng = true;
       } catch (rawErr) {
-        const err = normalizeOperationalWriteError(rawErr);
+        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
         if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
         throw await asInputErrorIfUndecodable(buf, err);
       }
@@ -161,7 +170,7 @@ export async function prepareRouteImage(
         buf = await sharp(buf).png().toBuffer();
         convertedToPng = true;
       } catch (rawErr) {
-        const err = normalizeOperationalWriteError(rawErr);
+        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
         if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
         throw await asInputErrorIfUndecodable(buf, err);
       }
