@@ -999,4 +999,47 @@ describe("writeTempExclusive operational write errors in decodeToSharpCompat and
     });
     expect(failures.closedHandles).toBe(6);
   });
+
+  it("surfaces a V8 buffer allocation RangeError from writeTempExclusive in decodeAnyFormat and ImageInputHandler.prepare as a 503 DecoderOutOfMemoryError (#3741)", async () => {
+    const { fixtures, readFixture } = await import("../../fixtures/index.js");
+    const { ImageInputHandler } = await import("../../../apps/api/src/modality/image-input.js");
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    failures.closedHandles = 0;
+    failures.writeFile = v8Oom;
+
+    const avifErr = (await decodeAnyFormat(Buffer.from("avif-bytes"), "avif").catch(
+      (e: unknown) => e,
+    )) as Error & { cause?: unknown };
+
+    expect(isDecoderUnavailable(avifErr)).toBe(true);
+    expect(avifErr.name).toBe("DecoderOutOfMemoryError");
+    expect(avifErr.cause).toBe(v8Oom);
+    expect(failures.closedHandles).toBe(1);
+
+    const corruptAvif = Buffer.from(readFixture(fixtures.image.formats("avif")));
+    corruptAvif.fill(0xff, corruptAvif.length - 200);
+    failures.writeFile = v8Oom;
+    const prepareErr = await new ImageInputHandler()
+      .prepare(corruptAvif, "photo.avif", {
+        scratchDir: "/tmp/in",
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as never,
+      })
+      .then(
+        (res) =>
+          new Error(
+            `Expected prepare() to reject, but resolved (${res.filename}, ${res.buffer.length} bytes)`,
+          ),
+        (e: unknown) => e,
+      );
+    expect(prepareErr).toMatchObject({
+      name: "InputValidationError",
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: expect.objectContaining({
+        name: "DecoderOutOfMemoryError",
+        cause: v8Oom,
+      }),
+    });
+    expect(failures.closedHandles).toBe(2);
+  });
 });

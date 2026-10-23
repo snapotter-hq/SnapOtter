@@ -512,7 +512,7 @@ async function writeTempExclusive(filePath: string, buffer: Buffer): Promise<voi
       });
     }
   } catch (err) {
-    throw normalizeOperationalWriteError(err);
+    throw normalizeOperationalWriteError(asDecoderOutOfMemory(err));
   }
 }
 

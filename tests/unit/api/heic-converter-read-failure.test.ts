@@ -602,4 +602,48 @@ describe("writeTempExclusive operational write errors in decodeHeic and encodeHe
     });
     expect(failures.closedHandles).toBe(4);
   });
+
+  it("surfaces a V8 buffer allocation RangeError from writeTempExclusive in decodeHeic, encodeHeic, and ImageInputHandler.prepare as a 503 DecoderOutOfMemoryError (#3741)", async () => {
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    failures.writeFile = v8Oom;
+    const decodeErr = await decodeError(readFixture(fixtures.image.formats("heic")));
+    expect(isDecoderUnavailable(decodeErr)).toBe(true);
+    expect(decodeErr.name).toBe("DecoderOutOfMemoryError");
+    expect(decodeErr.cause).toBe(v8Oom);
+    expect(failures.closedHandles).toBe(1);
+
+    failures.writeFile = v8Oom;
+    const encodeErr = (await encodeHeic(readFixture(fixtures.image.base.png200)).catch(
+      (e: unknown) => e,
+    )) as Error & { cause?: unknown };
+    expect(isDecoderUnavailable(encodeErr)).toBe(true);
+    expect(encodeErr.name).toBe("DecoderOutOfMemoryError");
+    expect(encodeErr.cause).toBe(v8Oom);
+    expect(failures.closedHandles).toBe(2);
+
+    const { ImageInputHandler } = await import("../../../apps/api/src/modality/image-input.js");
+    failures.writeFile = v8Oom;
+    const prepareErr = await new ImageInputHandler()
+      .prepare(readFixture(fixtures.image.formats("heic")), "photo.heic", {
+        scratchDir: "/tmp/in",
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as never,
+      })
+      .then(
+        (res) =>
+          new Error(
+            `Expected prepare() to reject, but resolved (${res.filename}, ${res.buffer.length} bytes)`,
+          ),
+        (e: unknown) => e,
+      );
+    expect(prepareErr).toMatchObject({
+      name: "InputValidationError",
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: expect.objectContaining({
+        name: "DecoderOutOfMemoryError",
+        cause: v8Oom,
+      }),
+    });
+    expect(failures.closedHandles).toBe(3);
+  });
 });
