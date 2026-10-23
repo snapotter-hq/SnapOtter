@@ -46,7 +46,7 @@ import {
   sanitizeSvg,
 } from "../lib/svg-sanitize.js";
 import { engineUnavailable } from "../modality/image-input.js";
-import { getAuthUser } from "../plugins/auth.js";
+import { requireFileAccess } from "../permissions.js";
 
 /** Formats browsers can display natively (no preview needed). */
 const BROWSER_PREVIEWABLE = new Set([
@@ -172,6 +172,12 @@ export async function registerFetchUrlsRoute(app: FastifyInstance): Promise<void
     "/api/v1/fetch-urls",
     { config: { rateLimit: { max: 200, timeWindow: "1 hour" } } },
     async (request, reply) => {
+      // A URL import stages files behind a public download link exactly as
+      // /api/v1/upload does, so it takes the same file permission. This route
+      // sits outside /api/v1/tools/, where the tool-access gate applies.
+      const user = await requireFileAccess(request, reply);
+      if (!user) return;
+
       // Validate body
       const parsed = fetchUrlsSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -181,7 +187,7 @@ export async function registerFetchUrlsRoute(app: FastifyInstance): Promise<void
 
       const { urls } = parsed.data;
       const jobId = randomUUID();
-      const userId = getAuthUser(request)?.id ?? null;
+      const userId = user.id;
 
       let aborted = false;
       let recordedJob = false;
