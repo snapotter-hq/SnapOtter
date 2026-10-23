@@ -1602,4 +1602,228 @@ describe("registerFetchUrlsRoute nameOnly image validations (#3263)", () => {
       vi.unstubAllGlobals();
     }
   });
+
+  it("sanitizes comment-padded SVGs disguised with .apng, .tga, or .dng extensions and skips the 1x1 probe (#3846)", async () => {
+    const sharpMod = (await import("sharp")).default;
+    const handler = await getFetchUrlsHandler();
+    const commentPaddedDirtySvg = Buffer.from(
+      `<!-- ${"x".repeat(4500)} --><svg xmlns="http://www.w3.org/2000/svg" width="25" height="20"><script>alert(1)</script><feImage href="http://169.254.169.254/latest/meta-data/"/><rect width="25" height="20" fill="red"/></svg>`,
+      "utf-8",
+    );
+    const commentPaddedOverCapSvg = Buffer.from(
+      `<!-- ${"x".repeat(4500)} --><svg xmlns="http://www.w3.org/2000/svg" width="25" height="20">${"<rect/>".repeat(5001)}</svg>`,
+      "utf-8",
+    );
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string | URL | Request) => {
+        const href = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+        if (href.endsWith("/padded-over.apng")) {
+          return new Response(new Uint8Array(commentPaddedOverCapSvg), {
+            status: 200,
+            headers: { "Content-Type": "image/apng" },
+          });
+        }
+        return new Response(new Uint8Array(commentPaddedDirtySvg), {
+          status: 200,
+          headers: { "Content-Type": "application/octet-stream" },
+        });
+      }),
+    );
+
+    const decodeSpy = vi
+      .spyOn(formatDecoders, "decodeToSharpCompat")
+      .mockRejectedValue(new Error("CLI decode failed"));
+    const origResize = sharpMod.prototype.resize;
+    let resized1x1 = false;
+    const resizeSpy = vi.spyOn(sharpMod.prototype, "resize").mockImplementation(function (
+      this: InstanceType<typeof sharpMod>,
+      ...args: Parameters<typeof origResize>
+    ) {
+      if (args[0] === 1) resized1x1 = true;
+      return origResize.apply(this, args);
+    });
+    const realSanitize = svgSanitize.sanitizeSvg;
+    let tgaSanitizedForPreview = false;
+    const sanitizeSpy = vi.spyOn(svgSanitize, "sanitizeSvg").mockImplementation((buf: Buffer) => {
+      const out = realSanitize(buf);
+      if (buf.toString("utf-8").includes("169.254.169.254")) {
+        tgaSanitizedForPreview = true;
+      }
+      return out;
+    });
+
+    try {
+      const { validateImageBuffer: realValidateImageBuffer } = await vi.importActual<
+        typeof import("../../../apps/api/src/lib/file-validation.js")
+      >("../../../apps/api/src/lib/file-validation.js");
+      validateImageBufferMock.mockImplementation(async (buf: Buffer, name?: string) => {
+        if (name?.endsWith(".tga")) {
+          return { valid: true, format: "tga", width: 0, height: 0 };
+        }
+        if (name?.endsWith(".dng")) {
+          return { valid: true, format: "raw", width: 0, height: 0 };
+        }
+        return realValidateImageBuffer(buf, name);
+      });
+
+      putObjectMock.mockClear();
+      const reply = makeReply();
+      await handler(
+        {
+          body: {
+            urls: [
+              "http://1.2.3.4:9999/padded.apng",
+              "http://1.2.3.4:9999/padded-over.apng",
+              "http://1.2.3.4:9999/padded.tga",
+              "http://1.2.3.4:9999/padded.dng",
+            ],
+          },
+          log: { warn: vi.fn(), error: vi.fn() },
+        },
+        reply,
+      );
+
+      expect(reply.statusCode).toBe(200);
+      const body = reply.payload as {
+        results: Array<{
+          success: boolean;
+          filename?: string;
+          width?: number;
+          height?: number;
+          previewUrl?: string | null;
+          error?: string;
+        }>;
+      };
+      expect(body.results[0]).toMatchObject({
+        success: true,
+        filename: "padded.apng",
+        width: 25,
+        height: 20,
+      });
+      expect(body.results[1]).toMatchObject({
+        success: false,
+        error: "SVG exceeds maximum element count of 5000",
+      });
+      expect(body.results[2]).toMatchObject({
+        success: true,
+        filename: "padded.tga",
+        width: 25,
+        height: 20,
+        previewUrl: expect.stringContaining("preview-padded.webp"),
+      });
+      expect(body.results[3]).toMatchObject({
+        success: true,
+        filename: "padded.dng",
+        width: 25,
+        height: 20,
+        previewUrl: expect.stringContaining("preview-padded.webp"),
+      });
+      expect(resized1x1).toBe(false);
+      expect(tgaSanitizedForPreview).toBe(true);
+
+      const storedBySuffix = new Map<string, Buffer>();
+      for (const call of putObjectMock.mock.calls as unknown as Array<[string, Buffer]>) {
+        const [key, data] = call;
+        storedBySuffix.set(key.split("/").pop() ?? key, data);
+      }
+      const apngStored = storedBySuffix.get("padded.apng")?.toString("utf-8") ?? "";
+      expect(apngStored).toContain("<svg");
+      expect(apngStored).not.toContain("<script");
+      expect(apngStored).not.toContain("169.254.169.254");
+      for (const name of ["padded.tga", "padded.dng"]) {
+        const cliStored = storedBySuffix.get(name)?.toString("utf-8") ?? "";
+        expect(cliStored).toContain("<svg");
+        expect(cliStored).not.toContain("<script");
+        expect(cliStored).not.toContain("169.254.169.254");
+      }
+
+      // Over-cap disguised .tga SVG fails before putObject
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () =>
+            new Response(new Uint8Array(commentPaddedOverCapSvg), {
+              status: 200,
+              headers: { "Content-Type": "application/octet-stream" },
+            }),
+        ),
+      );
+      putObjectMock.mockClear();
+      const overTgaReply = makeReply();
+      await handler(
+        {
+          body: { urls: ["http://1.2.3.4:9999/padded-over.tga"] },
+          log: { warn: vi.fn(), error: vi.fn() },
+        },
+        overTgaReply,
+      );
+      expect(overTgaReply.payload).toEqual({
+        results: [
+          {
+            success: false,
+            url: "http://1.2.3.4:9999/padded-over.tga",
+            error: "SVG exceeds maximum element count of 5000",
+          },
+        ],
+      });
+      expect(putObjectMock).not.toHaveBeenCalled();
+
+      // Unexpected sanitizer fault on comment-padded .apng and .tga reports 500 and returns "Internal server error"
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () =>
+            new Response(new Uint8Array(commentPaddedDirtySvg), {
+              status: 200,
+              headers: { "Content-Type": "application/octet-stream" },
+            }),
+        ),
+      );
+      reportErrorMock.mockClear();
+      sanitizeSpy
+        .mockImplementationOnce(() => {
+          throw new TypeError("unexpected fetch-urls apng sanitizer fault");
+        })
+        .mockImplementationOnce(() => {
+          throw new TypeError("unexpected fetch-urls tga sanitizer fault");
+        });
+      const faultReply = makeReply();
+      await handler(
+        {
+          body: {
+            urls: ["http://1.2.3.4:9999/padded.apng", "http://1.2.3.4:9999/padded.tga"],
+          },
+          log: { warn: vi.fn(), error: vi.fn() },
+        },
+        faultReply,
+      );
+      expect(faultReply.payload).toEqual({
+        results: [
+          {
+            success: false,
+            url: "http://1.2.3.4:9999/padded.apng",
+            error: "Internal server error",
+          },
+          {
+            success: false,
+            url: "http://1.2.3.4:9999/padded.tga",
+            error: "Internal server error",
+          },
+        ],
+      });
+      expect(reportErrorMock).toHaveBeenCalledTimes(2);
+    } finally {
+      resizeSpy.mockRestore();
+      decodeSpy.mockRestore();
+      sanitizeSpy.mockRestore();
+      const { validateImageBuffer: realValidateImageBuffer } = await vi.importActual<
+        typeof import("../../../apps/api/src/lib/file-validation.js")
+      >("../../../apps/api/src/lib/file-validation.js");
+      validateImageBufferMock.mockReset();
+      validateImageBufferMock.mockImplementation(realValidateImageBuffer);
+      vi.unstubAllGlobals();
+    }
+  });
 });

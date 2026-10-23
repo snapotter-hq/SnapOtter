@@ -1599,6 +1599,13 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
           { type: "field" as const, fieldname: "settings", value: "{}" },
         ],
       },
+      {
+        name: "POST /api/v1/tools/image/info",
+        url: "/api/v1/tools/image/info",
+        makeParts: (filename: string, content: Buffer) => [
+          { type: "file" as const, filename, content },
+        ],
+      },
     ])(
       "$name sanitizes comment-padded SVGs disguised with .apng, .tga, or .dng extensions (#3749)",
       async ({ url, makeParts }) => {

@@ -2775,6 +2775,252 @@ describe("user files route logic", () => {
           "Thumbnail generation failed",
         );
       });
+
+      it("sanitizes .svg, .svgz, and disguised SVGs (.apng, .tga, .dng) on thumbnail generation, upload, and save-result (#3846)", async () => {
+        const formatDecoders = await import("../../../apps/api/src/lib/format-decoders.js");
+        const svgSanitize = await import("../../../apps/api/src/lib/svg-sanitize.js");
+        const { validateImageBuffer: realValidateImageBuffer } = await vi.importActual<
+          typeof import("../../../apps/api/src/lib/file-validation.js")
+        >("../../../apps/api/src/lib/file-validation.js");
+
+        const dirtySvg = Buffer.from(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="30" height="20"><script>alert(1)</script><feImage href="http://169.254.169.254/latest/meta-data/"/><rect width="30" height="20" fill="red"/></svg>',
+          "utf-8",
+        );
+        const dirtySvgz = gzipSync(dirtySvg);
+        const commentPaddedDirtySvg = Buffer.from(
+          `<!-- ${"x".repeat(4500)} --><svg xmlns="http://www.w3.org/2000/svg" width="25" height="20"><script>alert(1)</script><feImage href="http://169.254.169.254/latest/meta-data/"/><rect width="25" height="20" fill="red"/></svg>`,
+          "utf-8",
+        );
+        const commentPaddedOverCapSvg = Buffer.from(
+          `<!-- ${"x".repeat(4500)} --><svg xmlns="http://www.w3.org/2000/svg" width="25" height="20">${"<rect/>".repeat(5001)}</svg>`,
+          "utf-8",
+        );
+
+        mocks.validateImageBuffer.mockImplementation(realValidateImageBuffer as never);
+        const decodeSpy = vi
+          .spyOn(formatDecoders, "decodeToSharpCompat")
+          .mockRejectedValue(new Error("CLI decode failed"));
+
+        try {
+          // 1. GET /api/v1/files/:id/thumbnail on .svg, .svgz, .apng, .tga, .dng
+          for (const [originalName, payload] of [
+            ["icon.svg", dirtySvg],
+            ["icon.svgz", dirtySvgz],
+            ["padded.apng", commentPaddedDirtySvg],
+            ["padded.tga", commentPaddedDirtySvg],
+            ["padded.dng", commentPaddedDirtySvg],
+          ] as const) {
+            const row = makeFileRow({
+              id: `thumb-${originalName}`,
+              originalName,
+              storedName: `stored-${originalName}`,
+              mimeType: "image/svg+xml",
+            });
+            mocks.parentRows = [row];
+            mocks.readStoredFile.mockResolvedValueOnce(payload);
+
+            let sanitized = false;
+            let resized1x1 = false;
+            const origResize = sharp.prototype.resize;
+            const resizeSpy = vi.spyOn(sharp.prototype, "resize").mockImplementation(function (
+              this: sharp.Sharp,
+              ...args: Parameters<typeof origResize>
+            ) {
+              if (args[0] === 1) resized1x1 = true;
+              return origResize.apply(this, args);
+            });
+            const realSanitize = svgSanitize.sanitizeSvg;
+            const sanitizeSpy = vi
+              .spyOn(svgSanitize, "sanitizeSvg")
+              .mockImplementation((buf: Buffer) => {
+                if (buf.toString("utf-8").includes("169.254.169.254")) sanitized = true;
+                return realSanitize(buf);
+              });
+
+            try {
+              const reply = makeReply();
+              await thumbnailHandler(
+                { params: { id: row.id }, log: { warn: vi.fn(), error: vi.fn() } },
+                reply,
+              );
+              expect(reply.statusCode, originalName).toBe(200);
+              expect(sanitized, originalName).toBe(true);
+              expect(resized1x1, originalName).toBe(false);
+            } finally {
+              resizeSpy.mockRestore();
+              sanitizeSpy.mockRestore();
+            }
+          }
+
+          // 2. POST /api/v1/files/upload with comment-padded .apng SVG
+          const savedUploads: Buffer[] = [];
+          mocks.saveFile.mockImplementation(async (buf: Buffer, name: string) => {
+            savedUploads.push(buf);
+            return `stored-${name}`;
+          });
+          const uploadReply = makeReply();
+          await uploadHandler(
+            {
+              log: { warn: vi.fn(), error: vi.fn() },
+              parts: async function* () {
+                yield {
+                  type: "file" as const,
+                  fieldname: "file",
+                  filename: "padded.apng",
+                  mimetype: "image/apng",
+                  file: Readable.from([commentPaddedDirtySvg]),
+                };
+              },
+            },
+            uploadReply,
+          );
+          expect(uploadReply.statusCode).toBe(201);
+          expect(savedUploads).toHaveLength(1);
+          expect(savedUploads[0]?.toString("utf-8")).toContain("<svg");
+          expect(savedUploads[0]?.toString("utf-8")).not.toContain("<script");
+          expect(savedUploads[0]?.toString("utf-8")).not.toContain("169.254.169.254");
+
+          // Over-cap .apng SVG on upload returns 400 and discards earlier staged files
+          const overUploadReply = makeReply();
+          await uploadHandler(
+            {
+              log: { warn: vi.fn(), error: vi.fn() },
+              parts: async function* () {
+                yield {
+                  type: "file" as const,
+                  fieldname: "file",
+                  filename: "padded-over.apng",
+                  mimetype: "image/apng",
+                  file: Readable.from([commentPaddedOverCapSvg]),
+                };
+              },
+            },
+            overUploadReply,
+          );
+          expect(overUploadReply.statusCode).toBe(400);
+          expect(overUploadReply.payload).toEqual({
+            error: "SVG exceeds maximum element count of 5000",
+          });
+
+          // Unexpected sanitizer fault on .apng upload returns 500
+          const unexpectedSanitizeSpy = vi
+            .spyOn(svgSanitize, "sanitizeSvg")
+            .mockImplementationOnce(() => {
+              throw new TypeError("unexpected upload apng svg fault");
+            });
+          const faultUploadReply = makeReply();
+          await uploadHandler(
+            {
+              log: { warn: vi.fn(), error: vi.fn() },
+              parts: async function* () {
+                yield {
+                  type: "file" as const,
+                  fieldname: "file",
+                  filename: "padded.apng",
+                  mimetype: "image/apng",
+                  file: Readable.from([commentPaddedDirtySvg]),
+                };
+              },
+            },
+            faultUploadReply,
+          );
+          expect(faultUploadReply.statusCode).toBe(500);
+          expect(faultUploadReply.payload).toEqual({ error: "Internal server error" });
+          unexpectedSanitizeSpy.mockRestore();
+
+          // Post-sanitize size growth exceeding quota returns 413 STORAGE_QUOTA_EXCEEDED
+          const growingSanitizeSpy = vi
+            .spyOn(svgSanitize, "sanitizeSvg")
+            .mockImplementationOnce((buf: Buffer) => Buffer.concat([buf, Buffer.from("   ")]));
+          mocks.quotaRefusal
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce("Storage quota full" as never);
+          const quotaUploadReply = makeReply();
+          await uploadHandler(
+            {
+              log: { warn: vi.fn(), error: vi.fn() },
+              parts: async function* () {
+                yield {
+                  type: "file" as const,
+                  fieldname: "file",
+                  filename: "padded.apng",
+                  mimetype: "image/apng",
+                  file: Readable.from([commentPaddedDirtySvg]),
+                };
+              },
+            },
+            quotaUploadReply,
+          );
+          expect(quotaUploadReply.statusCode).toBe(413);
+          expect(quotaUploadReply.payload).toEqual({
+            error: "Storage quota full",
+            code: "STORAGE_QUOTA_EXCEEDED",
+          });
+          growingSanitizeSpy.mockRestore();
+
+          // 3. POST /api/v1/files/save-result with comment-padded .apng SVG
+          savedUploads.length = 0;
+          mocks.parentRows = [
+            makeFileRow({ id: "parent-1", originalName: "anim.apng", mimeType: "image/apng" }),
+          ];
+          const saveReply = makeReply();
+          await saveResultHandler(
+            makeSaveResultRequest({
+              filename: "result.apng",
+              parentId: "parent-1",
+              toolId: "convert",
+              buffer: commentPaddedDirtySvg,
+            }),
+            saveReply,
+          );
+          expect(saveReply.statusCode).toBe(201);
+          expect(savedUploads).toHaveLength(1);
+          expect(savedUploads[0]?.toString("utf-8")).toContain("<svg");
+          expect(savedUploads[0]?.toString("utf-8")).not.toContain("<script");
+          expect(savedUploads[0]?.toString("utf-8")).not.toContain("169.254.169.254");
+
+          // Over-cap .apng SVG on save-result returns 400
+          const overSaveReply = makeReply();
+          await saveResultHandler(
+            makeSaveResultRequest({
+              filename: "result.apng",
+              parentId: "parent-1",
+              toolId: "convert",
+              buffer: commentPaddedOverCapSvg,
+            }),
+            overSaveReply,
+          );
+          expect(overSaveReply.statusCode).toBe(400);
+          expect(overSaveReply.payload).toEqual({
+            error: "SVG exceeds maximum element count of 5000",
+          });
+
+          // Unexpected sanitizer fault on .apng save-result returns 500
+          const saveFaultSpy = vi.spyOn(svgSanitize, "sanitizeSvg").mockImplementationOnce(() => {
+            throw new TypeError("unexpected save-result apng svg fault");
+          });
+          const faultSaveReply = makeReply();
+          await saveResultHandler(
+            makeSaveResultRequest({
+              filename: "result.apng",
+              parentId: "parent-1",
+              toolId: "convert",
+              buffer: commentPaddedDirtySvg,
+            }),
+            faultSaveReply,
+          );
+          expect(faultSaveReply.statusCode).toBe(500);
+          expect(faultSaveReply.payload).toEqual({ error: "Internal server error" });
+          saveFaultSpy.mockRestore();
+        } finally {
+          decodeSpy.mockRestore();
+          mocks.saveFile.mockImplementation(() => Promise.resolve("stored-result.png"));
+          mocks.validateImageBuffer.mockImplementation(() =>
+            Promise.resolve({ valid: true as const, format: "png", width: 800, height: 600 }),
+          );
+        }
+      });
     });
 
     describe("GET /api/v1/files/:id/download S3 fault classification (#2808)", () => {

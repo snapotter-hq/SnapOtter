@@ -1474,6 +1474,60 @@ describe("files route logic", () => {
       await expect(uploadHandler(req3, makeReply())).rejects.toBe(plain500Err);
       expect(log3.warn).not.toHaveBeenCalled();
     });
+
+    it("sanitizes comment-padded SVGs disguised with an .apng extension on POST /api/v1/upload (#3846)", async () => {
+      const commentPaddedDirtySvg = Buffer.from(
+        `<!-- ${"x".repeat(4500)} --><svg xmlns="http://www.w3.org/2000/svg" width="25" height="25"><script>alert(1)</script><feImage href="http://169.254.169.254/latest/meta-data/"/><rect width="25" height="25" fill="red"/></svg>`,
+        "utf-8",
+      );
+      const commentPaddedOverCapSvg = Buffer.from(
+        `<!-- ${"x".repeat(4500)} --><svg xmlns="http://www.w3.org/2000/svg" width="25" height="25">${"<rect/>".repeat(5001)}</svg>`,
+        "utf-8",
+      );
+
+      const okReply = makeReply();
+      await uploadHandler(makeRequest([filePart("padded.apng", commentPaddedDirtySvg)]), okReply);
+      expect(okReply.statusCode).toBe(200);
+      expect(mocks.putObject).toHaveBeenCalledTimes(1);
+      const storedXml = (mocks.putObject.mock.calls[0] as unknown as [string, Buffer])[1].toString(
+        "utf-8",
+      );
+      expect(storedXml).toContain("<svg");
+      expect(storedXml).not.toContain("<script");
+      expect(storedXml).not.toContain("169.254.169.254");
+
+      vi.clearAllMocks();
+      const overCapReply = makeReply();
+      await uploadHandler(
+        makeRequest([
+          filePart("first.txt", Buffer.from("hello")),
+          filePart("padded-over.apng", commentPaddedOverCapSvg),
+        ]),
+        overCapReply,
+      );
+      expect(overCapReply.statusCode).toBe(400);
+      expect(overCapReply.payload).toEqual({
+        error: "SVG exceeds maximum element count of 5000",
+      });
+      expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
+
+      vi.clearAllMocks();
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw new TypeError("unexpected apng svg sanitizer fault");
+      });
+      const faultReply = makeReply();
+      await uploadHandler(
+        makeRequest([
+          filePart("first.txt", Buffer.from("hello")),
+          filePart("padded.apng", commentPaddedDirtySvg),
+        ]),
+        faultReply,
+      );
+      expect(faultReply.statusCode).toBe(500);
+      expect(faultReply.payload).toEqual({ error: "Internal server error" });
+      expect(mocks.reportError).toHaveBeenCalledTimes(1);
+      expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("POST /api/v1/preview RAW extension extraction (#3246)", () => {
@@ -2068,6 +2122,137 @@ describe("files route logic", () => {
           '.split(".").pop()',
         );
       }
+    });
+
+    it("decompresses .svgz, sanitizes .svg and disguised SVGs (.apng, .tga, .dng), skips the 1x1 probe, and handles client/OOM/unexpected sanitizer errors on POST /api/v1/preview (#3846)", async () => {
+      const sharpMod = (await import("sharp")).default;
+      const formatDecoders = await import("../../../apps/api/src/lib/format-decoders.js");
+      const { sanitizeSvg: realSanitizeSvg } = await vi.importActual<
+        typeof import("../../../apps/api/src/lib/svg-sanitize.js")
+      >("../../../apps/api/src/lib/svg-sanitize.js");
+      const { validateImageBuffer: realValidateImageBuffer } = await vi.importActual<
+        typeof import("../../../apps/api/src/lib/file-validation.js")
+      >("../../../apps/api/src/lib/file-validation.js");
+      mocks.sanitizeSvg.mockImplementation(realSanitizeSvg);
+      mocks.validateImageBuffer.mockImplementation(realValidateImageBuffer);
+
+      const dirtySvg = Buffer.from(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><script>alert(1)</script><feImage href="http://169.254.169.254/latest/meta-data/"/><rect width="40" height="30" fill="red"/></svg>',
+        "utf-8",
+      );
+      const dirtySvgz = gzipSync(dirtySvg);
+      const commentPaddedDirtySvg = Buffer.from(
+        `<!-- ${"x".repeat(4500)} --><svg xmlns="http://www.w3.org/2000/svg" width="25" height="20"><script>alert(1)</script><feImage href="http://169.254.169.254/latest/meta-data/"/><rect width="25" height="20" fill="red"/></svg>`,
+        "utf-8",
+      );
+      const commentPaddedOverCapSvg = Buffer.from(
+        `<!-- ${"x".repeat(4500)} --><svg xmlns="http://www.w3.org/2000/svg" width="25" height="20">${"<rect/>".repeat(5001)}</svg>`,
+        "utf-8",
+      );
+
+      for (const [filename, payload, expectedWidth, expectedHeight] of [
+        ["icon.svg", dirtySvg, "40", "30"],
+        ["icon.svgz", dirtySvgz, "40", "30"],
+        ["padded.apng", commentPaddedDirtySvg, "25", "20"],
+        ["padded.tga", commentPaddedDirtySvg, "25", "20"],
+        ["padded.dng", commentPaddedDirtySvg, "25", "20"],
+      ] as const) {
+        mocks.decodeToSharpCompat.mockRejectedValueOnce(new Error("CLI decode failed"));
+        let sanitized = false;
+        let resized1x1 = false;
+        let webpEncodedBeforeSanitize = false;
+        const origResize = sharpMod.prototype.resize;
+        const resizeSpy = vi.spyOn(sharpMod.prototype, "resize").mockImplementation(function (
+          this: InstanceType<typeof sharpMod>,
+          ...args: Parameters<typeof origResize>
+        ) {
+          if (args[0] === 1) resized1x1 = true;
+          if (!sanitized) webpEncodedBeforeSanitize = true;
+          return origResize.apply(this, args);
+        });
+        mocks.sanitizeSvg.mockImplementation((buf: Buffer) => {
+          const out = realSanitizeSvg(buf);
+          if (buf.toString("utf-8").includes("169.254.169.254")) {
+            sanitized = true;
+          }
+          expect(out.toString("utf-8")).not.toContain("<script");
+          expect(out.toString("utf-8")).not.toContain("169.254.169.254");
+          return out;
+        });
+
+        try {
+          const reply = makePreviewReply();
+          await previewHandler(
+            {
+              log: { warn: vi.fn(), error: vi.fn() },
+              file: async () => ({ filename, toBuffer: async () => payload }),
+            },
+            reply,
+          );
+          expect(reply.statusCode, filename).toBe(200);
+          expect(reply.headers["Content-Type"], filename).toBe("image/webp");
+          expect(reply.headers["X-Original-Width"], filename).toBe(expectedWidth);
+          expect(reply.headers["X-Original-Height"], filename).toBe(expectedHeight);
+          expect(sanitized, filename).toBe(true);
+          expect(resized1x1, filename).toBe(false);
+          expect(webpEncodedBeforeSanitize, filename).toBe(false);
+          expect(mocks.readImageDimensions, filename).not.toHaveBeenCalled();
+        } finally {
+          resizeSpy.mockRestore();
+          mocks.sanitizeSvg.mockImplementation(realSanitizeSvg);
+        }
+      }
+
+      // Client SVG / SVGZ errors return 400
+      for (const [filename, payload] of [
+        ["not-svg.svgz", gzipSync(Buffer.from("not an svg"))],
+        ["corrupt.svgz", Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0xff, 0xff])],
+        ["padded-over.apng", commentPaddedOverCapSvg],
+        ["padded-over.tga", commentPaddedOverCapSvg],
+        ["padded-over.dng", commentPaddedOverCapSvg],
+      ] as const) {
+        mocks.decodeToSharpCompat.mockRejectedValueOnce(new Error("CLI decode failed"));
+        const reply = makePreviewReply();
+        await previewHandler(
+          {
+            log: { warn: vi.fn(), error: vi.fn() },
+            file: async () => ({ filename, toBuffer: async () => payload }),
+          },
+          reply,
+        );
+        expect(reply.statusCode, filename).toBe(400);
+      }
+
+      // V8 OOM in sanitizeSvg returns 503 ENGINE_UNAVAILABLE
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw new RangeError("Array buffer allocation failed");
+      });
+      const oomReply = makePreviewReply();
+      await previewHandler(
+        {
+          log: { warn: vi.fn(), error: vi.fn() },
+          file: async () => ({ filename: "icon.svg", toBuffer: async () => dirtySvg }),
+        },
+        oomReply,
+      );
+      expect(oomReply.statusCode).toBe(503);
+      expect(oomReply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+
+      // Unexpected sanitizer fault rethrows
+      const unexpectedSanitizeErr = new TypeError("unexpected preview sanitizer bug");
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw unexpectedSanitizeErr;
+      });
+      await expect(
+        previewHandler(
+          {
+            log: { warn: vi.fn(), error: vi.fn() },
+            file: async () => ({ filename: "icon.svg", toBuffer: async () => dirtySvg }),
+          },
+          makePreviewReply(),
+        ),
+      ).rejects.toBe(unexpectedSanitizeErr);
+      expect(formatDecoders).toBeDefined();
     });
   });
 });

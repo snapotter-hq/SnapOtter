@@ -33,6 +33,7 @@ import {
 import {
   decompressSvgz,
   isSvgBuffer,
+  isSvgClientError,
   isSvgzClientError,
   sanitizeSvg,
 } from "../lib/svg-sanitize.js";
@@ -175,6 +176,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
           let safeBuffer: Buffer = buffer;
           const uploadExt = extname(safeName).toLowerCase();
           let isDecompressedSvg = false;
+          let sanitizedAsSvg = false;
           if (uploadExt === ".svgz" || isSvgBuffer(buffer)) {
             try {
               if (uploadExt === ".svgz") {
@@ -182,6 +184,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
               }
               if (isSvgBuffer(safeBuffer)) {
                 safeBuffer = sanitizeSvg(safeBuffer);
+                sanitizedAsSvg = true;
                 if (uploadExt === ".svgz") {
                   isDecompressedSvg = true;
                 }
@@ -223,6 +226,28 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
             return null;
           });
           const isValidImage = validation?.valid === true && !validation.nameOnly;
+
+          if (!sanitizedAsSvg && isValidImage && validation.format === "svg") {
+            try {
+              safeBuffer = sanitizeSvg(decompressSvgz(safeBuffer));
+              sanitizedAsSvg = true;
+            } catch (err) {
+              if (isSvgClientError(err)) {
+                request.log.warn({ err, filename: part.filename }, "SVGZ decompression failed");
+                await discardUploads();
+                return reply.status(400).send({ error: (err as Error).message });
+              }
+              request.log.error({ err, filename: part.filename }, "SVG sanitize failed");
+              void reportError(err, {
+                source: "http",
+                route: "/api/v1/upload",
+                method: "POST",
+                statusCode: 500,
+              });
+              await discardUploads();
+              return reply.status(500).send({ error: "Internal server error" });
+            }
+          }
 
           // Record a completed jobs row before the first write so the S3 TTL
           // sweep can expire the prefix (#3624).
@@ -427,6 +452,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
     }
 
     // Decode CLI-decoded formats (RAW, PSD, TGA, EXR, HDR) via external tools
+    let fallbackFormat: string | undefined;
     if (needsCliDecode(validation.format)) {
       try {
         buffer = await decodeToSharpCompat(buffer, validation.format, ext);
@@ -445,8 +471,11 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
         }
         // CLI decoder unavailable: try Sharp directly as fallback for preview
         try {
-          await sharp(buffer).metadata();
-          await sharp(buffer).resize(1).raw().toBuffer();
+          const meta = await sharp(buffer).metadata();
+          fallbackFormat = meta.format;
+          if (fallbackFormat !== "svg") {
+            await sharp(buffer).resize(1).raw().toBuffer();
+          }
         } catch (rawProbeErr) {
           const probeErr = asDecoderOutOfMemory(rawProbeErr);
           if (probeErr instanceof DecoderOutOfMemoryError) {
@@ -472,12 +501,35 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
+    if (validation.format === "svg" || fallbackFormat === "svg") {
+      try {
+        buffer = decompressSvgz(buffer);
+        buffer = sanitizeSvg(buffer);
+      } catch (rawErr) {
+        if (isSvgClientError(rawErr)) {
+          return reply.status(400).send({
+            error: rawErr instanceof Error ? rawErr.message : "Invalid SVG",
+          });
+        }
+        const err = asDecoderOutOfMemory(rawErr);
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+          return sendInputValidationError(
+            reply,
+            engineUnavailable(err),
+            "file-preview",
+            request.log,
+          );
+        }
+        throw rawErr;
+      }
+    }
+
     try {
       const preMeta = await sharp(buffer).metadata();
       let origWidth = preMeta.width ?? 0;
       let origHeight = preMeta.height ?? 0;
 
-      if (validation.format === "raw") {
+      if (validation.format === "raw" && fallbackFormat !== "svg") {
         const dims = await readImageDimensions(originalBuffer, ext);
         if (dims) {
           origWidth = dims.width;

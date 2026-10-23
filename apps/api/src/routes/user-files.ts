@@ -59,6 +59,7 @@ import { quotaRefusal } from "../lib/quota.js";
 import {
   decompressSvgz,
   isSvgBuffer,
+  isSvgClientError,
   isSvgzClientError,
   sanitizeSvg,
 } from "../lib/svg-sanitize.js";
@@ -370,6 +371,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           let safeBuffer: Buffer = buffer;
           const ext = extname(safeName).toLowerCase();
           let isDecompressedSvg = false;
+          let sanitizedAsSvg = false;
           if (ext === ".svgz" || isSvgBuffer(buffer)) {
             try {
               if (ext === ".svgz") {
@@ -377,6 +379,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
               }
               if (isSvgBuffer(safeBuffer)) {
                 safeBuffer = sanitizeSvg(safeBuffer);
+                sanitizedAsSvg = true;
                 if (ext === ".svgz") {
                   isDecompressedSvg = true;
                 }
@@ -430,6 +433,39 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
             return null;
           });
           const isValidImage = validation?.valid === true && !validation.nameOnly;
+          if (!sanitizedAsSvg && isValidImage && validation.format === "svg") {
+            const preSanitizeLength = safeBuffer.length;
+            try {
+              safeBuffer = sanitizeSvg(decompressSvgz(safeBuffer));
+              sanitizedAsSvg = true;
+            } catch (err) {
+              if (isSvgClientError(err)) {
+                request.log.warn({ err, filename: part.filename }, "SVGZ decompression failed");
+                await discardStaged();
+                return reply.status(400).send({ error: (err as Error).message });
+              }
+              request.log.error({ err, filename: part.filename }, "SVG sanitize failed");
+              void reportError(err, {
+                source: "http",
+                route: "/api/v1/files/upload",
+                method: "POST",
+                statusCode: 500,
+              });
+              await discardStaged();
+              return reply.status(500).send({ error: "Internal server error" });
+            }
+            if (safeBuffer.length > preSanitizeLength) {
+              const postSanitizeOverQuota = await quotaRefusal(
+                db,
+                userId,
+                stagedBytes + safeBuffer.length,
+              );
+              if (postSanitizeOverQuota) {
+                await discardStaged();
+                return sendOverQuota(reply, postSanitizeOverQuota);
+              }
+            }
+          }
           const mimeType =
             (isValidImage && validatedImageMime(validation, safeName)) ||
             unverifiedMime(part.mimetype || "application/octet-stream");
@@ -772,6 +808,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           return reply.status(422).send({ error: "No thumbnail available for this file type" });
         }
         let decoded: Buffer<ArrayBuffer> = Buffer.from(rawBuffer);
+        let fallbackFormat: string | undefined;
         if (validation.valid && validation.format === "heif") {
           try {
             decoded = Buffer.from(await decodeHeic(rawBuffer));
@@ -792,8 +829,11 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
               throw decodeErr;
             }
             try {
-              await sharp(rawBuffer).metadata();
-              await sharp(rawBuffer).resize(1).raw().toBuffer();
+              const meta = await sharp(rawBuffer).metadata();
+              fallbackFormat = meta.format;
+              if (fallbackFormat !== "svg") {
+                await sharp(rawBuffer).resize(1).raw().toBuffer();
+              }
             } catch (err) {
               const probeErr = asDecoderOutOfMemory(err);
               if (probeErr instanceof DecoderOutOfMemoryError) {
@@ -805,6 +845,9 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
               throw err;
             }
           }
+        }
+        if (validation.format === "svg" || fallbackFormat === "svg") {
+          decoded = Buffer.from(sanitizeSvg(decompressSvgz(decoded)));
         }
         const fileBuffer = decoded;
 
@@ -1025,6 +1068,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
     let safeResultBuffer = fileBuffer;
     const resultExt = ext.toLowerCase();
     let isDecompressedSvg = false;
+    let sanitizedAsSvg = false;
     if (resultExt === ".svgz" || isSvgBuffer(fileBuffer)) {
       try {
         if (resultExt === ".svgz") {
@@ -1032,6 +1076,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
         }
         if (isSvgBuffer(safeResultBuffer)) {
           safeResultBuffer = sanitizeSvg(safeResultBuffer);
+          sanitizedAsSvg = true;
           if (resultExt === ".svgz") {
             isDecompressedSvg = true;
           }
@@ -1074,6 +1119,25 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
       return null;
     });
     const isValidImage = validation?.valid === true && !validation.nameOnly;
+    if (!sanitizedAsSvg && isValidImage && validation.format === "svg") {
+      try {
+        safeResultBuffer = sanitizeSvg(decompressSvgz(safeResultBuffer));
+        sanitizedAsSvg = true;
+      } catch (err) {
+        if (isSvgClientError(err)) {
+          request.log.warn({ err, filename }, "SVGZ decompression failed");
+          return reply.status(400).send({ error: (err as Error).message });
+        }
+        request.log.error({ err, filename }, "SVG sanitize failed");
+        void reportError(err, {
+          source: "http",
+          route: "/api/v1/files/save-result",
+          method: "POST",
+          statusCode: 500,
+        });
+        return reply.status(500).send({ error: "Internal server error" });
+      }
+    }
 
     const nextVersion = parent.version + 1;
 

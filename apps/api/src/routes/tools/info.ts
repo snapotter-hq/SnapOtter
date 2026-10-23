@@ -24,6 +24,7 @@ import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
 import {
   decompressSvgz,
   isSvgBuffer,
+  isSvgClientError,
   isSvgzClientError,
   sanitizeSvg,
 } from "../../lib/svg-sanitize.js";
@@ -90,6 +91,7 @@ export function registerInfo(app: FastifyInstance) {
       return reply.status(400).send({ error: "Invalid SVGZ file" });
     }
 
+    let fallbackFormat: string | undefined;
     try {
       if (isSvg) {
         // Already decompressed and sanitized above.
@@ -107,8 +109,11 @@ export function registerInfo(app: FastifyInstance) {
             throw decodeErr;
           }
           try {
-            await sharp(fileBuffer).metadata();
-            await sharp(fileBuffer).resize(1).raw().toBuffer();
+            const meta = await sharp(fileBuffer).metadata();
+            fallbackFormat = meta.format;
+            if (fallbackFormat !== "svg") {
+              await sharp(fileBuffer).resize(1).raw().toBuffer();
+            }
           } catch (rawProbeErr) {
             const probeErr = asDecoderOutOfMemory(rawProbeErr);
             if (probeErr instanceof DecoderOutOfMemoryError) {
@@ -121,7 +126,8 @@ export function registerInfo(app: FastifyInstance) {
       } else {
         let sharpDirectFailed = false;
         try {
-          await sharp(fileBuffer).metadata();
+          const meta = await sharp(fileBuffer).metadata();
+          fallbackFormat = meta.format;
         } catch (rawSharpErr) {
           const sharpErr = asDecoderOutOfMemory(rawSharpErr);
           if (sharpErr instanceof DecoderOutOfMemoryError) {
@@ -142,7 +148,30 @@ export function registerInfo(app: FastifyInstance) {
           });
         }
       }
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+      return reply.status(422).send({
+        error: "Failed to read image metadata",
+        details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
+      });
+    }
 
+    if (fallbackFormat === "svg") {
+      try {
+        metaBuffer = decompressSvgz(fileBuffer);
+        metaBuffer = sanitizeSvg(metaBuffer);
+      } catch (err) {
+        if (isSvgClientError(err)) {
+          return reply.status(400).send({
+            error: err instanceof Error ? err.message : "Invalid SVG",
+          });
+        }
+        throw asDecoderOutOfMemory(err);
+      }
+    }
+
+    try {
       const metadata = await sharp(metaBuffer).metadata();
       const stats = await sharp(metaBuffer).stats();
 
@@ -157,7 +186,10 @@ export function registerInfo(app: FastifyInstance) {
 
       // For RAW formats, Sharp reads the embedded thumbnail -- enrich with
       // ExifTool to get the real sensor dimensions and EXIF/ICC/XMP flags.
-      const exif = detectedFormat === "raw" ? await readExifToolMeta(fileBuffer, ext) : null;
+      const exif =
+        detectedFormat === "raw" && fallbackFormat !== "svg"
+          ? await readExifToolMeta(fileBuffer, ext)
+          : null;
 
       return reply.send({
         filename,

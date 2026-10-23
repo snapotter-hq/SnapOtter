@@ -41,6 +41,7 @@ import {
 import {
   decompressSvgz,
   isSvgBuffer,
+  isSvgClientError,
   isSvgzClientError,
   sanitizeSvg,
 } from "../lib/svg-sanitize.js";
@@ -334,6 +335,7 @@ async function fetchSingleUrl(
     let safeBuffer: Buffer = buffer;
     const uploadExt = extname(safeName).toLowerCase();
     let isDecompressedSvg = false;
+    let sanitizedAsSvg = false;
     if (uploadExt === ".svgz" || isSvgBuffer(buffer)) {
       try {
         if (uploadExt === ".svgz") {
@@ -341,6 +343,7 @@ async function fetchSingleUrl(
         }
         if (isSvgBuffer(safeBuffer)) {
           safeBuffer = sanitizeSvg(safeBuffer);
+          sanitizedAsSvg = true;
           if (uploadExt === ".svgz") {
             isDecompressedSvg = true;
           }
@@ -383,30 +386,24 @@ async function fetchSingleUrl(
       return null;
     });
     const isValidImage = validation?.valid === true && !validation.nameOnly;
-
-    // Record a completed jobs row before the first write so the S3 TTL sweep
-    // can expire the prefix (#3624).
-    if (hooks?.isAborted?.()) {
-      return { success: false, url, error: "Request aborted" };
-    }
-    const uploadKey = `outputs/${jobId}/${filename}`;
-    await hooks?.beforeWrite?.(uploadKey);
-    if (hooks?.isAborted?.()) {
-      return { success: false, url, error: "Request aborted" };
-    }
-
-    // Save to the outputs prefix: /api/v1/download serves outputs/ only.
-    try {
-      hooks?.markWrote?.();
-      await putObject(uploadKey, safeBuffer);
-    } catch (rawErr) {
-      const err = normalizeOperationalWriteError(rawErr);
-      if (hasServerErrorStatus(err)) {
-        throw err;
+    if (!sanitizedAsSvg && isValidImage && validation.format === "svg") {
+      try {
+        safeBuffer = sanitizeSvg(decompressSvgz(safeBuffer));
+        sanitizedAsSvg = true;
+      } catch (err) {
+        if (isSvgClientError(err)) {
+          log.warn({ err, filename: rawFilename }, "SVGZ decompression failed");
+          return { success: false, url, error: (err as Error).message };
+        }
+        (log.error ?? log.warn).call(log, { err, filename: rawFilename }, "SVG sanitize failed");
+        void reportError(err, {
+          source: "http",
+          route: "/api/v1/fetch-urls",
+          method: "POST",
+          statusCode: 500,
+        });
+        return { success: false, url, error: "Internal server error" };
       }
-      throw Object.assign(err instanceof Error ? err : new Error(String(err)), {
-        statusCode: 500,
-      });
     }
 
     const responseContentType = response.headers.get("content-type")?.split(";")[0]?.trim();
@@ -426,6 +423,7 @@ async function fetchSingleUrl(
     // and keep the 0x0 dimensions for whatever edge case failed to decode.
     let decodedBuffer: Buffer | null = safeBuffer;
     let didDecode = false;
+    let fallbackFormat: string | undefined;
     if (isValidImage) {
       try {
         if (validation.format === "heif") {
@@ -448,8 +446,11 @@ async function fetchSingleUrl(
             // Sharp reads some TIFF-headed RAW files (such as .dng) itself;
             // only surface a CLI decode failure if Sharp cannot read it either.
             try {
-              await sharp(safeBuffer).metadata();
-              await sharp(safeBuffer).resize(1).raw().toBuffer();
+              const meta = await sharp(safeBuffer).metadata();
+              fallbackFormat = meta.format;
+              if (fallbackFormat !== "svg") {
+                await sharp(safeBuffer).resize(1).raw().toBuffer();
+              }
             } catch (rawProbeErr) {
               const probeErr = asDecoderOutOfMemory(rawProbeErr);
               if (probeErr instanceof DecoderOutOfMemoryError) {
@@ -474,6 +475,51 @@ async function fetchSingleUrl(
         decodedBuffer = null;
         didDecode = false;
       }
+    }
+
+    if (fallbackFormat === "svg") {
+      try {
+        safeBuffer = sanitizeSvg(decompressSvgz(safeBuffer));
+        decodedBuffer = Buffer.from(safeBuffer);
+      } catch (err) {
+        if (isSvgClientError(err)) {
+          log.warn({ err, filename: rawFilename }, "SVGZ decompression failed");
+          return { success: false, url, error: (err as Error).message };
+        }
+        (log.error ?? log.warn).call(log, { err, filename: rawFilename }, "SVG sanitize failed");
+        void reportError(err, {
+          source: "http",
+          route: "/api/v1/fetch-urls",
+          method: "POST",
+          statusCode: 500,
+        });
+        return { success: false, url, error: "Internal server error" };
+      }
+    }
+
+    // Record a completed jobs row before the first write so the S3 TTL sweep
+    // can expire the prefix (#3624).
+    if (hooks?.isAborted?.()) {
+      return { success: false, url, error: "Request aborted" };
+    }
+    const uploadKey = `outputs/${jobId}/${filename}`;
+    await hooks?.beforeWrite?.(uploadKey);
+    if (hooks?.isAborted?.()) {
+      return { success: false, url, error: "Request aborted" };
+    }
+
+    // Save to the outputs prefix: /api/v1/download serves outputs/ only.
+    try {
+      hooks?.markWrote?.();
+      await putObject(uploadKey, safeBuffer);
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(rawErr);
+      if (hasServerErrorStatus(err)) {
+        throw err;
+      }
+      throw Object.assign(err instanceof Error ? err : new Error(String(err)), {
+        statusCode: 500,
+      });
     }
 
     // Real dimensions for formats that just got decoded above; every other
