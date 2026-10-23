@@ -1017,9 +1017,127 @@ describe("beautify route and processBeautify validation & backgroundImage prepar
           file: { filename: "valid.svgz", content: validSvgz },
           settings: {},
         }),
-      ).rejects.toBe(v8Oom);
+      ).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
+
+      decompressFaultSpy.mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      await expect(
+        invokeBeautify({
+          file: { filename: "main.png", content: PNG_200 },
+          backgroundImage: { filename: "bg.svgz", content: validSvgz },
+          settings: { backgroundType: "image" },
+        }),
+      ).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
+
+      decompressFaultSpy.mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      await expect(beautifyConfig.process(validSvgz, {}, "valid.svgz")).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
     } finally {
       decompressFaultSpy.mockRestore();
+    }
+
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    const memeConfig = getToolConfig("meme-generator");
+    if (!memeConfig) throw new Error("meme-generator missing from toolRegistry");
+    const sanitizeOomSpy = vi.spyOn(svgSanitize, "sanitizeSvg").mockImplementation(() => {
+      throw v8Oom;
+    });
+    try {
+      await expect(
+        invokeBeautify({
+          file: { filename: "valid.svg", content: validSvg },
+          settings: {},
+        }),
+      ).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
+
+      await expect(
+        invokeBeautify({
+          file: { filename: "main.png", content: PNG_200 },
+          backgroundImage: { filename: "bg.svg", content: validSvg },
+          settings: { backgroundType: "image" },
+        }),
+      ).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
+
+      await expect(beautifyConfig.process(validSvg, {}, "valid.svg")).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
+
+      await expect(invokeMemeMultipart("valid.svg", validSvg)).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
+
+      await expect(memeConfig.process(validSvg, {}, "valid.svg")).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
+    } finally {
+      sanitizeOomSpy.mockRestore();
+    }
+
+    const decompressOomSpy = vi.spyOn(svgSanitize, "decompressSvgz").mockImplementation(() => {
+      throw v8Oom;
+    });
+    try {
+      await expect(invokeMemeMultipart("valid.svgz", validSvgz)).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
+
+      await expect(memeConfig.process(validSvgz, {}, "valid.svgz")).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
+    } finally {
+      decompressOomSpy.mockRestore();
     }
   });
 

@@ -130,7 +130,7 @@ function sanitizeSvgInput(buf: Buffer): Buffer {
       validationErr.cause = err;
       throw validationErr;
     }
-    throw err;
+    throw asDecoderOutOfMemory(err);
   }
 }
 

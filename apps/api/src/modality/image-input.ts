@@ -149,6 +149,8 @@ export class ImageInputHandler implements InputHandler {
         if (isSvgClientError(err)) {
           throw new InputValidationError(err instanceof Error ? err.message : "Invalid SVG");
         }
+        const oom = asDecoderOutOfMemory(err);
+        if (oom instanceof DecoderOutOfMemoryError) throw engineUnavailable(oom);
         throw err;
       }
     }

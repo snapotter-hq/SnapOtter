@@ -612,7 +612,33 @@ describe("ImageInputHandler SVG sanitization abort signal (#2830)", () => {
         scratchDir: "/tmp/in",
         signal: new AbortController().signal,
       }),
-    ).rejects.toBe(v8Oom);
+    ).rejects.toMatchObject({
+      name: "InputValidationError",
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: expect.objectContaining({
+        name: "DecoderOutOfMemoryError",
+        cause: v8Oom,
+      }),
+    });
+
+    mocks.sanitizeSvg.mockImplementationOnce(() => {
+      throw v8Oom;
+    });
+    await expect(
+      new ImageInputHandler().prepare(RAW, "icon.svg", {
+        scratchDir: "/tmp/in",
+        signal: new AbortController().signal,
+      }),
+    ).rejects.toMatchObject({
+      name: "InputValidationError",
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: expect.objectContaining({
+        name: "DecoderOutOfMemoryError",
+        cause: v8Oom,
+      }),
+    });
   });
 });
 
