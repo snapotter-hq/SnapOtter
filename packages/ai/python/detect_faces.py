@@ -81,8 +81,10 @@ def _detect_with_solutions(img_array, min_confidence):
             model_selection=model_sel,
             min_detection_confidence=min_confidence,
         )
-        results = detector.process(img_array)
-        detector.close()
+        try:
+            results = detector.process(img_array)
+        finally:
+            detector.close()
         for detection in (results.detections or []):
             bbox = detection.location_data.relative_bounding_box
             all_faces.append({
@@ -106,9 +108,11 @@ def _detect_with_tasks(img_array, min_confidence):
         min_detection_confidence=min_confidence,
     )
     detector = mp.tasks.vision.FaceDetector.create_from_options(options)
-    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_array)
-    result = detector.detect(mp_image)
-    detector.close()
+    try:
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_array)
+        result = detector.detect(mp_image)
+    finally:
+        detector.close()
 
     faces = []
     for detection in result.detections:

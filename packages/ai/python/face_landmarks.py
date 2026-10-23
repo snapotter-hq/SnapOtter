@@ -65,9 +65,10 @@ def detect_with_solutions(img_array, max_faces=1):
         refine_landmarks=True,
         min_detection_confidence=0.5,
     )
-
-    results = face_mesh.process(img_array)
-    face_mesh.close()
+    try:
+        results = face_mesh.process(img_array)
+    finally:
+        face_mesh.close()
 
     if not results.multi_face_landmarks:
         return None
@@ -117,9 +118,11 @@ def detect_with_tasks(img_path, max_faces=1):
     )
 
     landmarker = mp.tasks.vision.FaceLandmarker.create_from_options(options)
-    mp_image = mp.Image.create_from_file(img_path)
-    result = landmarker.detect(mp_image)
-    landmarker.close()
+    try:
+        mp_image = mp.Image.create_from_file(img_path)
+        result = landmarker.detect(mp_image)
+    finally:
+        landmarker.close()
 
     if not result.face_landmarks:
         return None

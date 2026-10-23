@@ -1527,6 +1527,134 @@ print("RESTORE_3626_OK")
         expect(res.status, res.stderr).toBe(0);
         expect(res.stdout).toContain("RESTORE_3626_OK");
       });
+
+      it("closes MediaPipe detectors in enhance_faces when .process(), mp.Image(), or .detect() raises (issue #3654)", () => {
+        const res = runPy(`
+import importlib.util, os, sys, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+import gpu
+
+spec = importlib.util.spec_from_file_location("restore_mod_3654", os.path.join(py_dir, "restore.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+mod._IMPORT_ERROR = None
+
+class FakeArr:
+    shape = (200, 200, 3)
+    def copy(self):
+        return self
+
+mod.cv2 = types.SimpleNamespace(
+    COLOR_BGR2RGB=1,
+    cvtColor=lambda img, _c: img,
+)
+gpu.onnx_gpu_available = lambda: False
+
+# 1. mp.solutions path: detector.close() is called when detector.process() raises on model_selection=0 or model_selection=1
+closed_models = []
+fail_on_model = [0]
+
+class RaisingSolutionsDetector:
+    def __init__(self, model_selection=0, min_detection_confidence=0.4):
+        self.ms = model_selection
+    def process(self, _img):
+        if self.ms == fail_on_model[0]:
+            raise RuntimeError(f"restore solutions process failed on model {self.ms}")
+        return types.SimpleNamespace(detections=None)
+    def close(self):
+        closed_models.append(self.ms)
+
+fake_mp_sol = types.ModuleType("mediapipe")
+fake_mp_sol.solutions = types.SimpleNamespace(
+    face_detection=types.SimpleNamespace(FaceDetection=RaisingSolutionsDetector)
+)
+sys.modules["mediapipe"] = fake_mp_sol
+
+for target_ms, expected_closed in ((0, [0]), (1, [0, 1])):
+    closed_models.clear()
+    fail_on_model[0] = target_ms
+    try:
+        mod.enhance_faces(FakeArr(), 0.7)
+    except RuntimeError as exc:
+        assert str(exc) == f"restore solutions process failed on model {target_ms}", exc
+        assert closed_models == expected_closed, (target_ms, closed_models)
+    else:
+        raise AssertionError(f"Expected RuntimeError on model {target_ms}")
+
+closed_models.clear()
+fail_on_model[0] = -1
+_, count_sol = mod.enhance_faces(FakeArr(), 0.7)
+assert count_sol == 0, count_sol
+assert closed_models == [0, 1], closed_models
+
+# 2. mp.tasks path: fd.close() is called when mp.Image() raises or when fd.detect() raises
+mod._ensure_face_detect_model = lambda: "/tmp/fake-blaze-3654.tflite"
+tasks_closed = []
+raise_in_image = [False]
+raise_in_detect = [False]
+
+class RaisingTasksDetector:
+    def detect(self, _mp_image):
+        if raise_in_detect[0]:
+            raise RuntimeError("restore tasks detect failed")
+        return types.SimpleNamespace(detections=[])
+    def close(self):
+        tasks_closed.append(True)
+
+def fake_mp_image(image_format, data):
+    if raise_in_image[0]:
+        raise ValueError("restore mp.Image wrap failed")
+    return data
+
+fake_mp_tasks = types.ModuleType("mediapipe")
+fake_mp_tasks.ImageFormat = types.SimpleNamespace(SRGB=1)
+fake_mp_tasks.Image = fake_mp_image
+fake_mp_tasks.tasks = types.SimpleNamespace(
+    BaseOptions=lambda model_asset_path: model_asset_path,
+    vision=types.SimpleNamespace(
+        RunningMode=types.SimpleNamespace(IMAGE=1),
+        FaceDetectorOptions=lambda **kw: kw,
+        FaceDetector=types.SimpleNamespace(create_from_options=lambda _opts: RaisingTasksDetector()),
+    ),
+)
+sys.modules["mediapipe"] = fake_mp_tasks
+
+tasks_closed.clear()
+raise_in_image[0] = True
+raise_in_detect[0] = False
+try:
+    mod.enhance_faces(FakeArr(), 0.7)
+except ValueError as exc:
+    assert str(exc) == "restore mp.Image wrap failed", exc
+    assert tasks_closed == [True], tasks_closed
+else:
+    raise AssertionError("Expected ValueError from mp.Image()")
+
+tasks_closed.clear()
+raise_in_image[0] = False
+raise_in_detect[0] = True
+try:
+    mod.enhance_faces(FakeArr(), 0.7)
+except RuntimeError as exc:
+    assert str(exc) == "restore tasks detect failed", exc
+    assert tasks_closed == [True], tasks_closed
+else:
+    raise AssertionError("Expected RuntimeError from fd.detect()")
+
+tasks_closed.clear()
+raise_in_image[0] = False
+raise_in_detect[0] = False
+_, count_tasks = mod.enhance_faces(FakeArr(), 0.7)
+assert count_tasks == 0, count_tasks
+assert tasks_closed == [True], tasks_closed
+
+print("RESTORE_3654_OK")
+`);
+        expect(res.status, res.stderr).toBe(0);
+        expect(res.stdout).toContain("RESTORE_3654_OK");
+      });
     },
   );
 });

@@ -607,6 +607,125 @@ print("FACE_LANDMARKS_3626_OK")
         expect(res.status, res.stderr).toBe(0);
         expect(res.stdout).toContain("FACE_LANDMARKS_3626_OK");
       });
+
+      it("closes MediaPipe FaceMesh and FaceLandmarker in detect_with_solutions and detect_with_tasks when .process(), create_from_file(), or .detect() raises (issue #3654)", () => {
+        const res = spawnSync(
+          pythonBin as string,
+          [
+            "-c",
+            `
+import importlib.util, os, sys, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+
+class FakeArr:
+    shape = (64, 64, 3)
+
+spec = importlib.util.spec_from_file_location("face_landmarks_mod_3654", os.path.join(py_dir, "face_landmarks.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+# 1. detect_with_solutions: face_mesh.close() is called when face_mesh.process() raises
+solutions_closed = []
+raise_in_solutions = [True]
+
+class RaisingSolutionsMesh:
+    def __init__(self, **_kwargs):
+        pass
+    def process(self, _img):
+        if raise_in_solutions[0]:
+            raise RuntimeError("face_mesh process failed")
+        return types.SimpleNamespace(multi_face_landmarks=None)
+    def close(self):
+        solutions_closed.append(True)
+
+fake_mp_sol = types.ModuleType("mediapipe")
+fake_mp_sol.solutions = types.SimpleNamespace(
+    face_mesh=types.SimpleNamespace(FaceMesh=RaisingSolutionsMesh)
+)
+sys.modules["mediapipe"] = fake_mp_sol
+
+try:
+    mod.detect_with_solutions(FakeArr(), 1)
+except RuntimeError as exc:
+    assert str(exc) == "face_mesh process failed", exc
+    assert solutions_closed == [True], solutions_closed
+else:
+    raise AssertionError("Expected RuntimeError from face_mesh.process()")
+
+solutions_closed.clear()
+raise_in_solutions[0] = False
+assert mod.detect_with_solutions(FakeArr(), 1) is None
+assert solutions_closed == [True], solutions_closed
+
+# 2. detect_with_tasks: landmarker.close() is called when create_from_file() raises or when landmarker.detect() raises
+mod.ensure_model = lambda: "/tmp/fake-landmarker-3654.task"
+tasks_closed = []
+raise_in_create = [False]
+raise_in_detect = [False]
+
+class RaisingLandmarker:
+    def detect(self, _mp_image):
+        if raise_in_detect[0]:
+            raise RuntimeError("landmarker detect failed")
+        return types.SimpleNamespace(face_landmarks=[])
+    def close(self):
+        tasks_closed.append(True)
+
+def fake_create_from_file(path):
+    if raise_in_create[0]:
+        raise FileNotFoundError(f"cannot read image: {path}")
+    return path
+
+fake_mp_tasks = types.ModuleType("mediapipe")
+fake_mp_tasks.Image = types.SimpleNamespace(create_from_file=fake_create_from_file)
+fake_mp_tasks.tasks = types.SimpleNamespace(
+    BaseOptions=lambda model_asset_path: model_asset_path,
+    vision=types.SimpleNamespace(
+        RunningMode=types.SimpleNamespace(IMAGE=1),
+        FaceLandmarkerOptions=lambda **kw: kw,
+        FaceLandmarker=types.SimpleNamespace(create_from_options=lambda _opts: RaisingLandmarker()),
+    ),
+)
+sys.modules["mediapipe"] = fake_mp_tasks
+
+tasks_closed.clear()
+raise_in_create[0] = True
+raise_in_detect[0] = False
+try:
+    mod.detect_with_tasks("/tmp/missing.png", 1)
+except FileNotFoundError as exc:
+    assert "cannot read image: /tmp/missing.png" in str(exc), exc
+    assert tasks_closed == [True], tasks_closed
+else:
+    raise AssertionError("Expected FileNotFoundError from create_from_file()")
+
+tasks_closed.clear()
+raise_in_create[0] = False
+raise_in_detect[0] = True
+try:
+    mod.detect_with_tasks("/tmp/in.png", 1)
+except RuntimeError as exc:
+    assert str(exc) == "landmarker detect failed", exc
+    assert tasks_closed == [True], tasks_closed
+else:
+    raise AssertionError("Expected RuntimeError from landmarker.detect()")
+
+tasks_closed.clear()
+raise_in_create[0] = False
+raise_in_detect[0] = False
+assert mod.detect_with_tasks("/tmp/in.png", 1) is None
+assert tasks_closed == [True], tasks_closed
+
+print("FACE_LANDMARKS_3654_OK")
+`,
+          ],
+          { encoding: "utf8", timeout: 30_000 },
+        );
+        expect(res.status, res.stderr).toBe(0);
+        expect(res.stdout).toContain("FACE_LANDMARKS_3654_OK");
+      });
     },
   );
 });

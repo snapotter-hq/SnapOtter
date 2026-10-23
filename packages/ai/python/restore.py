@@ -521,8 +521,10 @@ def enhance_faces(img_bgr, fidelity=0.7):
             detector = mp_face.FaceDetection(
                 model_selection=model_sel, min_detection_confidence=0.4
             )
-            results = detector.process(det_rgb)
-            detector.close()
+            try:
+                results = detector.process(det_rgb)
+            finally:
+                detector.close()
             for detection in (results.detections or []):
                 all_detections.append(detection)
 
@@ -547,9 +549,11 @@ def enhance_faces(img_bgr, fidelity=0.7):
             min_detection_confidence=0.4,
         )
         fd = mp.tasks.vision.FaceDetector.create_from_options(options)
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=det_rgb)
-        result = fd.detect(mp_image)
-        fd.close()
+        try:
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=det_rgb)
+            result = fd.detect(mp_image)
+        finally:
+            fd.close()
 
         if not result.detections:
             return img_bgr, 0

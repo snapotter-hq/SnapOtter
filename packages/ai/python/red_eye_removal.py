@@ -47,8 +47,10 @@ def _mesh_with_solutions(img_array, max_faces=50, min_confidence=0.5):
         refine_landmarks=True,
         min_detection_confidence=min_confidence,
     )
-    results = mesh.process(img_array)
-    mesh.close()
+    try:
+        results = mesh.process(img_array)
+    finally:
+        mesh.close()
 
     if not results.multi_face_landmarks:
         return []
@@ -71,9 +73,11 @@ def _mesh_with_tasks(img_array, max_faces=50, min_confidence=0.5):
         min_face_detection_confidence=min_confidence,
     )
     landmarker = mp.tasks.vision.FaceLandmarker.create_from_options(options)
-    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_array)
-    result = landmarker.detect(mp_image)
-    landmarker.close()
+    try:
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_array)
+        result = landmarker.detect(mp_image)
+    finally:
+        landmarker.close()
 
     if not result.face_landmarks:
         return []

@@ -1248,6 +1248,129 @@ print("ENHANCE_FACES_3627_OK")
         expect(res.status, res.stderr).toBe(0);
         expect(res.stdout).toContain("ENHANCE_FACES_3627_OK");
       });
+
+      it("closes MediaPipe detectors in detect_faces_mediapipe when .process(), mp.Image(), or .detect() raises (issue #3654)", () => {
+        const res = spawnSync(
+          pythonBin as string,
+          [
+            "-c",
+            `
+import importlib.util, os, sys, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+
+class FakeArr:
+    shape = (100, 200, 3)
+
+spec = importlib.util.spec_from_file_location("enhance_faces_mod_3654", os.path.join(py_dir, "enhance_faces.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+# 1. mp.solutions path: detector.close() is called when detector.process() raises on model_selection=0 or model_selection=1
+closed_models = []
+fail_on_model = [0]
+
+class RaisingSolutionsDetector:
+    def __init__(self, model_selection=0, min_detection_confidence=0.5):
+        self.ms = model_selection
+    def process(self, _img):
+        if self.ms == fail_on_model[0]:
+            raise RuntimeError(f"solutions process failed on model {self.ms}")
+        return types.SimpleNamespace(detections=None)
+    def close(self):
+        closed_models.append(self.ms)
+
+fake_mp_sol = types.ModuleType("mediapipe")
+fake_mp_sol.solutions = types.SimpleNamespace(
+    face_detection=types.SimpleNamespace(FaceDetection=RaisingSolutionsDetector)
+)
+sys.modules["mediapipe"] = fake_mp_sol
+
+for target_ms, expected_closed in ((0, [0]), (1, [0, 1])):
+    closed_models.clear()
+    fail_on_model[0] = target_ms
+    try:
+        mod.detect_faces_mediapipe(FakeArr(), 0.5)
+    except RuntimeError as exc:
+        assert str(exc) == f"solutions process failed on model {target_ms}", exc
+        assert closed_models == expected_closed, (target_ms, closed_models)
+    else:
+        raise AssertionError(f"Expected RuntimeError on model {target_ms}")
+
+closed_models.clear()
+fail_on_model[0] = -1
+assert mod.detect_faces_mediapipe(FakeArr(), 0.5) == []
+assert closed_models == [0, 1], closed_models
+
+# 2. mp.tasks path: detector.close() is called when mp.Image() raises or when detector.detect() raises
+mod._ensure_face_detect_model = lambda: "/tmp/fake-blaze-3654.tflite"
+tasks_closed = []
+raise_in_image = [False]
+raise_in_detect = [False]
+
+class RaisingTasksDetector:
+    def detect(self, _mp_image):
+        if raise_in_detect[0]:
+            raise RuntimeError("tasks detect failed")
+        return types.SimpleNamespace(detections=[])
+    def close(self):
+        tasks_closed.append(True)
+
+def fake_mp_image(image_format, data):
+    if raise_in_image[0]:
+        raise ValueError("mp.Image wrap failed")
+    return data
+
+fake_mp_tasks = types.ModuleType("mediapipe")
+fake_mp_tasks.ImageFormat = types.SimpleNamespace(SRGB=1)
+fake_mp_tasks.Image = fake_mp_image
+fake_mp_tasks.tasks = types.SimpleNamespace(
+    BaseOptions=lambda model_asset_path: model_asset_path,
+    vision=types.SimpleNamespace(
+        RunningMode=types.SimpleNamespace(IMAGE=1),
+        FaceDetectorOptions=lambda **kw: kw,
+        FaceDetector=types.SimpleNamespace(create_from_options=lambda _opts: RaisingTasksDetector()),
+    ),
+)
+sys.modules["mediapipe"] = fake_mp_tasks
+
+tasks_closed.clear()
+raise_in_image[0] = True
+raise_in_detect[0] = False
+try:
+    mod.detect_faces_mediapipe(FakeArr(), 0.5)
+except ValueError as exc:
+    assert str(exc) == "mp.Image wrap failed", exc
+    assert tasks_closed == [True], tasks_closed
+else:
+    raise AssertionError("Expected ValueError from mp.Image()")
+
+tasks_closed.clear()
+raise_in_image[0] = False
+raise_in_detect[0] = True
+try:
+    mod.detect_faces_mediapipe(FakeArr(), 0.5)
+except RuntimeError as exc:
+    assert str(exc) == "tasks detect failed", exc
+    assert tasks_closed == [True], tasks_closed
+else:
+    raise AssertionError("Expected RuntimeError from detector.detect()")
+
+tasks_closed.clear()
+raise_in_image[0] = False
+raise_in_detect[0] = False
+assert mod.detect_faces_mediapipe(FakeArr(), 0.5) == []
+assert tasks_closed == [True], tasks_closed
+
+print("ENHANCE_FACES_3654_OK")
+`,
+          ],
+          { encoding: "utf8", timeout: 30_000 },
+        );
+        expect(res.status, res.stderr).toBe(0);
+        expect(res.stdout).toContain("ENHANCE_FACES_3654_OK");
+      });
     },
   );
 });

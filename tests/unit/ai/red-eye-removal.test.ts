@@ -641,6 +641,126 @@ print("RED_EYE_3652_OK")
         expect(res.status, res.stderr).toBe(0);
         expect(res.stdout).toContain("RED_EYE_3652_OK");
       });
+
+      it("closes MediaPipe FaceMesh and FaceLandmarker in _mesh_with_solutions and _mesh_with_tasks when .process(), mp.Image(), or .detect() raises (issue #3654)", () => {
+        const res = spawnSync(
+          pythonBin as string,
+          [
+            "-c",
+            `
+import importlib.util, os, sys, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+
+class FakeArr:
+    shape = (64, 64, 3)
+
+spec = importlib.util.spec_from_file_location("red_eye_removal_mod_3654", os.path.join(py_dir, "red_eye_removal.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+# 1. _mesh_with_solutions: mesh.close() is called when mesh.process() raises
+solutions_closed = []
+raise_in_solutions = [True]
+
+class RaisingSolutionsMesh:
+    def __init__(self, **_kwargs):
+        pass
+    def process(self, _img):
+        if raise_in_solutions[0]:
+            raise RuntimeError("mesh process failed")
+        return types.SimpleNamespace(multi_face_landmarks=None)
+    def close(self):
+        solutions_closed.append(True)
+
+fake_mp_sol = types.ModuleType("mediapipe")
+fake_mp_sol.solutions = types.SimpleNamespace(
+    face_mesh=types.SimpleNamespace(FaceMesh=RaisingSolutionsMesh)
+)
+sys.modules["mediapipe"] = fake_mp_sol
+
+try:
+    mod._mesh_with_solutions(FakeArr(), 10, 0.5)
+except RuntimeError as exc:
+    assert str(exc) == "mesh process failed", exc
+    assert solutions_closed == [True], solutions_closed
+else:
+    raise AssertionError("Expected RuntimeError from mesh.process()")
+
+solutions_closed.clear()
+raise_in_solutions[0] = False
+assert mod._mesh_with_solutions(FakeArr(), 10, 0.5) == []
+assert solutions_closed == [True], solutions_closed
+
+# 2. _mesh_with_tasks: landmarker.close() is called when mp.Image() raises or when landmarker.detect() raises
+mod._ensure_face_mesh_model = lambda: "/tmp/fake-landmarker-3654.task"
+tasks_closed = []
+raise_in_image = [False]
+raise_in_detect = [False]
+
+class RaisingLandmarker:
+    def detect(self, _mp_image):
+        if raise_in_detect[0]:
+            raise RuntimeError("landmarker detect failed")
+        return types.SimpleNamespace(face_landmarks=[])
+    def close(self):
+        tasks_closed.append(True)
+
+def fake_mp_image(image_format, data):
+    if raise_in_image[0]:
+        raise ValueError("red_eye mp.Image wrap failed")
+    return data
+
+fake_mp_tasks = types.ModuleType("mediapipe")
+fake_mp_tasks.ImageFormat = types.SimpleNamespace(SRGB=1)
+fake_mp_tasks.Image = fake_mp_image
+fake_mp_tasks.tasks = types.SimpleNamespace(
+    BaseOptions=lambda model_asset_path: model_asset_path,
+    vision=types.SimpleNamespace(
+        RunningMode=types.SimpleNamespace(IMAGE=1),
+        FaceLandmarkerOptions=lambda **kw: kw,
+        FaceLandmarker=types.SimpleNamespace(create_from_options=lambda _opts: RaisingLandmarker()),
+    ),
+)
+sys.modules["mediapipe"] = fake_mp_tasks
+
+tasks_closed.clear()
+raise_in_image[0] = True
+raise_in_detect[0] = False
+try:
+    mod._mesh_with_tasks(FakeArr(), 10, 0.5)
+except ValueError as exc:
+    assert str(exc) == "red_eye mp.Image wrap failed", exc
+    assert tasks_closed == [True], tasks_closed
+else:
+    raise AssertionError("Expected ValueError from mp.Image()")
+
+tasks_closed.clear()
+raise_in_image[0] = False
+raise_in_detect[0] = True
+try:
+    mod._mesh_with_tasks(FakeArr(), 10, 0.5)
+except RuntimeError as exc:
+    assert str(exc) == "landmarker detect failed", exc
+    assert tasks_closed == [True], tasks_closed
+else:
+    raise AssertionError("Expected RuntimeError from landmarker.detect()")
+
+tasks_closed.clear()
+raise_in_image[0] = False
+raise_in_detect[0] = False
+assert mod._mesh_with_tasks(FakeArr(), 10, 0.5) == []
+assert tasks_closed == [True], tasks_closed
+
+print("RED_EYE_3654_OK")
+`,
+          ],
+          { encoding: "utf8", timeout: 30_000 },
+        );
+        expect(res.status, res.stderr).toBe(0);
+        expect(res.stdout).toContain("RED_EYE_3654_OK");
+      });
     },
   );
 });
