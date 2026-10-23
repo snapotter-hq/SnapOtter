@@ -458,27 +458,29 @@ def main():
         # MuPDF could not map comes back as U+FFFD instead of a plausible letter.
         unmapped_as_fffd = fitz.TEXTFLAGS_TEXT & ~fitz.TEXT_CID_FOR_UNKNOWN_UNICODE
         doc = fitz.open(path)
-        parts, judged = [], []
-        for page in doc:
-            part = normalize_presentation_forms(page.get_text())
-            parts.append(part)
-            # The .txt keeps the default extraction either way; only the
-            # readability verdict looks through the glyph ids (#955), and
-            # past fonts that came out as glyph ids anyway (#1566).
-            # Every page goes through the glyph-id font check: an identity
-            # ToUnicode stream isn't flagged by draws_unmapped_composite_font,
-            # since MuPDF has a map for it (#1754).
-            flagged = draws_unmapped_composite_font(page)
-            readable = _judge_without_glyph_id_fonts(
-                page, unmapped_as_fffd if flagged else None
-            )
-            if readable is not None:
-                judged.append(readable)
-            elif flagged:
-                judged.append(page.get_text(flags=unmapped_as_fffd))
-            else:
-                judged.append(part)
-        doc.close()
+        try:
+            parts, judged = [], []
+            for page in doc:
+                part = normalize_presentation_forms(page.get_text())
+                parts.append(part)
+                # The .txt keeps the default extraction either way; only the
+                # readability verdict looks through the glyph ids (#955), and
+                # past fonts that came out as glyph ids anyway (#1566).
+                # Every page goes through the glyph-id font check: an identity
+                # ToUnicode stream isn't flagged by draws_unmapped_composite_font,
+                # since MuPDF has a map for it (#1754).
+                flagged = draws_unmapped_composite_font(page)
+                readable = _judge_without_glyph_id_fonts(
+                    page, unmapped_as_fffd if flagged else None
+                )
+                if readable is not None:
+                    judged.append(readable)
+                elif flagged:
+                    judged.append(page.get_text(flags=unmapped_as_fffd))
+                else:
+                    judged.append(part)
+        finally:
+            doc.close()
         text = "\n".join(parts)
         # hasText separates a PDF with a usable text layer from one that has
         # nothing to give: a scanned or image-only page returns "" so only the

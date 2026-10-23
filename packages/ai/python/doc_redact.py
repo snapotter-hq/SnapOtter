@@ -39,37 +39,41 @@ def main():
         sys.exit(1)
     try:
         doc = fitz.open(path)
-        flags = fitz.TEXT_DEHYPHENATE
-        found = 0
-        for page in doc:
-            for term in terms:
-                if case_sensitive:
-                    # search_for is always case-insensitive; keep only the
-                    # exact-case hits by checking the glyphs under each quad.
-                    quads = [
-                        q
-                        for q in page.search_for(term, quads=True, flags=flags)
-                        if term in page.get_textbox(q.rect)
-                    ]
-                else:
-                    quads = page.search_for(term, quads=True)
-                for quad in quads:
-                    page.add_redact_annot(quad, fill=(0, 0, 0))
-                    found += 1
-            page.apply_redactions()
-        doc.save(out, garbage=4, deflate=True)
-        doc.close()
+        try:
+            flags = fitz.TEXT_DEHYPHENATE
+            found = 0
+            for page in doc:
+                for term in terms:
+                    if case_sensitive:
+                        # search_for is always case-insensitive; keep only the
+                        # exact-case hits by checking the glyphs under each quad.
+                        quads = [
+                            q
+                            for q in page.search_for(term, quads=True, flags=flags)
+                            if term in page.get_textbox(q.rect)
+                        ]
+                    else:
+                        quads = page.search_for(term, quads=True)
+                    for quad in quads:
+                        page.add_redact_annot(quad, fill=(0, 0, 0))
+                        found += 1
+                page.apply_redactions()
+            doc.save(out, garbage=4, deflate=True)
+        finally:
+            doc.close()
         # Verification pass: reopen and prove no term is extractable anymore.
         check = fitz.open(out)
-        leaked = []
-        for page in check:
-            text = page.get_text()
-            haystack = text if case_sensitive else text.lower()
-            for term in terms:
-                needle = term if case_sensitive else term.lower()
-                if needle and needle in haystack:
-                    leaked.append(term)
-        check.close()
+        try:
+            leaked = []
+            for page in check:
+                text = page.get_text()
+                haystack = text if case_sensitive else text.lower()
+                for term in terms:
+                    needle = term if case_sensitive else term.lower()
+                    if needle and needle in haystack:
+                        leaked.append(term)
+        finally:
+            check.close()
         if leaked:
             print(json.dumps({"error": f"verification failed: terms still extractable: {sorted(set(leaked))}"}))
             sys.exit(1)

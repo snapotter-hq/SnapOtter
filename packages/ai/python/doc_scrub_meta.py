@@ -35,24 +35,25 @@ def main():
         sys.exit(1)
     try:
         doc = fitz.open(path)
-        if doc.needs_pass:
-            # Encrypted output: pass it through untouched rather than
-            # re-encrypting. `out` must always exist for the caller.
-            doc.close()
-            import shutil
+        try:
+            if doc.needs_pass:
+                # Encrypted output: pass it through untouched rather than
+                # re-encrypting. `out` must always exist for the caller.
+                import shutil
 
-            shutil.copyfile(path, out)
-            print(json.dumps({"ok": True, "skipped": "encrypted"}))
-            return
-        meta = doc.metadata or {}
-        meta["producer"] = "SnapOtter"
-        meta["creator"] = "SnapOtter"
-        doc.set_metadata(meta)
-        # XMP often carries the engine's own pdf:Producer; DocInfo is the
-        # canonical source for these files, so drop the stale copy.
-        doc.del_xml_metadata()
-        doc.save(out)
-        doc.close()
+                shutil.copyfile(path, out)
+                print(json.dumps({"ok": True, "skipped": "encrypted"}))
+                return
+            meta = doc.metadata or {}
+            meta["producer"] = "SnapOtter"
+            meta["creator"] = "SnapOtter"
+            doc.set_metadata(meta)
+            # XMP often carries the engine's own pdf:Producer; DocInfo is the
+            # canonical source for these files, so drop the stale copy.
+            doc.del_xml_metadata()
+            doc.save(out)
+        finally:
+            doc.close()
         print(json.dumps({"ok": True}))
     except Exception as exc:  # noqa: BLE001
         print(json.dumps({"error": str(exc).strip() or type(exc).__name__}))
