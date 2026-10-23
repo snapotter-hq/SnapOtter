@@ -1,7 +1,7 @@
 /**
- * Authorization on the standalone upload and preview endpoints.
+ * Authorization on the standalone upload, URL import, and preview endpoints.
  *
- * These three routes sit outside both enforcement points the rest of the API
+ * These four routes sit outside both enforcement points the rest of the API
  * relies on: `requireFileAccess`, which guards every route under /api/v1/files,
  * and the tool-access middleware, which only fires for routes registered under
  * /api/v1/tools/. Authentication alone used to be enough to reach them, so a
@@ -69,6 +69,20 @@ describe("upload and preview authorization", () => {
     expect(JSON.parse(res.body)).not.toHaveProperty("jobId");
   });
 
+  it("refuses a URL import from a principal without file permissions", async () => {
+    const res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/fetch-urls",
+      headers: { authorization: `Bearer ${scopedKey}` },
+      // Loopback, so the SSRF guard would answer it without a network call if
+      // the request ever got that far.
+      payload: { urls: ["http://127.0.0.1/probe.png"] },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(JSON.parse(res.body)).not.toHaveProperty("results");
+  });
+
   it("refuses an image preview from a principal without tool permissions", async () => {
     const { body, contentType } = pngUpload("file");
     const res = await testApp.app.inject({
@@ -104,6 +118,16 @@ describe("upload and preview authorization", () => {
     expect(uploadRes.statusCode).toBe(200);
     expect(JSON.parse(uploadRes.body).jobId).toBeTruthy();
 
+    // Past the permission gate, the SSRF guard answers per URL.
+    const fetchRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/fetch-urls",
+      headers: { authorization: `Bearer ${capableKey}` },
+      payload: { urls: ["http://127.0.0.1/probe.png"] },
+    });
+    expect(fetchRes.statusCode).toBe(200);
+    expect(JSON.parse(fetchRes.body).results[0].error).toMatch(/private or reserved/i);
+
     const preview = pngUpload("file");
     const previewRes = await testApp.app.inject({
       method: "POST",
@@ -124,5 +148,12 @@ describe("upload and preview authorization", () => {
     });
 
     expect(res.statusCode).toBe(401);
+
+    const fetchRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/fetch-urls",
+      payload: { urls: ["http://127.0.0.1/probe.png"] },
+    });
+    expect(fetchRes.statusCode).toBe(401);
   });
 });
