@@ -776,7 +776,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           try {
             decoded = Buffer.from(await decodeHeic(rawBuffer));
           } catch (rawHeicErr) {
-            throw normalizeOperationalWriteError(rawHeicErr);
+            throw normalizeOperationalWriteError(asDecoderOutOfMemory(rawHeicErr));
           }
         } else if (validation.valid && needsCliDecode(validation.format)) {
           try {
@@ -784,7 +784,7 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
               extname(file.originalName).toLowerCase().replace(/^\./, "") || undefined;
             decoded = Buffer.from(await decodeToSharpCompat(rawBuffer, validation.format, fileExt));
           } catch (rawDecodeErr) {
-            const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+            const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
             if (
               decodeErr instanceof DecoderOutOfMemoryError ||
               (!isDecoderUnavailable(decodeErr) && isPreviewServerFault(decodeErr))
@@ -795,6 +795,10 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
               await sharp(rawBuffer).metadata();
               await sharp(rawBuffer).resize(1).raw().toBuffer();
             } catch (err) {
+              const probeErr = asDecoderOutOfMemory(err);
+              if (probeErr instanceof DecoderOutOfMemoryError) {
+                throw probeErr;
+              }
               if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
                 throw decodeErr;
               }

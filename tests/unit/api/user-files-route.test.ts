@@ -2480,6 +2480,235 @@ describe("user files route logic", () => {
         }
       });
 
+      it("surfaces DecoderOutOfMemoryError when GET /api/v1/files/:id/thumbnail hits OOM in decodeHeic, decodeToSharpCompat, or the DNG Sharp fallback probe (#3631)", async () => {
+        const formatDecoders = await import("../../../apps/api/src/lib/format-decoders.js");
+        const heicConverter = await import("../../../apps/api/src/lib/heic-converter.js");
+        const objectStorage = await import("../../../apps/api/src/lib/object-storage.js");
+        const tiffHeadedDng = await sharp({
+          create: { width: 8, height: 8, channels: 3, background: { r: 10, g: 20, b: 30 } },
+        })
+          .tiff()
+          .toBuffer();
+        const dngRow = makeFileRow({
+          id: "file-dng-oom-3631",
+          originalName: "photo.dng",
+          storedName: "stored-dng-oom-3631.dng",
+          mimeType: "image/x-adobe-dng",
+        });
+        const heicRow = makeFileRow({
+          id: "file-heic-oom-3631",
+          originalName: "photo.heic",
+          storedName: "stored-heic-oom-3631.heic",
+          mimeType: "image/heic",
+        });
+
+        let fakeNow = Date.now() + 60 * 60_000;
+        const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => fakeNow);
+        const decodeSpy = vi.spyOn(formatDecoders, "decodeToSharpCompat");
+        const heicSpy = vi.spyOn(heicConverter, "decodeHeic");
+        const normalizeSpy = vi.spyOn(objectStorage, "normalizeOperationalWriteError");
+        try {
+          // 1. DNG Sharp fallback probe rejecting with V8 RangeError("Array buffer allocation failed") at sharp.prototype.raw surfaces DecoderOutOfMemoryError over DecoderUnavailableError
+          mocks.parentRows = [dngRow];
+          mocks.readStoredFile.mockResolvedValueOnce(tiffHeadedDng);
+          mocks.validateImageBuffer.mockResolvedValueOnce({
+            valid: true as const,
+            format: "raw",
+            width: 8,
+            height: 8,
+          });
+          decodeSpy.mockRejectedValueOnce(
+            new formatDecoders.DecoderUnavailableError("No dcraw_emu found."),
+          );
+          const rawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
+            this: sharp.Sharp,
+          ) {
+            return {
+              toBuffer: async () => {
+                throw new RangeError("Array buffer allocation failed");
+              },
+            } as unknown as sharp.Sharp;
+          });
+          try {
+            const warnProbeRawOom = vi.fn();
+            const probeRawOomReply = makeReply();
+            await thumbnailHandler(
+              { params: { id: dngRow.id }, log: { warn: warnProbeRawOom, error: vi.fn() } },
+              probeRawOomReply,
+            );
+            expect(probeRawOomReply.statusCode).toBe(503);
+            expect(probeRawOomReply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+            expect(warnProbeRawOom).toHaveBeenCalledWith(
+              expect.objectContaining({
+                code: "ENGINE_UNAVAILABLE",
+                cause: "DecoderOutOfMemoryError",
+                toolId: "user-file-thumbnail",
+              }),
+              "Tool engine unavailable during input preparation",
+            );
+          } finally {
+            rawSpy.mockRestore();
+          }
+
+          // 2. DNG Sharp fallback probe rejecting with V8 RangeError("Array buffer allocation failed") at sharp.prototype.metadata also surfaces DecoderOutOfMemoryError over DecoderUnavailableError
+          fakeNow += 11 * 60_000;
+          mocks.parentRows = [dngRow];
+          mocks.readStoredFile.mockResolvedValueOnce(tiffHeadedDng);
+          mocks.validateImageBuffer.mockResolvedValueOnce({
+            valid: true as const,
+            format: "raw",
+            width: 8,
+            height: 8,
+          });
+          decodeSpy.mockRejectedValueOnce(
+            new formatDecoders.DecoderUnavailableError("No dcraw_emu found."),
+          );
+          const metaSpy = vi
+            .spyOn(sharp.prototype, "metadata")
+            .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"));
+          try {
+            const warnProbeMetaOom = vi.fn();
+            const probeMetaOomReply = makeReply();
+            await thumbnailHandler(
+              { params: { id: dngRow.id }, log: { warn: warnProbeMetaOom, error: vi.fn() } },
+              probeMetaOomReply,
+            );
+            expect(probeMetaOomReply.statusCode).toBe(503);
+            expect(probeMetaOomReply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+            expect(warnProbeMetaOom).toHaveBeenCalledWith(
+              expect.objectContaining({
+                code: "ENGINE_UNAVAILABLE",
+                cause: "DecoderOutOfMemoryError",
+                toolId: "user-file-thumbnail",
+              }),
+              "Tool engine unavailable during input preparation",
+            );
+          } finally {
+            metaSpy.mockRestore();
+          }
+
+          // 3. Non-OOM RangeError in the DNG Sharp fallback probe still surfaces DecoderUnavailableError when the CLI decoder was missing
+          fakeNow += 11 * 60_000;
+          mocks.parentRows = [dngRow];
+          mocks.readStoredFile.mockResolvedValueOnce(tiffHeadedDng);
+          mocks.validateImageBuffer.mockResolvedValueOnce({
+            valid: true as const,
+            format: "raw",
+            width: 8,
+            height: 8,
+          });
+          decodeSpy.mockRejectedValueOnce(
+            new formatDecoders.DecoderUnavailableError("No dcraw_emu found."),
+          );
+          const nonOomRawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
+            this: sharp.Sharp,
+          ) {
+            return {
+              toBuffer: async () => {
+                throw new RangeError("Invalid raw parameter");
+              },
+            } as unknown as sharp.Sharp;
+          });
+          try {
+            const warnProbeNonOom = vi.fn();
+            const probeNonOomReply = makeReply();
+            await thumbnailHandler(
+              { params: { id: dngRow.id }, log: { warn: warnProbeNonOom, error: vi.fn() } },
+              probeNonOomReply,
+            );
+            expect(probeNonOomReply.statusCode).toBe(503);
+            expect(probeNonOomReply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+            expect(warnProbeNonOom).toHaveBeenCalledWith(
+              expect.objectContaining({
+                code: "ENGINE_UNAVAILABLE",
+                cause: "DecoderUnavailableError",
+                toolId: "user-file-thumbnail",
+              }),
+              "Tool engine unavailable during input preparation",
+            );
+          } finally {
+            nonOomRawSpy.mockRestore();
+          }
+
+          // 4. Raw OOM errors from decodeToSharpCompat (including stderr OOMs that would otherwise fall through to the Sharp DNG probe) and decodeHeic surface 503 DecoderOutOfMemoryError
+          for (const makeRawOom of [
+            () => new RangeError("Array buffer allocation failed"),
+            () => Object.assign(new Error("decoder exited SIGKILL"), { signal: "SIGKILL" }),
+            () =>
+              Object.assign(new Error("decoder stderr OOM"), {
+                stderr: "libgomp: Thread creation failed: Resource temporarily unavailable",
+              }),
+          ]) {
+            fakeNow += 11 * 60_000;
+            mocks.parentRows = [dngRow];
+            mocks.readStoredFile.mockResolvedValueOnce(tiffHeadedDng);
+            mocks.validateImageBuffer.mockResolvedValueOnce({
+              valid: true as const,
+              format: "raw",
+              width: 8,
+              height: 8,
+            });
+            decodeSpy.mockRejectedValueOnce(makeRawOom());
+            normalizeSpy.mockClear();
+            const warnDngOom = vi.fn();
+            const dngOomReply = makeReply();
+            await thumbnailHandler(
+              { params: { id: dngRow.id }, log: { warn: warnDngOom, error: vi.fn() } },
+              dngOomReply,
+            );
+            expect(normalizeSpy).toHaveBeenCalledWith(
+              expect.any(formatDecoders.DecoderOutOfMemoryError),
+            );
+            expect(dngOomReply.statusCode).toBe(503);
+            expect(dngOomReply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+            expect(warnDngOom).toHaveBeenCalledWith(
+              expect.objectContaining({
+                code: "ENGINE_UNAVAILABLE",
+                cause: "DecoderOutOfMemoryError",
+                toolId: "user-file-thumbnail",
+              }),
+              "Tool engine unavailable during input preparation",
+            );
+
+            fakeNow += 11 * 60_000;
+            mocks.parentRows = [heicRow];
+            mocks.readStoredFile.mockResolvedValueOnce(Buffer.from("heic-bytes"));
+            mocks.validateImageBuffer.mockResolvedValueOnce({
+              valid: true as const,
+              format: "heif",
+              width: 8,
+              height: 8,
+            });
+            heicSpy.mockRejectedValueOnce(makeRawOom());
+            normalizeSpy.mockClear();
+            const warnHeicOom = vi.fn();
+            const heicOomReply = makeReply();
+            await thumbnailHandler(
+              { params: { id: heicRow.id }, log: { warn: warnHeicOom, error: vi.fn() } },
+              heicOomReply,
+            );
+            expect(normalizeSpy).toHaveBeenCalledWith(
+              expect.any(formatDecoders.DecoderOutOfMemoryError),
+            );
+            expect(heicOomReply.statusCode).toBe(503);
+            expect(heicOomReply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+            expect(warnHeicOom).toHaveBeenCalledWith(
+              expect.objectContaining({
+                code: "ENGINE_UNAVAILABLE",
+                cause: "DecoderOutOfMemoryError",
+                toolId: "user-file-thumbnail",
+              }),
+              "Tool engine unavailable during input preparation",
+            );
+          }
+        } finally {
+          normalizeSpy.mockRestore();
+          decodeSpy.mockRestore();
+          heicSpy.mockRestore();
+          nowSpy.mockRestore();
+        }
+      });
+
       it("logs a warning and returns 422 when video, PDF, or image thumbnail generation fails (#2870)", async () => {
         const videoRow = makeFileRow({
           id: "file-vid-corrupt",
