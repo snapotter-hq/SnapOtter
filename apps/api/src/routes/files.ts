@@ -217,7 +217,11 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
 
           // Try image validation on the stored bytes; non-image files are accepted
           // with format from extension
-          const validation = await validateImageBuffer(safeBuffer, safeName).catch(() => null);
+          const validation = await validateImageBuffer(safeBuffer, safeName).catch((err) => {
+            if (err instanceof DecoderOutOfMemoryError || hasServerErrorStatus(err)) throw err;
+            request.log.warn({ err, filename: safeName }, "Image validation threw unexpectedly");
+            return null;
+          });
           const isValidImage = validation?.valid === true && !validation.nameOnly;
 
           // Record a completed jobs row before the first write so the S3 TTL

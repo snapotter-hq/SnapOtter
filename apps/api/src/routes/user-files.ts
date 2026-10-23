@@ -424,7 +424,11 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           // are stored: a hostile SVG that only decodes once it's clean is an
           // SVG (#1550). Non-images fail here and keep a type from
           // unverifiedMime().
-          const validation = await validateImageBuffer(safeBuffer, safeName).catch(() => null);
+          const validation = await validateImageBuffer(safeBuffer, safeName).catch((err) => {
+            if (err instanceof DecoderOutOfMemoryError || hasServerErrorStatus(err)) throw err;
+            request.log.warn({ err, filename: safeName }, "Image validation threw unexpectedly");
+            return null;
+          });
           const isValidImage = validation?.valid === true && !validation.nameOnly;
           const mimeType =
             (isValidImage && validatedImageMime(validation, safeName)) ||
@@ -1060,7 +1064,11 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
 
     // Try image validation on the bytes that will be stored; non-image outputs
     // from trusted tools are accepted
-    const validation = await validateImageBuffer(safeResultBuffer, resultName).catch(() => null);
+    const validation = await validateImageBuffer(safeResultBuffer, resultName).catch((err) => {
+      if (err instanceof DecoderOutOfMemoryError || hasServerErrorStatus(err)) throw err;
+      request.log.warn({ err, filename: resultName }, "Image validation threw unexpectedly");
+      return null;
+    });
     const isValidImage = validation?.valid === true && !validation.nameOnly;
 
     const nextVersion = parent.version + 1;

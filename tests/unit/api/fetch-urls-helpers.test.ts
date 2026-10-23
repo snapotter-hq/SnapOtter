@@ -14,6 +14,9 @@ const dbDeleteWhereMock = vi.hoisted(() => vi.fn(async (_where: unknown) => {}))
 const deletePrefixMock = vi.hoisted(() => vi.fn(async (_prefix: string) => {}));
 const putObjectMock = vi.hoisted(() => vi.fn(async () => {}));
 const reportErrorMock = vi.hoisted(() => vi.fn(async () => {}));
+const validateImageBufferMock = vi.hoisted(() =>
+  vi.fn<typeof import("../../../apps/api/src/lib/file-validation.js").validateImageBuffer>(),
+);
 
 vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {
@@ -39,6 +42,16 @@ vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
   return {
     ...actual,
     reportError: reportErrorMock,
+  };
+});
+vi.mock("../../../apps/api/src/lib/file-validation.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/file-validation.js")>();
+  validateImageBufferMock.mockImplementation(actual.validateImageBuffer);
+  return {
+    ...actual,
+    validateImageBuffer: (...args: Parameters<typeof actual.validateImageBuffer>) =>
+      validateImageBufferMock(...args),
   };
 });
 
@@ -1437,6 +1450,149 @@ describe("registerFetchUrlsRoute nameOnly image validations (#3263)", () => {
         putObjectMock.mock.invocationCallOrder[1] ?? 0,
       );
     } finally {
+      putObjectMock.mockReset();
+      putObjectMock.mockResolvedValue(undefined);
+      deletePrefixMock.mockReset();
+      deletePrefixMock.mockResolvedValue(undefined);
+      dbDeleteWhereMock.mockReset();
+      dbDeleteWhereMock.mockResolvedValue(undefined);
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("logs unexpected validateImageBuffer rejections as a warning and rethrows 5xx / DecoderOutOfMemoryError (#3593)", async () => {
+    const sharpMod = (await import("sharp")).default;
+    const handler = await getFetchUrlsHandler();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>', {
+            status: 200,
+            headers: { "Content-Type": "image/svg+xml" },
+          }),
+      ),
+    );
+
+    try {
+      // 1. Unexpected non-5xx rejection is logged as a warning and falls back to unverifiedMime
+      const unexpectedErr = new TypeError("unexpected validator fault on fetch-urls");
+      validateImageBufferMock.mockRejectedValueOnce(unexpectedErr);
+      putObjectMock.mockClear();
+      const warnMock = vi.fn();
+      const reply1 = makeReply();
+
+      await handler(
+        {
+          body: { urls: ["http://1.2.3.4:9999/icon.svg"] },
+          log: { warn: warnMock },
+        },
+        reply1,
+      );
+
+      expect(reply1.statusCode).toBe(200);
+      expect(warnMock).toHaveBeenCalledWith(
+        { err: unexpectedErr, filename: "icon.svg" },
+        "Image validation threw unexpectedly",
+      );
+      const body1 = reply1.payload as {
+        results: Array<{
+          success: boolean;
+          filename?: string;
+          contentType?: string;
+          width?: number;
+          height?: number;
+        }>;
+      };
+      expect(body1.results[0]).toMatchObject({
+        success: true,
+        filename: "icon.svg",
+        contentType: "application/octet-stream",
+        width: undefined,
+        height: undefined,
+      });
+
+      // 2. DecoderOutOfMemoryError from sharp.prototype.metadata inside validateImageBuffer rethrows and cleans up earlier uploads
+      dbInsertValuesMock.mockClear();
+      dbDeleteWhereMock.mockClear();
+      deletePrefixMock.mockClear();
+      putObjectMock.mockClear();
+      let releaseSecondFetch!: () => void;
+      const secondFetchGate = new Promise<void>((resolve) => {
+        releaseSecondFetch = resolve;
+      });
+      putObjectMock.mockImplementationOnce(async () => {
+        releaseSecondFetch();
+      });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string | URL | Request) => {
+          const href = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+          if (href.endsWith("/second.svg")) {
+            await secondFetchGate;
+          }
+          return new Response(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>',
+            {
+              status: 200,
+              headers: { "Content-Type": "image/svg+xml" },
+            },
+          );
+        }),
+      );
+      let metaCalls = 0;
+      const origMetadata = sharpMod.prototype.metadata;
+      const metaSpy = vi.spyOn(sharpMod.prototype, "metadata").mockImplementation(function (
+        this: InstanceType<typeof sharpMod>,
+      ) {
+        metaCalls += 1;
+        if (metaCalls === 2) {
+          return Promise.reject(new RangeError("Array buffer allocation failed"));
+        }
+        return origMetadata.call(this);
+      });
+      try {
+        const warnOomMock = vi.fn();
+        await expect(
+          handler(
+            {
+              body: {
+                urls: ["http://1.2.3.4:9999/first.svg", "http://1.2.3.4:9999/second.svg"],
+              },
+              log: { warn: warnOomMock },
+            },
+            makeReply(),
+          ),
+        ).rejects.toBeInstanceOf(formatDecoders.DecoderOutOfMemoryError);
+        expect(putObjectMock).toHaveBeenCalledTimes(1);
+        expect(deletePrefixMock).toHaveBeenCalledTimes(1);
+        expect(dbDeleteWhereMock).toHaveBeenCalledTimes(1);
+        expect(warnOomMock).not.toHaveBeenCalled();
+      } finally {
+        metaSpy.mockRestore();
+      }
+
+      // 3. Plain 5xx error (not an instance of DecoderOutOfMemoryError) also rethrows via hasServerErrorStatus(err)
+      const plain500Err = Object.assign(new Error("validator 500 fault"), { statusCode: 500 });
+      validateImageBufferMock.mockRejectedValueOnce(plain500Err);
+      const warn500Mock = vi.fn();
+      await expect(
+        handler(
+          {
+            body: { urls: ["http://1.2.3.4:9999/first.svg"] },
+            log: { warn: warn500Mock },
+          },
+          makeReply(),
+        ),
+      ).rejects.toBe(plain500Err);
+      expect(warn500Mock).not.toHaveBeenCalled();
+    } finally {
+      const { validateImageBuffer: realValidateImageBuffer } = await vi.importActual<
+        typeof import("../../../apps/api/src/lib/file-validation.js")
+      >("../../../apps/api/src/lib/file-validation.js");
+      validateImageBufferMock.mockReset();
+      validateImageBufferMock.mockImplementation(realValidateImageBuffer);
       putObjectMock.mockReset();
       putObjectMock.mockResolvedValue(undefined);
       deletePrefixMock.mockReset();

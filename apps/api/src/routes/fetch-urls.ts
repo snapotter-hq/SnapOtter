@@ -377,7 +377,11 @@ async function fetchSingleUrl(
     // accepted and typed from the HTTP response so URL import works for every
     // modality. The consuming tool runs modality-specific validation at
     // process time, and SSRF + size limits still bound what can be fetched.
-    const validation = await validateImageBuffer(safeBuffer, filename).catch(() => null);
+    const validation = await validateImageBuffer(safeBuffer, filename).catch((err) => {
+      if (err instanceof DecoderOutOfMemoryError || hasServerErrorStatus(err)) throw err;
+      log.warn({ err, filename }, "Image validation threw unexpectedly");
+      return null;
+    });
     const isValidImage = validation?.valid === true && !validation.nameOnly;
 
     // Record a completed jobs row before the first write so the S3 TTL sweep

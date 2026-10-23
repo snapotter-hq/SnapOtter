@@ -25,6 +25,8 @@ const mocks = vi.hoisted(() => ({
   requireFileAccess: vi.fn(() => Promise.resolve({ id: "user-1", role: "admin" })),
   requirePermission: vi.fn(() => () => Promise.resolve(true)),
   sanitizeSvg: vi.fn((buf: Buffer) => buf),
+  validateImageBuffer:
+    vi.fn<typeof import("../../../apps/api/src/lib/file-validation.js").validateImageBuffer>(),
   readImageDimensions: vi.fn<
     (_buf: Buffer, _ext?: string) => Promise<{ width: number; height: number } | null>
   >(() => Promise.resolve(null)),
@@ -79,6 +81,17 @@ vi.mock("../../../apps/api/src/lib/svg-sanitize.js", async (importOriginal) => {
   return {
     ...actual,
     sanitizeSvg: (...args: Parameters<typeof actual.sanitizeSvg>) => mocks.sanitizeSvg(...args),
+  };
+});
+
+vi.mock("../../../apps/api/src/lib/file-validation.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/file-validation.js")>();
+  mocks.validateImageBuffer.mockImplementation(actual.validateImageBuffer);
+  return {
+    ...actual,
+    validateImageBuffer: (...args: Parameters<typeof actual.validateImageBuffer>) =>
+      mocks.validateImageBuffer(...args),
   };
 });
 
@@ -849,6 +862,10 @@ describe("files route logic", () => {
         typeof import("../../../apps/api/src/lib/svg-sanitize.js")
       >("../../../apps/api/src/lib/svg-sanitize.js");
       mocks.sanitizeSvg.mockImplementation(realSanitizeSvg);
+      const { validateImageBuffer: realValidateImageBuffer } = await vi.importActual<
+        typeof import("../../../apps/api/src/lib/file-validation.js")
+      >("../../../apps/api/src/lib/file-validation.js");
+      mocks.validateImageBuffer.mockImplementation(realValidateImageBuffer);
     });
 
     function makeReply() {
@@ -1415,6 +1432,71 @@ describe("files route logic", () => {
       expect(mocks.putObject).not.toHaveBeenCalled();
       expect(mocks.deletePrefix).not.toHaveBeenCalled();
       expect(mocks.dbDeleteWhere).not.toHaveBeenCalled();
+    });
+
+    it("logs unexpected validateImageBuffer rejections as a warning and rethrows 5xx / DecoderOutOfMemoryError after discarding earlier parts (#3593)", async () => {
+      const sharpMod = (await import("sharp")).default;
+      const { DecoderOutOfMemoryError } = await import(
+        "../../../apps/api/src/lib/format-decoders.js"
+      );
+
+      // 1. Unexpected non-5xx rejection is logged as a warning and falls back to extension format
+      const unexpectedErr = new TypeError("unexpected validator fault");
+      mocks.validateImageBuffer.mockRejectedValueOnce(unexpectedErr);
+      const log1 = { warn: vi.fn(), error: vi.fn() };
+      const req1 = makeRequest([filePart("photo.png", Buffer.from("fake-png"))], log1);
+      const reply1 = makeReply();
+
+      await uploadHandler(req1, reply1);
+
+      expect(reply1.statusCode).toBe(200);
+      expect(reply1.payload).toEqual({
+        jobId: expect.any(String),
+        files: [{ name: "photo.png", size: 8, format: "png" }],
+      });
+      expect(log1.warn).toHaveBeenCalledWith(
+        { err: unexpectedErr, filename: "photo.png" },
+        "Image validation threw unexpectedly",
+      );
+
+      // 2. DecoderOutOfMemoryError from sharp.prototype.metadata inside validateImageBuffer rethrows and cleans up earlier parts
+      vi.clearAllMocks();
+      const metaSpy = vi
+        .spyOn(sharpMod.prototype, "metadata")
+        .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"));
+      try {
+        const log2 = { warn: vi.fn(), error: vi.fn() };
+        const req2 = makeRequest(
+          [
+            filePart("first.txt", Buffer.from("hello")),
+            filePart(
+              "second.svg",
+              Buffer.from(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>',
+              ),
+            ),
+          ],
+          log2,
+        );
+        const reply2 = makeReply();
+
+        await expect(uploadHandler(req2, reply2)).rejects.toBeInstanceOf(DecoderOutOfMemoryError);
+        expect(mocks.putObject).toHaveBeenCalledTimes(1);
+        expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
+        expect(mocks.dbDeleteWhere).toHaveBeenCalledTimes(1);
+        expect(log2.warn).not.toHaveBeenCalled();
+      } finally {
+        metaSpy.mockRestore();
+      }
+
+      // 3. Plain 5xx error (not an instance of DecoderOutOfMemoryError) also rethrows via hasServerErrorStatus(err)
+      vi.clearAllMocks();
+      const plain500Err = Object.assign(new Error("validator 500 fault"), { statusCode: 500 });
+      mocks.validateImageBuffer.mockRejectedValueOnce(plain500Err);
+      const log3 = { warn: vi.fn(), error: vi.fn() };
+      const req3 = makeRequest([filePart("photo.png", Buffer.from("fake-png"))], log3);
+      await expect(uploadHandler(req3, makeReply())).rejects.toBe(plain500Err);
+      expect(log3.warn).not.toHaveBeenCalled();
     });
   });
 

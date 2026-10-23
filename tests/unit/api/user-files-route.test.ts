@@ -1542,6 +1542,163 @@ describe("user files route logic", () => {
         expect(mocks.validateImageBuffer).not.toHaveBeenCalled();
         expect(mocks.saveFile).not.toHaveBeenCalled();
       });
+
+      it("logs unexpected validateImageBuffer rejections as a warning and rethrows 5xx / DecoderOutOfMemoryError on upload and save-result (#3593)", async () => {
+        const { DecoderOutOfMemoryError } = await import(
+          "../../../apps/api/src/lib/format-decoders.js"
+        );
+
+        // 1. POST /api/v1/files/upload: unexpected non-5xx rejection logs a warning and falls back to unverifiedMime
+        const unexpectedUploadErr = new TypeError("unexpected validator fault on upload");
+        mocks.validateImageBuffer.mockRejectedValueOnce(unexpectedUploadErr);
+        const uploadLog = { warn: vi.fn(), error: vi.fn() };
+        const uploadReply = makeReply();
+        await uploadHandler(
+          {
+            log: uploadLog,
+            parts: async function* () {
+              yield {
+                type: "file" as const,
+                fieldname: "file",
+                filename: "photo.png",
+                mimetype: "image/png",
+                file: Readable.from([Buffer.from("png-bytes")]),
+              };
+            },
+          },
+          uploadReply,
+        );
+        expect(uploadReply.statusCode).toBe(201);
+        expect(uploadLog.warn).toHaveBeenCalledWith(
+          { err: unexpectedUploadErr, filename: "photo.png" },
+          "Image validation threw unexpectedly",
+        );
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: "photo.png",
+          mimeType: "application/octet-stream",
+          width: null,
+          height: null,
+        });
+
+        // 2. POST /api/v1/files/upload: DecoderOutOfMemoryError rethrows and discards earlier staged blobs
+        mocks.saveFile.mockClear();
+        mocks.deleteStoredFile.mockClear();
+        mocks.insertedValues = undefined;
+        const uploadOomErr = new DecoderOutOfMemoryError("The image decoder ran out of memory.");
+        mocks.validateImageBuffer
+          .mockResolvedValueOnce({
+            valid: true as const,
+            format: "png",
+            width: 100,
+            height: 100,
+          })
+          .mockRejectedValueOnce(uploadOomErr);
+        mocks.saveFile.mockResolvedValueOnce("staged-first.png");
+        const oomUploadLog = { warn: vi.fn(), error: vi.fn() };
+        await expect(
+          uploadHandler(
+            {
+              log: oomUploadLog,
+              parts: async function* () {
+                yield {
+                  type: "file" as const,
+                  fieldname: "file",
+                  filename: "first.png",
+                  mimetype: "image/png",
+                  file: Readable.from([Buffer.from("first-png")]),
+                };
+                yield {
+                  type: "file" as const,
+                  fieldname: "file",
+                  filename: "second.png",
+                  mimetype: "image/png",
+                  file: Readable.from([Buffer.from("second-png")]),
+                };
+              },
+            },
+            makeReply(),
+          ),
+        ).rejects.toBe(uploadOomErr);
+        expect(mocks.saveFile).toHaveBeenCalledTimes(1);
+        expect(mocks.deleteStoredFile).toHaveBeenCalledWith("staged-first.png");
+        expect(mocks.insertedValues).toBeUndefined();
+        expect(oomUploadLog.warn).not.toHaveBeenCalled();
+
+        // 3. POST /api/v1/files/save-result: unexpected non-5xx rejection logs a warning and falls back to unverifiedMime
+        mocks.parentRows = [makeParent({ originalName: "photo.jpg", mimeType: "image/jpeg" })];
+        const unexpectedSaveErr = new TypeError("unexpected validator fault on save-result");
+        mocks.validateImageBuffer.mockRejectedValueOnce(unexpectedSaveErr);
+        const saveReq = makeSaveResultRequest({
+          filename: "result.png",
+          parentId: "parent-1",
+          toolId: "convert",
+          buffer: Buffer.from("png-bytes"),
+        });
+        const saveReply = makeReply();
+        await saveResultHandler(saveReq, saveReply);
+        expect(saveReply.statusCode).toBe(201);
+        expect(saveReq.log.warn).toHaveBeenCalledWith(
+          { err: unexpectedSaveErr, filename: "photo.png" },
+          "Image validation threw unexpectedly",
+        );
+        expect(mocks.insertedValues).toMatchObject({
+          originalName: "photo.png",
+          mimeType: "application/octet-stream",
+          width: null,
+          height: null,
+        });
+
+        // 4. POST /api/v1/files/save-result: DecoderOutOfMemoryError rethrows before saveFile or DB insert
+        mocks.saveFile.mockClear();
+        mocks.insertedValues = undefined;
+        mocks.parentRows = [makeParent({ originalName: "photo.jpg", mimeType: "image/jpeg" })];
+        const saveOomErr = new DecoderOutOfMemoryError("The image decoder ran out of memory.");
+        mocks.validateImageBuffer.mockRejectedValueOnce(saveOomErr);
+        const oomSaveReq = makeSaveResultRequest({
+          filename: "result.png",
+          parentId: "parent-1",
+          toolId: "convert",
+          buffer: Buffer.from("png-bytes"),
+        });
+        await expect(saveResultHandler(oomSaveReq, makeReply())).rejects.toBe(saveOomErr);
+        expect(mocks.saveFile).not.toHaveBeenCalled();
+        expect(mocks.insertedValues).toBeUndefined();
+        expect(oomSaveReq.log.warn).not.toHaveBeenCalled();
+
+        // 5. Plain 5xx error (not an instance of DecoderOutOfMemoryError) also rethrows on both upload and save-result
+        const plain500Err = Object.assign(new Error("validator 500 fault"), { statusCode: 500 });
+        mocks.validateImageBuffer
+          .mockRejectedValueOnce(plain500Err)
+          .mockRejectedValueOnce(plain500Err);
+        await expect(
+          uploadHandler(
+            {
+              log: { warn: vi.fn(), error: vi.fn() },
+              parts: async function* () {
+                yield {
+                  type: "file" as const,
+                  fieldname: "file",
+                  filename: "photo.png",
+                  mimetype: "image/png",
+                  file: Readable.from([Buffer.from("png-bytes")]),
+                };
+              },
+            },
+            makeReply(),
+          ),
+        ).rejects.toBe(plain500Err);
+        await expect(
+          saveResultHandler(
+            makeSaveResultRequest({
+              filename: "result.png",
+              parentId: "parent-1",
+              toolId: "convert",
+              buffer: Buffer.from("png-bytes"),
+            }),
+            makeReply(),
+          ),
+        ).rejects.toBe(plain500Err);
+      });
     });
 
     describe("GET /api/v1/files/:id/thumbnail cache write failure logging (#1633)", () => {
