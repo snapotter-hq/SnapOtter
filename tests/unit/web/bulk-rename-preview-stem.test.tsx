@@ -153,6 +153,108 @@ describe("BulkRenameSettings collision preview and React keys (#3035)", () => {
     const thirdRows = Array.from(container.querySelectorAll(".font-mono"), (el) => el.textContent);
     expect(thirdRows).toEqual(["readme", "readme_1", "readme_2", "readme_3"]);
 
+    act(() => {
+      useFileStore
+        .getState()
+        .setFiles([
+          makeFile("song.png", "image/png"),
+          makeFile("\u{017f}ong.png", "image/png"),
+          makeFile("masse.png", "image/png"),
+          makeFile("ma\u{00df}e.png", "image/png"),
+          makeFile("po\u{fb05}.png", "image/png"),
+        ]);
+    });
+    fireEvent.change(patternInput, { target: { value: "{{original}}" } });
+    const fourthRows = Array.from(container.querySelectorAll(".font-mono"), (el) => el.textContent);
+    expect(fourthRows).toEqual([
+      "song.png",
+      "\u{017f}ong_1.png",
+      "masse.png",
+      "ma\u{00df}e_1.png",
+      "po\u{fb05}.png",
+    ]);
+
+    act(() => {
+      useFileStore
+        .getState()
+        .setFiles([
+          makeFile("post.png", "image/png"),
+          makeFile("po\u{fb05}.png", "image/png"),
+          makeFile("po\u{fb06}.png", "image/png"),
+          makeFile("office.png", "image/png"),
+          makeFile("o\u{fb03}ce.png", "image/png"),
+        ]);
+    });
+    const fifthRows = Array.from(container.querySelectorAll(".font-mono"), (el) => el.textContent);
+    expect(fifthRows).toEqual([
+      "post.png",
+      "po\u{fb05}_1.png",
+      "po\u{fb06}_2.png",
+      "office.png",
+      "o\u{fb03}ce_1.png",
+    ]);
+
+    act(() => {
+      useFileStore
+        .getState()
+        .setFiles([
+          makeFile("o\u{fb00}ice.png", "image/png"),
+          makeFile("office.png", "image/png"),
+          makeFile("\u{fb01}le.png", "image/png"),
+          makeFile("file.png", "image/png"),
+          makeFile("\u{1e9b}in.png", "image/png"),
+        ]);
+    });
+    const sixthRows = Array.from(container.querySelectorAll(".font-mono"), (el) => el.textContent);
+    expect(sixthRows).toEqual([
+      "o\u{fb00}ice.png",
+      "office_1.png",
+      "\u{fb01}le.png",
+      "file_1.png",
+      "\u{1e9b}in.png",
+    ]);
+
+    act(() => {
+      useFileStore
+        .getState()
+        .setFiles([
+          makeFile("\u{fb02}ow.png", "image/png"),
+          makeFile("flow.png", "image/png"),
+          makeFile("ba\u{fb04}e.png", "image/png"),
+          makeFile("baffle.png", "image/png"),
+          makeFile("\u{1e61}in.png", "image/png"),
+        ]);
+    });
+    const seventhRows = Array.from(
+      container.querySelectorAll(".font-mono"),
+      (el) => el.textContent,
+    );
+    expect(seventhRows).toEqual([
+      "\u{fb02}ow.png",
+      "flow_1.png",
+      "ba\u{fb04}e.png",
+      "baffle_1.png",
+      "\u{1e61}in.png",
+    ]);
+
+    act(() => {
+      useFileStore
+        .getState()
+        .setFiles([
+          makeFile("\u{1e61}in.png", "image/png"),
+          makeFile("\u{1e9b}in.png", "image/png"),
+          makeFile("masse.png", "image/png"),
+          makeFile("MA\u{1e9e}E.png", "image/png"),
+        ]);
+    });
+    const eighthRows = Array.from(container.querySelectorAll(".font-mono"), (el) => el.textContent);
+    expect(eighthRows).toEqual([
+      "\u{1e61}in.png",
+      "\u{1e9b}in_1.png",
+      "masse.png",
+      "MA\u{1e9e}E_1.png",
+    ]);
+
     const keyWarnings = errorSpy.mock.calls.filter((args) =>
       args.some((arg) => typeof arg === "string" && arg.includes("same key")),
     );

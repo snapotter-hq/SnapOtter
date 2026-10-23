@@ -7,9 +7,26 @@ import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
 import { useFileStore } from "@/stores/file-store";
 
+const APFS_CASE_FOLDS: Record<string, string> = {
+  "\u{00df}": "ss",
+  "\u{017f}": "s",
+  "\u{fb00}": "ff",
+  "\u{fb01}": "fi",
+  "\u{fb02}": "fl",
+  "\u{fb03}": "ffi",
+  "\u{fb04}": "ffl",
+  "\u{fb05}": "st",
+  "\u{fb06}": "st",
+};
+const APFS_CASE_FOLD_RE = /[\u{00df}\u{017f}\u{fb00}-\u{fb06}]/gu;
+
 function createUniqueNamer(): (name: string) => string {
   const used = new Set<string>();
-  const key = (name: string) => name.normalize("NFC").toLowerCase();
+  const key = (name: string) =>
+    name
+      .normalize("NFD")
+      .toLowerCase()
+      .replace(APFS_CASE_FOLD_RE, (ch) => APFS_CASE_FOLDS[ch]);
   return (name) => {
     if (!used.has(key(name))) {
       used.add(key(name));

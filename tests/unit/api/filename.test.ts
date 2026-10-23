@@ -17,10 +17,43 @@ describe("createUniqueNamer", () => {
 
   it("treats the composed and decomposed spellings of a name as a collision", () => {
     const unique = createUniqueNamer();
-    const composed = "caf\u00e9.png";
-    const decomposed = "cafe\u0301.png";
+    const composed = "caf\u{00e9}.png";
+    const decomposed = "cafe\u{0301}.png";
     expect(unique(composed)).toBe(composed);
-    expect(unique(decomposed)).toBe("cafe\u0301_1.png");
+    expect(unique(decomposed)).toBe("cafe\u{0301}_1.png");
+  });
+
+  it("folds U+017F long-s and APFS full case-folding ligatures when deduplicating (#3821)", () => {
+    const unique = createUniqueNamer();
+    expect(unique("song.mp3")).toBe("song.mp3");
+    expect(unique("\u{017f}ong.mp3")).toBe("\u{017f}ong_1.mp3");
+    expect(unique("\u{017f}ong_1.mp3")).toBe("\u{017f}ong_1_1.mp3");
+
+    expect(unique("masse.pdf")).toBe("masse.pdf");
+    expect(unique("ma\u{00df}e.pdf")).toBe("ma\u{00df}e_1.pdf");
+    expect(unique("MA\u{1e9e}E.pdf")).toBe("MA\u{1e9e}E_2.pdf");
+
+    expect(unique("post.txt")).toBe("post.txt");
+    expect(unique("po\u{fb05}.txt")).toBe("po\u{fb05}_1.txt");
+    expect(unique("po\u{fb06}.txt")).toBe("po\u{fb06}_2.txt");
+    expect(unique("po\u{017f}t.txt")).toBe("po\u{017f}t_3.txt");
+
+    expect(unique("office.doc")).toBe("office.doc");
+    expect(unique("o\u{fb00}ice.doc")).toBe("o\u{fb00}ice_1.doc");
+    expect(unique("o\u{fb03}ce.doc")).toBe("o\u{fb03}ce_2.doc");
+
+    expect(unique("file.txt")).toBe("file.txt");
+    expect(unique("\u{fb01}le.txt")).toBe("\u{fb01}le_1.txt");
+    expect(unique("flow.txt")).toBe("flow.txt");
+    expect(unique("\u{fb02}ow.txt")).toBe("\u{fb02}ow_1.txt");
+    expect(unique("baffle.txt")).toBe("baffle.txt");
+    expect(unique("ba\u{fb04}e.txt")).toBe("ba\u{fb04}e_1.txt");
+
+    expect(unique("\u{1e61}in.txt")).toBe("\u{1e61}in.txt");
+    expect(unique("\u{1e9b}in.txt")).toBe("\u{1e9b}in_1.txt");
+
+    expect(unique("diagram.svg")).toBe("diagram.svg");
+    expect(unique("diagram.\u{017f}vg")).toBe("diagram_1.\u{017f}vg");
   });
 });
 

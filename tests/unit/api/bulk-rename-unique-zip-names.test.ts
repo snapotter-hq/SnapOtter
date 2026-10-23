@@ -94,6 +94,12 @@ describe("bulk-rename deduplicates colliding ZIP entry names (#3024)", () => {
             { filename: "photo.png", contentType: "image/png", content: TINY_PNG },
             { filename: "PHOTO.png", contentType: "image/png", content: PNG },
             { filename: "photo_1.png", contentType: "image/png", content: TINY_PNG },
+            { filename: "song.png", contentType: "image/png", content: PNG },
+            { filename: "\u{017f}ong.png", contentType: "image/png", content: TINY_PNG },
+            { filename: "masse.png", contentType: "image/png", content: PNG },
+            { filename: "ma\u{00df}e.png", contentType: "image/png", content: TINY_PNG },
+            { filename: "post.png", contentType: "image/png", content: PNG },
+            { filename: "po\u{fb05}.png", contentType: "image/png", content: TINY_PNG },
           ],
           { pattern: "{{original}}" },
         ),
@@ -107,11 +113,23 @@ describe("bulk-rename deduplicates colliding ZIP entry names (#3024)", () => {
         "photo_1.png",
         "PHOTO_2.png",
         "photo_1_1.png",
+        "song.png",
+        "\u{017f}ong_1.png",
+        "masse.png",
+        "ma\u{00df}e_1.png",
+        "post.png",
+        "po\u{fb05}_1.png",
       ]);
       expect(entries[0].getData().equals(PNG)).toBe(true);
       expect(entries[1].getData().equals(TINY_PNG)).toBe(true);
       expect(entries[2].getData().equals(PNG)).toBe(true);
       expect(entries[3].getData().equals(TINY_PNG)).toBe(true);
+      expect(entries[4].getData().equals(PNG)).toBe(true);
+      expect(entries[5].getData().equals(TINY_PNG)).toBe(true);
+      expect(entries[6].getData().equals(PNG)).toBe(true);
+      expect(entries[7].getData().equals(TINY_PNG)).toBe(true);
+      expect(entries[8].getData().equals(PNG)).toBe(true);
+      expect(entries[9].getData().equals(TINY_PNG)).toBe(true);
     } finally {
       await app.close();
     }
