@@ -11,8 +11,15 @@ vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
 
 import { env } from "../../../apps/api/src/config.js";
 import { db } from "../../../apps/api/src/db/index.js";
+import {
+  classifyError,
+  markQueueEventsJobFailure,
+} from "../../../apps/api/src/lib/error-report.js";
 import { readFilePart } from "../../../apps/api/src/lib/multipart-parts.js";
-import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
+import {
+  logAndReportRequestError,
+  registerErrorHandler,
+} from "../../../apps/api/src/plugins/error-handler.js";
 import { registerUpload } from "../../../apps/api/src/plugins/upload.js";
 import { registerScimRoutes } from "../../../apps/api/src/routes/enterprise/scim.js";
 
@@ -438,5 +445,71 @@ describe("an unhandled error on a SCIM route (#2230)", () => {
       selectSpy.mockRestore();
       await app.close();
     }
+  });
+});
+
+describe("upstream ECONNRESET vs client abort in logAndReportRequestError (#3697)", () => {
+  it("classifies an upstream ECONNRESET thrown while request.raw is open as operational", async () => {
+    const upstreamReset = Object.assign(new Error("read ECONNRESET"), {
+      code: "ECONNRESET",
+      syscall: "read",
+    });
+    const app = await appThrowing(() => upstreamReset);
+    try {
+      const res = await app.inject({ method: "GET", url: "/boom" });
+      expect(res.statusCode).toBe(500);
+      expect(reportError).toHaveBeenCalledTimes(1);
+      expect(classifyError(upstreamReset, "http")).toBe("operational");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("classifies an upstream ECONNRESET after a completed request body (destroyed=true, complete=true, socket.destroyed=false) as operational", () => {
+    const upstreamReset = Object.assign(new Error("read ECONNRESET"), {
+      code: "ECONNRESET",
+      syscall: "read",
+    });
+    const req = {
+      url: "/api/v1/tools/image/resize",
+      method: "POST",
+      routeOptions: { url: "/api/v1/tools/image/resize" },
+      raw: { aborted: false, destroyed: true, complete: true, socket: { destroyed: false } },
+      log: { error: vi.fn(), warn: vi.fn() },
+    };
+    expect(logAndReportRequestError(upstreamReset, req as never)).toBe(500);
+    expect(classifyError(upstreamReset, "http")).toBe("operational");
+  });
+
+  it("keeps a genuine client socket disconnect (aborted or destroyed before complete) classified as expected", () => {
+    for (const raw of [
+      { aborted: true, destroyed: true, complete: false, socket: { destroyed: true } },
+      { aborted: false, destroyed: true },
+      { aborted: false, destroyed: true, complete: true, socket: { destroyed: true } },
+    ]) {
+      const clientReset = Object.assign(new Error("aborted"), { code: "ECONNRESET" });
+      const req = {
+        url: "/api/v1/tools/image/resize",
+        method: "POST",
+        routeOptions: { url: "/api/v1/tools/image/resize" },
+        raw,
+        log: { error: vi.fn(), warn: vi.fn() },
+      };
+      expect(logAndReportRequestError(clientReset, req as never)).toBe(500);
+      expect(classifyError(clientReset, "http")).toBe("expected");
+    }
+
+    const strippedWorkerErr = markQueueEventsJobFailure(
+      new Error("The server's storage service is unavailable."),
+    );
+    const openReq = {
+      url: "/api/v1/tools/image/resize",
+      method: "POST",
+      routeOptions: { url: "/api/v1/tools/image/resize" },
+      raw: { aborted: false, destroyed: false, complete: true, socket: { destroyed: false } },
+      log: { error: vi.fn(), warn: vi.fn() },
+    };
+    expect(logAndReportRequestError(strippedWorkerErr, openReq as never)).toBe(500);
+    expect(classifyError(strippedWorkerErr, "http")).toBe("expected");
   });
 });

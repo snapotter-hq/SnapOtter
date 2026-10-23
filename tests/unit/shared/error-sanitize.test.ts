@@ -366,6 +366,43 @@ describe("isClientAbort", () => {
     expect(isClientAbort(wrapped)).toBe(false);
     expect(connectivityClass(wrapped)).toBe("pg-unavailable");
   });
+  it("does not treat a top-level Postgres/Drizzle ECONNRESET or pg chain with abort-shaped message as a client abort (#3697)", () => {
+    const topPgReset = Object.assign(new Error("read ECONNRESET"), {
+      name: "PostgresError",
+      code: "ECONNRESET",
+      syscall: "read",
+    });
+    const topDbReset = Object.assign(new Error("read ECONNRESET"), {
+      name: "DatabaseError",
+      code: "ECONNRESET",
+      syscall: "read",
+    });
+    const topSeverityReset = Object.assign(new Error("read ECONNRESET"), {
+      code: "ECONNRESET",
+      severity: "FATAL",
+    });
+    const topDrizzleReset = Object.assign(new Error("Failed query: select 1"), {
+      code: "ECONNRESET",
+    });
+    const topDrizzleClassReset = Object.assign(new Error("read ECONNRESET"), {
+      name: "DrizzleQueryError",
+      code: "ECONNRESET",
+    });
+    const wrappedAbortMsg = Object.assign(new Error("Failed query: select 1"), {
+      cause: Object.assign(new Error("aborted"), { code: "ECONNRESET" }),
+    });
+    for (const err of [
+      topPgReset,
+      topDbReset,
+      topSeverityReset,
+      topDrizzleReset,
+      topDrizzleClassReset,
+      wrappedAbortMsg,
+    ]) {
+      expect(isClientAbort(err)).toBe(false);
+      expect(connectivityClass(err)).toBe("pg-unavailable");
+    }
+  });
 });
 
 describe("hostile error shapes", () => {

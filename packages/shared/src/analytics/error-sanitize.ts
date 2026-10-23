@@ -58,6 +58,7 @@ function looksLikePg(links: ErrLike[]): boolean {
       (typeof l.code === "string" && SQLSTATE.test(l.code) && !NODE_CODE.test(l.code)) ||
       l.severity !== undefined ||
       l.name === "PostgresError" ||
+      l.name === "DatabaseError" ||
       l.name === "DrizzleQueryError" ||
       (typeof l.message === "string" && l.message.startsWith("Failed query")),
   );
@@ -232,7 +233,7 @@ export function isEnvironmentalDbError(err: unknown): boolean {
 export function isClientAbort(err: unknown): boolean {
   try {
     const links = chain(err);
-    if (links.length === 0) return false;
+    if (links.length === 0 || looksLikePg(links)) return false;
     const top = links[0];
     if (top.code === "ECONNRESET" || top.code === "ERR_STREAM_PREMATURE_CLOSE") return true;
     return links.some(

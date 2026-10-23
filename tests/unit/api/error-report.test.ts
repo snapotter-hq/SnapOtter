@@ -4,7 +4,9 @@ import {
   classifyError,
   errorSignature,
   isQueueEventsJobFailure,
+  isUpstreamError,
   markQueueEventsJobFailure,
+  markUpstreamError,
   resetThrottleForTests,
   safeFormatTag,
   shouldReport,
@@ -239,6 +241,9 @@ describe("classifyError", () => {
     const redisConn = markQueueEventsJobFailure(
       Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:6379"), { code: "ECONNREFUSED" }),
     );
+    const redisReset = markQueueEventsJobFailure(
+      Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET", syscall: "read" }),
+    );
     const redisClosed = markQueueEventsJobFailure(new Error("Connection is closed."));
     const redisCmdTimeout = markQueueEventsJobFailure(new Error("Command timed out"));
     const replyOom = markQueueEventsJobFailure(
@@ -251,15 +256,73 @@ describe("classifyError", () => {
     );
     const stallErr = markQueueEventsJobFailure(new Error("job stalled more than allowable limit"));
     expect(isQueueEventsJobFailure(redisConn)).toBe(false);
+    expect(isQueueEventsJobFailure(redisReset)).toBe(false);
+    expect(isUpstreamError(redisReset)).toBe(true);
     expect(isQueueEventsJobFailure(redisClosed)).toBe(false);
     expect(isQueueEventsJobFailure(redisCmdTimeout)).toBe(false);
     expect(isQueueEventsJobFailure(replyOom)).toBe(false);
     expect(isQueueEventsJobFailure(replyBug)).toBe(false);
     expect(isQueueEventsJobFailure(stallErr)).toBe(false);
     expect(classifyError(redisConn, "http")).toBe("operational");
+    expect(classifyError(redisReset, "http")).toBe("operational");
+    expect(classifyError(redisReset)).toBe("operational");
     expect(classifyError(replyOom, "http")).toBe("operational");
     expect(classifyError(replyBug, "http")).toBe("bug");
     expect(classifyError(stallErr, "http")).toBe("operational");
+  });
+  it("operational on http: Postgres/Drizzle ECONNRESET chains and markUpstreamError-tagged resets are not misclassified as client aborts (#3697)", () => {
+    const pgReset = Object.assign(new Error("read ECONNRESET"), {
+      name: "PostgresError",
+      code: "ECONNRESET",
+      syscall: "read",
+    });
+    const drizzleReset = Object.assign(new Error("Failed query: select 1"), {
+      code: "ECONNRESET",
+    });
+    const drizzleWrappedAbort = Object.assign(new Error("Failed query: select 1"), {
+      cause: Object.assign(new Error("aborted"), { code: "ECONNRESET" }),
+    });
+    for (const err of [pgReset, drizzleReset, drizzleWrappedAbort]) {
+      expect(classifyError(err, "http")).toBe("operational");
+      expect(classifyError(err)).toBe("operational");
+    }
+
+    const innerReset = Object.assign(new Error("read ECONNRESET"), {
+      code: "ECONNRESET",
+      syscall: "read",
+    });
+    const wrappedUpstream = markUpstreamError(
+      Object.assign(new Error("read ECONNRESET"), {
+        name: "UnrecoverableError",
+        cause: innerReset,
+      }),
+    );
+    expect(isUpstreamError(wrappedUpstream)).toBe(true);
+    expect(isUpstreamError(innerReset)).toBe(true);
+    expect(classifyError(wrappedUpstream, "http")).toBe("operational");
+    expect(classifyError(innerReset, "http")).toBe("operational");
+
+    const queueEventsTagged = markUpstreamError(
+      markQueueEventsJobFailure(new Error("connect ECONNREFUSED 127.0.0.1:5432")),
+    );
+    expect(isUpstreamError(queueEventsTagged)).toBe(false);
+    expect(classifyError(queueEventsTagged, "http")).toBe("expected");
+
+    const prematureClose = markUpstreamError(
+      Object.assign(new Error("Premature close"), { code: "ERR_STREAM_PREMATURE_CLOSE" }),
+    );
+    const abortErr = markUpstreamError(
+      Object.assign(new Error("The operation was aborted"), { name: "AbortError" }),
+    );
+    expect(isUpstreamError(prematureClose)).toBe(false);
+    expect(isUpstreamError(abortErr)).toBe(false);
+    expect(classifyError(prematureClose, "http")).toBe("expected");
+    expect(classifyError(abortErr, "http")).toBe("expected");
+
+    expect(markUpstreamError("not-an-error")).toBe("not-an-error");
+    expect(isUpstreamError("not-an-error")).toBe(false);
+    const plainBug = markUpstreamError(new Error("boom"));
+    expect(isUpstreamError(plainBug)).toBe(false);
   });
   it("looks through an UnrecoverableError with a cause so non-retryable worker errors keep their class (#1176)", () => {
     const wrap = (cause: Error) =>

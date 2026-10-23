@@ -1576,6 +1576,7 @@ describe("createToolRoute", () => {
 
       for (const operationalFault of [
         Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:6379"), { code: "ECONNREFUSED" }),
+        Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET", syscall: "read" }),
         Object.assign(new Error("connect ETIMEDOUT 127.0.0.1:6379"), { code: "ETIMEDOUT" }),
         Object.assign(new Error("Reached the max retries per request limit"), {
           name: "MaxRetriesPerRequestError",

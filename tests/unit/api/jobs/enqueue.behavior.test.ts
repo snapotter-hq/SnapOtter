@@ -332,6 +332,45 @@ describe("job enqueue helpers", () => {
     await expect(mod.waitForJob("image", "redis-down")).rejects.toBe(redisErr);
     expect(isQueueEventsJobFailure(redisErr)).toBe(false);
     expect(classifyError(redisErr, "http")).toBe("operational");
+
+    const redisResetErr = Object.assign(new Error("read ECONNRESET"), {
+      code: "ECONNRESET",
+      syscall: "read",
+    });
+    getJob.mockResolvedValueOnce({
+      waitUntilFinished: vi.fn().mockRejectedValue(redisResetErr),
+    });
+    await expect(mod.waitForJob("image", "redis-reset")).rejects.toBe(redisResetErr);
+    expect(isQueueEventsJobFailure(redisResetErr)).toBe(false);
+    expect(classifyError(redisResetErr, "http")).toBe("operational");
+
+    const getJobResetErr = Object.assign(new Error("read ECONNRESET"), {
+      code: "ECONNRESET",
+      syscall: "read",
+    });
+    getJob.mockRejectedValueOnce(getJobResetErr);
+    await expect(mod.waitForJob("image", "redis-getjob-reset")).rejects.toBe(getJobResetErr);
+    expect(isQueueEventsJobFailure(getJobResetErr)).toBe(false);
+    expect(classifyError(getJobResetErr, "http")).toBe("operational");
+
+    const addResetErr = Object.assign(new Error("read ECONNRESET"), {
+      code: "ECONNRESET",
+      syscall: "read",
+    });
+    queueAdd.mockRejectedValueOnce(addResetErr);
+    await expect(
+      mod.enqueueToolJob({
+        jobId: "job-add-reset",
+        userId: null,
+        toolId: "resize",
+        pool: "image",
+        kind: "single",
+        inputRefs: [],
+        filename: "file.png",
+        settings: {},
+      } as never),
+    ).rejects.toBe(addResetErr);
+    expect(classifyError(addResetErr, "http")).toBe("operational");
   });
 
   it("waitForJob returns the job result on the success path", async () => {

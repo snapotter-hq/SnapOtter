@@ -115,10 +115,12 @@ const REDIS_CLIENT_ERROR_MESSAGE =
  * `error-handler.ts` still reports them.
  */
 export function markQueueEventsJobFailure<T>(err: T): T {
-  if (!(err instanceof Error) || err.name !== "Error") return err;
+  if (!(err instanceof Error) || err.name !== "Error") return markUpstreamError(err);
   if (isSafeMessageError(err) || isToolInputError(err)) return err;
   const e = err as Error & { code?: unknown; statusCode?: unknown; cause?: unknown };
-  if (e.code !== undefined || e.statusCode !== undefined || e.cause !== undefined) return err;
+  if (e.code !== undefined || e.statusCode !== undefined || e.cause !== undefined) {
+    return markUpstreamError(err);
+  }
   if (isBullMqStallError(e) || REDIS_CLIENT_ERROR_MESSAGE.test(err.message)) {
     return err;
   }
@@ -134,6 +136,38 @@ export function isQueueEventsJobFailure(err: unknown): boolean {
     err instanceof Error &&
     (err as { isQueueEventsJobFailure?: unknown }).isQueueEventsJobFailure === true
   );
+}
+
+/**
+ * Tag a connectivity error (such as a Redis or Postgres `ECONNRESET`) that was
+ * thrown from an upstream service while the incoming HTTP request stream is
+ * still open, or inside `waitForJob`, so `classifyError(..., "http")` does not
+ * mistake it for a browser disconnect (#3697).
+ */
+export function markUpstreamError<T>(err: T): T {
+  const target = unwrapUnrecoverable(err);
+  if (
+    err instanceof Error &&
+    !isQueueEventsJobFailure(err) &&
+    !isQueueEventsJobFailure(target) &&
+    connectivityClass(target) !== null
+  ) {
+    Object.defineProperty(err, "isUpstreamError", {
+      value: true,
+      configurable: true,
+    });
+    if (target instanceof Error && target !== err) {
+      Object.defineProperty(target, "isUpstreamError", {
+        value: true,
+        configurable: true,
+      });
+    }
+  }
+  return err;
+}
+
+export function isUpstreamError(err: unknown): boolean {
+  return err instanceof Error && (err as { isUpstreamError?: unknown }).isUpstreamError === true;
 }
 
 export function classifyError(rawErr: unknown, source?: ReportContext["source"]): ErrorClass {
@@ -163,7 +197,9 @@ export function classifyError(rawErr: unknown, source?: ReportContext["source"])
   // worker-side parse failure is our bug.
   if (source === "http" || source === undefined) {
     if (isQueueEventsJobFailure(err)) return "expected";
-    if (isClientAbort(err)) return "expected";
+    if (!isUpstreamError(rawErr) && !isUpstreamError(err) && isClientAbort(err)) {
+      return "expected";
+    }
     // ZodError = settings validation. Settings are validated at the boundary, so
     // a worker-side ZodError is schema drift (our bug); only expected on http.
     if (e?.name === "ZodError") return "expected";
@@ -280,7 +316,7 @@ export async function reportError(rawErr: unknown, ctx: ReportContext): Promise<
   try {
     if (!analyticsEnabled()) return;
     const err = unwrapUnrecoverable(rawErr);
-    const cls = classifyError(err, ctx.source);
+    const cls = classifyError(rawErr, ctx.source);
     if (cls === "expected") return;
     if (!sentryDiagnostic() && !shouldReport(cls, errorSignature(err))) return;
 

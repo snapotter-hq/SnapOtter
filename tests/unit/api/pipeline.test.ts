@@ -1023,24 +1023,40 @@ describe("pipeline step error message formatting", () => {
       expect(classifyError(genericFinalizeErr, "http")).toBe("expected");
       expect(nonServerFaultLog.error).not.toHaveBeenCalled();
 
-      // And on /api/v1/pipeline/batch when settledFailureResponse returns null (#3791).
+      // And on /api/v1/pipeline/batch when settledFailureResponse returns null (#3791, #3697).
       const batchUnsettledErr = new Error("The server's storage service is unavailable.");
       waitForJobMock.mockRejectedValueOnce(batchUnsettledErr);
       selectWhereMock.mockResolvedValueOnce([{ error: null }]);
       await expect(invokePipelineBatchRoute(parts)).rejects.toBe(batchUnsettledErr);
       expect(classifyError(batchUnsettledErr, "http")).toBe("expected");
 
-      // When reading schema.jobs.error rejects, warn, report via reportError, and rethrow the waitForJob rejection (#3479, #3792).
-      const redisDownErr = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:6379"), {
-        code: "ECONNREFUSED",
+      const batchRedisResetErr = Object.assign(new Error("read ECONNRESET"), {
+        code: "ECONNRESET",
+        syscall: "read",
       });
-      const dbReadErr = new Error("postgres read failed");
+      waitForJobMock.mockRejectedValueOnce(batchRedisResetErr);
+      selectWhereMock.mockResolvedValueOnce([{ error: null }]);
+      await expect(invokePipelineBatchRoute(parts)).rejects.toBe(batchRedisResetErr);
+      expect(classifyError(batchRedisResetErr, "http")).toBe("operational");
+
+      // When reading schema.jobs.error rejects, warn, report via reportError, and rethrow the waitForJob rejection (#3479, #3792, #3697).
+      const redisDownErr = Object.assign(new Error("read ECONNRESET"), {
+        code: "ECONNRESET",
+        syscall: "read",
+      });
+      const dbReadErr = Object.assign(new Error("Failed query: select error from jobs"), {
+        cause: Object.assign(new Error("read ECONNRESET"), {
+          code: "ECONNRESET",
+          syscall: "read",
+        }),
+      });
       reportErrorMock.mockClear();
       waitForJobMock.mockRejectedValueOnce(redisDownErr);
       selectWhereMock.mockRejectedValueOnce(dbReadErr);
       const readFailLog = { error: vi.fn(), warn: vi.fn() };
       await expect(invokePipelineExecuteRoute(parts, readFailLog)).rejects.toBe(redisDownErr);
       expect(classifyError(redisDownErr, "http")).toBe("operational");
+      expect(classifyError(dbReadErr, "http")).toBe("operational");
       expect(readFailLog.warn).toHaveBeenCalledWith(
         { err: dbReadErr, jobId: expect.any(String) },
         "failed pipeline job row read failed",

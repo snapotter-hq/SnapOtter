@@ -12,7 +12,7 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { assertAiJobQuota } from "../lib/ai-quota.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
-import { markQueueEventsJobFailure } from "../lib/error-report.js";
+import { markQueueEventsJobFailure, markUpstreamError } from "../lib/error-report.js";
 import { toStorableJson } from "../lib/storable-json.js";
 import { clearTerminalReplayKey } from "../routes/progress.js";
 import { createBullMQConnection } from "./connection.js";
@@ -308,8 +308,12 @@ export async function enqueueToolJob(data: ToolJobData): Promise<Job<ToolJobData
   injectTraceContext(data);
 
   const queue = getQueue(data.pool);
-  const job = await queue.add(data.toolId, { ...data, jobId: data.jobId }, { jobId: data.jobId });
-  return job;
+  try {
+    const job = await queue.add(data.toolId, { ...data, jobId: data.jobId }, { jobId: data.jobId });
+    return job;
+  } catch (err: unknown) {
+    throw markUpstreamError(err);
+  }
 }
 
 /**
@@ -325,10 +329,11 @@ export async function waitForJob(
 ): Promise<ToolJobResult | null> {
   const queueEvents = getQueueEvents(pool);
   const queue = getQueue(pool);
-  const job = (await queue.getJob(jobId)) as Job<ToolJobData, ToolJobResult> | undefined;
-  if (!job) return null;
 
   try {
+    const job = (await queue.getJob(jobId)) as Job<ToolJobData, ToolJobResult> | undefined;
+    if (!job) return null;
+
     const result = await job.waitUntilFinished(queueEvents, windowMs);
     return result;
   } catch (err: unknown) {

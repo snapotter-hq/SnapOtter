@@ -1,8 +1,22 @@
 import { isSafeMessageError } from "@snapotter/shared";
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { reportError } from "../lib/error-report.js";
+import { markUpstreamError, reportError } from "../lib/error-report.js";
 import { stripInternalPaths } from "../lib/errors.js";
 import { multipartFailure } from "../lib/multipart-parts.js";
+
+function isRequestClientGone(request: FastifyRequest): boolean {
+  const raw = request.raw as
+    | {
+        aborted?: boolean;
+        destroyed?: boolean;
+        complete?: boolean;
+        socket?: { destroyed?: boolean } | null;
+      }
+    | undefined;
+  if (!raw) return false;
+  if (raw.aborted || raw.socket?.destroyed) return true;
+  return Boolean(raw.destroyed && !raw.complete);
+}
 
 /**
  * Logs a request error and reports 5xx faults to Sentry. Shared with the
@@ -21,6 +35,9 @@ export function logAndReportRequestError(
       { err: error, url: request.url, method: request.method },
       "Unhandled request error",
     );
+    if (request.raw && !isRequestClientGone(request)) {
+      markUpstreamError(error);
+    }
     void reportError(error, {
       source: "http",
       route: request.routeOptions?.url ?? undefined,

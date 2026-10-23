@@ -1613,5 +1613,22 @@ describe("batch route spooled multipart ingress (#1239)", () => {
       }),
     ).rejects.toBe(unsettledBatchErr);
     expect(classifyError(unsettledBatchErr, "http")).toBe("expected");
+
+    const redisResetBatchErr = Object.assign(new Error("read ECONNRESET"), {
+      code: "ECONNRESET",
+      syscall: "read",
+    });
+    mocks.waitForJob.mockRejectedValueOnce(redisResetBatchErr);
+    await expect(
+      invokeBatchRoute({
+        section: "image",
+        toolId: "resize",
+        parts: [
+          { type: "file", filename: "a.png", content: Buffer.from("valid-png") },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ],
+      }),
+    ).rejects.toBe(redisResetBatchErr);
+    expect(classifyError(redisResetBatchErr, "http")).toBe("operational");
   });
 });
