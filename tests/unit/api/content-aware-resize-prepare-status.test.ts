@@ -6,7 +6,12 @@
  */
 
 import multipart from "@fastify/multipart";
-import { MAX_RESIZE_OUTPUT_DIMENSION, SafeError, ToolInputError } from "@snapotter/shared";
+import {
+  isSafeMessageError,
+  MAX_RESIZE_OUTPUT_DIMENSION,
+  SafeError,
+  ToolInputError,
+} from "@snapotter/shared";
 import Fastify from "fastify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -156,5 +161,50 @@ describe("content-aware-resize route validation and prepare catch", () => {
       "base64",
     );
     await expect(config.process(onePxPng, { width: 8192 }, "a.png")).rejects.toBe(inputErr);
+  });
+
+  it("surfaces 503 ENGINE_UNAVAILABLE when caire binary is missing on HTTP route and pipeline process fn (#3858)", async () => {
+    const missingCaireErr = new SafeError(
+      "caire binary not found. Install via: go install github.com/esimov/caire/cmd/caire@v1.5.0",
+      { kind: "operational", code: "ENGINE_UNAVAILABLE", statusCode: 503 },
+    );
+    prepare.mockResolvedValue({ buffer: Buffer.from("prepared-image"), filename: "a.png" });
+    seamCarve.mockRejectedValueOnce(missingCaireErr);
+
+    const res = await send({ width: 50 });
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toEqual({
+      error: missingCaireErr.message,
+      code: "ENGINE_UNAVAILABLE",
+    });
+
+    const config = getToolConfig("content-aware-resize");
+    if (!config) throw new Error("content-aware-resize missing from toolRegistry");
+    seamCarve.mockRejectedValueOnce(missingCaireErr);
+    const onePxPng = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      "base64",
+    );
+    await expect(config.process(onePxPng, { width: 1 }, "a.png")).rejects.toBe(missingCaireErr);
+  });
+
+  it("wraps unexpected seamCarve failure as bug SafeError in pipeline process fn (#2828)", async () => {
+    const config = getToolConfig("content-aware-resize");
+    if (!config) throw new Error("content-aware-resize missing from toolRegistry");
+    const crashErr = new Error("caire exited with code 2");
+    seamCarve.mockRejectedValueOnce(crashErr);
+    const onePxPng = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      "base64",
+    );
+    const err = await config.process(onePxPng, { width: 1 }, "a.png").then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(isSafeMessageError(err)).toBe(true);
+    expect((err as SafeError).message).toBe("Content-aware resize failed");
+    expect((err as SafeError).kind).toBe("bug");
+    expect((err as SafeError).code).toBe("custom");
+    expect((err as SafeError).cause).toBe(crashErr);
   });
 });

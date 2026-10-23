@@ -22,7 +22,10 @@ import { join } from "node:path";
 import { apiToolPath } from "@snapotter/shared";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fixtureDir, fixtures } from "../../fixtures/index.js";
-import { featureUnavailableDisposition } from "../../helpers/generated-case-accounting.js";
+import {
+  featureUnavailableDisposition,
+  isEngineUnavailableResponse,
+} from "../../helpers/generated-case-accounting.js";
 import { cancelAcceptedJobAndWait } from "../settle-job.js";
 import {
   buildTestApp,
@@ -484,6 +487,9 @@ describe("AI tool cross-format matrix", () => {
             const responseBody = JSON.parse(res.body) as Record<string, unknown>;
             const skipReason = featurePrerequisiteSkipReason(tool.id, res.statusCode, responseBody);
             if (skipReason) return context.skip(skipReason);
+            if (isEngineUnavailableResponse(res.statusCode, res.body)) {
+              return context.skip(`${tool.id}: host engine unavailable for ${fmt.name}`);
+            }
 
             // Must be one of the acceptable codes
             expect(ACCEPTABLE_AI_CODES).toContain(res.statusCode);

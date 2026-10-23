@@ -961,7 +961,7 @@ describe("Image tool registry undecodable input & encode context guards (#949)",
     }
   });
 
-  it("content-aware-resize classifies bomb PNG as PIXEL_LIMIT_IMAGE_MESSAGE and wraps caire failures as SafeError", async () => {
+  it("content-aware-resize classifies bomb PNG as PIXEL_LIMIT_IMAGE_MESSAGE and missing caire binary as 503 ENGINE_UNAVAILABLE (#3858)", async () => {
     const bombPng = readFixture(fixtures.image.hostile.bomb);
     const config = getToolConfig("content-aware-resize");
     if (!config) throw new Error("content-aware-resize missing from toolRegistry");
@@ -983,8 +983,10 @@ describe("Image tool registry undecodable input & encode context guards (#949)",
         (e: unknown) => e,
       );
       expect(isSafeMessageError(caireErr)).toBe(true);
-      expect((caireErr as SafeError).message).toBe("Content-aware resize failed");
-      expect((caireErr as SafeError).kind).toBe("bug");
+      expect((caireErr as SafeError).kind).toBe("operational");
+      expect((caireErr as SafeError).code).toBe("ENGINE_UNAVAILABLE");
+      expect((caireErr as SafeError).statusCode).toBe(503);
+      expect((caireErr as SafeError).message).toContain("caire binary not found");
     } finally {
       process.env.PATH = prevPath;
       if (prevCaire === undefined) delete process.env.CAIRE_PATH;

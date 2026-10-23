@@ -29,29 +29,41 @@ export interface SeamCarveResult {
   height: number;
 }
 
+const CAIRE_UNAVAILABLE_MESSAGE =
+  "caire binary not found. Install via: go install github.com/esimov/caire/cmd/caire@v1.5.0";
+
 /**
  * Discover the caire binary. Checks PATH (Docker installs to /usr/local/bin)
  * and the CAIRE_PATH env var for local development.
  */
 let cachedCairePath: string | null = null;
+let cachedCaireEnvKey: string | null = null;
 
 async function findCaire(): Promise<string> {
-  if (cachedCairePath) return cachedCairePath;
+  const envKey = `${process.env.CAIRE_PATH ?? ""}\0${process.env.PATH ?? ""}`;
+  if (cachedCairePath && cachedCaireEnvKey === envKey) return cachedCairePath;
+  cachedCairePath = null;
+  cachedCaireEnvKey = null;
 
   const candidates = process.env.CAIRE_PATH ? [process.env.CAIRE_PATH, "caire"] : ["caire"];
 
+  let firstErr: unknown;
   for (const cmd of candidates) {
     try {
       await execFileAsync(cmd, ["-help"], { timeout: 5_000 });
       cachedCairePath = cmd;
+      cachedCaireEnvKey = envKey;
       return cmd;
-    } catch {
-      // try next
+    } catch (err) {
+      firstErr ??= err;
     }
   }
-  throw new Error(
-    "caire binary not found. Install via: go install github.com/esimov/caire/cmd/caire@v1.5.0",
-  );
+  throw new SafeError(CAIRE_UNAVAILABLE_MESSAGE, {
+    kind: "operational",
+    code: "ENGINE_UNAVAILABLE",
+    statusCode: 503,
+    cause: firstErr,
+  });
 }
 
 /**
@@ -65,7 +77,6 @@ export async function seamCarve(
   outputDir: string,
   options: SeamCarveOptions = {},
 ): Promise<SeamCarveResult> {
-  const cairePath = await findCaire();
   const id = randomUUID();
   const inputPath = join(outputDir, `caire-in-${id}.jpg`);
   const outputPath = join(outputDir, `caire-out-${id}.png`);
@@ -130,6 +141,7 @@ export async function seamCarve(
     }
 
     const processBuffer = await sharp(preResizedBuffer).jpeg({ quality: 95 }).toBuffer();
+    const cairePath = await findCaire();
 
     await writeFile(inputPath, processBuffer);
 
@@ -165,6 +177,16 @@ export async function seamCarve(
           "Content-aware resize timed out on this image. Try a smaller image or a larger target size.",
           { kind: "operational", code: "PROCESSING_TIMEOUT", statusCode: 422, cause: err },
         );
+      }
+      if ((err as NodeJS.ErrnoException).syscall?.startsWith("spawn")) {
+        cachedCairePath = null;
+        cachedCaireEnvKey = null;
+        throw new SafeError(CAIRE_UNAVAILABLE_MESSAGE, {
+          kind: "operational",
+          code: "ENGINE_UNAVAILABLE",
+          statusCode: 503,
+          cause: err,
+        });
       }
       throw err;
     }

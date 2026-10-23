@@ -180,15 +180,104 @@ describe("seamCarve", () => {
     expect(rm).toHaveBeenCalledTimes(2);
   });
 
-  it("throws when caire binary is not found", async () => {
+  it("throws operational 503 ENGINE_UNAVAILABLE SafeError when caire binary is not found (#3858)", async () => {
     const origCairePath = process.env.CAIRE_PATH;
     delete process.env.CAIRE_PATH;
 
-    const { seamCarve } = await importFresh();
-    mockExecFileAsync.mockRejectedValue(new Error("ENOENT"));
-    await expect(seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR)).rejects.toThrow("caire binary not found");
+    try {
+      const { seamCarve } = await importFresh();
+      const spawnErr = new Error("spawn caire ENOENT");
+      mockExecFileAsync.mockRejectedValue(spawnErr);
+      const err = await seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(isSafeMessageError(err)).toBe(true);
+      expect((err as SafeError).name).toBe("SafeError");
+      expect((err as SafeError).kind).toBe("operational");
+      expect((err as SafeError).code).toBe("ENGINE_UNAVAILABLE");
+      expect((err as SafeError).statusCode).toBe(503);
+      expect((err as SafeError).message).toContain("caire binary not found");
+      expect((err as SafeError).cause).toBe(spawnErr);
+    } finally {
+      if (origCairePath) process.env.CAIRE_PATH = origCairePath;
+    }
+  });
 
-    if (origCairePath) process.env.CAIRE_PATH = origCairePath;
+  it("preserves the CAIRE_PATH error as cause when both CAIRE_PATH and PATH fallback fail (#3858)", async () => {
+    const origCairePath = process.env.CAIRE_PATH;
+    process.env.CAIRE_PATH = "/custom/broken/caire";
+
+    try {
+      const { seamCarve } = await importFresh();
+      const customErr = Object.assign(new Error("spawn /custom/broken/caire EACCES"), {
+        code: "EACCES",
+        syscall: "spawn /custom/broken/caire",
+      });
+      const fallbackErr = Object.assign(new Error("spawn caire ENOENT"), {
+        code: "ENOENT",
+        syscall: "spawn caire",
+      });
+      mockExecFileAsync.mockRejectedValueOnce(customErr).mockRejectedValueOnce(fallbackErr);
+
+      const err = await seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(isSafeMessageError(err)).toBe(true);
+      expect((err as SafeError).code).toBe("ENGINE_UNAVAILABLE");
+      expect((err as SafeError).statusCode).toBe(503);
+      expect((err as SafeError).cause).toBe(customErr);
+    } finally {
+      if (origCairePath) process.env.CAIRE_PATH = origCairePath;
+      else delete process.env.CAIRE_PATH;
+    }
+  });
+
+  it("classifies a spawn failure on cached cairePath during execution as 503 ENGINE_UNAVAILABLE and clears cache (#3858)", async () => {
+    const origCairePath = process.env.CAIRE_PATH;
+    delete process.env.CAIRE_PATH;
+
+    try {
+      const { seamCarve } = await importFresh();
+      const spawnErr = Object.assign(new Error("spawn caire ENOENT"), {
+        code: "ENOENT",
+        syscall: "spawn caire",
+      });
+      mockExecFileAsync
+        .mockResolvedValueOnce({ stdout: "", stderr: "" })
+        .mockRejectedValueOnce(spawnErr)
+        .mockResolvedValue({ stdout: "", stderr: "" });
+
+      const err = await seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR, { width: 400 }).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(isSafeMessageError(err)).toBe(true);
+      expect((err as SafeError).kind).toBe("operational");
+      expect((err as SafeError).code).toBe("ENGINE_UNAVAILABLE");
+      expect((err as SafeError).statusCode).toBe(503);
+      expect((err as SafeError).cause).toBe(spawnErr);
+
+      // Next call must re-run the -help discovery probe because cache was cleared
+      await expect(seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR, { width: 400 })).resolves.toBeDefined();
+      const helpCalls = mockExecFileAsync.mock.calls.filter(
+        (c: unknown[]) => Array.isArray(c[1]) && c[1].includes("-help"),
+      );
+      expect(helpCalls).toHaveLength(2);
+
+      // Mutating CAIRE_PATH on the same module instance also invalidates the cache
+      process.env.CAIRE_PATH = "/updated/path/caire";
+      await expect(seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR, { width: 400 })).resolves.toBeDefined();
+      const updatedHelpCalls = mockExecFileAsync.mock.calls.filter(
+        (c: unknown[]) =>
+          c[0] === "/updated/path/caire" && Array.isArray(c[1]) && c[1].includes("-help"),
+      );
+      expect(updatedHelpCalls).toHaveLength(1);
+    } finally {
+      if (origCairePath) process.env.CAIRE_PATH = origCairePath;
+      else delete process.env.CAIRE_PATH;
+    }
   });
 
   it("uses CAIRE_PATH env var when set", async () => {
@@ -289,8 +378,9 @@ describe("seamCarve", () => {
     );
     await expect(seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR)).resolves.toBeDefined();
 
-    // 6000x5000 = 30 MP, exceeds 25 MP limit
+    // 6000x5000 = 30 MP, exceeds 25 MP limit even when caire is absent
     mockExecFileAsync.mockClear();
+    mockExecFileAsync.mockRejectedValue(new Error("spawn caire ENOENT"));
     vi.mocked(sharp).mockImplementation(
       () =>
         ({
@@ -305,10 +395,7 @@ describe("seamCarve", () => {
     const rejected = seamCarve(FAKE_INPUT, FAKE_OUTPUT_DIR);
     await expect(rejected).rejects.toSatisfy(isToolInputError);
     await expect(rejected).rejects.toThrow("Image is too large for content-aware resize");
-    const caireCalls = mockExecFileAsync.mock.calls.filter(
-      (c: unknown[]) => Array.isArray(c[1]) && c[1].includes("-preview=false"),
-    );
-    expect(caireCalls).toHaveLength(0);
+    expect(mockExecFileAsync).not.toHaveBeenCalled();
   });
 
   it("pre-resizes when width reduction exceeds 75%", async () => {

@@ -820,7 +820,10 @@ test.describe("Content-Aware Resize — extended", () => {
         settings: JSON.stringify({ width: 150, height: 150 }),
       },
     });
-    if (res.status() === 501) {
+    if (res.status() === 503) {
+      const body = await res.json();
+      expect(body.code).toBe("ENGINE_UNAVAILABLE");
+    } else if (res.status() === 501) {
       const body = await res.json();
       expect(body.code).toBe("FEATURE_NOT_INSTALLED");
     } else {
@@ -839,7 +842,10 @@ test.describe("Content-Aware Resize — extended", () => {
         settings: JSON.stringify({ width: 80, height: 80 }),
       },
     });
-    if (res.status() === 501) {
+    if (res.status() === 503) {
+      const body = await res.json();
+      expect(body.code).toBe("ENGINE_UNAVAILABLE");
+    } else if (res.status() === 501) {
       const body = await res.json();
       expect(body.code).toBe("FEATURE_NOT_INSTALLED");
     } else {
@@ -857,7 +863,10 @@ test.describe("Content-Aware Resize — extended", () => {
         settings: JSON.stringify({ width: 300, height: 300 }),
       },
     });
-    if (res.status() === 501) {
+    if (res.status() === 503) {
+      const body = await res.json();
+      expect(body.code).toBe("ENGINE_UNAVAILABLE");
+    } else if (res.status() === 501) {
       const body = await res.json();
       expect(body.code).toBe("FEATURE_NOT_INSTALLED");
     } else {
@@ -879,7 +888,10 @@ test.describe("Content-Aware Resize — HEIC & edge cases", () => {
         settings: JSON.stringify({ width: 150, height: 120 }),
       },
     });
-    if (res.status() === 501) {
+    if (res.status() === 503) {
+      const body = await res.json();
+      expect(body.code).toBe("ENGINE_UNAVAILABLE");
+    } else if (res.status() === 501) {
       const body = await res.json();
       expect(body.code).toBe("FEATURE_NOT_INSTALLED");
     } else {
@@ -897,7 +909,10 @@ test.describe("Content-Aware Resize — HEIC & edge cases", () => {
         settings: JSON.stringify({ width: 40, height: 40 }),
       },
     });
-    if (res.status() === 501) {
+    if (res.status() === 503) {
+      const body = await res.json();
+      expect(body.code).toBe("ENGINE_UNAVAILABLE");
+    } else if (res.status() === 501) {
       const body = await res.json();
       expect(body.code).toBe("FEATURE_NOT_INSTALLED");
     } else {

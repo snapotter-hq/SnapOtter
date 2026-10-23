@@ -656,8 +656,11 @@ test.describe("Content-Aware Resize", () => {
         settings: JSON.stringify({ width: 150, height: 150 }),
       },
     });
-    // Content-aware resize uses caire binary — may return 501 if not installed
-    if (res.status() === 501) {
+    // Content-aware resize uses caire binary: returns 503 if not installed
+    if (res.status() === 503) {
+      const body = await res.json();
+      expect(body.code).toBe("ENGINE_UNAVAILABLE");
+    } else if (res.status() === 501) {
       const body = await res.json();
       expect(body.code).toBe("FEATURE_NOT_INSTALLED");
     } else {
@@ -676,7 +679,10 @@ test.describe("Content-Aware Resize", () => {
         settings: JSON.stringify({ width: 80, height: 80 }),
       },
     });
-    if (res.status() === 501) {
+    if (res.status() === 503) {
+      const body = await res.json();
+      expect(body.code).toBe("ENGINE_UNAVAILABLE");
+    } else if (res.status() === 501) {
       const body = await res.json();
       expect(body.code).toBe("FEATURE_NOT_INSTALLED");
     } else {
