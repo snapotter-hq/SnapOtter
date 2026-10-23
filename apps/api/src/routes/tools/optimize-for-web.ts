@@ -132,7 +132,7 @@ export function registerOptimizeForWeb(app: FastifyInstance) {
         });
         fileBuffer = prepared.buffer;
       } catch (rawErr) {
-        const err = normalizeOperationalWriteError(rawErr);
+        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
         if (err instanceof InputValidationError) {
           return reply.status(400).send({ error: err.message });
         }
@@ -183,7 +183,7 @@ export function registerOptimizeForWeb(app: FastifyInstance) {
         reply.header("X-Output-Filename", encodeURIComponent(result.filename));
         return reply.send(result.buffer);
       } catch (rawErr) {
-        const err = normalizeOperationalWriteError(rawErr);
+        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
         if (isDecoderUnavailable(err)) {
           return sendInputValidationError(
             reply,

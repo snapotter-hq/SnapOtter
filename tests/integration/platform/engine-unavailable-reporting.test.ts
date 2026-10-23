@@ -1864,6 +1864,47 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
       } finally {
         enhStatsSpy.mockRestore();
       }
+
+      // 4. POST /api/v1/tools/image/optimize-for-web/preview (processImage / encodeJxl V8 OOM and SIGKILL, deduplicated, #3773)
+      const formatEncoders = await import("../../../apps/api/src/lib/format-encoders.js");
+      mocks.reportError.mockReset();
+      mocks.reportEngineUnavailable.mockClear();
+      nowSpy.mockReturnValue(expiredNow + 33 * 60_000);
+      let jxlCall = 0;
+      const encJxlSpy = vi.spyOn(formatEncoders, "encodeJxl").mockImplementation(async () => {
+        jxlCall++;
+        if (jxlCall === 1) throw oom();
+        throw Object.assign(new Error("Command failed: cjxl"), {
+          signal: "SIGKILL",
+          killed: true,
+        });
+      });
+      try {
+        const jxlSettings = {
+          name: "settings",
+          content: JSON.stringify({ format: "jxl", quality: 80 }),
+        };
+        for (const res of [
+          await post("/api/v1/tools/image/optimize-for-web/preview", [
+            pngPart("one.png"),
+            jxlSettings,
+          ]),
+          await post("/api/v1/tools/image/optimize-for-web/preview", [
+            pngPart("two.png"),
+            jxlSettings,
+          ]),
+        ]) {
+          expect(res.statusCode, res.body).toBe(503);
+          expect(res.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+        }
+        const optProcessReports = engineReports("optimize-for-web");
+        expect(optProcessReports).toHaveLength(1);
+        expect((optProcessReports[0]?.[0] as { cause?: { name?: string } })?.cause?.name).toBe(
+          "DecoderOutOfMemoryError",
+        );
+      } finally {
+        encJxlSpy.mockRestore();
+      }
     } finally {
       nowSpy.mockRestore();
     }
