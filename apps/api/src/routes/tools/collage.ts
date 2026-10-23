@@ -347,8 +347,10 @@ const settingsSchema = z.object({
   cells: z.array(cellSchema).optional(),
   gap: z.number().min(0).max(500).default(8),
   cornerRadius: z.number().min(0).max(500).default(0),
-  backgroundColor: z.string().default("#FFFFFF"),
-  aspectRatio: z.string().default("free"),
+  backgroundColor: z
+    .union([z.literal("transparent"), z.string().regex(/^#[0-9a-fA-F]{6}$/)])
+    .default("#FFFFFF"),
+  aspectRatio: z.enum(["free", "1:1", "4:3", "3:2", "16:9", "9:16", "4:5"]).default("free"),
   outputFormat: z.enum(["png", "jpeg", "webp", "avif", "jxl"]).default("png"),
   quality: z.number().min(1).max(100).default(90),
 });

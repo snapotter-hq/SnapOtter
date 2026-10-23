@@ -385,6 +385,64 @@ describe("Collage", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it.each(["red", "#fff", "not-a-color", "#12345g"])(
+    "rejects invalid backgroundColor (%s)",
+    async (backgroundColor) => {
+      const { body, contentType } = createMultipartPayload([
+        { name: "f1", filename: "a.png", contentType: "image/png", content: PNG },
+        { name: "f2", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+        {
+          name: "settings",
+          content: JSON.stringify({ templateId: "2-h-equal", backgroundColor }),
+        },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/collage",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      });
+
+      expect(res.statusCode).toBe(400);
+      const result = JSON.parse(res.body);
+      expect(result.error).toBe("Invalid settings");
+      expect(result.details).toContain("backgroundColor");
+    },
+  );
+
+  it.each(["21:9", "square", "2:3"])(
+    "rejects unsupported aspectRatio (%s)",
+    async (aspectRatio) => {
+      const { body, contentType } = createMultipartPayload([
+        { name: "f1", filename: "a.png", contentType: "image/png", content: PNG },
+        { name: "f2", filename: "b.jpg", contentType: "image/jpeg", content: JPG },
+        {
+          name: "settings",
+          content: JSON.stringify({ templateId: "2-h-equal", aspectRatio }),
+        },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/collage",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        body,
+      });
+
+      expect(res.statusCode).toBe(400);
+      const result = JSON.parse(res.body);
+      expect(result.error).toBe("Invalid settings");
+      expect(result.details).toContain("aspectRatio");
+    },
+  );
+
   it("rejects unauthenticated requests", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
