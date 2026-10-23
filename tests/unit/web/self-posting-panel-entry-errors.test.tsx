@@ -1122,7 +1122,7 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       unmount();
     }
 
-    // StripMetadataSettings does not cache a malformed 200 payload and rethrows non-SyntaxError body read failures.
+    // StripMetadataSettings does not cache a malformed 200 payload, rethrows non-SyntaxError body read failures, and falls back to inspectFailed when fetch rejects with an empty/whitespace Error.message or non-Error (#3692).
     {
       useFileStore.getState().reset();
       useFileStore.getState().setFiles([image("a.png"), image("b.png")]);
@@ -1140,6 +1140,15 @@ describe("self-posting tool panels: failed entry status and scoped error banners
               status: 200,
               json: () => Promise.reject(new TypeError("Strip inspect stream disconnected")),
             } as unknown as Response;
+          }
+          if (stripInspectCalls === 3) {
+            throw new Error("");
+          }
+          if (stripInspectCalls === 4) {
+            throw new Error("   ");
+          }
+          if (stripInspectCalls === 5) {
+            throw "non-error strip inspect rejection";
           }
           return new Response(JSON.stringify({ filename: "a.png", fileSize: 100 }), {
             status: 200,
@@ -1159,16 +1168,61 @@ describe("self-posting tool panels: failed entry status and scoped error banners
         expect(screen.getByText("Strip inspect stream disconnected")).toBeInTheDocument(),
       );
 
-      // Switching back to index 0 refetches because the first "{}" response was not cached.
+      // Call 3: empty Error("") falls back to inspectFailed.
       act(() => {
         useFileStore.getState().setSelectedIndex(0);
+      });
+      await waitFor(() =>
+        expect(
+          screen.getByText(en.toolSettings["strip-metadata"].inspectFailed),
+        ).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByText(en.toolSettings["strip-metadata"].readingMetadata),
+      ).not.toBeInTheDocument();
+      expect(stripInspectCalls).toBe(3);
+
+      // Call 4: whitespace Error("   ") falls back to inspectFailed instead of rendering a blank <p>.
+      act(() => {
+        useFileStore.getState().setSelectedIndex(1);
+      });
+      await waitFor(() =>
+        expect(
+          screen.getByText(en.toolSettings["strip-metadata"].inspectFailed),
+        ).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByText(en.toolSettings["strip-metadata"].readingMetadata),
+      ).not.toBeInTheDocument();
+      expect(stripInspectCalls).toBe(4);
+
+      // Call 5: non-Error rejection falls back to inspectFailed.
+      act(() => {
+        useFileStore.getState().setSelectedIndex(0);
+      });
+      await waitFor(() =>
+        expect(
+          screen.getByText(en.toolSettings["strip-metadata"].inspectFailed),
+        ).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByText(en.toolSettings["strip-metadata"].readingMetadata),
+      ).not.toBeInTheDocument();
+      expect(stripInspectCalls).toBe(5);
+
+      // Call 6: switching to index 1 refetches because none of the failures were cached.
+      act(() => {
+        useFileStore.getState().setSelectedIndex(1);
       });
       await waitFor(() =>
         expect(
           screen.getByText(en.toolSettings["strip-metadata"].noMetadataFound),
         ).toBeInTheDocument(),
       );
-      expect(stripInspectCalls).toBe(3);
+      expect(
+        screen.queryByText(en.toolSettings["strip-metadata"].inspectFailed),
+      ).not.toBeInTheDocument();
+      expect(stripInspectCalls).toBe(6);
       unmount();
     }
 

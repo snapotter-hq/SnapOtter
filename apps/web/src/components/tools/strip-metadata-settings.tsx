@@ -289,7 +289,9 @@ export function StripMetadataSettings() {
       } catch (err) {
         if (controller.signal.aborted || (err as Error)?.name === "AbortError") return;
         setInspectError(
-          err instanceof Error ? err.message : t.toolSettings["strip-metadata"].inspectFailed,
+          err instanceof Error && err.message.trim()
+            ? err.message
+            : t.toolSettings["strip-metadata"].inspectFailed,
         );
       } finally {
         if (!controller.signal.aborted) {
