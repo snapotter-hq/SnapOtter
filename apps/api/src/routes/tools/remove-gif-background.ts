@@ -220,10 +220,12 @@ registerAiJobHandler(
             ? (err.cause ?? new Error(err.message))
             : err;
         const classified = await asInputErrorIfUndecodable(input, probeCandidate);
-        if (isToolInputError(classified)) throw classified;
+        if (isToolInputError(classified) || isDecoderUnavailable(classified)) throw classified;
         if (bgBuffer) {
           const bgClassified = await asInputErrorIfUndecodable(bgBuffer, probeCandidate);
-          if (isToolInputError(bgClassified)) throw bgClassified;
+          if (isToolInputError(bgClassified) || isDecoderUnavailable(bgClassified)) {
+            throw bgClassified;
+          }
         }
         throw err;
       }
@@ -489,7 +491,7 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
                 ? (err.cause ?? new Error(err.message))
                 : err;
             const classified = await asInputErrorIfUndecodable(inputBuffer, probeCandidate);
-            if (isToolInputError(classified)) throw classified;
+            if (isToolInputError(classified) || isDecoderUnavailable(classified)) throw classified;
             throw err;
           }
           const base = filename.replace(/\.[^.]+$/, "");

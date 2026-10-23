@@ -1127,4 +1127,311 @@ describe("Image tool registry undecodable input & encode context guards (#949)",
     });
     expect(classifyError(nonMissingLocalErr, "worker")).toBe("bug");
   });
+
+  it("rethrows DecoderOutOfMemoryError from asInputErrorIfUndecodable in erase-object and remove-gif-background (#3805)", async () => {
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    const validGif = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 10, g: 20, b: 30 } },
+    })
+      .gif()
+      .toBuffer();
+    const sidecarBug = new SafeError("sidecar failed", { kind: "bug" });
+    const origRaw = sharp.prototype.raw;
+
+    // 1. erase-object AI job handler:
+    //    (a) inpaint fails on truncated mask while the 1x1 Sharp probe on input hits V8 OOM
+    //    (b) input probe succeeds and the 1x1 Sharp probe on maskBuffer hits V8 OOM
+    const maskKeyTrunc = "uploads/test-erase-oom/mask-trunc.jpg";
+    await putObject(maskKeyTrunc, truncatedJpg);
+    const eraseRawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
+      this: sharp.Sharp,
+    ) {
+      return {
+        toBuffer: async () => {
+          throw v8Oom;
+        },
+      } as unknown as sharp.Sharp;
+    });
+    try {
+      const eraseErr = await runAiToolJob(
+        {
+          jobId: "test-erase-oom",
+          toolId: "erase-object",
+          userId: null,
+          pool: "ai",
+          inputRefs: ["uploads/test-erase-oom/in.png", maskKeyTrunc],
+          filename: "valid.png",
+          settings: {},
+          kind: "ai-tool",
+        },
+        validPng,
+        {
+          scratchDir: tmpdir(),
+          signal: new AbortController().signal,
+          report: () => undefined,
+        },
+      ).then(
+        () => "resolved",
+        (e: unknown) => e,
+      );
+
+      expect(eraseErr).toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: v8Oom,
+      });
+    } finally {
+      eraseRawSpy.mockRestore();
+    }
+
+    let eraseMaskRawCalls = 0;
+    const eraseMaskRawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementation(function (
+      this: sharp.Sharp,
+    ) {
+      eraseMaskRawCalls++;
+      if (eraseMaskRawCalls === 2) {
+        return {
+          toBuffer: async () => {
+            throw v8Oom;
+          },
+        } as unknown as sharp.Sharp;
+      }
+      return origRaw.call(this);
+    });
+    try {
+      const eraseMaskOomErr = await runAiToolJob(
+        {
+          jobId: "test-erase-mask-oom",
+          toolId: "erase-object",
+          userId: null,
+          pool: "ai",
+          inputRefs: ["uploads/test-erase-oom/in.png", maskKeyTrunc],
+          filename: "valid.png",
+          settings: {},
+          kind: "ai-tool",
+        },
+        validPng,
+        {
+          scratchDir: tmpdir(),
+          signal: new AbortController().signal,
+          report: () => undefined,
+        },
+      ).then(
+        () => "resolved",
+        (e: unknown) => e,
+      );
+
+      expect(eraseMaskOomErr).toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: v8Oom,
+      });
+    } finally {
+      eraseMaskRawSpy.mockRestore();
+    }
+
+    // 2. remove-gif-background AI job handler:
+    //    (a) 1x1 probe of input hits V8 OOM after a bug-kind SafeError
+    //    (b) 1x1 probe of bgBuffer hits V8 OOM when input probe succeeds
+    //    (c) detectAnimation itself throws V8 OOM (probeCandidate is OOM)
+    const bgKeyValid = "uploads/test-gif-oom/bg.png";
+    await putObject(bgKeyValid, validPng);
+
+    const gifInputMetaSpy = vi.spyOn(sharp.prototype, "metadata").mockRejectedValueOnce(sidecarBug);
+    const gifInputRawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
+      this: sharp.Sharp,
+    ) {
+      return {
+        toBuffer: async () => {
+          throw v8Oom;
+        },
+      } as unknown as sharp.Sharp;
+    });
+    try {
+      const gifInputOomErr = await runAiToolJob(
+        {
+          jobId: "test-gif-input-oom",
+          toolId: "remove-gif-background",
+          userId: null,
+          pool: "ai",
+          inputRefs: ["uploads/test-gif-oom/in.gif"],
+          filename: "anim.gif",
+          settings: {},
+          kind: "ai-tool",
+        },
+        validGif,
+        {
+          scratchDir: tmpdir(),
+          signal: new AbortController().signal,
+          report: () => undefined,
+        },
+      ).then(
+        () => "resolved",
+        (e: unknown) => e,
+      );
+
+      expect(gifInputOomErr).toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: v8Oom,
+      });
+    } finally {
+      gifInputRawSpy.mockRestore();
+      gifInputMetaSpy.mockRestore();
+    }
+
+    let rawCalls = 0;
+    const gifBgMetaSpy = vi.spyOn(sharp.prototype, "metadata").mockRejectedValueOnce(sidecarBug);
+    const gifBgRawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementation(function (
+      this: sharp.Sharp,
+    ) {
+      rawCalls++;
+      if (rawCalls === 2) {
+        return {
+          toBuffer: async () => {
+            throw v8Oom;
+          },
+        } as unknown as sharp.Sharp;
+      }
+      return origRaw.call(this);
+    });
+    try {
+      const gifBgOomErr = await runAiToolJob(
+        {
+          jobId: "test-gif-bg-oom",
+          toolId: "remove-gif-background",
+          userId: null,
+          pool: "ai",
+          inputRefs: ["uploads/test-gif-oom/in.gif"],
+          filename: "anim.gif",
+          settings: {
+            backgroundType: "image",
+            bgImageKey: bgKeyValid,
+          },
+          kind: "ai-tool",
+        },
+        validGif,
+        {
+          scratchDir: tmpdir(),
+          signal: new AbortController().signal,
+          report: () => undefined,
+        },
+      ).then(
+        () => "resolved",
+        (e: unknown) => e,
+      );
+
+      expect(gifBgOomErr).toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: v8Oom,
+      });
+    } finally {
+      gifBgRawSpy.mockRestore();
+      gifBgMetaSpy.mockRestore();
+    }
+
+    const gifDirectMetaSpy = vi.spyOn(sharp.prototype, "metadata").mockRejectedValueOnce(v8Oom);
+    try {
+      const gifDirectOomErr = await runAiToolJob(
+        {
+          jobId: "test-gif-direct-oom",
+          toolId: "remove-gif-background",
+          userId: null,
+          pool: "ai",
+          inputRefs: ["uploads/test-gif-oom/in.gif"],
+          filename: "anim.gif",
+          settings: {},
+          kind: "ai-tool",
+        },
+        validGif,
+        {
+          scratchDir: tmpdir(),
+          signal: new AbortController().signal,
+          report: () => undefined,
+        },
+      ).then(
+        () => "resolved",
+        (e: unknown) => e,
+      );
+
+      expect(gifDirectOomErr).toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: v8Oom,
+      });
+    } finally {
+      gifDirectMetaSpy.mockRestore();
+    }
+
+    // 3. remove-gif-background registry processV2: 1x1 probe OOM and direct probeCandidate OOM
+    const gifConfig = getToolConfig("remove-gif-background");
+    if (!gifConfig?.processV2) throw new Error("remove-gif-background missing from toolRegistry");
+    const parsedGifSettings = gifConfig.settingsSchema.parse({});
+
+    const regProbeMetaSpy = vi.spyOn(sharp.prototype, "metadata").mockRejectedValueOnce(sidecarBug);
+    const regRawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
+      this: sharp.Sharp,
+    ) {
+      return {
+        toBuffer: async () => {
+          throw v8Oom;
+        },
+      } as unknown as sharp.Sharp;
+    });
+    try {
+      const regProbeOomErr = await gifConfig
+        .processV2({
+          inputs: [{ buffer: validGif, filename: "anim.gif", ref: "r1" }],
+          settings: parsedGifSettings,
+          scratchDir: tmpdir(),
+          signal: new AbortController().signal,
+          report: () => undefined,
+        })
+        .then(
+          () => "resolved",
+          (e: unknown) => e,
+        );
+
+      expect(regProbeOomErr).toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: v8Oom,
+      });
+    } finally {
+      regRawSpy.mockRestore();
+      regProbeMetaSpy.mockRestore();
+    }
+
+    const regMetaSpy = vi.spyOn(sharp.prototype, "metadata").mockRejectedValueOnce(v8Oom);
+    try {
+      const regDirectOomErr = await gifConfig
+        .processV2({
+          inputs: [{ buffer: validGif, filename: "anim.gif", ref: "r1" }],
+          settings: parsedGifSettings,
+          scratchDir: tmpdir(),
+          signal: new AbortController().signal,
+          report: () => undefined,
+        })
+        .then(
+          () => "resolved",
+          (e: unknown) => e,
+        );
+
+      expect(regDirectOomErr).toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: v8Oom,
+      });
+    } finally {
+      regMetaSpy.mockRestore();
+    }
+  });
 });

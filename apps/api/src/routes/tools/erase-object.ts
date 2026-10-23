@@ -395,7 +395,9 @@ registerAiJobHandler(
         );
       } catch (err) {
         const classifiedInput = await asInputErrorIfUndecodable(input, err);
-        if (isToolInputError(classifiedInput)) throw classifiedInput;
+        if (isToolInputError(classifiedInput) || isDecoderUnavailable(classifiedInput)) {
+          throw classifiedInput;
+        }
         throw await asInputErrorIfUndecodable(maskBuffer, err);
       }
 
