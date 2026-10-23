@@ -59,11 +59,7 @@ async function readAnimation(buffer: Buffer): Promise<FrameInfo> {
   try {
     meta = await sharp(buffer).metadata();
   } catch (err) {
-    const oom = asDecoderOutOfMemory(
-      err instanceof Error && /\bAllocating \d+ bytes failed\b/.test(err.message)
-        ? Object.assign(err, { stderr: err.message })
-        : err,
-    );
+    const oom = asDecoderOutOfMemory(err);
     if (oom instanceof DecoderOutOfMemoryError) throw oom;
     // Treating an unreadable header as a still is what the caller wants for
     // genuinely broken input, since it reopens the buffer and fails with its

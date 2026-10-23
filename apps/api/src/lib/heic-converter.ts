@@ -185,11 +185,7 @@ export async function decodeHeic(buffer: Buffer, options: HeicDecodeOptions = {}
       ) {
         throw error;
       }
-      const outOfMemory = asDecoderOutOfMemory(
-        error instanceof Error && /\bAllocating \d+ bytes failed\b/.test(error.message)
-          ? Object.assign(error, { stderr: error.message })
-          : error,
-      );
+      const outOfMemory = asDecoderOutOfMemory(error);
       if (outOfMemory !== error) throw outOfMemory;
       metadataError = error;
     }
@@ -222,11 +218,7 @@ export async function decodeHeic(buffer: Buffer, options: HeicDecodeOptions = {}
     ) {
       throw error;
     }
-    const outOfMemory = asDecoderOutOfMemory(
-      error instanceof Error && /\bAllocating \d+ bytes failed\b/.test(error.message)
-        ? Object.assign(error, { stderr: error.message })
-        : error,
-    );
+    const outOfMemory = asDecoderOutOfMemory(error);
     if (outOfMemory !== error) throw outOfMemory;
     if (!(error instanceof Error && SHARP_UNSUPPORTED_HEIF_CODEC.test(error.message))) {
       sharpVerdict = error;

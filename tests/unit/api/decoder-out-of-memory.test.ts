@@ -274,6 +274,33 @@ describe("asDecoderOutOfMemory", () => {
     expect(err.name).toBe("DecoderOutOfMemoryError");
     expect(asDecoderOutOfMemory(err)).toBe(err);
   });
+
+  it("answers an in-process Sharp libheif allocation error (stderr === undefined) as running out of memory while leaving child-process command lines and security limits alone (#3837)", () => {
+    const inProcessOom = new Error(
+      "heif: Memory allocation error: Unspecified: Allocating 4147215 bytes failed",
+    );
+    const classified = asDecoderOutOfMemory(inProcessOom) as Error;
+    expect(isDecoderUnavailable(classified)).toBe(true);
+    expect(classified.name).toBe("DecoderOutOfMemoryError");
+    expect(classified.cause).toBe(inProcessOom);
+
+    const securityLimit = new Error(
+      "heif: Memory allocation error: Security limit exceeded: Allocating 2147483648 bytes exceeds the security limit of 536870912 bytes",
+    );
+    expect(asDecoderOutOfMemory(securityLimit)).toBe(securityLimit);
+
+    const execCmdError = Object.assign(
+      new Error("Command failed: magick /tmp/Allocating 4147215 bytes failed.avif"),
+      { code: 1, signal: null, cmd: "magick /tmp/Allocating 4147215 bytes failed.avif" },
+    );
+    expect(asDecoderOutOfMemory(execCmdError)).toBe(execCmdError);
+
+    const execMsgError = Object.assign(
+      new Error("Command failed: magick /tmp/Allocating 4147215 bytes failed.avif"),
+      { code: 1, signal: null },
+    );
+    expect(asDecoderOutOfMemory(execMsgError)).toBe(execMsgError);
+  });
 });
 
 describe("decoders that run ImageMagick (#1751)", () => {

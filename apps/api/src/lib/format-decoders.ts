@@ -169,8 +169,10 @@ export function lacksFormatSupport(err: unknown): boolean {
  * Not matched: an uncaught std::bad_alloc and ImageMagick's "memory
  * allocation failed", since nothing bounds those allocations and a crafted
  * file can raise them on a healthy host, and ImageMagick's "cache resources
- * exhausted", which our own -limit flags produce. stderr is read rather than
- * the message, which adds the command line.
+ * exhausted", which our own -limit flags produce. For child processes, stderr
+ * is read rather than the message, which adds the command line; for in-process
+ * Sharp errors (no stderr or cmd), the message itself carries libheif's error
+ * (#3837).
  */
 const LIBHEIF_ALLOCATION_FAILED = /\bAllocating \d+ bytes failed\b/;
 const THREAD_START_ABORTED =
@@ -179,7 +181,11 @@ const OPENMP_THREAD_FAILED = /libgomp: Thread creation failed: Resource temporar
 
 export function asDecoderOutOfMemory(err: unknown): unknown {
   if (err instanceof DecoderOutOfMemoryError) return err;
-  const { signal, stderr } = (err ?? {}) as { signal?: unknown; stderr?: unknown };
+  const { cmd, signal, stderr } = (err ?? {}) as {
+    cmd?: unknown;
+    signal?: unknown;
+    stderr?: unknown;
+  };
   const decoderOutput =
     typeof stderr === "string" ? stderr : Buffer.isBuffer(stderr) ? stderr.toString("utf8") : "";
   if (
@@ -191,10 +197,18 @@ export function asDecoderOutOfMemory(err: unknown): unknown {
       err,
     );
   }
+  const inProcessMessage =
+    stderr === undefined &&
+    cmd === undefined &&
+    err instanceof Error &&
+    !err.message.startsWith("Command failed:")
+      ? err.message
+      : "";
   const outOfMemory =
     (err instanceof RangeError && err.message.startsWith("Array buffer allocation failed")) ||
     signal === "SIGKILL" ||
-    LIBHEIF_ALLOCATION_FAILED.test(decoderOutput);
+    LIBHEIF_ALLOCATION_FAILED.test(decoderOutput) ||
+    LIBHEIF_ALLOCATION_FAILED.test(inProcessMessage);
   if (!outOfMemory) return err;
   return new DecoderOutOfMemoryError(
     "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.",

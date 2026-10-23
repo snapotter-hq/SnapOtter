@@ -343,11 +343,7 @@ export async function validateImageBuffer(
 
     return { valid: true, format: detectedFormat, width, height };
   } catch (err) {
-    const outOfMemory = asDecoderOutOfMemory(
-      err instanceof Error && /\bAllocating \d+ bytes failed\b/.test(err.message)
-        ? Object.assign(err, { stderr: err.message })
-        : err,
-    );
+    const outOfMemory = asDecoderOutOfMemory(err);
     if (outOfMemory instanceof DecoderOutOfMemoryError) throw outOfMemory;
     return { valid: false, reason: "Failed to read image metadata" };
   }

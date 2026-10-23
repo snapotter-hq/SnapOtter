@@ -1089,6 +1089,51 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         metaSpy.mockRestore();
       }
     });
+
+    it("propagates DecoderOutOfMemoryError when sharp metadata() or stats() hits an in-process libheif allocation failure in /api/v1/tools/image/info (#3837)", async () => {
+      const exifJpg = readFixture(fixtures.image.exifGps);
+      const heifOom = new Error(
+        "heif: Memory allocation error: Unspecified: Allocating 4147215 bytes failed",
+      );
+      const statsSpy = vi.spyOn(sharp.prototype, "stats").mockRejectedValueOnce(heifOom);
+      try {
+        await expect(
+          invokeRoute(handler, [{ type: "file", filename: "sample.avif", content: exifJpg }]),
+        ).rejects.toMatchObject({
+          name: "DecoderOutOfMemoryError",
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          cause: heifOom,
+        });
+      } finally {
+        statsSpy.mockRestore();
+      }
+
+      const origMetadata = sharp.prototype.metadata;
+      let metaCalls = 0;
+      const metaSpy = vi.spyOn(sharp.prototype, "metadata").mockImplementation(function (
+        this: sharp.Sharp,
+      ) {
+        metaCalls++;
+        // Call 1 is validateImageBuffer; call 2 is info.ts's direct sharp(fileBuffer).metadata() probe.
+        if (metaCalls === 2) {
+          return Promise.reject(heifOom);
+        }
+        return origMetadata.call(this);
+      });
+      try {
+        await expect(
+          invokeRoute(handler, [{ type: "file", filename: "sample.avif", content: exifJpg }]),
+        ).rejects.toMatchObject({
+          name: "DecoderOutOfMemoryError",
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          cause: heifOom,
+        });
+      } finally {
+        metaSpy.mockRestore();
+      }
+    });
   });
 
   describe("custom SVG tool routes rethrow unexpected sanitizer faults while returning 400/batch-skip on client SVG errors (#3580)", () => {

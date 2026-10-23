@@ -219,11 +219,7 @@ export function registerStripMetadata(app: FastifyInstance) {
 
         return reply.send(result);
       } catch (err) {
-        const oomErr = asDecoderOutOfMemory(
-          err instanceof Error && /\bAllocating \d+ bytes failed\b/.test(err.message)
-            ? Object.assign(err, { stderr: err.message })
-            : err,
-        );
+        const oomErr = asDecoderOutOfMemory(err);
         if (isDecoderUnavailable(oomErr)) throw oomErr;
         return reply.status(422).send({
           error: "Failed to read image metadata",

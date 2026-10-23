@@ -26,6 +26,7 @@ const failures = vi.hoisted(() => ({
   probed: [] as string[],
   readResult: null as Buffer | null,
   metadataError: null as Error | null,
+  toBufferError: null as Error | null,
 }));
 
 vi.mock("sharp", async (importOriginal) => {
@@ -43,6 +44,17 @@ vi.mock("sharp", async (importOriginal) => {
         }
         return origMetadata(...args);
       }) as typeof instance.metadata;
+    }
+    if (failures.toBufferError) {
+      const origToBuffer = instance.toBuffer.bind(instance);
+      instance.toBuffer = (async (...args: Parameters<typeof origToBuffer>) => {
+        if (failures.toBufferError) {
+          const err = failures.toBufferError;
+          failures.toBufferError = null;
+          throw err;
+        }
+        return origToBuffer(...args);
+      }) as typeof instance.toBuffer;
     }
     return instance;
   }) as typeof realSharp;
@@ -150,6 +162,7 @@ afterEach(() => {
   failures.probed = [];
   failures.readResult = null;
   failures.metadataError = null;
+  failures.toBufferError = null;
 });
 
 async function decodeError(
@@ -262,6 +275,21 @@ describe("verifyDecodedImageLimits and metadata preflight fault handling (#2883)
     expect(isDecoderUnavailable(err)).toBe(true);
     expect(err.name).toBe("DecoderOutOfMemoryError");
     expect(err.cause).toBe(v8Oom);
+  });
+
+  it("surfaces an in-process Sharp libheif allocation failure or V8 RangeError during decodeHeic's direct decode attempt as a 503 DecoderOutOfMemoryError without falling back to the CLI (#3837)", async () => {
+    const heic = readFixture(fixtures.image.formats("heic"));
+    for (const oomErr of [
+      new Error("heif: Memory allocation error: Unspecified: Allocating 4147215 bytes failed"),
+      new RangeError("Array buffer allocation failed"),
+    ]) {
+      failures.toBufferError = oomErr;
+      failures.open = new Error("should not reach CLI temp file open");
+      const err = await decodeError(heic, { maxPixels: 10_000_000 });
+      expect(isDecoderUnavailable(err)).toBe(true);
+      expect(err.name).toBe("DecoderOutOfMemoryError");
+      expect(err.cause).toBe(oomErr);
+    }
   });
 
   it("rethrows a pixel safety limit error from decodeHeic's metadata preflight directly", async () => {
