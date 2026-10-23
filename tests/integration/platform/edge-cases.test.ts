@@ -75,6 +75,8 @@ describe("Zero-byte / empty file uploads", () => {
     });
 
     expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toBe("Invalid image: File contains no image data");
   });
 });
 
@@ -242,6 +244,8 @@ describe("Extreme filenames", () => {
     const json = JSON.parse(res.body);
     // Download URL should not contain path traversal
     expect(json.downloadUrl).not.toContain("..");
+    expect(json.downloadUrl).not.toContain("etc/passwd");
+    expect(json.downloadUrl).toMatch(/\/passwd_resize\.png$/);
   });
 });
 
@@ -288,6 +292,41 @@ describe("Settings field edge cases", () => {
     const json = JSON.parse(res.body);
     expect(json.error).toBe("Invalid settings");
     expect(json.details).toContain("At least one of width, height, or percentage is required");
+  });
+
+  it("populates default settings when no settings field is provided", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", content: PNG_200x150, contentType: "image/png" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/compress",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toContain(".png");
+  });
+
+  it("populates default settings when settings is an empty JSON object", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "test.png", content: PNG_200x150, contentType: "image/png" },
+      { name: "settings", content: "{}" },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/compress",
+      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
+      body,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toContain(".png");
   });
 
   it("handles null values in settings gracefully", async () => {
@@ -484,31 +523,6 @@ describe("Unicode and special filenames", () => {
 
     // Should succeed — sanitizeFilename may truncate but not crash
     expect(res.statusCode).toBe(200);
-  });
-
-  it("sanitizes path traversal in filename", async () => {
-    const { body, contentType } = createMultipartPayload([
-      {
-        name: "file",
-        filename: "../../../etc/passwd.png",
-        content: PNG_200x150,
-        contentType: "image/png",
-      },
-      { name: "settings", content: JSON.stringify({ width: 100 }) },
-    ]);
-
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/resize",
-      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
-      body,
-    });
-
-    expect(res.statusCode).toBe(200);
-    const json = JSON.parse(res.body);
-    // Download URL must not contain traversal sequences
-    expect(json.downloadUrl).not.toContain("..");
-    expect(json.downloadUrl).not.toContain("etc/passwd");
   });
 
   it("handles filename with no extension", async () => {
@@ -841,5 +855,7 @@ describe("Settings with extreme values", () => {
 
     // Settings payload exceeds the 64KB security limit
     expect(res.statusCode).toBe(400);
+    const json = JSON.parse(res.body);
+    expect(json.error).toBe("Settings payload too large (max 64KB)");
   });
 });
