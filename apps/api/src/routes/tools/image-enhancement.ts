@@ -16,7 +16,7 @@ import { stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { isDecoderUnavailable } from "../../lib/format-decoders.js";
+import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { prepareRouteImage } from "../../lib/image-input-prep.js";
 import { logger } from "../../lib/logger.js";
@@ -244,7 +244,21 @@ export function registerImageEnhancement(app: FastifyInstance) {
         return reply.status(400).send({ error: "No image file provided" });
       }
 
-      const validation = await validateImageBuffer(fileBuffer, filename);
+      let validation: Awaited<ReturnType<typeof validateImageBuffer>>;
+      try {
+        validation = await validateImageBuffer(fileBuffer, filename);
+      } catch (rawErr) {
+        const err = asDecoderOutOfMemory(rawErr);
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+          return sendInputValidationError(
+            reply,
+            engineUnavailable(err),
+            "image-enhancement",
+            request.log,
+          );
+        }
+        throw rawErr;
+      }
       if (!validation.valid) {
         return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
       }
@@ -286,6 +300,14 @@ export function registerImageEnhancement(app: FastifyInstance) {
       } catch (rawErr) {
         const classified = await asInputErrorIfUndecodable(fileBuffer, rawErr);
         const err = normalizeOperationalWriteError(classified);
+        if (isDecoderUnavailable(err)) {
+          return sendInputValidationError(
+            reply,
+            engineUnavailable(err),
+            "image-enhancement",
+            request.log,
+          );
+        }
         if (hasServerErrorStatus(err)) throw err;
         if (!isToolInputError(err)) {
           request.log.error({ err, toolId: "image-enhancement" }, "Image analysis failed");

@@ -1732,4 +1732,89 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
       nowSpy.mockRestore();
     }
   });
+
+  it("routes validateImageBuffer and analyzeImage DecoderOutOfMemoryError through sendInputValidationError on optimize-for-web /preview and image-enhancement /analyze (#3831)", async () => {
+    const sharpMod = (await import("sharp")).default;
+    const expiredNow = Date.now() + 120 * 60_000;
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(expiredNow);
+    const oom = () => new RangeError("Array buffer allocation failed");
+
+    try {
+      // 1. POST /api/v1/tools/image/optimize-for-web/preview (validateImageBuffer OOM, deduplicated)
+      mocks.reportError.mockReset();
+      mocks.reportEngineUnavailable.mockClear();
+      const optMetaSpy = vi
+        .spyOn(sharpMod.prototype, "metadata")
+        .mockRejectedValueOnce(oom())
+        .mockRejectedValueOnce(oom());
+      try {
+        for (const res of [
+          await post("/api/v1/tools/image/optimize-for-web/preview", [pngPart("one.png")]),
+          await post("/api/v1/tools/image/optimize-for-web/preview", [pngPart("two.png")]),
+        ]) {
+          expect(res.statusCode, res.body).toBe(503);
+          expect(res.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+        }
+        const optReports = engineReports("optimize-for-web");
+        expect(optReports).toHaveLength(1);
+        expect((optReports[0]?.[0] as { cause?: { name?: string } })?.cause?.name).toBe(
+          "DecoderOutOfMemoryError",
+        );
+      } finally {
+        optMetaSpy.mockRestore();
+      }
+
+      // 2. POST /api/v1/tools/image/image-enhancement/analyze (validateImageBuffer OOM, deduplicated)
+      mocks.reportError.mockReset();
+      mocks.reportEngineUnavailable.mockClear();
+      nowSpy.mockReturnValue(expiredNow + 11 * 60_000);
+      const enhMetaSpy = vi
+        .spyOn(sharpMod.prototype, "metadata")
+        .mockRejectedValueOnce(oom())
+        .mockRejectedValueOnce(oom());
+      try {
+        for (const res of [
+          await post("/api/v1/tools/image/image-enhancement/analyze", [pngPart("one.png")]),
+          await post("/api/v1/tools/image/image-enhancement/analyze", [pngPart("two.png")]),
+        ]) {
+          expect(res.statusCode, res.body).toBe(503);
+          expect(res.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+        }
+        const enhValidateReports = engineReports("image-enhancement");
+        expect(enhValidateReports).toHaveLength(1);
+        expect((enhValidateReports[0]?.[0] as { cause?: { name?: string } })?.cause?.name).toBe(
+          "DecoderOutOfMemoryError",
+        );
+      } finally {
+        enhMetaSpy.mockRestore();
+      }
+
+      // 3. POST /api/v1/tools/image/image-enhancement/analyze (analyzeImage OOM, deduplicated)
+      mocks.reportError.mockReset();
+      mocks.reportEngineUnavailable.mockClear();
+      nowSpy.mockReturnValue(expiredNow + 22 * 60_000);
+      const enhStatsSpy = vi
+        .spyOn(sharpMod.prototype, "stats")
+        .mockRejectedValueOnce(oom())
+        .mockRejectedValueOnce(oom());
+      try {
+        for (const res of [
+          await post("/api/v1/tools/image/image-enhancement/analyze", [pngPart("one.png")]),
+          await post("/api/v1/tools/image/image-enhancement/analyze", [pngPart("two.png")]),
+        ]) {
+          expect(res.statusCode, res.body).toBe(503);
+          expect(res.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+        }
+        const enhAnalyzeReports = engineReports("image-enhancement");
+        expect(enhAnalyzeReports).toHaveLength(1);
+        expect((enhAnalyzeReports[0]?.[0] as { cause?: { name?: string } })?.cause?.name).toBe(
+          "DecoderOutOfMemoryError",
+        );
+      } finally {
+        enhStatsSpy.mockRestore();
+      }
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
 });

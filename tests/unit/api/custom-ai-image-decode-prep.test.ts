@@ -41,10 +41,27 @@ const mocks = vi.hoisted(() => ({
   removeBackground: vi.fn(),
   removeBackgroundAnimated: vi.fn(),
   removeRedEye: vi.fn(),
+  reportError: vi.fn(),
   seamCarve: vi.fn(),
   updateSingleFileProgress: vi.fn(),
   waitForJob: vi.fn(),
 }));
+
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>()),
+  reportError: mocks.reportError,
+}));
+
+vi.mock("../../../apps/api/src/lib/file-validation.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/file-validation.js")>();
+  return {
+    ...actual,
+    validateImageBuffer: vi.fn((...args: Parameters<typeof actual.validateImageBuffer>) =>
+      actual.validateImageBuffer(...args),
+    ),
+  };
+});
 
 vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {
@@ -109,6 +126,7 @@ vi.mock("@snapotter/ai", async (importOriginal) => ({
 }));
 
 import * as autoOrientModule from "../../../apps/api/src/lib/auto-orient.js";
+import * as fileValidation from "../../../apps/api/src/lib/file-validation.js";
 import * as formatDecoders from "../../../apps/api/src/lib/format-decoders.js";
 import * as heicConverter from "../../../apps/api/src/lib/heic-converter.js";
 import { prepareRouteImage } from "../../../apps/api/src/lib/image-input-prep.js";
@@ -597,6 +615,135 @@ describe("custom AI image routes input decode, fileExt, SVG prep, and error logg
       await handlers[route](badTgaReq, badTgaReply);
       expect(badTgaReply.statusCode).toBe(422);
       expect(badTgaReq.log.error).not.toHaveBeenCalled();
+    }
+  });
+
+  it("routes validateImageBuffer and analyzeImage OOMs and 5xx faults through sendInputValidationError on image-enhancement/analyze and optimize-for-web/preview (#3831)", async () => {
+    let fakeNow = Date.now() + 30 * 60_000;
+    const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => fakeNow);
+
+    try {
+      // 1. validateImageBuffer rejecting with DecoderOutOfMemoryError (from sharp.prototype.metadata OOM) on both routes
+      for (const [route, toolId] of [
+        ["/api/v1/tools/image/optimize-for-web/preview", "optimize-for-web"],
+        ["/api/v1/tools/image/image-enhancement/analyze", "image-enhancement"],
+      ] as const) {
+        fakeNow += 11 * 60_000;
+        mocks.reportError.mockClear();
+        const metaSpy = vi
+          .spyOn(sharp.prototype, "metadata")
+          .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"))
+          .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"));
+        try {
+          const warnSpy = vi.fn();
+          for (let attempt = 0; attempt < 2; attempt++) {
+            const req = makeRequest([
+              { type: "file", fieldname: "file", filename: "photo.png", content: validPng },
+            ]);
+            req.log.warn = warnSpy;
+            const reply = makeReply();
+            await handlers[route](req, reply);
+            expect(reply.statusCode).toBe(503);
+            expect(reply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+          }
+          expect(warnSpy).toHaveBeenCalledTimes(1);
+          expect(warnSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+              code: "ENGINE_UNAVAILABLE",
+              cause: "DecoderOutOfMemoryError",
+              toolId,
+            }),
+            "Tool engine unavailable during input preparation",
+          );
+          expect(mocks.reportError).toHaveBeenCalledTimes(1);
+        } finally {
+          metaSpy.mockRestore();
+        }
+
+        // validateImageBuffer 5xx SafeError routes through sendInputValidationError, while unexpected non-5xx rethrows
+        fakeNow += 11 * 60_000;
+        mocks.reportError.mockClear();
+        const storageFullErr = Object.assign(new Error("The server's storage is full."), {
+          isSafeMessage: true,
+          statusCode: 503,
+          code: "storage-full",
+        });
+        vi.mocked(fileValidation.validateImageBuffer).mockRejectedValueOnce(storageFullErr);
+        const req503 = makeRequest([
+          { type: "file", fieldname: "file", filename: "photo.png", content: validPng },
+        ]);
+        const reply503 = makeReply();
+        await handlers[route](req503, reply503);
+        expect(reply503.statusCode).toBe(503);
+        expect(reply503.payload).toEqual({
+          error: "The server's storage is full.",
+          code: "storage-full",
+        });
+
+        const unexpectedValidateErr = new TypeError("unexpected validator fault");
+        vi.mocked(fileValidation.validateImageBuffer).mockRejectedValueOnce(unexpectedValidateErr);
+        const reqUnexpected = makeRequest([
+          { type: "file", fieldname: "file", filename: "photo.png", content: validPng },
+        ]);
+        await expect(handlers[route](reqUnexpected, makeReply())).rejects.toBe(
+          unexpectedValidateErr,
+        );
+      }
+
+      // 2. analyzeImage rejecting with DecoderOutOfMemoryError (from sharp.prototype.stats OOM) on image-enhancement/analyze
+      fakeNow += 11 * 60_000;
+      mocks.reportError.mockClear();
+      const statsSpy = vi
+        .spyOn(sharp.prototype, "stats")
+        .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"))
+        .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"));
+      try {
+        const warnAnalyzeOom = vi.fn();
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const req = makeRequest([
+            { type: "file", fieldname: "file", filename: "photo.png", content: validPng },
+          ]);
+          req.log.warn = warnAnalyzeOom;
+          const reply = makeReply();
+          await handlers["/api/v1/tools/image/image-enhancement/analyze"](req, reply);
+          expect(reply.statusCode).toBe(503);
+          expect(reply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+        }
+        expect(warnAnalyzeOom).toHaveBeenCalledTimes(1);
+        expect(warnAnalyzeOom).toHaveBeenCalledWith(
+          expect.objectContaining({
+            code: "ENGINE_UNAVAILABLE",
+            cause: "DecoderOutOfMemoryError",
+            toolId: "image-enhancement",
+          }),
+          "Tool engine unavailable during input preparation",
+        );
+        expect(mocks.reportError).toHaveBeenCalledTimes(1);
+      } finally {
+        statsSpy.mockRestore();
+      }
+
+      // Non-ENGINE_UNAVAILABLE 5xx error in analyzeImage still rethrows
+      const statsEnospcSpy = vi
+        .spyOn(sharp.prototype, "stats")
+        .mockRejectedValueOnce(
+          Object.assign(new Error("ENOSPC: no space left on device"), { code: "ENOSPC" }),
+        );
+      try {
+        const reqEnospc = makeRequest([
+          { type: "file", fieldname: "file", filename: "photo.png", content: validPng },
+        ]);
+        await expect(
+          handlers["/api/v1/tools/image/image-enhancement/analyze"](reqEnospc, makeReply()),
+        ).rejects.toMatchObject({
+          statusCode: 503,
+          code: "storage-full",
+        });
+      } finally {
+        statsEnospcSpy.mockRestore();
+      }
+    } finally {
+      nowSpy.mockRestore();
     }
   });
 

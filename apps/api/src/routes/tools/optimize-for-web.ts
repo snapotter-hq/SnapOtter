@@ -8,7 +8,7 @@ import { sendInputValidationError } from "../../lib/engine-unavailable.js";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { isDecoderUnavailable } from "../../lib/format-decoders.js";
+import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { prepareRouteImage } from "../../lib/image-input-prep.js";
@@ -107,7 +107,21 @@ export function registerOptimizeForWeb(app: FastifyInstance) {
         return reply.status(400).send({ error: "No image file provided" });
       }
 
-      const validation = await validateImageBuffer(fileBuffer, filename);
+      let validation: Awaited<ReturnType<typeof validateImageBuffer>>;
+      try {
+        validation = await validateImageBuffer(fileBuffer, filename);
+      } catch (rawErr) {
+        const err = asDecoderOutOfMemory(rawErr);
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+          return sendInputValidationError(
+            reply,
+            engineUnavailable(err),
+            "optimize-for-web",
+            request.log,
+          );
+        }
+        throw rawErr;
+      }
       if (!validation.valid) {
         return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
       }

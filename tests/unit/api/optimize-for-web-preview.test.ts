@@ -1,12 +1,34 @@
 import { Readable } from "node:stream";
 import { gzipSync } from "node:zlib";
+import sharp from "sharp";
 import { describe, expect, it, vi } from "vitest";
 import { openAnimated } from "../../../apps/api/src/lib/animated-image.js";
+import * as fileValidation from "../../../apps/api/src/lib/file-validation.js";
 import { registerOptimizeForWeb } from "../../../apps/api/src/routes/tools/optimize-for-web.js";
+
+const mocks = vi.hoisted(() => ({
+  reportError: vi.fn(),
+}));
 
 vi.mock("../../../apps/api/src/routes/tool-factory.js", () => ({
   createToolRoute: vi.fn(),
 }));
+
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>()),
+  reportError: mocks.reportError,
+}));
+
+vi.mock("../../../apps/api/src/lib/file-validation.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../../apps/api/src/lib/file-validation.js")>();
+  return {
+    ...actual,
+    validateImageBuffer: vi.fn((...args: Parameters<typeof actual.validateImageBuffer>) =>
+      actual.validateImageBuffer(...args),
+    ),
+  };
+});
 
 vi.mock("../../../apps/api/src/lib/animated-image.js", async (importOriginal) => {
   const actual =
@@ -25,6 +47,10 @@ describe("POST /api/v1/tools/image/optimize-for-web/preview SVG/SVGZ handling (#
       | { type: "file"; filename: string; content: Buffer }
       | { type: "field"; fieldname: string; value: string }
     >,
+    log: { error: ReturnType<typeof vi.fn>; warn: ReturnType<typeof vi.fn> } = {
+      error: vi.fn(),
+      warn: vi.fn(),
+    },
   ) {
     let handler: ((req: unknown, rep: unknown) => Promise<unknown>) | undefined;
     registerOptimizeForWeb({
@@ -36,7 +62,7 @@ describe("POST /api/v1/tools/image/optimize-for-web/preview SVG/SVGZ handling (#
     const headers: Record<string, string> = {};
     const request = {
       headers: {},
-      log: { error: vi.fn(), warn: vi.fn() },
+      log,
       parts: async function* () {
         for (const p of parts) {
           if (p.type === "file") {
@@ -121,5 +147,71 @@ describe("POST /api/v1/tools/image/optimize-for-web/preview SVG/SVGZ handling (#
     expect(overCapReply.payload).toEqual({
       error: "SVG exceeds maximum element count of 5000",
     });
+  });
+
+  it("routes validateImageBuffer DecoderOutOfMemoryError and 5xx faults through sendInputValidationError, deduplicating within the 10-minute window (#3831)", async () => {
+    const validPng = await sharp({
+      create: { width: 16, height: 16, channels: 4, background: { r: 10, g: 20, b: 30, alpha: 1 } },
+    })
+      .png()
+      .toBuffer();
+    let fakeNow = Date.now() + 20 * 60_000;
+    const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => fakeNow);
+
+    try {
+      mocks.reportError.mockClear();
+      const metaSpy = vi
+        .spyOn(sharp.prototype, "metadata")
+        .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"))
+        .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"));
+      try {
+        const log = { error: vi.fn(), warn: vi.fn() };
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const reply = await invokePreviewRoute(
+            [{ type: "file", filename: "photo.png", content: validPng }],
+            log,
+          );
+          expect(reply.statusCode).toBe(503);
+          expect(reply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+        }
+        expect(log.warn).toHaveBeenCalledTimes(1);
+        expect(log.warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            code: "ENGINE_UNAVAILABLE",
+            cause: "DecoderOutOfMemoryError",
+            toolId: "optimize-for-web",
+          }),
+          "Tool engine unavailable during input preparation",
+        );
+        expect(mocks.reportError).toHaveBeenCalledTimes(1);
+      } finally {
+        metaSpy.mockRestore();
+      }
+
+      fakeNow += 11 * 60_000;
+      mocks.reportError.mockClear();
+      const storageFullErr = Object.assign(new Error("The server's storage is full."), {
+        isSafeMessage: true,
+        statusCode: 503,
+        code: "storage-full",
+      });
+      vi.mocked(fileValidation.validateImageBuffer).mockRejectedValueOnce(storageFullErr);
+      const storageReply = await invokePreviewRoute([
+        { type: "file", filename: "photo.png", content: validPng },
+      ]);
+      expect(storageReply.statusCode).toBe(503);
+      expect(storageReply.payload).toEqual({
+        error: "The server's storage is full.",
+        code: "storage-full",
+      });
+
+      const unexpectedValidateErr = new TypeError("unexpected preview validator fault");
+      vi.mocked(fileValidation.validateImageBuffer).mockRejectedValueOnce(unexpectedValidateErr);
+      await expect(
+        invokePreviewRoute([{ type: "file", filename: "photo.png", content: validPng }]),
+      ).rejects.toBe(unexpectedValidateErr);
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 });
