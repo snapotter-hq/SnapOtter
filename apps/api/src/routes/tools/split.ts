@@ -12,6 +12,7 @@ import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import {
+  asDecoderOutOfMemory,
   DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
@@ -156,7 +157,7 @@ export function registerSplit(app: FastifyInstance) {
         try {
           fileBuffer = await decodeHeic(fileBuffer);
         } catch (rawErr) {
-          const err = normalizeOperationalWriteError(rawErr);
+          const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
           if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
           return reply.status(422).send({
             error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
@@ -172,7 +173,7 @@ export function registerSplit(app: FastifyInstance) {
           const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
           fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt);
         } catch (rawDecodeErr) {
-          const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+          const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
           if (
             decodeErr instanceof DecoderOutOfMemoryError ||
             (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
@@ -182,11 +183,15 @@ export function registerSplit(app: FastifyInstance) {
           try {
             await sharp(fileBuffer).metadata();
             await sharp(fileBuffer).resize(1).raw().toBuffer();
-          } catch (err) {
+          } catch (rawProbeErr) {
+            const probeErr = asDecoderOutOfMemory(rawProbeErr);
+            if (probeErr instanceof DecoderOutOfMemoryError) throw probeErr;
             if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) throw decodeErr;
             return reply.status(422).send({
               error: `Failed to decode ${validation.format.toUpperCase()} file`,
-              details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+              details: stripInternalPaths(
+                rawProbeErr instanceof Error ? rawProbeErr.message : String(rawProbeErr),
+              ),
             });
           }
         }

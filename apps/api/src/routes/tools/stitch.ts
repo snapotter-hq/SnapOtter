@@ -10,6 +10,7 @@ import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import {
+  asDecoderOutOfMemory,
   DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
@@ -96,7 +97,7 @@ export function registerStitch(app: FastifyInstance) {
         try {
           file.buffer = await decodeHeic(file.buffer);
         } catch (rawErr) {
-          const err = normalizeOperationalWriteError(rawErr);
+          const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
           if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
           return reply.status(422).send({
             error: `Failed to decode "${file.filename}" (HEIC). Ensure libheif-examples is installed.`,
@@ -110,7 +111,7 @@ export function registerStitch(app: FastifyInstance) {
         try {
           file.buffer = await decodeToSharpCompat(file.buffer, validation.format, fileExt);
         } catch (rawDecodeErr) {
-          const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+          const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
           if (
             decodeErr instanceof DecoderOutOfMemoryError ||
             (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
@@ -120,11 +121,15 @@ export function registerStitch(app: FastifyInstance) {
           try {
             await sharp(file.buffer).metadata();
             await sharp(file.buffer).resize(1).raw().toBuffer();
-          } catch (err) {
+          } catch (rawProbeErr) {
+            const probeErr = asDecoderOutOfMemory(rawProbeErr);
+            if (probeErr instanceof DecoderOutOfMemoryError) throw probeErr;
             if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) throw decodeErr;
             return reply.status(422).send({
               error: `Failed to decode "${file.filename}" (${validation.format.toUpperCase()})`,
-              details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+              details: stripInternalPaths(
+                rawProbeErr instanceof Error ? rawProbeErr.message : String(rawProbeErr),
+              ),
             });
           }
         }

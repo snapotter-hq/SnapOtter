@@ -9,6 +9,7 @@ import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import {
+  asDecoderOutOfMemory,
   DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
@@ -184,7 +185,7 @@ export function registerFindDuplicates(app: FastifyInstance) {
           // A missing decoder or storage write fault is the operator's
           // problem, not this file's: rethrow it so the request answers
           // 503 (#2800).
-          const err = normalizeOperationalWriteError(rawErr);
+          const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
           if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
           logger.warn(
             { err, filename: file.filename, format: validation.format },
@@ -199,7 +200,7 @@ export function registerFindDuplicates(app: FastifyInstance) {
           const fileExt = extname(file.filename).toLowerCase().replace(/^\./, "") || undefined;
           file.buffer = await decodeToSharpCompat(file.buffer, validation.format, fileExt);
         } catch (rawDecodeErr) {
-          const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+          const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
           if (
             decodeErr instanceof DecoderOutOfMemoryError ||
             (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
@@ -211,7 +212,11 @@ export function registerFindDuplicates(app: FastifyInstance) {
           try {
             await sharp(file.buffer).metadata();
             await sharp(file.buffer).resize(1).raw().toBuffer();
-          } catch (err) {
+          } catch (rawProbeErr) {
+            const probeErr = asDecoderOutOfMemory(rawProbeErr);
+            if (probeErr instanceof DecoderOutOfMemoryError) {
+              throw probeErr;
+            }
             if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
               throw decodeErr;
             }
@@ -219,7 +224,7 @@ export function registerFindDuplicates(app: FastifyInstance) {
             // failure goes in as its message or it would land as `{}`.
             logger.warn(
               {
-                err,
+                err: rawProbeErr,
                 decodeErr: decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
                 filename: file.filename,
                 format: validation.format,

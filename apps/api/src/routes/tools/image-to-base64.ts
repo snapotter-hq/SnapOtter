@@ -6,6 +6,7 @@ import { z } from "zod";
 import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import {
+  asDecoderOutOfMemory,
   DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
@@ -143,7 +144,7 @@ export function registerImageToBase64(app: FastifyInstance) {
               const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
               decoded = await decodeToSharpCompat(decoded, validation.format, fileExt);
             } catch (rawDecodeErr) {
-              const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+              const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
               if (
                 decodeErr instanceof DecoderOutOfMemoryError ||
                 (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
@@ -155,11 +156,15 @@ export function registerImageToBase64(app: FastifyInstance) {
                 if (meta.format !== "svg") {
                   await sharp(decoded).resize(1).raw().toBuffer();
                 }
-              } catch (err) {
+              } catch (rawProbeErr) {
+                const probeErr = asDecoderOutOfMemory(rawProbeErr);
+                if (probeErr instanceof DecoderOutOfMemoryError) {
+                  throw probeErr;
+                }
                 if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
                   throw decodeErr;
                 }
-                throw err;
+                throw rawProbeErr;
               }
             }
           }
@@ -266,7 +271,7 @@ export function registerImageToBase64(app: FastifyInstance) {
           });
         } catch (rawErr) {
           if (unexpectedSvgFault) throw rawErr;
-          const err = normalizeOperationalWriteError(rawErr);
+          const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
           if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
           errors.push({
             filename,

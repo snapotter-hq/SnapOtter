@@ -13,6 +13,7 @@ import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import {
+  asDecoderOutOfMemory,
   DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
@@ -240,7 +241,7 @@ export function registerBarcodeRead(app: FastifyInstance) {
             // tmpdir write failure) is not a bad file. decodeHeic reports
             // running out of memory as decoder unavailable (#1577), which the
             // outer catch hands to the global handler as a 503 (#1533, #2800).
-            const err = normalizeOperationalWriteError(rawErr);
+            const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
             if (isDecoderUnavailable(err) || hasServerErrorStatus(err) || isDecoderFault(err)) {
               throw err;
             }
@@ -255,7 +256,7 @@ export function registerBarcodeRead(app: FastifyInstance) {
             const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
             fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt);
           } catch (rawDecodeErr) {
-            const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+            const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
             if (
               decodeErr instanceof DecoderOutOfMemoryError ||
               (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
@@ -265,13 +266,19 @@ export function registerBarcodeRead(app: FastifyInstance) {
             try {
               await sharp(fileBuffer).metadata();
               await sharp(fileBuffer).resize(1).raw().toBuffer();
-            } catch (err) {
+            } catch (rawProbeErr) {
+              const probeErr = asDecoderOutOfMemory(rawProbeErr);
+              if (probeErr instanceof DecoderOutOfMemoryError) {
+                throw probeErr;
+              }
               if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
                 throw decodeErr;
               }
               return reply.status(422).send({
                 error: `Failed to decode ${validation.format.toUpperCase()} file`,
-                details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+                details: stripInternalPaths(
+                  rawProbeErr instanceof Error ? rawProbeErr.message : String(rawProbeErr),
+                ),
               });
             }
           }

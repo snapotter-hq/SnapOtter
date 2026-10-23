@@ -51,6 +51,7 @@ import {
 import { getFirstMissingBundleForTool } from "../lib/feature-status.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import {
+  asDecoderOutOfMemory,
   DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
@@ -473,7 +474,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                         const ext = filename.match(/\.[^.]+$/)?.[0];
                         if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
                       } catch (rawErr) {
-                        const err = normalizeOperationalWriteError(rawErr);
+                        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
                         if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
                         return reply.status(422).send({
                           error:
@@ -498,7 +499,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                         const ext = filename.match(/\.[^.]+$/)?.[0];
                         if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
                       } catch (rawErr) {
-                        const err = normalizeOperationalWriteError(rawErr);
+                        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
                         if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
                         return reply.status(422).send({
                           error: `Failed to decode ${validation.format} file`,
@@ -1560,7 +1561,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                     const ext = processFilename.match(/\.[^.]+$/)?.[0];
                     if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
                   } catch (rawErr) {
-                    const err = normalizeOperationalWriteError(rawErr);
+                    const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
                     if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
                       const unavailable = engineUnavailable(err);
                       reportEngineUnavailable(
@@ -1597,7 +1598,9 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                     const ext = processFilename.match(/\.[^.]+$/)?.[0];
                     if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
                   } catch (rawDecodeErr) {
-                    const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+                    const decodeErr = normalizeOperationalWriteError(
+                      asDecoderOutOfMemory(rawDecodeErr),
+                    );
                     if (
                       decodeErr instanceof DecoderOutOfMemoryError ||
                       (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
@@ -1619,7 +1622,23 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                     try {
                       await sharp(processBuffer).metadata();
                       await sharp(processBuffer).resize(1).raw().toBuffer();
-                    } catch {
+                    } catch (rawProbeErr) {
+                      const probeErr = asDecoderOutOfMemory(rawProbeErr);
+                      if (probeErr instanceof DecoderOutOfMemoryError) {
+                        const unavailable = engineUnavailable(probeErr);
+                        reportEngineUnavailable(
+                          unavailable,
+                          parsedSteps[0]?.resolvedToolId ?? "pipeline",
+                          request.log,
+                        );
+                        preFailures.push({
+                          originalIndex: fi,
+                          filename: file.filename,
+                          error: unavailable.message,
+                          ...preFailureFaultFields(unavailable),
+                        });
+                        continue;
+                      }
                       if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
                         const unavailable = engineUnavailable(decodeErr);
                         reportEngineUnavailable(

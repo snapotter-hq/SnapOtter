@@ -9,6 +9,7 @@ import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import {
+  asDecoderOutOfMemory,
   DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
@@ -482,7 +483,7 @@ export function registerCollage(app: FastifyInstance) {
           // A missing decoder or storage write fault is this server's fault,
           // not the user's file: rethrow so the global handler logs and
           // reports it as a 503 (#795, #2800).
-          const err = normalizeOperationalWriteError(rawErr);
+          const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
           if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
           return reply.status(422).send({
             error: `Failed to decode "${file.filename}" (HEIC). Ensure libheif-examples is installed.`,
@@ -495,7 +496,7 @@ export function registerCollage(app: FastifyInstance) {
           const fileExt = extname(file.filename).toLowerCase().replace(/^\./, "") || undefined;
           file.buffer = await decodeToSharpCompat(file.buffer, validation.format, fileExt);
         } catch (rawDecodeErr) {
-          const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+          const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
           if (
             decodeErr instanceof DecoderOutOfMemoryError ||
             (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
@@ -505,13 +506,17 @@ export function registerCollage(app: FastifyInstance) {
           try {
             await sharp(file.buffer).metadata();
             await sharp(file.buffer).resize(1).raw().toBuffer();
-          } catch (err) {
+          } catch (rawProbeErr) {
+            const probeErr = asDecoderOutOfMemory(rawProbeErr);
+            if (probeErr instanceof DecoderOutOfMemoryError) throw probeErr;
             // Sharp can read some of these formats itself, so a missing CLI
             // decoder only matters once that fallback fails too (#795).
             if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) throw decodeErr;
             return reply.status(422).send({
               error: `Failed to decode "${file.filename}" (${validation.format.toUpperCase()})`,
-              details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+              details: stripInternalPaths(
+                rawProbeErr instanceof Error ? rawProbeErr.message : String(rawProbeErr),
+              ),
             });
           }
         }

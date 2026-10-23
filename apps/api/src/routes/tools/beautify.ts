@@ -22,6 +22,7 @@ import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import {
+  asDecoderOutOfMemory,
   DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
@@ -111,7 +112,7 @@ async function prepareBeautifyImage(
     try {
       buf = await decodeHeic(buf);
     } catch (rawErr) {
-      const err = normalizeOperationalWriteError(rawErr);
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
       throw await asInputErrorIfUndecodable(buf, err);
     }
@@ -122,7 +123,7 @@ async function prepareBeautifyImage(
       const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
       buf = await decodeToSharpCompat(buf, validation.format, fileExt);
     } catch (rawDecodeErr) {
-      const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+      const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
       if (
         decodeErr instanceof DecoderOutOfMemoryError ||
         (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
@@ -135,9 +136,11 @@ async function prepareBeautifyImage(
         if (fallbackFormat !== "svg") {
           await sharp(buf).resize(1).raw().toBuffer();
         }
-      } catch (err) {
+      } catch (rawProbeErr) {
+        const probeErr = asDecoderOutOfMemory(rawProbeErr);
+        if (probeErr instanceof DecoderOutOfMemoryError) throw probeErr;
         if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) throw decodeErr;
-        throw await asInputErrorIfUndecodable(buf, err);
+        throw await asInputErrorIfUndecodable(buf, rawProbeErr);
       }
     }
   }

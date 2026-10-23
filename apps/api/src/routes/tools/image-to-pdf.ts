@@ -226,7 +226,7 @@ export function registerImageToPdfRoute(
         try {
           buf = await decodeHeic(buf);
         } catch (rawErr) {
-          const err = normalizeOperationalWriteError(rawErr);
+          const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
           if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
           return reply.status(422).send({
             error: `Failed to decode HEIC file "${file.filename}"`,
@@ -238,7 +238,7 @@ export function registerImageToPdfRoute(
           const fileExt = extname(file.filename).toLowerCase().replace(/^\./, "") || undefined;
           buf = await decodeToSharpCompat(buf, validation.format, fileExt);
         } catch (rawDecodeErr) {
-          const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+          const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
           if (
             decodeErr instanceof DecoderOutOfMemoryError ||
             (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
@@ -248,13 +248,17 @@ export function registerImageToPdfRoute(
           try {
             await sharp(buf).metadata();
             await sharp(buf).resize(1).raw().toBuffer();
-          } catch (err) {
+          } catch (rawProbeErr) {
+            const probeErr = asDecoderOutOfMemory(rawProbeErr);
+            if (probeErr instanceof DecoderOutOfMemoryError) {
+              throw probeErr;
+            }
             if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
               throw decodeErr;
             }
             return reply.status(422).send({
               error: `Failed to decode ${validation.format.toUpperCase()} file "${file.filename}"`,
-              details: err instanceof Error ? err.message : String(err),
+              details: rawProbeErr instanceof Error ? rawProbeErr.message : String(rawProbeErr),
             });
           }
         }

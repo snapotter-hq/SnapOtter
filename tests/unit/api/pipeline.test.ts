@@ -2550,6 +2550,157 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
     },
   );
 
+  it("answers 503 ENGINE_UNAVAILABLE with DecoderOutOfMemoryError when decodeHeic, decodeToSharpCompat, or the DNG Sharp fallback probe hits V8 OOM or SIGKILL on /api/v1/pipeline/batch (#3764)", async () => {
+    const sharpMod = (await import("sharp")).default;
+    const { decodeHeic } = await import("../../../apps/api/src/lib/heic-converter.js");
+    const { DecoderUnavailableError, decodeToSharpCompat, needsCliDecode } = await import(
+      "../../../apps/api/src/lib/format-decoders.js"
+    );
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const dngBytes = readFileSync(join(__dirname, "../../fixtures/image/formats/sample.dng"));
+    const oomMessage =
+      "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+
+    try {
+      for (const makeRawOom of [
+        () => new RangeError("Array buffer allocation failed"),
+        () => Object.assign(new Error("decoder exited SIGKILL"), { signal: "SIGKILL" }),
+      ]) {
+        vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+          valid: true,
+          format: "heif",
+          width: 10,
+          height: 10,
+        });
+        vi.mocked(decodeHeic).mockRejectedValueOnce(makeRawOom());
+        const batchHeicReply = await invokePipelineBatchRoute([
+          { type: "file", filename: "photo.heic", content: Buffer.from("heic-bytes") },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: [{ toolId: batchTestToolId, settings: {} }],
+            }),
+          },
+        ]);
+        expect(batchHeicReply.statusCode).toBe(503);
+        expect(batchHeicReply.payload).toMatchObject({
+          error: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+        });
+
+        vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+          valid: true,
+          format: "raw",
+          width: 10,
+          height: 10,
+        });
+        vi.mocked(needsCliDecode).mockReturnValueOnce(true);
+        vi.mocked(decodeToSharpCompat).mockRejectedValueOnce(makeRawOom());
+        const batchDngReply = await invokePipelineBatchRoute([
+          { type: "file", filename: "photo.dng", content: dngBytes },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: [{ toolId: batchTestToolId, settings: {} }],
+            }),
+          },
+        ]);
+        expect(batchDngReply.statusCode).toBe(503);
+        expect(batchDngReply.payload).toMatchObject({
+          error: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+        });
+      }
+
+      for (const initialDecodeErr of [
+        new DecoderUnavailableError("No dcraw_emu found."),
+        new Error("dcraw failed"),
+      ]) {
+        vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+          valid: true,
+          format: "raw",
+          width: 10,
+          height: 10,
+        });
+        vi.mocked(needsCliDecode).mockReturnValueOnce(true);
+        vi.mocked(decodeToSharpCompat).mockRejectedValueOnce(initialDecodeErr);
+        const rawSpy = vi.spyOn(sharpMod.prototype, "raw").mockImplementationOnce(function (
+          this: InstanceType<typeof sharpMod>,
+        ) {
+          return {
+            toBuffer: async () => {
+              throw new RangeError("Array buffer allocation failed");
+            },
+          } as unknown as InstanceType<typeof sharpMod>;
+        });
+        try {
+          const probeReply = await invokePipelineBatchRoute([
+            { type: "file", filename: "photo.dng", content: dngBytes },
+            {
+              type: "field",
+              fieldname: "pipeline",
+              value: JSON.stringify({
+                steps: [{ toolId: batchTestToolId, settings: {} }],
+              }),
+            },
+          ]);
+          expect(probeReply.statusCode).toBe(503);
+          expect(probeReply.payload).toMatchObject({
+            error: oomMessage,
+            code: "ENGINE_UNAVAILABLE",
+          });
+        } finally {
+          rawSpy.mockRestore();
+        }
+      }
+
+      // Non-OOM RangeError in the Sharp probe still preserves DecoderUnavailableError
+      vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+        valid: true,
+        format: "raw",
+        width: 10,
+        height: 10,
+      });
+      vi.mocked(needsCliDecode).mockReturnValueOnce(true);
+      vi.mocked(decodeToSharpCompat).mockRejectedValueOnce(
+        new DecoderUnavailableError("No dcraw_emu found."),
+      );
+      const nonOomRawSpy = vi.spyOn(sharpMod.prototype, "raw").mockImplementationOnce(function (
+        this: InstanceType<typeof sharpMod>,
+      ) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Invalid raw parameter");
+          },
+        } as unknown as InstanceType<typeof sharpMod>;
+      });
+      try {
+        const nonOomReply = await invokePipelineBatchRoute([
+          { type: "file", filename: "photo.dng", content: dngBytes },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: [{ toolId: batchTestToolId, settings: {} }],
+            }),
+          },
+        ]);
+        expect(nonOomReply.statusCode).toBe(503);
+        expect(nonOomReply.payload).toMatchObject({
+          error: "No dcraw_emu found.",
+          code: "ENGINE_UNAVAILABLE",
+        });
+      } finally {
+        nonOomRawSpy.mockRestore();
+      }
+    } finally {
+      vi.mocked(needsCliDecode).mockReturnValue(false);
+    }
+  });
+
   it("includes filename alongside statusCode, code, and details in preFailureFaults when a 5xx pre-failure is paired with a valid upload (#3150)", async () => {
     vi.clearAllMocks();
     const { InputValidationError } = await import("../../../apps/api/src/modality/contract.js");
@@ -3349,4 +3500,76 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
       }
     },
   );
+
+  it("surfaces 503 ENGINE_UNAVAILABLE with DecoderOutOfMemoryError when decodeHeic or decodeToSharpCompat hits V8 OOM or SIGKILL on /api/v1/pipeline/execute (#3764)", async () => {
+    const { decodeHeic } = await import("../../../apps/api/src/lib/heic-converter.js");
+    const { decodeToSharpCompat, needsCliDecode } = await import(
+      "../../../apps/api/src/lib/format-decoders.js"
+    );
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const dngBytes = readFileSync(join(__dirname, "../../fixtures/image/formats/sample.dng"));
+    const oomMessage =
+      "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+
+    try {
+      for (const makeRawOom of [
+        () => new RangeError("Array buffer allocation failed"),
+        () => Object.assign(new Error("decoder exited SIGKILL"), { signal: "SIGKILL" }),
+      ]) {
+        vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+          valid: true,
+          format: "heif",
+          width: 10,
+          height: 10,
+        });
+        vi.mocked(decodeHeic).mockRejectedValueOnce(makeRawOom());
+        await expect(
+          invokePipelineExecuteRoute([
+            { type: "file", filename: "photo.heic", content: Buffer.from("heic-bytes") },
+            {
+              type: "field",
+              fieldname: "pipeline",
+              value: JSON.stringify({
+                steps: [{ toolId: executeTestToolId, settings: {} }],
+              }),
+            },
+          ]),
+        ).rejects.toMatchObject({
+          name: "DecoderOutOfMemoryError",
+          message: oomMessage,
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+        });
+
+        vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+          valid: true,
+          format: "raw",
+          width: 10,
+          height: 10,
+        });
+        vi.mocked(needsCliDecode).mockReturnValueOnce(true);
+        vi.mocked(decodeToSharpCompat).mockRejectedValueOnce(makeRawOom());
+        await expect(
+          invokePipelineExecuteRoute([
+            { type: "file", filename: "photo.dng", content: dngBytes },
+            {
+              type: "field",
+              fieldname: "pipeline",
+              value: JSON.stringify({
+                steps: [{ toolId: executeTestToolId, settings: {} }],
+              }),
+            },
+          ]),
+        ).rejects.toMatchObject({
+          name: "DecoderOutOfMemoryError",
+          message: oomMessage,
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+        });
+      }
+    } finally {
+      vi.mocked(needsCliDecode).mockReturnValue(false);
+    }
+  });
 });

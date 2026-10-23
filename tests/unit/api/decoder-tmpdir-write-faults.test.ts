@@ -170,6 +170,7 @@ import { registerFavicon } from "../../../apps/api/src/routes/tools/favicon.js";
 import { registerFindDuplicates } from "../../../apps/api/src/routes/tools/find-duplicates.js";
 import { registerImageEnhancement } from "../../../apps/api/src/routes/tools/image-enhancement.js";
 import { registerImageToBase64 } from "../../../apps/api/src/routes/tools/image-to-base64.js";
+import { registerImageToPdf } from "../../../apps/api/src/routes/tools/image-to-pdf.js";
 import { registerInfo } from "../../../apps/api/src/routes/tools/info.js";
 import { registerMemeGenerator } from "../../../apps/api/src/routes/tools/meme-generator.js";
 import { registerOptimizeForWeb } from "../../../apps/api/src/routes/tools/optimize-for-web.js";
@@ -235,6 +236,7 @@ async function buildApp() {
   registerFindDuplicates(app);
   registerFavicon(app);
   registerImageToBase64(app);
+  registerImageToPdf(app);
   registerBeautify(app);
   registerEditMetadata(app);
   registerInfo(app);
@@ -267,6 +269,13 @@ const ROUTES: RouteSpec[] = [
     psdFiles: [{ filename: "layer.psd", contentType: "image/vnd.adobe.photoshop", content: PSD }],
     dngFiles: [{ filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG }],
     settings: { width: 100 },
+  },
+  {
+    name: "image-to-pdf",
+    url: apiToolPath("image-to-pdf"),
+    heicFiles: [{ filename: "photo.heic", contentType: "image/heic", content: HEIC }],
+    psdFiles: [{ filename: "layer.psd", contentType: "image/vnd.adobe.photoshop", content: PSD }],
+    dngFiles: [{ filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG }],
   },
   {
     name: "stitch",
@@ -519,6 +528,105 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
         expect(res.json()).toMatchObject({ code: "storage-full" });
       }
     });
+
+    if (
+      route.name !== "resize (factory ImageInputHandler)" &&
+      route.name !== "image-enhancement/analyze" &&
+      route.name !== "optimize-for-web/preview"
+    ) {
+      it("answers 503 ENGINE_UNAVAILABLE with DecoderOutOfMemoryError when decodeHeic, decodeToSharpCompat, or the DNG Sharp fallback probe hits V8 OOM or SIGKILL (#3764)", async () => {
+        const sharpMod = (await import("sharp")).default;
+        const oomMessage =
+          "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+
+        for (const makeRawOom of [
+          () => new RangeError("Array buffer allocation failed"),
+          () => Object.assign(new Error("decoder exited SIGKILL"), { signal: "SIGKILL" }),
+        ]) {
+          decodeHeic.mockRejectedValueOnce(makeRawOom());
+          const heicRes = await app.inject({
+            method: "POST",
+            url: route.url,
+            ...multipartBody(route.heicFiles, route.settings),
+          });
+          expect(heicRes.statusCode, heicRes.body).toBe(503);
+          expect(heicRes.json()).toMatchObject({
+            error: oomMessage,
+            code: "ENGINE_UNAVAILABLE",
+          });
+
+          decodeToSharpCompat.mockRejectedValueOnce(makeRawOom());
+          const dngDecodeOomRes = await app.inject({
+            method: "POST",
+            url: route.url,
+            ...multipartBody(route.dngFiles, route.settings),
+          });
+          expect(dngDecodeOomRes.statusCode, dngDecodeOomRes.body).toBe(503);
+          expect(dngDecodeOomRes.json()).toMatchObject({
+            error: oomMessage,
+            code: "ENGINE_UNAVAILABLE",
+          });
+        }
+
+        for (const initialDecodeErr of [
+          new DecoderUnavailableError("No dcraw_emu found."),
+          new Error("dcraw failed"),
+        ]) {
+          decodeToSharpCompat.mockRejectedValueOnce(initialDecodeErr);
+          const rawSpy = vi.spyOn(sharpMod.prototype, "raw").mockImplementationOnce(function (
+            this: InstanceType<typeof sharpMod>,
+          ) {
+            return {
+              toBuffer: async () => {
+                throw new RangeError("Array buffer allocation failed");
+              },
+            } as unknown as InstanceType<typeof sharpMod>;
+          });
+          try {
+            const probeRes = await app.inject({
+              method: "POST",
+              url: route.url,
+              ...multipartBody(route.dngFiles, route.settings),
+            });
+            expect(probeRes.statusCode, probeRes.body).toBe(503);
+            expect(probeRes.json()).toMatchObject({
+              error: oomMessage,
+              code: "ENGINE_UNAVAILABLE",
+            });
+          } finally {
+            rawSpy.mockRestore();
+          }
+        }
+
+        // Non-OOM RangeError in the Sharp probe still preserves DecoderUnavailableError
+        decodeToSharpCompat.mockRejectedValueOnce(
+          new DecoderUnavailableError("No dcraw_emu found."),
+        );
+        const nonOomRawSpy = vi.spyOn(sharpMod.prototype, "raw").mockImplementationOnce(function (
+          this: InstanceType<typeof sharpMod>,
+        ) {
+          return {
+            toBuffer: async () => {
+              throw new RangeError("Invalid raw parameter");
+            },
+          } as unknown as InstanceType<typeof sharpMod>;
+        });
+        try {
+          const nonOomProbeRes = await app.inject({
+            method: "POST",
+            url: route.url,
+            ...multipartBody(route.dngFiles, route.settings),
+          });
+          expect(nonOomProbeRes.statusCode, nonOomProbeRes.body).toBe(503);
+          expect(nonOomProbeRes.json()).toMatchObject({
+            error: "No dcraw_emu found.",
+            code: "ENGINE_UNAVAILABLE",
+          });
+        } finally {
+          nonOomRawSpy.mockRestore();
+        }
+      });
+    }
   });
 
   describe.each([
@@ -544,6 +652,61 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
         });
       },
     );
+
+    it("surfaces 503 ENGINE_UNAVAILABLE with DecoderOutOfMemoryError when decodeHeic, decodeToSharpCompat, or the DNG Sharp fallback probe hits V8 OOM or SIGKILL (#3764)", async () => {
+      const sharpMod = (await import("sharp")).default;
+      const oomMessage =
+        "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+      const cfg = getToolConfig(toolId);
+      expect(cfg).toBeDefined();
+
+      for (const makeRawOom of [
+        () => new RangeError("Array buffer allocation failed"),
+        () => Object.assign(new Error("decoder exited SIGKILL"), { signal: "SIGKILL" }),
+      ]) {
+        decodeHeic.mockRejectedValueOnce(makeRawOom());
+        await expect(cfg?.process(HEIC, defaultSettings, "photo.heic")).rejects.toMatchObject({
+          name: "DecoderOutOfMemoryError",
+          message: oomMessage,
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+        });
+
+        decodeToSharpCompat.mockRejectedValueOnce(makeRawOom());
+        await expect(cfg?.process(DNG, defaultSettings, "photo.dng")).rejects.toMatchObject({
+          name: "DecoderOutOfMemoryError",
+          message: oomMessage,
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+        });
+      }
+
+      for (const initialDecodeErr of [
+        new DecoderUnavailableError("No dcraw_emu found."),
+        new Error("dcraw failed"),
+      ]) {
+        decodeToSharpCompat.mockRejectedValueOnce(initialDecodeErr);
+        const rawSpy = vi.spyOn(sharpMod.prototype, "raw").mockImplementationOnce(function (
+          this: InstanceType<typeof sharpMod>,
+        ) {
+          return {
+            toBuffer: async () => {
+              throw new RangeError("Array buffer allocation failed");
+            },
+          } as unknown as InstanceType<typeof sharpMod>;
+        });
+        try {
+          await expect(cfg?.process(DNG, defaultSettings, "photo.dng")).rejects.toMatchObject({
+            name: "DecoderOutOfMemoryError",
+            message: oomMessage,
+            statusCode: 503,
+            code: "ENGINE_UNAVAILABLE",
+          });
+        } finally {
+          rawSpy.mockRestore();
+        }
+      }
+    });
   });
 
   describe("info HEIC fallback guess and readExifToolMeta (#3451)", () => {

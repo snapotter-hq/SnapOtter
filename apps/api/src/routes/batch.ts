@@ -52,6 +52,7 @@ import {
 import { getFirstMissingBundleForTool } from "../lib/feature-status.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import {
+  asDecoderOutOfMemory,
   DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
@@ -524,7 +525,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                     const ext = processFilename.match(/\.[^.]+$/)?.[0];
                     if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
                   } catch (rawErr) {
-                    const err = normalizeOperationalWriteError(rawErr);
+                    const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
                     if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
                       const unavailable = engineUnavailable(err);
                       reportEngineUnavailable(unavailable, toolId, request.log);
@@ -557,7 +558,9 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                     const ext = processFilename.match(/\.[^.]+$/)?.[0];
                     if (ext) processFilename = `${processFilename.slice(0, -ext.length)}.png`;
                   } catch (rawDecodeErr) {
-                    const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+                    const decodeErr = normalizeOperationalWriteError(
+                      asDecoderOutOfMemory(rawDecodeErr),
+                    );
                     if (
                       decodeErr instanceof DecoderOutOfMemoryError ||
                       (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
@@ -575,7 +578,19 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                     try {
                       await sharp(processBuffer).metadata();
                       await sharp(processBuffer).resize(1).raw().toBuffer();
-                    } catch {
+                    } catch (rawProbeErr) {
+                      const probeErr = asDecoderOutOfMemory(rawProbeErr);
+                      if (probeErr instanceof DecoderOutOfMemoryError) {
+                        const unavailable = engineUnavailable(probeErr);
+                        reportEngineUnavailable(unavailable, toolId, request.log);
+                        preFailures.push({
+                          originalIndex: i,
+                          filename: file.filename,
+                          error: unavailable.message,
+                          ...preFailureFaultFields(unavailable),
+                        });
+                        continue;
+                      }
                       if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
                         const unavailable = engineUnavailable(decodeErr);
                         reportEngineUnavailable(unavailable, toolId, request.log);

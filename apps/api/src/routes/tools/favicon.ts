@@ -13,6 +13,7 @@ import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import {
+  asDecoderOutOfMemory,
   DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
@@ -162,7 +163,7 @@ export function registerFavicon(app: FastifyInstance) {
           try {
             buf = await decodeToSharpCompat(buf, validation.format, fileExt);
           } catch (rawDecodeErr) {
-            const decodeErr = normalizeOperationalWriteError(rawDecodeErr);
+            const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
             if (
               decodeErr instanceof DecoderOutOfMemoryError ||
               (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
@@ -172,11 +173,15 @@ export function registerFavicon(app: FastifyInstance) {
             try {
               await sharp(buf).metadata();
               await sharp(buf).resize(1).raw().toBuffer();
-            } catch (err) {
+            } catch (rawProbeErr) {
+              const probeErr = asDecoderOutOfMemory(rawProbeErr);
+              if (probeErr instanceof DecoderOutOfMemoryError) {
+                throw probeErr;
+              }
               if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
                 throw decodeErr;
               }
-              throw err;
+              throw rawProbeErr;
             }
           }
         }
@@ -191,7 +196,7 @@ export function registerFavicon(app: FastifyInstance) {
 
         decodedFiles.push({ buffer: buf, filename: file.filename });
       } catch (rawErr) {
-        const err = normalizeOperationalWriteError(rawErr);
+        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
         if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
         const reason = err instanceof Error ? err.message : "Unknown decode error";
         skippedFiles.push({ filename: file.filename, reason });
