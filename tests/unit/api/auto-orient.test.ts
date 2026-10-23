@@ -10,6 +10,7 @@ const loggerMock = vi.hoisted(() => ({
 vi.mock("../../../apps/api/src/lib/logger.js", () => ({ logger: loggerMock }));
 
 import { autoOrient } from "../../../apps/api/src/lib/auto-orient.js";
+import { DecoderOutOfMemoryError } from "../../../apps/api/src/lib/format-decoders.js";
 
 beforeEach(() => {
   loggerMock.warn.mockReset();
@@ -538,5 +539,41 @@ describe("autoOrient", () => {
       pages: 3,
       bytes: corrupted.length,
     });
+  });
+
+  it("rethrows DecoderOutOfMemoryError without logging warn when metadata() or rotation hits OOM (#3804)", async () => {
+    const buf = await createImageWithOrientation(6);
+    const v8Oom = new RangeError("Array buffer allocation failed");
+
+    const metaSpy = vi.spyOn(sharp.prototype, "metadata").mockRejectedValueOnce(v8Oom);
+    try {
+      const thrown = await autoOrient(buf).catch((e: unknown) => e);
+      expect(thrown).toBeInstanceOf(DecoderOutOfMemoryError);
+      expect(thrown).toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: v8Oom,
+      });
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+    } finally {
+      metaSpy.mockRestore();
+    }
+
+    const rotateOom = new RangeError("Array buffer allocation failed");
+    const toBufferSpy = vi.spyOn(sharp.prototype, "toBuffer").mockRejectedValueOnce(rotateOom);
+    try {
+      const thrown = await autoOrient(buf).catch((e: unknown) => e);
+      expect(thrown).toBeInstanceOf(DecoderOutOfMemoryError);
+      expect(thrown).toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: rotateOom,
+      });
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+    } finally {
+      toBufferSpy.mockRestore();
+    }
   });
 });

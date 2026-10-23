@@ -840,5 +840,38 @@ describe("ImageInputHandler operational tmpdir write faults (#2800)", () => {
       code: "ENGINE_UNAVAILABLE",
       cause: expect.any(DecoderOutOfMemoryError),
     });
+
+    // 5. autoOrient hits DecoderOutOfMemoryError or raw V8 OOM (#3804), while non-OOM or abort rethrows unchanged
+    for (const orientErr of [
+      new DecoderOutOfMemoryError("The image decoder ran out of memory."),
+      v8Oom(),
+    ]) {
+      detected("jpeg");
+      mocks.autoOrient.mockRejectedValueOnce(orientErr);
+      await expect(prepare("photo.jpg")).rejects.toMatchObject({
+        name: "InputValidationError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: expect.any(DecoderOutOfMemoryError),
+      });
+    }
+
+    const unexpectedOrientErr = new TypeError("unexpected orient fault");
+    detected("jpeg");
+    mocks.autoOrient.mockRejectedValueOnce(unexpectedOrientErr);
+    await expect(prepare("photo.jpg")).rejects.toBe(unexpectedOrientErr);
+
+    const orientAbort = new AbortController();
+    detected("jpeg");
+    mocks.autoOrient.mockImplementationOnce(async () => {
+      orientAbort.abort("orient-canceled");
+      throw v8Oom();
+    });
+    await expect(
+      new ImageInputHandler().prepare(RAW, "photo.jpg", {
+        scratchDir: "/tmp/in",
+        signal: orientAbort.signal,
+      }),
+    ).rejects.toBe("orient-canceled");
   });
 });

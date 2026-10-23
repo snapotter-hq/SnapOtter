@@ -1,5 +1,6 @@
 import type { FastifyBaseLogger } from "fastify";
 import sharp, { type Metadata, type Sharp } from "sharp";
+import { asDecoderOutOfMemory, DecoderOutOfMemoryError } from "./format-decoders.js";
 import { assertGifWorkload } from "./gif-limits.js";
 import { logger } from "./logger.js";
 import { resolveOutputFormat } from "./output-format.js";
@@ -14,9 +15,10 @@ import { resolveOutputFormat } from "./output-format.js";
  * This function physically rotates the pixels to match the EXIF orientation,
  * then strips the tag so downstream processing produces correct results.
  *
- * Returns the original buffer unchanged if no rotation is needed. Also passes
- * the buffer through, with a warn log, when its metadata can't be read or the
- * rotation itself fails, so a sideways result is traceable.
+ * Returns the original buffer unchanged if no rotation is needed. Rethrows
+ * `DecoderOutOfMemoryError` when Sharp runs out of memory, and otherwise
+ * passes the buffer through, with a warn log, when its metadata can't be read
+ * or the rotation itself fails, so a sideways result is traceable.
  *
  * Pass the request logger (or a child carrying jobId and toolId) where one is
  * in scope, so those warn lines can be joined to the upload that produced a
@@ -57,6 +59,8 @@ export async function autoOrient(
   try {
     meta = await sharp(buffer).metadata();
   } catch (err) {
+    const oom = asDecoderOutOfMemory(err);
+    if (oom instanceof DecoderOutOfMemoryError) throw oom;
     // Callers validate the upload as an image before this runs, so an
     // unreadable header here is either a format only the tool's own decoder
     // handles or a transient failure on a valid file. Passing it through is
@@ -110,6 +114,8 @@ export async function autoOrient(
 
     return await pipeline.toFormat(output.format, encoderOptions).toBuffer();
   } catch (err) {
+    const oom = asDecoderOutOfMemory(err);
+    if (oom instanceof DecoderOutOfMemoryError) throw oom;
     // The tool's own decode of the same buffer is expected to reject it. A warn
     // here with no failed-job line after it points at an encode-side bug.
     log.warn(

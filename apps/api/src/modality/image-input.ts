@@ -230,7 +230,14 @@ export class ImageInputHandler implements InputHandler {
     // the EXIF orientation tag so the worker sees upright pixels.
     if (!isSvg) {
       opts.signal?.throwIfAborted();
-      fileBuffer = await autoOrient(fileBuffer, opts.log);
+      try {
+        fileBuffer = await autoOrient(fileBuffer, opts.log);
+      } catch (err) {
+        opts.signal?.throwIfAborted();
+        const oom = asDecoderOutOfMemory(err);
+        if (oom instanceof DecoderOutOfMemoryError) throw engineUnavailable(oom);
+        throw err;
+      }
       opts.signal?.throwIfAborted();
     }
 

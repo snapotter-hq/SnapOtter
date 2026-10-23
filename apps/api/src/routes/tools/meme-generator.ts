@@ -184,7 +184,11 @@ async function prepareMemeImage(
   if (!isSvg && validation.format === "png" && filename.toLowerCase().endsWith(".apng")) {
     const meta = await sharp(buf)
       .metadata()
-      .catch(() => null);
+      .catch((err: unknown) => {
+        const oom = asDecoderOutOfMemory(err);
+        if (oom instanceof DecoderOutOfMemoryError) throw oom;
+        return null;
+      });
     if (meta?.format === "svg") isSvg = true;
   }
   if (isSvg) {

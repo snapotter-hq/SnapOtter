@@ -1011,4 +1011,92 @@ describe("beautify route and processBeautify validation & backgroundImage prepar
       decompressFaultSpy.mockRestore();
     }
   });
+
+  it("rethrows DecoderOutOfMemoryError when sharp(buf).metadata() rejects on the .apng disguised-SVG check in beautify and meme-generator (#3804)", async () => {
+    const memeConfig = getToolConfig("meme-generator");
+    if (!memeConfig) throw new Error("meme-generator missing from toolRegistry");
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    const origMetadata = sharp.prototype.metadata;
+
+    // 1. processBeautify main .apng upload: 1st metadata() is validateImageBuffer, 2nd is .apng SVG check
+    let callCount = 0;
+    const metaSpy = vi.spyOn(sharp.prototype, "metadata").mockImplementation(async function (
+      this: sharp.Sharp,
+    ) {
+      callCount++;
+      if (callCount === 2) throw v8Oom;
+      return origMetadata.call(this);
+    });
+    try {
+      const mainThrown = await processBeautify(
+        PNG_200,
+        settingsSchema.parse({}),
+        "photo.apng",
+      ).then(
+        () => "resolved",
+        (e: unknown) => e,
+      );
+      expect(mainThrown).toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: v8Oom,
+      });
+
+      // 2. POST /api/v1/tools/image/beautify backgroundImage .apng upload
+      // (call 1: main validateImageBuffer, call 2: main autoOrient metadata, call 3: bg validateImageBuffer, call 4: bg .apng SVG check)
+      callCount = 0;
+      metaSpy.mockImplementation(async function (this: sharp.Sharp) {
+        callCount++;
+        if (callCount === 4) throw v8Oom;
+        return origMetadata.call(this);
+      });
+      const bgThrown = await invokeBeautify({
+        file: { filename: "main.png", content: PNG_200 },
+        backgroundImage: { filename: "bg.apng", content: PNG_200 },
+        settings: { backgroundType: "image", shadowPreset: "none" },
+      }).then(
+        () => "resolved",
+        (e: unknown) => e,
+      );
+      expect(bgThrown).toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: v8Oom,
+      });
+
+      // 3. POST /api/v1/tools/image/meme-generator and registry process .apng upload
+      callCount = 0;
+      metaSpy.mockImplementation(async function (this: sharp.Sharp) {
+        callCount++;
+        if (callCount === 2) throw v8Oom;
+        return origMetadata.call(this);
+      });
+      const memeRouteThrown = await invokeMemeMultipart("photo.apng", PNG_200).then(
+        () => "resolved",
+        (e: unknown) => e,
+      );
+      expect(memeRouteThrown).toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: v8Oom,
+      });
+
+      callCount = 0;
+      const memeRegThrown = await memeConfig.process(PNG_200, {}, "photo.apng").then(
+        () => "resolved",
+        (e: unknown) => e,
+      );
+      expect(memeRegThrown).toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: v8Oom,
+      });
+    } finally {
+      metaSpy.mockRestore();
+    }
+  });
 });
