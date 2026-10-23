@@ -301,9 +301,9 @@ describe("url import: FEATURE_NOT_INSTALLED", () => {
     storageMap.set("snapotter-locale", "de");
     answer = { status: 501, body: FEATURE_NOT_INSTALLED };
     render(<Dropzone onUrlImport={vi.fn()} />, { wrapper: inGerman });
-    await waitFor(() => expect(document.documentElement.lang).toBe("de"));
 
-    fireEvent.change(screen.getByPlaceholderText(de.dropzone.urlPlaceholder), {
+    const input = await screen.findByPlaceholderText(de.dropzone.urlPlaceholder);
+    fireEvent.change(input, {
       target: { value: "https://example.com/a.png" },
     });
     fireEvent.click(screen.getByRole("button", { name: de.dropzone.addUrlButton }));
@@ -336,9 +336,9 @@ describe("url import: FEATURE_NOT_INSTALLED", () => {
       ),
     );
     render(<Dropzone onUrlImport={vi.fn()} />, { wrapper: inGerman });
-    await waitFor(() => expect(document.documentElement.lang).toBe("de"));
 
-    fireEvent.change(screen.getByPlaceholderText(de.dropzone.urlPlaceholder), {
+    const input = await screen.findByPlaceholderText(de.dropzone.urlPlaceholder);
+    fireEvent.change(input, {
       target: { value: "https://example.com/a.png" },
     });
     fireEvent.click(screen.getByRole("button", { name: de.dropzone.addUrlButton }));
