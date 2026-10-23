@@ -107,16 +107,16 @@ export function CollageSettings() {
     let result: CollageResult;
     try {
       const formData = new FormData();
-      for (let i = 0; i < template.cells.length; i++) {
-        const imgIdx = cellAssignments[i] ?? -1;
-        if (imgIdx >= 0 && images[imgIdx]) {
-          formData.append("file", images[imgIdx].file);
-        }
-      }
-
+      let nextFileIndex = 0;
       const cells = template.cells.map((_, i) => {
+        const imgIdx = cellAssignments[i] ?? -1;
+        const img = imgIdx >= 0 ? images[imgIdx] : undefined;
+        const imageIndex = img ? nextFileIndex++ : -1;
+        if (img) {
+          formData.append("file", img.file);
+        }
         const t = cellTransforms[i] ?? { panX: 0, panY: 0, zoom: 1, objectFit: "cover" };
-        return { imageIndex: i, panX: t.panX, panY: t.panY, zoom: t.zoom, objectFit: t.objectFit };
+        return { imageIndex, panX: t.panX, panY: t.panY, zoom: t.zoom, objectFit: t.objectFit };
       });
 
       formData.append(

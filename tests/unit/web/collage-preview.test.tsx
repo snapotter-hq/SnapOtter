@@ -10,6 +10,7 @@ vi.mock("@/lib/image-preview", () => ({
 }));
 
 import { CollagePreview } from "@/components/tools/collage-preview";
+import { CollageSettings } from "@/components/tools/collage-settings";
 import { useCollageStore } from "@/stores/collage-store";
 
 function imageFile(name: string) {
@@ -373,5 +374,51 @@ describe("CollagePreview touch and mouse cell reordering (#2596)", () => {
     // Pressing Escape on the grip button deselects the cell
     fireEvent.keyDown(grip, { key: "Escape", code: "Escape" });
     expect(useCollageStore.getState().selectedCell).toBeNull();
+  });
+
+  it("submits cells with imageIndex -1 for empty slots and sequential upload indices for populated slots (#3796)", () => {
+    const first = imageFile("first.png");
+    const second = imageFile("second.png");
+    useCollageStore.getState().addImages([first, second]);
+    useCollageStore.getState().setTemplateId("3-h-equal");
+    // Initial assignments for 2 images in 3-h-equal: [0, 1, -1].
+    // Swap cell 0 onto empty cell 2 so assignments become [-1, 1, 0].
+    useCollageStore.getState().swapCells(0, 2);
+    useCollageStore
+      .getState()
+      .setCellTransform(2, { zoom: 2, panX: 15, panY: -10, objectFit: "contain" });
+
+    let sentFormData: FormData | null = null;
+    class FakeXhr {
+      upload = { onprogress: null as ((e: ProgressEvent) => void) | null };
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      status = 200;
+      responseText = "";
+      open = vi.fn();
+      setRequestHeader = vi.fn();
+      abort = vi.fn();
+      send = vi.fn((body: FormData) => {
+        sentFormData = body;
+      });
+    }
+    vi.stubGlobal("XMLHttpRequest", FakeXhr);
+
+    render(<CollageSettings />);
+    fireEvent.click(screen.getByTestId("collage-submit"));
+
+    if (!sentFormData) {
+      throw new Error("Expected CollageSettings to send FormData");
+    }
+    const files = (sentFormData as FormData).getAll("file");
+    expect(files).toEqual([second, first]);
+
+    const settings = JSON.parse((sentFormData as FormData).get("settings") as string);
+    expect(settings.templateId).toBe("3-h-equal");
+    expect(settings.cells).toEqual([
+      { imageIndex: -1, panX: 0, panY: 0, zoom: 1, objectFit: "cover" },
+      { imageIndex: 0, panX: 0, panY: 0, zoom: 1, objectFit: "cover" },
+      { imageIndex: 1, panX: 15, panY: -10, zoom: 2, objectFit: "contain" },
+    ]);
   });
 });

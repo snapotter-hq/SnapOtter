@@ -2694,3 +2694,213 @@ describe("Collage pan range and cover cells (#718)", () => {
     expect(corner[2]).toBeGreaterThan(200);
   });
 });
+
+describe("Collage sparse cell assignments and imageIndex mapping (#3796)", () => {
+  const CELL_W = 800;
+  const CELL_H = 1800;
+
+  let greenImg: Buffer;
+  let markerImg: Buffer;
+
+  beforeAll(async () => {
+    greenImg = await sharp({
+      create: { width: 100, height: 100, channels: 3, background: { r: 0, g: 220, b: 0 } },
+    })
+      .png()
+      .toBuffer();
+
+    const raw = Buffer.alloc(200 * 100 * 3);
+    for (let i = 0; i < raw.length; i += 3) raw[i + 2] = 255;
+    for (let y = 45; y < 55; y++) {
+      for (let x = 95; x < 105; x++) {
+        const i = (y * 200 + x) * 3;
+        raw[i] = 255;
+        raw[i + 2] = 0;
+      }
+    }
+    markerImg = await sharp(raw, { raw: { width: 200, height: 100, channels: 3 } })
+      .png()
+      .toBuffer();
+  });
+
+  async function extractCell(output: Buffer, cellIndex: number) {
+    const data = await sharp(output)
+      .extract({ left: cellIndex * CELL_W, top: 0, width: CELL_W, height: CELL_H })
+      .ensureAlpha()
+      .raw()
+      .toBuffer();
+    const at = (x: number, y: number) => [
+      data[(y * CELL_W + x) * 4],
+      data[(y * CELL_W + x) * 4 + 1],
+      data[(y * CELL_W + x) * 4 + 2],
+      data[(y * CELL_W + x) * 4 + 3],
+    ];
+    return { data, at };
+  }
+
+  function redCentroid(data: Buffer) {
+    let count = 0;
+    let sumX = 0;
+    for (let y = 0; y < CELL_H; y++) {
+      for (let x = 0; x < CELL_W; x++) {
+        const i = (y * CELL_W + x) * 4;
+        if (data[i] > 200 && data[i + 1] < 60 && data[i + 2] < 60) {
+          count++;
+          sumX += x;
+        }
+      }
+    }
+    return { count, centroidX: count ? sumX / count : Number.NaN };
+  }
+
+  it("places populated cells at their template slots with matching transforms when an empty cell precedes them", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "green.png", contentType: "image/png", content: greenImg },
+      { name: "file", filename: "marker.png", contentType: "image/png", content: markerImg },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          templateId: "3-h-equal",
+          gap: 0,
+          backgroundColor: "#FFFFFF",
+          cells: [
+            { imageIndex: -1, panX: 0, panY: 0, zoom: 1, objectFit: "cover" },
+            { imageIndex: 0, panX: 0, panY: 0, zoom: 1, objectFit: "cover" },
+            { imageIndex: 1, panX: 25, panY: 0, zoom: 2, objectFit: "contain" },
+          ],
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/collage",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+    expect(res.statusCode).toBe(200);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: JSON.parse(res.body).downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const output = dlRes.rawPayload;
+
+    // Cell 0 (empty, imageIndex -1): stays blank white background
+    const cell0 = await extractCell(output, 0);
+    expect(cell0.at(400, 900)).toEqual([255, 255, 255, 255]);
+
+    // Cell 1 (imageIndex 0 -> greenImg): solid green
+    const cell1 = await extractCell(output, 1);
+    const px1 = cell1.at(400, 900);
+    expect(px1[0]).toBeLessThan(30);
+    expect(px1[1]).toBeGreaterThan(200);
+    expect(px1[2]).toBeLessThan(30);
+
+    // Cell 2 (imageIndex 1 -> markerImg with zoom 2 and panX 25 in an 800x1800 cell):
+    // panX 25 shifts the red centre by 25% of 800 = 200px right, from x=400 to x=600.
+    const cell2 = await extractCell(output, 2);
+    const stats2 = redCentroid(cell2.data);
+    expect(stats2.count).toBeGreaterThan(2000);
+    expect(Math.abs(stats2.centroidX - 600)).toBeLessThan(15);
+  });
+
+  it("honors non-sequential imageIndex mappings and skips out-of-range indices", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "green.png", contentType: "image/png", content: greenImg },
+      { name: "file", filename: "marker.png", contentType: "image/png", content: markerImg },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          templateId: "3-h-equal",
+          gap: 0,
+          backgroundColor: "#FFFFFF",
+          cells: [
+            { imageIndex: 1, panX: 0, panY: 0, zoom: 1, objectFit: "contain" },
+            { imageIndex: 2, panX: 0, panY: 0, zoom: 1, objectFit: "cover" },
+            { imageIndex: 0, panX: 0, panY: 0, zoom: 1, objectFit: "cover" },
+          ],
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/collage",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+    expect(res.statusCode).toBe(200);
+
+    const dlRes = await app.inject({
+      method: "GET",
+      url: JSON.parse(res.body).downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    const output = dlRes.rawPayload;
+
+    // Cell 0 gets files[1] (markerImg, centered at x=400)
+    const cell0 = await extractCell(output, 0);
+    const stats0 = redCentroid(cell0.data);
+    expect(stats0.count).toBeGreaterThan(500);
+    expect(Math.abs(stats0.centroidX - 400)).toBeLessThan(15);
+
+    // Cell 1 has out-of-range imageIndex 2 (only 2 files uploaded): stays blank white
+    const cell1 = await extractCell(output, 1);
+    expect(cell1.at(400, 900)).toEqual([255, 255, 255, 255]);
+
+    // Cell 2 gets files[0] (greenImg)
+    const cell2 = await extractCell(output, 2);
+    const px2 = cell2.at(400, 900);
+    expect(px2[0]).toBeLessThan(30);
+    expect(px2[1]).toBeGreaterThan(200);
+    expect(px2[2]).toBeLessThan(30);
+  });
+
+  it("rejects imageIndex below -1", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "green.png", contentType: "image/png", content: greenImg },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          templateId: "2-h-equal",
+          cells: [{ imageIndex: -2, panX: 0, panY: 0, zoom: 1, objectFit: "cover" }],
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/collage",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("rejects requests where every cell resolves to no image", async () => {
+    const { body, contentType } = createMultipartPayload([
+      { name: "file", filename: "green.png", contentType: "image/png", content: greenImg },
+      {
+        name: "settings",
+        content: JSON.stringify({
+          templateId: "2-h-equal",
+          cells: [
+            { imageIndex: -1, panX: 0, panY: 0, zoom: 1, objectFit: "cover" },
+            { imageIndex: -1, panX: 0, panY: 0, zoom: 1, objectFit: "cover" },
+          ],
+        }),
+      },
+    ]);
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/collage",
+      headers: { authorization: `Bearer ${adminToken}`, "content-type": contentType },
+      body,
+    });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/at least one cell/i);
+  });
+});

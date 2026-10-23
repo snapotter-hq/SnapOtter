@@ -331,7 +331,7 @@ const TEMPLATES: Template[] = [
 // ── Zod schema ──────────────��───────────────────────────────────────
 
 const cellSchema = z.object({
-  imageIndex: z.number().int().min(0),
+  imageIndex: z.number().int().min(-1),
   // COLLAGE_PAN_LIMIT mirrors the preview's drag clamp (collage-preview.tsx),
   // shared so the two can't drift; anything narrower turns a draggable position
   // into a 400 at submit time (#718). In cover mode the extract saturates at the
@@ -602,11 +602,20 @@ export function registerCollage(app: FastifyInstance) {
       const composites: OverlayOptions[] = [];
       const cellSettings = settings.cells ?? [];
 
-      for (let i = 0; i < cellRects.length && i < files.length; i++) {
+      for (let i = 0; i < cellRects.length; i++) {
+        const cellSetting = cellSettings[i] ?? {
+          imageIndex: i,
+          panX: 0,
+          panY: 0,
+          zoom: 1,
+          objectFit: "cover",
+        };
+        const file = cellSetting.imageIndex >= 0 ? files[cellSetting.imageIndex] : undefined;
+        if (!file) continue;
+
         const rect = cellRects[i];
         const cellW = Math.max(1, Math.round(rect.w));
         const cellH = Math.max(1, Math.round(rect.h));
-        const cellSetting = cellSettings[i] ?? { panX: 0, panY: 0, zoom: 1, objectFit: "cover" };
 
         const zoom = Math.max(1, cellSetting.zoom);
         const fitMode = cellSetting.objectFit ?? "cover";
@@ -615,12 +624,12 @@ export function registerCollage(app: FastifyInstance) {
 
         try {
           // Get image metadata for proper crop calculation
-          const meta = await sharp(files[i].buffer).metadata();
+          const meta = await sharp(file.buffer).metadata();
           if (!meta.width || !meta.height) {
             // Falling back to the cell's own size would fill-stretch the image
             // to the cell aspect: silent distortion instead of an error (#718).
             throw new InputValidationError(
-              `Could not read image dimensions for "${files[i].filename}"`,
+              `Could not read image dimensions for "${file.filename}"`,
             );
           }
           const imgW = meta.width;
@@ -650,7 +659,7 @@ export function registerCollage(app: FastifyInstance) {
             if (zoom === 1 && panXPx === 0 && panYPx === 0) {
               // PNG, not the input format: a JPEG cell buffer cannot carry the
               // alpha the cornerRadius mask cuts, so corners flatten to black.
-              cellBuffer = await sharp(files[i].buffer)
+              cellBuffer = await sharp(file.buffer)
                 .resize(cellW, cellH, { fit: "contain", background: bgColor })
                 .png()
                 .toBuffer();
@@ -684,7 +693,7 @@ export function registerCollage(app: FastifyInstance) {
               } else {
                 // PNG, so the cell is not re-encoded in its own input's container
                 // on the way to the canvas (#1190).
-                const visible = await sharp(files[i].buffer)
+                const visible = await sharp(file.buffer)
                   .resize(contentW, contentH, { fit: "fill" })
                   .extract({
                     left: visLeft - x0,
@@ -717,7 +726,7 @@ export function registerCollage(app: FastifyInstance) {
 
             // PNG, not the input format: a JPEG cell buffer cannot carry the
             // alpha the cornerRadius mask cuts, so corners flatten to black.
-            cellBuffer = await sharp(files[i].buffer)
+            cellBuffer = await sharp(file.buffer)
               .resize(resizedW, resizedH, { fit: "fill" })
               .extract({
                 left: Math.max(0, Math.min(extractLeft, resizedW - cellW)),
@@ -729,7 +738,7 @@ export function registerCollage(app: FastifyInstance) {
               .toBuffer();
           }
         } catch (err) {
-          throw await asInputErrorIfUndecodable(files[i].buffer, err);
+          throw await asInputErrorIfUndecodable(file.buffer, err);
         }
 
         // Apply corner radius via SVG mask if needed
@@ -756,6 +765,12 @@ export function registerCollage(app: FastifyInstance) {
           top: Math.round(rect.y),
           left: Math.round(rect.x),
         });
+      }
+
+      if (composites.length === 0) {
+        return reply
+          .status(400)
+          .send({ error: "At least one cell must reference a provided image" });
       }
 
       // Create canvas and composite
