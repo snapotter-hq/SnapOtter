@@ -465,6 +465,182 @@ print("RED_EYE_3640_OK")
         expect(res.status, res.stderr).toBe(0);
         expect(res.stdout).toContain("RED_EYE_3640_OK");
       });
+
+      it("scopes except AttributeError in _detect_face_mesh to mp.solutions.face_mesh lookup (issue #3652)", () => {
+        const res = spawnSync(
+          pythonBin as string,
+          [
+            "-c",
+            `
+import contextlib, importlib.util, io, json, os, sys, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+os.environ["SNAPOTTER_ALLOW_MODEL_DOWNLOAD"] = "0"
+os.environ["MODELS_PATH"] = "/tmp/nonexistent-models-3652"
+
+class FakeArr:
+    shape = (64, 64, 3)
+
+spec = importlib.util.spec_from_file_location("red_eye_removal_mod_3652", os.path.join(py_dir, "red_eye_removal.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+mod._DOCKER_MODEL_PATH = "/tmp/nonexistent-docker-3652.task"
+mod._LOCAL_MODEL_PATH = "/tmp/nonexistent-local-3652.task"
+
+ensure_model_calls = []
+orig_ensure_model = mod._ensure_face_mesh_model
+def tracked_ensure_model():
+    ensure_model_calls.append(True)
+    return orig_ensure_model()
+mod._ensure_face_mesh_model = tracked_ensure_model
+
+# 1. AttributeError inside FaceMesh() init or mesh.process() when mp.solutions.face_mesh exists must propagate directly
+class InitAttrErrorMesh:
+    def __init__(self, **_kwargs):
+        raise AttributeError("unexpected NoneType attribute in init")
+
+class ProcessAttrErrorMesh:
+    def __init__(self, **_kwargs):
+        pass
+    def process(self, _img):
+        raise AttributeError("unexpected NoneType attribute in process")
+    def close(self):
+        pass
+
+fake_mp = types.ModuleType("mediapipe")
+fake_mp.solutions = types.SimpleNamespace(
+    face_mesh=types.SimpleNamespace(FaceMesh=InitAttrErrorMesh)
+)
+sys.modules["mediapipe"] = fake_mp
+
+for mesh_cls, expected_msg in (
+    (InitAttrErrorMesh, "unexpected NoneType attribute in init"),
+    (ProcessAttrErrorMesh, "unexpected NoneType attribute in process"),
+):
+    fake_mp.solutions.face_mesh.FaceMesh = mesh_cls
+    try:
+        mod._detect_face_mesh(FakeArr(), 25, 0.6)
+    except AttributeError as exc:
+        assert str(exc) == expected_msg, exc
+        assert ensure_model_calls == [], f"_ensure_face_mesh_model must not be called: {ensure_model_calls}"
+    else:
+        raise AssertionError(f"Expected AttributeError from {mesh_cls.__name__} to propagate")
+
+# 1b. Through main(), AttributeError in mesh.process() reports the AttributeError, not the offline model download error
+fake_pil = types.ModuleType("PIL")
+fake_pil.Image = types.SimpleNamespace(
+    open=lambda _p: types.SimpleNamespace(convert=lambda _m: types.SimpleNamespace(size=(64, 64), save=lambda *_a, **_k: None)),
+    fromarray=lambda _a: types.SimpleNamespace(size=(64, 64), save=lambda *_a, **_k: None),
+)
+sys.modules["PIL"] = fake_pil
+fake_np = types.ModuleType("numpy")
+fake_np.array = lambda _img: FakeArr()
+sys.modules["numpy"] = fake_np
+fake_cv2 = types.ModuleType("cv2")
+sys.modules["cv2"] = fake_cv2
+
+sys.argv = ["red_eye_removal.py", "/tmp/in.png", "/tmp/out.png", "{}"]
+out_buf, err_buf = io.StringIO(), io.StringIO()
+try:
+    with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+        mod.main()
+except SystemExit as exc:
+    assert exc.code == 1, exc.code
+    payload = json.loads(out_buf.getvalue().strip())
+    assert payload == {"success": False, "error": "unexpected NoneType attribute in process"}, payload
+    assert ensure_model_calls == [], ensure_model_calls
+else:
+    raise AssertionError("Expected SystemExit(1) from main()")
+
+# 2. AttributeError during landmark list comprehension in _mesh_with_solutions must propagate directly
+class BadFaceLandmarkMesh:
+    def __init__(self, **_kwargs):
+        pass
+    def process(self, _img):
+        return types.SimpleNamespace(multi_face_landmarks=[None])
+    def close(self):
+        pass
+
+fake_mp.solutions.face_mesh.FaceMesh = BadFaceLandmarkMesh
+try:
+    mod._detect_face_mesh(FakeArr())
+except AttributeError as exc:
+    assert "landmark" in str(exc), exc
+    assert ensure_model_calls == [], ensure_model_calls
+else:
+    raise AssertionError("Expected AttributeError from face.landmark extraction to propagate")
+
+# 3. Positive mp.solutions paths (no face found and face found) return landmarks without touching _mesh_with_tasks
+class EmptySolutionsMesh:
+    def __init__(self, **_kwargs):
+        pass
+    def process(self, _img):
+        return types.SimpleNamespace(multi_face_landmarks=None)
+    def close(self):
+        pass
+
+fake_mp.solutions.face_mesh.FaceMesh = EmptySolutionsMesh
+assert mod._detect_face_mesh(FakeArr()) == []
+assert ensure_model_calls == [], ensure_model_calls
+
+class OkSolutionsMesh:
+    def __init__(self, max_num_faces=50, min_detection_confidence=0.5, **_kwargs):
+        self.max_num_faces = max_num_faces
+        self.min_detection_confidence = min_detection_confidence
+    def process(self, _img):
+        pts = [types.SimpleNamespace(x=0.5, y=0.5, max_f=self.max_num_faces, min_c=self.min_detection_confidence)]
+        return types.SimpleNamespace(multi_face_landmarks=[types.SimpleNamespace(landmark=pts)])
+    def close(self):
+        pass
+
+fake_mp.solutions.face_mesh.FaceMesh = OkSolutionsMesh
+sol_res = mod._detect_face_mesh(FakeArr(), max_faces=12, min_confidence=0.75)
+assert len(sol_res) == 1 and sol_res[0][0].max_f == 12 and sol_res[0][0].min_c == 0.75, sol_res
+assert ensure_model_calls == [], ensure_model_calls
+
+# 4. When mp.solutions is missing (or face_mesh is missing/None), falls back to _mesh_with_tasks
+mod._ensure_face_mesh_model = lambda: "/tmp/fake-landmarker-3652.task"
+tasks_calls = []
+class FakeLandmarker:
+    def __init__(self, opts):
+        self.opts = opts
+    def detect(self, _mp_image):
+        tasks_calls.append(self.opts)
+        pts = [types.SimpleNamespace(x=0.25, y=0.75)]
+        return types.SimpleNamespace(face_landmarks=[pts])
+    def close(self):
+        pass
+
+for missing_solutions in ("no_attr", None, types.SimpleNamespace(), types.SimpleNamespace(face_mesh=None)):
+    tasks_calls.clear()
+    mp_tasks_mod = types.ModuleType("mediapipe")
+    if missing_solutions != "no_attr":
+        mp_tasks_mod.solutions = missing_solutions
+    mp_tasks_mod.ImageFormat = types.SimpleNamespace(SRGB=1)
+    mp_tasks_mod.Image = lambda image_format, data: data
+    mp_tasks_mod.tasks = types.SimpleNamespace(
+        BaseOptions=lambda model_asset_path: model_asset_path,
+        vision=types.SimpleNamespace(
+            RunningMode=types.SimpleNamespace(IMAGE=1),
+            FaceLandmarkerOptions=lambda **kw: kw,
+            FaceLandmarker=types.SimpleNamespace(create_from_options=lambda opts: FakeLandmarker(opts)),
+        ),
+    )
+    sys.modules["mediapipe"] = mp_tasks_mod
+    tasks_res = mod._detect_face_mesh(FakeArr(), max_faces=10, min_confidence=0.4)
+    assert len(tasks_res) == 1 and tasks_res[0][0].x == 0.25, (missing_solutions, tasks_res)
+    assert len(tasks_calls) == 1, (missing_solutions, tasks_calls)
+    assert tasks_calls[0]["num_faces"] == 10 and tasks_calls[0]["min_face_detection_confidence"] == 0.4, tasks_calls
+
+print("RED_EYE_3652_OK")
+`,
+          ],
+          { encoding: "utf8", timeout: 30_000 },
+        );
+        expect(res.status, res.stderr).toBe(0);
+        expect(res.stdout).toContain("RED_EYE_3652_OK");
+      });
     },
   );
 });

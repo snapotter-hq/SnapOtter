@@ -83,10 +83,16 @@ def _mesh_with_tasks(img_array, max_faces=50, min_confidence=0.5):
 
 def _detect_face_mesh(img_array, max_faces=50, min_confidence=0.5):
     """Detect face mesh, trying legacy API first then falling back to tasks API."""
+    import mediapipe as mp
+
     try:
-        return _mesh_with_solutions(img_array, max_faces, min_confidence)
+        mp_face_mesh = mp.solutions.face_mesh
     except AttributeError:
-        return _mesh_with_tasks(img_array, max_faces, min_confidence)
+        mp_face_mesh = None
+
+    if mp_face_mesh is not None:
+        return _mesh_with_solutions(img_array, max_faces, min_confidence)
+    return _mesh_with_tasks(img_array, max_faces, min_confidence)
 
 
 def main():
