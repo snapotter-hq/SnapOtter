@@ -31,13 +31,18 @@ const mocks = vi.hoisted(() => ({
   decodeToSharpCompat:
     vi.fn<(_buf: Buffer, _format: string, _ext?: string, _options?: unknown) => Promise<Buffer>>(),
   decodeHeic: vi.fn<(_buf: Buffer, _options?: unknown) => Promise<Buffer>>(),
+  dbInsertValues: vi.fn<(_values: unknown) => Promise<void>>(() => Promise.resolve()),
+  dbDeleteWhere: vi.fn<(_where: unknown) => Promise<void>>(() => Promise.resolve()),
 }));
 
 vi.mock("../../../apps/api/src/db/index.js", () => ({
-  db: {},
+  db: {
+    insert: () => ({ values: (v: unknown) => mocks.dbInsertValues(v) }),
+    delete: () => ({ where: (w: unknown) => mocks.dbDeleteWhere(w) }),
+  },
   pool: {},
   closeDb: async () => {},
-  schema: {},
+  schema: { jobs: { id: "jobs.id" } },
 }));
 
 vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
@@ -837,6 +842,8 @@ describe("files route logic", () => {
       vi.clearAllMocks();
       mocks.deletePrefix.mockResolvedValue(undefined);
       mocks.putObject.mockResolvedValue(undefined);
+      mocks.dbInsertValues.mockResolvedValue(undefined);
+      mocks.dbDeleteWhere.mockResolvedValue(undefined);
       mocks.requireFileAccess.mockResolvedValue({ id: "user-1", role: "admin" });
       const { sanitizeSvg: realSanitizeSvg } = await vi.importActual<
         typeof import("../../../apps/api/src/lib/svg-sanitize.js")
@@ -1010,11 +1017,13 @@ describe("files route logic", () => {
       const reply = makeReply();
 
       await expect(uploadHandler(req, reply)).rejects.toBe(storageFault);
+      expect(mocks.dbInsertValues).toHaveBeenCalledTimes(1);
       expect(mocks.putObject).toHaveBeenCalledTimes(1);
       const writtenKey = (mocks.putObject.mock.calls[0] as unknown[])[0] as string;
       const prefix = writtenKey.replace(/first\.txt$/, "");
       expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
       expect(mocks.deletePrefix).toHaveBeenCalledWith(prefix);
+      expect(mocks.dbDeleteWhere).toHaveBeenCalledTimes(1);
     });
 
     it("does not mask a rethrown stream or storage error when deletePrefix fails in the outer catch", async () => {
@@ -1031,6 +1040,7 @@ describe("files route logic", () => {
       const reply = makeReply();
 
       await expect(uploadHandler(req, reply)).rejects.toBe(tooLarge);
+      expect(mocks.dbDeleteWhere).not.toHaveBeenCalled();
       expect(log.warn).toHaveBeenCalledWith(
         expect.objectContaining({ err: expect.any(Error), jobId: expect.any(String) }),
         "failed to discard a rejected request's uploads",
@@ -1083,8 +1093,10 @@ describe("files route logic", () => {
       await uploadHandler(req, reply);
 
       expect(reply.statusCode).toBe(400);
+      expect(mocks.dbInsertValues).not.toHaveBeenCalled();
       expect(mocks.putObject).not.toHaveBeenCalled();
       expect(mocks.deletePrefix).not.toHaveBeenCalled();
+      expect(mocks.dbDeleteWhere).not.toHaveBeenCalled();
     });
 
     it("keeps uploaded files when all parts succeed", async () => {
@@ -1282,6 +1294,127 @@ describe("files route logic", () => {
       expect(secondStored.equals(compressedSvg)).toBe(true);
       const thirdStored = (mocks.putObject.mock.calls[2] as unknown as [string, Buffer])[1];
       expect(thirdStored.equals(nonSvgGzip)).toBe(true);
+    });
+
+    it("records a completed upload jobs row once before the first putObject so S3 TTL sweep expires the prefix (#3624)", async () => {
+      const req = makeRequest([
+        filePart("first.txt", Buffer.from("hello")),
+        filePart("second.txt", Buffer.from("world")),
+      ]);
+      const reply = makeReply();
+
+      await uploadHandler(req, reply);
+
+      expect(reply.statusCode).toBe(200);
+      const { jobId } = reply.payload as { jobId: string };
+      expect(mocks.dbInsertValues).toHaveBeenCalledTimes(1);
+      expect(mocks.dbInsertValues).toHaveBeenCalledWith({
+        id: jobId,
+        userId: "user-1",
+        toolId: "upload",
+        type: "single",
+        status: "completed",
+        inputRefs: [],
+        outputRefs: [`uploads/${jobId}/first.txt`],
+        completedAt: expect.any(Date),
+      });
+      expect(mocks.dbInsertValues.mock.invocationCallOrder[0]).toBeLessThan(
+        mocks.putObject.mock.invocationCallOrder[0] ?? 0,
+      );
+      expect(mocks.dbDeleteWhere).not.toHaveBeenCalled();
+    });
+
+    it("deletes the recorded jobs row in discardUploads when a later part fails, and keeps the row when deletePrefix fails (#3624)", async () => {
+      const clientErr = Object.assign(new Error("SVG exceeds maximum element count (5000)"), {
+        statusCode: 400,
+      });
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw clientErr;
+      });
+      const req1 = makeRequest([
+        filePart("first.txt", Buffer.from("hello")),
+        filePart(
+          "second.svg",
+          Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'),
+        ),
+      ]);
+      const reply1 = makeReply();
+
+      await uploadHandler(req1, reply1);
+
+      expect(reply1.statusCode).toBe(400);
+      expect(mocks.dbInsertValues).toHaveBeenCalledTimes(1);
+      expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
+      expect(mocks.dbDeleteWhere).toHaveBeenCalledTimes(1);
+
+      // When deletePrefix fails, keep the jobs row so the S3 TTL sweep can expire the prefix later
+      vi.clearAllMocks();
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw clientErr;
+      });
+      mocks.deletePrefix.mockRejectedValueOnce(new Error("S3 cleanup fault"));
+      const log2 = { warn: vi.fn(), error: vi.fn() };
+      const req2 = makeRequest(
+        [
+          filePart("first.txt", Buffer.from("hello")),
+          filePart(
+            "second.svg",
+            Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'),
+          ),
+        ],
+        log2,
+      );
+      const reply2 = makeReply();
+
+      await uploadHandler(req2, reply2);
+
+      expect(reply2.statusCode).toBe(400);
+      expect(mocks.dbInsertValues).toHaveBeenCalledTimes(1);
+      expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
+      expect(mocks.dbDeleteWhere).not.toHaveBeenCalled();
+
+      // When db.delete fails during discardUploads, log a warning without masking the original error
+      vi.clearAllMocks();
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw clientErr;
+      });
+      mocks.dbDeleteWhere.mockRejectedValueOnce(new Error("DB delete fault"));
+      const log3 = { warn: vi.fn(), error: vi.fn() };
+      const req3 = makeRequest(
+        [
+          filePart("first.txt", Buffer.from("hello")),
+          filePart(
+            "second.svg",
+            Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'),
+          ),
+        ],
+        log3,
+      );
+      const reply3 = makeReply();
+
+      await uploadHandler(req3, reply3);
+
+      expect(reply3.statusCode).toBe(400);
+      expect(log3.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ err: expect.any(Error), jobId: expect.any(String) }),
+        "failed to delete a rejected request's job row",
+      );
+    });
+
+    it("rethrows a 500 error and writes nothing to storage when recording the upload jobs row fails (#3624)", async () => {
+      mocks.dbInsertValues.mockRejectedValueOnce(
+        new Error('Failed query: insert into "jobs" params: secret'),
+      );
+      const req = makeRequest([filePart("first.txt", Buffer.from("hello"))]);
+      const reply = makeReply();
+
+      await expect(uploadHandler(req, reply)).rejects.toMatchObject({
+        message: "Failed to record the job",
+        statusCode: 500,
+      });
+      expect(mocks.putObject).not.toHaveBeenCalled();
+      expect(mocks.deletePrefix).not.toHaveBeenCalled();
+      expect(mocks.dbDeleteWhere).not.toHaveBeenCalled();
     });
   });
 

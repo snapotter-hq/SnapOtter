@@ -9,20 +9,28 @@ import { gzipSync } from "node:zlib";
 import Fastify, { type FastifyRequest } from "fastify";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../apps/api/src/db/index.js", () => ({
-  db: {},
-  pool: {},
-  closeDb: async () => {},
-  schema: {},
-}));
-
+const dbInsertValuesMock = vi.hoisted(() => vi.fn(async (_values: unknown) => {}));
+const dbDeleteWhereMock = vi.hoisted(() => vi.fn(async (_where: unknown) => {}));
+const deletePrefixMock = vi.hoisted(() => vi.fn(async (_prefix: string) => {}));
 const putObjectMock = vi.hoisted(() => vi.fn(async () => {}));
 const reportErrorMock = vi.hoisted(() => vi.fn(async () => {}));
+
+vi.mock("../../../apps/api/src/db/index.js", () => ({
+  db: {
+    insert: () => ({ values: (v: unknown) => dbInsertValuesMock(v) }),
+    delete: () => ({ where: (w: unknown) => dbDeleteWhereMock(w) }),
+  },
+  pool: {},
+  closeDb: async () => {},
+  schema: { jobs: { id: "jobs.id" } },
+}));
+
 vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("../../../apps/api/src/lib/object-storage.js")>();
   return {
     ...actual,
+    deletePrefix: deletePrefixMock,
     putObject: putObjectMock,
   };
 });
@@ -1164,6 +1172,277 @@ describe("registerFetchUrlsRoute nameOnly image validations (#3263)", () => {
         expect.stringContaining("does not contain SVG"),
       );
     } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("records a completed fetch-urls jobs row once before the first putObject and skips inserting when all URLs fail (#3624)", async () => {
+    const handler = await getFetchUrlsHandler();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string | URL | Request) => {
+        const href = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+        if (href.endsWith("/missing.txt")) {
+          return new Response("Not Found", { status: 404 });
+        }
+        return new Response("hello", {
+          status: 200,
+          headers: { "Content-Type": "text/plain" },
+        });
+      }),
+    );
+
+    try {
+      dbInsertValuesMock.mockClear();
+      dbDeleteWhereMock.mockClear();
+      putObjectMock.mockClear();
+
+      // 1. Multiple successful URLs record a single completed row before the first putObject
+      const reply1 = makeReply();
+      await handler(
+        {
+          user: { id: "user-fetch-1", role: "user" },
+          body: {
+            urls: ["http://1.2.3.4:9999/one.txt", "http://1.2.3.4:9999/two.txt"],
+          },
+          log: { warn: vi.fn() },
+        },
+        reply1,
+      );
+
+      expect(reply1.statusCode).toBe(200);
+      expect(putObjectMock).toHaveBeenCalledTimes(2);
+      expect(dbInsertValuesMock).toHaveBeenCalledTimes(1);
+      const firstKey = (putObjectMock.mock.calls[0] as unknown[])[0] as string;
+      const jobId = firstKey.split("/")[1];
+      expect(dbInsertValuesMock).toHaveBeenCalledWith({
+        id: jobId,
+        userId: "user-fetch-1",
+        toolId: "fetch-urls",
+        type: "single",
+        status: "completed",
+        inputRefs: [],
+        outputRefs: [firstKey],
+        completedAt: expect.any(Date),
+      });
+      expect(dbInsertValuesMock.mock.invocationCallOrder[0]).toBeLessThan(
+        putObjectMock.mock.invocationCallOrder[0] ?? 0,
+      );
+      expect(dbDeleteWhereMock).not.toHaveBeenCalled();
+
+      // 2. When all URLs fail before putObject, no jobs row is inserted
+      dbInsertValuesMock.mockClear();
+      putObjectMock.mockClear();
+      const reply2 = makeReply();
+      await handler(
+        {
+          user: { id: "user-fetch-1", role: "user" },
+          body: { urls: ["http://1.2.3.4:9999/missing.txt"] },
+          log: { warn: vi.fn() },
+        },
+        reply2,
+      );
+      expect(reply2.statusCode).toBe(200);
+      expect(putObjectMock).not.toHaveBeenCalled();
+      expect(dbInsertValuesMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("answers 500 without leaking SQL and writes nothing when recording the fetch-urls jobs row fails (#3624)", async () => {
+    const app = Fastify();
+    registerErrorHandler(app);
+    await registerFetchUrlsRoute(app);
+    await app.ready();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>', {
+            status: 200,
+            headers: { "Content-Type": "image/svg+xml" },
+          }),
+      ),
+    );
+
+    try {
+      putObjectMock.mockClear();
+      dbInsertValuesMock.mockReset();
+      dbInsertValuesMock.mockRejectedValueOnce(
+        new Error('Failed query: insert into "jobs" params: secret'),
+      );
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/fetch-urls",
+        payload: { urls: ["http://1.2.3.4:9999/icon.svg"] },
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(res.body).not.toMatch(/insert into|secret/);
+      expect(putObjectMock).not.toHaveBeenCalled();
+    } finally {
+      dbInsertValuesMock.mockReset();
+      dbInsertValuesMock.mockResolvedValue(undefined);
+      await app.close();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("discards uploaded objects and deletes the jobs row when putObject fails with 5xx, keeping the row if deletePrefix fails (#3624)", async () => {
+    const handler = await getFetchUrlsHandler();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response("hello", {
+            status: 200,
+            headers: { "Content-Type": "text/plain" },
+          }),
+      ),
+    );
+
+    const storageFault = Object.assign(new Error("The server's storage is full."), {
+      statusCode: 503,
+    });
+
+    try {
+      dbInsertValuesMock.mockClear();
+      dbDeleteWhereMock.mockClear();
+      deletePrefixMock.mockClear();
+      putObjectMock.mockReset();
+      putObjectMock.mockRejectedValueOnce(storageFault);
+
+      await expect(
+        handler(
+          {
+            body: { urls: ["http://1.2.3.4:9999/one.txt"] },
+            log: { warn: vi.fn() },
+          },
+          makeReply(),
+        ),
+      ).rejects.toBe(storageFault);
+      expect(dbInsertValuesMock).toHaveBeenCalledTimes(1);
+      expect(deletePrefixMock).toHaveBeenCalledTimes(1);
+      expect(dbDeleteWhereMock).toHaveBeenCalledTimes(1);
+
+      // When deletePrefix fails during cleanup, keep the jobs row so S3 TTL sweep can expire the prefix later
+      dbInsertValuesMock.mockClear();
+      dbDeleteWhereMock.mockClear();
+      deletePrefixMock.mockReset();
+      deletePrefixMock.mockRejectedValueOnce(new Error("S3 cleanup fault"));
+      putObjectMock.mockReset();
+      putObjectMock.mockRejectedValueOnce(storageFault);
+      const warnMock = vi.fn();
+
+      await expect(
+        handler(
+          {
+            body: { urls: ["http://1.2.3.4:9999/one.txt"] },
+            log: { warn: warnMock },
+          },
+          makeReply(),
+        ),
+      ).rejects.toBe(storageFault);
+      expect(dbInsertValuesMock).toHaveBeenCalledTimes(1);
+      expect(deletePrefixMock).toHaveBeenCalledTimes(1);
+      expect(dbDeleteWhereMock).not.toHaveBeenCalled();
+      expect(warnMock).toHaveBeenCalledWith(
+        expect.objectContaining({ err: expect.any(Error), jobId: expect.any(String) }),
+        "failed to discard a rejected request's uploads",
+      );
+
+      // When db.delete fails during cleanup, log a warning without masking the original error
+      dbInsertValuesMock.mockClear();
+      dbDeleteWhereMock.mockReset();
+      dbDeleteWhereMock.mockRejectedValueOnce(new Error("DB delete fault"));
+      deletePrefixMock.mockReset();
+      deletePrefixMock.mockResolvedValue(undefined);
+      putObjectMock.mockReset();
+      putObjectMock.mockRejectedValueOnce(storageFault);
+      const warnDeleteMock = vi.fn();
+
+      await expect(
+        handler(
+          {
+            body: { urls: ["http://1.2.3.4:9999/one.txt"] },
+            log: { warn: warnDeleteMock },
+          },
+          makeReply(),
+        ),
+      ).rejects.toBe(storageFault);
+      expect(warnDeleteMock).toHaveBeenCalledWith(
+        expect.objectContaining({ err: expect.any(Error), jobId: expect.any(String) }),
+        "failed to delete a rejected request's job row",
+      );
+
+      // Multi-URL abort + queue.onIdle() drain: when a sibling URL's putObject
+      // fails with 503 while another URL is still mid-fetch, the aborted sibling
+      // skips writing and cleanup runs only after all in-flight tasks settle.
+      dbInsertValuesMock.mockClear();
+      dbDeleteWhereMock.mockReset();
+      dbDeleteWhereMock.mockResolvedValue(undefined);
+      deletePrefixMock.mockReset();
+      deletePrefixMock.mockResolvedValue(undefined);
+      putObjectMock.mockReset();
+
+      let releaseSlowUrl!: () => void;
+      const slowUrlGate = new Promise<void>((resolve) => {
+        releaseSlowUrl = resolve;
+      });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string | URL | Request) => {
+          const href = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+          if (href.endsWith("/slow.txt")) {
+            await slowUrlGate;
+          }
+          return new Response("hello", {
+            status: 200,
+            headers: { "Content-Type": "text/plain" },
+          });
+        }),
+      );
+
+      putObjectMock
+        .mockImplementationOnce(async () => {})
+        .mockImplementationOnce(async () => {
+          setTimeout(() => releaseSlowUrl(), 5);
+          throw storageFault;
+        });
+
+      await expect(
+        handler(
+          {
+            body: {
+              urls: [
+                "http://1.2.3.4:9999/one.txt",
+                "http://1.2.3.4:9999/two.txt",
+                "http://1.2.3.4:9999/slow.txt",
+              ],
+            },
+            log: { warn: vi.fn() },
+          },
+          makeReply(),
+        ),
+      ).rejects.toBe(storageFault);
+
+      // Only one.txt and two.txt reached putObject; slow.txt saw hooks.isAborted() after unblocking
+      expect(putObjectMock).toHaveBeenCalledTimes(2);
+      expect(deletePrefixMock).toHaveBeenCalledTimes(1);
+      expect(dbDeleteWhereMock).toHaveBeenCalledTimes(1);
+      expect(deletePrefixMock.mock.invocationCallOrder[0]).toBeGreaterThan(
+        putObjectMock.mock.invocationCallOrder[1] ?? 0,
+      );
+    } finally {
+      putObjectMock.mockReset();
+      putObjectMock.mockResolvedValue(undefined);
+      deletePrefixMock.mockReset();
+      deletePrefixMock.mockResolvedValue(undefined);
+      dbDeleteWhereMock.mockReset();
+      dbDeleteWhereMock.mockResolvedValue(undefined);
       vi.unstubAllGlobals();
     }
   });

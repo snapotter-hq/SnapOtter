@@ -8,7 +8,10 @@
  */
 
 import { gzipSync } from "node:zlib";
+import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { db, schema } from "../../../apps/api/src/db/index.js";
+import { decideExpiry } from "../../../apps/api/src/jobs/system-jobs.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
@@ -1008,5 +1011,42 @@ describe("POST /api/v1/fetch-urls", () => {
       contentType: "application/pdf",
       previewUrl: null,
     });
+  });
+
+  it("records a completed jobs row for fetched URLs so the S3 TTL sweep expires the prefix (#3624)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/fetch-urls",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { urls: [`${MOCK_ORIGIN}/photo.jpg`, `${MOCK_ORIGIN}/not-image.txt`] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body) as {
+      results: Array<{ success: boolean; downloadUrl?: string }>;
+    };
+    expect(body.results[0]?.success).toBe(true);
+    const downloadUrl = body.results[0]?.downloadUrl ?? "";
+    const match = downloadUrl.match(/^\/api\/v1\/download\/([^/]+)\//);
+    expect(match).not.toBeNull();
+    const jobId = match?.[1] ?? "";
+
+    const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+    expect(row).toBeDefined();
+    expect(row.status).toBe("completed");
+    expect(row.toolId).toBe("fetch-urls");
+    expect(row.userId).toBeTruthy();
+    expect(row.completedAt).toBeInstanceOf(Date);
+    expect(row.outputRefs).toHaveLength(1);
+    expect([`uploads/${jobId}/photo.jpg`, `uploads/${jobId}/not-image.txt`]).toContain(
+      row.outputRefs?.[0],
+    );
+
+    const rowsById = new Map([
+      [row.id, { createdAt: row.createdAt, completedAt: row.completedAt }],
+    ]);
+    expect(
+      decideExpiry({ key: `uploads/${jobId}`, size: 0, mtimeMs: 0 }, Date.now() + 60_000, rowsById),
+    ).toBe("expired");
   });
 });

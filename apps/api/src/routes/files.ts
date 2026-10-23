@@ -4,6 +4,7 @@ import { pipeline, type Readable, Transform } from "node:stream";
 import { hasServerErrorStatus, IMAGE_EXT_TO_MIME } from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
+import { deleteRecordedToolJob, recordCompletedToolJob } from "../lib/completed-job.js";
 import { sendInputValidationError } from "../lib/engine-unavailable.js";
 import { reportError } from "../lib/error-report.js";
 import { readImageDimensions } from "../lib/exiftool.js";
@@ -115,7 +116,8 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
       // Persists bytes that /api/v1/download then serves without auth, so this
       // needs the same grant as the rest of the file surface. The tool-access
       // middleware only covers /api/v1/tools/, and never reached this route.
-      if (!(await requireFileAccess(request, reply))) return;
+      const user = await requireFileAccess(request, reply);
+      if (!user) return;
 
       const jobId = randomUUID();
 
@@ -124,13 +126,23 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
         size: number;
         format: string;
       }> = [];
+      let recordedJob = false;
       let wroteUpload = false;
       const discardUploads = async () => {
-        if (!wroteUpload) return;
-        wroteUpload = false;
-        await deletePrefix(`uploads/${jobId}/`).catch((err) => {
-          request.log.warn({ err, jobId }, "failed to discard a rejected request's uploads");
-        });
+        let prefixDeleted = true;
+        if (wroteUpload) {
+          wroteUpload = false;
+          await deletePrefix(`uploads/${jobId}/`).catch((err) => {
+            prefixDeleted = false;
+            request.log.warn({ err, jobId }, "failed to discard a rejected request's uploads");
+          });
+        }
+        if (recordedJob && prefixDeleted) {
+          recordedJob = false;
+          await deleteRecordedToolJob(jobId).catch((err) => {
+            request.log.warn({ err, jobId }, "failed to delete a rejected request's job row");
+          });
+        }
       };
 
       const parts = request.parts();
@@ -208,9 +220,22 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
           const validation = await validateImageBuffer(safeBuffer, safeName).catch(() => null);
           const isValidImage = validation?.valid === true && !validation.nameOnly;
 
+          // Record a completed jobs row before the first write so the S3 TTL
+          // sweep can expire the prefix (#3624).
+          const uploadKey = `uploads/${jobId}/${safeName}`;
+          if (!recordedJob) {
+            await recordCompletedToolJob({
+              jobId,
+              userId: user.id ?? null,
+              toolId: "upload",
+              outputRefs: [uploadKey],
+            });
+            recordedJob = true;
+          }
+
           // Write to object storage uploads prefix
           wroteUpload = true;
-          await putObject(`uploads/${jobId}/${safeName}`, safeBuffer);
+          await putObject(uploadKey, safeBuffer);
 
           const fileExt = extname(safeName).toLowerCase().replace(/^\./, "");
           uploadedFiles.push({

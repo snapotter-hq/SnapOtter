@@ -8,7 +8,10 @@
  */
 
 import { apiToolPath } from "@snapotter/shared";
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { db, schema } from "../../../apps/api/src/db/index.js";
+import { decideExpiry } from "../../../apps/api/src/jobs/system-jobs.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import { cancelAcceptedJobAndWait, waitForAcceptedJobOrCancel } from "../settle-job.js";
 import {
@@ -654,6 +657,88 @@ describe("File upload/download", () => {
       const body = JSON.parse(res.body);
       expect(body.files[0].name).not.toContain("..");
       expect(body.files[0].name).not.toContain("/");
+    });
+
+    it("records a completed jobs row for the upload so the S3 TTL sweep expires the prefix (#3624)", async () => {
+      const { body: payload, contentType } = createMultipartPayload([
+        {
+          name: "file",
+          filename: "staged-ttl.png",
+          contentType: "image/png",
+          content: PNG_1x1,
+        },
+      ]);
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/v1/upload",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": contentType,
+        },
+        payload,
+      });
+      expect(res.statusCode).toBe(200);
+      const { jobId } = JSON.parse(res.body) as { jobId: string };
+
+      const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+      expect(row).toBeDefined();
+      expect(row.status).toBe("completed");
+      expect(row.toolId).toBe("upload");
+      expect(row.userId).toBeTruthy();
+      expect(row.completedAt).toBeInstanceOf(Date);
+      expect(row.outputRefs).toEqual([`uploads/${jobId}/staged-ttl.png`]);
+
+      const rowsById = new Map([
+        [row.id, { createdAt: row.createdAt, completedAt: row.completedAt }],
+      ]);
+      expect(
+        decideExpiry(
+          { key: `uploads/${jobId}`, size: 0, mtimeMs: 0 },
+          Date.now() + 60_000,
+          rowsById,
+        ),
+      ).toBe("expired");
+
+      // A rejected multi-part upload (part 1 valid, part 2 corrupt .svgz) deletes its recorded jobs row
+      const beforeUploadRows = await db
+        .select({ id: schema.jobs.id })
+        .from(schema.jobs)
+        .where(eq(schema.jobs.toolId, "upload"));
+      const beforeIds = new Set(beforeUploadRows.map((r) => r.id));
+
+      const corruptSvgz = Buffer.from([0x1f, 0x8b, 0x08, 0x00, 0xff, 0xff, 0xff]);
+      const { body: badPayload, contentType: badContentType } = createMultipartPayload([
+        {
+          name: "file",
+          filename: "part1.png",
+          contentType: "image/png",
+          content: PNG_1x1,
+        },
+        {
+          name: "file",
+          filename: "part2.svgz",
+          contentType: "image/svg+xml",
+          content: corruptSvgz,
+        },
+      ]);
+      const badRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/upload",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+          "content-type": badContentType,
+        },
+        payload: badPayload,
+      });
+      expect(badRes.statusCode).toBe(400);
+
+      const afterUploadRows = await db
+        .select({ id: schema.jobs.id })
+        .from(schema.jobs)
+        .where(eq(schema.jobs.toolId, "upload"));
+      const leakedIds = afterUploadRows.map((r) => r.id).filter((id) => !beforeIds.has(id));
+      expect(leakedIds).toEqual([]);
     });
   });
 

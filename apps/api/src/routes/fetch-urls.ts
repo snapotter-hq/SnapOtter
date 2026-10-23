@@ -15,6 +15,7 @@ import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 import PQueue from "p-queue";
 import sharp from "sharp";
 import { z } from "zod";
+import { deleteRecordedToolJob, recordCompletedToolJob } from "../lib/completed-job.js";
 import { reportEngineUnavailable } from "../lib/engine-unavailable.js";
 import { reportError } from "../lib/error-report.js";
 import { stripInternalPaths } from "../lib/errors.js";
@@ -29,7 +30,7 @@ import {
 } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import { logger } from "../lib/logger.js";
-import { normalizeOperationalWriteError, putObject } from "../lib/object-storage.js";
+import { deletePrefix, normalizeOperationalWriteError, putObject } from "../lib/object-storage.js";
 import {
   FETCH_TIMEOUT_MS,
   MAX_URL_FETCH_SIZE,
@@ -44,6 +45,7 @@ import {
   sanitizeSvg,
 } from "../lib/svg-sanitize.js";
 import { engineUnavailable } from "../modality/image-input.js";
+import { getAuthUser } from "../plugins/auth.js";
 
 /** Formats browsers can display natively (no preview needed). */
 const BROWSER_PREVIEWABLE = new Set([
@@ -178,6 +180,46 @@ export async function registerFetchUrlsRoute(app: FastifyInstance): Promise<void
 
       const { urls } = parsed.data;
       const jobId = randomUUID();
+      const userId = getAuthUser(request)?.id ?? null;
+
+      let aborted = false;
+      let recordedJob = false;
+      let wroteUpload = false;
+      let recordJobPromise: Promise<void> | null = null;
+
+      const beforeWrite = async (firstOutputRef: string): Promise<void> => {
+        if (!recordJobPromise) {
+          recordJobPromise = recordCompletedToolJob({
+            jobId,
+            userId,
+            toolId: "fetch-urls",
+            outputRefs: [firstOutputRef],
+          }).then(() => {
+            recordedJob = true;
+          });
+        }
+        await recordJobPromise;
+      };
+
+      const discardUploads = async () => {
+        if (recordJobPromise) {
+          await recordJobPromise.catch(() => {});
+        }
+        let prefixDeleted = true;
+        if (wroteUpload) {
+          wroteUpload = false;
+          await deletePrefix(`uploads/${jobId}/`).catch((err) => {
+            prefixDeleted = false;
+            request.log.warn({ err, jobId }, "failed to discard a rejected request's uploads");
+          });
+        }
+        if (recordedJob && prefixDeleted) {
+          recordedJob = false;
+          await deleteRecordedToolJob(jobId).catch((err) => {
+            request.log.warn({ err, jobId }, "failed to delete a rejected request's job row");
+          });
+        }
+      };
 
       const queue = new PQueue({ concurrency: URL_FETCH_CONCURRENCY });
 
@@ -188,17 +230,37 @@ export async function registerFetchUrlsRoute(app: FastifyInstance): Promise<void
       // Pre-allocate result slots to preserve order
       const resultSlots: FetchResult[] = new Array(urls.length);
 
-      await Promise.all(
-        urls.map((url, index) =>
-          queue.add(async () => {
-            resultSlots[index] = await fetchSingleUrl(url, jobId, usedFilenames, request.log);
-          }),
-        ),
-      );
+      try {
+        await Promise.all(
+          urls.map((url, index) =>
+            queue.add(async () => {
+              resultSlots[index] = await fetchSingleUrl(url, jobId, usedFilenames, request.log, {
+                isAborted: () => aborted,
+                beforeWrite,
+                markWrote: () => {
+                  wroteUpload = true;
+                },
+              });
+            }),
+          ),
+        );
+      } catch (err) {
+        aborted = true;
+        queue.clear();
+        await queue.onIdle().catch(() => {});
+        await discardUploads();
+        throw err;
+      }
 
       return reply.send({ results: resultSlots });
     },
   );
+}
+
+interface FetchWriteHooks {
+  isAborted?: () => boolean;
+  beforeWrite?: (firstOutputRef: string) => Promise<void>;
+  markWrote?: () => void;
 }
 
 async function fetchSingleUrl(
@@ -206,6 +268,7 @@ async function fetchSingleUrl(
   jobId: string,
   usedFilenames: Set<string>,
   log: Pick<FastifyBaseLogger, "warn"> & Partial<Pick<FastifyBaseLogger, "error">> = logger,
+  hooks?: FetchWriteHooks,
 ): Promise<FetchResult> {
   try {
     // Fetch with SSRF protection and timeout
@@ -317,9 +380,21 @@ async function fetchSingleUrl(
     const validation = await validateImageBuffer(safeBuffer, filename).catch(() => null);
     const isValidImage = validation?.valid === true && !validation.nameOnly;
 
+    // Record a completed jobs row before the first write so the S3 TTL sweep
+    // can expire the prefix (#3624).
+    if (hooks?.isAborted?.()) {
+      return { success: false, url, error: "Request aborted" };
+    }
+    const uploadKey = `uploads/${jobId}/${filename}`;
+    await hooks?.beforeWrite?.(uploadKey);
+    if (hooks?.isAborted?.()) {
+      return { success: false, url, error: "Request aborted" };
+    }
+
     // Save to object storage uploads prefix (raw fetched files)
     try {
-      await putObject(`uploads/${jobId}/${filename}`, safeBuffer);
+      hooks?.markWrote?.();
+      await putObject(uploadKey, safeBuffer);
     } catch (rawErr) {
       const err = normalizeOperationalWriteError(rawErr);
       if (hasServerErrorStatus(err)) {
@@ -420,9 +495,11 @@ async function fetchSingleUrl(
     if (decodedBuffer && isValidImage && !BROWSER_PREVIEWABLE.has(contentType)) {
       try {
         const previewBuffer = await sharp(decodedBuffer).webp({ quality: 80 }).toBuffer();
-        const previewFilename = `preview-${filename.replace(/\.[^.]+$/, "")}.webp`;
-        await putObject(`uploads/${jobId}/${previewFilename}`, previewBuffer);
-        previewUrl = `/api/v1/download/${jobId}/${encodeURIComponent(previewFilename)}`;
+        if (!hooks?.isAborted?.()) {
+          const previewFilename = `preview-${filename.replace(/\.[^.]+$/, "")}.webp`;
+          await putObject(`uploads/${jobId}/${previewFilename}`, previewBuffer);
+          previewUrl = `/api/v1/download/${jobId}/${encodeURIComponent(previewFilename)}`;
+        }
       } catch (err) {
         const decoderErr = asDecoderOutOfMemory(err);
         if (isDecoderUnavailable(decoderErr)) {

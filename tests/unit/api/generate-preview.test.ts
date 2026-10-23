@@ -14,8 +14,11 @@ import sharp from "sharp";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../apps/api/src/db/index.js", () => ({
-  db: {},
-  schema: { jobs: {}, userFiles: {} },
+  db: {
+    insert: () => ({ values: async () => {} }),
+    delete: () => ({ where: async () => {} }),
+  },
+  schema: { jobs: { id: "jobs.id" }, userFiles: {} },
 }));
 
 const putObjectMock = vi.hoisted(() => vi.fn());
