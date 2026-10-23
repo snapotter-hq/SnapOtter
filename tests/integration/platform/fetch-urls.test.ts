@@ -1038,7 +1038,7 @@ describe("POST /api/v1/fetch-urls", () => {
     expect(row.userId).toBeTruthy();
     expect(row.completedAt).toBeInstanceOf(Date);
     expect(row.outputRefs).toHaveLength(1);
-    expect([`uploads/${jobId}/photo.jpg`, `uploads/${jobId}/not-image.txt`]).toContain(
+    expect([`outputs/${jobId}/photo.jpg`, `outputs/${jobId}/not-image.txt`]).toContain(
       row.outputRefs?.[0],
     );
 
@@ -1046,7 +1046,7 @@ describe("POST /api/v1/fetch-urls", () => {
       [row.id, { createdAt: row.createdAt, completedAt: row.completedAt }],
     ]);
     expect(
-      decideExpiry({ key: `uploads/${jobId}`, size: 0, mtimeMs: 0 }, Date.now() + 60_000, rowsById),
+      decideExpiry({ key: `outputs/${jobId}`, size: 0, mtimeMs: 0 }, Date.now() + 60_000, rowsById),
     ).toBe("expired");
   });
 });

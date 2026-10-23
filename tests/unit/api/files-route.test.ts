@@ -1308,7 +1308,7 @@ describe("files route logic", () => {
         type: "single",
         status: "completed",
         inputRefs: [],
-        outputRefs: [`uploads/${jobId}/first.txt`],
+        outputRefs: [`outputs/${jobId}/first.txt`],
         completedAt: expect.any(Date),
       });
       expect(mocks.dbInsertValues.mock.invocationCallOrder[0]).toBeLessThan(

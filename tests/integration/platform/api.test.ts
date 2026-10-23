@@ -687,14 +687,14 @@ describe("File upload/download", () => {
       expect(row.toolId).toBe("upload");
       expect(row.userId).toBeTruthy();
       expect(row.completedAt).toBeInstanceOf(Date);
-      expect(row.outputRefs).toEqual([`uploads/${jobId}/staged-ttl.png`]);
+      expect(row.outputRefs).toEqual([`outputs/${jobId}/staged-ttl.png`]);
 
       const rowsById = new Map([
         [row.id, { createdAt: row.createdAt, completedAt: row.completedAt }],
       ]);
       expect(
         decideExpiry(
-          { key: `uploads/${jobId}`, size: 0, mtimeMs: 0 },
+          { key: `outputs/${jobId}`, size: 0, mtimeMs: 0 },
           Date.now() + 60_000,
           rowsById,
         ),
