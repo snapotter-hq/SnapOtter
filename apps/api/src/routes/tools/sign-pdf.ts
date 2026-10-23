@@ -18,7 +18,7 @@ import {
   type ToolJobData,
 } from "../../jobs/types.js";
 import { reportEngineUnavailable } from "../../lib/engine-unavailable.js";
-import { reportError } from "../../lib/error-report.js";
+import { markQueueEventsJobFailure, reportError } from "../../lib/error-report.js";
 import { friendlyError, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { createUniqueNamer } from "../../lib/filename.js";
@@ -295,7 +295,7 @@ export function registerSignPdf(app: FastifyInstance) {
         return reply.status(failure.httpStatus).send(body);
       }
       if (failure === null) {
-        throw err;
+        throw markQueueEventsJobFailure(err);
       }
       request.log.error({ err, toolId: TOOL_ID }, "sign-pdf processing failed");
       const rawDetail =

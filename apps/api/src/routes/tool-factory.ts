@@ -24,7 +24,7 @@ import {
   type ToolJobData,
 } from "../jobs/types.js";
 import { reportEngineUnavailable } from "../lib/engine-unavailable.js";
-import { reportError } from "../lib/error-report.js";
+import { markQueueEventsJobFailure, reportError } from "../lib/error-report.js";
 import { formatZodErrors, friendlyError } from "../lib/errors.js";
 import { getFirstMissingBundleForTool, isToolInstalled } from "../lib/feature-status.js";
 import { createUniqueNamer } from "../lib/filename.js";
@@ -758,7 +758,7 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
             return reply.status(failure.httpStatus).send(body);
           }
           if (failure === null) {
-            throw err;
+            throw markQueueEventsJobFailure(err);
           }
           // Keep the full error (incl. raw ffmpeg/tool stderr) in server logs,
           // but return only a user-safe detail to the client.

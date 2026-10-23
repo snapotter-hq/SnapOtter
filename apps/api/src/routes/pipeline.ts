@@ -42,6 +42,7 @@ import {
   reportEngineUnavailable,
   sharedServerFault,
 } from "../lib/engine-unavailable.js";
+import { markQueueEventsJobFailure } from "../lib/error-report.js";
 import {
   formatZodErrors,
   friendlyError,
@@ -872,7 +873,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               if (failure.code) body.code = failure.code;
               return reply.status(failure.httpStatus).send(body);
             }
-            throw err;
+            throw markQueueEventsJobFailure(err);
           }
 
           if (!result) {
@@ -1840,7 +1841,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             // its reason, which the sync client must see instead of the
             // masked rejection (#2180).
             const failure = await settledFailureResponse(parentId, request.log);
-            if (!failure) throw err;
+            if (!failure) throw markQueueEventsJobFailure(err);
             return reply.status(failure.status).send(failure.body);
           }
 

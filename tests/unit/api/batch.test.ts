@@ -1596,4 +1596,22 @@ describe("batch route spooled multipart ingress (#1239)", () => {
       }),
     );
   });
+
+  it("tags stripped QueueEvents waitForJob rejections on /batch when settledFailureResponse returns null (#3791)", async () => {
+    const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
+    const unsettledBatchErr = new Error("The server's storage service is unavailable.");
+    mocks.waitForJob.mockRejectedValueOnce(unsettledBatchErr);
+
+    await expect(
+      invokeBatchRoute({
+        section: "image",
+        toolId: "resize",
+        parts: [
+          { type: "file", filename: "a.png", content: Buffer.from("valid-png") },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ],
+      }),
+    ).rejects.toBe(unsettledBatchErr);
+    expect(classifyError(unsettledBatchErr, "http")).toBe("expected");
+  });
 });

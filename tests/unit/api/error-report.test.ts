@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   classifyError,
   errorSignature,
+  isQueueEventsJobFailure,
+  markQueueEventsJobFailure,
   resetThrottleForTests,
   safeFormatTag,
   shouldReport,
@@ -215,6 +217,49 @@ describe("classifyError", () => {
       expect(classifyError(new Error(msg), "http")).toBe("operational");
       expect(classifyError(new Error(msg), "worker")).toBe("operational");
     }
+  });
+  it("expected on http: a stripped QueueEvents job-failure Error tagged by waitForJob is not double-reported as an http bug (#3791)", () => {
+    const stripped503 = markQueueEventsJobFailure(
+      new Error("The server's storage service is unavailable."),
+    );
+    const stripped422 = markQueueEventsJobFailure(new Error("Start is past the end"));
+    const strippedWorkerConn = markQueueEventsJobFailure(
+      new Error("connect ECONNREFUSED 127.0.0.1:5432"),
+    );
+    expect(isQueueEventsJobFailure(stripped503)).toBe(true);
+    expect(isQueueEventsJobFailure(stripped422)).toBe(true);
+    expect(isQueueEventsJobFailure(strippedWorkerConn)).toBe(true);
+    expect(classifyError(stripped503, "http")).toBe("expected");
+    expect(classifyError(stripped422, "http")).toBe("expected");
+    expect(classifyError(strippedWorkerConn, "http")).toBe("expected");
+    expect(classifyError(stripped503)).toBe("expected");
+    expect(classifyError(stripped503, "worker")).toBe("bug");
+
+    // Direct Redis/client errors (including codeless ioredis connection/timeout errors) and BullMQ stall errors are not tagged.
+    const redisConn = markQueueEventsJobFailure(
+      Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:6379"), { code: "ECONNREFUSED" }),
+    );
+    const redisClosed = markQueueEventsJobFailure(new Error("Connection is closed."));
+    const redisCmdTimeout = markQueueEventsJobFailure(new Error("Command timed out"));
+    const replyOom = markQueueEventsJobFailure(
+      Object.assign(new Error("OOM command not allowed when used memory > 'maxmemory'."), {
+        name: "ReplyError",
+      }),
+    );
+    const replyBug = markQueueEventsJobFailure(
+      Object.assign(new Error("ERR unknown command"), { name: "ReplyError" }),
+    );
+    const stallErr = markQueueEventsJobFailure(new Error("job stalled more than allowable limit"));
+    expect(isQueueEventsJobFailure(redisConn)).toBe(false);
+    expect(isQueueEventsJobFailure(redisClosed)).toBe(false);
+    expect(isQueueEventsJobFailure(redisCmdTimeout)).toBe(false);
+    expect(isQueueEventsJobFailure(replyOom)).toBe(false);
+    expect(isQueueEventsJobFailure(replyBug)).toBe(false);
+    expect(isQueueEventsJobFailure(stallErr)).toBe(false);
+    expect(classifyError(redisConn, "http")).toBe("operational");
+    expect(classifyError(replyOom, "http")).toBe("operational");
+    expect(classifyError(replyBug, "http")).toBe("bug");
+    expect(classifyError(stallErr, "http")).toBe("operational");
   });
   it("looks through an UnrecoverableError with a cause so non-retryable worker errors keep their class (#1176)", () => {
     const wrap = (cause: Error) =>

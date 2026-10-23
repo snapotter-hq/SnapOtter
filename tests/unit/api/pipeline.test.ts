@@ -1003,7 +1003,8 @@ describe("pipeline step error message formatting", () => {
         details: "Send fewer files at a time",
       });
 
-      // When the settled row has no httpStatus (or a non-5xx httpStatus), rethrow the waitForJob rejection (#3479).
+      // When the settled row has no httpStatus (or a non-5xx httpStatus), rethrow the waitForJob rejection (#3479, #3791).
+      const { classifyError } = await import("../../../apps/api/src/lib/error-report.js");
       const genericFinalizeErr = new Error("Pipeline processing failed");
       waitForJobMock.mockRejectedValueOnce(genericFinalizeErr);
       selectWhereMock.mockResolvedValueOnce([
@@ -1017,15 +1018,26 @@ describe("pipeline step error message formatting", () => {
       await expect(invokePipelineExecuteRoute(parts, nonServerFaultLog)).rejects.toBe(
         genericFinalizeErr,
       );
+      expect(classifyError(genericFinalizeErr, "http")).toBe("expected");
       expect(nonServerFaultLog.error).not.toHaveBeenCalled();
 
+      // And on /api/v1/pipeline/batch when settledFailureResponse returns null (#3791).
+      const batchUnsettledErr = new Error("The server's storage service is unavailable.");
+      waitForJobMock.mockRejectedValueOnce(batchUnsettledErr);
+      selectWhereMock.mockResolvedValueOnce([{ error: null }]);
+      await expect(invokePipelineBatchRoute(parts)).rejects.toBe(batchUnsettledErr);
+      expect(classifyError(batchUnsettledErr, "http")).toBe("expected");
+
       // When reading schema.jobs.error rejects, warn and rethrow the waitForJob rejection (#3479).
-      const redisDownErr = new Error("connect ECONNREFUSED 127.0.0.1:6379");
+      const redisDownErr = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:6379"), {
+        code: "ECONNREFUSED",
+      });
       const dbReadErr = new Error("postgres read failed");
       waitForJobMock.mockRejectedValueOnce(redisDownErr);
       selectWhereMock.mockRejectedValueOnce(dbReadErr);
       const readFailLog = { error: vi.fn(), warn: vi.fn() };
       await expect(invokePipelineExecuteRoute(parts, readFailLog)).rejects.toBe(redisDownErr);
+      expect(classifyError(redisDownErr, "http")).toBe("operational");
       expect(readFailLog.warn).toHaveBeenCalledWith(
         { err: dbReadErr, jobId: expect.any(String) },
         "failed pipeline job row read failed",

@@ -43,6 +43,7 @@ import {
   reportEngineUnavailable,
   sharedServerFault,
 } from "../lib/engine-unavailable.js";
+import { markQueueEventsJobFailure } from "../lib/error-report.js";
 import {
   formatZodErrors,
   friendlyError,
@@ -807,7 +808,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             // workspace cap's message, for one); answer with that instead of
             // the plain Error BullMQ rejects with (#1161).
             const failure = await settledFailureResponse(parentId, request.log);
-            if (!failure) throw err;
+            if (!failure) throw markQueueEventsJobFailure(err);
             return reply.status(failure.status).send(failure.body);
           }
 

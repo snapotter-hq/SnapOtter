@@ -96,6 +96,46 @@ function isBullMqStallError(e: { name?: unknown; message?: unknown } | null): bo
   );
 }
 
+const REDIS_CLIENT_ERROR_MESSAGE =
+  /^(Connection is closed\.?|Command timed out|Stream isn't writeable|Socket timeout\.|Ready check failed:|closing queue$)/i;
+
+/**
+ * Tag a plain Error reconstructed by BullMQ's `Job.waitUntilFinished` from a
+ * `QueueEvents` `failed:<jobId>` event (`new Error(args.failedReason || args)`).
+ *
+ * The worker's `failed` listener already receives the original un-stripped
+ * error (`SafeError`, `InputValidationError`, `ToolInputError`, or a real bug
+ * with its stack and tool context) and passes it to `reportError` with
+ * `source: "worker"`. When a route rethrows the `waitForJob` rejection so
+ * `error-handler.ts` answers 500 (because `schema.jobs.error` is null or
+ * unreadable), the stripped `Error` would otherwise classify as an HTTP `"bug"`
+ * (#3791). Direct Redis/client errors (`connectivityClass`, `ReplyError`,
+ * coded errnos, codeless ioredis connection/timeout errors) and BullMQ
+ * stall/lock-loss errors (`isBullMqStallError`) stay untagged so
+ * `error-handler.ts` still reports them.
+ */
+export function markQueueEventsJobFailure<T>(err: T): T {
+  if (!(err instanceof Error) || err.name !== "Error") return err;
+  if (isSafeMessageError(err) || isToolInputError(err)) return err;
+  const e = err as Error & { code?: unknown; statusCode?: unknown; cause?: unknown };
+  if (e.code !== undefined || e.statusCode !== undefined || e.cause !== undefined) return err;
+  if (isBullMqStallError(e) || REDIS_CLIENT_ERROR_MESSAGE.test(err.message)) {
+    return err;
+  }
+  Object.defineProperty(err, "isQueueEventsJobFailure", {
+    value: true,
+    configurable: true,
+  });
+  return err;
+}
+
+export function isQueueEventsJobFailure(err: unknown): boolean {
+  return (
+    err instanceof Error &&
+    (err as { isQueueEventsJobFailure?: unknown }).isQueueEventsJobFailure === true
+  );
+}
+
 export function classifyError(rawErr: unknown, source?: ReportContext["source"]): ErrorClass {
   const err = unwrapUnrecoverable(rawErr);
   if (isToolInputError(err)) return "expected";
@@ -116,12 +156,13 @@ export function classifyError(rawErr: unknown, source?: ReportContext["source"])
   // code="ECONNRESET") or an upstream "aborted"/"Premature close" wrapped in a
   // storage SafeError is not mistaken for the browser hanging up (#1643).
   if (isSafeMessageError(err)) return err.kind === "bug" ? "bug" : "operational";
-  // The next two shortcuts only make sense at the HTTP boundary (undefined
-  // keeps the http-ish default for direct calls). Off the request path a bare
+  // The next shortcuts only make sense at the HTTP boundary (undefined keeps
+  // the http-ish default for direct calls). Off the request path a bare
   // ECONNRESET is an upstream socket loss, not a client abort, and a ZodError
   // means schema drift: settings were already validated at the boundary, so a
   // worker-side parse failure is our bug.
   if (source === "http" || source === undefined) {
+    if (isQueueEventsJobFailure(err)) return "expected";
     if (isClientAbort(err)) return "expected";
     // ZodError = settings validation. Settings are validated at the boundary, so
     // a worker-side ZodError is schema drift (our bug); only expected on http.

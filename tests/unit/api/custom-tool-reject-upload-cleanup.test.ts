@@ -1001,17 +1001,22 @@ describe("pre-enqueue S3 getObjectBuffer fault normalization and sign-pdf waitFo
       expect(mocks.deletePrefix).not.toHaveBeenCalled();
     }
 
-    // Worker 503 fault whose terminal DB write failed leaves schema.jobs.error null (#3698)
-    const unsettled503 = new Error("The server's storage service is unavailable.");
-    jobRows.rows = [{ status: "processing", error: null }];
-    mocks.waitForJob.mockRejectedValueOnce(unsettled503);
-    const reqUnsettled = makeRequest(validPartsFor("sign-pdf"));
-    const replyUnsettled = makeReply();
-    await expect(handlers["/api/v1/tools/pdf/sign-pdf"](reqUnsettled, replyUnsettled)).rejects.toBe(
-      unsettled503,
-    );
-    expect(replyUnsettled.payload).toBeUndefined();
-    expect(reqUnsettled.log.error).not.toHaveBeenCalled();
+    // Worker 503 fault and 4xx fault whose terminal DB write failed leaves schema.jobs.error null (#3698, #3791)
+    for (const unsettledWorkerErr of [
+      new Error("The server's storage service is unavailable."),
+      new Error("Placement page out of range"),
+    ]) {
+      jobRows.rows = [{ status: "processing", error: null }];
+      mocks.waitForJob.mockRejectedValueOnce(unsettledWorkerErr);
+      const reqUnsettled = makeRequest(validPartsFor("sign-pdf"));
+      const replyUnsettled = makeReply();
+      await expect(
+        handlers["/api/v1/tools/pdf/sign-pdf"](reqUnsettled, replyUnsettled),
+      ).rejects.toBe(unsettledWorkerErr);
+      expect(classifyError(unsettledWorkerErr, "http")).toBe("expected");
+      expect(replyUnsettled.payload).toBeUndefined();
+      expect(reqUnsettled.log.error).not.toHaveBeenCalled();
+    }
 
     // Also rethrows fault and reports readErr when reading schema.jobs.error itself rejects
     mocks.reportError.mockClear();

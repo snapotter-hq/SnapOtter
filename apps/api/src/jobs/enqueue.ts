@@ -12,6 +12,7 @@ import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { assertAiJobQuota } from "../lib/ai-quota.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
+import { markQueueEventsJobFailure } from "../lib/error-report.js";
 import { toStorableJson } from "../lib/storable-json.js";
 import { clearTerminalReplayKey } from "../routes/progress.js";
 import { createBullMQConnection } from "./connection.js";
@@ -335,7 +336,7 @@ export async function waitForJob(
     if (/timed out before finishing/i.test(msg)) {
       return null; // sync-wait window expired; fall back to SSE
     }
-    throw err; // real failure
+    throw markQueueEventsJobFailure(err); // real failure
   }
 }
 

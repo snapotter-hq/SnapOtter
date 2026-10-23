@@ -1380,8 +1380,16 @@ describe("createToolRoute", () => {
         method: "POST",
         jobId,
       });
+      expect(classifyError(workerErr, "http")).toBe("expected");
+      const { logAndReportRequestError } = await import(
+        "../../../apps/api/src/plugins/error-handler.js"
+      );
+      expect(logAndReportRequestError(workerErr, req as never)).toBe(500);
+      expect(req.log.error).toHaveBeenCalledWith(
+        { err: workerErr, url: req.url, method: "POST" },
+        "Unhandled request error",
+      );
       expect(reply.status).not.toHaveBeenCalled();
-      expect(req.log.error).not.toHaveBeenCalled();
     });
 
     it("answers the status the worker recorded for rejected input", async () => {
@@ -1536,22 +1544,27 @@ describe("createToolRoute", () => {
         expect(deletePrefix).not.toHaveBeenCalled();
       }
 
-      // Worker 503 fault whose terminal DB write failed leaves schema.jobs.error null (#3698)
-      const unsettled503 = new Error("The server's storage service is unavailable.");
-      jobRows.rows = [{ status: "processing", error: null }];
-      vi.mocked(waitForJob).mockRejectedValueOnce(unsettled503);
-      const unsettledReply = createMockReply();
-      const unsettledReq = createMockRequest({
-        fileBuffer: Buffer.from("png-data"),
-        settings: "{}",
-      });
-      try {
-        await expect(handler(unsettledReq, unsettledReply)).rejects.toBe(unsettled503);
-      } finally {
-        jobRows.rows = [];
+      // Worker 503 fault and 4xx validation fault whose terminal DB write failed leaves schema.jobs.error null (#3698, #3791)
+      for (const unsettledWorkerErr of [
+        new Error("The server's storage service is unavailable."),
+        new Error("Start is past the end"),
+      ]) {
+        jobRows.rows = [{ status: "processing", error: null }];
+        vi.mocked(waitForJob).mockRejectedValueOnce(unsettledWorkerErr);
+        const unsettledReply = createMockReply();
+        const unsettledReq = createMockRequest({
+          fileBuffer: Buffer.from("png-data"),
+          settings: "{}",
+        });
+        try {
+          await expect(handler(unsettledReq, unsettledReply)).rejects.toBe(unsettledWorkerErr);
+        } finally {
+          jobRows.rows = [];
+        }
+        expect(classifyError(unsettledWorkerErr, "http")).toBe("expected");
+        expect(unsettledReply.status).not.toHaveBeenCalled();
+        expect(unsettledReq.log.error).not.toHaveBeenCalled();
       }
-      expect(unsettledReply.status).not.toHaveBeenCalled();
-      expect(unsettledReq.log.error).not.toHaveBeenCalled();
 
       // Also rethrows fault and reports readErr when reading schema.jobs.error itself rejects
       vi.mocked(reportError).mockClear();

@@ -301,13 +301,37 @@ describe("job enqueue helpers", () => {
     await expect(mod.waitForJob("image", "slow", 25)).resolves.toBeNull();
   });
 
-  it("waitForJob rethrows real job failures", async () => {
+  it("waitForJob rethrows real job failures and tags stripped QueueEvents Errors while leaving Redis and stall faults untagged (#3791)", async () => {
+    const { classifyError, isQueueEventsJobFailure } = await import(
+      "../../../../apps/api/src/lib/error-report.js"
+    );
     const { mod } = await loadEnqueueModule();
+    const stripped503 = new Error("The server's storage service is unavailable.");
     getJob.mockResolvedValueOnce({
-      waitUntilFinished: vi.fn().mockRejectedValue(new Error("processor failed")),
+      waitUntilFinished: vi.fn().mockRejectedValue(stripped503),
     });
 
-    await expect(mod.waitForJob("image", "failed")).rejects.toThrow("processor failed");
+    await expect(mod.waitForJob("image", "failed")).rejects.toBe(stripped503);
+    expect(isQueueEventsJobFailure(stripped503)).toBe(true);
+    expect(classifyError(stripped503, "http")).toBe("expected");
+
+    const stallErr = new Error("Missing lock for job 1 moveToFinished");
+    getJob.mockResolvedValueOnce({
+      waitUntilFinished: vi.fn().mockRejectedValue(stallErr),
+    });
+    await expect(mod.waitForJob("image", "stalled")).rejects.toBe(stallErr);
+    expect(isQueueEventsJobFailure(stallErr)).toBe(false);
+    expect(classifyError(stallErr, "http")).toBe("operational");
+
+    const redisErr = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:6379"), {
+      code: "ECONNREFUSED",
+    });
+    getJob.mockResolvedValueOnce({
+      waitUntilFinished: vi.fn().mockRejectedValue(redisErr),
+    });
+    await expect(mod.waitForJob("image", "redis-down")).rejects.toBe(redisErr);
+    expect(isQueueEventsJobFailure(redisErr)).toBe(false);
+    expect(classifyError(redisErr, "http")).toBe("operational");
   });
 
   it("waitForJob returns the job result on the success path", async () => {
