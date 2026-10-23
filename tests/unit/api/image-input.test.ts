@@ -68,6 +68,7 @@ import {
   DecoderOutOfMemoryError,
   DecoderUnavailableError,
 } from "../../../apps/api/src/lib/format-decoders.js";
+import { normalizeOperationalWriteError } from "../../../apps/api/src/lib/object-storage.js";
 import { InputValidationError } from "../../../apps/api/src/modality/contract.js";
 import { ImageInputHandler } from "../../../apps/api/src/modality/image-input.js";
 
@@ -670,4 +671,62 @@ describe("ImageInputHandler operational tmpdir write faults (#2800)", () => {
       });
     },
   );
+
+  it.each(cases)(
+    "preserves a normalized 503 %s SafeError from preflightEncodedDimensions / writeTempExclusive (%s) without falling back to Sharp on DNG (#3740)",
+    async (errno, expectedCode) => {
+      detected("raw");
+      const normalized = normalizeOperationalWriteError(errnoError(errno));
+      mocks.decodeToSharpCompat.mockRejectedValueOnce(normalized);
+
+      await expect(
+        new ImageInputHandler().prepare(RAW, "photo.dng", {
+          scratchDir: "/tmp/in",
+          maxPixels: 40_000_000,
+        }),
+      ).rejects.toMatchObject({
+        name: "InputValidationError",
+        statusCode: 503,
+        code: expectedCode,
+        cause: normalized,
+      });
+      expect(mocks.metadata).not.toHaveBeenCalled();
+    },
+  );
+
+  it("falls back to Sharp on DNG and surfaces 503 ENGINE_UNAVAILABLE on NEF when preflightEncodedDimensions wraps a non-storage EMFILE temp-write failure (#3740)", async () => {
+    detected("raw");
+    const emfileErr = errnoError("EMFILE");
+    const unavailable = new DecoderUnavailableError(
+      "The server could not write a temporary file to check image dimensions.",
+      emfileErr,
+    );
+    mocks.decodeToSharpCompat.mockRejectedValueOnce(unavailable);
+
+    const dngResult = await new ImageInputHandler().prepare(RAW, "photo.dng", {
+      scratchDir: "/tmp/in",
+      maxPixels: 40_000_000,
+    });
+    expect(dngResult).toEqual({ buffer: ORIENTED, filename: "photo.png" });
+
+    mocks.decodeToSharpCompat.mockRejectedValueOnce(unavailable);
+    mocks.metadata.mockRejectedValueOnce(
+      new Error("Input buffer contains unsupported image format"),
+    );
+
+    await expect(
+      new ImageInputHandler().prepare(RAW, "photo.nef", {
+        scratchDir: "/tmp/in",
+        maxPixels: 40_000_000,
+      }),
+    ).rejects.toMatchObject({
+      name: "InputValidationError",
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: expect.objectContaining({
+        name: "DecoderUnavailableError",
+        cause: emfileErr,
+      }),
+    });
+  });
 });

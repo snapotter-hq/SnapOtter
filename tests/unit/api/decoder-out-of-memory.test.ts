@@ -485,8 +485,8 @@ describe("decodeRaw and preflight/post-decode fault handling (#1758)", () => {
     expect((err as Error).name).toBe("DecoderOutOfMemoryError");
   });
 
-  it.each(["ENOSPC", "EMFILE", "EACCES"])(
-    "surfaces a %s temp-write failure in preflightEncodedDimensions as a 503 with cause",
+  it.each(["EMFILE", "ENFILE", "EIO"])(
+    "surfaces a non-storage %s temp-write failure in preflightEncodedDimensions as a 503 DecoderUnavailableError with cause",
     async (code) => {
       const fsErr = Object.assign(new Error(`${code}: open temp file`), {
         code,
@@ -505,6 +505,147 @@ describe("decodeRaw and preflight/post-decode fault handling (#1758)", () => {
       expect(err.cause).toBe(fsErr);
     },
   );
+
+  it.each([
+    ["ENOSPC", "storage-full"],
+    ["EDQUOT", "storage-full"],
+    ["EACCES", "storage-not-writable"],
+    ["EPERM", "storage-not-writable"],
+    ["EROFS", "storage-not-writable"],
+  ] as const)(
+    "preserves a normalized 503 %s SafeError when %s occurs in preflightEncodedDimensions (#3740)",
+    async (code, expectedCode) => {
+      const fsErr = Object.assign(new Error(`${code}: open temp file`), {
+        code,
+        syscall: "open",
+      });
+      failures.open = fsErr;
+
+      const err = await decodeToSharpCompat(Buffer.from("not really a jxl"), "jxl", undefined, {
+        maxPixels: 100_000,
+      }).catch((e: unknown) => e);
+
+      expect(isDecoderUnavailable(err)).toBe(false);
+      expect(err).toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        statusCode: 503,
+        code: expectedCode,
+        cause: fsErr,
+      });
+
+      failures.open = fsErr;
+      const anyErr = await decodeAnyFormat(Buffer.from("avif-bytes"), "avif", {
+        maxDimension: 1_000,
+      }).catch((e: unknown) => e);
+
+      expect(isDecoderUnavailable(anyErr)).toBe(false);
+      expect(anyErr).toMatchObject({
+        isSafeMessage: true,
+        kind: "operational",
+        statusCode: 503,
+        code: expectedCode,
+        cause: fsErr,
+      });
+    },
+  );
+
+  it("surfaces a V8 buffer allocation failure during writeTempExclusive in preflightEncodedDimensions as a 503 DecoderOutOfMemoryError (#3740)", async () => {
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    failures.writeFile = v8Oom;
+
+    const err = (await decodeToSharpCompat(Buffer.from("not really a jxl"), "jxl", undefined, {
+      maxPixels: 100_000,
+    }).catch((e: unknown) => e)) as Error;
+
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect(err.name).toBe("DecoderOutOfMemoryError");
+    expect(err.cause).toBe(v8Oom);
+
+    failures.writeFile = v8Oom;
+    const anyErr = (await decodeAnyFormat(Buffer.from("avif-bytes"), "avif", {
+      maxDimension: 1_000,
+    }).catch((e: unknown) => e)) as Error;
+
+    expect(isDecoderUnavailable(anyErr)).toBe(true);
+    expect(anyErr.name).toBe("DecoderOutOfMemoryError");
+    expect(anyErr.cause).toBe(v8Oom);
+  });
+
+  it.each([
+    ["ENOSPC", "storage-full"],
+    ["EDQUOT", "storage-full"],
+    ["EACCES", "storage-not-writable"],
+    ["EPERM", "storage-not-writable"],
+    ["EROFS", "storage-not-writable"],
+  ] as const)(
+    "surfaces %s from preflightEncodedDimensions in ImageInputHandler.prepare as 503 %s instead of falling back to Sharp on DNG (#3740)",
+    async (code, expectedCode) => {
+      const { fixtures, readFixture } = await import("../../fixtures/index.js");
+      const { ImageInputHandler } = await import("../../../apps/api/src/modality/image-input.js");
+      const fsErr = Object.assign(new Error(`${code}: open temp file`), {
+        code,
+        syscall: "open",
+      });
+      failures.open = fsErr;
+
+      const err = await new ImageInputHandler()
+        .prepare(readFixture(fixtures.image.formats("dng")), "photo.dng", {
+          scratchDir: "/tmp/in",
+          maxPixels: 40_000_000,
+          log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as never,
+        })
+        .then(
+          (res) =>
+            new Error(
+              `Expected prepare() to reject, but resolved (${res.filename}, ${res.buffer.length} bytes)`,
+            ),
+          (e: unknown) => e,
+        );
+
+      expect(err).toMatchObject({
+        name: "InputValidationError",
+        statusCode: 503,
+        code: expectedCode,
+        cause: expect.objectContaining({
+          isSafeMessage: true,
+          code: expectedCode,
+          cause: fsErr,
+        }),
+      });
+    },
+  );
+
+  it("surfaces a V8 buffer allocation failure from preflightEncodedDimensions in ImageInputHandler.prepare as 503 ENGINE_UNAVAILABLE instead of falling back to Sharp on DNG (#3740)", async () => {
+    const { fixtures, readFixture } = await import("../../fixtures/index.js");
+    const { ImageInputHandler } = await import("../../../apps/api/src/modality/image-input.js");
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    failures.writeFile = v8Oom;
+
+    const err = await new ImageInputHandler()
+      .prepare(readFixture(fixtures.image.formats("dng")), "photo.dng", {
+        scratchDir: "/tmp/in",
+        maxPixels: 40_000_000,
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as never,
+      })
+      .then(
+        (res) =>
+          new Error(
+            `Expected prepare() to reject, but resolved (${res.filename}, ${res.buffer.length} bytes)`,
+          ),
+        (e: unknown) => e,
+      );
+
+    expect(err).toMatchObject({
+      name: "InputValidationError",
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: expect.objectContaining({
+        name: "DecoderOutOfMemoryError",
+        cause: v8Oom,
+      }),
+    });
+  });
 
   it("surfaces a killed exiftool in preflightEncodedDimensions as a 503 DecoderOutOfMemoryError", async () => {
     const killFields = { code: null, signal: "SIGKILL", stderr: "" };
@@ -795,14 +936,19 @@ describe("writeTempExclusive operational write errors in decodeToSharpCompat and
 
     failures.writeFile = writeErr;
     failures.close = closeErr;
-    const preflightErr = (await decodeToSharpCompat(
+    const preflightErr = await decodeToSharpCompat(
       Buffer.from("not really a jxl"),
       "jxl",
       undefined,
       { maxPixels: 100_000 },
-    ).catch((e: unknown) => e)) as Error;
-    expect(preflightErr).toBeInstanceOf(DecoderUnavailableError);
-    expect(preflightErr.cause).toBe(writeErr);
+    ).catch((e: unknown) => e);
+    expect(preflightErr).toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      statusCode: 503,
+      code: "storage-full",
+      cause: writeErr,
+    });
     expect(failures.closedHandles).toBe(3);
 
     const closeEnospc = Object.assign(new Error("ENOSPC: close flush failed"), {
@@ -838,14 +984,19 @@ describe("writeTempExclusive operational write errors in decodeToSharpCompat and
     expect(failures.closedHandles).toBe(5);
 
     failures.close = closeEnospc;
-    const preflightCloseErr = (await decodeToSharpCompat(
+    const preflightCloseErr = await decodeToSharpCompat(
       Buffer.from("not really a jxl"),
       "jxl",
       undefined,
       { maxPixels: 100_000 },
-    ).catch((e: unknown) => e)) as Error;
-    expect(preflightCloseErr).toBeInstanceOf(DecoderUnavailableError);
-    expect(preflightCloseErr.cause).toBe(closeEnospc);
+    ).catch((e: unknown) => e);
+    expect(preflightCloseErr).toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      statusCode: 503,
+      code: "storage-full",
+      cause: closeEnospc,
+    });
     expect(failures.closedHandles).toBe(6);
   });
 });

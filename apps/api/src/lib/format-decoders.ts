@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { resolveFfmpeg } from "@snapotter/media-engine";
-import { isSafeMessageError, SafeError } from "@snapotter/shared";
+import { hasServerErrorStatus, isSafeMessageError, SafeError } from "@snapotter/shared";
 import sharp from "sharp";
 import { isBinarySpawnFailure } from "./binary-overrides.js";
 import { isRawExtension } from "./file-validation.js";
@@ -433,9 +433,18 @@ async function preflightEncodedDimensions(
       await writeTempExclusive(inputPath, buffer);
     } catch (error) {
       options.signal?.throwIfAborted();
+      const classified = normalizeOperationalWriteError(asDecoderOutOfMemory(error));
+      if (
+        classified instanceof DecoderOutOfMemoryError ||
+        (hasServerErrorStatus(classified) && !isDecoderUnavailable(classified))
+      ) {
+        throw classified;
+      }
       throw new DecoderUnavailableError(
         "The server could not write a temporary file to check image dimensions.",
-        isSafeMessageError(error) && error.cause !== undefined ? error.cause : error,
+        isSafeMessageError(classified) && classified.cause !== undefined
+          ? classified.cause
+          : classified,
       );
     }
     try {
