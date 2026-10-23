@@ -296,7 +296,7 @@ async function main() {
   // color-adjustments is part of image-enhancement, not a separate tool
   await test("Image Enhancement (landscape)", "image-enhancement", { mode: "landscape" });
   await test("Sharpening", "sharpening", { sigma: 1.5, amount: 1.0 });
-  await test("Border", "border", { size: 20, color: "#ff0000" });
+  await test("Border", "border", { borderWidth: 20, borderColor: "#ff0000" });
   await test("Replace Color", "replace-color", {
     sourceColor: "#ffffff",
     targetColor: "#000000",

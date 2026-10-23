@@ -791,13 +791,19 @@ test.describe("Overlay: batch border", () => {
         { name: "file", filename: "c.webp", contentType: "image/webp", buffer: WEBP_50x50 },
         { name: "file", filename: "d.heic", contentType: "image/heic", buffer: HEIC_200x150 },
       ],
-      [{ name: "settings", value: JSON.stringify({ size: 20, color: "#ff0000" }) }],
+      [{ name: "settings", value: JSON.stringify({ borderWidth: 20, borderColor: "#ff0000" }) }],
     );
     const res = await request.post("/api/v1/tools/image/border/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
-    await expectBatchSuccess(res);
+    const zip = await readBatchZip(res, request);
+    expect(zip.getEntries()).toHaveLength(4);
+    expect(readFirstPngPixelRgb(readZipEntry(zip, "a_border.png"))).toEqual([255, 0, 0]);
+    expect(readFirstPngPixelRgb(readZipEntry(zip, "d_border.png"))).toEqual([255, 0, 0]);
+    for (const name of ["b_border.jpg", "c_border.webp"]) {
+      expect(readZipEntry(zip, name).length).toBeGreaterThan(0);
+    }
   });
 });
 

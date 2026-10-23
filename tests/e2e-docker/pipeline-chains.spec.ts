@@ -177,7 +177,7 @@ test.describe("Color Adjust + Sharpen + Border chain", () => {
           steps: [
             { toolId: "adjust-colors", settings: { brightness: 10, contrast: 20 } },
             { toolId: "sharpening", settings: { sigma: 1.0 } },
-            { toolId: "border", settings: { size: 10, color: "#333333" } },
+            { toolId: "border", settings: { borderWidth: 10, borderColor: "#333333" } },
           ],
         }),
       },
@@ -185,6 +185,11 @@ test.describe("Color Adjust + Sharpen + Border chain", () => {
     expect(res.ok()).toBe(true);
     const body = await res.json();
     expect(body.downloadUrl).toBeTruthy();
+    const dlRes = await request.get(body.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    expect(readFirstPngPixelRgb(Buffer.from(await dlRes.body()))).toEqual([51, 51, 51]);
   });
 });
 
@@ -430,7 +435,7 @@ test.describe("Print preparation chain", () => {
             { toolId: "strip-metadata", settings: {} },
             { toolId: "resize", settings: { width: 2480, fit: "contain" } },
             { toolId: "sharpening", settings: { sigma: 1.2 } },
-            { toolId: "border", settings: { size: 40, color: "#ffffff" } },
+            { toolId: "border", settings: { borderWidth: 40, borderColor: "#ffffff" } },
           ],
         }),
       },
@@ -556,7 +561,7 @@ test.describe("Pipeline chain validation", () => {
         pipeline: JSON.stringify({
           steps: [
             { toolId: "resize", settings: { width: 100, fit: "contain" } },
-            { toolId: "border", settings: { size: 5, color: "#000000" } },
+            { toolId: "border", settings: { borderWidth: 5, borderColor: "#000000" } },
           ],
         }),
       },

@@ -158,7 +158,7 @@ test.describe("4-step eCommerce product workflow", () => {
           steps: [
             { toolId: "crop", settings: { left: 20, top: 20, width: 300, height: 300 } },
             { toolId: "image-enhancement", settings: { mode: "landscape" } },
-            { toolId: "border", settings: { size: 5, color: "#ffffff" } },
+            { toolId: "border", settings: { borderWidth: 5, borderColor: "#ffffff" } },
             { toolId: "optimize-for-web", settings: { maxWidth: 800, quality: 85 } },
           ],
         }),
@@ -182,7 +182,7 @@ test.describe("4-step grayscale print preparation", () => {
           steps: [
             { toolId: "adjust-colors", settings: { effect: "grayscale" } },
             { toolId: "sharpening", settings: { sigma: 1.5 } },
-            { toolId: "border", settings: { size: 30, color: "#ffffff" } },
+            { toolId: "border", settings: { borderWidth: 30, borderColor: "#ffffff" } },
             { toolId: "convert", settings: { format: "tiff" } },
           ],
         }),
@@ -196,13 +196,28 @@ test.describe("4-step grayscale print preparation", () => {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(dlRes.ok()).toBe(true);
+    const outTiff = Buffer.from(await dlRes.body());
+    const borderPngRes = await request.post("/api/v1/tools/image/convert", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "out.tiff", mimeType: "image/tiff", buffer: outTiff },
+        settings: JSON.stringify({ format: "png" }),
+      },
+    });
+    expect(borderPngRes.ok()).toBe(true);
+    const borderPngBody = await borderPngRes.json();
+    const borderPngDl = await request.get(borderPngBody.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(borderPngDl.ok()).toBe(true);
+    expect(readFirstPngPixelRgb(Buffer.from(await borderPngDl.body()))).toEqual([255, 255, 255]);
     const probeRes = await request.post("/api/v1/pipeline/execute", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: {
           name: "out.tiff",
           mimeType: "image/tiff",
-          buffer: Buffer.from(await dlRes.body()),
+          buffer: outTiff,
         },
         pipeline: JSON.stringify({
           steps: [
@@ -383,7 +398,7 @@ test.describe("5-step avatar generation", () => {
             { toolId: "crop", settings: { left: 50, top: 50, width: 200, height: 200 } },
             { toolId: "resize", settings: { width: 128, height: 128, fit: "cover" } },
             { toolId: "image-enhancement", settings: { mode: "portrait" } },
-            { toolId: "border", settings: { size: 3, color: "#cccccc" } },
+            { toolId: "border", settings: { borderWidth: 3, borderColor: "#cccccc" } },
             { toolId: "convert", settings: { format: "png" } },
           ],
         }),
@@ -397,15 +412,23 @@ test.describe("5-step avatar generation", () => {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(dlRes.ok()).toBe(true);
+    const avatarBuffer = Buffer.from(await dlRes.body());
+    const [br, bg, bb] = readFirstPngPixelRgb(avatarBuffer);
+    expect(br).toBeGreaterThanOrEqual(200);
+    expect(br).toBeLessThanOrEqual(208);
+    expect(bg).toBeGreaterThanOrEqual(200);
+    expect(bg).toBeLessThanOrEqual(208);
+    expect(bb).toBeGreaterThanOrEqual(200);
+    expect(bb).toBeLessThanOrEqual(208);
     const cropRes = await request.post("/api/v1/tools/image/crop", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: {
           name: "avatar.png",
           mimeType: "image/png",
-          buffer: Buffer.from(await dlRes.body()),
+          buffer: avatarBuffer,
         },
-        settings: JSON.stringify({ left: 20, top: 20, width: 50, height: 50 }),
+        settings: JSON.stringify({ left: 13, top: 13, width: 50, height: 50 }),
       },
     });
     expect(cropRes.ok()).toBe(true);
@@ -415,11 +438,11 @@ test.describe("5-step avatar generation", () => {
     });
     expect(croppedPngRes.ok()).toBe(true);
     const [r, g, b] = readFirstPngPixelRgb(Buffer.from(await croppedPngRes.body()));
-    expect(r).toBeGreaterThanOrEqual(54);
+    expect(r).toBeGreaterThanOrEqual(50);
     expect(r).toBeLessThanOrEqual(65);
-    expect(g).toBeGreaterThanOrEqual(40);
+    expect(g).toBeGreaterThanOrEqual(35);
     expect(g).toBeLessThanOrEqual(50);
-    expect(b).toBeGreaterThanOrEqual(14);
+    expect(b).toBeGreaterThanOrEqual(8);
     expect(b).toBeLessThanOrEqual(25);
   });
 });
@@ -489,7 +512,7 @@ test.describe("Pipeline with exotic format input", () => {
         pipeline: JSON.stringify({
           steps: [
             { toolId: "image-enhancement", settings: { mode: "auto" } },
-            { toolId: "border", settings: { size: 10, color: "#1a1a1a" } },
+            { toolId: "border", settings: { borderWidth: 10, borderColor: "#1a1a1a" } },
             { toolId: "compress", settings: { quality: 70 } },
           ],
         }),
@@ -587,7 +610,7 @@ test.describe("Pipeline output verification", () => {
         pipeline: JSON.stringify({
           steps: [
             { toolId: "resize", settings: { width: 80, fit: "contain" } },
-            { toolId: "border", settings: { size: 10, color: "#ff0000" } },
+            { toolId: "border", settings: { borderWidth: 10, borderColor: "#ff0000" } },
             { toolId: "convert", settings: { format: "png" } },
           ],
         }),
@@ -604,6 +627,7 @@ test.describe("Pipeline output verification", () => {
     expect(dlRes.ok()).toBe(true);
     const buffer = Buffer.from(await dlRes.body());
     expect(buffer.length).toBeGreaterThan(0);
+    expect(readFirstPngPixelRgb(buffer)).toEqual([255, 0, 0]);
 
     // Verify dimensions via info
     const infoRes = await request.post("/api/v1/tools/image/info", {

@@ -133,7 +133,7 @@ test.describe("Pipeline execution", () => {
           steps: [
             { toolId: "resize", settings: { width: 100, fit: "contain" } },
             { toolId: "rotate", settings: { angle: 90 } },
-            { toolId: "border", settings: { size: 10, color: "#ff0000" } },
+            { toolId: "border", settings: { borderWidth: 10, borderColor: "#ff0000" } },
           ],
         }),
       },
@@ -141,6 +141,11 @@ test.describe("Pipeline execution", () => {
     expect(res.ok()).toBe(true);
     const body = await res.json();
     expect(body.downloadUrl).toBeTruthy();
+    const dlRes = await request.get(body.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    expect(readFirstPngPixelRgb(Buffer.from(await dlRes.body()))).toEqual([255, 0, 0]);
   });
 
   test("execute pipeline with format conversion", async ({ request }) => {
@@ -494,7 +499,7 @@ test.describe("Pipeline edge cases", () => {
                 position: "center",
               },
             },
-            { toolId: "border", settings: { size: 5, color: "#000000" } },
+            { toolId: "border", settings: { borderWidth: 5, borderColor: "#000000" } },
           ],
         }),
       },
@@ -609,7 +614,7 @@ test.describe("Pipeline with various tools", () => {
         pipeline: JSON.stringify({
           steps: [
             { toolId: "crop", settings: { left: 0, top: 0, width: 200, height: 200 } },
-            { toolId: "border", settings: { size: 10, color: "#ff0000" } },
+            { toolId: "border", settings: { borderWidth: 10, borderColor: "#ff0000" } },
             { toolId: "compress", settings: { quality: 70 } },
           ],
         }),
@@ -758,7 +763,7 @@ test.describe("Pipeline with various tools", () => {
           steps: [
             { toolId: "resize", settings: { width: 500, fit: "contain" } },
             { toolId: "adjust-colors", settings: { brightness: 5, contrast: 10 } },
-            { toolId: "border", settings: { size: 5, color: "#333333" } },
+            { toolId: "border", settings: { borderWidth: 5, borderColor: "#333333" } },
             { toolId: "compress", settings: { quality: 75 } },
           ],
         }),
@@ -828,7 +833,7 @@ test.describe("Pipeline output verification", () => {
         pipeline: JSON.stringify({
           steps: [
             { toolId: "resize", settings: { width: 80, fit: "contain" } },
-            { toolId: "border", settings: { size: 5, color: "#FF0000" } },
+            { toolId: "border", settings: { borderWidth: 5, borderColor: "#FF0000" } },
           ],
         }),
       },
@@ -844,6 +849,7 @@ test.describe("Pipeline output verification", () => {
     expect(dlRes.ok()).toBe(true);
     const buffer = Buffer.from(await dlRes.body());
     expect(buffer.length).toBeGreaterThan(0);
+    expect(readFirstPngPixelRgb(buffer)).toEqual([255, 0, 0]);
   });
 
   test("pipeline output dimensions match expected", async ({ request }) => {
@@ -925,7 +931,7 @@ test.describe("Pipeline: 4+ step chains", () => {
           steps: [
             { toolId: "crop", settings: { left: 0, top: 0, width: 100, height: 100 } },
             { toolId: "rotate", settings: { angle: 45, background: "#000000" } },
-            { toolId: "border", settings: { size: 10, color: "#FFFFFF" } },
+            { toolId: "border", settings: { borderWidth: 10, borderColor: "#FFFFFF" } },
             { toolId: "compress", settings: { quality: 70 } },
           ],
         }),
@@ -1044,7 +1050,7 @@ test.describe("Pipeline: save and execute", () => {
           { toolId: "resize", settings: { width: 600, fit: "inside" } },
           { toolId: "adjust-colors", settings: { brightness: 10, contrast: 5 } },
           { toolId: "sharpening", settings: { sigma: 1.5 } },
-          { toolId: "border", settings: { size: 5, color: "#333333" } },
+          { toolId: "border", settings: { borderWidth: 5, borderColor: "#333333" } },
           { toolId: "compress", settings: { quality: 80 } },
         ],
       },
@@ -1179,7 +1185,7 @@ test.describe("Pipeline: tool combination chains", () => {
                 position: "center",
               },
             },
-            { toolId: "border", settings: { size: 10, color: "#333333" } },
+            { toolId: "border", settings: { borderWidth: 10, borderColor: "#333333" } },
             { toolId: "compress", settings: { quality: 70 } },
             { toolId: "convert", settings: { format: "jpg" } },
           ],
@@ -1202,7 +1208,7 @@ test.describe("Pipeline: tool combination chains", () => {
           steps: [
             { toolId: "strip-metadata", settings: {} },
             { toolId: "resize", settings: { width: 300, fit: "contain" } },
-            { toolId: "border", settings: { size: 5, color: "#FFFFFF" } },
+            { toolId: "border", settings: { borderWidth: 5, borderColor: "#FFFFFF" } },
             { toolId: "convert", settings: { format: "webp" } },
           ],
         }),

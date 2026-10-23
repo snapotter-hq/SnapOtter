@@ -400,7 +400,7 @@ test.describe("HEIC input through multi-step pipelines", () => {
           steps: [
             { toolId: "adjust-colors", settings: { brightness: 15, contrast: 10 } },
             { toolId: "resize", settings: { width: 150, fit: "contain" } },
-            { toolId: "border", settings: { size: 5, color: "#000000" } },
+            { toolId: "border", settings: { borderWidth: 5, borderColor: "#000000" } },
             { toolId: "compress", settings: { quality: 70 } },
           ],
         }),
@@ -461,7 +461,7 @@ test.describe("Deep pipelines (6+ steps)", () => {
             { toolId: "resize", settings: { width: 600, fit: "contain" } },
             { toolId: "adjust-colors", settings: { effect: "grayscale" } },
             { toolId: "sharpening", settings: { sigma: 1.5 } },
-            { toolId: "border", settings: { size: 8, color: "#ffffff" } },
+            { toolId: "border", settings: { borderWidth: 8, borderColor: "#ffffff" } },
             { toolId: "convert", settings: { format: "webp" } },
           ],
         }),
@@ -475,13 +475,31 @@ test.describe("Deep pipelines (6+ steps)", () => {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(dlRes.ok()).toBe(true);
+    const outWebp = Buffer.from(await dlRes.body());
+    const borderPngRes = await request.post("/api/v1/tools/image/convert", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: { name: "out.webp", mimeType: "image/webp", buffer: outWebp },
+        settings: JSON.stringify({ format: "png" }),
+      },
+    });
+    expect(borderPngRes.ok()).toBe(true);
+    const borderPngBody = await borderPngRes.json();
+    const borderPngDl = await request.get(borderPngBody.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(borderPngDl.ok()).toBe(true);
+    const [br, bg, bb] = readFirstPngPixelRgb(Buffer.from(await borderPngDl.body()));
+    expect(br).toBeGreaterThanOrEqual(250);
+    expect(bg).toBeGreaterThanOrEqual(250);
+    expect(bb).toBeGreaterThanOrEqual(250);
     const probeRes = await request.post("/api/v1/pipeline/execute", {
       headers: { Authorization: `Bearer ${token}` },
       multipart: {
         file: {
           name: "out.webp",
           mimeType: "image/webp",
-          buffer: Buffer.from(await dlRes.body()),
+          buffer: outWebp,
         },
         pipeline: JSON.stringify({
           steps: [
@@ -689,7 +707,7 @@ test.describe("Enhancement + Border + Convert pipeline", () => {
         pipeline: JSON.stringify({
           steps: [
             { toolId: "image-enhancement", settings: { mode: "auto" } },
-            { toolId: "border", settings: { size: 10, color: "#333333" } },
+            { toolId: "border", settings: { borderWidth: 10, borderColor: "#333333" } },
             { toolId: "convert", settings: { format: "webp" } },
           ],
         }),
@@ -699,6 +717,34 @@ test.describe("Enhancement + Border + Convert pipeline", () => {
     const body = await res.json();
     expect(body.downloadUrl).toBeTruthy();
     expect(body.downloadUrl).toContain(".webp");
+    const dlRes = await request.get(body.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dlRes.ok()).toBe(true);
+    const convRes = await request.post("/api/v1/tools/image/convert", {
+      headers: { Authorization: `Bearer ${token}` },
+      multipart: {
+        file: {
+          name: "out.webp",
+          mimeType: "image/webp",
+          buffer: Buffer.from(await dlRes.body()),
+        },
+        settings: JSON.stringify({ format: "png" }),
+      },
+    });
+    expect(convRes.ok()).toBe(true);
+    const convBody = await convRes.json();
+    const pngRes = await request.get(convBody.downloadUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(pngRes.ok()).toBe(true);
+    const [r, g, b] = readFirstPngPixelRgb(Buffer.from(await pngRes.body()));
+    expect(r).toBeGreaterThanOrEqual(45);
+    expect(r).toBeLessThanOrEqual(57);
+    expect(g).toBeGreaterThanOrEqual(45);
+    expect(g).toBeLessThanOrEqual(57);
+    expect(b).toBeGreaterThanOrEqual(45);
+    expect(b).toBeLessThanOrEqual(57);
   });
 });
 

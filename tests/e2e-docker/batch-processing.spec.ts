@@ -567,20 +567,17 @@ test.describe("Batch Border", () => {
         { name: "file", filename: "b.jpg", contentType: "image/jpeg", buffer: JPG_100x100 },
         { name: "file", filename: "c.webp", contentType: "image/webp", buffer: WEBP_50x50 },
       ],
-      [{ name: "settings", value: JSON.stringify({ size: 10, color: "#0000ff" }) }],
+      [{ name: "settings", value: JSON.stringify({ borderWidth: 10, borderColor: "#0000ff" }) }],
     );
     const res = await request.post("/api/v1/tools/image/border/batch", {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": contentType },
       data: reqBody,
     });
-    expect(res.ok()).toBe(true);
-    const resContentType = res.headers()["content-type"] ?? "";
-    if (resContentType.includes("application/json")) {
-      const json = await res.json();
-      expect(json.downloadUrl).toBeTruthy();
-    } else {
-      const buffer = Buffer.from(await res.body());
-      expect(buffer.length).toBeGreaterThan(0);
+    const zip = await readBatchZip(res, request);
+    expect(zip.getEntries()).toHaveLength(3);
+    expect(readFirstPngPixelRgb(readZipEntry(zip, "a_border.png"))).toEqual([0, 0, 255]);
+    for (const name of ["b_border.jpg", "c_border.webp"]) {
+      expect(readZipEntry(zip, name).length).toBeGreaterThan(0);
     }
   });
 });
