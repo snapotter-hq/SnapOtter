@@ -195,6 +195,7 @@ export function registerFindDuplicates(app: FastifyInstance) {
           continue;
         }
       }
+      let fallbackFormat: string | undefined;
       if (needsCliDecode(validation.format)) {
         try {
           const fileExt = extname(file.filename).toLowerCase().replace(/^\./, "") || undefined;
@@ -210,8 +211,11 @@ export function registerFindDuplicates(app: FastifyInstance) {
           // Sharp reads some of these formats itself (DNG is a TIFF), so the
           // decoder's failure only matters once that fallback fails too.
           try {
-            await sharp(file.buffer).metadata();
-            await sharp(file.buffer).resize(1).raw().toBuffer();
+            const meta = await sharp(file.buffer).metadata();
+            fallbackFormat = meta.format;
+            if (fallbackFormat !== "svg") {
+              await sharp(file.buffer).resize(1).raw().toBuffer();
+            }
           } catch (rawProbeErr) {
             const probeErr = asDecoderOutOfMemory(rawProbeErr);
             if (probeErr instanceof DecoderOutOfMemoryError) {
@@ -239,7 +243,7 @@ export function registerFindDuplicates(app: FastifyInstance) {
           }
         }
       }
-      if (validation.format === "svg") {
+      if (validation.format === "svg" || fallbackFormat === "svg") {
         try {
           file.buffer = decompressSvgz(file.buffer);
           file.buffer = sanitizeSvg(file.buffer);
@@ -252,11 +256,12 @@ export function registerFindDuplicates(app: FastifyInstance) {
           skippedFiles.push({ filename: file.filename, reason: "Invalid SVG" });
           continue;
         }
+      } else {
+        // autoOrient rethrows DecoderOutOfMemoryError and otherwise logs and
+        // returns the input when rotation fails; the hash step below is what
+        // rejects a buffer Sharp can't decode.
+        file.buffer = await autoOrient(file.buffer);
       }
-      // autoOrient rethrows DecoderOutOfMemoryError and otherwise logs and
-      // returns the input when rotation fails; the hash step below is what
-      // rejects a buffer Sharp can't decode.
-      file.buffer = await autoOrient(file.buffer);
       processableFiles.push(file);
     }
 

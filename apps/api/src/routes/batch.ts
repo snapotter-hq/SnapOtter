@@ -564,6 +564,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                   }
                 }
 
+                let fallbackFormat: string | undefined;
                 if (!skipPreprocess && needsCliDecode(validation.format)) {
                   try {
                     const fileExt =
@@ -594,8 +595,11 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                       continue;
                     }
                     try {
-                      await sharp(processBuffer).metadata();
-                      await sharp(processBuffer).resize(1).raw().toBuffer();
+                      const meta = await sharp(processBuffer).metadata();
+                      fallbackFormat = meta.format;
+                      if (fallbackFormat !== "svg") {
+                        await sharp(processBuffer).resize(1).raw().toBuffer();
+                      }
                     } catch (rawProbeErr) {
                       const probeErr = asDecoderOutOfMemory(rawProbeErr);
                       if (probeErr instanceof DecoderOutOfMemoryError) {
@@ -625,7 +629,7 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                   }
                 }
 
-                if (validation.format === "svg") {
+                if (validation.format === "svg" || fallbackFormat === "svg") {
                   try {
                     processBuffer = decompressSvgz(processBuffer);
                     processBuffer = sanitizeSvg(processBuffer);

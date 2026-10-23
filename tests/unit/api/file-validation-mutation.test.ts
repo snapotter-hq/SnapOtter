@@ -664,6 +664,14 @@ describe("validateImageBuffer - extension-driven detection", () => {
     expectValid(await validateImageBuffer(png, "anim.apng"), "png", 3, 2);
   });
 
+  it("identifies a comment-padded SVG disguised with an .apng extension as svg (#3749)", async () => {
+    const commentPaddedSvg = Buffer.from(
+      `<!-- ${"x".repeat(4500)} --><svg xmlns="http://www.w3.org/2000/svg" width="25" height="15"><rect width="25" height="15"/></svg>`,
+      "utf-8",
+    );
+    expectValid(await validateImageBuffer(commentPaddedSvg, "padded.apng"), "svg", 25, 15);
+  });
+
   it("falls back to raw for a RAW extension with unrecognized magic bytes", async () => {
     // A .rw2 (Panasonic) buffer with no recognized magic -> raw via L249.
     const buf = Buffer.alloc(32);

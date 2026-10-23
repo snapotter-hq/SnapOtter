@@ -206,7 +206,51 @@ export function registerColorPalette(app: FastifyInstance) {
     if (!validation.valid) {
       return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
     }
-    if (validation.format === "svg") {
+    if (validation.format === "heif") {
+      try {
+        fileBuffer = await decodeHeic(fileBuffer);
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+        return reply.status(422).send({
+          error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
+          details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+        });
+      }
+    }
+    let fallbackFormat: string | undefined;
+    if (needsCliDecode(validation.format)) {
+      try {
+        const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
+        fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt);
+      } catch (rawDecodeErr) {
+        const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
+        if (
+          decodeErr instanceof DecoderOutOfMemoryError ||
+          (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+        ) {
+          throw decodeErr;
+        }
+        try {
+          const meta = await sharp(fileBuffer).metadata();
+          fallbackFormat = meta.format;
+          if (fallbackFormat !== "svg") {
+            await sharp(fileBuffer).resize(1).raw().toBuffer();
+          }
+        } catch (rawProbeErr) {
+          const probeErr = asDecoderOutOfMemory(rawProbeErr);
+          if (probeErr instanceof DecoderOutOfMemoryError) throw probeErr;
+          if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) throw decodeErr;
+          return reply.status(422).send({
+            error: `Failed to decode ${validation.format.toUpperCase()} file`,
+            details: stripInternalPaths(
+              rawProbeErr instanceof Error ? rawProbeErr.message : String(rawProbeErr),
+            ),
+          });
+        }
+      }
+    }
+    if (validation.format === "svg" || fallbackFormat === "svg") {
       try {
         fileBuffer = decompressSvgz(fileBuffer);
         fileBuffer = sanitizeSvg(fileBuffer);
@@ -221,47 +265,6 @@ export function registerColorPalette(app: FastifyInstance) {
     }
 
     try {
-      if (validation.format === "heif") {
-        try {
-          fileBuffer = await decodeHeic(fileBuffer);
-        } catch (rawErr) {
-          const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
-          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
-          return reply.status(422).send({
-            error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
-            details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-          });
-        }
-      }
-      if (needsCliDecode(validation.format)) {
-        try {
-          const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
-          fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt);
-        } catch (rawDecodeErr) {
-          const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
-          if (
-            decodeErr instanceof DecoderOutOfMemoryError ||
-            (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
-          ) {
-            throw decodeErr;
-          }
-          try {
-            await sharp(fileBuffer).metadata();
-            await sharp(fileBuffer).resize(1).raw().toBuffer();
-          } catch (rawProbeErr) {
-            const probeErr = asDecoderOutOfMemory(rawProbeErr);
-            if (probeErr instanceof DecoderOutOfMemoryError) throw probeErr;
-            if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) throw decodeErr;
-            return reply.status(422).send({
-              error: `Failed to decode ${validation.format.toUpperCase()} file`,
-              details: stripInternalPaths(
-                rawProbeErr instanceof Error ? rawProbeErr.message : String(rawProbeErr),
-              ),
-            });
-          }
-        }
-      }
-
       // Resize to small image for analysis (100x100 for better sampling)
       const raw = await sharp(fileBuffer)
         .resize(100, 100, { fit: "fill" })

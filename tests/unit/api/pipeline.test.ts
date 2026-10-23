@@ -3243,6 +3243,120 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
     expect(autoOrient).not.toHaveBeenCalled();
   });
 
+  it("skips the 1x1 pixel probe, sanitizes disguised SVGs (.tga / .dng), and skips autoOrient on /api/v1/pipeline/execute and /api/v1/pipeline/batch (#3749)", async () => {
+    vi.clearAllMocks();
+    const sharpMod = (await import("sharp")).default;
+    const { decodeToSharpCompat, needsCliDecode } = await import(
+      "../../../apps/api/src/lib/format-decoders.js"
+    );
+
+    const commentPaddedDirtySvg = Buffer.from(
+      `<!-- ${"x".repeat(4500)} --><svg xmlns="http://www.w3.org/2000/svg" width="25" height="25"><script>alert(1)</script><feImage href="http://169.254.169.254/latest/meta-data/"/><rect width="25" height="25" fill="red"/></svg>`,
+      "utf-8",
+    );
+    const commentPaddedOverCapSvg = Buffer.from(
+      `<!-- ${"x".repeat(4500)} --><svg xmlns="http://www.w3.org/2000/svg" width="25" height="25">${"<rect/>".repeat(5001)}</svg>`,
+      "utf-8",
+    );
+
+    const resizeSpy = vi.spyOn(sharpMod.prototype, "resize");
+    try {
+      // 1. /api/v1/pipeline/execute with disguised .tga SVG
+      vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+        valid: true,
+        format: "tga",
+        width: 0,
+        height: 0,
+      });
+      vi.mocked(needsCliDecode).mockReturnValueOnce(true);
+      vi.mocked(decodeToSharpCompat).mockRejectedValueOnce(new Error("CLI decode failed"));
+
+      const execReply = await invokePipelineExecuteRoute([
+        { type: "file", filename: "padded.tga", content: commentPaddedDirtySvg },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: executeTestToolId, settings: {} }],
+          }),
+        },
+      ]);
+
+      expect(execReply.statusCode).toBe(202);
+      expect(resizeSpy).not.toHaveBeenCalled();
+      expect(autoOrient).not.toHaveBeenCalled();
+      expect(putObjectMock).toHaveBeenCalledTimes(1);
+      const execCall = putObjectMock.mock.calls[0] as unknown[] | undefined;
+      const execStored = (execCall ? (execCall[1] as Buffer) : Buffer.alloc(0)).toString("utf-8");
+      expect(execStored).toContain("<svg");
+      expect(execStored).not.toContain("<script");
+      expect(execStored).not.toContain("169.254.169.254");
+
+      // Over-cap disguised SVG on /api/v1/pipeline/execute returns 400
+      vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+        valid: true,
+        format: "raw",
+        width: 0,
+        height: 0,
+      });
+      vi.mocked(needsCliDecode).mockReturnValueOnce(true);
+      vi.mocked(decodeToSharpCompat).mockRejectedValueOnce(new Error("CLI decode failed"));
+
+      const execOverCapReply = await invokePipelineExecuteRoute([
+        { type: "file", filename: "padded.dng", content: commentPaddedOverCapSvg },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: executeTestToolId, settings: {} }],
+          }),
+        },
+      ]);
+      expect(execOverCapReply.statusCode).toBe(400);
+      expect(execOverCapReply.payload).toEqual({
+        error: "SVG exceeds maximum element count of 5000",
+      });
+
+      // 2. /api/v1/pipeline/batch with disguised .tga and over-cap .dng SVGs
+      putObjectMock.mockClear();
+      vi.mocked(validateImageBuffer)
+        .mockResolvedValueOnce({ valid: true, format: "tga", width: 0, height: 0 })
+        .mockResolvedValueOnce({ valid: true, format: "raw", width: 0, height: 0 });
+      vi.mocked(needsCliDecode).mockReturnValueOnce(true).mockReturnValueOnce(true);
+      vi.mocked(decodeToSharpCompat)
+        .mockRejectedValueOnce(new Error("CLI decode failed"))
+        .mockRejectedValueOnce(new Error("CLI decode failed"));
+
+      const batchReply = await invokePipelineBatchRoute([
+        { type: "file", filename: "padded.tga", content: commentPaddedDirtySvg },
+        { type: "file", filename: "padded.dng", content: commentPaddedOverCapSvg },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: executeTestToolId, settings: {} }],
+          }),
+        },
+        { type: "field", fieldname: "clientJobId", value: "pipeline-batch-disguised-svg" },
+      ]);
+
+      expect(batchReply.statusCode).toBe(202);
+      expect(resizeSpy).not.toHaveBeenCalled();
+      expect(autoOrient).not.toHaveBeenCalled();
+      expect(putObjectMock).toHaveBeenCalledTimes(1);
+      const batchCall = putObjectMock.mock.calls[0] as unknown[] | undefined;
+      const batchStored = (batchCall ? (batchCall[1] as Buffer) : Buffer.alloc(0)).toString(
+        "utf-8",
+      );
+      expect(batchStored).toContain("<svg");
+      expect(batchStored).not.toContain("<script");
+      expect(batchStored).not.toContain("169.254.169.254");
+    } finally {
+      resizeSpy.mockRestore();
+      vi.mocked(needsCliDecode).mockReturnValue(false);
+    }
+  });
+
   it("answers 400 when decompressSvgz or sanitizeSvg rejects on /api/v1/pipeline/execute (#3083)", async () => {
     vi.clearAllMocks();
     vi.mocked(validateImageBuffer).mockResolvedValue({

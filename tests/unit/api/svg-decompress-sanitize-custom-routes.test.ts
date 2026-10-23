@@ -1,4 +1,4 @@
-import { Readable } from "node:stream";
+import { PassThrough, Readable } from "node:stream";
 import { gzipSync } from "node:zlib";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -159,10 +159,18 @@ async function invokeRoute(
       }
     },
   };
+  const rawStream = Object.assign(new PassThrough(), {
+    headersSent: false,
+    writeHead: vi.fn(function (this: { headersSent: boolean }) {
+      this.headersSent = true;
+    }),
+  });
+  rawStream.resume();
   const reply = {
     statusCode: 200,
     payload: undefined as unknown,
-    raw: { headersSent: false, destroy: vi.fn() },
+    hijack: vi.fn(),
+    raw: rawStream,
     status(code: number) {
       this.statusCode = code;
       return this;
@@ -1472,5 +1480,166 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         ]),
       ).rejects.toThrow(decompressFault);
     });
+
+    it.each([
+      {
+        name: "POST /api/v1/tools/image/stitch",
+        url: "/api/v1/tools/image/stitch",
+        makeParts: (filename: string, content: Buffer) => [
+          { type: "file" as const, filename, content },
+          { type: "file" as const, filename: "second.svg", content: DIRTY_SVG },
+          { type: "field" as const, fieldname: "settings", value: "{}" },
+        ],
+      },
+      {
+        name: "POST /api/v1/tools/image/barcode-read",
+        url: "/api/v1/tools/image/barcode-read",
+        makeParts: (filename: string, content: Buffer) => [
+          { type: "file" as const, filename, content },
+          { type: "field" as const, fieldname: "settings", value: "{}" },
+        ],
+      },
+      {
+        name: "POST /api/v1/tools/image/split",
+        url: "/api/v1/tools/image/split",
+        makeParts: (filename: string, content: Buffer) => [
+          { type: "file" as const, filename, content },
+          { type: "field" as const, fieldname: "settings", value: "{}" },
+        ],
+      },
+      {
+        name: "POST /api/v1/tools/image/color-palette",
+        url: "/api/v1/tools/image/color-palette",
+        makeParts: (filename: string, content: Buffer) => [
+          { type: "file" as const, filename, content },
+          { type: "field" as const, fieldname: "settings", value: "{}" },
+        ],
+      },
+      {
+        name: "POST /api/v1/tools/image/collage",
+        url: "/api/v1/tools/image/collage",
+        makeParts: (filename: string, content: Buffer) => [
+          { type: "file" as const, filename, content },
+          { type: "file" as const, filename: "second.svg", content: DIRTY_SVG },
+          {
+            type: "field" as const,
+            fieldname: "settings",
+            value: JSON.stringify({ templateId: "2-h-equal" }),
+          },
+        ],
+      },
+      {
+        name: "POST /api/v1/tools/image/image-to-pdf",
+        url: "/api/v1/tools/image/image-to-pdf",
+        makeParts: (filename: string, content: Buffer) => [
+          { type: "file" as const, filename, content },
+          { type: "file" as const, filename: "second.svg", content: DIRTY_SVG },
+          { type: "field" as const, fieldname: "settings", value: "{}" },
+        ],
+      },
+      {
+        name: "POST /api/v1/tools/image/favicon",
+        url: "/api/v1/tools/image/favicon",
+        makeParts: (filename: string, content: Buffer) => [
+          { type: "file" as const, filename, content },
+          { type: "field" as const, fieldname: "settings", value: "{}" },
+        ],
+      },
+      {
+        name: "POST /api/v1/tools/image/find-duplicates",
+        url: "/api/v1/tools/image/find-duplicates",
+        makeParts: (filename: string, content: Buffer) => [
+          { type: "file" as const, filename, content },
+          { type: "file" as const, filename: "second.svg", content: DIRTY_SVG },
+          { type: "field" as const, fieldname: "settings", value: "{}" },
+        ],
+      },
+    ])(
+      "$name sanitizes comment-padded SVGs disguised with .apng, .tga, or .dng extensions (#3749)",
+      async ({ url, makeParts }) => {
+        const routeHandler = routes.get(url);
+        const commentPaddedDirtySvg = Buffer.from(
+          `<!-- ${"x".repeat(4500)} --><svg xmlns="http://www.w3.org/2000/svg" width="25" height="25"><script>alert(1)</script><feImage href="http://169.254.169.254/latest/meta-data/"/><rect width="25" height="25" fill="red"/></svg>`,
+          "utf-8",
+        );
+        const commentPaddedOverCapSvg = Buffer.from(
+          `<!-- ${"x".repeat(4500)} --><svg xmlns="http://www.w3.org/2000/svg" width="25" height="25">${"<rect/>".repeat(5001)}</svg>`,
+          "utf-8",
+        );
+
+        for (const ext of ["apng", "tga", "dng"]) {
+          let disguisedSanitized = false;
+          let pixelDecodedBeforeSanitize = false;
+          const origResize = sharp.prototype.resize;
+          const origStats = sharp.prototype.stats;
+          const resizeSpy = vi.spyOn(sharp.prototype, "resize").mockImplementation(function (
+            this: sharp.Sharp,
+            ...args: Parameters<typeof origResize>
+          ) {
+            if (!disguisedSanitized) pixelDecodedBeforeSanitize = true;
+            return origResize.apply(this, args);
+          });
+          const statsSpy = vi.spyOn(sharp.prototype, "stats").mockImplementation(function (
+            this: sharp.Sharp,
+            ...args: Parameters<typeof origStats>
+          ) {
+            if (!disguisedSanitized) pixelDecodedBeforeSanitize = true;
+            return origStats.apply(this, args);
+          });
+
+          const sanitizedInputs: Buffer[] = [];
+          mocks.sanitizeSvg.mockImplementation((buf: Buffer) => {
+            if (buf.toString("utf-8").includes("169.254.169.254")) {
+              disguisedSanitized = true;
+            }
+            sanitizedInputs.push(buf);
+            return Buffer.from(
+              '<svg xmlns="http://www.w3.org/2000/svg" width="25" height="25"><rect width="25" height="25" fill="red"/></svg>',
+              "utf-8",
+            );
+          });
+
+          try {
+            const okReply = await invokeRoute(
+              routeHandler,
+              makeParts(`padded.${ext}`, commentPaddedDirtySvg),
+            );
+            expect(okReply.statusCode).toBe(200);
+            expect(disguisedSanitized).toBe(true);
+            expect(pixelDecodedBeforeSanitize).toBe(false);
+            expect(
+              sanitizedInputs.some((b) => b.toString("utf-8").includes("169.254.169.254")),
+            ).toBe(true);
+          } finally {
+            resizeSpy.mockRestore();
+            statsSpy.mockRestore();
+            mocks.sanitizeSvg.mockReset();
+          }
+
+          const overCapReply = await invokeRoute(
+            routeHandler,
+            makeParts(`padded-over.${ext}`, commentPaddedOverCapSvg),
+          );
+          expect(overCapReply.statusCode).toBe(400);
+          if (url === "/api/v1/tools/image/find-duplicates") {
+            expect(overCapReply.payload).toMatchObject({
+              skippedFiles: [{ filename: `padded-over.${ext}`, reason: "Invalid SVG" }],
+            });
+          } else {
+            expect((overCapReply.payload as { error?: string })?.error).toContain(
+              "SVG exceeds maximum element count of 5000",
+            );
+          }
+
+          const sanitizeFault = new TypeError(`unexpected sanitizer fault (${ext})`);
+          mocks.sanitizeSvg.mockImplementationOnce(() => {
+            throw sanitizeFault;
+          });
+          await expect(
+            invokeRoute(routeHandler, makeParts(`padded.${ext}`, commentPaddedDirtySvg)),
+          ).rejects.toThrow(sanitizeFault);
+        }
+      },
+    );
   });
 });

@@ -327,6 +327,9 @@ export async function validateImageBuffer(
   try {
     const sharpOpts = detectedFormat === "svg" ? { density: 72 } : undefined;
     const metadata = await sharp(buffer, sharpOpts).metadata();
+    if (metadata.format === "svg") {
+      detectedFormat = "svg";
+    }
     const width = metadata.width ?? 0;
     const height = metadata.height ?? 0;
     const megapixels = (width * height) / 1_000_000;

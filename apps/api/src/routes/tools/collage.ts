@@ -491,6 +491,7 @@ export function registerCollage(app: FastifyInstance) {
           });
         }
       }
+      let fallbackFormat: string | undefined;
       if (needsCliDecode(validation.format)) {
         try {
           const fileExt = extname(file.filename).toLowerCase().replace(/^\./, "") || undefined;
@@ -504,8 +505,11 @@ export function registerCollage(app: FastifyInstance) {
             throw decodeErr;
           }
           try {
-            await sharp(file.buffer).metadata();
-            await sharp(file.buffer).resize(1).raw().toBuffer();
+            const meta = await sharp(file.buffer).metadata();
+            fallbackFormat = meta.format;
+            if (fallbackFormat !== "svg") {
+              await sharp(file.buffer).resize(1).raw().toBuffer();
+            }
           } catch (rawProbeErr) {
             const probeErr = asDecoderOutOfMemory(rawProbeErr);
             if (probeErr instanceof DecoderOutOfMemoryError) throw probeErr;
@@ -521,7 +525,7 @@ export function registerCollage(app: FastifyInstance) {
           }
         }
       }
-      if (validation.format === "svg") {
+      if (validation.format === "svg" || fallbackFormat === "svg") {
         try {
           file.buffer = decompressSvgz(file.buffer);
           file.buffer = sanitizeSvg(file.buffer);
@@ -533,8 +537,9 @@ export function registerCollage(app: FastifyInstance) {
           }
           throw err;
         }
+      } else {
+        file.buffer = await autoOrient(file.buffer);
       }
-      file.buffer = await autoOrient(file.buffer);
     }
 
     let settings: z.infer<typeof settingsSchema>;

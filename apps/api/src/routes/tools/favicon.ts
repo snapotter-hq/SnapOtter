@@ -137,21 +137,7 @@ export function registerFavicon(app: FastifyInstance) {
       let buf = file.buffer;
       const fileExt = extname(file.filename).toLowerCase().replace(/^\./, "") || undefined;
 
-      // Sanitize SVG input
-      if (validation.format === "svg") {
-        try {
-          buf = decompressSvgz(buf);
-          buf = sanitizeSvg(buf);
-        } catch (err) {
-          if (!isSvgClientError(err)) throw err;
-          const reason = err instanceof Error ? err.message : "Unknown decode error";
-          skippedFiles.push({ filename: file.filename, reason });
-          continue;
-        }
-        decodedFiles.push({ buffer: buf, filename: file.filename });
-        continue;
-      }
-
+      let fallbackFormat: string | undefined;
       try {
         // Decode HEIC/HEIF via system decoder
         if (validation.format === "heif") {
@@ -171,8 +157,11 @@ export function registerFavicon(app: FastifyInstance) {
               throw decodeErr;
             }
             try {
-              await sharp(buf).metadata();
-              await sharp(buf).resize(1).raw().toBuffer();
+              const meta = await sharp(buf).metadata();
+              fallbackFormat = meta.format;
+              if (fallbackFormat !== "svg") {
+                await sharp(buf).resize(1).raw().toBuffer();
+              }
             } catch (rawProbeErr) {
               const probeErr = asDecoderOutOfMemory(rawProbeErr);
               if (probeErr instanceof DecoderOutOfMemoryError) {
@@ -185,7 +174,30 @@ export function registerFavicon(app: FastifyInstance) {
             }
           }
         }
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+        const reason = err instanceof Error ? err.message : "Unknown decode error";
+        skippedFiles.push({ filename: file.filename, reason });
+        continue;
+      }
 
+      // Sanitize SVG input
+      if (validation.format === "svg" || fallbackFormat === "svg") {
+        try {
+          buf = decompressSvgz(buf);
+          buf = sanitizeSvg(buf);
+        } catch (err) {
+          if (!isSvgClientError(err)) throw err;
+          const reason = err instanceof Error ? err.message : "Unknown decode error";
+          skippedFiles.push({ filename: file.filename, reason });
+          continue;
+        }
+        decodedFiles.push({ buffer: buf, filename: file.filename });
+        continue;
+      }
+
+      try {
         // Auto-orient EXIF rotation
         buf = await autoOrient(buf);
 

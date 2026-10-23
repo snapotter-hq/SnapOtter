@@ -506,6 +506,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                     }
 
                     // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
+                    let fallbackFormat: string | undefined;
                     if (needsCliDecode(validation.format)) {
                       try {
                         const fileExt =
@@ -517,20 +518,41 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                         );
                         const ext = filename.match(/\.[^.]+$/)?.[0];
                         if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
-                      } catch (rawErr) {
-                        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
-                        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
-                        return reply.status(422).send({
-                          error: `Failed to decode ${validation.format} file`,
-                          details: stripInternalPaths(
-                            err instanceof Error ? err.message : String(err),
-                          ),
-                        });
+                      } catch (rawDecodeErr) {
+                        const decodeErr = normalizeOperationalWriteError(
+                          asDecoderOutOfMemory(rawDecodeErr),
+                        );
+                        if (
+                          decodeErr instanceof DecoderOutOfMemoryError ||
+                          (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+                        ) {
+                          throw decodeErr;
+                        }
+                        const meta = await sharp(processBuffer)
+                          .metadata()
+                          .catch((rawProbeErr: unknown) => {
+                            const probeErr = asDecoderOutOfMemory(rawProbeErr);
+                            if (probeErr instanceof DecoderOutOfMemoryError) throw probeErr;
+                            return null;
+                          });
+                        if (meta?.format === "svg") {
+                          fallbackFormat = "svg";
+                        } else {
+                          if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
+                            throw decodeErr;
+                          }
+                          return reply.status(422).send({
+                            error: `Failed to decode ${validation.format} file`,
+                            details: stripInternalPaths(
+                              decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
+                            ),
+                          });
+                        }
                       }
                     }
 
                     // Sanitize SVG input and normalize EXIF orientation
-                    if (validation.format === "svg") {
+                    if (validation.format === "svg" || fallbackFormat === "svg") {
                       try {
                         processBuffer = decompressSvgz(processBuffer);
                         processBuffer = sanitizeSvg(processBuffer);
@@ -1653,6 +1675,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   }
                 }
 
+                let fallbackFormat: string | undefined;
                 if (needsCliDecode(fileValidation.format)) {
                   try {
                     const fileExt =
@@ -1687,8 +1710,11 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                       continue;
                     }
                     try {
-                      await sharp(processBuffer).metadata();
-                      await sharp(processBuffer).resize(1).raw().toBuffer();
+                      const meta = await sharp(processBuffer).metadata();
+                      fallbackFormat = meta.format;
+                      if (fallbackFormat !== "svg") {
+                        await sharp(processBuffer).resize(1).raw().toBuffer();
+                      }
                     } catch (rawProbeErr) {
                       const probeErr = asDecoderOutOfMemory(rawProbeErr);
                       if (probeErr instanceof DecoderOutOfMemoryError) {
@@ -1726,7 +1752,7 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   }
                 }
 
-                if (fileValidation.format === "svg") {
+                if (fileValidation.format === "svg" || fallbackFormat === "svg") {
                   try {
                     processBuffer = decompressSvgz(processBuffer);
                     processBuffer = sanitizeSvg(processBuffer);

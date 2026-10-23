@@ -214,7 +214,63 @@ export function registerBarcodeRead(app: FastifyInstance) {
         return reply.status(400).send({ error: "Settings must be valid JSON" });
       }
 
-      if (validation.format === "svg") {
+      if (validation.format === "heif") {
+        try {
+          fileBuffer = await decodeHeic(fileBuffer);
+        } catch (rawErr) {
+          // A server fault (no decoder, no memory for its output, or a
+          // tmpdir write failure) is not a bad file. decodeHeic reports
+          // running out of memory as decoder unavailable (#1577), which the
+          // outer catch hands to the global handler as a 503 (#1533, #2800).
+          const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err) || isDecoderFault(err)) {
+            throw err;
+          }
+          return reply.status(422).send({
+            error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
+            details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+          });
+        }
+      }
+      let fallbackFormat: string | undefined;
+      if (needsCliDecode(validation.format)) {
+        try {
+          const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
+          fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt);
+        } catch (rawDecodeErr) {
+          const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
+          if (
+            decodeErr instanceof DecoderOutOfMemoryError ||
+            (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+          ) {
+            throw decodeErr;
+          }
+          try {
+            const meta = await sharp(fileBuffer).metadata();
+            fallbackFormat = meta.format;
+            if (fallbackFormat !== "svg") {
+              await sharp(fileBuffer).resize(1).raw().toBuffer();
+            }
+          } catch (rawProbeErr) {
+            const probeErr = asDecoderOutOfMemory(rawProbeErr);
+            if (probeErr instanceof DecoderOutOfMemoryError) {
+              throw probeErr;
+            }
+            if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
+              throw decodeErr;
+            }
+            return reply.status(422).send({
+              error: `Failed to decode ${validation.format.toUpperCase()} file`,
+              details: stripInternalPaths(
+                rawProbeErr instanceof Error ? rawProbeErr.message : String(rawProbeErr),
+              ),
+            });
+          }
+        }
+      }
+
+      const isSvg = validation.format === "svg" || fallbackFormat === "svg";
+      if (isSvg) {
         try {
           fileBuffer = decompressSvgz(fileBuffer);
           fileBuffer = sanitizeSvg(fileBuffer);
@@ -233,57 +289,9 @@ export function registerBarcodeRead(app: FastifyInstance) {
       try {
         const tryHarder = settings.tryHarder;
 
-        if (validation.format === "heif") {
-          try {
-            fileBuffer = await decodeHeic(fileBuffer);
-          } catch (rawErr) {
-            // A server fault (no decoder, no memory for its output, or a
-            // tmpdir write failure) is not a bad file. decodeHeic reports
-            // running out of memory as decoder unavailable (#1577), which the
-            // outer catch hands to the global handler as a 503 (#1533, #2800).
-            const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
-            if (isDecoderUnavailable(err) || hasServerErrorStatus(err) || isDecoderFault(err)) {
-              throw err;
-            }
-            return reply.status(422).send({
-              error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
-              details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
-            });
-          }
+        if (!isSvg) {
+          fileBuffer = await autoOrient(fileBuffer);
         }
-        if (needsCliDecode(validation.format)) {
-          try {
-            const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
-            fileBuffer = await decodeToSharpCompat(fileBuffer, validation.format, fileExt);
-          } catch (rawDecodeErr) {
-            const decodeErr = normalizeOperationalWriteError(asDecoderOutOfMemory(rawDecodeErr));
-            if (
-              decodeErr instanceof DecoderOutOfMemoryError ||
-              (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
-            ) {
-              throw decodeErr;
-            }
-            try {
-              await sharp(fileBuffer).metadata();
-              await sharp(fileBuffer).resize(1).raw().toBuffer();
-            } catch (rawProbeErr) {
-              const probeErr = asDecoderOutOfMemory(rawProbeErr);
-              if (probeErr instanceof DecoderOutOfMemoryError) {
-                throw probeErr;
-              }
-              if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
-                throw decodeErr;
-              }
-              return reply.status(422).send({
-                error: `Failed to decode ${validation.format.toUpperCase()} file`,
-                details: stripInternalPaths(
-                  rawProbeErr instanceof Error ? rawProbeErr.message : String(rawProbeErr),
-                ),
-              });
-            }
-          }
-        }
-        fileBuffer = await autoOrient(fileBuffer);
 
         // Convert to raw RGBA pixel data
         const image = sharp(fileBuffer);

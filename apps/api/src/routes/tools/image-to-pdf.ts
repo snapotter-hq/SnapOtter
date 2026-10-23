@@ -222,6 +222,7 @@ export function registerImageToPdfRoute(
         });
       }
 
+      let fallbackFormat: string | undefined;
       if (validation.format === "heif") {
         try {
           buf = await decodeHeic(buf);
@@ -246,8 +247,11 @@ export function registerImageToPdfRoute(
             throw decodeErr;
           }
           try {
-            await sharp(buf).metadata();
-            await sharp(buf).resize(1).raw().toBuffer();
+            const meta = await sharp(buf).metadata();
+            fallbackFormat = meta.format;
+            if (fallbackFormat !== "svg") {
+              await sharp(buf).resize(1).raw().toBuffer();
+            }
           } catch (rawProbeErr) {
             const probeErr = asDecoderOutOfMemory(rawProbeErr);
             if (probeErr instanceof DecoderOutOfMemoryError) {
@@ -262,7 +266,9 @@ export function registerImageToPdfRoute(
             });
           }
         }
-      } else if (validation.format === "svg") {
+      }
+
+      if (validation.format === "svg" || fallbackFormat === "svg") {
         try {
           buf = decompressSvgz(buf);
           buf = sanitizeSvg(buf);
@@ -274,9 +280,10 @@ export function registerImageToPdfRoute(
           }
           throw err;
         }
+        preparedBuffers.push(buf);
+      } else {
+        preparedBuffers.push(await autoOrient(buf));
       }
-
-      preparedBuffers.push(await autoOrient(buf));
     }
 
     const jobId = randomUUID();

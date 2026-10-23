@@ -968,6 +968,62 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     expect(mocks.autoOrient).not.toHaveBeenCalled();
   });
 
+  it("skips the 1x1 pixel probe, sanitizes disguised SVGs (.tga / .dng), and skips autoOrient on /batch (#3749)", async () => {
+    const sharpMod = (await import("sharp")).default;
+    const formatDecoders = await import("../../../apps/api/src/lib/format-decoders.js");
+    const uploadedPayloads: string[] = [];
+    mocks.validateImageBuffer.mockImplementation(async (_buf: Buffer, name: string) => ({
+      valid: true,
+      format: name.endsWith(".dng") ? "raw" : "tga",
+    }));
+    mocks.putObject.mockImplementation(async (_key: string, data: Buffer | string) => {
+      uploadedPayloads.push(Buffer.isBuffer(data) ? data.toString("utf-8") : data);
+    });
+
+    const decodeSpy = vi
+      .spyOn(formatDecoders, "decodeToSharpCompat")
+      .mockRejectedValue(new Error("CLI decode failed"));
+    const resizeSpy = vi.spyOn(sharpMod.prototype, "resize");
+    try {
+      const commentPaddedDirtySvg = Buffer.from(
+        `<!-- ${"x".repeat(4500)} --><svg xmlns="http://www.w3.org/2000/svg" width="25" height="25"><script>alert(1)</script><feImage href="http://169.254.169.254/latest/meta-data/"/><rect width="25" height="25" fill="red"/></svg>`,
+        "utf-8",
+      );
+      const commentPaddedOverCapSvg = Buffer.from(
+        `<!-- ${"x".repeat(4500)} --><svg xmlns="http://www.w3.org/2000/svg" width="25" height="25">${"<rect/>".repeat(5001)}</svg>`,
+        "utf-8",
+      );
+
+      const reply = await invokeBatchRoute({
+        section: "image",
+        toolId: "resize",
+        parts: [
+          { type: "file", filename: "padded.tga", content: commentPaddedDirtySvg },
+          { type: "file", filename: "padded.dng", content: commentPaddedOverCapSvg },
+          { type: "field", fieldname: "settings", value: "{}" },
+          { type: "field", fieldname: "clientJobId", value: "batch-disguised-svg" },
+        ],
+      });
+
+      expect(reply.statusCode).toBe(202);
+      expect(resizeSpy).not.toHaveBeenCalled();
+      expect(mocks.autoOrient).not.toHaveBeenCalled();
+      expect(uploadedPayloads).toHaveLength(1);
+      expect(uploadedPayloads[0]).toContain("<svg");
+      expect(uploadedPayloads[0]).not.toContain("<script");
+      expect(uploadedPayloads[0]).not.toContain("169.254.169.254");
+      expect(mocks.recordChildOutcome).toHaveBeenCalledWith(
+        "batch-disguised-svg",
+        2,
+        "padded.dng",
+        "SVG exceeds maximum element count of 5000",
+      );
+    } finally {
+      resizeSpy.mockRestore();
+      decodeSpy.mockRestore();
+    }
+  });
+
   it("records a preFailure and continues the batch when decompressSvgz or sanitizeSvg rejects (#3083)", async () => {
     const uploadedKeys: string[] = [];
     mocks.validateImageBuffer.mockImplementation(async (_buf: Buffer, name: string) => ({

@@ -304,6 +304,22 @@ describe("ImageInputHandler decoder availability (#1428)", () => {
     expect(result.buffer).toBe(ORIENTED);
   });
 
+  it("skips the 1x1 pixel probe, sanitizes the SVG, and skips autoOrient when the CLI fallback detects an SVG (#3749)", async () => {
+    const sanitized = Buffer.from("<svg sanitized/>");
+    detected("raw");
+    mocks.decodeToSharpCompat.mockRejectedValue(new Error("Command failed: dcraw_emu"));
+    mocks.metadata.mockResolvedValue({ format: "svg", width: 25, height: 25 });
+    mocks.sanitizeSvg.mockReturnValue(sanitized);
+
+    const result = await prepare("padded.dng");
+
+    expect(mocks.resize).not.toHaveBeenCalled();
+    expect(mocks.decompressSvgz).toHaveBeenCalledWith(RAW);
+    expect(mocks.sanitizeSvg).toHaveBeenCalledWith(RAW);
+    expect(mocks.autoOrient).not.toHaveBeenCalled();
+    expect(result).toEqual({ buffer: sanitized, filename: "padded.dng" });
+  });
+
   it("turns a CLI decoder out-of-memory error into 503 even when Sharp can read the header (#1453)", async () => {
     detected("raw");
     mocks.decodeToSharpCompat.mockRejectedValue(

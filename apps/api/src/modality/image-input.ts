@@ -89,6 +89,7 @@ export class ImageInputHandler implements InputHandler {
     // The decoded buffer is PNG, so update the filename extension to match.
     // Pass the original file extension so RAW decoder can use the correct
     // temp file suffix (e.g. .cr3, .nef) for format identification.
+    let fallbackFormat: string | undefined;
     if (needsCliDecode(validation.format)) {
       try {
         opts.signal?.throwIfAborted();
@@ -117,8 +118,11 @@ export class ImageInputHandler implements InputHandler {
           throw engineUnavailable(decodeErr);
         }
         try {
-          await boundedSharp(fileBuffer, opts.maxPixels).metadata();
-          await boundedSharp(fileBuffer, opts.maxPixels).resize(1).raw().toBuffer();
+          const meta = await boundedSharp(fileBuffer, opts.maxPixels).metadata();
+          fallbackFormat = meta.format;
+          if (fallbackFormat !== "svg") {
+            await boundedSharp(fileBuffer, opts.maxPixels).resize(1).raw().toBuffer();
+          }
         } catch (err) {
           opts.signal?.throwIfAborted();
           const probeErr = asDecoderOutOfMemory(err);
@@ -140,12 +144,14 @@ export class ImageInputHandler implements InputHandler {
           );
         }
       }
-      const ext = name.match(/\.[^.]+$/)?.[0];
-      if (ext) name = `${name.slice(0, -ext.length)}.png`;
+      if (fallbackFormat !== "svg") {
+        const ext = name.match(/\.[^.]+$/)?.[0];
+        if (ext) name = `${name.slice(0, -ext.length)}.png`;
+      }
     }
 
     // Sanitize SVG input to prevent XXE, SSRF, and script injection
-    const isSvg = validation.format === "svg";
+    const isSvg = validation.format === "svg" || fallbackFormat === "svg";
     if (isSvg) {
       try {
         opts.signal?.throwIfAborted();
