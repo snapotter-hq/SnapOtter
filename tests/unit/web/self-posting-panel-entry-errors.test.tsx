@@ -1226,6 +1226,88 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       unmount();
     }
 
+    // StripMetadataSettings renders metadata.exifError instead of noMetadataFound when ICC and XMP are absent, keeps sectionCount scoped to present sections when ICC/XMP coexist with exifError, and ignores whitespace-only exifError (#3770).
+    {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("a.jpg"), image("b.jpg"), image("c.jpg")]);
+      let inspectCall = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          inspectCall++;
+          if (inspectCall === 1) {
+            return new Response(
+              JSON.stringify({
+                filename: "a.jpg",
+                fileSize: 1024,
+                exif: null,
+                exifError: "Failed to parse EXIF data",
+              }),
+              { status: 200 },
+            );
+          }
+          if (inspectCall === 2) {
+            return new Response(
+              JSON.stringify({
+                filename: "b.jpg",
+                fileSize: 1024,
+                exif: null,
+                exifError: "  Failed to parse EXIF data  ",
+                icc: { "Color Space": "RGB" },
+              }),
+              { status: 200 },
+            );
+          }
+          return new Response(
+            JSON.stringify({
+              filename: "c.jpg",
+              fileSize: 1024,
+              exif: null,
+              exifError: "   ",
+            }),
+            { status: 200 },
+          );
+        }),
+      );
+
+      const { container, unmount } = render(<StripMetadataSettings />);
+      await waitFor(() =>
+        expect(screen.getByText("EXIF: Failed to parse EXIF data")).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByText(en.toolSettings["strip-metadata"].noMetadataFound),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText("0 metadata sections found")).not.toBeInTheDocument();
+      expect(container.querySelectorAll(".border-t.border-border")).toHaveLength(2);
+
+      act(() => {
+        useFileStore.getState().setSelectedIndex(1);
+      });
+      await waitFor(() =>
+        expect(screen.getByText(en.toolSettings["strip-metadata"].iccProfile)).toBeInTheDocument(),
+      );
+      expect(screen.getByText("EXIF: Failed to parse EXIF data").textContent).toBe(
+        "EXIF: Failed to parse EXIF data",
+      );
+      expect(screen.getByText("1 metadata section found")).toBeInTheDocument();
+      expect(
+        screen.queryByText(en.toolSettings["strip-metadata"].noMetadataFound),
+      ).not.toBeInTheDocument();
+
+      act(() => {
+        useFileStore.getState().setSelectedIndex(2);
+      });
+      await waitFor(() =>
+        expect(
+          screen.getByText(en.toolSettings["strip-metadata"].noMetadataFound),
+        ).toBeInTheDocument(),
+      );
+      expect(screen.queryByText(/^EXIF:/)).not.toBeInTheDocument();
+      expect(container.querySelectorAll(".border-t.border-border")).toHaveLength(1);
+
+      unmount();
+    }
+
     // 4. EditMetadataSettings (inspect): rejects malformed 2xx without caching or crashing
     for (const badBody of [
       "<html>gateway</html>",

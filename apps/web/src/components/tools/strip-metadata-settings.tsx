@@ -16,7 +16,7 @@ interface MetadataResult {
   filename: string;
   fileSize: number;
   exif?: Record<string, unknown> | null;
-  exifError?: string;
+  exifError?: string | null;
   gps?: Record<string, unknown> | null;
   icc?: Record<string, string> | null;
   xmp?: Record<string, string> | null;
@@ -322,6 +322,7 @@ export function StripMetadataSettings() {
   const hasGps = metadata?.gps && Object.keys(metadata.gps).length > 0;
   const hasIcc = metadata?.icc && Object.keys(metadata.icc).length > 0;
   const hasXmp = metadata?.xmp && Object.keys(metadata.xmp).length > 0;
+  const exifError = metadata?.exifError?.trim() || null;
   const hasAnyMetadata = hasExif || hasGps || hasIcc || hasXmp;
   const sectionCount = [hasExif, hasGps, hasIcc, hasXmp].filter(Boolean).length;
 
@@ -347,13 +348,13 @@ export function StripMetadataSettings() {
 
           {inspectError && <p className="text-[10px] text-destructive-ink">{inspectError}</p>}
 
-          {metadata && !hasAnyMetadata && !inspecting && (
+          {metadata && !hasAnyMetadata && !exifError && !inspecting && (
             <p className="text-xs text-muted-foreground italic py-1">
               {t.toolSettings["strip-metadata"].noMetadataFound}
             </p>
           )}
 
-          {metadata && hasAnyMetadata && (
+          {metadata && (hasAnyMetadata || exifError) && (
             <div className="space-y-1.5">
               {/* GPS warning banner. Coordinates render as plain text: no map
                   tiles are fetched, so the photo's location never leaves the
@@ -394,9 +395,7 @@ export function StripMetadataSettings() {
                 </CollapsibleSection>
               )}
 
-              {metadata?.exifError && (
-                <p className="text-[11px] text-muted-foreground">EXIF: {metadata.exifError}</p>
-              )}
+              {exifError && <p className="text-[11px] text-muted-foreground">EXIF: {exifError}</p>}
 
               {hasGps && metadata.gps && (
                 <CollapsibleSection
@@ -426,23 +425,25 @@ export function StripMetadataSettings() {
                 </CollapsibleSection>
               )}
 
-              <p className="text-[10px] text-muted-foreground">
-                {plural(
-                  sectionCount,
-                  format(t.toolSettings["strip-metadata"].metadataSections, {
-                    count: sectionCount,
-                  }),
-                  format(t.toolSettings["strip-metadata"].metadataSectionsPlural, {
-                    count: sectionCount,
-                  }),
-                )}
-              </p>
+              {hasAnyMetadata && (
+                <p className="text-[10px] text-muted-foreground">
+                  {plural(
+                    sectionCount,
+                    format(t.toolSettings["strip-metadata"].metadataSections, {
+                      count: sectionCount,
+                    }),
+                    format(t.toolSettings["strip-metadata"].metadataSectionsPlural, {
+                      count: sectionCount,
+                    }),
+                  )}
+                </p>
+              )}
             </div>
           )}
         </div>
       )}
 
-      {hasFile && hasAnyMetadata && <div className="border-t border-border" />}
+      {hasFile && (hasAnyMetadata || exifError) && <div className="border-t border-border" />}
 
       <StripMetadataControls
         onChange={setStripSettings}
