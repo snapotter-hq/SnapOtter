@@ -658,5 +658,115 @@ print("OCR_PREPROCESS_3420_OK")
       expect(res.status, res.stderr).toBe(0);
       expect(res.stdout).toContain("OCR_PREPROCESS_3420_OK");
     });
+
+    it("guards top-level cv2 and numpy imports and reports Missing dependency JSON with libGL hint (issue #3640)", () => {
+      const res = spawnSync(
+        pythonBin as string,
+        [
+          "-c",
+          `
+import builtins, contextlib, importlib.util, io, json, os, sys, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+script_path = os.path.join(py_dir, "ocr_preprocess.py")
+
+orig_import = builtins.__import__
+
+def exec_with_import_error(module_name, target_pkg, exc):
+    def custom_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == target_pkg:
+            raise exc
+        return orig_import(name, globals, locals, fromlist, level)
+
+    sys.modules.pop("cv2", None)
+    sys.modules.pop("numpy", None)
+    if target_pkg != "cv2":
+        sys.modules["cv2"] = types.ModuleType("cv2")
+    spec = importlib.util.spec_from_file_location(module_name, script_path)
+    mod = importlib.util.module_from_spec(spec)
+    out_buf, err_buf = io.StringIO(), io.StringIO()
+    builtins.__import__ = custom_import
+    try:
+        with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+            spec.loader.exec_module(mod)
+    finally:
+        builtins.__import__ = orig_import
+    return mod, out_buf.getvalue().strip()
+
+# 1. Standalone (__main__) execution with libGL ImportError emits JSON with libgl1 hint and exits 1
+for target_pkg, exc, expected_err in (
+    (
+        "cv2",
+        ImportError("libGL.so.1: cannot open shared object file: No such file or directory"),
+        "Missing dependency: libGL.so.1: cannot open shared object file: No such file or directory. Fix with: apt-get install -y libgl1",
+    ),
+    (
+        "cv2",
+        ModuleNotFoundError("No module named 'cv2'"),
+        "Missing dependency: No module named 'cv2'. Install with: pip install opencv-python-headless numpy",
+    ),
+    (
+        "numpy",
+        ModuleNotFoundError("No module named 'numpy'"),
+        "Missing dependency: No module named 'numpy'. Install with: pip install opencv-python-headless numpy",
+    ),
+    (
+        "cv2",
+        ImportError("   "),
+        "Missing dependency: ImportError. Install with: pip install opencv-python-headless numpy",
+    ),
+):
+    out_buf, err_buf = io.StringIO(), io.StringIO()
+    def custom_import(name, globals=None, locals=None, fromlist=(), level=0, _pkg=target_pkg, _exc=exc):
+        if name == _pkg:
+            raise _exc
+        return orig_import(name, globals, locals, fromlist, level)
+
+    sys.modules.pop("cv2", None)
+    sys.modules.pop("numpy", None)
+    if target_pkg != "cv2":
+        sys.modules["cv2"] = types.ModuleType("cv2")
+    spec = importlib.util.spec_from_file_location("__main__", script_path)
+    mod = importlib.util.module_from_spec(spec)
+    builtins.__import__ = custom_import
+    try:
+        try:
+            with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+                spec.loader.exec_module(mod)
+        except SystemExit as exit_exc:
+            assert exit_exc.code == 1, exit_exc.code
+        else:
+            raise AssertionError("Expected SystemExit(1) on __main__ import failure")
+    finally:
+        builtins.__import__ = orig_import
+    payload = json.loads(out_buf.getvalue().strip())
+    assert payload == {"success": False, "error": expected_err}, (target_pkg, exc, payload)
+
+    # 2. Imported as non-__main__ module: defers exit to main()
+    mod_imported, import_stdout = exec_with_import_error("ocr_preprocess_mod", target_pkg, exc)
+    assert import_stdout == "", import_stdout
+    assert mod_imported._IMPORT_ERROR is exc
+    assert mod_imported.cv2 is None
+    assert mod_imported.np is None
+    main_out, main_err = io.StringIO(), io.StringIO()
+    try:
+        with contextlib.redirect_stdout(main_out), contextlib.redirect_stderr(main_err):
+            mod_imported.main()
+    except SystemExit as exit_exc:
+        assert exit_exc.code == 1, exit_exc.code
+    else:
+        raise AssertionError("Expected SystemExit(1) when calling main() with _IMPORT_ERROR set")
+    main_payload = json.loads(main_out.getvalue().strip())
+    assert main_payload == {"success": False, "error": expected_err}, (target_pkg, exc, main_payload)
+
+print("OCR_PREPROCESS_3640_OK")
+`,
+        ],
+        { encoding: "utf8", timeout: 30_000 },
+      );
+      expect(res.status, res.stderr).toBe(0);
+      expect(res.stdout).toContain("OCR_PREPROCESS_3640_OK");
+    });
   });
 });

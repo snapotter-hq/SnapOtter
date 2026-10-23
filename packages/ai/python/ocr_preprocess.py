@@ -3,10 +3,26 @@
 Uses OpenCV for deskew, adaptive binarization, CLAHE contrast enhancement,
 and denoising. All operations work on the image file in-place (overwrite).
 """
-import cv2
-import numpy as np
 import sys
 import json
+
+try:
+    import cv2
+    import numpy as np
+    _IMPORT_ERROR = None
+except ImportError as _e:
+    cv2 = None
+    np = None
+    _IMPORT_ERROR = _e
+    if __name__ == "__main__":
+        _msg = str(_e).strip() or type(_e).__name__
+        _hint = (
+            "Fix with: apt-get install -y libgl1"
+            if "libGL" in _msg
+            else "Install with: pip install opencv-python-headless numpy"
+        )
+        print(json.dumps({"success": False, "error": f"Missing dependency: {_msg}. {_hint}"}))
+        sys.exit(1)
 
 
 def emit_progress(percent, stage):
@@ -88,6 +104,16 @@ def preprocess(input_path, output_path):
 
 
 def main():
+    if _IMPORT_ERROR is not None:
+        _msg = str(_IMPORT_ERROR).strip() or type(_IMPORT_ERROR).__name__
+        _hint = (
+            "Fix with: apt-get install -y libgl1"
+            if "libGL" in _msg
+            else "Install with: pip install opencv-python-headless numpy"
+        )
+        print(json.dumps({"success": False, "error": f"Missing dependency: {_msg}. {_hint}"}))
+        sys.exit(1)
+
     try:
         input_path = sys.argv[1]
         output_path = sys.argv[2]

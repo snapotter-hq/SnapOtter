@@ -109,7 +109,18 @@ def main():
 
     try:
         emit_progress(10, "Preparing image")
-        from PIL import Image
+        try:
+            from PIL import Image
+        except ImportError:
+            print(
+                json.dumps(
+                    {
+                        "success": False,
+                        "error": "Pillow is not installed. Install with: pip install Pillow",
+                    }
+                )
+            )
+            sys.exit(1)
 
         img = Image.open(input_path).convert("RGB")
         width, height = img.size
@@ -268,30 +279,6 @@ def main():
                 # Update the PIL image from the corrected array
                 img = Image.fromarray(img_array)
 
-            emit_progress(95, "Saving result")
-
-            save_kwargs = {}
-            if save_format == "JPEG":
-                save_kwargs["quality"] = quality
-            elif save_format == "WEBP":
-                save_kwargs["quality"] = quality
-
-            img.save(output_path, format=save_format, **save_kwargs)
-
-            print(
-                json.dumps(
-                    {
-                        "success": True,
-                        "facesDetected": faces_detected,
-                        "eyesCorrected": eyes_corrected,
-                        "width": width,
-                        "height": height,
-                        "format": format_label,
-                        "output_path": output_path,
-                    }
-                )
-            )
-
         except ImportError as e:
             msg = str(e).strip() or type(e).__name__
             hint = "Fix with: apt-get install -y libgl1" if "libGL" in msg else "Install with: pip install mediapipe numpy opencv-python"
@@ -305,16 +292,30 @@ def main():
             )
             sys.exit(1)
 
-    except ImportError:
+        emit_progress(95, "Saving result")
+
+        save_kwargs = {}
+        if save_format == "JPEG":
+            save_kwargs["quality"] = quality
+        elif save_format == "WEBP":
+            save_kwargs["quality"] = quality
+
+        img.save(output_path, format=save_format, **save_kwargs)
+
         print(
             json.dumps(
                 {
-                    "success": False,
-                    "error": "Pillow is not installed. Install with: pip install Pillow",
+                    "success": True,
+                    "facesDetected": faces_detected,
+                    "eyesCorrected": eyes_corrected,
+                    "width": width,
+                    "height": height,
+                    "format": format_label,
+                    "output_path": output_path,
                 }
             )
         )
-        sys.exit(1)
+
     except Exception as e:
         print(json.dumps({"success": False, "error": str(e).strip() or type(e).__name__}))
         sys.exit(1)

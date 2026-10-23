@@ -151,7 +151,18 @@ def main():
 
     try:
         emit_progress(5, "Opening image")
-        from PIL import Image
+        try:
+            from PIL import Image
+        except ImportError:
+            print(
+                json.dumps(
+                    {
+                        "success": False,
+                        "error": "Pillow is not installed. Install with: pip install Pillow",
+                    }
+                )
+            )
+            sys.exit(1)
 
         img = Image.open(input_path)
         new_size = (img.width * scale, img.height * scale)
@@ -378,16 +389,6 @@ def main():
             )
         )
 
-    except ImportError:
-        print(
-            json.dumps(
-                {
-                    "success": False,
-                    "error": "Pillow is not installed. Install with: pip install Pillow",
-                }
-            )
-        )
-        sys.exit(1)
     except Exception as e:
         print(json.dumps({"success": False, "error": str(e).strip() or type(e).__name__}))
         sys.exit(1)

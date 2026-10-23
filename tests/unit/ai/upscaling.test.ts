@@ -1009,5 +1009,88 @@ print("TILE_OK")
       expect(res.status, res.stderr).toBe(0);
       expect(res.stdout).toContain("TILE_OK");
     });
+
+    it("scopes Pillow ImportError to PIL import so Image.open and result.save ImportErrors are not misreported as missing Pillow (issue #3640)", () => {
+      const script = `
+import contextlib, importlib.util, io, json, os, sys, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+spec = importlib.util.spec_from_file_location("upscale_mod", os.path.join(py_dir, "upscale.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+def run_main(settings=None):
+    sys.argv = ["upscale.py", "/tmp/in.png", "/tmp/out.png", json.dumps(settings or {"model": "lanczos", "scale": 2})]
+    out_buf, err_buf = io.StringIO(), io.StringIO()
+    try:
+        with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+            mod.main()
+    except SystemExit as exc:
+        assert exc.code == 1, exc.code
+    else:
+        raise AssertionError(f"Expected SystemExit(1), got stdout={out_buf.getvalue()!r}")
+    return json.loads(out_buf.getvalue().strip())
+
+# 1. Missing PIL still reports Pillow installation message
+sys.modules["PIL"] = None
+try:
+    payload = run_main()
+    assert payload == {
+        "success": False,
+        "error": "Pillow is not installed. Install with: pip install Pillow",
+    }, payload
+finally:
+    sys.modules.pop("PIL", None)
+
+# 2. ImportError inside Image.open (e.g. missing codec plugin) is not misreported as missing Pillow
+fake_pil = types.ModuleType("PIL")
+fake_pil.Image = types.SimpleNamespace(
+    LANCZOS=1,
+    ADAPTIVE=1,
+    open=lambda _p: (_ for _ in ()).throw(ImportError("No module named 'pillow_heif'")),
+)
+sys.modules["PIL"] = fake_pil
+
+payload = run_main()
+assert payload == {
+    "success": False,
+    "error": "No module named 'pillow_heif'",
+}, payload
+
+# 3. ImportError inside result.save (e.g. missing output codec plugin) is not misreported as missing Pillow
+class FakeImg:
+    width = 32
+    height = 32
+    size = (64, 64)
+    def resize(self, _sz, _flt): return self
+    def convert(self, *_a, **_k): return self
+    def save(self, _p, **_k):
+        raise ImportError("No module named 'pillow_avif'")
+
+fake_pil.Image.open = lambda _p: FakeImg()
+payload = run_main()
+assert payload == {
+    "success": False,
+    "error": "No module named 'pillow_avif'",
+}, payload
+
+# 4. Empty ImportError inside Image.open falls back to exception class name
+fake_pil.Image.open = lambda _p: (_ for _ in ()).throw(ImportError("   "))
+payload = run_main()
+assert payload == {
+    "success": False,
+    "error": "ImportError",
+}, payload
+
+print("UPSCALE_3640_OK")
+`;
+      const res = spawnSync(pythonBin as string, ["-c", script], {
+        encoding: "utf8",
+        timeout: 15_000,
+      });
+      expect(res.status, res.stderr).toBe(0);
+      expect(res.stdout).toContain("UPSCALE_3640_OK");
+    });
   });
 });

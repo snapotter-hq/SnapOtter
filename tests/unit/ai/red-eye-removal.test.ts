@@ -1,5 +1,9 @@
+import { spawnSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { hasPython, pythonBin } from "../../helpers/python-gate.js";
 
 vi.mock("sharp", () => {
   const mockSharp = vi.fn(() => ({
@@ -302,4 +306,165 @@ describe("removeRedEye", () => {
       expect(JSON.parse(args[2])).toEqual({});
     });
   });
+
+  describe.skipIf(!hasPython)(
+    "red_eye_removal.py ImportError scoping and detail reporting (issue #3640)",
+    () => {
+      const here = dirname(fileURLToPath(import.meta.url));
+      const pyDir = resolve(here, "../../../packages/ai/python");
+
+      it("scopes Pillow ImportError to PIL import and preserves downstream ImportErrors", () => {
+        const res = spawnSync(
+          pythonBin as string,
+          [
+            "-c",
+            `
+import contextlib, importlib.util, io, json, os, sys, types
+
+py_dir = ${JSON.stringify(pyDir)}
+sys.path.insert(0, py_dir)
+
+class FakeArr:
+    shape = (64, 64, 3)
+
+spec = importlib.util.spec_from_file_location("red_eye_removal_mod", os.path.join(py_dir, "red_eye_removal.py"))
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+def run_main(settings=None):
+    sys.argv = ["red_eye_removal.py", "/tmp/in.png", "/tmp/out.png", json.dumps(settings or {})]
+    out_buf, err_buf = io.StringIO(), io.StringIO()
+    try:
+        with contextlib.redirect_stdout(out_buf), contextlib.redirect_stderr(err_buf):
+            mod.main()
+    except SystemExit as exc:
+        assert exc.code == 1, exc.code
+    else:
+        raise AssertionError(f"Expected SystemExit(1), got stdout={out_buf.getvalue()!r}")
+    return json.loads(out_buf.getvalue().strip())
+
+# 1. Missing PIL still reports Pillow installation message
+sys.modules["PIL"] = None
+try:
+    payload = run_main()
+    assert payload == {
+        "success": False,
+        "error": "Pillow is not installed. Install with: pip install Pillow",
+    }, payload
+finally:
+    sys.modules.pop("PIL", None)
+
+fake_pil = types.ModuleType("PIL")
+fake_pil.Image = types.SimpleNamespace(
+    open=lambda _p: types.SimpleNamespace(convert=lambda _m: types.SimpleNamespace(size=(64, 64), save=lambda *_a, **_k: None)),
+    fromarray=lambda _a: types.SimpleNamespace(size=(64, 64), save=lambda *_a, **_k: None),
+)
+sys.modules["PIL"] = fake_pil
+
+# 2. ImportError inside Image.open (e.g. missing codec plugin) is not misreported as missing Pillow
+fake_pil.Image.open = lambda _p: (_ for _ in ()).throw(ImportError("No module named 'pillow_heif'"))
+payload = run_main()
+assert payload == {
+    "success": False,
+    "error": "No module named 'pillow_heif'",
+}, payload
+
+fake_pil.Image.open = lambda _p: (_ for _ in ()).throw(ImportError("   "))
+payload = run_main()
+assert payload == {
+    "success": False,
+    "error": "ImportError",
+}, payload
+
+fake_pil.Image.open = lambda _p: types.SimpleNamespace(convert=lambda _m: types.SimpleNamespace(size=(64, 64), save=lambda *_a, **_k: None))
+
+# 3. Missing numpy reports numpy ImportError with detail, not Pillow
+sys.modules["numpy"] = None
+try:
+    payload = run_main()
+    assert payload == {
+        "success": False,
+        "error": "Missing dependency: import of numpy halted; None in sys.modules. Install with: pip install mediapipe numpy opencv-python",
+    }, payload
+finally:
+    sys.modules.pop("numpy", None)
+
+fake_np = types.ModuleType("numpy")
+fake_np.array = lambda _img: FakeArr()
+sys.modules["numpy"] = fake_np
+
+# 4. Missing cv2 reports cv2 ImportError with detail
+sys.modules["cv2"] = None
+try:
+    payload = run_main()
+    assert payload == {
+        "success": False,
+        "error": "Missing dependency: import of cv2 halted; None in sys.modules. Install with: pip install mediapipe numpy opencv-python",
+    }, payload
+finally:
+    sys.modules.pop("cv2", None)
+
+fake_cv2 = types.ModuleType("cv2")
+sys.modules["cv2"] = fake_cv2
+
+# 5. Unstubbed _detect_face_mesh propagates real mediapipe ImportError when mediapipe is missing
+sys.modules["mediapipe"] = None
+try:
+    payload = run_main()
+    assert payload == {
+        "success": False,
+        "error": "Missing dependency: import of mediapipe halted; None in sys.modules. Install with: pip install mediapipe numpy opencv-python",
+    }, payload
+finally:
+    sys.modules.pop("mediapipe", None)
+
+# 6. MediaPipe / libGL / empty ImportErrors in _detect_face_mesh include detail and appropriate hint
+for detect_exc, expected_error in (
+    (
+        ModuleNotFoundError("No module named 'mediapipe'"),
+        "Missing dependency: No module named 'mediapipe'. Install with: pip install mediapipe numpy opencv-python",
+    ),
+    (
+        ImportError("libGL.so.1: cannot open shared object file: No such file or directory"),
+        "Missing dependency: libGL.so.1: cannot open shared object file: No such file or directory. Fix with: apt-get install -y libgl1",
+    ),
+    (
+        ImportError(),
+        "Missing dependency: ImportError. Install with: pip install mediapipe numpy opencv-python",
+    ),
+    (
+        ImportError("   "),
+        "Missing dependency: ImportError. Install with: pip install mediapipe numpy opencv-python",
+    ),
+):
+    def raise_mesh(_arr, _max=50, _min=0.5, _exc=detect_exc):
+        raise _exc
+    mod._detect_face_mesh = raise_mesh
+    payload = run_main()
+    assert payload == {"success": False, "error": expected_error}, (detect_exc, payload)
+
+# 7. ImportError inside img.save (e.g. missing output codec plugin) is not misreported as missing Pillow or mediapipe
+mod._detect_face_mesh = lambda _arr, _max=50, _min=0.5: []
+fake_pil.Image.open = lambda _p: types.SimpleNamespace(
+    convert=lambda _m: types.SimpleNamespace(
+        size=(64, 64),
+        save=lambda *_a, **_k: (_ for _ in ()).throw(ImportError("No module named 'pillow_avif'")),
+    ),
+)
+payload = run_main()
+assert payload == {
+    "success": False,
+    "error": "No module named 'pillow_avif'",
+}, payload
+
+print("RED_EYE_3640_OK")
+`,
+          ],
+          { encoding: "utf8", timeout: 30_000 },
+        );
+        expect(res.status, res.stderr).toBe(0);
+        expect(res.stdout).toContain("RED_EYE_3640_OK");
+      });
+    },
+  );
 });
