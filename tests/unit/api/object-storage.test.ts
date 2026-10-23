@@ -1626,10 +1626,22 @@ describe("object-storage missing-key + robustness paths", () => {
     expect(isValidObjectKey("outputs/job-1/.snapotter-\u{017f}taging")).toBe(false);
     expect(isValidObjectKey("uploads/job-1/.\u{017f}napotter-\u{017f}taging")).toBe(false);
     expect(isValidObjectKey("outputs/job-1/.\u{017f}NAPOTTER-\u{017f}TAGING")).toBe(false);
+    expect(isValidObjectKey("outputs/job-1/.snapotter-\u{fb05}aging")).toBe(false);
+    expect(isValidObjectKey("uploads/job-1/.snapotter-\u{fb05}aging")).toBe(false);
+    expect(isValidObjectKey("outputs/job-1/.snapotter-\u{fb06}aging")).toBe(false);
+    expect(isValidObjectKey("uploads/job-1/.snapotter-\u{fb06}aging")).toBe(false);
+    expect(isValidObjectKey("outputs/job-1/.SNAPOTTER-\u{fb05}AGING")).toBe(false);
+    expect(isValidObjectKey("outputs/job-1/.SNAPOTTER-\u{fb06}AGING")).toBe(false);
+    expect(isValidObjectKey("outputs/job-1/.\u{017f}napotter-\u{fb05}aging")).toBe(false);
+    expect(isValidObjectKey("uploads/job-1/.\u{017f}napotter-\u{fb06}aging")).toBe(false);
     expect(isValidObjectKey("outputs/job-1/.SNAPOTTER-STAGING.png")).toBe(true);
     expect(isValidObjectKey("outputs/job-1/.\u{017f}napotter-staging.png")).toBe(true);
+    expect(isValidObjectKey("outputs/job-1/.snapotter-\u{fb05}aging.png")).toBe(true);
+    expect(isValidObjectKey("outputs/job-1/.snapotter-\u{fb06}aging.png")).toBe(true);
     expect(isValidObjectKey("outputs/job-1/foo.snapotter-staging")).toBe(true);
     expect(isValidObjectKey("outputs/job-1/foo.\u{017f}napotter-staging")).toBe(true);
+    expect(isValidObjectKey("outputs/job-1/foo.snapotter-\u{fb05}aging")).toBe(true);
+    expect(isValidObjectKey("outputs/job-1/foo.snapotter-\u{fb06}aging")).toBe(true);
     expect(isValidObjectKey("outputs/job-1/.hidden")).toBe(true);
     expect(isValidObjectKey("outputs/job-1/file.")).toBe(true);
     await expect(getObjectSize("outputs/job-1/.")).rejects.toThrow(/invalid object key/i);
@@ -1643,11 +1655,23 @@ describe("object-storage missing-key + robustness paths", () => {
     await expect(getObjectStream("outputs/job-1/.\u{017f}napotter-staging")).rejects.toThrow(
       /invalid object key/i,
     );
+    await expect(getObjectStream("outputs/job-1/.snapotter-\u{fb05}aging")).rejects.toThrow(
+      /invalid object key/i,
+    );
+    await expect(getObjectStream("outputs/job-1/.snapotter-\u{fb06}aging")).rejects.toThrow(
+      /invalid object key/i,
+    );
     await expect(putObject("uploads/job-1/.SNAPOTTER-STAGING", Buffer.from("x"))).rejects.toThrow(
       /invalid object key/i,
     );
     await expect(
       putObject("uploads/job-1/.\u{017f}napotter-staging", Buffer.from("x")),
+    ).rejects.toThrow(/invalid object key/i);
+    await expect(
+      putObject("uploads/job-1/.snapotter-\u{fb05}aging", Buffer.from("x")),
+    ).rejects.toThrow(/invalid object key/i);
+    await expect(
+      putObject("uploads/job-1/.snapotter-\u{fb06}aging", Buffer.from("x")),
     ).rejects.toThrow(/invalid object key/i);
   });
 

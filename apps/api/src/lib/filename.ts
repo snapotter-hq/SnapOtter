@@ -77,7 +77,7 @@ const SAFE_EXTENSIONS = new Set([
   ".srt",
 ]);
 
-const RESERVED_STAGING_NAME = /^\.snapotter-staging$/iu;
+const RESERVED_STAGING_NAME = /^\.snapotter-(?:st|[\u{fb05}\u{fb06}])aging$/iu;
 
 /**
  * Sanitize a filename to prevent path traversal and double-extension attacks.

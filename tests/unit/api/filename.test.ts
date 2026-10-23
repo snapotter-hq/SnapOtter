@@ -227,7 +227,7 @@ describe("sanitizeFilename", () => {
     }
   });
 
-  it("falls back to upload for .snapotter-staging reserved name (#3562, #3713)", () => {
+  it("falls back to upload for .snapotter-staging reserved name (#3562, #3713, #3822)", () => {
     for (const raw of [
       ".snapotter-staging",
       ".SNAPOTTER-STAGING",
@@ -235,12 +235,24 @@ describe("sanitizeFilename", () => {
       ".snapotter-\u{017f}taging",
       ".\u{017f}napotter-\u{017f}taging",
       ".\u{017f}NAPOTTER-\u{017f}TAGING",
+      ".snapotter-\u{fb05}aging",
+      ".snapotter-\u{fb06}aging",
+      ".SNAPOTTER-\u{fb05}AGING",
+      ".SNAPOTTER-\u{fb06}AGING",
+      ".\u{017f}napotter-\u{fb05}aging",
+      ".\u{017f}napotter-\u{fb06}aging",
       "/tmp/.snapotter-staging",
       "/tmp/.\u{017f}napotter-staging",
+      "/tmp/.snapotter-\u{fb05}aging",
+      "/tmp/.snapotter-\u{fb06}aging",
       ".\0snapotter-staging",
       ".\0\u{017f}napotter-staging",
+      ".\0snapotter-\u{fb05}aging",
+      ".\0snapotter-\u{fb06}aging",
       ".snapotter-staging..",
       ".\u{017f}napotter-staging..",
+      ".snapotter-\u{fb05}aging..",
+      ".snapotter-\u{fb06}aging..",
     ]) {
       const sanitized = sanitizeFilename(raw);
       expect(sanitized).toBe("upload");
@@ -254,6 +266,10 @@ describe("sanitizeFilename", () => {
     const longSWithExt = sanitizeFilename(".\u{017f}napotter-staging.png.php");
     expect(longSWithExt).toBe(".\u{017f}napotter-staging.png");
     expect(isValidObjectKey(`uploads/job/${longSWithExt}`)).toBe(true);
+
+    const stLigatureWithExt = sanitizeFilename(".snapotter-\u{fb05}aging.png.php");
+    expect(stLigatureWithExt).toBe(".snapotter-\u{fb05}aging.png");
+    expect(isValidObjectKey(`uploads/job/${stLigatureWithExt}`)).toBe(true);
   });
 
   it("strips trailing dots from the truncated stem before reattaching the extension (#3691)", () => {

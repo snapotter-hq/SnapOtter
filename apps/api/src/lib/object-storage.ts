@@ -35,7 +35,7 @@ export interface ObjectInfo {
 }
 
 const VALID_KEY = /^(uploads|outputs)\/[A-Za-z0-9][A-Za-z0-9._-]*\/[^/\0]+$/;
-const RESERVED_STAGING_KEY_SUFFIX = /\/\.snapotter-staging$/iu;
+const RESERVED_STAGING_KEY_SUFFIX = /\/\.snapotter-(?:st|[\u{fb05}\u{fb06}])aging$/iu;
 
 /**
  * True when a key can name a stored object at all. Exported so routes can
