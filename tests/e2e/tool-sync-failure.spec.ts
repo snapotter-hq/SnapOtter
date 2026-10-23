@@ -53,7 +53,10 @@ test.describe("Tool sync failure exits", () => {
 
     await startResize(page);
 
-    await expectFailureScreen(page, "This file is over the server's upload size limit.");
+    await expectFailureScreen(
+      page,
+      "This file is too large to upload. Try a smaller file, or ask your server admin to raise the upload limit.",
+    );
   });
 
   test("a failed run leaves the tool ready for the next one", async ({ loggedInPage: page }) => {

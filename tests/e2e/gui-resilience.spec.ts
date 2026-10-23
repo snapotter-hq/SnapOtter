@@ -1157,7 +1157,9 @@ test.describe("Server Error Handling", () => {
 
     await page.getByTestId("stitch-submit").click();
 
-    await expect(page.getByText("Failed: 422", { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByText("We couldn't complete that request. Please try again.", { exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("[object Object]")).toHaveCount(0);
     await expect(page.getByTestId("stitch-submit")).toBeEnabled();
   });
