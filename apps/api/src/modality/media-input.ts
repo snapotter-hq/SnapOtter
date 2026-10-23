@@ -4,6 +4,7 @@ import { extname, join } from "node:path";
 import { probeMedia } from "@snapotter/media-engine";
 import { SUBTITLE_INPUTS } from "@snapotter/shared";
 import { env } from "../config.js";
+import { isBinarySpawnFailure } from "../lib/binary-overrides.js";
 import { type InputHandler, InputValidationError, type PreparedInput } from "./contract.js";
 
 export type MediaInputKind = "video" | "audio" | "image" | "subtitle";
@@ -14,15 +15,16 @@ const MAX_SUBTITLE_BYTES = 1 * 1024 * 1024; // 1 MiB
 /**
  * True when the probe failed because the engine is missing or misconfigured,
  * rather than because the file is bad. Two ways to get here: nothing on PATH
- * and no override, which media-engine reports before spawning; or FFPROBE_PATH
- * pointing somewhere that does not exist, which fails at spawn with ENOENT.
+ * and no override, which media-engine reports before spawning; or a spawn
+ * failure (ENOENT for a missing FFPROBE_PATH, EACCES for a directory or missing
+ * execute bit, ENOEXEC for a wrong-architecture binary, ENOMEM/EAGAIN).
  * Both are the operator's container. A real parse failure carries ffprobe's own
  * stderr and must keep being treated as a client error.
  */
 function isEngineUnavailable(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
   if (/\bffprobe binary not found\b/.test(err.message)) return true;
-  return (err as NodeJS.ErrnoException).code === "ENOENT";
+  return isBinarySpawnFailure(err);
 }
 
 /**
@@ -62,12 +64,14 @@ export class MediaInputHandler implements InputHandler {
         // Reporting it as a corrupt upload sends them to inspect a file that is
         // perfectly fine, and hides the one fact that would fix it.
         if (isEngineUnavailable(err)) {
-          throw new InputValidationError(
+          const converted = new InputValidationError(
             "Media processing is unavailable on this server because ffmpeg is not installed.",
             503,
             "Install ffmpeg in the container or set FFMPEG_PATH and FFPROBE_PATH.",
             "ENGINE_UNAVAILABLE",
           );
+          converted.cause = err;
+          throw converted;
         }
         // ffprobe could not parse the upload. Surface a clean message; the raw
         // tool error is intentionally not exposed to the client, and a bad

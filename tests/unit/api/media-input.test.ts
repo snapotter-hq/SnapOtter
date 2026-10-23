@@ -187,7 +187,7 @@ describe("MediaInputHandler AbortSignal handling (#3709)", () => {
     const raceReason = new DOMException("Client disconnected during spawn race", "AbortError");
     mediaEngine.probeMedia.mockImplementationOnce(async () => {
       raceController.abort(raceReason);
-      throw Object.assign(new Error("spawn ffprobe ENOENT"), { code: "ENOENT" });
+      throw Object.assign(new Error("spawn ffprobe ENOENT"), { code: "ENOENT", syscall: "spawn" });
     });
 
     await expect(
@@ -233,9 +233,11 @@ describe("MediaInputHandler AbortSignal handling (#3709)", () => {
       message: expect.stringMatching(/Unrecognized video file/i),
     });
 
-    mediaEngine.probeMedia.mockRejectedValueOnce(
-      Object.assign(new Error("spawn ffprobe ENOENT"), { code: "ENOENT" }),
-    );
+    const spawnErr = Object.assign(new Error("spawn ffprobe ENOENT"), {
+      code: "ENOENT",
+      syscall: "spawn",
+    });
+    mediaEngine.probeMedia.mockRejectedValueOnce(spawnErr);
     await expect(
       new MediaInputHandler("video").prepare(input, "clip.mp4", {
         scratchDir,
@@ -245,6 +247,75 @@ describe("MediaInputHandler AbortSignal handling (#3709)", () => {
       name: "InputValidationError",
       statusCode: 503,
       code: "ENGINE_UNAVAILABLE",
+      cause: spawnErr,
+    });
+    expect(readdirSync(scratchDir)).toEqual([]);
+  });
+});
+
+describe("ffprobe spawn failures (#3716)", () => {
+  const spawnFailure = (code: string) =>
+    Object.assign(new Error(`spawn /bad/ffprobe ${code}`), {
+      code,
+      syscall: "spawn /bad/ffprobe",
+      path: "/bad/ffprobe",
+    });
+
+  it.each(["ENOENT", "EACCES", "ENOEXEC", "ENOTDIR", "ENOMEM", "EAGAIN"])(
+    "reports an ffprobe that cannot be started (%s) as 503 ENGINE_UNAVAILABLE and preserves cause",
+    async (code) => {
+      const input = Buffer.from("fake-media");
+      for (const kind of ["video", "audio", "image"] as const) {
+        const cause = spawnFailure(code);
+        mediaEngine.probeMedia.mockRejectedValueOnce(cause);
+
+        const err = await new MediaInputHandler(kind)
+          .prepare(input, `clip.${kind}`, { scratchDir })
+          .catch((e: unknown) => e);
+
+        expect(err).toMatchObject({
+          name: "InputValidationError",
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          cause,
+        });
+        expect((err as Error).message).toMatch(/ffmpeg is not installed/i);
+        expect((err as { details?: string }).details).toMatch(/FFMPEG_PATH and FFPROBE_PATH/);
+      }
+      expect(readdirSync(scratchDir)).toEqual([]);
+    },
+  );
+
+  it("preserves cause when probeMedia rejects because no ffprobe binary was resolved", async () => {
+    const cause = new Error("ffprobe binary not found (set FFPROBE_PATH or install ffmpeg)");
+    mediaEngine.probeMedia.mockRejectedValueOnce(cause);
+
+    const err = await new MediaInputHandler("video")
+      .prepare(Buffer.from("fake-mp4"), "clip.mp4", { scratchDir })
+      .catch((e: unknown) => e);
+
+    expect(err).toMatchObject({
+      name: "InputValidationError",
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause,
+    });
+    expect(readdirSync(scratchDir)).toEqual([]);
+  });
+
+  it("does not treat a non-spawn ENOENT (such as syscall 'open') as an unavailable engine", async () => {
+    const openErr = Object.assign(new Error("ENOENT: no such file or directory, open '/tmp/x'"), {
+      code: "ENOENT",
+      syscall: "open",
+    });
+    mediaEngine.probeMedia.mockRejectedValueOnce(openErr);
+
+    await expect(
+      new MediaInputHandler("video").prepare(Buffer.from("fake-mp4"), "clip.mp4", { scratchDir }),
+    ).rejects.toMatchObject({
+      name: "InputValidationError",
+      statusCode: 400,
+      message: "Unrecognized video file. It may be corrupt or in an unsupported format.",
     });
     expect(readdirSync(scratchDir)).toEqual([]);
   });
