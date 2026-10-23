@@ -27,6 +27,14 @@ const getObjectBuffer = vi.fn();
 const deletePrefix = vi.fn();
 const decodeHeic = vi.fn();
 const decodeToSharpCompat = vi.fn();
+const realDecoders = vi.hoisted(() => ({
+  decodeHeic: null as
+    | typeof import("../../../apps/api/src/lib/heic-converter.js").decodeHeic
+    | null,
+  decodeToSharpCompat: null as
+    | typeof import("../../../apps/api/src/lib/format-decoders.js").decodeToSharpCompat
+    | null,
+}));
 const writeFileFailure = { next: null as Error | null };
 const handleWriteFailure = { next: null as Error | null };
 const handleCloseFailure = { next: null as Error | null };
@@ -35,6 +43,8 @@ const infoExifPaths: string[] = [];
 const infoExifOpenFlags: Array<number | string | undefined> = [];
 const exiftoolPaths: string[] = [];
 const exiftoolOpenFlags: Array<number | string | undefined> = [];
+const decoderPaths: string[] = [];
+const decoderOpenFlags: Array<number | string | undefined> = [];
 const uploadedBuffers = new Map<string, Buffer>();
 
 vi.mock("node:fs/promises", async (importOriginal) => {
@@ -42,13 +52,20 @@ vi.mock("node:fs/promises", async (importOriginal) => {
   return {
     ...actual,
     open: (async (path: unknown, flags?: unknown, ...rest: unknown[]) => {
-      if (/(?:info-exif|exif-inspect|exif-write|exif-dim)-/.test(String(path))) {
+      if (
+        /(?:info-exif|exif-inspect|exif-write|exif-dim|heic-in|psd-in|raw-in|dimensions)-/.test(
+          String(path),
+        )
+      ) {
         if (/info-exif-/.test(String(path))) {
           infoExifPaths.push(String(path));
           infoExifOpenFlags.push(flags as number | string | undefined);
-        } else {
+        } else if (/(?:exif-inspect|exif-write|exif-dim)-/.test(String(path))) {
           exiftoolPaths.push(String(path));
           exiftoolOpenFlags.push(flags as number | string | undefined);
+        } else {
+          decoderPaths.push(String(path));
+          decoderOpenFlags.push(flags as number | string | undefined);
         }
         if (writeFileFailure.next) {
           const err = writeFileFailure.next;
@@ -120,6 +137,7 @@ vi.mock("../../../apps/api/src/lib/object-storage.js", async (importOriginal) =>
 vi.mock("../../../apps/api/src/lib/heic-converter.js", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("../../../apps/api/src/lib/heic-converter.js")>();
+  realDecoders.decodeHeic = actual.decodeHeic;
   return {
     ...actual,
     decodeHeic: (...args: unknown[]) => decodeHeic(...args),
@@ -129,6 +147,7 @@ vi.mock("../../../apps/api/src/lib/heic-converter.js", async (importOriginal) =>
 vi.mock("../../../apps/api/src/lib/format-decoders.js", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("../../../apps/api/src/lib/format-decoders.js")>();
+  realDecoders.decodeToSharpCompat = actual.decodeToSharpCompat;
   return {
     ...actual,
     decodeToSharpCompat: (...args: unknown[]) => decodeToSharpCompat(...args),
@@ -448,6 +467,8 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
     infoExifOpenFlags.length = 0;
     exiftoolPaths.length = 0;
     exiftoolOpenFlags.length = 0;
+    decoderPaths.length = 0;
+    decoderOpenFlags.length = 0;
   });
 
   describe.each(ROUTES)("$name", (route) => {
@@ -806,6 +827,119 @@ describe("inline decode routes surface operational tmpdir write faults as 503 (#
       });
       expect(oomRes.statusCode, oomRes.body).toBe(503);
       expect(oomRes.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+    });
+
+    it("preserves a primary fh.writeFile ENOSPC fault when fh.close also rejects in decodeHeic and decodeToSharpCompat (#3649)", async () => {
+      const originalPath = process.env.PATH;
+      const shimDir = mkdtempSync(join(tmpdir(), "decoder-close-fault-"));
+      try {
+        for (const bin of ["heif-convert", "magick"]) {
+          const shimPath = join(shimDir, bin);
+          writeFileSync(
+            shimPath,
+            '#!/bin/sh\nif [ "$1" = "--version" ]; then echo "1.0.0"; exit 0; fi\nexit 1\n',
+          );
+          chmodSync(shimPath, 0o755);
+        }
+        process.env.PATH = `${shimDir}:${originalPath ?? ""}`;
+
+        if (!realDecoders.decodeHeic || !realDecoders.decodeToSharpCompat) {
+          throw new Error("realDecoders not initialized");
+        }
+        const actualDecodeHeic = realDecoders.decodeHeic;
+        const actualDecodeToSharpCompat = realDecoders.decodeToSharpCompat;
+
+        decodeHeic.mockImplementation((...args: Parameters<typeof actualDecodeHeic>) =>
+          actualDecodeHeic(...args),
+        );
+        decodeToSharpCompat.mockImplementation(
+          (...args: Parameters<typeof actualDecodeToSharpCompat>) =>
+            actualDecodeToSharpCompat(...args),
+        );
+
+        handleWriteFailure.next = errnoError("ENOSPC", "write");
+        handleCloseFailure.next = Object.assign(new Error("EIO: close failed"), {
+          code: "EIO",
+          syscall: "close",
+        });
+        await expect(actualDecodeHeic(HEIC)).rejects.toMatchObject({
+          isSafeMessage: true,
+          kind: "operational",
+          statusCode: 503,
+          code: "storage-full",
+        });
+
+        handleWriteFailure.next = errnoError("ENOSPC", "write");
+        handleCloseFailure.next = Object.assign(new Error("EIO: close failed"), {
+          code: "EIO",
+          syscall: "close",
+        });
+        await expect(actualDecodeToSharpCompat(PSD, "psd", "psd")).rejects.toMatchObject({
+          isSafeMessage: true,
+          kind: "operational",
+          statusCode: 503,
+          code: "storage-full",
+        });
+
+        handleWriteFailure.next = errnoError("ENOSPC", "write");
+        handleCloseFailure.next = Object.assign(new Error("EIO: close failed"), {
+          code: "EIO",
+          syscall: "close",
+        });
+        const heicInfoRes = await app.inject({
+          method: "POST",
+          url: apiToolPath("info"),
+          ...multipartBody([{ filename: "photo.heic", contentType: "image/heic", content: HEIC }]),
+        });
+        expect(heicInfoRes.statusCode, heicInfoRes.body).toBe(503);
+        expect(heicInfoRes.json()).toMatchObject({ code: "storage-full" });
+
+        handleWriteFailure.next = errnoError("ENOSPC", "write");
+        handleCloseFailure.next = Object.assign(new Error("EIO: close failed"), {
+          code: "EIO",
+          syscall: "close",
+        });
+        const psdInfoRes = await app.inject({
+          method: "POST",
+          url: apiToolPath("info"),
+          ...multipartBody([
+            { filename: "layer.psd", contentType: "image/vnd.adobe.photoshop", content: PSD },
+          ]),
+        });
+        expect(psdInfoRes.statusCode, psdInfoRes.body).toBe(503);
+        expect(psdInfoRes.json()).toMatchObject({ code: "storage-full" });
+
+        handleWriteFailure.next = errnoError("ENOSPC", "write");
+        handleCloseFailure.next = Object.assign(new Error("EIO: close failed"), {
+          code: "EIO",
+          syscall: "close",
+        });
+        const dngInfoRes = await app.inject({
+          method: "POST",
+          url: apiToolPath("info"),
+          ...multipartBody([
+            { filename: "photo.dng", contentType: "image/x-adobe-dng", content: DNG },
+          ]),
+        });
+        expect(dngInfoRes.statusCode, dngInfoRes.body).toBe(503);
+        expect(dngInfoRes.json()).toMatchObject({ code: "storage-full" });
+
+        const expectedFlags = constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY;
+        expect(decoderPaths).toHaveLength(5);
+        expect(decoderOpenFlags).toEqual([
+          expectedFlags,
+          expectedFlags,
+          expectedFlags,
+          expectedFlags,
+          expectedFlags,
+        ]);
+        for (const p of decoderPaths) {
+          expect(existsSync(p)).toBe(false);
+        }
+      } finally {
+        process.env.PATH = originalPath;
+        rmSync(shimDir, { recursive: true, force: true });
+      }
     });
 
     it.each([

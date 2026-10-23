@@ -96,10 +96,16 @@ function readIspeDimensions(buffer: Buffer): Array<{ width: number; height: numb
 async function writeTempExclusive(filePath: string, buffer: Buffer): Promise<void> {
   try {
     const fh = await open(filePath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY);
+    let fileWriteErr: unknown;
     try {
       await fh.writeFile(buffer);
+    } catch (err) {
+      fileWriteErr = err;
+      throw err;
     } finally {
-      await fh.close();
+      await fh.close().catch((closeErr: unknown) => {
+        if (fileWriteErr === undefined) throw closeErr;
+      });
     }
   } catch (err) {
     throw normalizeOperationalWriteError(err);

@@ -11,10 +11,16 @@ import { describe, expect, it } from "vitest";
  */
 async function writeTempExclusive(filePath: string, buffer: Buffer): Promise<void> {
   const fh = await open(filePath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY);
+  let fileWriteErr: unknown;
   try {
     await fh.writeFile(buffer);
+  } catch (err) {
+    fileWriteErr = err;
+    throw err;
   } finally {
-    await fh.close();
+    await fh.close().catch((closeErr: unknown) => {
+      if (fileWriteErr === undefined) throw closeErr;
+    });
   }
 }
 

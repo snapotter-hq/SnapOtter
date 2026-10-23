@@ -17,6 +17,7 @@ const failures = vi.hoisted(() => ({
   next: null as Error | null,
   open: null as Error | null,
   writeFile: null as Error | null,
+  close: null as Error | null,
   closedHandles: 0,
   // Which output read fails: heif-dec's single-image name or the -1 fallback.
   pattern: /heic-out-(?![^/\\]*-1\.png$)[^/\\]*\.png$/,
@@ -63,16 +64,24 @@ vi.mock("node:fs/promises", async (importOriginal) => {
         filePath,
         ...rest,
       )) as { writeFile: (...args: unknown[]) => Promise<unknown>; close: () => Promise<unknown> };
-      if (failures.writeFile && /heic-in-[^/\\]*\.(?:heic|png)$/.test(String(filePath))) {
-        const err = failures.writeFile;
+      if (
+        (failures.writeFile || failures.close) &&
+        /heic-in-[^/\\]*\.(?:heic|png)$/.test(String(filePath))
+      ) {
+        const writeErr = failures.writeFile;
+        const closeErr = failures.close;
         failures.writeFile = null;
+        failures.close = null;
         const origClose = handle.close.bind(handle);
-        handle.writeFile = async () => {
-          throw err;
-        };
+        if (writeErr) {
+          handle.writeFile = async () => {
+            throw writeErr;
+          };
+        }
         handle.close = async () => {
           failures.closedHandles += 1;
-          return origClose();
+          await origClose().catch(() => {});
+          if (closeErr) throw closeErr;
         };
       }
       return handle;
@@ -133,6 +142,7 @@ afterEach(() => {
   failures.next = null;
   failures.open = null;
   failures.writeFile = null;
+  failures.close = null;
   failures.closedHandles = 0;
   failures.pattern = SINGLE;
   failures.kill = null;
@@ -526,5 +536,70 @@ describe("writeTempExclusive operational write errors in decodeHeic and encodeHe
       cause: writeErr,
     });
     expect(failures.closedHandles).toBe(1);
+  });
+
+  it("preserves a primary fh.writeFile fault when fh.close also rejects, and surfaces fh.close faults when fh.writeFile succeeds in decodeHeic and encodeHeic (#3649)", async () => {
+    const writeErr = Object.assign(new Error("ENOSPC: no space left on device, write"), {
+      code: "ENOSPC",
+      syscall: "write",
+    });
+    const closeErr = Object.assign(new Error("EIO: close failed"), {
+      code: "EIO",
+      syscall: "close",
+    });
+
+    failures.writeFile = writeErr;
+    failures.close = closeErr;
+    const decodeErr = await decodeError(readFixture(fixtures.image.formats("heic")));
+    expect(decodeErr).toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      statusCode: 503,
+      code: "storage-full",
+      cause: writeErr,
+    });
+    expect(failures.closedHandles).toBe(1);
+
+    failures.writeFile = writeErr;
+    failures.close = closeErr;
+    const encodeErr = await encodeHeic(readFixture(fixtures.image.base.png200)).catch(
+      (e: unknown) => e,
+    );
+    expect(encodeErr).toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      statusCode: 503,
+      code: "storage-full",
+      cause: writeErr,
+    });
+    expect(failures.closedHandles).toBe(2);
+
+    const closeEnospc = Object.assign(new Error("ENOSPC: close flush failed"), {
+      code: "ENOSPC",
+      syscall: "close",
+    });
+    failures.close = closeEnospc;
+    const decodeCloseErr = await decodeError(readFixture(fixtures.image.formats("heic")));
+    expect(decodeCloseErr).toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      statusCode: 503,
+      code: "storage-full",
+      cause: closeEnospc,
+    });
+    expect(failures.closedHandles).toBe(3);
+
+    failures.close = closeEnospc;
+    const encodeCloseErr = await encodeHeic(readFixture(fixtures.image.base.png200)).catch(
+      (e: unknown) => e,
+    );
+    expect(encodeCloseErr).toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      statusCode: 503,
+      code: "storage-full",
+      cause: closeEnospc,
+    });
+    expect(failures.closedHandles).toBe(4);
   });
 });

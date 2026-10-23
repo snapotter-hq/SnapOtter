@@ -18,6 +18,7 @@ const failures = vi.hoisted(() => ({
   byCommand: {} as Record<string, Record<string, unknown>>,
   open: null as Error | null,
   writeFile: null as Error | null,
+  close: null as Error | null,
   closedHandles: 0,
   read: null as Error | null,
   writeOutput: null as Buffer | null,
@@ -76,16 +77,24 @@ vi.mock("node:fs/promises", async (importOriginal) => {
         path,
         ...rest,
       )) as { writeFile: (...args: unknown[]) => Promise<unknown>; close: () => Promise<unknown> };
-      if (failures.writeFile && /(?:psd-in|any-in)-[^/\\]*\.\w+$/.test(String(path))) {
-        const err = failures.writeFile;
+      if (
+        (failures.writeFile || failures.close) &&
+        /(?:dimensions|psd-in|any-in)-[^/\\]*\.\w+$/.test(String(path))
+      ) {
+        const writeErr = failures.writeFile;
+        const closeErr = failures.close;
         failures.writeFile = null;
+        failures.close = null;
         const origClose = handle.close.bind(handle);
-        handle.writeFile = async () => {
-          throw err;
-        };
+        if (writeErr) {
+          handle.writeFile = async () => {
+            throw writeErr;
+          };
+        }
         handle.close = async () => {
           failures.closedHandles += 1;
-          return origClose();
+          await origClose().catch(() => {});
+          if (closeErr) throw closeErr;
         };
       }
       return handle;
@@ -162,6 +171,9 @@ afterEach(() => {
   failures.probe = null;
   failures.byCommand = {};
   failures.open = null;
+  failures.writeFile = null;
+  failures.close = null;
+  failures.closedHandles = 0;
   failures.read = null;
   failures.writeOutput = null;
   failures.sharpToBuffer = null;
@@ -738,5 +750,102 @@ describe("writeTempExclusive operational write errors in decodeToSharpCompat and
       cause: writeErr,
     });
     expect(failures.closedHandles).toBe(1);
+  });
+
+  it("preserves a primary fh.writeFile fault when fh.close also rejects, and surfaces fh.close faults when fh.writeFile succeeds in decodeToSharpCompat, decodeAnyFormat, and preflightEncodedDimensions (#3649)", async () => {
+    const { fixtures, readFixture } = await import("../../fixtures/index.js");
+    const writeErr = Object.assign(new Error("ENOSPC: no space left on device, write"), {
+      code: "ENOSPC",
+      syscall: "write",
+    });
+    const closeErr = Object.assign(new Error("EIO: close failed"), {
+      code: "EIO",
+      syscall: "close",
+    });
+
+    failures.writeFile = writeErr;
+    failures.close = closeErr;
+    const psdErr = await decodeToSharpCompat(
+      readFixture(fixtures.image.formats("psd")),
+      "psd",
+      "psd",
+    ).catch((e: unknown) => e);
+    expect(psdErr).toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      statusCode: 503,
+      code: "storage-full",
+      cause: writeErr,
+    });
+    expect(failures.closedHandles).toBe(1);
+
+    failures.writeFile = writeErr;
+    failures.close = closeErr;
+    const avifErr = await decodeAnyFormat(Buffer.from("avif-bytes"), "avif").catch(
+      (e: unknown) => e,
+    );
+    expect(avifErr).toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      statusCode: 503,
+      code: "storage-full",
+      cause: writeErr,
+    });
+    expect(failures.closedHandles).toBe(2);
+
+    failures.writeFile = writeErr;
+    failures.close = closeErr;
+    const preflightErr = (await decodeToSharpCompat(
+      Buffer.from("not really a jxl"),
+      "jxl",
+      undefined,
+      { maxPixels: 100_000 },
+    ).catch((e: unknown) => e)) as Error;
+    expect(preflightErr).toBeInstanceOf(DecoderUnavailableError);
+    expect(preflightErr.cause).toBe(writeErr);
+    expect(failures.closedHandles).toBe(3);
+
+    const closeEnospc = Object.assign(new Error("ENOSPC: close flush failed"), {
+      code: "ENOSPC",
+      syscall: "close",
+    });
+    failures.close = closeEnospc;
+    const psdCloseErr = await decodeToSharpCompat(
+      readFixture(fixtures.image.formats("psd")),
+      "psd",
+      "psd",
+    ).catch((e: unknown) => e);
+    expect(psdCloseErr).toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      statusCode: 503,
+      code: "storage-full",
+      cause: closeEnospc,
+    });
+    expect(failures.closedHandles).toBe(4);
+
+    failures.close = closeEnospc;
+    const avifCloseErr = await decodeAnyFormat(Buffer.from("avif-bytes"), "avif").catch(
+      (e: unknown) => e,
+    );
+    expect(avifCloseErr).toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      statusCode: 503,
+      code: "storage-full",
+      cause: closeEnospc,
+    });
+    expect(failures.closedHandles).toBe(5);
+
+    failures.close = closeEnospc;
+    const preflightCloseErr = (await decodeToSharpCompat(
+      Buffer.from("not really a jxl"),
+      "jxl",
+      undefined,
+      { maxPixels: 100_000 },
+    ).catch((e: unknown) => e)) as Error;
+    expect(preflightCloseErr).toBeInstanceOf(DecoderUnavailableError);
+    expect(preflightCloseErr.cause).toBe(closeEnospc);
+    expect(failures.closedHandles).toBe(6);
   });
 });
