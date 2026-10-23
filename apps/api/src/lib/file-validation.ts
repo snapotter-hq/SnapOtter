@@ -4,6 +4,7 @@ import { extToMime, formatToMime } from "@snapotter/image-engine";
 import { CAMERA_RAW_INPUTS } from "@snapotter/shared";
 import sharp from "sharp";
 import { env } from "../config.js";
+import { asDecoderOutOfMemory, DecoderOutOfMemoryError } from "./format-decoders.js";
 import { isSvgBuffer, SVG_SNIFF_BYTES } from "./svg-sanitize.js";
 
 /** Formats we accept as input. */
@@ -338,7 +339,13 @@ export async function validateImageBuffer(
     }
 
     return { valid: true, format: detectedFormat, width, height };
-  } catch {
+  } catch (err) {
+    const outOfMemory = asDecoderOutOfMemory(
+      err instanceof Error && /\bAllocating \d+ bytes failed\b/.test(err.message)
+        ? Object.assign(err, { stderr: err.message })
+        : err,
+    );
+    if (outOfMemory instanceof DecoderOutOfMemoryError) throw outOfMemory;
     return { valid: false, reason: "Failed to read image metadata" };
   }
 }

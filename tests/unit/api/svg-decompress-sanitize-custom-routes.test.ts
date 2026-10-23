@@ -68,7 +68,9 @@ vi.mock("../../../apps/api/src/routes/tool-factory.js", () => ({
   registerToolProcessFn: vi.fn(),
 }));
 
+import sharp from "sharp";
 import { env } from "../../../apps/api/src/config.js";
+import { DecoderOutOfMemoryError } from "../../../apps/api/src/lib/format-decoders.js";
 import { registerEditMetadata } from "../../../apps/api/src/routes/tools/edit-metadata.js";
 import { registerInfo } from "../../../apps/api/src/routes/tools/info.js";
 import { registerStripMetadata } from "../../../apps/api/src/routes/tools/strip-metadata.js";
@@ -740,6 +742,50 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
       await expect(
         invokeRoute(handler, [{ type: "file", filename: "icon.svgz", content: SCRIPT_LT_SVGZ }]),
       ).rejects.toThrow(decompressFault);
+    });
+
+    it("propagates DecoderOutOfMemoryError when validateImageBuffer hits a V8 allocation RangeError (#3717)", async () => {
+      const exifJpg = readFixture(fixtures.image.exifGps);
+      const oom = () => new RangeError("Array buffer allocation failed");
+      const metaSpy = vi
+        .spyOn(sharp.prototype, "metadata")
+        .mockRejectedValueOnce(oom())
+        .mockRejectedValueOnce(oom())
+        .mockRejectedValueOnce(oom())
+        .mockRejectedValueOnce(oom())
+        .mockRejectedValueOnce(oom());
+      try {
+        await expect(
+          invokeRoute(routes.get("/api/v1/tools/image/edit-metadata"), [
+            { type: "file", filename: "sample.jpg", content: exifJpg },
+            { type: "field", fieldname: "settings", value: "{}" },
+          ]),
+        ).rejects.toBeInstanceOf(DecoderOutOfMemoryError);
+
+        await expect(
+          invokeRoute(routes.get("/api/v1/tools/image/edit-metadata/inspect"), [
+            { type: "file", filename: "misnamed.svgz", content: exifJpg },
+          ]),
+        ).rejects.toBeInstanceOf(DecoderOutOfMemoryError);
+
+        await expect(
+          invokeRoute(routes.get("/api/v1/tools/image/strip-metadata/inspect"), [
+            { type: "file", filename: "misnamed.svgz", content: exifJpg },
+          ]),
+        ).rejects.toBeInstanceOf(DecoderOutOfMemoryError);
+
+        await expect(
+          invokeRoute(handler, [{ type: "file", filename: "sample.jpg", content: exifJpg }]),
+        ).rejects.toBeInstanceOf(DecoderOutOfMemoryError);
+        expect(metaSpy).toHaveBeenCalledTimes(4);
+
+        await expect(
+          invokeRoute(handler, [{ type: "file", filename: "misnamed.svgz", content: exifJpg }]),
+        ).rejects.toBeInstanceOf(DecoderOutOfMemoryError);
+        expect(metaSpy).toHaveBeenCalledTimes(5);
+      } finally {
+        metaSpy.mockRestore();
+      }
     });
   });
 });

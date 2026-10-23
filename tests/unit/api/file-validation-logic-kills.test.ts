@@ -1,7 +1,8 @@
 import sharp from "sharp";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { validateImageBuffer } from "../../../apps/api/src/lib/file-validation.js";
+import { DecoderOutOfMemoryError } from "../../../apps/api/src/lib/format-decoders.js";
 
 // Targets the LOGIC survivors of file-validation.ts (L200+): the megapixel
 // limit arithmetic, the null-byte spot-check positions, the SVGZ gzip guard,
@@ -203,5 +204,53 @@ describe("file-validation extension extraction + TGA (L216, L228)", () => {
         reason: "Unrecognized image format",
       });
     }
+  });
+});
+
+describe("file-validation metadata OOM propagation (#3717)", () => {
+  it("rethrows DecoderOutOfMemoryError when sharp.prototype.metadata rejects with a V8 allocation RangeError or libheif OOM", async () => {
+    const buf = await png(10, 10);
+    const oomErr = new RangeError("Array buffer allocation failed");
+    const heifOomErr = new Error(
+      "heif: Memory allocation error: Unspecified: Allocating 4147215 bytes failed",
+    );
+    const metaSpy = vi
+      .spyOn(sharp.prototype, "metadata")
+      .mockRejectedValueOnce(oomErr)
+      .mockRejectedValueOnce(heifOomErr)
+      .mockRejectedValueOnce(new RangeError("Invalid count value"));
+    try {
+      const caught = await validateImageBuffer(buf, "sample.png").catch((e: unknown) => e);
+      expect(caught).toBeInstanceOf(DecoderOutOfMemoryError);
+      expect(caught).toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: oomErr,
+      });
+
+      const caughtHeif = await validateImageBuffer(buf, "sample.png").catch((e: unknown) => e);
+      expect(caughtHeif).toBeInstanceOf(DecoderOutOfMemoryError);
+      expect(caughtHeif).toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: heifOomErr,
+      });
+
+      await expect(validateImageBuffer(buf, "sample.png")).resolves.toEqual({
+        valid: false,
+        reason: "Failed to read image metadata",
+      });
+    } finally {
+      metaSpy.mockRestore();
+    }
+
+    await expect(
+      validateImageBuffer(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00]), "corrupt.png"),
+    ).resolves.toEqual({
+      valid: false,
+      reason: "Failed to read image metadata",
+    });
   });
 });
