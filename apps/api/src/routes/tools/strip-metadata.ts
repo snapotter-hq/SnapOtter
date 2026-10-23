@@ -187,7 +187,9 @@ export function registerStripMetadata(app: FastifyInstance) {
 
             if (Object.keys(exifData).length > 0) result.exif = exifData;
             if (Object.keys(gpsData).length > 0) result.gps = gpsData;
-          } catch {
+          } catch (err) {
+            const oomErr = asDecoderOutOfMemory(err);
+            if (isDecoderUnavailable(oomErr)) throw oomErr;
             result.exif = null;
             result.exifError = "Failed to parse EXIF data";
           }
@@ -197,7 +199,9 @@ export function registerStripMetadata(app: FastifyInstance) {
         if (metadata.icc) {
           try {
             result.icc = parseIccProfile(metadata.icc);
-          } catch {
+          } catch (err) {
+            const oomErr = asDecoderOutOfMemory(err);
+            if (isDecoderUnavailable(oomErr)) throw oomErr;
             result.icc = null;
           }
         }
@@ -206,7 +210,9 @@ export function registerStripMetadata(app: FastifyInstance) {
         if (metadata.xmp) {
           try {
             result.xmp = parseXmp(metadata.xmp);
-          } catch {
+          } catch (err) {
+            const oomErr = asDecoderOutOfMemory(err);
+            if (isDecoderUnavailable(oomErr)) throw oomErr;
             result.xmp = null;
           }
         }

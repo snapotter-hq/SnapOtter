@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   getImageInfo,
   parseExif,
@@ -212,6 +212,34 @@ describe("parseExif", () => {
   it("returns empty sections (does not throw) on a malformed buffer", () => {
     const result = parseExif(Buffer.from("garbage exif bytes that will not parse"));
     expect(result).toEqual({ image: {}, photo: {}, iop: {}, gps: {} });
+  });
+
+  it("rethrows V8 buffer allocation RangeError while swallowing non-OOM RangeError (#3835)", () => {
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    const exifBuf = Buffer.from("Exif\0\0MM\0*", "ascii");
+    const toStringSpy = vi.spyOn(exifBuf, "toString").mockImplementationOnce(() => {
+      throw v8Oom;
+    });
+    try {
+      expect(() => parseExif(exifBuf)).toThrow(v8Oom);
+    } finally {
+      toStringSpy.mockRestore();
+    }
+
+    const nonOomRangeBuf = Buffer.from("Exif\0\0MM\0*", "ascii");
+    const rangeSpy = vi.spyOn(nonOomRangeBuf, "toString").mockImplementationOnce(() => {
+      throw new RangeError("Attempt to access memory outside buffer bounds");
+    });
+    try {
+      expect(parseExif(nonOomRangeBuf)).toEqual({
+        image: {},
+        photo: {},
+        iop: {},
+        gps: {},
+      });
+    } finally {
+      rangeSpy.mockRestore();
+    }
   });
 
   it("populates the image section from a real EXIF blob", async () => {

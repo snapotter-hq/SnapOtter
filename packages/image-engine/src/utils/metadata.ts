@@ -89,7 +89,10 @@ export function parseExif(exifBuffer: Buffer): {
         result.gps[k] = sanitizeValue(v);
       }
     }
-  } catch {
+  } catch (err) {
+    if (err instanceof RangeError && err.message.startsWith("Array buffer allocation failed")) {
+      throw err;
+    }
     // Return empty sections on parse failure
   }
 

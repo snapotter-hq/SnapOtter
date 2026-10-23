@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import path from "node:path";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 // sharp is only installed in the image-engine package, so resolve it from there
 const require = createRequire(
@@ -216,6 +216,34 @@ describe("parseExif", () => {
     const result = parseExif(Buffer.from([0x00, 0x00]));
     expect(result.image).toEqual({});
     expect(result.photo).toEqual({});
+  });
+
+  it("rethrows V8 buffer allocation RangeError instead of returning empty sections (#3835)", () => {
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    const exifBuf = Buffer.from("Exif\0\0MM\0*", "ascii");
+    const toStringSpy = vi.spyOn(exifBuf, "toString").mockImplementationOnce(() => {
+      throw v8Oom;
+    });
+    try {
+      expect(() => parseExif(exifBuf)).toThrow(v8Oom);
+    } finally {
+      toStringSpy.mockRestore();
+    }
+
+    const nonOomRangeBuf = Buffer.from("Exif\0\0MM\0*", "ascii");
+    const rangeSpy = vi.spyOn(nonOomRangeBuf, "toString").mockImplementationOnce(() => {
+      throw new RangeError("Attempt to access memory outside buffer bounds");
+    });
+    try {
+      expect(parseExif(nonOomRangeBuf)).toEqual({
+        image: {},
+        photo: {},
+        iop: {},
+        gps: {},
+      });
+    } finally {
+      rangeSpy.mockRestore();
+    }
   });
 
   it("parses GPSInfo section when GPS data is present", async () => {

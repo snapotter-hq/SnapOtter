@@ -772,6 +772,112 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         metaSpy.mockRestore();
       }
     });
+
+    it("rethrows DecoderOutOfMemoryError when EXIF, ICC, or XMP parsing hits a V8 buffer allocation RangeError (#3835)", async () => {
+      const exifJpg = readFixture(fixtures.image.exifGps);
+      const v8Oom = new RangeError("Array buffer allocation failed");
+
+      // Build a minimal ICC profile with an mluc description tag so parseIccProfile
+      // executes Buffer.alloc(raw.length) at line 90.
+      const mlucIcc = Buffer.alloc(180);
+      mlucIcc.writeUInt32BE(1, 128);
+      mlucIcc.write("desc", 132, "ascii");
+      mlucIcc.writeUInt32BE(144, 136);
+      mlucIcc.writeUInt32BE(36, 140);
+      mlucIcc.write("mluc", 144, "ascii");
+      mlucIcc.writeUInt32BE(1, 152);
+      mlucIcc.writeUInt32BE(8, 160);
+      mlucIcc.writeUInt32BE(28, 164);
+      Buffer.from([0x00, 0x73, 0x00, 0x52, 0x00, 0x47, 0x00, 0x42]).copy(mlucIcc, 172);
+
+      const exifOomBuf = Buffer.from("Exif\0\0MM\0*", "ascii");
+      vi.spyOn(exifOomBuf, "toString").mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+
+      const xmpOomBuf = Buffer.from('<rdf:Description dc:title="Test"/>', "utf-8");
+      vi.spyOn(xmpOomBuf, "toString").mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+
+      const exifCorruptBuf = {
+        get length(): number {
+          throw new RangeError("Invalid array length");
+        },
+      } as unknown as Buffer;
+
+      const iccCorruptBuf = Buffer.from(mlucIcc);
+      vi.spyOn(iccCorruptBuf, "readUInt32BE").mockImplementationOnce(() => {
+        throw new RangeError("Index out of range");
+      });
+
+      const xmpCorruptBuf = Buffer.from('<rdf:Description dc:title="Test"/>', "utf-8");
+      vi.spyOn(xmpCorruptBuf, "toString").mockImplementationOnce(() => {
+        throw new RangeError("Invalid string length");
+      });
+
+      let allocSpy: { mockRestore(): void } | undefined;
+      const metaSpy = vi
+        .spyOn(sharp.prototype, "metadata")
+        .mockResolvedValueOnce({ exif: exifOomBuf } as sharp.Metadata)
+        .mockImplementationOnce(async () => {
+          allocSpy = vi.spyOn(Buffer, "alloc").mockImplementationOnce(() => {
+            throw v8Oom;
+          });
+          return { icc: mlucIcc } as sharp.Metadata;
+        })
+        .mockResolvedValueOnce({ xmp: xmpOomBuf } as sharp.Metadata)
+        .mockResolvedValueOnce({
+          exif: exifCorruptBuf,
+          icc: iccCorruptBuf,
+          xmp: xmpCorruptBuf,
+        } as sharp.Metadata);
+
+      try {
+        await expect(
+          invokeRoute(handler, [{ type: "file", filename: "sample.jpg", content: exifJpg }]),
+        ).rejects.toMatchObject({
+          name: "DecoderOutOfMemoryError",
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          cause: v8Oom,
+        });
+
+        await expect(
+          invokeRoute(handler, [{ type: "file", filename: "sample.jpg", content: exifJpg }]),
+        ).rejects.toMatchObject({
+          name: "DecoderOutOfMemoryError",
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          cause: v8Oom,
+        });
+
+        await expect(
+          invokeRoute(handler, [{ type: "file", filename: "sample.jpg", content: exifJpg }]),
+        ).rejects.toMatchObject({
+          name: "DecoderOutOfMemoryError",
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          cause: v8Oom,
+        });
+
+        const fallbackReply = await invokeRoute(handler, [
+          { type: "file", filename: "sample.jpg", content: exifJpg },
+        ]);
+        expect(fallbackReply.statusCode).toBe(200);
+        expect(fallbackReply.payload).toEqual({
+          filename: "sample.jpg",
+          fileSize: exifJpg.length,
+          exif: null,
+          exifError: "Failed to parse EXIF data",
+          icc: null,
+          xmp: null,
+        });
+      } finally {
+        allocSpy?.mockRestore();
+        metaSpy.mockRestore();
+      }
+    });
   });
 
   describe("POST /api/v1/tools/image/info", () => {
