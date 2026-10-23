@@ -39,6 +39,7 @@ vi.mock("../../../apps/api/src/lib/browser-service.js", () => ({
   capturePage: async () => Buffer.from("png"),
 }));
 
+import * as exiftoolMod from "../../../apps/api/src/lib/exiftool.js";
 import {
   DecoderOutOfMemoryError,
   DecoderUnavailableError,
@@ -47,6 +48,7 @@ import * as formatEncoders from "../../../apps/api/src/lib/format-encoders.js";
 import * as heicConverter from "../../../apps/api/src/lib/heic-converter.js";
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
 import { registerCompare } from "../../../apps/api/src/routes/tools/compare.js";
+import { registerEditMetadata } from "../../../apps/api/src/routes/tools/edit-metadata.js";
 import { registerHtmlToImage } from "../../../apps/api/src/routes/tools/html-to-image.js";
 import { registerPassportPhoto } from "../../../apps/api/src/routes/tools/passport-photo.js";
 import { registerQrGenerate } from "../../../apps/api/src/routes/tools/qr-generate.js";
@@ -286,6 +288,77 @@ describe("compare", () => {
     expect(res.statusCode).toBe(422);
     expect(res.json().error).toBe("Comparison failed");
     await app.close();
+  });
+});
+
+describe("edit-metadata (#3646)", () => {
+  beforeEach(() => {
+    putObject.mockReset().mockResolvedValue(undefined);
+  });
+
+  it("surfaces 503 ENGINE_UNAVAILABLE when writeMetadata or inspectMetadata rejects with a V8 buffer allocation RangeError or SIGKILL, and keeps 422 on ordinary errors (#3646)", async () => {
+    const oomMessage =
+      "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+    const png = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: "#f00" },
+    })
+      .png()
+      .toBuffer();
+    const writeSpy = vi
+      .spyOn(exiftoolMod, "writeMetadata")
+      .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"))
+      .mockRejectedValueOnce(
+        Object.assign(new Error("exiftool exited SIGKILL"), { signal: "SIGKILL" }),
+      )
+      .mockRejectedValueOnce(new Error("exiftool rejected tag"));
+    const inspectSpy = vi
+      .spyOn(exiftoolMod, "inspectMetadata")
+      .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"));
+    const app = await buildApp(registerEditMetadata);
+    try {
+      for (let i = 0; i < 2; i++) {
+        const res = await app.inject({
+          method: "POST",
+          url: apiToolPath("edit-metadata"),
+          ...multipartBody([{ name: "a.png", type: "image/png", data: png }], {
+            artist: "Test",
+          }),
+        });
+        expect(res.statusCode).toBe(503);
+        expect(res.json()).toMatchObject({
+          error: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+        });
+      }
+
+      const inspectRes = await app.inject({
+        method: "POST",
+        url: `${apiToolPath("edit-metadata")}/inspect`,
+        ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
+      });
+      expect(inspectRes.statusCode).toBe(503);
+      expect(inspectRes.json()).toMatchObject({
+        error: oomMessage,
+        code: "ENGINE_UNAVAILABLE",
+      });
+
+      const badRes = await app.inject({
+        method: "POST",
+        url: apiToolPath("edit-metadata"),
+        ...multipartBody([{ name: "a.png", type: "image/png", data: png }], {
+          artist: "Test",
+        }),
+      });
+      expect(badRes.statusCode).toBe(422);
+      expect(badRes.json()).toEqual({
+        error: "Metadata edit failed",
+        details: "exiftool rejected tag",
+      });
+    } finally {
+      inspectSpy.mockRestore();
+      writeSpy.mockRestore();
+      await app.close();
+    }
   });
 });
 

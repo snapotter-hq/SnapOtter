@@ -255,6 +255,95 @@ describe("pdf-to-image single-file route", () => {
     expect(logLines.some((line) => line.includes("PDF conversion failed"))).toBe(true);
     await app.close();
   });
+
+  it("surfaces 503 ENGINE_UNAVAILABLE and reports once when Sharp, encodeJxl, or encodeHeic hits V8 OOM, SIGKILL, or DecoderUnavailableError (#3646)", async () => {
+    const oomMessage =
+      "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 25 * 60_000);
+    const reportSpy = vi.spyOn(engineUnavailableMod, "reportEngineUnavailable");
+    const pngSpy = vi.spyOn(sharp.prototype, "png").mockImplementationOnce(function (
+      this: sharp.Sharp,
+    ) {
+      return {
+        toBuffer: async () => {
+          throw new RangeError("Array buffer allocation failed");
+        },
+      } as unknown as sharp.Sharp;
+    });
+    const jxlSpy = vi
+      .spyOn(formatEncoders, "encodeJxl")
+      .mockRejectedValueOnce(Object.assign(new Error("cjxl exited SIGKILL"), { signal: "SIGKILL" }))
+      .mockRejectedValueOnce(new DecoderUnavailableError("No cjxl found."))
+      .mockRejectedValueOnce(
+        new SafeError("No cjxl found (statusless).", { code: "ENGINE_UNAVAILABLE" }),
+      );
+    const heicSpy = vi
+      .spyOn(heicConverter, "encodeHeic")
+      .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"))
+      .mockRejectedValueOnce(new DecoderOutOfMemoryError("heif-enc killed"));
+    const app = await buildApp(registerPdfToImage);
+    try {
+      const pngRes = await send(app);
+      expect(pngRes.statusCode).toBe(503);
+      expect(pngRes.json()).toMatchObject({
+        error: oomMessage,
+        code: "ENGINE_UNAVAILABLE",
+      });
+      expect(deletePrefix).toHaveBeenCalledTimes(1);
+
+      for (const expectedError of [oomMessage, "No cjxl found.", "No cjxl found (statusless)."]) {
+        deletePrefix.mockClear();
+        const jxlRes = await app.inject({
+          method: "POST",
+          url: apiToolPath("pdf-to-image"),
+          ...multipartBody([{ name: "a.pdf", type: "application/pdf", data: PDF }], {
+            dpi: 36,
+            format: "jxl",
+          }),
+        });
+        expect(jxlRes.statusCode).toBe(503);
+        expect(jxlRes.json()).toMatchObject({
+          error: expectedError,
+          code: "ENGINE_UNAVAILABLE",
+        });
+        expect(deletePrefix).toHaveBeenCalledTimes(1);
+      }
+
+      for (const expectedError of [oomMessage, "heif-enc killed"]) {
+        deletePrefix.mockClear();
+        const heicRes = await app.inject({
+          method: "POST",
+          url: apiToolPath("pdf-to-image"),
+          ...multipartBody([{ name: "a.pdf", type: "application/pdf", data: PDF }], {
+            dpi: 36,
+            format: "heic",
+          }),
+        });
+        expect(heicRes.statusCode).toBe(503);
+        expect(heicRes.json()).toMatchObject({
+          error: expectedError,
+          code: "ENGINE_UNAVAILABLE",
+        });
+        expect(deletePrefix).toHaveBeenCalledTimes(1);
+      }
+
+      expect(reportSpy).toHaveBeenCalledTimes(6);
+      // 3 distinct cause names in this window: DecoderOutOfMemoryError, DecoderUnavailableError, SafeError.
+      expect(
+        logLines.filter((line) =>
+          line.includes("Tool engine unavailable during input preparation"),
+        ),
+      ).toHaveLength(3);
+      expect(logLines.some((line) => line.includes("Unhandled request error"))).toBe(false);
+    } finally {
+      pngSpy.mockRestore();
+      jxlSpy.mockRestore();
+      heicSpy.mockRestore();
+      reportSpy.mockRestore();
+      nowSpy.mockRestore();
+      await app.close();
+    }
+  });
 });
 
 describe("image-to-pdf ZIP of per-image PDFs", () => {
@@ -387,6 +476,117 @@ describe("image-to-pdf ZIP of per-image PDFs", () => {
       expect(localRes.json()).toEqual({ error: "Internal server error" });
     } finally {
       (env as { STORAGE_MODE: string }).STORAGE_MODE = originalMode;
+      await app.close();
+    }
+  });
+
+  it("surfaces 503 ENGINE_UNAVAILABLE when Sharp conversion, flattenAlpha, or compressImagesForTarget hits a V8 buffer allocation RangeError, and cleans up partial outputs when wroteOutput is true (#3646)", async () => {
+    const oomMessage =
+      "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+    const png = await sharp({
+      create: {
+        width: 20,
+        height: 20,
+        channels: 4,
+        background: { r: 255, g: 0, b: 0, alpha: 0.5 },
+      },
+    })
+      .png()
+      .toBuffer();
+    const pngSpy = vi
+      .spyOn(sharp.prototype, "png")
+      .mockImplementationOnce(function (this: sharp.Sharp) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Array buffer allocation failed");
+          },
+        } as unknown as sharp.Sharp;
+      })
+      .mockImplementationOnce(function (this: sharp.Sharp) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Array buffer allocation failed");
+          },
+        } as unknown as sharp.Sharp;
+      });
+    const jpegSpy = vi.spyOn(sharp.prototype, "jpeg").mockImplementationOnce(function (
+      this: sharp.Sharp,
+    ) {
+      return {
+        toBuffer: async () => {
+          throw new RangeError("Array buffer allocation failed");
+        },
+      } as unknown as sharp.Sharp;
+    });
+    const app = await buildApp(registerImageToPdf);
+    try {
+      // 1. Direct sharp(buf).png().toBuffer() branch (no targetSize)
+      const pngRes = await app.inject({
+        method: "POST",
+        url: apiToolPath("image-to-pdf"),
+        ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
+      });
+      expect(pngRes.statusCode).toBe(503);
+      expect(pngRes.json()).toMatchObject({
+        error: oomMessage,
+        code: "ENGINE_UNAVAILABLE",
+      });
+      expect(deletePrefix).not.toHaveBeenCalled();
+
+      // 2. flattenAlpha(buf) branch (targetSize set, consumes second pngSpy mock)
+      const flattenRes = await app.inject({
+        method: "POST",
+        url: apiToolPath("image-to-pdf"),
+        ...multipartBody([{ name: "a.png", type: "image/png", data: png }], {
+          targetSize: { value: 100, unit: "KB" },
+        }),
+      });
+      expect(flattenRes.statusCode).toBe(503);
+      expect(flattenRes.json()).toMatchObject({
+        error: oomMessage,
+        code: "ENGINE_UNAVAILABLE",
+      });
+      expect(deletePrefix).not.toHaveBeenCalled();
+
+      // 3. compressImagesForTarget branch (targetSize set, flattenAlpha succeeds, jpegSpy throws)
+      const targetRes = await app.inject({
+        method: "POST",
+        url: apiToolPath("image-to-pdf"),
+        ...multipartBody([{ name: "a.png", type: "image/png", data: png }], {
+          targetSize: { value: 100, unit: "KB" },
+        }),
+      });
+      expect(targetRes.statusCode).toBe(503);
+      expect(targetRes.json()).toMatchObject({
+        error: oomMessage,
+        code: "ENGINE_UNAVAILABLE",
+      });
+      expect(deletePrefix).not.toHaveBeenCalled();
+
+      // 4. collate: false when first PDF was written (wroteOutput = true) and second PDF hits V8 OOM
+      putObject
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"));
+      const partialRes = await app.inject({
+        method: "POST",
+        url: apiToolPath("image-to-pdf"),
+        ...multipartBody(
+          [
+            { name: "a.png", type: "image/png", data: png },
+            { name: "b.png", type: "image/png", data: png },
+          ],
+          { collate: false },
+        ),
+      });
+      expect(partialRes.statusCode).toBe(503);
+      expect(partialRes.json()).toMatchObject({
+        error: oomMessage,
+        code: "ENGINE_UNAVAILABLE",
+      });
+      expect(deletePrefix).toHaveBeenCalledTimes(1);
+    } finally {
+      pngSpy.mockRestore();
+      jpegSpy.mockRestore();
       await app.close();
     }
   });
@@ -935,6 +1135,169 @@ describe("pdf-to-image batch route (#1552)", () => {
     );
     expect(logLines.some((line) => line.includes("no terminal frame announced"))).toBe(false);
     await app.close();
+  });
+
+  it("settles the batch, reports ENGINE_UNAVAILABLE, and answers 503 when Sharp, encodeJxl, or encodeHeic hits V8 OOM, SIGKILL, or DecoderUnavailableError mid-batch (#3646)", async () => {
+    const oomMessage =
+      "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 50 * 60_000);
+    const reportSpy = vi.spyOn(engineUnavailableMod, "reportEngineUnavailable");
+    const pngSpy = vi.spyOn(sharp.prototype, "png").mockImplementationOnce(function (
+      this: sharp.Sharp,
+    ) {
+      return {
+        toBuffer: async () => {
+          throw new RangeError("Array buffer allocation failed");
+        },
+      } as unknown as sharp.Sharp;
+    });
+    const jxlSpy = vi
+      .spyOn(formatEncoders, "encodeJxl")
+      .mockRejectedValueOnce(Object.assign(new Error("cjxl exited SIGKILL"), { signal: "SIGKILL" }))
+      .mockRejectedValueOnce(new DecoderUnavailableError("No cjxl found."))
+      .mockRejectedValueOnce(
+        new SafeError("No cjxl found (statusless).", { code: "ENGINE_UNAVAILABLE" }),
+      );
+    const heicSpy = vi
+      .spyOn(heicConverter, "encodeHeic")
+      .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"))
+      .mockRejectedValueOnce(new DecoderOutOfMemoryError("heif-enc killed"))
+      .mockRejectedValueOnce(new DecoderOutOfMemoryError("heif-enc killed on second doc"));
+    const app = await buildApp(registerPdfToImage);
+    try {
+      const pngRes = await sendBatch(app);
+      expect(pngRes.statusCode).toBe(503);
+      expect(pngRes.json()).toMatchObject({
+        error: oomMessage,
+        code: "ENGINE_UNAVAILABLE",
+      });
+      expect(deletePrefix).toHaveBeenCalledTimes(1);
+      expect(failBatchJob).toHaveBeenCalledWith({
+        jobId: expect.any(String),
+        totalFiles: 2,
+        completedFiles: 2,
+        failedFiles: 2,
+        errors: [{ filename: "", error: oomMessage }],
+        message: oomMessage,
+        code: "ENGINE_UNAVAILABLE",
+      });
+
+      for (const expectedError of [oomMessage, "No cjxl found.", "No cjxl found (statusless)."]) {
+        failBatchJob.mockClear();
+        deletePrefix.mockClear();
+        const jxlRes = await app.inject({
+          method: "POST",
+          url: `${apiToolPath("pdf-to-image")}/batch`,
+          ...multipartBody(
+            [
+              { name: "a.pdf", type: "application/pdf", data: PDF },
+              { name: "b.pdf", type: "application/pdf", data: PDF },
+            ],
+            { dpi: 36, format: "jxl" },
+          ),
+        });
+        expect(jxlRes.statusCode).toBe(503);
+        expect(jxlRes.json()).toMatchObject({
+          error: expectedError,
+          code: "ENGINE_UNAVAILABLE",
+        });
+        expect(deletePrefix).toHaveBeenCalledTimes(1);
+        expect(failBatchJob).toHaveBeenCalledWith({
+          jobId: expect.any(String),
+          totalFiles: 2,
+          completedFiles: 2,
+          failedFiles: 2,
+          errors: [{ filename: "", error: expectedError }],
+          message: expectedError,
+          code: "ENGINE_UNAVAILABLE",
+        });
+      }
+
+      for (const expectedError of [oomMessage, "heif-enc killed"]) {
+        failBatchJob.mockClear();
+        deletePrefix.mockClear();
+        const heicRes = await app.inject({
+          method: "POST",
+          url: `${apiToolPath("pdf-to-image")}/batch`,
+          ...multipartBody(
+            [
+              { name: "a.pdf", type: "application/pdf", data: PDF },
+              { name: "b.pdf", type: "application/pdf", data: PDF },
+            ],
+            { dpi: 36, format: "heic" },
+          ),
+        });
+        expect(heicRes.statusCode).toBe(503);
+        expect(heicRes.json()).toMatchObject({
+          error: expectedError,
+          code: "ENGINE_UNAVAILABLE",
+        });
+        expect(deletePrefix).toHaveBeenCalledTimes(1);
+        expect(failBatchJob).toHaveBeenCalledWith({
+          jobId: expect.any(String),
+          totalFiles: 2,
+          completedFiles: 2,
+          failedFiles: 2,
+          errors: [{ filename: "", error: expectedError }],
+          message: expectedError,
+          code: "ENGINE_UNAVAILABLE",
+        });
+      }
+
+      // Mid-batch failure on i = 1 after i = 0 failed with a 400 PdfInputError:
+      // preserves the earlier per-file error and cleans up both -f0 and -f1 prefixes.
+      failBatchJob.mockClear();
+      deletePrefix.mockClear();
+      const midBatchRes = await app.inject({
+        method: "POST",
+        url: `${apiToolPath("pdf-to-image")}/batch`,
+        ...multipartBody(
+          [
+            { name: "bad.pdf", type: "application/pdf", data: Buffer.from("not a pdf") },
+            { name: "b.pdf", type: "application/pdf", data: PDF },
+          ],
+          { dpi: 36, format: "heic" },
+        ),
+      });
+      expect(midBatchRes.statusCode).toBe(503);
+      expect(midBatchRes.json()).toMatchObject({
+        error: "heif-enc killed on second doc",
+        code: "ENGINE_UNAVAILABLE",
+      });
+      // 1 deletePrefix for bad.pdf's per-file catch + 2 deletePrefix calls for slice(0, 2) on b.pdf's 503
+      expect(deletePrefix).toHaveBeenCalledTimes(3);
+      expect(failBatchJob).toHaveBeenCalledWith({
+        jobId: expect.any(String),
+        totalFiles: 2,
+        completedFiles: 2,
+        failedFiles: 2,
+        errors: [
+          { filename: "bad.pdf", error: "Invalid or corrupt PDF file" },
+          { filename: "", error: "heif-enc killed on second doc" },
+        ],
+        message: "heif-enc killed on second doc",
+        code: "ENGINE_UNAVAILABLE",
+      });
+
+      expect(reportSpy).toHaveBeenCalledTimes(7);
+      // 3 distinct cause names in this window: DecoderOutOfMemoryError, DecoderUnavailableError, SafeError.
+      expect(
+        logLines.filter((line) =>
+          line.includes("Tool engine unavailable during input preparation"),
+        ),
+      ).toHaveLength(3);
+      expect(logLines.some((line) => line.includes("PDF batch file conversion failed"))).toBe(
+        false,
+      );
+      expect(logLines.some((line) => line.includes("Unhandled request error"))).toBe(false);
+    } finally {
+      pngSpy.mockRestore();
+      jxlSpy.mockRestore();
+      heicSpy.mockRestore();
+      reportSpy.mockRestore();
+      nowSpy.mockRestore();
+      await app.close();
+    }
   });
 });
 

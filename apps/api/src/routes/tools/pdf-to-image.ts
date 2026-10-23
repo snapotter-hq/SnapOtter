@@ -10,8 +10,10 @@ import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
 import { INVALID_CLIENT_JOB_ID_ERROR, parseClientJobIdField } from "../../jobs/types.js";
 import { getSecurityHeaders } from "../../lib/csp.js";
+import { reportEngineUnavailable } from "../../lib/engine-unavailable.js";
 import { formatZodErrors, friendlyError } from "../../lib/errors.js";
 import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
+import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { encodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
@@ -25,6 +27,7 @@ import {
   putObject,
 } from "../../lib/object-storage.js";
 import { isUniqueViolation } from "../../lib/pg-errors.js";
+import { engineUnavailable } from "../../modality/image-input.js";
 import { requireToolAccess } from "../../permissions.js";
 import { failBatchJob, updateJobProgress } from "../progress.js";
 
@@ -600,19 +603,24 @@ export function registerPdfToImageRoute(
           await putObject(key, await buildPagesZip(childJobId, filenames));
           results[i] = { key, prefix, filename: zipName };
         } catch (rawErr) {
-          const err = normalizeOperationalWriteError(rawErr);
+          const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
           // A storage or infrastructure fault is not a bad document. Let it
           // reach the error handler (which logs it, reports it, and honors its
           // status) instead of telling the user their PDF is broken.
           const statusCode = (err as { statusCode?: unknown })?.statusCode;
-          if (typeof statusCode === "number") {
+          if (
+            isDecoderUnavailable(err) ||
+            hasServerErrorStatus(err) ||
+            typeof statusCode === "number"
+          ) {
+            const resolvedStatus = typeof statusCode === "number" ? statusCode : 503;
             // But settle the progress row first: skipping the terminal frame
             // below left a client watching this job over SSE on "processing"
             // until the next restart (#1443). Guarded, so it never overwrites a
             // terminal row, and a failed settle can't mask the real fault.
             const safe = isSafeMessageError(err);
             const message =
-              statusCode >= 500 && !safe
+              resolvedStatus >= 500 && !safe
                 ? "Internal server error"
                 : friendlyError(err instanceof Error ? err.message : String(err));
             await settleFaultedBatch(
@@ -636,6 +644,14 @@ export function registerPdfToImageRoute(
                 );
               }),
             );
+            if (isDecoderUnavailable(err)) {
+              const unavailable = engineUnavailable(err);
+              reportEngineUnavailable(unavailable, opts.toolId, request.log);
+              return reply.status(unavailable.statusCode).send({
+                error: unavailable.message,
+                ...(unavailable.code !== undefined && { code: unavailable.code }),
+              });
+            }
             throw err;
           }
 
@@ -918,7 +934,7 @@ export function registerPdfToImageRoute(
         zipSize: zipBuffer.length,
       });
     } catch (rawErr) {
-      const err = normalizeOperationalWriteError(rawErr);
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       // Raised before the first page is written, so there is nothing to clear.
       if (err instanceof PdfInputError) {
         return reply.status(400).send({ error: err.message });
@@ -932,6 +948,14 @@ export function registerPdfToImageRoute(
           "cleanup of a failed PDF conversion failed",
         ),
       );
+      if (isDecoderUnavailable(err)) {
+        const unavailable = engineUnavailable(err);
+        reportEngineUnavailable(unavailable, opts.toolId, request.log);
+        return reply.status(unavailable.statusCode).send({
+          error: unavailable.message,
+          ...(unavailable.code !== undefined && { code: unavailable.code }),
+        });
+      }
       if (hasServerErrorStatus(err)) throw err;
       request.log.error({ err, toolId: opts.toolId }, "PDF conversion failed");
       return reply.status(422).send({

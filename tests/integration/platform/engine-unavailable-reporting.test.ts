@@ -1232,6 +1232,105 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
       }
     });
 
+    it("edit-metadata, image-to-pdf, and pdf-to-image single-file and batch routes surface 503 ENGINE_UNAVAILABLE on V8 buffer allocation OOM and encoder faults (#3646)", async () => {
+      const sharpMod = (await import("sharp")).default;
+      const exiftoolMod = await import("../../../apps/api/src/lib/exiftool.js");
+      const formatEncoders = await import("../../../apps/api/src/lib/format-encoders.js");
+      const expiredNow = Date.now() + 36 * 60_000;
+      const nowSpy = vi.spyOn(Date, "now").mockReturnValue(expiredNow);
+      const writeSpy = vi
+        .spyOn(exiftoolMod, "writeMetadata")
+        .mockRejectedValueOnce(
+          Object.assign(new Error("exiftool exited SIGKILL"), { signal: "SIGKILL" }),
+        );
+      const pngSpy = vi
+        .spyOn(sharpMod.prototype, "png")
+        .mockImplementationOnce(function (this: InstanceType<typeof sharpMod>) {
+          return {
+            toBuffer: async () => {
+              throw new RangeError("Array buffer allocation failed");
+            },
+          } as unknown as InstanceType<typeof sharpMod>;
+        })
+        .mockImplementationOnce(function (this: InstanceType<typeof sharpMod>) {
+          return {
+            toBuffer: async () => {
+              throw new RangeError("Array buffer allocation failed");
+            },
+          } as unknown as InstanceType<typeof sharpMod>;
+        });
+      const encJxlSpy = vi
+        .spyOn(formatEncoders, "encodeJxl")
+        .mockRejectedValue(new DecoderUnavailableError("No cjxl found."));
+
+      try {
+        const editRes = await post("/api/v1/tools/image/edit-metadata", [
+          { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+          { name: "settings", content: JSON.stringify({ artist: "Test" }) },
+        ]);
+        expect(editRes.statusCode, editRes.body).toBe(503);
+        expect(editRes.json()).toMatchObject({
+          code: "ENGINE_UNAVAILABLE",
+        });
+
+        const imgToPdfRes = await post("/api/v1/tools/image/image-to-pdf", [
+          { name: "file", filename: "photo.png", contentType: "image/png", content: PNG },
+        ]);
+        expect(imgToPdfRes.statusCode, imgToPdfRes.body).toBe(503);
+        expect(imgToPdfRes.json()).toMatchObject({
+          code: "ENGINE_UNAVAILABLE",
+        });
+
+        const pdfSingleRes = await post("/api/v1/tools/pdf/pdf-to-image", [
+          pdfPart("scan.pdf"),
+          { name: "settings", content: JSON.stringify({ dpi: 36, format: "png", pages: "1" }) },
+        ]);
+        expect(pdfSingleRes.statusCode, pdfSingleRes.body).toBe(503);
+        expect(pdfSingleRes.json()).toMatchObject({
+          code: "ENGINE_UNAVAILABLE",
+        });
+
+        const clientJobId = randomUUID();
+        const pdfBatchRes = await post("/api/v1/tools/pdf/pdf-to-image/batch", [
+          pdfPart("a.pdf"),
+          pdfPart("b.pdf"),
+          { name: "settings", content: JSON.stringify({ dpi: 36, format: "jxl", pages: "1" }) },
+          { name: "clientJobId", content: clientJobId },
+        ]);
+        expect(pdfBatchRes.statusCode, pdfBatchRes.body).toBe(503);
+        expect(pdfBatchRes.json()).toMatchObject({
+          error: "No cjxl found.",
+          code: "ENGINE_UNAVAILABLE",
+        });
+        expect(helperSawEngineDown("pdf-to-image")).toBe(true);
+        // Both DecoderOutOfMemoryError (single-file) and DecoderUnavailableError (batch) report once each (#1628).
+        expect(engineReports("pdf-to-image")).toHaveLength(2);
+
+        const row = await parentRow(clientJobId);
+        expect(row?.status).toBe("failed");
+        expect(row?.error).toMatchObject({
+          message: "No cjxl found.",
+          code: "ENGINE_UNAVAILABLE",
+        });
+        expect(
+          buildBatchReplayEvent({
+            jobId: clientJobId,
+            status: row.status,
+            progress: row.progress,
+            error: row.error,
+          }),
+        ).toMatchObject({
+          status: "failed",
+          code: "ENGINE_UNAVAILABLE",
+        });
+      } finally {
+        encJxlSpy.mockRestore();
+        pngSpy.mockRestore();
+        writeSpy.mockRestore();
+        nowSpy.mockRestore();
+      }
+    });
+
     it("worker process functions propagate a CLI decoder fault even on a DNG Sharp can read, and do not retry ENGINE_UNAVAILABLE", async () => {
       for (const toolId of ["blur-faces", "meme-generator", "red-eye-removal", "beautify"]) {
         const config = getToolConfig(toolId);

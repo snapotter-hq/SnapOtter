@@ -194,7 +194,7 @@ export function registerEditMetadata(app: FastifyInstance) {
         const result = await inspectMetadata(inspectBuffer, filename);
         return reply.send({ ...result, fileSize: fileBuffer.length });
       } catch (rawErr) {
-        const err = normalizeOperationalWriteError(rawErr);
+        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
         if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
         return reply.status(422).send({
           error: "Failed to read image metadata",
@@ -365,7 +365,7 @@ export function registerEditMetadata(app: FastifyInstance) {
           processedSize: outputBuffer.length,
         });
       } catch (rawErr) {
-        const err = normalizeOperationalWriteError(rawErr);
+        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
         if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
         request.log.error({ err, toolId: "edit-metadata" }, "Metadata edit failed");
         return reply.status(422).send({

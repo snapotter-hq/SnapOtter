@@ -11,6 +11,7 @@ import { formatZodErrors } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
 import {
+  asDecoderOutOfMemory,
   DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
@@ -410,7 +411,7 @@ export function registerImageToPdfRoute(
         ...(compression ? { compression } : {}),
       });
     } catch (rawErr) {
-      const err = normalizeOperationalWriteError(rawErr);
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (wroteOutput) {
         await deletePrefix(`outputs/${jobId}`).catch((cleanupErr) =>
           request.log.warn(
