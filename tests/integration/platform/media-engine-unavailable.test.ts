@@ -140,6 +140,112 @@ describe("media validation when the engine is unavailable", () => {
     },
   );
 
+  it.each([
+    ["off", undefined],
+    ["on", "64"],
+  ])(
+    "reports exit 126 (ENOEXEC), exit 127 (ENOENT), and signal kills (ENOMEM) from ffprobe as 503 ENGINE_UNAVAILABLE with memory limit %s (#3825)",
+    async (_label, limit) => {
+      const dir = mkdtempSync(join(tmpdir(), "media-spawn-close-ffprobe-"));
+      scratchDirs.push(dir);
+      if (limit === undefined) delete process.env.SUBPROCESS_MEMORY_LIMIT_MB;
+      else process.env.SUBPROCESS_MEMORY_LIMIT_MB = limit;
+
+      const cases: Array<{
+        name: string;
+        script: string;
+        expectedErrno: string;
+        expectedSignal?: string;
+      }> = [
+        {
+          name: "ffprobe-126",
+          script: "#!/bin/sh\necho 'Exec format error' >&2\nexit 126\n",
+          expectedErrno: "ENOEXEC",
+        },
+        {
+          name: "ffprobe-127",
+          script: "#!/bin/sh\necho 'ffprobe: not found' >&2\nexit 127\n",
+          expectedErrno: "ENOENT",
+        },
+        {
+          name: "ffprobe-sigterm",
+          script: "#!/bin/sh\nkill -TERM $$\n",
+          expectedErrno: "ENOMEM",
+          expectedSignal: "SIGTERM",
+        },
+      ];
+
+      for (const c of cases) {
+        const stubPath = join(dir, c.name);
+        writeFileSync(stubPath, c.script);
+        chmodSync(stubPath, 0o755);
+        process.env.FFPROBE_PATH = stubPath;
+
+        const handler = await freshHandler("video");
+        const error = await handler.prepare(MP4, "clip.mp4", { scratchDir: dir }).then(
+          () => null,
+          (caught: unknown) => caught,
+        );
+
+        const failure = error as {
+          name?: string;
+          message: string;
+          statusCode?: number;
+          code?: string;
+          cause?: NodeJS.ErrnoException & { signal?: string };
+        };
+        expect(failure?.name).toBe("InputValidationError");
+        expect(failure.statusCode).toBe(503);
+        expect(failure.code).toBe("ENGINE_UNAVAILABLE");
+        expect(failure.message).not.toMatch(/corrupt/i);
+        expect(failure.cause).toMatchObject({
+          code: c.expectedErrno,
+          syscall: "spawn",
+          path: stubPath,
+          ...(c.expectedSignal ? { signal: c.expectedSignal } : {}),
+        });
+      }
+    },
+  );
+
+  it("reports a probe timeout with a timeout-specific 400 message instead of claiming the file is unrecognized (#3825)", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "media-timeout-ffprobe-"));
+    scratchDirs.push(dir);
+    const stubHang = join(dir, "ffprobe-hang");
+    writeFileSync(stubHang, "#!/bin/sh\nexec sleep 30\n");
+    chmodSync(stubHang, 0o755);
+    process.env.FFPROBE_PATH = stubHang;
+
+    const handler = await freshHandler("video");
+    vi.useFakeTimers();
+    try {
+      const pending = handler.prepare(MP4, "clip.mp4", { scratchDir: dir }).then(
+        () => null,
+        (caught: unknown) => caught,
+      );
+      await vi.waitFor(() => {
+        expect(vi.getTimerCount()).toBeGreaterThan(0);
+      });
+      await vi.advanceTimersByTimeAsync(15_000);
+      const error = await pending;
+
+      const failure = error as {
+        name?: string;
+        message: string;
+        statusCode?: number;
+        code?: string;
+      };
+      expect(failure?.name).toBe("InputValidationError");
+      expect(failure.statusCode).toBe(400);
+      expect(failure.code).toBeUndefined();
+      expect(failure.message).toBe(
+        "Could not inspect this video file within the time limit. It may be malformed; try a different file.",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   // Needs a working ffprobe to reach the parse failure at all. CI shards ship
   // without ffmpeg, where every media input is an engine gap instead.
   it.skipIf(!ffmpegAvailable())(

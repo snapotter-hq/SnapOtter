@@ -294,17 +294,84 @@ describe("probeMedia: error paths", () => {
     const p = probeMedia("/media/clip.mp4");
     child.stderr.emit("data", Buffer.from("some probe failure"));
     child.proc.emit("close", 2, null);
-    await expect(p).rejects.toThrow("ffprobe exited 2: some probe failure");
+    const err = await p.catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toBe("ffprobe exited 2: some probe failure");
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
   });
 
-  it("uses the signal name when the exit code is null", async () => {
+  it("tags a signal kill (code === null) as an errno-coded spawn failure (#3825)", async () => {
     const child = makeChild();
     vi.mocked(spawn).mockReturnValue(child.proc);
     const { probeMedia } = await import("../src/ffprobe.js");
     const p = probeMedia("/media/clip.mp4");
-    child.stderr.emit("data", Buffer.from("killed"));
+    child.stderr.emit("data", Buffer.from("killed\n"));
     child.proc.emit("close", null, "SIGKILL");
-    await expect(p).rejects.toThrow("ffprobe exited SIGKILL: killed");
+    await expect(p).rejects.toMatchObject({
+      message: "ffprobe exited SIGKILL: killed",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/fake/ffprobe",
+      signal: "SIGKILL",
+    });
+  });
+
+  it("falls back to a spawn ENOMEM message when a signal kill produces no output (#3825)", async () => {
+    const child = makeChild();
+    vi.mocked(spawn).mockReturnValue(child.proc);
+    const { probeMedia } = await import("../src/ffprobe.js");
+    const p = probeMedia("/media/clip.mp4");
+    child.proc.emit("close", null, "SIGTERM");
+    await expect(p).rejects.toMatchObject({
+      message: "spawn /fake/ffprobe ENOMEM",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/fake/ffprobe",
+      signal: "SIGTERM",
+    });
+  });
+
+  it("tags exit codes 126 and 127 as errno-coded spawn failures (#3825)", async () => {
+    const child126 = makeChild();
+    vi.mocked(spawn).mockReturnValueOnce(child126.proc);
+    const { probeMedia } = await import("../src/ffprobe.js");
+    const p126 = probeMedia("/media/clip.mp4");
+    child126.stderr.emit("data", Buffer.from("sh: exec format error\n"));
+    child126.proc.emit("close", 126, null);
+    await expect(p126).rejects.toMatchObject({
+      message: "ffprobe exited 126: sh: exec format error",
+      code: "ENOEXEC",
+      syscall: "spawn",
+      path: "/fake/ffprobe",
+    });
+
+    const child127 = makeChild();
+    vi.mocked(spawn).mockReturnValueOnce(child127.proc);
+    const p127 = probeMedia("/media/clip.mp4");
+    child127.stderr.emit("data", Buffer.from("sh: ffprobe: not found\n"));
+    child127.proc.emit("close", 127, null);
+    await expect(p127).rejects.toMatchObject({
+      message: "ffprobe exited 127: sh: ffprobe: not found",
+      code: "ENOENT",
+      syscall: "spawn",
+      path: "/fake/ffprobe",
+    });
+  });
+
+  it("falls back to stdout in the spawn failure message when stderr is empty or whitespace-only (#3825)", async () => {
+    const child = makeChild();
+    vi.mocked(spawn).mockReturnValue(child.proc);
+    const { probeMedia } = await import("../src/ffprobe.js");
+    const p = probeMedia("/media/clip.mp4");
+    child.stderr.emit("data", Buffer.from("  \n"));
+    child.stdout.emit("data", Buffer.from("stdout-only diagnostic\n"));
+    child.proc.emit("close", 126, null);
+    await expect(p).rejects.toMatchObject({
+      message: "ffprobe exited 126: stdout-only diagnostic",
+      code: "ENOEXEC",
+      syscall: "spawn",
+      path: "/fake/ffprobe",
+    });
   });
 
   it("marks the rejection as a tool input error when stderr matches an input pattern", async () => {
@@ -369,15 +436,19 @@ describe("probeMedia: error paths", () => {
 });
 
 describe("probeMedia: timeout", () => {
-  it("rejects with 'ffprobe timed out after 15s' at the default timeout and SIGKILLs", async () => {
+  it("rejects with FfprobeTimeoutError('ffprobe timed out after 15s') at the default timeout and SIGKILLs", async () => {
     vi.useFakeTimers();
     const child = makeChild();
     vi.mocked(spawn).mockReturnValue(child.proc);
-    const { probeMedia } = await import("../src/ffprobe.js");
-    const p = probeMedia("/media/clip.mp4");
-    const assertion = expect(p).rejects.toThrow("ffprobe timed out after 15s");
+    const mod = await import("../src/ffprobe.js");
+    const p = mod.probeMedia("/media/clip.mp4");
+    const assertion = expect(p).rejects.toMatchObject({
+      name: "FfprobeTimeoutError",
+      message: "ffprobe timed out after 15s",
+    });
     vi.advanceTimersByTime(15_000);
     await assertion;
+    await expect(p).rejects.toBeInstanceOf(mod.FfprobeTimeoutError);
     expect(child.kill).toHaveBeenCalledWith("SIGKILL");
   });
 

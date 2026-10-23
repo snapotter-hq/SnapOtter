@@ -319,4 +319,33 @@ describe("ffprobe spawn failures (#3716)", () => {
     });
     expect(readdirSync(scratchDir)).toEqual([]);
   });
+
+  it("reports a probe timeout with a timeout-specific 400 message instead of claiming the file is unrecognized (#3825)", async () => {
+    const input = Buffer.from("fake-media");
+    for (const kind of ["video", "audio", "image"] as const) {
+      const timeoutErr = Object.assign(new Error("ffprobe timed out after 15s"), {
+        name: "FfprobeTimeoutError",
+      });
+      mediaEngine.probeMedia.mockRejectedValueOnce(timeoutErr);
+
+      await expect(
+        new MediaInputHandler(kind).prepare(input, `clip.${kind}`, { scratchDir }),
+      ).rejects.toMatchObject({
+        name: "InputValidationError",
+        statusCode: 400,
+        message: `Could not inspect this ${kind} file within the time limit. It may be malformed; try a different file.`,
+      });
+
+      // Also matches by message shape if an untagged Error("ffprobe timed out after 15s") surfaces
+      mediaEngine.probeMedia.mockRejectedValueOnce(new Error("ffprobe timed out after 15s"));
+      await expect(
+        new MediaInputHandler(kind).prepare(input, `clip.${kind}`, { scratchDir }),
+      ).rejects.toMatchObject({
+        name: "InputValidationError",
+        statusCode: 400,
+        message: `Could not inspect this ${kind} file within the time limit. It may be malformed; try a different file.`,
+      });
+    }
+    expect(readdirSync(scratchDir)).toEqual([]);
+  });
 });

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
-import { probeMedia } from "@snapotter/media-engine";
+import { FfprobeTimeoutError, probeMedia } from "@snapotter/media-engine";
 import { SUBTITLE_INPUTS } from "@snapotter/shared";
 import { env } from "../config.js";
 import { isBinarySpawnFailure } from "../lib/binary-overrides.js";
@@ -11,6 +11,15 @@ export type MediaInputKind = "video" | "audio" | "image" | "subtitle";
 
 const SUBTITLE_EXT_SET = new Set<string>(SUBTITLE_INPUTS);
 const MAX_SUBTITLE_BYTES = 1 * 1024 * 1024; // 1 MiB
+
+/** instanceof plus name/message checks so a dual copy of media-engine cannot revert timeouts to "Unrecognized". */
+function isFfprobeTimeout(err: unknown): boolean {
+  return (
+    err instanceof FfprobeTimeoutError ||
+    (err instanceof Error &&
+      (err.name === "FfprobeTimeoutError" || /^ffprobe timed out after \d+s$/.test(err.message)))
+  );
+}
 
 /**
  * True when the probe failed because the engine is missing or misconfigured,
@@ -72,6 +81,11 @@ export class MediaInputHandler implements InputHandler {
           );
           converted.cause = err;
           throw converted;
+        }
+        if (isFfprobeTimeout(err)) {
+          throw new InputValidationError(
+            `Could not inspect this ${this.kind} file within the time limit. It may be malformed; try a different file.`,
+          );
         }
         // ffprobe could not parse the upload. Surface a clean message; the raw
         // tool error is intentionally not exposed to the client, and a bad
