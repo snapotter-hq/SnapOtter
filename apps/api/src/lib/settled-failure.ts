@@ -3,6 +3,7 @@
 import { eq } from "drizzle-orm";
 import type { FastifyBaseLogger } from "fastify";
 import { db, schema } from "../db/index.js";
+import { reportError } from "./error-report.js";
 import { STORAGE_FAULT_CODES } from "./object-storage.js";
 
 /** Re-reads of a row still in flight, and the pause between them: half a second in all. */
@@ -49,6 +50,7 @@ export async function settledFailureResponse(
       [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
     } catch (err) {
       log.warn({ err, jobId }, "Could not read the parent row of a failed batch");
+      void reportError(err, { source: "http", jobId });
       return null;
     }
     const inFlight = row?.status === "processing" || row?.status === "queued";

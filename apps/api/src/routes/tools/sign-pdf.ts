@@ -262,17 +262,23 @@ export function registerSignPdf(app: FastifyInstance) {
           .then((rows) => rows[0]?.status === "canceled")
           .catch((readErr) => {
             request.log.warn({ err: readErr, jobId }, "canceled job status read failed");
+            void reportError(readErr, {
+              source: "http",
+              route: request.routeOptions?.url,
+              method: request.method,
+              jobId,
+            });
             return false;
           });
         if (wasCanceled) {
           return reply.status(422).send({ error: "Canceled", canceled: true });
         }
       }
-      const failure = await db
-        .select({ error: schema.jobs.error })
+      const row = await db
+        .select({ status: schema.jobs.status, error: schema.jobs.error })
         .from(schema.jobs)
         .where(eq(schema.jobs.id, jobId))
-        .then((rows) => rows[0]?.error ?? null)
+        .then((rows) => rows[0] ?? null)
         .catch((readErr) => {
           request.log.warn({ err: readErr, jobId }, "failed job row read failed");
           void reportError(readErr, {
@@ -283,6 +289,10 @@ export function registerSignPdf(app: FastifyInstance) {
           });
           return null;
         });
+      if (row?.status === "canceled") {
+        return reply.status(422).send({ error: "Canceled", canceled: true });
+      }
+      const failure = row?.error ?? null;
       if (typeof failure?.httpStatus === "number") {
         if (failure.httpStatus >= 500) {
           request.log.error({ err, toolId: TOOL_ID }, "sign-pdf processing failed");

@@ -1301,14 +1301,15 @@ describe("createToolRoute", () => {
       });
     });
 
-    it("logs a warning on request.log and falls through when reading canceled job status fails (#3527)", async () => {
+    it("logs a warning on request.log, reports via reportError, and falls through when reading canceled job status fails (#3527, #3792)", async () => {
       const statusReadErr = new Error("db read timeout");
       vi.mocked(waitForJob).mockRejectedValueOnce(new Error("Canceled"));
+      vi.mocked(reportError).mockClear();
       jobRows.rows = [{ status: "failed", error: { message: "Canceled" } }];
       const select = vi.mocked(db.select);
       const original = select.getMockImplementation();
       select.mockImplementation(((fields?: Record<string, unknown>) =>
-        fields && "status" in fields
+        fields && "status" in fields && !("error" in fields)
           ? { from: () => ({ where: () => Promise.reject(statusReadErr) }) }
           : original?.(fields as never)) as never);
 
@@ -1316,7 +1317,10 @@ describe("createToolRoute", () => {
       const id = "resize";
       createToolRoute(app as never, makeMockConfig(id));
       const reply = createMockReply();
-      const req = createMockRequest({ fileBuffer: Buffer.from("png-data"), settings: "{}" });
+      const req = Object.assign(
+        createMockRequest({ fileBuffer: Buffer.from("png-data"), settings: "{}" }),
+        { method: "POST", routeOptions: { url: apiToolPath(id) } },
+      );
 
       try {
         await app.routes[apiToolPath(id)](req, reply);
@@ -1331,6 +1335,12 @@ describe("createToolRoute", () => {
         { err: statusReadErr, jobId },
         "canceled job status read failed",
       );
+      expect(reportError).toHaveBeenCalledWith(statusReadErr, {
+        source: "http",
+        route: apiToolPath(id),
+        method: "POST",
+        jobId,
+      });
       expect(req.log.error).toHaveBeenCalledWith(
         expect.objectContaining({ toolId: id }),
         "tool processing failed",
@@ -1339,6 +1349,55 @@ describe("createToolRoute", () => {
       expect(reply.send).toHaveBeenCalledWith({
         error: "Processing failed",
         details: "Canceled",
+      });
+    });
+
+    it("reports statusReadErr via reportError and still answers 422 with canceled: true when the first status read fails transiently on a canceled job (#3792)", async () => {
+      const statusReadErr = new Error("transient status read timeout");
+      vi.mocked(waitForJob).mockRejectedValueOnce(new Error("Canceled"));
+      vi.mocked(reportError).mockClear();
+      jobRows.rows = [{ status: "canceled", error: { message: "Canceled" } }];
+      const select = vi.mocked(db.select);
+      const original = select.getMockImplementation();
+      select.mockImplementation(((fields?: Record<string, unknown>) =>
+        fields && "status" in fields && !("error" in fields)
+          ? { from: () => ({ where: () => Promise.reject(statusReadErr) }) }
+          : original?.(fields as never)) as never);
+
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const reply = createMockReply();
+      const req = Object.assign(
+        createMockRequest({ fileBuffer: Buffer.from("png-data"), settings: "{}" }),
+        { method: "POST", routeOptions: { url: apiToolPath(id) } },
+      );
+
+      try {
+        await app.routes[apiToolPath(id)](req, reply);
+      } finally {
+        select.mockImplementation(original as never);
+        jobRows.rows = [];
+      }
+
+      const jobId = vi.mocked(enqueueToolJob).mock.calls[0][0].jobId;
+      expect(req.log.warn).toHaveBeenCalledTimes(1);
+      expect(req.log.warn).toHaveBeenCalledWith(
+        { err: statusReadErr, jobId },
+        "canceled job status read failed",
+      );
+      expect(reportError).toHaveBeenCalledTimes(1);
+      expect(reportError).toHaveBeenCalledWith(statusReadErr, {
+        source: "http",
+        route: apiToolPath(id),
+        method: "POST",
+        jobId,
+      });
+      expect(req.log.error).not.toHaveBeenCalled();
+      expect(reply.status).toHaveBeenCalledWith(422);
+      expect(reply.send).toHaveBeenCalledWith({
+        error: "Canceled",
+        canceled: true,
       });
     });
 

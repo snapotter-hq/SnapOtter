@@ -526,6 +526,8 @@ async function invokePipelineExecuteRoute(
 
   const request = {
     headers: {},
+    method: "POST",
+    routeOptions: { url: "/api/v1/pipeline/execute" },
     log: logOverride ?? { error: vi.fn(), warn: vi.fn() },
     raw: {
       aborted: false,
@@ -1028,11 +1030,12 @@ describe("pipeline step error message formatting", () => {
       await expect(invokePipelineBatchRoute(parts)).rejects.toBe(batchUnsettledErr);
       expect(classifyError(batchUnsettledErr, "http")).toBe("expected");
 
-      // When reading schema.jobs.error rejects, warn and rethrow the waitForJob rejection (#3479).
+      // When reading schema.jobs.error rejects, warn, report via reportError, and rethrow the waitForJob rejection (#3479, #3792).
       const redisDownErr = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:6379"), {
         code: "ECONNREFUSED",
       });
       const dbReadErr = new Error("postgres read failed");
+      reportErrorMock.mockClear();
       waitForJobMock.mockRejectedValueOnce(redisDownErr);
       selectWhereMock.mockRejectedValueOnce(dbReadErr);
       const readFailLog = { error: vi.fn(), warn: vi.fn() };
@@ -1042,6 +1045,12 @@ describe("pipeline step error message formatting", () => {
         { err: dbReadErr, jobId: expect.any(String) },
         "failed pipeline job row read failed",
       );
+      expect(reportErrorMock).toHaveBeenCalledWith(dbReadErr, {
+        source: "http",
+        route: "/api/v1/pipeline/execute",
+        method: "POST",
+        jobId: expect.any(String),
+      });
     } finally {
       selectWhereMock.mockReset().mockResolvedValue([]);
       waitForJobMock.mockReset();

@@ -9,6 +9,7 @@ import { fixtures, readFixture } from "../../fixtures/index.js";
 const jobRows = vi.hoisted(() => ({
   rows: [] as unknown[],
   error: null as Error | null,
+  statusError: null as Error | null,
 }));
 
 const mocks = vi.hoisted(() => ({
@@ -29,10 +30,14 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {
-    select: vi.fn(() => ({
+    select: vi.fn((fields?: Record<string, unknown>) => ({
       from: () => ({
-        where: () =>
-          jobRows.error ? Promise.reject(jobRows.error) : Promise.resolve(jobRows.rows),
+        where: () => {
+          if (jobRows.statusError && fields && "status" in fields && !("error" in fields)) {
+            return Promise.reject(jobRows.statusError);
+          }
+          return jobRows.error ? Promise.reject(jobRows.error) : Promise.resolve(jobRows.rows);
+        },
       }),
     })),
   },
@@ -901,7 +906,8 @@ describe("pre-enqueue S3 getObjectBuffer fault normalization and sign-pdf waitFo
       details: "Canceled",
     });
 
-    // 5. DB read failure when checking canceled and failed job row reports readErr and rethrows (#3698)
+    // 5. DB read failure when checking canceled and failed job row reports readErr on both reads and rethrows (#3698, #3792)
+    mocks.reportError.mockClear();
     jobRows.error = new Error("db read timeout");
     const cancelErr = new Error("Canceled");
     mocks.waitForJob.mockRejectedValueOnce(cancelErr);
@@ -922,12 +928,58 @@ describe("pre-enqueue S3 getObjectBuffer fault normalization and sign-pdf waitFo
       expect.objectContaining({ err: jobRows.error }),
       "failed job row read failed",
     );
-    expect(mocks.reportError).toHaveBeenCalledWith(jobRows.error, {
+    expect(mocks.reportError).toHaveBeenCalledTimes(2);
+    expect(mocks.reportError).toHaveBeenNthCalledWith(1, jobRows.error, {
       source: "http",
       route: "/api/v1/tools/pdf/sign-pdf",
       method: "POST",
       jobId: expect.any(String),
     });
+    expect(mocks.reportError).toHaveBeenNthCalledWith(2, jobRows.error, {
+      source: "http",
+      route: "/api/v1/tools/pdf/sign-pdf",
+      method: "POST",
+      jobId: expect.any(String),
+    });
+
+    // 5b. Transient failure on the first status query still reports readErr and answers 422 canceled: true when the second row read sees status === "canceled" (#3792)
+    mocks.reportError.mockClear();
+    jobRows.error = null;
+    jobRows.statusError = new Error("transient status read timeout");
+    jobRows.rows = [{ status: "canceled", error: { message: "Canceled" } }];
+    mocks.waitForJob.mockRejectedValueOnce(new Error("Canceled"));
+    const reqTransientCancel = Object.assign(makeRequest(validPartsFor("sign-pdf")), {
+      method: "POST",
+      routeOptions: { url: "/api/v1/tools/pdf/sign-pdf" },
+    });
+    const replyTransientCancel = makeReply();
+    try {
+      await handlers["/api/v1/tools/pdf/sign-pdf"](reqTransientCancel, replyTransientCancel);
+    } finally {
+      jobRows.statusError = null;
+    }
+    expect(replyTransientCancel.statusCode).toBe(422);
+    expect(replyTransientCancel.payload).toEqual({
+      error: "Canceled",
+      canceled: true,
+    });
+    expect(reqTransientCancel.log.warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        err: expect.objectContaining({ message: "transient status read timeout" }),
+      }),
+      "canceled job status read failed",
+    );
+    expect(mocks.reportError).toHaveBeenCalledTimes(1);
+    expect(mocks.reportError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "transient status read timeout" }),
+      {
+        source: "http",
+        route: "/api/v1/tools/pdf/sign-pdf",
+        method: "POST",
+        jobId: expect.any(String),
+      },
+    );
+    expect(reqTransientCancel.log.error).not.toHaveBeenCalled();
 
     // 6. Sanitizes Python traceback via friendlyError and prefers failure.message when present (#3667)
     jobRows.error = null;

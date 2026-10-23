@@ -42,7 +42,7 @@ import {
   reportEngineUnavailable,
   sharedServerFault,
 } from "../lib/engine-unavailable.js";
-import { markQueueEventsJobFailure } from "../lib/error-report.js";
+import { markQueueEventsJobFailure, reportError } from "../lib/error-report.js";
 import {
   formatZodErrors,
   friendlyError,
@@ -861,6 +861,12 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               .then((rows) => rows[0]?.error ?? null)
               .catch((readErr) => {
                 request.log.warn({ err: readErr, jobId }, "failed pipeline job row read failed");
+                void reportError(readErr, {
+                  source: "http",
+                  route: request.routeOptions?.url,
+                  method: request.method,
+                  jobId,
+                });
                 return null;
               });
             if (typeof failure?.httpStatus === "number" && failure.httpStatus >= 500) {

@@ -7,9 +7,13 @@ const state = vi.hoisted(() => ({
   /** Results served first, one per read, before `result` (#2209). */
   queue: [] as unknown[][],
   reads: 0,
+  reportError: vi.fn(),
 }));
 
 vi.mock("drizzle-orm", () => ({ eq: () => ({}) }));
+vi.mock("../../../apps/api/src/lib/error-report.js", () => ({
+  reportError: state.reportError,
+}));
 vi.mock("../../../apps/api/src/db/index.js", () => ({
   db: {
     select: () => ({
@@ -38,6 +42,7 @@ beforeEach(() => {
   state.result = [];
   state.queue = [];
   state.reads = 0;
+  state.reportError.mockClear();
   vi.mocked(log.warn).mockClear();
 });
 
@@ -139,10 +144,16 @@ describe("settledFailureResponse (#2180)", () => {
     expect((await settledFailureResponse("parent", log))?.body.errors).toEqual([]);
   });
 
-  it("logs and answers null when the row can't be read, so the caller keeps its own error", async () => {
-    state.result = new Error("connection reset");
+  it("logs, reports via reportError, and answers null when the row can't be read, so the caller keeps its own error (#3792)", async () => {
+    const dbErr = new Error("connection reset");
+    state.result = dbErr;
 
     expect(await settledFailureResponse("parent", log)).toBeNull();
     expect(log.warn).toHaveBeenCalledOnce();
+    expect(state.reportError).toHaveBeenCalledOnce();
+    expect(state.reportError).toHaveBeenCalledWith(dbErr, {
+      source: "http",
+      jobId: "parent",
+    });
   });
 });
