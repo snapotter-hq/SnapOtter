@@ -3624,4 +3624,169 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
       vi.mocked(needsCliDecode).mockReturnValue(false);
     }
   });
+
+  it("routes DecoderOutOfMemoryError and 5xx faults from validateImageBuffer and autoOrient through reportEngineUnavailable on /api/v1/pipeline/execute and /api/v1/pipeline/batch (#3726)", async () => {
+    const { DecoderOutOfMemoryError } = await import(
+      "../../../apps/api/src/lib/format-decoders.js"
+    );
+    const oomMessage =
+      "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+    let fakeNow = Date.now() + 40 * 60_000;
+    const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => fakeNow);
+
+    try {
+      // 1. /api/v1/pipeline/execute: validateImageBuffer and autoOrient OOM answer 503 with code ENGINE_UNAVAILABLE and report via reportEngineUnavailable
+      for (const phase of ["validate", "orient"] as const) {
+        fakeNow += 11 * 60_000;
+        reportErrorMock.mockClear();
+        const log = { error: vi.fn(), warn: vi.fn() };
+        if (phase === "validate") {
+          vi.mocked(validateImageBuffer).mockRejectedValueOnce(
+            new DecoderOutOfMemoryError(oomMessage),
+          );
+        } else {
+          vi.mocked(autoOrient).mockRejectedValueOnce(
+            new RangeError("Array buffer allocation failed"),
+          );
+        }
+
+        const reply = await invokePipelineExecuteRoute(
+          [
+            { type: "file", filename: "photo.png", content: Buffer.from("png-bytes") },
+            {
+              type: "field",
+              fieldname: "pipeline",
+              value: JSON.stringify({
+                steps: [{ toolId: executeTestToolId, settings: {} }],
+              }),
+            },
+          ],
+          log,
+        );
+
+        expect(reply.statusCode).toBe(503);
+        expect(reply.payload).toEqual({
+          error: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+        });
+        expect(log.warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            code: "ENGINE_UNAVAILABLE",
+            cause: "DecoderOutOfMemoryError",
+            toolId: executeTestToolId,
+          }),
+          "Tool engine unavailable during input preparation",
+        );
+        expect(reportErrorMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: "InputValidationError",
+            statusCode: 503,
+            code: "ENGINE_UNAVAILABLE",
+          }),
+          {
+            source: "http",
+            toolId: executeTestToolId,
+            statusCode: 503,
+          },
+        );
+      }
+
+      // 2. /api/v1/pipeline/batch: validateImageBuffer OOM on file 0 and autoOrient OOM on file 1 record preFailures and continue with file 2
+      fakeNow += 11 * 60_000;
+      reportErrorMock.mockClear();
+      flowAddMock.mockClear();
+      vi.mocked(validateImageBuffer)
+        .mockRejectedValueOnce(new DecoderOutOfMemoryError(oomMessage))
+        .mockResolvedValueOnce({ valid: true, format: "png", width: 10, height: 10 })
+        .mockResolvedValueOnce({ valid: true, format: "png", width: 10, height: 10 });
+      vi.mocked(autoOrient)
+        .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"))
+        .mockImplementationOnce(async (buf: Buffer) => buf);
+
+      const batchLog = { error: vi.fn(), warn: vi.fn() };
+      const batchReply = await invokePipelineBatchRoute(
+        [
+          { type: "file", filename: "validate-oom.png", content: Buffer.from("v-oom") },
+          { type: "file", filename: "orient-oom.png", content: Buffer.from("o-oom") },
+          { type: "file", filename: "ok.png", content: Buffer.from("ok-png") },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: [{ toolId: executeTestToolId, settings: {} }],
+            }),
+          },
+        ],
+        batchLog,
+      );
+
+      expect(batchReply.statusCode).toBe(202);
+      expect(batchLog.warn).toHaveBeenCalledTimes(1);
+      expect(reportErrorMock).toHaveBeenCalledTimes(1);
+      expect(flowAddMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            settings: expect.objectContaining({
+              flowChildCount: 1,
+              fileIndexMap: [2],
+              preFailureFaults: [
+                {
+                  filename: "validate-oom.png",
+                  error: oomMessage,
+                  statusCode: 503,
+                  code: "ENGINE_UNAVAILABLE",
+                },
+                {
+                  filename: "orient-oom.png",
+                  error: oomMessage,
+                  statusCode: 503,
+                  code: "ENGINE_UNAVAILABLE",
+                },
+              ],
+            }),
+          }),
+        }),
+      );
+
+      // 3. Unexpected non-5xx errors in validateImageBuffer or autoOrient still rethrow on both routes
+      const unexpectedValidateErr = new TypeError("unexpected pipeline validate fault");
+      vi.mocked(validateImageBuffer).mockRejectedValueOnce(unexpectedValidateErr);
+      await expect(
+        invokePipelineExecuteRoute([
+          { type: "file", filename: "photo.png", content: Buffer.from("png-bytes") },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: [{ toolId: executeTestToolId, settings: {} }],
+            }),
+          },
+        ]),
+      ).rejects.toBe(unexpectedValidateErr);
+
+      const unexpectedOrientErr = new TypeError("unexpected pipeline orient fault");
+      vi.mocked(autoOrient).mockRejectedValueOnce(unexpectedOrientErr);
+      await expect(
+        invokePipelineBatchRoute([
+          { type: "file", filename: "photo.png", content: Buffer.from("png-bytes") },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: [{ toolId: executeTestToolId, settings: {} }],
+            }),
+          },
+        ]),
+      ).rejects.toBe(unexpectedOrientErr);
+    } finally {
+      nowSpy.mockRestore();
+      vi.mocked(validateImageBuffer).mockResolvedValue({
+        valid: true,
+        format: "png",
+        width: 100,
+        height: 100,
+      });
+      vi.mocked(autoOrient).mockImplementation(async (buf: Buffer) => buf);
+    }
+  });
 });

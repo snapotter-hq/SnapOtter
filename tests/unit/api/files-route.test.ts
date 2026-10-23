@@ -1972,6 +1972,53 @@ describe("files route logic", () => {
             "Tool engine unavailable during input preparation",
           );
         }
+
+        // 4. validateImageBuffer rejecting with DecoderOutOfMemoryError (from sharp.prototype.metadata OOM) or 5xx fault routes through sendInputValidationError and deduplicates within the 10-minute window (#3726)
+        fakeNow += 11 * 60_000;
+        mocks.reportError.mockClear();
+        const metaValidateSpy = vi
+          .spyOn(sharpMod.prototype, "metadata")
+          .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"))
+          .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"));
+        try {
+          const warnValidateOom = vi.fn();
+          for (let attempt = 0; attempt < 2; attempt++) {
+            const validateOomReply = makePreviewReply();
+            await previewHandler(
+              {
+                log: { warn: warnValidateOom, error: vi.fn() },
+                file: async () => ({ filename: "photo.tiff", toBuffer: async () => tiffBytes }),
+              },
+              validateOomReply,
+            );
+            expect(validateOomReply.statusCode).toBe(503);
+            expect(validateOomReply.payload).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+          }
+          expect(warnValidateOom).toHaveBeenCalledTimes(1);
+          expect(warnValidateOom).toHaveBeenCalledWith(
+            expect.objectContaining({
+              code: "ENGINE_UNAVAILABLE",
+              cause: "DecoderOutOfMemoryError",
+              toolId: "file-preview",
+            }),
+            "Tool engine unavailable during input preparation",
+          );
+          expect(mocks.reportError).toHaveBeenCalledTimes(1);
+        } finally {
+          metaValidateSpy.mockRestore();
+        }
+
+        const unexpectedValidateErr = new TypeError("unexpected preview validator fault");
+        mocks.validateImageBuffer.mockRejectedValueOnce(unexpectedValidateErr);
+        await expect(
+          previewHandler(
+            {
+              log: { warn: vi.fn(), error: vi.fn() },
+              file: async () => ({ filename: "photo.tiff", toBuffer: async () => tiffBytes }),
+            },
+            makePreviewReply(),
+          ),
+        ).rejects.toBe(unexpectedValidateErr);
       } finally {
         webpSpy.mockRestore();
         nowSpy.mockRestore();

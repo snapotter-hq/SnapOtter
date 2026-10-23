@@ -1648,4 +1648,158 @@ describe("batch route spooled multipart ingress (#1239)", () => {
     ).rejects.toBe(flowAddResetErr);
     expect(classifyError(flowAddResetErr, "http")).toBe("operational");
   });
+
+  it("routes DecoderOutOfMemoryError and 5xx faults from validateImageBuffer and autoOrient through reportEngineUnavailable and preFailures on /batch (#3726)", async () => {
+    const { DecoderOutOfMemoryError } = await import(
+      "../../../apps/api/src/lib/format-decoders.js"
+    );
+    const oomMessage =
+      "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+    let fakeNow = Date.now() + 30 * 60_000;
+    const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => fakeNow);
+
+    try {
+      // 1. validateImageBuffer OOM on first file records preFailure with 503/ENGINE_UNAVAILABLE and continues with second file
+      mocks.validateImageBuffer
+        .mockRejectedValueOnce(new DecoderOutOfMemoryError(oomMessage))
+        .mockResolvedValueOnce({ valid: true, format: "png" });
+      const log1 = { error: vi.fn(), warn: vi.fn() };
+      const partialValidateReply = await invokeBatchRoute({
+        section: "image",
+        toolId: "resize",
+        log: log1,
+        parts: [
+          { type: "file", filename: "oom.png", content: Buffer.from("oom-png") },
+          { type: "file", filename: "ok.png", content: Buffer.from("ok-png") },
+          { type: "field", fieldname: "settings", value: '{"width":100}' },
+        ],
+      });
+      expect(partialValidateReply.statusCode).toBe(202);
+      expect(log1.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: "ENGINE_UNAVAILABLE",
+          cause: "DecoderOutOfMemoryError",
+          toolId: "resize",
+        }),
+        "Tool engine unavailable during input preparation",
+      );
+      expect(mocks.flowAdd).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            settings: expect.objectContaining({
+              flowChildCount: 1,
+              fileIndexMap: [1],
+              preFailureFaults: [
+                {
+                  filename: "oom.png",
+                  error: oomMessage,
+                  statusCode: 503,
+                  code: "ENGINE_UNAVAILABLE",
+                },
+              ],
+            }),
+          }),
+        }),
+      );
+
+      // 2. autoOrient OOM (or raw V8 RangeError) on first file records preFailure with 503/ENGINE_UNAVAILABLE and continues with second file
+      fakeNow += 11 * 60_000;
+      mocks.flowAdd.mockClear();
+      mocks.autoOrient
+        .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"))
+        .mockImplementationOnce(async (buf: Buffer) => buf);
+      const log2 = { error: vi.fn(), warn: vi.fn() };
+      const partialOrientReply = await invokeBatchRoute({
+        section: "image",
+        toolId: "resize",
+        log: log2,
+        parts: [
+          { type: "file", filename: "orient-oom.png", content: Buffer.from("oom-png") },
+          { type: "file", filename: "ok.png", content: Buffer.from("ok-png") },
+          { type: "field", fieldname: "settings", value: '{"width":100}' },
+        ],
+      });
+      expect(partialOrientReply.statusCode).toBe(202);
+      expect(log2.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: "ENGINE_UNAVAILABLE",
+          cause: "DecoderOutOfMemoryError",
+          toolId: "resize",
+        }),
+        "Tool engine unavailable during input preparation",
+      );
+      expect(mocks.flowAdd).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            settings: expect.objectContaining({
+              flowChildCount: 1,
+              fileIndexMap: [1],
+              preFailureFaults: [
+                {
+                  filename: "orient-oom.png",
+                  error: oomMessage,
+                  statusCode: 503,
+                  code: "ENGINE_UNAVAILABLE",
+                },
+              ],
+            }),
+          }),
+        }),
+      );
+
+      // 3. All files failing in validateImageBuffer and autoOrient answers 503 with shared ENGINE_UNAVAILABLE
+      fakeNow += 11 * 60_000;
+      mocks.validateImageBuffer
+        .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"))
+        .mockResolvedValueOnce({ valid: true, format: "png" });
+      mocks.autoOrient.mockRejectedValueOnce(new DecoderOutOfMemoryError(oomMessage));
+      const allOomReply = await invokeBatchRoute({
+        section: "image",
+        toolId: "resize",
+        parts: [
+          { type: "file", filename: "a.png", content: Buffer.from("a-png") },
+          { type: "file", filename: "b.png", content: Buffer.from("b-png") },
+          { type: "field", fieldname: "settings", value: '{"width":100}' },
+        ],
+      });
+      expect(allOomReply.statusCode).toBe(503);
+      expect(allOomReply.payload).toMatchObject({
+        error: oomMessage,
+        code: "ENGINE_UNAVAILABLE",
+        errors: [
+          { filename: "a.png", code: "ENGINE_UNAVAILABLE" },
+          { filename: "b.png", code: "ENGINE_UNAVAILABLE" },
+        ],
+      });
+
+      // 4. Unexpected non-5xx errors in validateImageBuffer or autoOrient rethrow
+      const unexpectedValidateErr = new TypeError("unexpected validate fault");
+      mocks.validateImageBuffer.mockRejectedValueOnce(unexpectedValidateErr);
+      await expect(
+        invokeBatchRoute({
+          section: "image",
+          toolId: "resize",
+          parts: [
+            { type: "file", filename: "a.png", content: Buffer.from("a-png") },
+            { type: "field", fieldname: "settings", value: '{"width":100}' },
+          ],
+        }),
+      ).rejects.toBe(unexpectedValidateErr);
+
+      const unexpectedOrientErr = new TypeError("unexpected orient fault");
+      mocks.autoOrient.mockRejectedValueOnce(unexpectedOrientErr);
+      await expect(
+        invokeBatchRoute({
+          section: "image",
+          toolId: "resize",
+          parts: [
+            { type: "file", filename: "a.png", content: Buffer.from("a-png") },
+            { type: "field", fieldname: "settings", value: '{"width":100}' },
+          ],
+        }),
+      ).rejects.toBe(unexpectedOrientErr);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
 });

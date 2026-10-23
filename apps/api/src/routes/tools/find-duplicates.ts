@@ -253,9 +253,9 @@ export function registerFindDuplicates(app: FastifyInstance) {
           continue;
         }
       }
-      // autoOrient never throws: it logs and returns the input when the
-      // rotation fails, and the hash step below is what rejects a buffer
-      // Sharp can't decode.
+      // autoOrient rethrows DecoderOutOfMemoryError and otherwise logs and
+      // returns the input when rotation fails; the hash step below is what
+      // rejects a buffer Sharp can't decode.
       file.buffer = await autoOrient(file.buffer);
       processableFiles.push(file);
     }

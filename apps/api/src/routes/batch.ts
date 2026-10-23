@@ -507,7 +507,24 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                   throw err;
                 }
               } else if (modality === "image") {
-                const validation = await validateImageBuffer(processBuffer, processFilename);
+                let validation: Awaited<ReturnType<typeof validateImageBuffer>>;
+                try {
+                  validation = await validateImageBuffer(processBuffer, processFilename);
+                } catch (rawErr) {
+                  const err = asDecoderOutOfMemory(rawErr);
+                  if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+                    const unavailable = engineUnavailable(err);
+                    reportEngineUnavailable(unavailable, toolId, request.log);
+                    preFailures.push({
+                      originalIndex: i,
+                      filename: file.filename,
+                      error: unavailable.message,
+                      ...preFailureFaultFields(unavailable),
+                    });
+                    continue;
+                  }
+                  throw rawErr;
+                }
                 if (!validation.valid) {
                   preFailures.push({
                     originalIndex: i,
@@ -624,7 +641,23 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                     throw err;
                   }
                 } else if (!skipPreprocess) {
-                  processBuffer = await autoOrient(processBuffer);
+                  try {
+                    processBuffer = await autoOrient(processBuffer);
+                  } catch (rawErr) {
+                    const err = asDecoderOutOfMemory(rawErr);
+                    if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+                      const unavailable = engineUnavailable(err);
+                      reportEngineUnavailable(unavailable, toolId, request.log);
+                      preFailures.push({
+                        originalIndex: i,
+                        filename: file.filename,
+                        error: unavailable.message,
+                        ...preFailureFaultFields(unavailable),
+                      });
+                      continue;
+                    }
+                    throw rawErr;
+                  }
                 }
               } else {
                 // Non-image modalities (audio/video/document/file) keep their buffered contract.

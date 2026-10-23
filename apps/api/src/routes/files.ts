@@ -394,7 +394,16 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
       ? extname(data.filename).toLowerCase().replace(/^\./, "") || undefined
       : undefined;
 
-    const validation = await validateImageBuffer(buffer, data.filename);
+    let validation: Awaited<ReturnType<typeof validateImageBuffer>>;
+    try {
+      validation = await validateImageBuffer(buffer, data.filename);
+    } catch (rawErr) {
+      const err = asDecoderOutOfMemory(rawErr);
+      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+        return sendInputValidationError(reply, engineUnavailable(err), "file-preview", request.log);
+      }
+      throw rawErr;
+    }
     if (!validation.valid) {
       return reply.status(400).send({ error: validation.reason });
     }

@@ -41,8 +41,16 @@ export class ImageInputHandler implements InputHandler {
     opts.signal?.throwIfAborted();
 
     // Validate the uploaded image
-    const validation = await validateImageBuffer(fileBuffer, name);
-    opts.signal?.throwIfAborted();
+    let validation: Awaited<ReturnType<typeof validateImageBuffer>>;
+    try {
+      validation = await validateImageBuffer(fileBuffer, name);
+      opts.signal?.throwIfAborted();
+    } catch (rawErr) {
+      opts.signal?.throwIfAborted();
+      const err = asDecoderOutOfMemory(rawErr);
+      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw engineUnavailable(err);
+      throw rawErr;
+    }
     if (!validation.valid) {
       throw new InputValidationError(`Invalid image: ${validation.reason}`);
     }
@@ -234,11 +242,11 @@ export class ImageInputHandler implements InputHandler {
       opts.signal?.throwIfAborted();
       try {
         fileBuffer = await autoOrient(fileBuffer, opts.log);
-      } catch (err) {
+      } catch (rawErr) {
         opts.signal?.throwIfAborted();
-        const oom = asDecoderOutOfMemory(err);
-        if (oom instanceof DecoderOutOfMemoryError) throw engineUnavailable(oom);
-        throw err;
+        const err = asDecoderOutOfMemory(rawErr);
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw engineUnavailable(err);
+        throw rawErr;
       }
       opts.signal?.throwIfAborted();
     }

@@ -461,7 +461,25 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                     }
                   } else if (inputModality === "image") {
                     // Validate the initial image
-                    const validation = await validateImageBuffer(processBuffer, filename);
+                    let validation: Awaited<ReturnType<typeof validateImageBuffer>>;
+                    try {
+                      validation = await validateImageBuffer(processBuffer, filename);
+                    } catch (rawErr) {
+                      const err = asDecoderOutOfMemory(rawErr);
+                      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+                        const unavailable = engineUnavailable(err);
+                        reportEngineUnavailable(
+                          unavailable,
+                          firstToolId ?? "pipeline",
+                          request.log,
+                        );
+                        const body: Record<string, string> = { error: unavailable.message };
+                        if (unavailable.details) body.details = unavailable.details;
+                        if (unavailable.code) body.code = unavailable.code;
+                        return reply.status(unavailable.statusCode).send(body);
+                      }
+                      throw rawErr;
+                    }
                     if (!validation.valid) {
                       return reply.status(400).send({
                         error: `Invalid image: ${validation.reason}`,
@@ -525,7 +543,24 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                         throw err;
                       }
                     } else {
-                      processBuffer = await autoOrient(processBuffer);
+                      try {
+                        processBuffer = await autoOrient(processBuffer);
+                      } catch (rawErr) {
+                        const err = asDecoderOutOfMemory(rawErr);
+                        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+                          const unavailable = engineUnavailable(err);
+                          reportEngineUnavailable(
+                            unavailable,
+                            firstToolId ?? "pipeline",
+                            request.log,
+                          );
+                          const body: Record<string, string> = { error: unavailable.message };
+                          if (unavailable.details) body.details = unavailable.details;
+                          if (unavailable.code) body.code = unavailable.code;
+                          return reply.status(unavailable.statusCode).send(body);
+                        }
+                        throw rawErr;
+                      }
                     }
                   } else {
                     // Non-image input: validate/decode via the tool's modality handler.
@@ -1556,7 +1591,28 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                   throw err;
                 }
               } else if (batchModality === "image") {
-                const fileValidation = await validateImageBuffer(processBuffer, processFilename);
+                let fileValidation: Awaited<ReturnType<typeof validateImageBuffer>>;
+                try {
+                  fileValidation = await validateImageBuffer(processBuffer, processFilename);
+                } catch (rawErr) {
+                  const err = asDecoderOutOfMemory(rawErr);
+                  if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+                    const unavailable = engineUnavailable(err);
+                    reportEngineUnavailable(
+                      unavailable,
+                      parsedSteps[0]?.resolvedToolId ?? "pipeline",
+                      request.log,
+                    );
+                    preFailures.push({
+                      originalIndex: fi,
+                      filename: file.filename,
+                      error: unavailable.message,
+                      ...preFailureFaultFields(unavailable),
+                    });
+                    continue;
+                  }
+                  throw rawErr;
+                }
                 if (!fileValidation.valid) {
                   preFailures.push({
                     originalIndex: fi,
@@ -1686,7 +1742,27 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                     throw err;
                   }
                 } else {
-                  processBuffer = await autoOrient(processBuffer);
+                  try {
+                    processBuffer = await autoOrient(processBuffer);
+                  } catch (rawErr) {
+                    const err = asDecoderOutOfMemory(rawErr);
+                    if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+                      const unavailable = engineUnavailable(err);
+                      reportEngineUnavailable(
+                        unavailable,
+                        parsedSteps[0]?.resolvedToolId ?? "pipeline",
+                        request.log,
+                      );
+                      preFailures.push({
+                        originalIndex: fi,
+                        filename: file.filename,
+                        error: unavailable.message,
+                        ...preFailureFaultFields(unavailable),
+                      });
+                      continue;
+                    }
+                    throw rawErr;
+                  }
                 }
               } else {
                 try {

@@ -910,5 +910,43 @@ describe("ImageInputHandler operational tmpdir write faults (#2800)", () => {
         signal: orientAbort.signal,
       }),
     ).rejects.toBe("orient-canceled");
+
+    // 6. validateImageBuffer hits DecoderOutOfMemoryError, raw V8 OOM, or a 5xx fault (#3726), while non-5xx or abort rethrows
+    for (const validatorErr of [
+      new DecoderOutOfMemoryError("The image decoder ran out of memory."),
+      v8Oom(),
+      new DecoderUnavailableError("No image decoder found."),
+      Object.assign(new Error("The server's storage is full."), {
+        isSafeMessage: true,
+        statusCode: 503,
+        code: "storage-full",
+      }),
+    ]) {
+      mocks.validateImageBuffer.mockRejectedValueOnce(validatorErr);
+      await expect(prepare("photo.png")).rejects.toMatchObject({
+        name: "InputValidationError",
+        statusCode: 503,
+        code:
+          (validatorErr as { code?: string }).code === "storage-full"
+            ? "storage-full"
+            : "ENGINE_UNAVAILABLE",
+      });
+    }
+
+    const unexpectedValidatorErr = new TypeError("unexpected validator fault");
+    mocks.validateImageBuffer.mockRejectedValueOnce(unexpectedValidatorErr);
+    await expect(prepare("photo.png")).rejects.toBe(unexpectedValidatorErr);
+
+    const validateAbort = new AbortController();
+    mocks.validateImageBuffer.mockImplementationOnce(async () => {
+      validateAbort.abort("validate-canceled");
+      throw v8Oom();
+    });
+    await expect(
+      new ImageInputHandler().prepare(RAW, "photo.png", {
+        scratchDir: "/tmp/in",
+        signal: validateAbort.signal,
+      }),
+    ).rejects.toBe("validate-canceled");
   });
 });

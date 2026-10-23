@@ -1601,4 +1601,135 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
       errorSpy.mockRestore();
     }
   });
+
+  it("routes validateImageBuffer and autoOrient DecoderOutOfMemoryError through reportEngineUnavailable and batch preFailures (#3726)", async () => {
+    const sharpMod = (await import("sharp")).default;
+    const autoOrientMod = await import("../../../apps/api/src/lib/auto-orient.js");
+    const expiredNow = Date.now() + 50 * 60_000;
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(expiredNow);
+    const oom = () => new RangeError("Array buffer allocation failed");
+
+    try {
+      // 1. Single-file tool-factory route (ImageInputHandler.prepare -> validateImageBuffer)
+      const singleMetaSpy = vi.spyOn(sharpMod.prototype, "metadata").mockRejectedValueOnce(oom());
+      try {
+        const singleRes = await post("/api/v1/tools/image/resize", [
+          pngPart("one.png"),
+          { name: "settings", content: JSON.stringify({ width: 50 }) },
+        ]);
+        expect(singleRes.statusCode, singleRes.body).toBe(503);
+        expect(singleRes.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+        expect(helperSawEngineDown("resize")).toBe(true);
+        expect(engineReports("resize")).toHaveLength(1);
+      } finally {
+        singleMetaSpy.mockRestore();
+      }
+
+      // 2. Batch route: first file fails in validateImageBuffer, second file fails in autoOrient
+      mocks.reportError.mockReset();
+      mocks.reportEngineUnavailable.mockClear();
+      nowSpy.mockReturnValue(expiredNow + 11 * 60_000);
+      const batchMetaSpy = vi.spyOn(sharpMod.prototype, "metadata").mockRejectedValueOnce(oom());
+      const orientSpy = vi.spyOn(autoOrientMod, "autoOrient").mockRejectedValueOnce(oom());
+      try {
+        const batchRes = await post("/api/v1/tools/image/resize/batch", [
+          pngPart("a.png"),
+          pngPart("b.png"),
+          { name: "settings", content: JSON.stringify({ width: 50 }) },
+        ]);
+        expect(batchRes.statusCode, batchRes.body).toBe(503);
+        expect(batchRes.json()).toMatchObject({
+          code: "ENGINE_UNAVAILABLE",
+          errors: [
+            { filename: "a.png", code: "ENGINE_UNAVAILABLE" },
+            { filename: "b.png", code: "ENGINE_UNAVAILABLE" },
+          ],
+        });
+        expect(helperSawEngineDown("resize")).toBe(true);
+        expect(engineReports("resize")).toHaveLength(1);
+      } finally {
+        orientSpy.mockRestore();
+        batchMetaSpy.mockRestore();
+      }
+
+      // 3. Pipeline execute and pipeline batch
+      mocks.reportError.mockReset();
+      mocks.reportEngineUnavailable.mockClear();
+      nowSpy.mockReturnValue(expiredNow + 22 * 60_000);
+      const pipeMetaSpy = vi.spyOn(sharpMod.prototype, "metadata").mockRejectedValueOnce(oom());
+      try {
+        const pipeExecRes = await post("/api/v1/pipeline/execute", [
+          pngPart("one.png"),
+          {
+            name: "pipeline",
+            content: JSON.stringify({ steps: [{ toolId: "resize", settings: { width: 50 } }] }),
+          },
+        ]);
+        expect(pipeExecRes.statusCode, pipeExecRes.body).toBe(503);
+        expect(pipeExecRes.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+        expect(helperSawEngineDown("resize")).toBe(true);
+        expect(engineReports("resize")).toHaveLength(1);
+      } finally {
+        pipeMetaSpy.mockRestore();
+      }
+
+      mocks.reportError.mockReset();
+      mocks.reportEngineUnavailable.mockClear();
+      nowSpy.mockReturnValue(expiredNow + 33 * 60_000);
+      const pipeBatchMetaSpy = vi
+        .spyOn(sharpMod.prototype, "metadata")
+        .mockRejectedValueOnce(oom());
+      const pipeBatchOrientSpy = vi.spyOn(autoOrientMod, "autoOrient").mockRejectedValueOnce(oom());
+      try {
+        const pipeBatchRes = await post("/api/v1/pipeline/batch", [
+          pngPart("one.png"),
+          pngPart("two.png"),
+          {
+            name: "pipeline",
+            content: JSON.stringify({ steps: [{ toolId: "resize", settings: { width: 50 } }] }),
+          },
+        ]);
+        expect(pipeBatchRes.statusCode, pipeBatchRes.body).toBe(503);
+        expect(pipeBatchRes.json()).toMatchObject({
+          code: "ENGINE_UNAVAILABLE",
+          errors: [
+            { filename: "one.png", code: "ENGINE_UNAVAILABLE" },
+            { filename: "two.png", code: "ENGINE_UNAVAILABLE" },
+          ],
+        });
+        expect(helperSawEngineDown("resize")).toBe(true);
+        expect(engineReports("resize")).toHaveLength(1);
+      } finally {
+        pipeBatchOrientSpy.mockRestore();
+        pipeBatchMetaSpy.mockRestore();
+      }
+
+      // 4. POST /api/v1/preview (validateImageBuffer OOM, deduplicated across repeat requests)
+      mocks.reportError.mockReset();
+      mocks.reportEngineUnavailable.mockClear();
+      nowSpy.mockReturnValue(expiredNow + 44 * 60_000);
+      const previewMetaSpy = vi
+        .spyOn(sharpMod.prototype, "metadata")
+        .mockRejectedValueOnce(oom())
+        .mockRejectedValueOnce(oom());
+      try {
+        for (const res of [
+          await post("/api/v1/preview", [pngPart("one.png")]),
+          await post("/api/v1/preview", [pngPart("two.png")]),
+        ]) {
+          expect(res.statusCode, res.body).toBe(503);
+          expect(res.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
+        }
+        const previewReports = engineReports("file-preview");
+        expect(previewReports).toHaveLength(1);
+        expect((previewReports[0]?.[0] as { cause?: { name?: string } })?.cause?.name).toBe(
+          "DecoderOutOfMemoryError",
+        );
+      } finally {
+        previewMetaSpy.mockRestore();
+      }
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
 });
