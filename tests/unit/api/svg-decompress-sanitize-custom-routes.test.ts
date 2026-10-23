@@ -1017,9 +1017,20 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         mocks.decompressSvgz.mockImplementationOnce(() => {
           throw v8Oom;
         });
-        await expect(invokeRoute(routeHandler, makeParts("icon.svgz", DIRTY_SVGZ))).rejects.toThrow(
-          v8Oom,
-        );
+        if (url === "/api/v1/tools/image/meme-generator") {
+          await expect(
+            invokeRoute(routeHandler, makeParts("icon.svgz", DIRTY_SVGZ)),
+          ).rejects.toMatchObject({
+            name: "DecoderOutOfMemoryError",
+            statusCode: 503,
+            code: "ENGINE_UNAVAILABLE",
+            cause: v8Oom,
+          });
+        } else {
+          await expect(
+            invokeRoute(routeHandler, makeParts("icon.svgz", DIRTY_SVGZ)),
+          ).rejects.toThrow(v8Oom);
+        }
 
         expect(mocks.putObject).not.toHaveBeenCalled();
       },
