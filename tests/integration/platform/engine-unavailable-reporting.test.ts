@@ -1232,7 +1232,7 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
       }
     });
 
-    it("edit-metadata, image-to-pdf, and pdf-to-image single-file and batch routes surface 503 ENGINE_UNAVAILABLE on V8 buffer allocation OOM and encoder faults (#3646)", async () => {
+    it("edit-metadata, image-to-pdf, and pdf-to-image single-file, preview, and batch routes surface 503 ENGINE_UNAVAILABLE on V8 buffer allocation OOM and encoder faults (#3646, #3763)", async () => {
       const sharpMod = (await import("sharp")).default;
       const exiftoolMod = await import("../../../apps/api/src/lib/exiftool.js");
       const formatEncoders = await import("../../../apps/api/src/lib/format-encoders.js");
@@ -1259,6 +1259,15 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
             },
           } as unknown as InstanceType<typeof sharpMod>;
         });
+      const jpegSpy = vi.spyOn(sharpMod.prototype, "jpeg").mockImplementationOnce(function (
+        this: InstanceType<typeof sharpMod>,
+      ) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Array buffer allocation failed");
+          },
+        } as unknown as InstanceType<typeof sharpMod>;
+      });
       const encJxlSpy = vi
         .spyOn(formatEncoders, "encodeJxl")
         .mockRejectedValue(new DecoderUnavailableError("No cjxl found."));
@@ -1290,6 +1299,14 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
           code: "ENGINE_UNAVAILABLE",
         });
 
+        const pdfPreviewRes = await post("/api/v1/tools/pdf/pdf-to-image/preview", [
+          pdfPart("scan.pdf"),
+        ]);
+        expect(pdfPreviewRes.statusCode, pdfPreviewRes.body).toBe(503);
+        expect(pdfPreviewRes.json()).toMatchObject({
+          code: "ENGINE_UNAVAILABLE",
+        });
+
         const clientJobId = randomUUID();
         const pdfBatchRes = await post("/api/v1/tools/pdf/pdf-to-image/batch", [
           pdfPart("a.pdf"),
@@ -1303,8 +1320,24 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
           code: "ENGINE_UNAVAILABLE",
         });
         expect(helperSawEngineDown("pdf-to-image")).toBe(true);
-        // Both DecoderOutOfMemoryError (single-file) and DecoderUnavailableError (batch) report once each (#1628).
+        // Both DecoderOutOfMemoryError (single-file + preview, deduplicated within window) and DecoderUnavailableError (batch) report once each (#1628).
         expect(engineReports("pdf-to-image")).toHaveLength(2);
+        expect(
+          mocks.reportEngineUnavailable.mock.calls.filter(
+            ([err, id]) =>
+              (err as { code?: string }).code === "ENGINE_UNAVAILABLE" &&
+              (err as { cause?: { name?: string } }).cause?.name === "DecoderOutOfMemoryError" &&
+              id === "pdf-to-image",
+          ),
+        ).toHaveLength(2);
+        expect(
+          mocks.reportEngineUnavailable.mock.calls.filter(
+            ([err, id]) =>
+              (err as { code?: string }).code === "ENGINE_UNAVAILABLE" &&
+              (err as { cause?: { name?: string } }).cause?.name === "DecoderUnavailableError" &&
+              id === "pdf-to-image",
+          ),
+        ).toHaveLength(1);
 
         const row = await parentRow(clientJobId);
         expect(row?.status).toBe("failed");
@@ -1325,6 +1358,7 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
         });
       } finally {
         encJxlSpy.mockRestore();
+        jpegSpy.mockRestore();
         pngSpy.mockRestore();
         writeSpy.mockRestore();
         nowSpy.mockRestore();

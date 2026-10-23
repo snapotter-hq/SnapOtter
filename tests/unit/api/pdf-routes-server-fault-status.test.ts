@@ -63,7 +63,10 @@ import * as formatEncoders from "../../../apps/api/src/lib/format-encoders.js";
 import * as heicConverter from "../../../apps/api/src/lib/heic-converter.js";
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
 import { registerImageToPdf } from "../../../apps/api/src/routes/tools/image-to-pdf.js";
-import { registerPdfToImage } from "../../../apps/api/src/routes/tools/pdf-to-image.js";
+import {
+  registerPdfToImage,
+  registerPdfToImagePreset,
+} from "../../../apps/api/src/routes/tools/pdf-to-image.js";
 import { registerSvgToRasterRoute } from "../../../apps/api/src/routes/tools/svg-to-raster.js";
 
 const PDF = readFileSync(join(__dirname, "../../fixtures/document/valid/test-3page.pdf"));
@@ -339,6 +342,140 @@ describe("pdf-to-image single-file route", () => {
       pngSpy.mockRestore();
       jxlSpy.mockRestore();
       heicSpy.mockRestore();
+      reportSpy.mockRestore();
+      nowSpy.mockRestore();
+      await app.close();
+    }
+  });
+
+  it("preview endpoint surfaces 503 ENGINE_UNAVAILABLE and reports once per window when Sharp hits V8 OOM or a 5xx fault, and keeps 400 for password or corrupt PDFs (#3763)", async () => {
+    const oomMessage =
+      "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+    const encryptedPdf = readFileSync(
+      join(__dirname, "../../fixtures/document/valid/encrypted.pdf"),
+    );
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 75 * 60_000);
+    const reportSpy = vi.spyOn(engineUnavailableMod, "reportEngineUnavailable");
+    const jpegSpy = vi
+      .spyOn(sharp.prototype, "jpeg")
+      .mockImplementationOnce(function (this: sharp.Sharp) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Array buffer allocation failed");
+          },
+        } as unknown as sharp.Sharp;
+      })
+      .mockImplementationOnce(function (this: sharp.Sharp) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Array buffer allocation failed");
+          },
+        } as unknown as sharp.Sharp;
+      })
+      .mockImplementationOnce(function (this: sharp.Sharp) {
+        return {
+          toBuffer: async () => {
+            throw Object.assign(new Error("ENOSPC: no space left on device, write"), {
+              code: "ENOSPC",
+            });
+          },
+        } as unknown as sharp.Sharp;
+      });
+    const metaSpy = vi
+      .spyOn(sharp.prototype, "metadata")
+      .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"))
+      .mockRejectedValueOnce(new RangeError("Invalid parameter"));
+
+    const app = await buildApp((instance) => {
+      registerPdfToImage(instance);
+      registerPdfToImagePreset(instance, "pdf-to-jpg", "jpg");
+    });
+    try {
+      const sendPreview = (toolId = "pdf-to-image", data: Buffer = PDF) =>
+        app.inject({
+          method: "POST",
+          url: `${apiToolPath(toolId)}/preview`,
+          ...multipartBody([{ name: "a.pdf", type: "application/pdf", data }]),
+        });
+
+      // 1. sharp.prototype.jpeg rejects with V8 buffer allocation RangeError -> 503 ENGINE_UNAVAILABLE
+      const firstOom = await sendPreview();
+      expect(firstOom.statusCode).toBe(503);
+      expect(firstOom.json()).toMatchObject({
+        error: oomMessage,
+        code: "ENGINE_UNAVAILABLE",
+      });
+
+      // 2. Repeat within the same 10-minute window still answers 503 and deduplicates the log/report
+      const secondOom = await sendPreview();
+      expect(secondOom.statusCode).toBe(503);
+      expect(secondOom.json()).toMatchObject({
+        error: oomMessage,
+        code: "ENGINE_UNAVAILABLE",
+      });
+
+      // 3. Operational write fault (ENOSPC) normalized via normalizeOperationalWriteError -> 503 storage-full
+      const enospcRes = await sendPreview();
+      expect(enospcRes.statusCode).toBe(503);
+      expect(enospcRes.json()).toMatchObject({
+        error: "The server's storage is full.",
+        code: "storage-full",
+      });
+
+      // 4. sharp(thumb).metadata() rejects with V8 RangeError on a preset route -> 503 reported under preset toolId
+      const presetOom = await sendPreview("pdf-to-jpg");
+      expect(presetOom.statusCode).toBe(503);
+      expect(presetOom.json()).toMatchObject({
+        error: oomMessage,
+        code: "ENGINE_UNAVAILABLE",
+      });
+
+      // 5. Non-OOM RangeError, password-protected, and corrupt PDFs still return 400 without reporting engine unavailable
+      const nonOomRangeRes = await sendPreview("pdf-to-image");
+      expect(nonOomRangeRes.statusCode).toBe(400);
+      expect(nonOomRangeRes.json()).toEqual({
+        error: "Invalid or corrupt PDF file",
+      });
+
+      const encryptedRes = await sendPreview("pdf-to-image", encryptedPdf);
+      expect(encryptedRes.statusCode).toBe(400);
+      expect(encryptedRes.json()).toEqual({
+        error: "Password-protected PDFs are not supported",
+      });
+
+      const corruptRes = await sendPreview(
+        "pdf-to-image",
+        Buffer.from("%PDF-1.4\nnot really a document"),
+      );
+      expect(corruptRes.statusCode).toBe(400);
+      expect(corruptRes.json()).toEqual({
+        error: "Invalid or corrupt PDF file",
+      });
+
+      expect(reportSpy).toHaveBeenCalledTimes(4);
+      expect(reportSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ statusCode: 503, code: "ENGINE_UNAVAILABLE" }),
+        "pdf-to-image",
+        expect.anything(),
+      );
+      expect(reportSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ statusCode: 503, code: "ENGINE_UNAVAILABLE" }),
+        "pdf-to-jpg",
+        expect.anything(),
+      );
+      // 3 distinct (code, cause, toolId) tuples:
+      // (ENGINE_UNAVAILABLE, DecoderOutOfMemoryError, pdf-to-image),
+      // (storage-full, SafeError, pdf-to-image),
+      // (ENGINE_UNAVAILABLE, DecoderOutOfMemoryError, pdf-to-jpg)
+      expect(
+        logLines.filter((line) =>
+          line.includes("Tool engine unavailable during input preparation"),
+        ),
+      ).toHaveLength(3);
+      expect(logLines.some((line) => line.includes("Unhandled request error"))).toBe(false);
+    } finally {
+      jpegSpy.mockRestore();
+      metaSpy.mockRestore();
       reportSpy.mockRestore();
       nowSpy.mockRestore();
       await app.close();

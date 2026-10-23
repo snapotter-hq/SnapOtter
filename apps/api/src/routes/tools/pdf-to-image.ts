@@ -414,7 +414,16 @@ export function registerPdfToImageRoute(
       }
 
       return reply.send({ pageCount, thumbnails });
-    } catch (err) {
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+        const unavailable = engineUnavailable(err);
+        reportEngineUnavailable(unavailable, opts.toolId, request.log);
+        return reply.status(unavailable.statusCode).send({
+          error: unavailable.message,
+          ...(unavailable.code !== undefined && { code: unavailable.code }),
+        });
+      }
       if (
         err instanceof Error &&
         (err.message.includes("password") || err.message.includes("Password"))
