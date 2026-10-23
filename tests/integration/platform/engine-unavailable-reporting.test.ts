@@ -1232,7 +1232,7 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
       }
     });
 
-    it("edit-metadata, gif-tools /info, image-to-pdf, and pdf-to-image single-file, preview, and batch routes surface 503 ENGINE_UNAVAILABLE on V8 buffer allocation OOM and encoder faults (#3646, #3763, #3772)", async () => {
+    it("edit-metadata, gif-tools /info and preValidate, image-to-pdf, and pdf-to-image single-file, preview, and batch routes surface 503 ENGINE_UNAVAILABLE on V8 buffer allocation OOM and encoder faults (#3646, #3763, #3772, #3859)", async () => {
       const sharpMod = (await import("sharp")).default;
       const exiftoolMod = await import("../../../apps/api/src/lib/exiftool.js");
       const formatEncoders = await import("../../../apps/api/src/lib/format-encoders.js");
@@ -1307,29 +1307,53 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
           code: "ENGINE_UNAVAILABLE",
         });
 
-        const gifMetaSpy = vi
-          .spyOn(sharpMod.prototype, "metadata")
-          .mockImplementation(() =>
-            Promise.reject(new RangeError("Array buffer allocation failed")),
-          );
+        const origGifMeta = sharpMod.prototype.metadata;
+        let gifMetaCalls = 0;
+        const gifMetaSpy = vi.spyOn(sharpMod.prototype, "metadata").mockImplementation(function (
+          this: import("sharp").Sharp,
+        ) {
+          gifMetaCalls++;
+          const pages = (this as unknown as { options?: { input?: { pages?: number } } }).options
+            ?.input?.pages;
+          if (gifMetaCalls === 1 || pages === -1) {
+            return Promise.reject(new RangeError("Array buffer allocation failed"));
+          }
+          return origGifMeta.call(this);
+        });
         try {
-          const gifInfoRes = await post("/api/v1/tools/image/gif-tools/info", [
-            {
-              name: "file",
-              filename: "animated.gif",
-              contentType: "image/gif",
-              content: readFixture(fixtures.image.animated.gif),
-            },
-          ]);
+          const gifPart = {
+            name: "file",
+            filename: "animated.gif",
+            contentType: "image/gif",
+            content: readFixture(fixtures.image.animated.gif),
+          };
+          const gifInfoRes = await post("/api/v1/tools/image/gif-tools/info", [gifPart]);
           expect(gifInfoRes.statusCode, gifInfoRes.body).toBe(503);
           expect(gifInfoRes.json()).toMatchObject({
             code: "ENGINE_UNAVAILABLE",
           });
+          const gifToolRes = await post("/api/v1/tools/image/gif-tools", [
+            gifPart,
+            { name: "settings", content: JSON.stringify({ mode: "resize", width: 16 }) },
+          ]);
+          expect(gifToolRes.statusCode, gifToolRes.body).toBe(503);
+          expect(gifToolRes.json()).toMatchObject({
+            code: "ENGINE_UNAVAILABLE",
+          });
+          expect(helperSawEngineDown("gif-tools")).toBe(true);
           const gifReports = engineReports("gif-tools");
           expect(gifReports).toHaveLength(1);
           expect((gifReports[0]?.[0] as { cause?: { name?: string } })?.cause?.name).toBe(
             "DecoderOutOfMemoryError",
           );
+          expect(
+            mocks.reportEngineUnavailable.mock.calls.filter(
+              ([err, id]) =>
+                (err as { code?: string }).code === "ENGINE_UNAVAILABLE" &&
+                (err as { cause?: { name?: string } }).cause?.name === "DecoderOutOfMemoryError" &&
+                id === "gif-tools",
+            ),
+          ).toHaveLength(1);
         } finally {
           gifMetaSpy.mockRestore();
         }

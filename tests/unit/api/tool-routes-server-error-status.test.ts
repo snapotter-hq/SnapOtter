@@ -7,7 +7,7 @@
 
 import multipart from "@fastify/multipart";
 import { apiToolPath, hasServerErrorStatus, SafeError } from "@snapotter/shared";
-import Fastify from "fastify";
+import Fastify, { type FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -661,7 +661,7 @@ describe("json-bodied routes", () => {
   });
 });
 
-describe("gif-tools /info (#3772)", () => {
+describe("gif-tools /info and preValidate (#3772, #3859)", () => {
   it("surfaces 503 ENGINE_UNAVAILABLE and reports once per window when sharp.metadata() hits V8 buffer allocation OOM or a 5xx fault, and keeps 422 on ordinary errors (#3772)", async () => {
     const oomMessage =
       "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
@@ -750,6 +750,134 @@ describe("gif-tools /info (#3772)", () => {
     } finally {
       metaSpy.mockRestore();
       sendSpy.mockRestore();
+      nowSpy.mockRestore();
+      await app.close();
+    }
+  });
+
+  it("surfaces 503 ENGINE_UNAVAILABLE on V8 OOM or storage faults and 400 ToolInputError on undecodable GIF headers in gif-tools preValidate (#3859)", async () => {
+    const oomMessage =
+      "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+    const gif = await sharp({
+      create: { width: 8, height: 8, channels: 4, background: { r: 255, g: 0, b: 0, alpha: 1 } },
+    })
+      .gif()
+      .toBuffer();
+    putObject.mockResolvedValue(undefined);
+    getObjectBuffer.mockResolvedValue(gif);
+
+    const logLines: string[] = [];
+    const app = Fastify({
+      logger: { level: "warn", stream: { write: (line: string) => void logLines.push(line) } },
+    });
+    app.addHook("onRequest", async (req: FastifyRequest) => {
+      (req as FastifyRequest & { user?: unknown }).user = { id: "u1", role: "admin" };
+    });
+    await app.register(multipart);
+    registerErrorHandler(app);
+    registerGifTools(app);
+    await app.ready();
+
+    const origMeta = sharp.prototype.metadata;
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 125 * 60_000);
+    const reportSpy = vi.spyOn(engineUnavailableMod, "reportEngineUnavailable");
+    let animatedFault: Error | null = null;
+    const metaSpy = vi.spyOn(sharp.prototype, "metadata").mockImplementation(function (
+      this: sharp.Sharp,
+    ) {
+      const pages = (this as unknown as { options?: { input?: { pages?: number } } }).options?.input
+        ?.pages;
+      if (pages === -1 && animatedFault) {
+        return Promise.reject(animatedFault);
+      }
+      return origMeta.call(this);
+    });
+
+    try {
+      const sendTool = () =>
+        app.inject({
+          method: "POST",
+          url: "/api/v1/tools/image/gif-tools",
+          ...multipartBody([{ name: "test.gif", type: "image/gif", data: gif }], {
+            mode: "resize",
+            width: 16,
+          }),
+        });
+
+      animatedFault = new RangeError("Array buffer allocation failed");
+      const firstOom = await sendTool();
+      expect(firstOom.statusCode).toBe(503);
+      expect(firstOom.json()).toEqual({
+        error: oomMessage,
+        code: "ENGINE_UNAVAILABLE",
+      });
+
+      const secondOom = await sendTool();
+      expect(secondOom.statusCode).toBe(503);
+      expect(secondOom.json()).toEqual({
+        error: oomMessage,
+        code: "ENGINE_UNAVAILABLE",
+      });
+
+      animatedFault = Object.assign(new Error("ENOSPC: no space left on device, write"), {
+        code: "ENOSPC",
+      });
+      const enospcRes = await sendTool();
+      expect(enospcRes.statusCode).toBe(503);
+      expect(enospcRes.json()).toEqual({
+        error: "The server's storage is full.",
+        code: "storage-full",
+      });
+
+      animatedFault = Object.assign(new Error("EPERM: operation not permitted, write"), {
+        code: "EPERM",
+      });
+      const epermRes = await sendTool();
+      expect(epermRes.statusCode).toBe(503);
+      expect(epermRes.json()).toEqual({
+        error:
+          "The server can't write to its storage: it's read-only or not allowed to write there.",
+        code: "storage-not-writable",
+      });
+
+      animatedFault = Object.assign(new Error("EMFILE: too many open files"), {
+        code: "EMFILE",
+      });
+      const emfileRes = await sendTool();
+      expect(emfileRes.statusCode).toBe(503);
+      expect(emfileRes.json()).toEqual({
+        error:
+          "The server has too many files open to process this image right now. Try again shortly.",
+        code: "EMFILE",
+      });
+
+      animatedFault = new Error(
+        "Input buffer has corrupt header: gifload_buffer: Unexpected end of GIF source data",
+      );
+      const corruptHeaderRes = await sendTool();
+      expect(corruptHeaderRes.statusCode).toBe(400);
+      expect(corruptHeaderRes.json()).toEqual({
+        error:
+          "This image can't be decoded. The file may be corrupt or use an unsupported encoding.",
+      });
+
+      animatedFault = new Error("Input image exceeds pixel limit");
+      const pixelLimitRes = await sendTool();
+      expect(pixelLimitRes.statusCode).toBe(400);
+      expect(pixelLimitRes.json()).toEqual({
+        error: "This image is too large to process. Reduce its dimensions and try again.",
+      });
+
+      expect(reportSpy).toHaveBeenCalledTimes(5);
+      expect(
+        logLines.filter((line) =>
+          line.includes("Tool engine unavailable during input preparation"),
+        ),
+      ).toHaveLength(4);
+      expect(logLines.some((line) => line.includes("Unhandled request error"))).toBe(false);
+    } finally {
+      metaSpy.mockRestore();
+      reportSpy.mockRestore();
       nowSpy.mockRestore();
       await app.close();
     }

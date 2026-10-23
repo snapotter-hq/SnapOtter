@@ -1,20 +1,38 @@
 import { MAX_RESIZE_OUTPUT_DIMENSION } from "@snapotter/image-engine";
-import { hasServerErrorStatus, ToolInputError } from "@snapotter/shared";
+import {
+  hasServerErrorStatus,
+  isSafeMessageError,
+  isToolInputError,
+  SafeError,
+  ToolInputError,
+} from "@snapotter/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { zipSync } from "fflate";
-import sharp from "sharp";
+import sharp, { type Metadata } from "sharp";
 import { z } from "zod";
 import { sendInputValidationError } from "../../lib/engine-unavailable.js";
-import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
+import { isOperationalErrno } from "../../lib/error-report.js";
+import {
+  asDecoderOutOfMemory,
+  DecoderOutOfMemoryError,
+  isDecoderUnavailable,
+} from "../../lib/format-decoders.js";
 import {
   assertGifWorkload,
   MAX_GIF_TOTAL_PIXELS,
   resolveGifResizeDimensions,
 } from "../../lib/gif-limits.js";
-import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
+import {
+  asInputErrorIfUndecodable,
+  DESCRIPTOR_ENVIRONMENT_MESSAGE,
+  PIXEL_LIMIT_IMAGE_MESSAGE,
+  UNDECODABLE_IMAGE_MESSAGE,
+  withImageEncodeContext,
+} from "../../lib/image-error.js";
+import { logger } from "../../lib/logger.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
-import { engineUnavailable } from "../../modality/image-input.js";
+import { engineUnavailable, isPixelSafetyError } from "../../modality/image-input.js";
 import { createToolRoute } from "../tool-factory.js";
 
 const settingsSchema = z.object({
@@ -54,10 +72,40 @@ const settingsSchema = z.object({
 });
 
 async function inspectGifWorkload(inputBuffer: Buffer) {
-  const metadata = await sharp(inputBuffer, {
-    animated: true,
-    limitInputPixels: false,
-  }).metadata();
+  let metadata: Metadata;
+  try {
+    metadata = await sharp(inputBuffer, {
+      animated: true,
+      limitInputPixels: false,
+    }).metadata();
+  } catch (rawErr) {
+    const oom = asDecoderOutOfMemory(rawErr);
+    if (oom instanceof DecoderOutOfMemoryError) throw oom;
+    if (rawErr instanceof Error && isOperationalErrno(rawErr)) throw rawErr;
+    const normalized = normalizeOperationalWriteError(rawErr);
+    if (
+      isToolInputError(normalized) ||
+      isSafeMessageError(normalized) ||
+      isDecoderUnavailable(normalized) ||
+      hasServerErrorStatus(normalized)
+    ) {
+      throw normalized;
+    }
+    const err = await asInputErrorIfUndecodable(inputBuffer, rawErr);
+    if (
+      isToolInputError(err) ||
+      isSafeMessageError(err) ||
+      hasServerErrorStatus(err) ||
+      (err instanceof Error && isOperationalErrno(err))
+    ) {
+      throw err;
+    }
+    logger.info({ err: rawErr }, "undecodable image input rejected");
+    if (isPixelSafetyError(err)) {
+      throw new ToolInputError(PIXEL_LIMIT_IMAGE_MESSAGE, { cause: rawErr });
+    }
+    throw new ToolInputError(UNDECODABLE_IMAGE_MESSAGE, { cause: rawErr });
+  }
   return { metadata, workload: assertGifWorkload(metadata) };
 }
 
@@ -129,8 +177,27 @@ export function registerGifTools(app: FastifyInstance) {
     toolId: "gif-tools",
     settingsSchema,
     preValidate: async ({ inputs, settings }) => {
-      const { workload } = await inspectGifWorkload(inputs[0].buffer);
-      assertGifResizeOutput(workload, settings);
+      try {
+        const { workload } = await inspectGifWorkload(inputs[0].buffer);
+        assertGifResizeOutput(workload, settings);
+      } catch (rawErr) {
+        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+          throw engineUnavailable(err);
+        }
+        if (err instanceof Error && isOperationalErrno(err)) {
+          const code = String((err as NodeJS.ErrnoException).code);
+          throw engineUnavailable(
+            new SafeError(DESCRIPTOR_ENVIRONMENT_MESSAGE, {
+              kind: "operational",
+              code,
+              statusCode: 503,
+              cause: err,
+            }),
+          );
+        }
+        throw err;
+      }
     },
     process: withImageEncodeContext<z.infer<typeof settingsSchema>>(
       "GIF processing failed",
@@ -138,10 +205,11 @@ export function registerGifTools(app: FastifyInstance) {
       async (inputBuffer, settings, filename) => {
         const baseName = filename.replace(/\.[^.]+$/, "");
         const loop = settings.loop;
-        const { metadata, workload: inputWorkload } = await inspectGifWorkload(inputBuffer);
-        assertGifResizeOutput(inputWorkload, settings);
 
         try {
+          const { metadata, workload: inputWorkload } = await inspectGifWorkload(inputBuffer);
+          assertGifResizeOutput(inputWorkload, settings);
+
           switch (settings.mode) {
             case "resize": {
               const output = resolveGifResizeDimensions(inputWorkload, settings);

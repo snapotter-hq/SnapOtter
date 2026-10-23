@@ -705,6 +705,12 @@ describe("Image tool registry undecodable input & encode context guards (#949)",
     { toolId: "convert", settings: { format: "psd" } },
     { toolId: "convert", settings: { format: "heic" } },
     { toolId: "gif-tools", settings: { mode: "resize", width: 32 }, filename: "truncated.gif" },
+    {
+      toolId: "gif-tools",
+      settings: { mode: "resize", width: 32 },
+      filename: "truncated.gif",
+      inputBuffer: truncatedGifHeader,
+    },
     { toolId: "image-enhancement", settings: {} },
     { toolId: "strip-metadata", settings: { stripAll: true } },
     { toolId: "transparency-fixer", settings: { removeWatermark: true } },
@@ -940,6 +946,7 @@ describe("Image tool registry undecodable input & encode context guards (#949)",
     for (const [toolId, rawSettings] of [
       ["adjust-colors", { sharpness: 20 }],
       ["image-enhancement", {}],
+      ["gif-tools", { mode: "resize", width: 16 }],
     ] as const) {
       const config = getToolConfig(toolId);
       if (!config?.processV2) throw new Error(`${toolId} missing from toolRegistry`);
@@ -1023,6 +1030,7 @@ describe("Image tool registry undecodable input & encode context guards (#949)",
       ["optimize-for-web", { format: "invalid" }, "Web optimization failed"],
       ["sharpening", { method: "invalid" }, "Image sharpening failed"],
       ["convert", { format: "invalid" }, "Image conversion failed"],
+      ["gif-tools", { mode: "optimize", effort: 99 }, "GIF processing failed"],
     ] as const) {
       const config = getToolConfig(toolId);
       if (!config) throw new Error(`${toolId} missing from toolRegistry`);
@@ -1044,7 +1052,6 @@ describe("Image tool registry undecodable input & encode context guards (#949)",
       ["circle-crop", {}, "Circle crop failed"],
       ["rounded-crop", {}, "Rounded crop failed"],
       ["duotone", {}, "Duotone failed"],
-      ["gif-tools", { mode: "resize", width: 32 }, "GIF processing failed"],
       ["strip-metadata", { stripAll: true }, "Metadata strip failed"],
     ] as const) {
       const config = getToolConfig(toolId);
@@ -1450,6 +1457,101 @@ describe("Image tool registry undecodable input & encode context guards (#949)",
       });
     } finally {
       regMetaSpy.mockRestore();
+    }
+
+    // 4. gif-tools process and preValidate: inspectGifWorkload classifies V8 OOM,
+    //    operational errnos, pixel limits, and undecodable animated metadata (#3859)
+    const gifToolsConfig = getToolConfig("gif-tools");
+    if (!gifToolsConfig?.preValidate) throw new Error("gif-tools missing from toolRegistry");
+    const parsedGifToolsSettings = gifToolsConfig.settingsSchema.parse({
+      mode: "resize",
+      width: 16,
+    });
+
+    const gifToolsOomSpy = vi.spyOn(sharp.prototype, "metadata").mockRejectedValueOnce(v8Oom);
+    try {
+      const gifToolsProcOom = await gifToolsConfig
+        .process(validGif, parsedGifToolsSettings, "anim.gif")
+        .then(
+          () => "resolved",
+          (e: unknown) => e,
+        );
+      expect(gifToolsProcOom).toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: v8Oom,
+      });
+    } finally {
+      gifToolsOomSpy.mockRestore();
+    }
+
+    const gifToolsProbeMetaSpy = vi
+      .spyOn(sharp.prototype, "metadata")
+      .mockRejectedValueOnce(new Error("gifload_buffer: Invalid GIF header"));
+    const gifToolsProbeRawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
+      this: sharp.Sharp,
+    ) {
+      return {
+        toBuffer: async () => {
+          throw v8Oom;
+        },
+      } as unknown as sharp.Sharp;
+    });
+    try {
+      const gifToolsProbeOom = await gifToolsConfig
+        .process(validGif, parsedGifToolsSettings, "anim.gif")
+        .then(
+          () => "resolved",
+          (e: unknown) => e,
+        );
+      expect(gifToolsProbeOom).toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: v8Oom,
+      });
+    } finally {
+      gifToolsProbeRawSpy.mockRestore();
+      gifToolsProbeMetaSpy.mockRestore();
+    }
+
+    const gifToolsEnospcSpy = vi
+      .spyOn(sharp.prototype, "metadata")
+      .mockRejectedValueOnce(
+        Object.assign(new Error("ENOSPC: no space left on device"), { code: "ENOSPC" }),
+      );
+    try {
+      const gifToolsEnospc = await gifToolsConfig
+        .process(validGif, parsedGifToolsSettings, "anim.gif")
+        .then(
+          () => "resolved",
+          (e: unknown) => e,
+        );
+      expect(gifToolsEnospc).toMatchObject({
+        name: "SafeError",
+        kind: "operational",
+        code: "ENOSPC",
+        message: DISK_ENVIRONMENT_MESSAGE,
+      });
+    } finally {
+      gifToolsEnospcSpy.mockRestore();
+    }
+
+    const gifToolsHeaderSpy = vi
+      .spyOn(sharp.prototype, "metadata")
+      .mockRejectedValueOnce(new Error("gifload_buffer: Invalid multi-frame header"));
+    try {
+      const gifToolsHeaderErr = await gifToolsConfig
+        .process(validGif, parsedGifToolsSettings, "anim.gif")
+        .then(
+          () => "resolved",
+          (e: unknown) => e,
+        );
+      expect(isToolInputError(gifToolsHeaderErr)).toBe(true);
+      expect((gifToolsHeaderErr as Error).message).toBe(UNDECODABLE_IMAGE_MESSAGE);
+    } finally {
+      gifToolsHeaderSpy.mockRestore();
     }
   });
 });
