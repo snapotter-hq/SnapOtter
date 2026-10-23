@@ -139,11 +139,11 @@ export function Dropzone({
   onUrlImportRef.current = onUrlImport;
 
   useEffect(() => {
-    if (error) {
+    if (error && !showBulkModal) {
       const timer = setTimeout(() => setError(null), 5000);
       return () => clearTimeout(timer);
     }
-  }, [error]);
+  }, [error, showBulkModal]);
 
   const { importSingleUrl } = useUrlImport();
 

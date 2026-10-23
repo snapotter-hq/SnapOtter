@@ -19,6 +19,7 @@ import { toolAcceptsCameraPhotos } from "@/lib/camera-capture";
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -2937,6 +2938,108 @@ describe("Dropzone", () => {
 
       expect(screen.queryByText(en.dropzone.urlFetchFailed)).toBeNull();
       expect(onUrlImport).not.toHaveBeenCalled();
+    });
+
+    it("pauses Dropzone error auto-clear while UrlImportModal is open on partial download failure and starts the 5s timer on close (#3516)", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.endsWith("/api/v1/fetch-urls")) {
+            return Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  results: [
+                    {
+                      success: true,
+                      url: "https://example.com/notes.txt",
+                      filename: "notes.txt",
+                      size: 12,
+                      downloadUrl: "https://example.com/dl/notes.txt",
+                    },
+                    {
+                      success: true,
+                      url: "https://example.com/photo.png",
+                      filename: "photo.png",
+                      size: 16,
+                      downloadUrl: "https://example.com/dl/photo.png",
+                    },
+                  ],
+                }),
+                { status: 200, headers: { "Content-Type": "application/json" } },
+              ),
+            );
+          }
+          if (url.endsWith("/dl/notes.txt")) {
+            return Promise.resolve(
+              new Response("hello world", {
+                status: 200,
+                headers: { "Content-Type": "text/plain" },
+              }),
+            );
+          }
+          return Promise.resolve(new Response("Not found", { status: 404 }));
+        }),
+      );
+
+      const onUrlImport = vi.fn();
+      render(<Dropzone onUrlImport={onUrlImport} fileFilter={isImageFile} />);
+
+      fireEvent.click(screen.getByRole("button", { name: en.dropzone.importMultipleUrls }));
+      const dialog = screen.getByRole("dialog");
+      fireEvent.change(within(dialog).getByRole("textbox"), {
+        target: { value: "https://example.com/notes.txt\nhttps://example.com/photo.png" },
+      });
+      fireEvent.click(within(dialog).getByRole("button", { name: en.urlImport.importButton }));
+
+      const addBtn = await within(dialog).findByRole("button", { name: "Add 2 Files" });
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      await act(async () => {
+        fireEvent.click(addBtn);
+      });
+
+      expect(within(dialog).getByTitle(en.urlImport.retryButton)).toBeDefined();
+      expect(onUrlImport).not.toHaveBeenCalled();
+      expect(within(dialog).queryByText("notes.txt")).toBeNull();
+      expect(within(dialog).getByText("photo.png")).toBeDefined();
+      expect(screen.getByText(en.dropzone.unsupportedFileType)).toBeDefined();
+
+      // Waiting > 5 seconds while UrlImportModal remains open must not auto-clear the Dropzone error.
+      act(() => {
+        vi.advanceTimersByTime(10_000);
+      });
+      expect(screen.getByText(en.dropzone.unsupportedFileType)).toBeDefined();
+
+      // Closing UrlImportModal starts the 5-second auto-dismiss timer so the user sees the error.
+      fireEvent.click(within(dialog).getByRole("button", { name: en.common.close }));
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(screen.getByText(en.dropzone.unsupportedFileType)).toBeDefined();
+
+      // Re-opening UrlImportModal mid-countdown cancels the active timer until the modal closes again.
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+      expect(screen.getByText(en.dropzone.unsupportedFileType)).toBeDefined();
+
+      fireEvent.click(screen.getByRole("button", { name: en.dropzone.importMultipleUrls }));
+      const reopenedDialog = screen.getByRole("dialog");
+      act(() => {
+        vi.advanceTimersByTime(10_000);
+      });
+      expect(screen.getByText(en.dropzone.unsupportedFileType)).toBeDefined();
+
+      fireEvent.click(within(reopenedDialog).getByRole("button", { name: en.common.close }));
+      expect(screen.queryByRole("dialog")).toBeNull();
+
+      act(() => {
+        vi.advanceTimersByTime(4999);
+      });
+      expect(screen.getByText(en.dropzone.unsupportedFileType)).toBeDefined();
+
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(screen.queryByText(en.dropzone.unsupportedFileType)).toBeNull();
     });
   });
 });
