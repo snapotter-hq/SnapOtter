@@ -363,7 +363,7 @@ describe("1x1 pixel image through additional tools", () => {
   it("converts a 1x1 PNG to JPEG without crashing", async () => {
     const { body, contentType } = createMultipartPayload([
       { name: "file", filename: "tiny.png", content: PNG_1x1, contentType: "image/png" },
-      { name: "settings", content: JSON.stringify({ format: "jpeg" }) },
+      { name: "settings", content: JSON.stringify({ format: "jpg" }) },
     ]);
 
     const res = await app.inject({
@@ -373,11 +373,19 @@ describe("1x1 pixel image through additional tools", () => {
       body,
     });
 
-    expect([200, 400]).toContain(res.statusCode);
-    if (res.statusCode === 400) {
-      const json = JSON.parse(res.body);
-      expect(json.error).toBeDefined();
-    }
+    expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.downloadUrl).toContain(".jpg");
+
+    const downloadRes = await app.inject({
+      method: "GET",
+      url: json.downloadUrl,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(downloadRes.statusCode).toBe(200);
+    expect(downloadRes.rawPayload[0]).toBe(0xff);
+    expect(downloadRes.rawPayload[1]).toBe(0xd8);
+    expect(downloadRes.rawPayload[2]).toBe(0xff);
   });
 });
 

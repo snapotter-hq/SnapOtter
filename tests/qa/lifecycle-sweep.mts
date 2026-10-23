@@ -344,7 +344,7 @@ async function checkPipeline(): Promise<void> {
   const steps = [
     { toolId: "resize", settings: { width: 120 } },
     { toolId: "adjust-colors", settings: { effect: "grayscale" } },
-    { toolId: "convert", settings: { format: "jpeg" } },
+    { toolId: "convert", settings: { format: "jpg" } },
   ];
   const outcome = await client.submit({
     path: "/api/v1/pipeline/execute",
