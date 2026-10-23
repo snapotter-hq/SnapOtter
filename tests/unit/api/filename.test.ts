@@ -227,13 +227,20 @@ describe("sanitizeFilename", () => {
     }
   });
 
-  it("falls back to upload for .snapotter-staging reserved name (#3562)", () => {
+  it("falls back to upload for .snapotter-staging reserved name (#3562, #3713)", () => {
     for (const raw of [
       ".snapotter-staging",
       ".SNAPOTTER-STAGING",
+      ".\u{017f}napotter-staging",
+      ".snapotter-\u{017f}taging",
+      ".\u{017f}napotter-\u{017f}taging",
+      ".\u{017f}NAPOTTER-\u{017f}TAGING",
       "/tmp/.snapotter-staging",
+      "/tmp/.\u{017f}napotter-staging",
       ".\0snapotter-staging",
+      ".\0\u{017f}napotter-staging",
       ".snapotter-staging..",
+      ".\u{017f}napotter-staging..",
     ]) {
       const sanitized = sanitizeFilename(raw);
       expect(sanitized).toBe("upload");
@@ -243,6 +250,10 @@ describe("sanitizeFilename", () => {
     const withExt = sanitizeFilename(".snapotter-staging.png.php");
     expect(withExt).toBe(".snapotter-staging.png");
     expect(isValidObjectKey(`uploads/job/${withExt}`)).toBe(true);
+
+    const longSWithExt = sanitizeFilename(".\u{017f}napotter-staging.png.php");
+    expect(longSWithExt).toBe(".\u{017f}napotter-staging.png");
+    expect(isValidObjectKey(`uploads/job/${longSWithExt}`)).toBe(true);
   });
 
   it("strips trailing dots from the truncated stem before reattaching the extension (#3691)", () => {

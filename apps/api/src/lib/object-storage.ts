@@ -35,6 +35,7 @@ export interface ObjectInfo {
 }
 
 const VALID_KEY = /^(uploads|outputs)\/[A-Za-z0-9][A-Za-z0-9._-]*\/[^/\0]+$/;
+const RESERVED_STAGING_KEY_SUFFIX = /\/\.snapotter-staging$/iu;
 
 /**
  * True when a key can name a stored object at all. Exported so routes can
@@ -46,7 +47,7 @@ export function isValidObjectKey(key: string): boolean {
     VALID_KEY.test(key) &&
     !key.includes("..") &&
     !key.endsWith("/.") &&
-    !key.toLowerCase().endsWith("/.snapotter-staging")
+    !RESERVED_STAGING_KEY_SUFFIX.test(key)
   );
 }
 

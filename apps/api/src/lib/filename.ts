@@ -77,6 +77,8 @@ const SAFE_EXTENSIONS = new Set([
   ".srt",
 ]);
 
+const RESERVED_STAGING_NAME = /^\.snapotter-staging$/iu;
+
 /**
  * Sanitize a filename to prevent path traversal and double-extension attacks.
  *
@@ -90,7 +92,7 @@ export function sanitizeFilename(raw: string): string {
   let name = basename(raw);
   name = name.replace(/\0/g, "");
   name = name.replace(/\.\./g, "");
-  if (!name || name === "." || name === ".." || name.toLowerCase() === ".snapotter-staging") {
+  if (!name || name === "." || name === ".." || RESERVED_STAGING_NAME.test(name)) {
     name = "upload";
   }
 
@@ -122,7 +124,7 @@ export function sanitizeFilename(raw: string): string {
     }
     const base = baseChars.join("").replace(/\.+$/, "");
     name = base + ext;
-    if (!name || name === "." || name === ".." || name.toLowerCase() === ".snapotter-staging") {
+    if (!name || name === "." || name === ".." || RESERVED_STAGING_NAME.test(name)) {
       name = "upload";
     }
   }
