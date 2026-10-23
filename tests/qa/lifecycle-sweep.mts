@@ -145,11 +145,17 @@ async function checkAsyncContract(): Promise<void> {
   const percents = outcome.sseFrames
     .map((frame) => frame.data.percent)
     .filter((value): value is number => typeof value === "number");
-  const monotonic = percents.every((value, index) => index === 0 || value >= percents[index - 1]);
+  const monotonic =
+    percents.length > 0 &&
+    percents.every((value, index) => index === 0 || value >= percents[index - 1]);
+  const mediaOk =
+    Boolean(facts.media?.formatName) &&
+    typeof facts.media?.durationS === "number" &&
+    facts.media.durationS > 0;
   const state = await sql(`select status from jobs where id = '${outcome.jobId}'`);
   report(
     "async-202-contract",
-    facts.decodeError || !monotonic ? "fail" : "pass",
+    facts.decodeError || !mediaOk || !monotonic || state !== "completed" ? "fail" : "pass",
     `202 -> SSE ${outcome.sseFrames.length} frames, percents [${percents.join(",")}] monotonic=${monotonic}, output ${facts.media?.formatName} ${facts.media?.durationS}s, jobs row status=${state}`,
     { percents, decodeError: facts.decodeError },
   );
@@ -171,25 +177,41 @@ async function checkSseReconnectAndIdempotency(): Promise<void> {
   const jobId = submit.jobId;
   if (submit.httpStatus !== 202 || !jobId) {
     report("sse-reconnect", "blocked", `could not start an async job (${submit.httpStatus})`);
+    report(
+      "sse-terminal-idempotency",
+      "blocked",
+      `could not start an async job (${submit.httpStatus})`,
+    );
     return;
   }
 
   // First connection: read a little, then abandon it.
   const controller = new AbortController();
-  const first = await fetch(`${BASE}/api/v1/jobs/${jobId}/progress`, {
-    signal: controller.signal,
-    headers: { Authorization: `Bearer ${token}`, Accept: "text/event-stream" },
-  });
-  const reader = first.body?.getReader();
-  await reader?.read();
-  controller.abort();
+  let firstStatus = 0;
+  let firstChunkOk = false;
+  try {
+    const first = await fetch(`${BASE}/api/v1/jobs/${jobId}/progress`, {
+      signal: AbortSignal.any([controller.signal, AbortSignal.timeout(30_000)]),
+      headers: { Authorization: `Bearer ${token}`, Accept: "text/event-stream" },
+    });
+    firstStatus = first.status;
+    const reader = first.body?.getReader();
+    const firstChunk = first.ok && reader ? await reader.read() : undefined;
+    firstChunkOk = Boolean(
+      first.ok && firstChunk && !firstChunk.done && firstChunk.value?.byteLength,
+    );
+  } catch {
+    firstChunkOk = false;
+  } finally {
+    controller.abort();
+  }
 
   // Second connection: must still reach the terminal frame.
   const reconnect = await client.followProgress(jobId, 300_000);
   report(
     "sse-reconnect",
-    reconnect.outcome === "complete" ? "pass" : "fail",
-    `after dropping the first SSE connection, reconnect observed ${reconnect.frames.length} frames and terminal=${reconnect.outcome}`,
+    firstChunkOk && reconnect.outcome === "complete" ? "pass" : "fail",
+    `first SSE HTTP ${firstStatus} chunk=${firstChunkOk}; after dropping the first SSE connection, reconnect observed ${reconnect.frames.length} frames and terminal=${reconnect.outcome}`,
   );
 
   // Third and fourth connections after completion: terminal frame each time.
@@ -207,10 +229,7 @@ async function checkSseReconnectAndIdempotency(): Promise<void> {
 
 /** Cancelling a queued job and an in-flight job must both reach a terminal state. */
 async function checkCancellation(): Promise<void> {
-  for (const [id, waitMs] of [
-    ["cancel-before-start", 0],
-    ["cancel-in-flight", 2_500],
-  ] as const) {
+  for (const id of ["cancel-before-start", "cancel-in-flight"] as const) {
     // Stabilization is two ffmpeg passes, so it stays in flight long enough
     // for an in-flight cancel to land on a running job rather than a finished one.
     const submit = await client.submit({
@@ -225,7 +244,23 @@ async function checkCancellation(): Promise<void> {
       report(id, "blocked", `no jobId to cancel (HTTP ${submit.httpStatus})`);
       continue;
     }
-    if (waitMs) await sleep(waitMs);
+    if (id === "cancel-in-flight") {
+      let preState = "";
+      for (let attempt = 0; attempt < 60; attempt++) {
+        preState = await sql(`select status from jobs where id = '${jobId}'`);
+        if (["processing", "active"].includes(preState)) break;
+        if (["completed", "failed", "cancelled", "canceled"].includes(preState)) break;
+        await sleep(250);
+      }
+      if (!["processing", "active"].includes(preState)) {
+        report(
+          id,
+          "fail",
+          `job ${jobId} did not enter processing before cancel (pre-cancel status="${preState}")`,
+        );
+        continue;
+      }
+    }
     const response = await client.raw(`/api/v1/jobs/${jobId}/cancel`, { method: "POST" }, 20_000);
     const rawBody = await response.text().catch(() => "");
     let body: { canceled?: boolean } = {};
@@ -243,11 +278,7 @@ async function checkCancellation(): Promise<void> {
       await sleep(2_000);
     }
     const canceledState = ["cancelled", "canceled"].includes(state);
-    const terminal =
-      id === "cancel-before-start"
-        ? body.canceled === true && canceledState
-        : (body.canceled === true && canceledState) ||
-          (body.canceled === false && state === "completed");
+    const terminal = body.canceled === true && canceledState;
     const canceledDetail =
       typeof body.canceled === "boolean"
         ? String(body.canceled)
@@ -291,16 +322,20 @@ async function checkDuplicateConcurrent(): Promise<void> {
  * media, image work to image; the image job has to finish while video is busy.
  */
 async function checkPoolIsolation(): Promise<void> {
-  const videoJobs = Array.from({ length: 3 }, () =>
-    client.submit({
-      path: "/api/v1/tools/video/compress-video",
-      files: [{ field: "file", path: MP4 }],
-      settings: {},
-      timeoutMs: 300_000,
-      followAsync: false,
-    }),
+  const videoSubmits = await Promise.all(
+    Array.from({ length: 3 }, () =>
+      client.submit({
+        path: "/api/v1/tools/video/compress-video",
+        files: [{ field: "file", path: MP4 }],
+        settings: {},
+        timeoutMs: 300_000,
+        followAsync: false,
+      }),
+    ),
   );
-  await Promise.all(videoJobs);
+  const videosEnqueued = videoSubmits.every(
+    (submit) => submit.httpStatus === 202 && Boolean(submit.jobId),
+  );
   const started = Date.now();
   const image = await client.submit({
     path: "/api/v1/tools/image/resize",
@@ -311,8 +346,8 @@ async function checkPoolIsolation(): Promise<void> {
   const elapsed = Date.now() - started;
   report(
     "pool-isolation",
-    image.httpStatus === 200 && image.bytes ? "pass" : "fail",
-    `with 3 media-pool jobs in flight, an image-pool job returned ${image.httpStatus} in ${elapsed}ms`,
+    videosEnqueued && image.httpStatus === 200 && image.bytes ? "pass" : "fail",
+    `with 3 media-pool jobs in flight (statuses [${videoSubmits.map((s) => s.httpStatus).join(",")}]), an image-pool job returned ${image.httpStatus} in ${elapsed}ms`,
   );
 }
 
@@ -344,13 +379,14 @@ async function checkBatch(): Promise<void> {
   const members = facts.zip?.members ?? [];
   const order = members.map((member) => member.name);
   const correctCount = members.length === inputs.length;
-  const ordered = order.every((name, index) => name.includes(`batch-${index}`));
-  const allNonEmpty = members.every((member) => member.size > 0);
+  const ordered =
+    members.length > 0 && order.every((name, index) => name.includes(`batch-${index}`));
+  const allNonEmpty = members.length > 0 && members.every((member) => member.size > 0);
   report(
     "batch-zip",
-    correctCount && allNonEmpty ? "pass" : "fail",
-    `${members.length}/${inputs.length} members, all non-empty=${allNonEmpty}, input order preserved=${ordered}, names [${order.join(", ")}]`,
-    { members },
+    !facts.decodeError && correctCount && allNonEmpty && ordered ? "pass" : "fail",
+    `${members.length}/${inputs.length} members, all non-empty=${allNonEmpty}, input order preserved=${ordered}, names [${order.join(", ")}]${facts.decodeError ? `, decodeError=${facts.decodeError}` : ""}`,
+    { members, decodeError: facts.decodeError },
   );
 }
 
@@ -411,15 +447,23 @@ async function checkPipelineCrossModality(): Promise<void> {
     timeoutMs: 120_000,
   });
   let terminal = outcome.asyncOutcome;
-  let error = outcome.asyncError ?? outcome.bodyText ?? "";
+  const jsonError =
+    typeof outcome.json?.error === "string"
+      ? [outcome.json.error, typeof outcome.json.details === "string" ? outcome.json.details : ""]
+          .filter(Boolean)
+          .join("\n")
+      : undefined;
+  let error = outcome.asyncError ?? jsonError ?? outcome.bodyText ?? "";
   if (outcome.jobId && !terminal) {
     const progress = await client.followProgress(outcome.jobId, 120_000);
     terminal = progress.outcome;
     error = progress.error ?? error;
   }
   const status = outcome.httpStatus ?? 0;
+  const hasMessage = error.trim().length > 0;
+  const noStackTrace = !/(?:\r?\n|\\n)\s+at\s/.test(error) && !/^SSE returned \d+$/u.test(error);
   const cleanlyRefused =
-    (status >= 400 && status < 500 && !/\n\s+at\s/.test(error)) || terminal === "failed";
+    hasMessage && noStackTrace && ((status >= 400 && status < 500) || terminal === "failed");
   report(
     "pipeline-incoherent-steps",
     status >= 500 ? "fail" : cleanlyRefused ? "pass" : "fail",
@@ -446,10 +490,12 @@ async function checkWorkerRestartRecovery(): Promise<void> {
   const jobId = submit.jobId;
   if (!jobId) {
     report("worker-restart-recovery", "blocked", `could not start a job (${submit.httpStatus})`);
+    report("stale-job-reconciliation", "blocked", `could not start a job (${submit.httpStatus})`);
     return;
   }
   await sleep(6_000);
   const before = await sql(`select status from jobs where id = '${jobId}'`);
+  const beforeActive = ["processing", "queued", "active"].includes(before);
 
   await run("docker", ["restart", "-t", "5", APP], { timeout: 120_000 });
 
@@ -465,6 +511,7 @@ async function checkWorkerRestartRecovery(): Promise<void> {
   }
   if (!healthy) {
     report("worker-restart-recovery", "fail", "container did not become healthy after restart");
+    report("stale-job-reconciliation", "blocked", "container did not become healthy after restart");
     return;
   }
 
@@ -477,7 +524,9 @@ async function checkWorkerRestartRecovery(): Promise<void> {
   }
   report(
     "worker-restart-recovery",
-    ["completed", "failed", "cancelled", "canceled"].includes(after) ? "pass" : "fail",
+    beforeActive && ["completed", "failed", "cancelled", "canceled"].includes(after)
+      ? "pass"
+      : "fail",
     `job ${jobId} was "${before}" at restart and settled to "${after}" afterwards (a row still queued or processing means orphan reconciliation did not run)`,
   );
 
@@ -487,8 +536,8 @@ async function checkWorkerRestartRecovery(): Promise<void> {
   );
   report(
     "stale-job-reconciliation",
-    Number(stuck) === 0 ? "pass" : "fail",
-    `${stuck} job row(s) older than 5 minutes still in processing or queued after the restart`,
+    /^\d+$/u.test(stuck) && Number(stuck) === 0 ? "pass" : "fail",
+    `${stuck || "(empty)"} job row(s) older than 5 minutes still in processing or queued after the restart`,
   );
 }
 
@@ -499,7 +548,7 @@ async function checkUnknownJobProgress(): Promise<void> {
   const elapsed = Date.now() - started;
   report(
     "unknown-job-progress",
-    progress.outcome !== "complete" ? "pass" : "fail",
+    progress.outcome === "failed" ? "pass" : "fail",
     `progress for a non-existent job returned ${progress.outcome} after ${elapsed}ms with ${progress.frames.length} frames`,
   );
 }
@@ -552,8 +601,9 @@ async function main(): Promise<void> {
     `${JSON.stringify({ baseUrl: BASE, checks }, null, 2)}\n`,
   );
   const failed = checks.filter((check) => check.verdict === "fail").length;
-  console.log(`\nlifecycle: ${checks.length} checks, ${failed} failed`);
-  process.exit(failed > 0 ? 1 : 0);
+  const blocked = checks.filter((check) => check.verdict === "blocked").length;
+  console.log(`\nlifecycle: ${checks.length} checks, ${failed} failed, ${blocked} blocked`);
+  process.exit(checks.some((check) => check.verdict !== "pass") ? 1 : 0);
 }
 
 main().catch((error) => {
