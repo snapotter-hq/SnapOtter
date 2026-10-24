@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import path from "node:path";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 const require = createRequire(
   path.resolve(__dirname, "../../../packages/image-engine/src/index.ts"),
@@ -276,6 +276,55 @@ describe("editMetadata", () => {
           artist: "Survivor",
         }),
       ).rejects.toThrow("Cannot safely edit metadata because existing EXIF data is invalid");
+    }
+  });
+
+  it("rethrows V8 buffer allocation RangeError instead of converting to ToolInputError (#3885)", async () => {
+    const v8Oom = new RangeError("Array buffer allocation failed: exif");
+    const exifOomBuf = Buffer.from("Exif\0\0MM\0*", "ascii");
+    vi.spyOn(exifOomBuf, "toString").mockImplementation(() => {
+      throw v8Oom;
+    });
+
+    const img = sharp(jpgWithExif);
+    const metaSpy = vi
+      .spyOn(img, "metadata")
+      .mockResolvedValue({ exif: exifOomBuf } as sharp.Metadata);
+    try {
+      await expect(editMetadata(img, { fieldsToRemove: ["Software"] })).rejects.toThrow(v8Oom);
+      await expect(editMetadata(img, { clearGps: true })).rejects.toThrow(v8Oom);
+    } finally {
+      metaSpy.mockRestore();
+    }
+
+    const nonOomRangeBuf = Buffer.from("Exif\0\0MM\0*", "ascii");
+    vi.spyOn(nonOomRangeBuf, "toString").mockImplementationOnce(() => {
+      throw new RangeError("Attempt to access memory outside buffer bounds");
+    });
+    const rangeMetaSpy = vi
+      .spyOn(img, "metadata")
+      .mockResolvedValueOnce({ exif: nonOomRangeBuf } as sharp.Metadata);
+    try {
+      await expect(editMetadata(img, { fieldsToRemove: ["Software"] })).rejects.toThrow(
+        "Cannot safely edit metadata because existing EXIF data is invalid",
+      );
+    } finally {
+      rangeMetaSpy.mockRestore();
+    }
+
+    const nonRangeOomMsgBuf = Buffer.from("Exif\0\0MM\0*", "ascii");
+    vi.spyOn(nonRangeOomMsgBuf, "toString").mockImplementationOnce(() => {
+      throw new Error("Array buffer allocation failed");
+    });
+    const nonRangeMetaSpy = vi
+      .spyOn(img, "metadata")
+      .mockResolvedValueOnce({ exif: nonRangeOomMsgBuf } as sharp.Metadata);
+    try {
+      await expect(editMetadata(img, { fieldsToRemove: ["Software"] })).rejects.toThrow(
+        "Cannot safely edit metadata because existing EXIF data is invalid",
+      );
+    } finally {
+      nonRangeMetaSpy.mockRestore();
     }
   });
 });

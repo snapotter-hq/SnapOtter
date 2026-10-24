@@ -277,6 +277,56 @@ describe("editMetadata", () => {
     }
   });
 
+  it("rethrows V8 buffer allocation RangeError while converting non-OOM RangeError to ToolInputError (#3885)", async () => {
+    const v8Oom = new RangeError("Array buffer allocation failed: exif");
+    const exifOomBuf = Buffer.from("Exif\0\0MM\0*", "ascii");
+    vi.spyOn(exifOomBuf, "toString").mockImplementation(() => {
+      throw v8Oom;
+    });
+
+    const withExifOom = vi.fn();
+    const fakeOom = {
+      metadata: vi.fn().mockResolvedValue({ exif: exifOomBuf }),
+      withExif: withExifOom,
+    } as unknown as Sharp;
+
+    await expect(editMetadata(fakeOom, { fieldsToRemove: ["Software"] })).rejects.toThrow(v8Oom);
+    await expect(editMetadata(fakeOom, { clearGps: true })).rejects.toThrow(v8Oom);
+    expect(withExifOom).not.toHaveBeenCalled();
+
+    const nonOomRangeBuf = Buffer.from("Exif\0\0MM\0*", "ascii");
+    vi.spyOn(nonOomRangeBuf, "toString").mockImplementationOnce(() => {
+      throw new RangeError("Attempt to access memory outside buffer bounds");
+    });
+
+    const withExifRange = vi.fn();
+    const fakeRange = {
+      metadata: vi.fn().mockResolvedValue({ exif: nonOomRangeBuf }),
+      withExif: withExifRange,
+    } as unknown as Sharp;
+
+    await expect(editMetadata(fakeRange, { fieldsToRemove: ["Software"] })).rejects.toThrow(
+      "Cannot safely edit metadata because existing EXIF data is invalid",
+    );
+    expect(withExifRange).not.toHaveBeenCalled();
+
+    const nonRangeOomMsgBuf = Buffer.from("Exif\0\0MM\0*", "ascii");
+    vi.spyOn(nonRangeOomMsgBuf, "toString").mockImplementationOnce(() => {
+      throw new Error("Array buffer allocation failed");
+    });
+
+    const withExifNonRange = vi.fn();
+    const fakeNonRange = {
+      metadata: vi.fn().mockResolvedValue({ exif: nonRangeOomMsgBuf }),
+      withExif: withExifNonRange,
+    } as unknown as Sharp;
+
+    await expect(editMetadata(fakeNonRange, { fieldsToRemove: ["Software"] })).rejects.toThrow(
+      "Cannot safely edit metadata because existing EXIF data is invalid",
+    );
+    expect(withExifNonRange).not.toHaveBeenCalled();
+  });
+
   it("does not change image dimensions or format", async () => {
     const buf = await (await editMetadata(richImage(), { artist: "DimCheck" })).jpeg().toBuffer();
     const meta = await sharp(buf).metadata();

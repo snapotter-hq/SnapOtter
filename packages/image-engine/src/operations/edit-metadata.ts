@@ -90,7 +90,10 @@ export async function editMetadata(
       let parsed: ReturnType<typeof exifReader> | undefined;
       try {
         parsed = exifReader(metadata.exif);
-      } catch {
+      } catch (err) {
+        if (err instanceof RangeError && err.message.startsWith("Array buffer allocation failed")) {
+          throw err;
+        }
         // Handled below alongside truncated IFD sections
       }
       if (
