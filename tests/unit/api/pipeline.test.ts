@@ -3739,6 +3739,243 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
     }
   });
 
+  it("falls back to Sharp on a readable .dng when decodeToSharpCompat fails on /api/v1/pipeline/execute, and surfaces DecoderOutOfMemoryError, DecoderUnavailableError, or 422 when the probe fails (#3788)", async () => {
+    const sharpMod = (await import("sharp")).default;
+    const { DecoderUnavailableError, decodeToSharpCompat, needsCliDecode } = await import(
+      "../../../apps/api/src/lib/format-decoders.js"
+    );
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const dngBytes = readFileSync(join(__dirname, "../../fixtures/image/formats/sample.dng"));
+    const oomMessage =
+      "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+
+    try {
+      // 1. Readable .dng succeeds via Sharp 1x1 probe when decodeToSharpCompat rejects with DecoderUnavailableError or a generic Error, preserving .dng buffer and filename
+      for (const initialDecodeErr of [
+        new DecoderUnavailableError("No dcraw_emu found."),
+        new Error("dcraw failed"),
+      ]) {
+        vi.clearAllMocks();
+        vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+          valid: true,
+          format: "raw",
+          width: 10,
+          height: 10,
+        });
+        vi.mocked(needsCliDecode).mockReturnValueOnce(true);
+        vi.mocked(decodeToSharpCompat).mockRejectedValueOnce(initialDecodeErr);
+
+        const okReply = await invokePipelineExecuteRoute([
+          { type: "file", filename: "photo.dng", content: dngBytes },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: [{ toolId: executeTestToolId, settings: {} }],
+            }),
+          },
+        ]);
+
+        expect(okReply.statusCode).toBe(202);
+        expect(putObjectMock).toHaveBeenCalledTimes(1);
+        const firstCall = putObjectMock.mock.calls[0] as unknown[] | undefined;
+        const storedKey = firstCall ? String(firstCall[0]) : "";
+        const storedBuf = firstCall ? (firstCall[1] as Buffer) : Buffer.alloc(0);
+        expect(storedKey).toMatch(/^uploads\/.*\/photo\.dng$/);
+        expect(storedBuf.equals(dngBytes)).toBe(true);
+      }
+
+      // 2. V8 OOM in the 1x1 Sharp probe surfaces DecoderOutOfMemoryError (503 ENGINE_UNAVAILABLE)
+      for (const initialDecodeErr of [
+        new DecoderUnavailableError("No dcraw_emu found."),
+        new Error("dcraw failed"),
+      ]) {
+        vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+          valid: true,
+          format: "raw",
+          width: 10,
+          height: 10,
+        });
+        vi.mocked(needsCliDecode).mockReturnValueOnce(true);
+        vi.mocked(decodeToSharpCompat).mockRejectedValueOnce(initialDecodeErr);
+        const rawSpy = vi.spyOn(sharpMod.prototype, "raw").mockImplementationOnce(function (
+          this: InstanceType<typeof sharpMod>,
+        ) {
+          return {
+            toBuffer: async () => {
+              throw new RangeError("Array buffer allocation failed");
+            },
+          } as unknown as InstanceType<typeof sharpMod>;
+        });
+        try {
+          await expect(
+            invokePipelineExecuteRoute([
+              { type: "file", filename: "photo.dng", content: dngBytes },
+              {
+                type: "field",
+                fieldname: "pipeline",
+                value: JSON.stringify({
+                  steps: [{ toolId: executeTestToolId, settings: {} }],
+                }),
+              },
+            ]),
+          ).rejects.toMatchObject({
+            name: "DecoderOutOfMemoryError",
+            message: oomMessage,
+            statusCode: 503,
+            code: "ENGINE_UNAVAILABLE",
+          });
+        } finally {
+          rawSpy.mockRestore();
+        }
+      }
+
+      // 3. Non-OOM RangeError in the 1x1 Sharp probe preserves DecoderUnavailableError when CLI decoder was unavailable, or replies 422 when CLI decoder rejected the file
+      vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+        valid: true,
+        format: "raw",
+        width: 10,
+        height: 10,
+      });
+      vi.mocked(needsCliDecode).mockReturnValueOnce(true);
+      const unavailableErr = new DecoderUnavailableError("No dcraw_emu found.");
+      vi.mocked(decodeToSharpCompat).mockRejectedValueOnce(unavailableErr);
+      const nonOomUnavailableSpy = vi
+        .spyOn(sharpMod.prototype, "raw")
+        .mockImplementationOnce(function (this: InstanceType<typeof sharpMod>) {
+          return {
+            toBuffer: async () => {
+              throw new RangeError("Invalid raw parameter");
+            },
+          } as unknown as InstanceType<typeof sharpMod>;
+        });
+      try {
+        await expect(
+          invokePipelineExecuteRoute([
+            { type: "file", filename: "photo.dng", content: dngBytes },
+            {
+              type: "field",
+              fieldname: "pipeline",
+              value: JSON.stringify({
+                steps: [{ toolId: executeTestToolId, settings: {} }],
+              }),
+            },
+          ]),
+        ).rejects.toBe(unavailableErr);
+      } finally {
+        nonOomUnavailableSpy.mockRestore();
+      }
+
+      vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+        valid: true,
+        format: "raw",
+        width: 10,
+        height: 10,
+      });
+      vi.mocked(needsCliDecode).mockReturnValueOnce(true);
+      vi.mocked(decodeToSharpCompat).mockRejectedValueOnce(
+        new Error("dcraw failed at /tmp/snapotter-scratch/secret/in.dng"),
+      );
+      const nonOomBadFileSpy = vi.spyOn(sharpMod.prototype, "raw").mockImplementationOnce(function (
+        this: InstanceType<typeof sharpMod>,
+      ) {
+        return {
+          toBuffer: async () => {
+            throw new Error("Input buffer contains unsupported image format");
+          },
+        } as unknown as InstanceType<typeof sharpMod>;
+      });
+      try {
+        const badFileReply = await invokePipelineExecuteRoute([
+          { type: "file", filename: "photo.dng", content: dngBytes },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: [{ toolId: executeTestToolId, settings: {} }],
+            }),
+          },
+        ]);
+        expect(badFileReply.statusCode).toBe(422);
+        expect(badFileReply.payload).toEqual({
+          error: "Failed to decode raw file",
+          details: "dcraw failed at [internal]",
+        });
+      } finally {
+        nonOomBadFileSpy.mockRestore();
+      }
+
+      // 4. Non-Error decode rejection also strips internal paths on 422 when the probe fails, and decodeToSharpCompat success rewrites extension to .png
+      vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+        valid: true,
+        format: "raw",
+        width: 10,
+        height: 10,
+      });
+      vi.mocked(needsCliDecode).mockReturnValueOnce(true);
+      vi.mocked(decodeToSharpCompat).mockRejectedValueOnce(
+        "dcraw string error at /tmp/snapotter-scratch/secret/in.dng",
+      );
+      const nonErrorBadFileSpy = vi
+        .spyOn(sharpMod.prototype, "raw")
+        .mockImplementationOnce(function (this: InstanceType<typeof sharpMod>) {
+          return {
+            toBuffer: async () => {
+              throw new Error("Input buffer contains unsupported image format");
+            },
+          } as unknown as InstanceType<typeof sharpMod>;
+        });
+      try {
+        const stringErrReply = await invokePipelineExecuteRoute([
+          { type: "file", filename: "photo.dng", content: dngBytes },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: [{ toolId: executeTestToolId, settings: {} }],
+            }),
+          },
+        ]);
+        expect(stringErrReply.statusCode).toBe(422);
+        expect(stringErrReply.payload).toEqual({
+          error: "Failed to decode raw file",
+          details: "dcraw string error at [internal]",
+        });
+      } finally {
+        nonErrorBadFileSpy.mockRestore();
+      }
+
+      vi.clearAllMocks();
+      const decodedPng = Buffer.from("decoded-png-bytes");
+      vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+        valid: true,
+        format: "raw",
+        width: 10,
+        height: 10,
+      });
+      vi.mocked(needsCliDecode).mockReturnValueOnce(true);
+      vi.mocked(decodeToSharpCompat).mockResolvedValueOnce(decodedPng);
+      const cliSuccessReply = await invokePipelineExecuteRoute([
+        { type: "file", filename: "photo.dng", content: dngBytes },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: executeTestToolId, settings: {} }],
+          }),
+        },
+      ]);
+      expect(cliSuccessReply.statusCode).toBe(202);
+      expect(putObjectMock).toHaveBeenCalledWith(
+        expect.stringMatching(/^uploads\/.*\/photo\.png$/),
+        decodedPng,
+      );
+    } finally {
+      vi.mocked(needsCliDecode).mockReturnValue(false);
+    }
+  });
+
   it("routes DecoderOutOfMemoryError and 5xx faults from validateImageBuffer and autoOrient through reportEngineUnavailable on /api/v1/pipeline/execute and /api/v1/pipeline/batch (#3726)", async () => {
     const { DecoderOutOfMemoryError } = await import(
       "../../../apps/api/src/lib/format-decoders.js"

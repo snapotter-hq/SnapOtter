@@ -528,16 +528,15 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                         ) {
                           throw decodeErr;
                         }
-                        const meta = await sharp(processBuffer)
-                          .metadata()
-                          .catch((rawProbeErr: unknown) => {
-                            const probeErr = asDecoderOutOfMemory(rawProbeErr);
-                            if (probeErr instanceof DecoderOutOfMemoryError) throw probeErr;
-                            return null;
-                          });
-                        if (meta?.format === "svg") {
-                          fallbackFormat = "svg";
-                        } else {
+                        try {
+                          const meta = await sharp(processBuffer).metadata();
+                          fallbackFormat = meta.format;
+                          if (fallbackFormat !== "svg") {
+                            await sharp(processBuffer).resize(1).raw().toBuffer();
+                          }
+                        } catch (rawProbeErr) {
+                          const probeErr = asDecoderOutOfMemory(rawProbeErr);
+                          if (probeErr instanceof DecoderOutOfMemoryError) throw probeErr;
                           if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
                             throw decodeErr;
                           }
