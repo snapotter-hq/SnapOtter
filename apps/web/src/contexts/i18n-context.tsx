@@ -1,6 +1,6 @@
 import type { SupportedLocale, TranslationKeys } from "@snapotter/shared";
 import { en, SUPPORTED_LOCALES } from "@snapotter/shared";
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { appUrl } from "@/lib/app-url";
 
 type LocaleModule = Record<string, TranslationKeys>;
@@ -58,24 +58,53 @@ const I18nContext = createContext<I18nContextValue>({
 });
 
 const LOCALE_STORAGE_KEY = "snapotter-locale";
+const SUPPORTED_CODES = SUPPORTED_LOCALES.map((l) => l.code);
 
-function detectLocale(): string {
+function resolveSupportedLocale(candidate: unknown): string | null {
+  if (typeof candidate !== "string") return null;
+  const normalized = candidate.trim().replace(/_/g, "-");
+  if (!normalized) return null;
+  if (SUPPORTED_CODES.includes(normalized)) return normalized;
+  const lower = normalized.toLowerCase();
+  const caseMatch = SUPPORTED_CODES.find((c) => c.toLowerCase() === lower);
+  if (caseMatch) return caseMatch;
+  const subtags = lower.split("-");
+  const prefix = subtags[0];
+  if (prefix === "zh") {
+    return subtags.includes("hant") ||
+      subtags.includes("tw") ||
+      subtags.includes("hk") ||
+      subtags.includes("mo")
+      ? "zh-TW"
+      : "zh-CN";
+  }
+  return (
+    SUPPORTED_CODES.find((c) => {
+      const codeLower = c.toLowerCase();
+      return codeLower === prefix || codeLower.startsWith(`${prefix}-`);
+    }) ?? null
+  );
+}
+
+function readStoredLocale(): string | null {
   try {
-    const stored = localStorage.getItem(LOCALE_STORAGE_KEY);
-    if (stored) return stored;
+    return resolveSupportedLocale(localStorage.getItem(LOCALE_STORAGE_KEY));
   } catch (error) {
     console.warn("Failed to read locale preference from browser storage.", error);
+    return null;
   }
+}
 
-  const codes = SUPPORTED_LOCALES.map((l) => l.code);
-  for (const browserLang of navigator.languages) {
-    if (codes.includes(browserLang)) return browserLang;
-    const prefix = browserLang.split("-")[0];
-    const match = codes.find((c) => c === prefix || c.startsWith(`${prefix}-`));
+function detectBrowserLocale(): string {
+  for (const browserLang of navigator.languages ?? []) {
+    const match = resolveSupportedLocale(browserLang);
     if (match) return match;
   }
-
   return "en";
+}
+
+function detectLocale(): string {
+  return readStoredLocale() ?? detectBrowserLocale();
 }
 
 async function fetchInstanceDefault(): Promise<string> {
@@ -83,8 +112,9 @@ async function fetchInstanceDefault(): Promise<string> {
     const res = await fetch(appUrl("/api/v1/config/locale"));
     if (res.ok) {
       const data = await res.json();
-      if (data.defaultLocale && data.defaultLocale !== "en") {
-        return data.defaultLocale;
+      const resolved = resolveSupportedLocale(data?.defaultLocale);
+      if (resolved && resolved !== "en") {
+        return resolved;
       }
     }
   } catch {
@@ -100,22 +130,21 @@ function getDir(code: string): "ltr" | "rtl" {
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState(() => detectLocale());
   const [translations, setTranslations] = useState<TranslationKeys>(en);
+  const hasExplicitChoiceRef = useRef(false);
   const dir = getDir(locale);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: instance default only checked once on initial mount
   useEffect(() => {
-    let hasExplicitChoice: string | null = null;
-    try {
-      hasExplicitChoice = localStorage.getItem(LOCALE_STORAGE_KEY);
-    } catch (error) {
-      console.warn("Failed to read locale preference from browser storage.", error);
-    }
-    if (hasExplicitChoice) return;
-
-    if (detectLocale() !== "en") return;
+    if (locale !== "en" || readStoredLocale()) return;
 
     let cancelled = false;
     fetchInstanceDefault().then((instanceLocale) => {
-      if (!cancelled && instanceLocale !== "en") {
+      if (
+        !cancelled &&
+        !hasExplicitChoiceRef.current &&
+        !readStoredLocale() &&
+        instanceLocale !== "en"
+      ) {
         setLocaleState(instanceLocale);
       }
     });
@@ -143,12 +172,14 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   }, [locale, dir]);
 
   const setLocale = useCallback((code: string) => {
+    hasExplicitChoiceRef.current = true;
+    const resolved = resolveSupportedLocale(code) ?? "en";
     try {
-      localStorage.setItem(LOCALE_STORAGE_KEY, code);
+      localStorage.setItem(LOCALE_STORAGE_KEY, resolved);
     } catch (error) {
       console.warn("Failed to persist locale preference to browser storage.", error);
     }
-    setLocaleState(code);
+    setLocaleState(resolved);
   }, []);
 
   return (
