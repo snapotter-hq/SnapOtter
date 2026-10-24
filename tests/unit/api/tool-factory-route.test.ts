@@ -116,7 +116,8 @@ vi.mock("../../../apps/api/src/lib/file-validation.js", () => ({
   ),
 }));
 
-vi.mock("../../../apps/api/src/lib/format-decoders.js", () => ({
+vi.mock("../../../apps/api/src/lib/format-decoders.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../apps/api/src/lib/format-decoders.js")>()),
   decodeToSharpCompat: vi.fn(),
   decodeAnyFormat: vi.fn(),
   needsCliDecode: vi.fn(() => false),

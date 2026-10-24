@@ -4866,6 +4866,7 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
         ANALYTICS_EVENTS: {},
         TOOLS,
         COMPRESS_PRESETS: [],
+        CAMERA_RAW_INPUTS: [],
         getBundleForTool: vi.fn(() => null),
         getOptionalBundleForTool: vi.fn(() => null),
       }));
@@ -4907,6 +4908,7 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
           t.id === "adjust-colors" ? { ...t, executionHint: "long" as const } : t,
         ),
         COMPRESS_PRESETS: [],
+        CAMERA_RAW_INPUTS: [],
         getBundleForTool: vi.fn(() => null),
         getOptionalBundleForTool: vi.fn(() => null),
       }));
@@ -4968,6 +4970,7 @@ describe("timeoutMsFor and executionHint: 'long' worker deadline (#3253)", () =>
           ANALYTICS_EVENTS: {},
           TOOLS,
           COMPRESS_PRESETS: [],
+          CAMERA_RAW_INPUTS: [],
           getBundleForTool: vi.fn(() => null),
           getOptionalBundleForTool: vi.fn(() => null),
         }));
