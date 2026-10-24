@@ -156,6 +156,54 @@ describe("withImageEncodeContext", () => {
     );
     await expect(wrapped(input, settings, "in.png")).rejects.toBe(valErr);
   });
+
+  it("converts V8 buffer allocation RangeError, SIGKILL, libheif OOM, and thread creation failures into DecoderOutOfMemoryError instead of a bug-kind SafeError (#3789)", async () => {
+    for (const rawOom of [
+      new RangeError("Array buffer allocation failed"),
+      Object.assign(new Error("cjxl exited SIGKILL"), { signal: "SIGKILL" }),
+      new Error("heif: Memory allocation error: Unspecified: Allocating 4147215 bytes failed"),
+      Object.assign(new Error("Command failed"), {
+        signal: "SIGABRT",
+        stderr:
+          "terminate called after throwing an instance of 'std::system_error'  what():  Resource temporarily unavailable",
+      }),
+      Object.assign(new Error("Command failed"), {
+        stderr: "libgomp: Thread creation failed: Resource temporarily unavailable",
+      }),
+    ]) {
+      const wrapped = withImageEncodeContext(
+        "Image conversion failed",
+        (s: Settings) => s.format,
+        async () => {
+          throw rawOom;
+        },
+      );
+      await expect(wrapped(input, settings, "in.png")).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        kind: "operational",
+        code: "ENGINE_UNAVAILABLE",
+        statusCode: 503,
+        cause: rawOom,
+      });
+    }
+
+    // Non-OOM RangeError is still wrapped as a bug-kind SafeError
+    const nonOomRange = new RangeError("Invalid parameter");
+    const wrappedNonOom = withImageEncodeContext(
+      "Image conversion failed",
+      (s: Settings) => s.format,
+      async () => {
+        throw nonOomRange;
+      },
+    );
+    await expect(wrappedNonOom(input, settings, "in.png")).rejects.toMatchObject({
+      name: "SafeError",
+      message: "Image conversion failed",
+      kind: "bug",
+      code: "webp",
+      cause: nonOomRange,
+    });
+  });
 });
 
 describe("withImageEncodeContextV2", () => {
@@ -205,6 +253,22 @@ describe("withImageEncodeContextV2", () => {
       );
       await expect(wrapped(ctx)).rejects.toBe(err);
     }
+
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    const wrappedOom = withImageEncodeContextV2(
+      "Failed",
+      () => "v2",
+      async () => {
+        throw v8Oom;
+      },
+    );
+    await expect(wrappedOom(ctx)).rejects.toMatchObject({
+      name: "DecoderOutOfMemoryError",
+      kind: "operational",
+      code: "ENGINE_UNAVAILABLE",
+      statusCode: 503,
+      cause: v8Oom,
+    });
   });
 });
 
@@ -276,6 +340,22 @@ describe("withAiImageEncodeContext", () => {
       );
       await expect(wrapped(input, jobData, aiCtx)).rejects.toBe(err);
     }
+
+    const sigkillErr = Object.assign(new Error("sidecar exited SIGKILL"), { signal: "SIGKILL" });
+    const wrappedOom = withAiImageEncodeContext(
+      "Failed",
+      () => "ai",
+      async () => {
+        throw sigkillErr;
+      },
+    );
+    await expect(wrappedOom(input, jobData, aiCtx)).rejects.toMatchObject({
+      name: "DecoderOutOfMemoryError",
+      kind: "operational",
+      code: "ENGINE_UNAVAILABLE",
+      statusCode: 503,
+      cause: sigkillErr,
+    });
   });
 });
 

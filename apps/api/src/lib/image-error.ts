@@ -79,6 +79,10 @@ function wrapEncodeFailure<T>(
   if (isPassthroughError(err)) {
     throw err;
   }
+  const oom = asDecoderOutOfMemory(err);
+  if (oom instanceof DecoderOutOfMemoryError) {
+    throw oom;
+  }
   if (err instanceof Error && isOperationalErrno(err)) {
     const code = String((err as NodeJS.ErrnoException).code);
     throw new SafeError(environmentMessage(code), { kind: "operational", code, cause: err });

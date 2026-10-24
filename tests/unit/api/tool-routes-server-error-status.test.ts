@@ -61,13 +61,19 @@ import {
 import * as formatEncoders from "../../../apps/api/src/lib/format-encoders.js";
 import * as heicConverter from "../../../apps/api/src/lib/heic-converter.js";
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
+import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
+import { registerBeautify } from "../../../apps/api/src/routes/tools/beautify.js";
+import { registerColorPalette } from "../../../apps/api/src/routes/tools/color-palette.js";
 import { registerCompare } from "../../../apps/api/src/routes/tools/compare.js";
 import { registerEditMetadata } from "../../../apps/api/src/routes/tools/edit-metadata.js";
 import { registerFindDuplicates } from "../../../apps/api/src/routes/tools/find-duplicates.js";
 import { registerGifTools } from "../../../apps/api/src/routes/tools/gif-tools.js";
 import { registerHtmlToImage } from "../../../apps/api/src/routes/tools/html-to-image.js";
+import { registerMemeGenerator } from "../../../apps/api/src/routes/tools/meme-generator.js";
 import { registerPassportPhoto } from "../../../apps/api/src/routes/tools/passport-photo.js";
 import { registerQrGenerate } from "../../../apps/api/src/routes/tools/qr-generate.js";
+import { registerSplit } from "../../../apps/api/src/routes/tools/split.js";
+import { registerStitch } from "../../../apps/api/src/routes/tools/stitch.js";
 import { registerSvgToRaster } from "../../../apps/api/src/routes/tools/svg-to-raster.js";
 
 const SVG = Buffer.from(
@@ -1037,6 +1043,404 @@ describe("find-duplicates post-intake OOM handling (#3790)", () => {
       } finally {
         rawThrowSpy.mockRestore();
         classifySpy.mockRestore();
+      }
+    } finally {
+      await app.close();
+    }
+  });
+});
+
+describe("outer processing catches in color-palette, split, stitch, beautify, and meme-generator (#3789)", () => {
+  const oomMessage =
+    "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+
+  beforeEach(() => {
+    putObject.mockReset().mockResolvedValue(undefined);
+  });
+
+  it("color-palette surfaces 503 ENGINE_UNAVAILABLE on V8 buffer allocation RangeError or SIGKILL in Sharp raw decode, and keeps 422 on non-OOM errors (#3789)", async () => {
+    const png = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: "#f00" },
+    })
+      .png()
+      .toBuffer();
+    const rawSpy = vi
+      .spyOn(sharp.prototype, "raw")
+      .mockImplementationOnce(function (this: sharp.Sharp) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Array buffer allocation failed");
+          },
+        } as unknown as sharp.Sharp;
+      })
+      .mockImplementationOnce(function (this: sharp.Sharp) {
+        return {
+          toBuffer: async () => {
+            throw Object.assign(new Error("decoder exited SIGKILL"), { signal: "SIGKILL" });
+          },
+        } as unknown as sharp.Sharp;
+      })
+      .mockImplementationOnce(function (this: sharp.Sharp) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Invalid raw parameter");
+          },
+        } as unknown as sharp.Sharp;
+      });
+    const app = await buildApp(registerColorPalette);
+    try {
+      for (let i = 0; i < 2; i++) {
+        const res = await app.inject({
+          method: "POST",
+          url: apiToolPath("color-palette"),
+          ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
+        });
+        expect(res.statusCode, res.body).toBe(503);
+        expect(res.json()).toEqual({
+          error: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+        });
+      }
+
+      const badRes = await app.inject({
+        method: "POST",
+        url: apiToolPath("color-palette"),
+        ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
+      });
+      expect(badRes.statusCode, badRes.body).toBe(422);
+      expect(badRes.json()).toEqual({
+        error: "Color extraction failed",
+        details: "Invalid raw parameter",
+      });
+    } finally {
+      rawSpy.mockRestore();
+      await app.close();
+    }
+  });
+
+  it("split surfaces 503 ENGINE_UNAVAILABLE before streaming when metadata() rejects with V8 RangeError or SIGKILL, and in its registered process function when encodeJxl rejects with OOM (#3789)", async () => {
+    const png = await sharp({
+      create: { width: 20, height: 20, channels: 3, background: "#f00" },
+    })
+      .png()
+      .toBuffer();
+    const origMetadata = sharp.prototype.metadata;
+    let callCount = 0;
+    let thirdCallError: Error = new RangeError("Array buffer allocation failed");
+    const metaSpy = vi.spyOn(sharp.prototype, "metadata").mockImplementation(function (
+      this: sharp.Sharp,
+    ) {
+      callCount += 1;
+      // Call 1: validateImageBuffer, Call 2: autoOrient, Call 3: outer try block in split.ts
+      if (callCount === 3) {
+        return Promise.reject(thirdCallError);
+      }
+      return origMetadata.call(this);
+    });
+    const app = await buildApp(registerSplit);
+    try {
+      for (const err of [
+        new RangeError("Array buffer allocation failed"),
+        Object.assign(new Error("vips exited SIGKILL"), { signal: "SIGKILL" }),
+      ]) {
+        callCount = 0;
+        thirdCallError = err;
+        const res = await app.inject({
+          method: "POST",
+          url: apiToolPath("split"),
+          ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
+        });
+        expect(res.statusCode, res.body).toBe(503);
+        expect(res.json()).toEqual({
+          error: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+        });
+      }
+
+      callCount = 0;
+      thirdCallError = new RangeError("Invalid metadata parameter");
+      const badRes = await app.inject({
+        method: "POST",
+        url: apiToolPath("split"),
+        ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
+      });
+      expect(badRes.statusCode, badRes.body).toBe(422);
+      expect(badRes.json()).toEqual({
+        error: "Split failed",
+        details: "Invalid metadata parameter",
+      });
+    } finally {
+      metaSpy.mockRestore();
+      await app.close();
+    }
+
+    const splitConfig = getToolConfig("split");
+    if (!splitConfig) throw new Error("split missing from toolRegistry");
+    const jxlSpy = vi
+      .spyOn(formatEncoders, "encodeJxl")
+      .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"))
+      .mockRejectedValueOnce(
+        Object.assign(new Error("cjxl exited SIGKILL"), { signal: "SIGKILL" }),
+      );
+    try {
+      for (let i = 0; i < 2; i++) {
+        await expect(
+          splitConfig.process(
+            png,
+            splitConfig.settingsSchema.parse({ columns: 2, rows: 2, outputFormat: "jxl" }),
+            "a.png",
+          ),
+        ).rejects.toMatchObject({
+          name: "DecoderOutOfMemoryError",
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          message: oomMessage,
+        });
+      }
+    } finally {
+      jxlSpy.mockRestore();
+    }
+  });
+
+  it("stitch surfaces 503 ENGINE_UNAVAILABLE on V8 RangeError or SIGKILL and 503 storage-full/storage-not-writable on operational write errnos in its outer catch (#3789)", async () => {
+    const png = await sharp({
+      create: { width: 16, height: 16, channels: 3, background: "#f00" },
+    })
+      .png()
+      .toBuffer();
+    const jxlSpy = vi
+      .spyOn(formatEncoders, "encodeJxl")
+      .mockRejectedValueOnce(Object.assign(new Error("cjxl exited SIGKILL"), { signal: "SIGKILL" }))
+      .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"))
+      .mockRejectedValueOnce(
+        Object.assign(new Error("ENOSPC: no space left on device, open '/tmp/jxl'"), {
+          code: "ENOSPC",
+          syscall: "open",
+        }),
+      )
+      .mockRejectedValueOnce(
+        Object.assign(new Error("EACCES: permission denied, open '/tmp/jxl'"), {
+          code: "EACCES",
+          syscall: "open",
+        }),
+      )
+      .mockRejectedValueOnce(new RangeError("Invalid cjxl parameter"));
+    const app = await buildApp(registerStitch);
+    try {
+      const files = [
+        { name: "a.png", type: "image/png", data: png },
+        { name: "b.png", type: "image/png", data: png },
+      ];
+      for (let i = 0; i < 2; i++) {
+        const oomRes = await app.inject({
+          method: "POST",
+          url: apiToolPath("stitch"),
+          ...multipartBody(files, { format: "jxl" }),
+        });
+        expect(oomRes.statusCode, oomRes.body).toBe(503);
+        expect(oomRes.json()).toEqual({
+          error: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+        });
+      }
+
+      const enospcRes = await app.inject({
+        method: "POST",
+        url: apiToolPath("stitch"),
+        ...multipartBody(files, { format: "jxl" }),
+      });
+      expect(enospcRes.statusCode, enospcRes.body).toBe(503);
+      expect(enospcRes.json()).toMatchObject({ code: "storage-full" });
+
+      const eaccesRes = await app.inject({
+        method: "POST",
+        url: apiToolPath("stitch"),
+        ...multipartBody(files, { format: "jxl" }),
+      });
+      expect(eaccesRes.statusCode, eaccesRes.body).toBe(503);
+      expect(eaccesRes.json()).toMatchObject({ code: "storage-not-writable" });
+
+      const badRes = await app.inject({
+        method: "POST",
+        url: apiToolPath("stitch"),
+        ...multipartBody(files, { format: "jxl" }),
+      });
+      expect(badRes.statusCode, badRes.body).toBe(422);
+      expect(badRes.json()).toEqual({
+        error: "Stitch creation failed",
+        details: "Invalid cjxl parameter",
+      });
+    } finally {
+      jxlSpy.mockRestore();
+      await app.close();
+    }
+  });
+
+  it("beautify and meme-generator surface 503 ENGINE_UNAVAILABLE on V8 RangeError or SIGKILL and 503 storage-full/storage-not-writable on operational write errnos in their outer catches (#3789)", async () => {
+    const png = await sharp({
+      create: { width: 16, height: 16, channels: 3, background: "#f00" },
+    })
+      .png()
+      .toBuffer();
+
+    const app = Fastify();
+    await app.register(multipart);
+    registerErrorHandler(app);
+    registerBeautify(app);
+    registerMemeGenerator(app);
+    await app.ready();
+
+    try {
+      for (const toolId of ["beautify", "meme-generator"] as const) {
+        putObject
+          .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"))
+          .mockRejectedValueOnce(
+            Object.assign(new Error("worker exited SIGKILL"), { signal: "SIGKILL" }),
+          )
+          .mockRejectedValueOnce(
+            Object.assign(new Error("ENOSPC: no space left on device, open '/tmp/out'"), {
+              code: "ENOSPC",
+              syscall: "open",
+            }),
+          )
+          .mockRejectedValueOnce(
+            Object.assign(new Error("EROFS: read-only file system, open '/tmp/out'"), {
+              code: "EROFS",
+              syscall: "open",
+            }),
+          )
+          .mockRejectedValueOnce(new RangeError("Invalid output parameter"));
+
+        for (let i = 0; i < 2; i++) {
+          const oomRes = await app.inject({
+            method: "POST",
+            url: apiToolPath(toolId),
+            ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
+          });
+          expect(oomRes.statusCode, `${toolId} OOM #${i}: ${oomRes.body}`).toBe(503);
+          expect(oomRes.json()).toEqual({
+            error: oomMessage,
+            code: "ENGINE_UNAVAILABLE",
+          });
+        }
+
+        const enospcRes = await app.inject({
+          method: "POST",
+          url: apiToolPath(toolId),
+          ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
+        });
+        expect(enospcRes.statusCode, `${toolId} ENOSPC: ${enospcRes.body}`).toBe(503);
+        expect(enospcRes.json()).toMatchObject({ code: "storage-full" });
+
+        const erofsRes = await app.inject({
+          method: "POST",
+          url: apiToolPath(toolId),
+          ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
+        });
+        expect(erofsRes.statusCode, `${toolId} EROFS: ${erofsRes.body}`).toBe(503);
+        expect(erofsRes.json()).toMatchObject({ code: "storage-not-writable" });
+
+        const badRes = await app.inject({
+          method: "POST",
+          url: apiToolPath(toolId),
+          ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
+        });
+        expect(badRes.statusCode, `${toolId} non-OOM: ${badRes.body}`).toBe(422);
+        expect(badRes.json()).toEqual({
+          error: "Processing failed",
+          details: "Invalid output parameter",
+        });
+      }
+
+      // Direct Sharp pipeline step OOM in renderBeautify (webp output encode) and
+      // processMeme (final output metadata read), on both HTTP routes and registered process fns
+      const webpSpy = vi
+        .spyOn(sharp.prototype, "webp")
+        .mockImplementationOnce(function (this: sharp.Sharp) {
+          return {
+            toBuffer: async () => {
+              throw new RangeError("Array buffer allocation failed");
+            },
+          } as unknown as sharp.Sharp;
+        })
+        .mockImplementationOnce(function (this: sharp.Sharp) {
+          return {
+            toBuffer: async () => {
+              throw new RangeError("Array buffer allocation failed");
+            },
+          } as unknown as sharp.Sharp;
+        });
+      try {
+        const beautifyHttpOom = await app.inject({
+          method: "POST",
+          url: apiToolPath("beautify"),
+          ...multipartBody([{ name: "a.png", type: "image/png", data: png }], {
+            outputFormat: "webp",
+            shadowPreset: "none",
+          }),
+        });
+        expect(beautifyHttpOom.statusCode, beautifyHttpOom.body).toBe(503);
+        expect(beautifyHttpOom.json()).toEqual({
+          error: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+        });
+
+        const beautifyCfg = getToolConfig("beautify");
+        if (!beautifyCfg) throw new Error("beautify missing from toolRegistry");
+        await expect(
+          beautifyCfg.process(
+            png,
+            beautifyCfg.settingsSchema.parse({ outputFormat: "webp", shadowPreset: "none" }),
+            "a.png",
+          ),
+        ).rejects.toMatchObject({
+          name: "DecoderOutOfMemoryError",
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          message: oomMessage,
+        });
+      } finally {
+        webpSpy.mockRestore();
+      }
+
+      const origMeta = sharp.prototype.metadata;
+      let memeMetaCall = 0;
+      const memeMetaSpy = vi.spyOn(sharp.prototype, "metadata").mockImplementation(function (
+        this: sharp.Sharp,
+      ) {
+        memeMetaCall += 1;
+        // Call 1: validateImageBuffer, Call 2: autoOrient, Call 3: processMeme input metadata, Call 4: processMeme output metadata
+        if (memeMetaCall === 4) {
+          return Promise.reject(new RangeError("Array buffer allocation failed"));
+        }
+        return origMeta.call(this);
+      });
+      try {
+        memeMetaCall = 0;
+        const memeHttpOom = await app.inject({
+          method: "POST",
+          url: apiToolPath("meme-generator"),
+          ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
+        });
+        expect(memeHttpOom.statusCode, memeHttpOom.body).toBe(503);
+        expect(memeHttpOom.json()).toEqual({
+          error: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+        });
+
+        memeMetaCall = 0;
+        const memeCfg = getToolConfig("meme-generator");
+        if (!memeCfg) throw new Error("meme-generator missing from toolRegistry");
+        await expect(
+          memeCfg.process(png, memeCfg.settingsSchema.parse({}), "a.png"),
+        ).rejects.toMatchObject({
+          name: "DecoderOutOfMemoryError",
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          message: oomMessage,
+        });
+      } finally {
+        memeMetaSpy.mockRestore();
       }
     } finally {
       await app.close();

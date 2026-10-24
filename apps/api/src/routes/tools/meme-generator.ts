@@ -416,7 +416,8 @@ export function registerMemeGenerator(app: FastifyInstance) {
         originalSize: imageBuffer.length,
         processedSize: output.buffer.length,
       });
-    } catch (err) {
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err)) throw err;
       if (hasServerErrorStatus(err)) throw err;
       if (err instanceof InputValidationError) {

@@ -447,7 +447,8 @@ export function registerBeautify(app: FastifyInstance) {
         originalSize,
         processedSize: outputBuf.length,
       });
-    } catch (err) {
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err)) throw err;
       if (hasServerErrorStatus(err)) throw err;
       if (err instanceof InputValidationError) {

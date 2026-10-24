@@ -281,7 +281,7 @@ export function registerColorPalette(app: FastifyInstance) {
         count: colors.length,
       });
     } catch (rawErr) {
-      const err = normalizeOperationalWriteError(rawErr);
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
       return reply.status(422).send({
         error: "Color extraction failed",

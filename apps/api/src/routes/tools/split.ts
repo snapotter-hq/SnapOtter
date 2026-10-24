@@ -301,7 +301,7 @@ export function registerSplit(app: FastifyInstance) {
 
       await archive.finalize();
     } catch (rawErr) {
-      const err = normalizeOperationalWriteError(rawErr);
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (!reply.raw.headersSent) {
         // Once the ZIP is streaming, a rethrow would leave the client hanging.
         if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;

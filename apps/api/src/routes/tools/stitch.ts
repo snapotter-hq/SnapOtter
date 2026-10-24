@@ -325,7 +325,8 @@ export function registerStitch(app: FastifyInstance) {
         originalSize: files.reduce((s, f) => s + f.buffer.length, 0),
         processedSize: result.length,
       });
-    } catch (err) {
+    } catch (rawErr) {
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err)) throw err;
       if (hasServerErrorStatus(err)) throw err;
       return reply.status(422).send({
