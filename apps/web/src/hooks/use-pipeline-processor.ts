@@ -55,6 +55,7 @@ const IDLE_PROGRESS: PipelineProgress = {
 };
 
 const UPLOAD_WEIGHT = 15;
+const UPLOAD_STALL_TIMEOUT_MS = 120_000;
 const SSE_STALL_TIMEOUT_MS = 300_000;
 // After degrading a dead POST to the async path, how long to wait for any SSE
 // frame proving the flow reached the server. Only armed when no frame arrived
@@ -86,6 +87,7 @@ export function usePipelineProcessor() {
   const [progress, setProgress] = useState<PipelineProgress>(IDLE_PROGRESS);
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const requestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const stallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const jobEvidenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -129,6 +131,13 @@ export function usePipelineProcessor() {
     setActiveJob(null, null);
   }, [setActiveJob]);
 
+  const clearRequestTimer = useCallback(() => {
+    if (requestTimerRef.current) {
+      clearTimeout(requestTimerRef.current);
+      requestTimerRef.current = null;
+    }
+  }, []);
+
   const clearStallTimer = useCallback(() => {
     if (stallTimerRef.current) {
       clearTimeout(stallTimerRef.current);
@@ -150,6 +159,7 @@ export function usePipelineProcessor() {
   const storeWasReset = useCallback(() => {
     const state = useFileStore.getState();
     if (state.processing && state.activeJobId === activeJobIdRef.current) return false;
+    clearRequestTimer();
     clearJobEvidenceTimer();
     clearStallTimer();
     if (elapsedRef.current) {
@@ -171,7 +181,7 @@ export function usePipelineProcessor() {
     activeEntryIdsRef.current = null;
     setProgress(IDLE_PROGRESS);
     return true;
-  }, [clearJobEvidenceTimer, clearStallTimer]);
+  }, [clearJobEvidenceTimer, clearRequestTimer, clearStallTimer]);
 
   const resetStallTimer = useCallback(() => {
     clearStallTimer();
@@ -226,6 +236,7 @@ export function usePipelineProcessor() {
       jobEvidenceTimerRef.current = null;
       if (!activeJobIdRef.current) return;
       if (storeWasReset()) return;
+      clearRequestTimer();
       clearStallTimer();
       if (elapsedRef.current) clearInterval(elapsedRef.current);
       if (eventSourceRef.current) {
@@ -248,6 +259,7 @@ export function usePipelineProcessor() {
     }, JOB_EVIDENCE_TIMEOUT_MS);
   }, [
     clearJobEvidenceTimer,
+    clearRequestTimer,
     clearStallTimer,
     clearActiveJob,
     settleProcessingEntries,
@@ -302,6 +314,7 @@ export function usePipelineProcessor() {
         } catch (_e) {
           console.debug("Ignored xhr.abort error:", _e);
         }
+        clearRequestTimer();
         clearJobEvidenceTimer();
         clearStallTimer();
         if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -326,6 +339,7 @@ export function usePipelineProcessor() {
     }
   }, [
     clearJobEvidenceTimer,
+    clearRequestTimer,
     clearStallTimer,
     clearActiveJob,
     settleProcessingEntries,
@@ -344,6 +358,7 @@ export function usePipelineProcessor() {
   const failRunOnHandlerError = useCallback(
     (es: EventSource) => {
       if (!activeJobIdRef.current && !useFileStore.getState().processing) return;
+      clearRequestTimer();
       clearStallTimer();
       clearJobEvidenceTimer();
       if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -375,6 +390,7 @@ export function usePipelineProcessor() {
       settleProcessingEntries(trackingFailed);
     },
     [
+      clearRequestTimer,
       clearStallTimer,
       clearJobEvidenceTimer,
       clearActiveJob,
@@ -393,6 +409,7 @@ export function usePipelineProcessor() {
   // teardown that breaks as well is reported here (#1812).
   const endRunAtStart = useCallback(
     (entryIds: ReadonlySet<string> | null = activeEntryIdsRef.current) => {
+      clearRequestTimer();
       clearStallTimer();
       clearJobEvidenceTimer();
       if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -414,6 +431,7 @@ export function usePipelineProcessor() {
       settleProcessingEntries(trackingFailed, entryIds);
     },
     [
+      clearRequestTimer,
       clearStallTimer,
       clearJobEvidenceTimer,
       clearActiveJob,
@@ -509,6 +527,7 @@ export function usePipelineProcessor() {
               // In sync mode the XHR response owns settling: the terminal
               // frame always precedes the streamed ZIP.
               if (!asyncModeRef.current) return;
+              clearRequestTimer();
               clearStallTimer();
               es.close();
               eventSourceRef.current = null;
@@ -549,6 +568,7 @@ export function usePipelineProcessor() {
             // Ends the run on the server's word: a failed frame, or a
             // completed one with nothing to download.
             const endFailedRun = (message: string) => {
+              clearRequestTimer();
               clearStallTimer();
               if (elapsedRef.current) clearInterval(elapsedRef.current);
               es.close();
@@ -586,6 +606,7 @@ export function usePipelineProcessor() {
                 endFailedRun(tRef.current.errors.invalidServerResponse);
                 return;
               }
+              clearRequestTimer();
               clearStallTimer();
               if (elapsedRef.current) clearInterval(elapsedRef.current);
               es.close();
@@ -663,6 +684,7 @@ export function usePipelineProcessor() {
       }
     },
     [
+      clearRequestTimer,
       clearStallTimer,
       clearJobEvidenceTimer,
       clearActiveJob,
@@ -693,6 +715,7 @@ export function usePipelineProcessor() {
       // settle, and an error written now would land on whatever the user does
       // next (#2748).
       if (storeWasReset()) return;
+      clearRequestTimer();
       // The job outlives its observer: the request and stream are gone, and so
       // is the handle that would cancel it. Ask the server to stop it before
       // clearing the job id.
@@ -754,6 +777,7 @@ export function usePipelineProcessor() {
           console.debug("Ignored xhr.abort error:", _e);
         }
       }
+      if (requestTimerRef.current) clearTimeout(requestTimerRef.current);
       if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
       if (jobEvidenceTimerRef.current) clearTimeout(jobEvidenceTimerRef.current);
       settleStoppedRunRef.current();
@@ -797,6 +821,7 @@ export function usePipelineProcessor() {
         setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
         // A stale evidence timer from a previous degraded run must not fire
         // into this run, and evidence never carries across runs.
+        clearRequestTimer();
         clearJobEvidenceTimer();
         sawJobEvidenceRef.current = false;
         asyncModeRef.current = false;
@@ -834,13 +859,46 @@ export function usePipelineProcessor() {
         // The server holds this response for up to its 10-minute sync wait and
         // then answers 202; a client wall-clock cap would always fire first,
         // turning every legitimately long pipeline into a spurious degrade.
-        // Liveness is owned by the SSE settle plus the evidence and stall
-        // timers.
+        // An upload stall watchdog bounds silent uploads (#3871), and the SSE
+        // settle plus the evidence and stall timers own liveness once the body
+        // is sent.
         xhr.timeout = 0;
 
+        let uploadedFully = false;
+        let lastUploadedBytes = 0;
+        const fireUploadStallTimeout = () => {
+          requestTimerRef.current = null;
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          try {
+            xhr.abort();
+          } catch (_e) {
+            console.debug("Ignored xhr.abort error:", _e);
+          }
+          xhr.ontimeout?.(new ProgressEvent("timeout"));
+        };
+        const armUploadStallTimer = () => {
+          clearRequestTimer();
+          requestTimerRef.current = setTimeout(fireUploadStallTimeout, UPLOAD_STALL_TIMEOUT_MS);
+        };
+
         xhr.upload.onprogress = (event) => {
-          if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId || storeWasReset()) {
+            return;
+          }
+          if (event.loaded > lastUploadedBytes) {
+            lastUploadedBytes = event.loaded;
+            if (!uploadedFully) {
+              armUploadStallTimer();
+            }
+          }
           if (event.lengthComputable) {
+            // Firefox fires upload.onload only once the response starts, so the
+            // final progress event also counts as the body having left the
+            // browser (#2136, #2240).
+            if (event.loaded >= event.total) {
+              uploadedFully = true;
+              clearRequestTimer();
+            }
             const uploadPercent = (event.loaded / event.total) * UPLOAD_WEIGHT;
             setProgress((prev) => {
               if (prev.phase !== "uploading") return prev;
@@ -849,10 +907,12 @@ export function usePipelineProcessor() {
           }
         };
 
-        let uploadedFully = false;
         xhr.upload.onload = () => {
-          if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId || storeWasReset()) {
+            return;
+          }
           uploadedFully = true;
+          clearRequestTimer();
           setProgress((prev) => ({
             ...prev,
             phase: "processing",
@@ -866,6 +926,7 @@ export function usePipelineProcessor() {
         // frame carries the full result (#766, mirroring #722).
         const degradeToAsync = (trigger: "socket" | "timeout" | "http-502" | "http-504") => {
           if (!uploadedFully || activeJobIdRef.current !== clientJobId) return false;
+          clearRequestTimer();
           asyncModeRef.current = true;
           trackDegrade(trigger, false);
           reconnectSSE(true);
@@ -883,6 +944,7 @@ export function usePipelineProcessor() {
         // settles last. Returns the first teardown error, for the caller to
         // rethrow once the run is over.
         const endSyncRun = (failure: string | null): { cause: unknown } | null => {
+          clearRequestTimer();
           setProgress(IDLE_PROGRESS);
           const teardownError = runEndWrites([
             clearActiveJob,
@@ -894,7 +956,8 @@ export function usePipelineProcessor() {
         };
 
         xhr.onload = () => {
-          if (activeJobIdRef.current !== clientJobId) return;
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          clearRequestTimer();
           if (storeWasReset()) return;
 
           if (xhr.status === 202) {
@@ -1034,7 +1097,8 @@ export function usePipelineProcessor() {
         xhr.onerror = () => {
           // Settled runs and successor runs must not be touched by late socket
           // events (#722 run-identity guard).
-          if (activeJobIdRef.current !== clientJobId) return;
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          clearRequestTimer();
           if (storeWasReset()) return;
           if (degradeToAsync("socket")) return;
           clearStallTimer();
@@ -1048,7 +1112,8 @@ export function usePipelineProcessor() {
         };
 
         xhr.ontimeout = () => {
-          if (activeJobIdRef.current !== clientJobId) return;
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          clearRequestTimer();
           if (storeWasReset()) return;
           if (degradeToAsync("timeout")) return;
           clearStallTimer();
@@ -1065,6 +1130,7 @@ export function usePipelineProcessor() {
         formatHeaders().forEach((value, key) => {
           xhr.setRequestHeader(key, value);
         });
+        armUploadStallTimer();
         xhr.send(formData);
       } catch (cause) {
         if (claimed) endRunAtStart(runEntryIds);
@@ -1081,6 +1147,7 @@ export function usePipelineProcessor() {
       cancelCurrentJob,
       clearActiveJob,
       clearJobEvidenceTimer,
+      clearRequestTimer,
       clearStallTimer,
       reconnectSSE,
       resetStallTimer,
@@ -1148,6 +1215,7 @@ export function usePipelineProcessor() {
 
         setProcessing(true);
         setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
+        clearRequestTimer();
         clearJobEvidenceTimer();
         sawJobEvidenceRef.current = false;
         asyncModeRef.current = false;
@@ -1168,6 +1236,7 @@ export function usePipelineProcessor() {
         // Stops everything that could still act on the run: its timers, its
         // stream and its batch closure. No store writes.
         const releaseRun = () => {
+          clearRequestTimer();
           clearJobEvidenceTimer();
           clearStallTimer();
           if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -1419,12 +1488,45 @@ export function usePipelineProcessor() {
         xhrRef.current = xhr;
         xhr.responseType = "blob";
         // Pipeline batches legitimately hold the sync response for many
-        // minutes; the stall and evidence timers own liveness.
+        // minutes; an upload stall watchdog bounds silent uploads (#3871), and
+        // the stall and evidence timers own liveness once the body is sent.
         xhr.timeout = 0;
 
+        let uploadedFully = false;
+        let lastUploadedBytes = 0;
+        const fireUploadStallTimeout = () => {
+          requestTimerRef.current = null;
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          try {
+            xhr.abort();
+          } catch (_e) {
+            console.debug("Ignored xhr.abort error:", _e);
+          }
+          xhr.ontimeout?.(new ProgressEvent("timeout"));
+        };
+        const armUploadStallTimer = () => {
+          clearRequestTimer();
+          requestTimerRef.current = setTimeout(fireUploadStallTimeout, UPLOAD_STALL_TIMEOUT_MS);
+        };
+
         xhr.upload.onprogress = (event) => {
-          if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId || storeWasReset()) {
+            return;
+          }
+          if (event.loaded > lastUploadedBytes) {
+            lastUploadedBytes = event.loaded;
+            if (!uploadedFully) {
+              armUploadStallTimer();
+            }
+          }
           if (event.lengthComputable) {
+            // Firefox fires upload.onload only once the response starts, so the
+            // final progress event also counts as the body having left the
+            // browser (#2136, #2240).
+            if (event.loaded >= event.total) {
+              uploadedFully = true;
+              clearRequestTimer();
+            }
             const uploadPercent = (event.loaded / event.total) * UPLOAD_WEIGHT;
             setProgress((prev) => {
               if (prev.phase !== "uploading") return prev;
@@ -1433,10 +1535,12 @@ export function usePipelineProcessor() {
           }
         };
 
-        let uploadedFully = false;
         xhr.upload.onload = () => {
-          if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId || storeWasReset()) {
+            return;
+          }
           uploadedFully = true;
+          clearRequestTimer();
           setProgress((prev) => ({
             ...prev,
             phase: "processing",
@@ -1447,6 +1551,7 @@ export function usePipelineProcessor() {
 
         const degradeToAsync = (trigger: "socket" | "timeout" | "http-502" | "http-504") => {
           if (!uploadedFully || activeJobIdRef.current !== clientJobId) return false;
+          clearRequestTimer();
           asyncModeRef.current = true;
           trackDegrade(trigger, true);
           reconnectSSE(true);
@@ -1458,7 +1563,8 @@ export function usePipelineProcessor() {
         };
 
         xhr.onload = () => {
-          if (activeJobIdRef.current !== clientJobId) return;
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          clearRequestTimer();
           if (storeWasReset()) return;
 
           if (xhr.status === 202) {
@@ -1550,14 +1656,16 @@ export function usePipelineProcessor() {
         };
 
         xhr.onerror = () => {
-          if (activeJobIdRef.current !== clientJobId) return;
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          clearRequestTimer();
           if (storeWasReset()) return;
           if (degradeToAsync("socket")) return;
           failRun(t.errors.processingInterrupted);
         };
 
         xhr.ontimeout = () => {
-          if (activeJobIdRef.current !== clientJobId) return;
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          clearRequestTimer();
           if (storeWasReset()) return;
           if (degradeToAsync("timeout")) return;
           failRun(t.errors.uploadTimeout);
@@ -1567,6 +1675,7 @@ export function usePipelineProcessor() {
         formatHeaders().forEach((value, key) => {
           xhr.setRequestHeader(key, value);
         });
+        armUploadStallTimer();
         xhr.send(formData);
       } catch (cause) {
         if (claimed) endRunAtStart(runEntryIds);
@@ -1584,6 +1693,7 @@ export function usePipelineProcessor() {
       cancelCurrentJob,
       clearActiveJob,
       clearJobEvidenceTimer,
+      clearRequestTimer,
       clearStallTimer,
       reconnectSSE,
       resetStallTimer,

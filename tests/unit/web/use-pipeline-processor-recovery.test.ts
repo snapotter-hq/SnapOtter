@@ -465,11 +465,86 @@ describe("usePipelineProcessor single-run recovery (#766)", () => {
     });
 
     act(() => {
-      vi.advanceTimersByTime(120_000);
+      vi.advanceTimersByTime(60_000);
+      (xhrs[1].upload.onprogress as ((e: ProgressEvent) => void) | undefined)?.(
+        new ProgressEvent("progress", { lengthComputable: true, loaded: 32, total: 64 }),
+      );
+      vi.advanceTimersByTime(60_000);
     });
 
     expect(useFileStore.getState().error).toBeNull();
     expect(useFileStore.getState().processing).toBe(true);
+
+    unmount();
+  });
+
+  it("keeps a slow single upload with steady progress past 120s alive and fails when progress stalls for 120s (#3871)", () => {
+    vi.useFakeTimers();
+    const { result, unmount } = startSingleRun();
+
+    expect(xhrs[0].timeout).toBe(0);
+
+    const fireProgress = (xhrIndex: number, loaded: number, lengthComputable = true) => {
+      (xhrs[xhrIndex].upload.onprogress as ((e: ProgressEvent) => void) | undefined)?.(
+        new ProgressEvent("progress", {
+          lengthComputable,
+          loaded,
+          total: lengthComputable ? 64 : 0,
+        }),
+      );
+    };
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+      fireProgress(0, 16);
+      vi.advanceTimersByTime(60_000);
+      fireProgress(0, 32, false);
+      vi.advanceTimersByTime(60_000);
+      // A progress event that does not advance loaded bytes does not reset the stall window.
+      fireProgress(0, 32);
+    });
+
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().error).toBeNull();
+
+    // Even if xhr.abort throws, the stall timeout still settles the run.
+    xhrs[0].abort.mockImplementationOnce(() => {
+      throw new Error("abort failed");
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    expect(xhrs[0].abort).toHaveBeenCalledOnce();
+    expect(useFileStore.getState().error).toBe(
+      "The upload timed out. Check your connection or try a smaller file.",
+    );
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "The upload timed out. Check your connection or try a smaller file.",
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+
+    // Once the final progress event reports the full body sent (Firefox #2136),
+    // the upload stall timer is cleared and a post-upload socket drop degrades to async.
+    act(() => {
+      result.current.processSingle(useFileStore.getState().files[0], STEPS);
+    });
+    act(() => {
+      fireProgress(1, 64);
+      vi.advanceTimersByTime(240_000);
+    });
+
+    expect(xhrs[1].abort).not.toHaveBeenCalled();
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().error).toBeNull();
+
+    act(() => {
+      xhrs[1].onerror?.();
+    });
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().error).toBeNull();
 
     unmount();
   });
@@ -785,6 +860,71 @@ describe("usePipelineProcessor batch recovery (#766)", () => {
 
     expect(useFileStore.getState().error).toBeNull();
     expect(useFileStore.getState().processing).toBe(true);
+
+    unmount();
+  });
+
+  it("keeps a slow batch upload with steady progress past 120s alive and fails when progress stalls for 120s (#3871)", () => {
+    vi.useFakeTimers();
+    const { result, unmount } = startBatchRun();
+
+    expect(xhrs[0].timeout).toBe(0);
+
+    const fireProgress = (xhrIndex: number, loaded: number) => {
+      (xhrs[xhrIndex].upload.onprogress as ((e: ProgressEvent) => void) | undefined)?.(
+        new ProgressEvent("progress", { lengthComputable: true, loaded, total: 32 }),
+      );
+    };
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+      fireProgress(0, 8);
+      vi.advanceTimersByTime(60_000);
+      fireProgress(0, 16);
+      vi.advanceTimersByTime(60_000);
+      fireProgress(0, 16);
+    });
+
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().error).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    expect(xhrs[0].abort).toHaveBeenCalledOnce();
+    expect(useFileStore.getState().error).toBe(
+      "The upload timed out. Check your connection or try a smaller file.",
+    );
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "The upload timed out. Check your connection or try a smaller file.",
+    });
+    expect(useFileStore.getState().entries[1]).toMatchObject({
+      status: "failed",
+      error: "The upload timed out. Check your connection or try a smaller file.",
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+
+    // Once the final progress event reports the full body sent, the upload
+    // stall timer is cleared and a post-upload socket drop degrades to async.
+    act(() => {
+      void result.current.processAll(useFileStore.getState().files, STEPS);
+    });
+    act(() => {
+      fireProgress(1, 32);
+      vi.advanceTimersByTime(240_000);
+    });
+
+    expect(xhrs[1].abort).not.toHaveBeenCalled();
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().error).toBeNull();
+
+    act(() => {
+      xhrs[1].onerror?.();
+    });
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().error).toBeNull();
 
     unmount();
   });
