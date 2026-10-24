@@ -198,13 +198,15 @@ export async function saveFile(buffer: Buffer, originalName: string): Promise<st
   } catch (e) {
     throw storageWriteError(e);
   }
+  let closed = false;
   try {
     await handle.writeFile(buffer);
+    closed = true;
     await handle.close();
   } catch (e) {
     // The write error is the one the caller needs; a close failing on top of
     // it adds nothing.
-    await handle.close().catch(() => {});
+    if (!closed) await handle.close().catch(() => {});
     await removePartialWrite(path, storedName, e);
     throw storageWriteError(e);
   }

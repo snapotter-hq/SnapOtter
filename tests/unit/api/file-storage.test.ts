@@ -85,11 +85,16 @@ vi.mock("node:fs/promises", async (importOriginal) => {
         const writeCode =
           typeof diskState.failWriteMidway === "string" ? diskState.failWriteMidway : "ENOSPC";
         const write = handle.writeFile.bind(handle);
+        const close = handle.close.bind(handle);
         Object.assign(handle, {
           writeFile: async (data: Buffer) => {
             diskState.partialPath = String(path);
             await write(data.subarray(0, Math.floor(data.length / 2)));
             throw errno(writeCode);
+          },
+          close: async () => {
+            diskState.closeCalls += 1;
+            await close();
           },
         });
       }
@@ -1005,6 +1010,7 @@ describe("saveFile after a failed write", () => {
       expect(err?.code).toBe("storage-full");
       expect(err?.statusCode).toBe(503);
       expect(err?.cause).toMatchObject({ code });
+      expect(diskState.closeCalls).toBe(1);
       // The half-write really happened in the storage root, and is gone.
       expect(dirname(diskState.partialPath)).toBe(testDir);
       expect(existsSync(diskState.partialPath)).toBe(false);
@@ -1029,6 +1035,7 @@ describe("saveFile after a failed write", () => {
       expect(err?.code).toBe("storage-full");
       expect(err?.statusCode).toBe(503);
       expect(err?.cause).toMatchObject({ code });
+      expect(diskState.closeCalls).toBe(1);
       expect(dirname(diskState.partialPath)).toBe(testDir);
       expect(existsSync(diskState.partialPath)).toBe(false);
       expect(await storedFiles()).toEqual([]);
@@ -1156,6 +1163,7 @@ describe("saveThumbnail after a failed write (#1633)", () => {
       expect(err?.code).toBe("storage-full");
       expect(err?.statusCode).toBe(503);
       expect(err?.cause).toMatchObject({ code });
+      expect(diskState.closeCalls).toBe(1);
       expect(dirname(diskState.partialPath)).toBe(join(testDir, ".thumbs"));
       expect(diskState.partialPath).not.toBe(join(testDir, ".thumbs", "photo.png.thumb.jpg"));
       expect(existsSync(diskState.partialPath)).toBe(false);
