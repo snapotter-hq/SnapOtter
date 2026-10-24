@@ -148,7 +148,9 @@ export function FindDuplicatesSettings() {
     // background and lands in the store. Its answer is only taken while the files
     // it was sent for are still loaded (#2314).
     const sentFiles = files;
+    let canceled = false;
     const stillLoaded = () => {
+      if (canceled) return false;
       const now = useFileStore.getState().files;
       return now.length === sentFiles.length && now.every((f, i) => f === sentFiles[i]);
     };
@@ -159,10 +161,22 @@ export function FindDuplicatesSettings() {
       () => stillLoaded() && useDuplicateStore.getState().scanning,
     );
     const unwatchFiles = useFileStore.subscribe(() => {
-      if (!stillLoaded()) cleanup();
+      if (!stillLoaded()) {
+        canceled = true;
+        cleanup();
+        try {
+          resetDuplicates();
+        } finally {
+          xhr.abort();
+        }
+      }
     });
     const unwatchDuplicates = useDuplicateStore.subscribe((state) => {
-      if (!state.scanning) cleanup();
+      if (!state.scanning) {
+        canceled = true;
+        cleanup();
+        xhr.abort();
+      }
     });
     function cleanup() {
       unwatchFiles();

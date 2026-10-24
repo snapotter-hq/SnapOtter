@@ -27,7 +27,10 @@ class FakeXhr {
   status = 0;
   responseText = "";
   timeout = 0;
-  upload: { onprogress: unknown } = { onprogress: null };
+  upload: {
+    onprogress: ((e: ProgressEvent) => void) | null;
+    onload: (() => void) | null;
+  } = { onprogress: null, onload: null };
   onload: (() => void) | null = null;
   onerror: (() => void) | null = null;
   ontimeout: (() => void) | null = null;
@@ -130,10 +133,94 @@ describe("find duplicates across a remount (#2314)", () => {
       useFileStore.getState().setFiles([image("three.png"), image("four.png")]);
     });
 
+    expect(FakeXhr.instances[0].aborted).toBe(true);
+    expect(useDuplicateStore.getState().scanning).toBe(false);
+
     FakeXhr.instances[0].respond(200, RESULT);
 
     expect(useDuplicateStore.getState().results).toBeNull();
     expect(useDuplicateStore.getState().scanning).toBe(false);
+  });
+
+  it("aborts the scan and resets scanning when files are replaced while unmounted (#3939)", () => {
+    const initialFiles = useFileStore.getState().files;
+    const { unmount } = startScan();
+    unmount();
+
+    act(() => {
+      useFileStore.getState().setFiles([image("three.png"), image("four.png")]);
+    });
+
+    expect(FakeXhr.instances[0].aborted).toBe(true);
+    expect(useDuplicateStore.getState().scanning).toBe(false);
+    expect(useDuplicateStore.getState().results).toBeNull();
+    expect(useDuplicateStore.getState().error).toBeNull();
+
+    render(<FindDuplicatesSettings />);
+    expect(useDuplicateStore.getState().scanning).toBe(false);
+    expect(screen.getByTestId("find-duplicates-submit")).toBeEnabled();
+
+    FakeXhr.instances[0].respond(200, RESULT);
+    act(() => {
+      FakeXhr.instances[0].onerror?.();
+      FakeXhr.instances[0].ontimeout?.();
+    });
+
+    expect(useDuplicateStore.getState().scanning).toBe(false);
+    expect(useDuplicateStore.getState().results).toBeNull();
+    expect(useDuplicateStore.getState().error).toBeNull();
+    expect(screen.getByTestId("find-duplicates-submit")).toBeEnabled();
+
+    // Even if the original File instances are loaded back in, the canceled XHR cannot land
+    act(() => {
+      useFileStore.getState().setFiles(initialFiles);
+      FakeXhr.instances[0].upload.onprogress?.(
+        new ProgressEvent("progress", { lengthComputable: true, loaded: 50, total: 100 }),
+      );
+      FakeXhr.instances[0].upload.onload?.();
+    });
+    FakeXhr.instances[0].respond(200, RESULT);
+    expect(useDuplicateStore.getState().results).toBeNull();
+
+    // Starting a new scan on the remounted panel works normally
+    fireEvent.click(screen.getByTestId("find-duplicates-submit"));
+    expect(useDuplicateStore.getState().scanning).toBe(true);
+    FakeXhr.instances[1].respond(200, RESULT);
+    expect(useDuplicateStore.getState().scanning).toBe(false);
+    expect(useDuplicateStore.getState().results).toEqual(RESULT);
+
+    // Resetting useDuplicateStore directly while files remain loaded aborts the XHR and latches canceled
+    act(() => {
+      useDuplicateStore.getState().reset();
+    });
+    fireEvent.click(screen.getByTestId("find-duplicates-submit"));
+    act(() => {
+      useDuplicateStore.getState().reset();
+    });
+    expect(FakeXhr.instances[2].aborted).toBe(true);
+    FakeXhr.instances[2].respond(200, RESULT);
+    expect(useDuplicateStore.getState().results).toBeNull();
+
+    // If a useDuplicateStore subscriber throws during resetDuplicates(), finally still aborts the XHR
+    fireEvent.click(screen.getByTestId("find-duplicates-submit"));
+    let threwOnReset = false;
+    const unsubDup = useDuplicateStore.subscribe((state: { scanning: boolean }) => {
+      if (!state.scanning && !threwOnReset) {
+        threwOnReset = true;
+        throw new Error("duplicate subscriber boom");
+      }
+    });
+    try {
+      expect(() => {
+        act(() => {
+          useFileStore.getState().setFiles([image("five.png"), image("six.png")]);
+        });
+      }).toThrow("duplicate subscriber boom");
+      expect(FakeXhr.instances[3].aborted).toBe(true);
+      expect(useDuplicateStore.getState().scanning).toBe(false);
+    } finally {
+      unsubDup();
+    }
   });
 
   it("drops the answer when the page cleared the files while the scan was out", () => {
@@ -143,6 +230,9 @@ describe("find duplicates across a remount (#2314)", () => {
       useFileStore.getState().reset();
       useDuplicateStore.getState().reset();
     });
+
+    expect(FakeXhr.instances[0].aborted).toBe(true);
+    expect(useDuplicateStore.getState().scanning).toBe(false);
 
     FakeXhr.instances[0].respond(200, RESULT);
 
