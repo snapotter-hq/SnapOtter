@@ -31,7 +31,11 @@ import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { isToolInstalled } from "../../lib/feature-status.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
-import { isDecoderUnavailable } from "../../lib/format-decoders.js";
+import {
+  asDecoderOutOfMemory,
+  DecoderOutOfMemoryError,
+  isDecoderUnavailable,
+} from "../../lib/format-decoders.js";
 import {
   asInputErrorIfUndecodable,
   withAiImageEncodeContext,
@@ -350,6 +354,9 @@ export function registerRemoveGifBackground(app: FastifyInstance) {
         try {
           animation = await detectAnimation(fileBuffer, filename);
         } catch (err) {
+          const oom = asDecoderOutOfMemory(err);
+          if (oom instanceof DecoderOutOfMemoryError) throw oom;
+          if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
           return reply.status(400).send({
             error: `Invalid image: ${stripInternalPaths(err instanceof Error ? err.message : "unreadable")}`,
           });

@@ -854,6 +854,55 @@ describe("custom AI image routes input decode, fileExt, SVG prep, and error logg
 
       expect(badBgReply.statusCode).toBe(422);
       expect(badBgReq.log.error).not.toHaveBeenCalled();
+
+      // 6. V8 OOM in detectAnimation (second sharp.prototype.metadata call after validateImageBuffer) rethrows DecoderOutOfMemoryError instead of returning 400 (#3812)
+      const origMetadata = sharp.prototype.metadata;
+      const v8Oom = new RangeError("Array buffer allocation failed");
+      const corruptMetaErr = new Error("Input buffer has corrupt header: gifload");
+      let metaCalls = 0;
+      const metaSpy = vi.spyOn(sharp.prototype, "metadata").mockImplementation(function (
+        this: sharp.Sharp,
+        ...args: Parameters<typeof origMetadata>
+      ) {
+        metaCalls++;
+        if (metaCalls === 2) {
+          return Promise.reject(v8Oom);
+        }
+        if (metaCalls === 4) {
+          return Promise.reject(corruptMetaErr);
+        }
+        return origMetadata.apply(this, args);
+      });
+      try {
+        mocks.deletePrefix.mockClear();
+        const oomReq = makeRequest([
+          { type: "file", fieldname: "file", filename: "anim.gif", file: {} },
+        ]);
+        const oomReply = makeReply();
+        const err = await handlers["/api/v1/tools/image/remove-gif-background"](
+          oomReq,
+          oomReply,
+        ).catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(formatDecoders.DecoderOutOfMemoryError);
+        expect(err).toMatchObject({
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          cause: v8Oom,
+        });
+        expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
+
+        const corruptReq = makeRequest([
+          { type: "file", fieldname: "file", filename: "anim.gif", file: {} },
+        ]);
+        const corruptReply = makeReply();
+        await handlers["/api/v1/tools/image/remove-gif-background"](corruptReq, corruptReply);
+        expect(corruptReply.statusCode).toBe(400);
+        expect(corruptReply.payload).toEqual({
+          error: "Invalid image: Input buffer has corrupt header: gifload",
+        });
+      } finally {
+        metaSpy.mockRestore();
+      }
     } finally {
       sanitizeSpy.mockRestore();
       heicSpy.mockRestore();

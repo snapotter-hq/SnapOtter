@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
+import sharp from "sharp";
+import { describe, expect, it, vi } from "vitest";
 import { detectAnimation } from "../../../apps/api/src/lib/animation-detect.js";
+import { DecoderOutOfMemoryError } from "../../../apps/api/src/lib/format-decoders.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 
 describe("detectAnimation", () => {
@@ -53,5 +55,34 @@ describe("detectAnimation", () => {
     const r = await detectAnimation(readFixture(fixtures.image.formats("webp")));
     expect(r.animated).toBe(false);
     expect(r.frames).toBe(1);
+  });
+
+  it("rethrows DecoderOutOfMemoryError when sharp metadata hits V8 OOM and leaves non-OOM errors untouched (#3812)", async () => {
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    const corruptErr = new Error("Input buffer has corrupt header: gifload");
+    const metaSpy = vi
+      .spyOn(sharp.prototype, "metadata")
+      .mockRejectedValueOnce(v8Oom)
+      .mockRejectedValueOnce(corruptErr);
+    try {
+      const err = await detectAnimation(
+        readFixture(fixtures.image.animated.gif),
+        "animated.gif",
+      ).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(DecoderOutOfMemoryError);
+      expect(err).toMatchObject({
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: v8Oom,
+      });
+
+      const nonOom = await detectAnimation(
+        readFixture(fixtures.image.animated.gif),
+        "animated.gif",
+      ).catch((e: unknown) => e);
+      expect(nonOom).toBe(corruptErr);
+    } finally {
+      metaSpy.mockRestore();
+    }
   });
 });

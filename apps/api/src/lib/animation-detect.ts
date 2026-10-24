@@ -1,5 +1,6 @@
-import sharp from "sharp";
+import sharp, { type Metadata } from "sharp";
 import { apngFrameCount } from "./apng.js";
+import { asDecoderOutOfMemory, DecoderOutOfMemoryError } from "./format-decoders.js";
 
 export interface AnimationInfo {
   animated: boolean;
@@ -19,7 +20,14 @@ export async function detectAnimation(buf: Buffer, _filename?: string): Promise<
   if (apngFrames !== null) {
     return { animated: apngFrames > 1, frames: apngFrames };
   }
-  const meta = await sharp(buf, { animated: true }).metadata();
+  let meta: Metadata;
+  try {
+    meta = await sharp(buf, { animated: true }).metadata();
+  } catch (err) {
+    const oom = asDecoderOutOfMemory(err);
+    if (oom instanceof DecoderOutOfMemoryError) throw oom;
+    throw err;
+  }
   if (meta.format !== "gif" && meta.format !== "webp") {
     return { animated: false, frames: 1 };
   }
