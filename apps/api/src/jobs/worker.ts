@@ -1284,6 +1284,19 @@ async function processPipelineStep(job: Job<ToolJobData>): Promise<ToolJobResult
           ? ((prevRow.error as { message?: string } | null)?.message ?? "Processing failed")
           : "Previous step has no output",
       );
+      if (prevRow?.status !== "failed" && prevRow?.status !== "canceled") {
+        const err = new Error(prevError);
+        logger.error(
+          { err, jobId: data.jobId, prevJobId: data.prevJobId },
+          "pipeline step predecessor has no output",
+        );
+        void reportError(err, {
+          source: "worker",
+          pool: data.pool,
+          toolId: data.toolId,
+          jobId: job.id ?? data.jobId,
+        });
+      }
       await db
         .update(schema.jobs)
         .set({ status: "failed", completedAt: new Date(), error: { message: prevError } })
@@ -1465,6 +1478,14 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
     if (!row) {
       failedAtStep = i;
       failError = `Step ${i + 1} row not found`;
+      const err = new Error(failError);
+      logger.error({ err, jobId: data.jobId, stepId }, "pipeline step row not found");
+      void reportError(err, {
+        source: "worker",
+        pool: data.pool,
+        toolId: data.toolId,
+        jobId: job.id ?? data.jobId,
+      });
       break;
     }
 
@@ -2236,6 +2257,14 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
     const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, childId));
 
     if (!row) {
+      const err = new Error("Child job row not found");
+      logger.error({ err, jobId: data.jobId, childId }, "batch child job row not found");
+      void reportError(err, {
+        source: "worker",
+        pool: data.pool,
+        toolId: data.toolId,
+        jobId: job.id ?? data.jobId,
+      });
       manifest.push({ index: i, filename: `file-${i}`, error: "Child job row not found" });
       // Counted without a code, so it can't be folded into a shared fault.
       childFaults.push({ error: "Child job row not found" });

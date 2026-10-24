@@ -913,6 +913,7 @@ describe("pipeline finalize", () => {
 
   it("fails the pipeline when a step row is missing", async () => {
     const jobId = `pf-${randomUUID()}`;
+    reported.errors.length = 0;
 
     await enqueueToolJob(
       toolJob({
@@ -931,6 +932,9 @@ describe("pipeline finalize", () => {
     const frame = await terminalFrame(jobId);
     expect(frame.phase).toBe("failed");
     expect(frame.error).toBe("Step 1: Step 1 row not found");
+    expect(
+      reported.errors.some((e) => e instanceof Error && e.message === "Step 1 row not found"),
+    ).toBe(true);
 
     const events = await emittedEvents(ANALYTICS_EVENTS.PIPELINE_EXECUTED, jobId);
     const props = events[0];
@@ -2197,6 +2201,7 @@ describe("batch children and finalize", () => {
       error: { message: "child died" },
     });
     // No -f2 row: reported as "Child job row not found".
+    reported.errors.length = 0;
 
     await enqueueToolJob(
       toolJob({
@@ -2227,6 +2232,9 @@ describe("batch children and finalize", () => {
       { index: 1, filename: "orig.png", error: "child died" },
       { index: 2, filename: "file-2", error: "Child job row not found" },
     ]);
+    expect(
+      reported.errors.some((e) => e instanceof Error && e.message === "Child job row not found"),
+    ).toBe(true);
   });
 
   it("settles an all-canceled batch as canceled when the cancel flag expired (#809)", async () => {
