@@ -53,10 +53,12 @@ function executePipeline(
   image: Buffer,
   filename: string,
   pipeline: { steps: Array<{ toolId: string; settings?: Record<string, unknown> }> },
+  clientJobId?: string,
 ) {
   const { body, contentType } = createMultipartPayload([
     { name: "file", filename, content: image, contentType: "image/png" },
     { name: "pipeline", content: JSON.stringify(pipeline) },
+    ...(clientJobId ? [{ name: "clientJobId", content: clientJobId }] : []),
   ]);
   return app.inject({
     method: "POST",
@@ -1100,13 +1102,23 @@ describe.skipIf(!ffmpegAvailable())("Non-image pipeline (video)", () => {
 // EXECUTE INGRESS PREPROCESSING (validate/decode/sanitize branches)
 // ═══════════════════════════════════════════════════════════════════════════
 describe("Pipeline execute ingress preprocessing", () => {
-  it("rejects a garbage buffer with an invalid-image error", async () => {
-    const res = await executePipeline(GARBAGE_IMAGE, "garbage.jpg", {
-      steps: [{ toolId: "resize", settings: { width: 100 } }],
-    });
+  it("rejects a garbage buffer with an invalid-image error without enqueuing a pipeline flow (#3913)", async () => {
+    const clientJobId = `pipeline-reject-${randomUUID()}`;
+    const res = await executePipeline(
+      GARBAGE_IMAGE,
+      "garbage.jpg",
+      {
+        steps: [{ toolId: "resize", settings: { width: 100 } }],
+      },
+      clientJobId,
+    );
 
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).error).toMatch(/invalid image/i);
+
+    await new Promise((r) => setTimeout(r, 100));
+    const rows = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    expect(rows).toHaveLength(0);
   });
 
   it("sanitizes SVG input at ingress before step validation runs", async () => {
@@ -1193,13 +1205,23 @@ describe("Pipeline OCR step ingress gating", () => {
     expect(json.compatibilityReason).toBeDefined();
   });
 
-  it("rejects a garbage image through the OCR ingress preparer", async () => {
-    const res = await executePipeline(GARBAGE_IMAGE, "scan.jpg", {
-      steps: [{ toolId: "ocr", settings: { quality: "fast" } }],
-    });
+  it("rejects a garbage image through the OCR ingress preparer without enqueuing a pipeline flow (#3913)", async () => {
+    const clientJobId = `pipeline-ocr-reject-${randomUUID()}`;
+    const res = await executePipeline(
+      GARBAGE_IMAGE,
+      "scan.jpg",
+      {
+        steps: [{ toolId: "ocr", settings: { quality: "fast" } }],
+      },
+      clientJobId,
+    );
 
     expect(res.statusCode).toBe(400);
     expect(JSON.parse(res.body).error).toMatch(/invalid image/i);
+
+    await new Promise((r) => setTimeout(r, 100));
+    const rows = await db.select().from(schema.jobs).where(eq(schema.jobs.id, clientJobId));
+    expect(rows).toHaveLength(0);
   });
 
   it("rejects Korean fast OCR on the batch endpoint too", async () => {

@@ -551,14 +551,24 @@ async function invokePipelineExecuteRoute(
   };
   const reply = {
     statusCode: 200,
+    sent: false,
     payload: undefined as unknown,
     status(code: number) {
       this.statusCode = code;
       return this;
     },
     send(payload: unknown) {
+      this.sent = true;
       this.payload = payload;
-      return payload;
+      return this;
+    },
+    // Mirror Fastify Reply.prototype.then (fastify/lib/reply.js:486-505):
+    // reply is a thenable that fulfills with undefined once sent.
+    // biome-ignore lint/suspicious/noThenProperty: Intentionally mirrors Fastify Reply.prototype.then
+    then(fulfilled?: () => void) {
+      if (this.sent) {
+        fulfilled?.();
+      }
     },
   };
 
@@ -566,7 +576,7 @@ async function invokePipelineExecuteRoute(
     throw new Error("POST /api/v1/pipeline/execute handler was not registered");
   }
   await handler(request, reply);
-  return reply;
+  return { statusCode: reply.statusCode, payload: reply.payload };
 }
 
 async function invokePipelineBatchRoute(
@@ -614,6 +624,7 @@ async function invokePipelineBatchRoute(
   };
   const reply = {
     statusCode: 200,
+    sent: false,
     payload: undefined as unknown,
     log: request.log,
     status(code: number) {
@@ -621,8 +632,15 @@ async function invokePipelineBatchRoute(
       return this;
     },
     send(payload: unknown) {
+      this.sent = true;
       this.payload = payload;
-      return payload;
+      return this;
+    },
+    // biome-ignore lint/suspicious/noThenProperty: Intentionally mirrors Fastify Reply.prototype.then
+    then(fulfilled?: () => void) {
+      if (this.sent) {
+        fulfilled?.();
+      }
     },
   };
 
@@ -630,7 +648,7 @@ async function invokePipelineBatchRoute(
     throw new Error("POST /api/v1/pipeline/batch handler was not registered");
   }
   await handler(request, reply);
-  return reply;
+  return { statusCode: reply.statusCode, payload: reply.payload, log: reply.log };
 }
 
 describe("pipeline step error message formatting", () => {
@@ -3385,6 +3403,9 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
       expect(execStored).not.toContain("169.254.169.254");
 
       // Over-cap disguised SVG on /api/v1/pipeline/execute returns 400
+      putObjectMock.mockClear();
+      insertValuesMock.mockClear();
+      flowAddMock.mockClear();
       vi.mocked(validateImageBuffer).mockResolvedValueOnce({
         valid: true,
         format: "raw",
@@ -3408,6 +3429,9 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
       expect(execOverCapReply.payload).toEqual({
         error: "SVG exceeds maximum element count of 5000",
       });
+      expect(putObjectMock).not.toHaveBeenCalled();
+      expect(insertValuesMock).not.toHaveBeenCalled();
+      expect(flowAddMock).not.toHaveBeenCalled();
 
       // 2. /api/v1/pipeline/batch with disguised .tga and over-cap .dng SVGs
       putObjectMock.mockClear();
@@ -3494,6 +3518,8 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
         error: "SVG exceeds maximum element count of 5000",
       });
       expect(putObjectMock).not.toHaveBeenCalled();
+      expect(insertValuesMock).not.toHaveBeenCalled();
+      expect(flowAddMock).not.toHaveBeenCalled();
 
       const svgSanitize = await import("../../../apps/api/src/lib/svg-sanitize.js");
       const sanitizeFault = new TypeError("unexpected sanitizer fault");
@@ -3538,6 +3564,9 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
       try {
         for (const fn of ["decompressSvgz", "sanitizeSvg"] as const) {
           fakeNow += 11 * 60_000;
+          putObjectMock.mockClear();
+          insertValuesMock.mockClear();
+          flowAddMock.mockClear();
           if (fn === "decompressSvgz") {
             vi.mocked(svgSanitize.decompressSvgz).mockImplementationOnce(() => {
               throw v8Oom;
@@ -3566,6 +3595,9 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
             error: oomMessage,
             code: "ENGINE_UNAVAILABLE",
           });
+          expect(putObjectMock).not.toHaveBeenCalled();
+          expect(insertValuesMock).not.toHaveBeenCalled();
+          expect(flowAddMock).not.toHaveBeenCalled();
           expect(execLog.warn).toHaveBeenCalledWith(
             expect.objectContaining({
               code: "ENGINE_UNAVAILABLE",
@@ -4008,6 +4040,9 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
         nonOomUnavailableSpy.mockRestore();
       }
 
+      putObjectMock.mockClear();
+      insertValuesMock.mockClear();
+      flowAddMock.mockClear();
       vi.mocked(validateImageBuffer).mockResolvedValueOnce({
         valid: true,
         format: "raw",
@@ -4043,6 +4078,9 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
           error: "Failed to decode raw file",
           details: "dcraw failed at [internal]",
         });
+        expect(putObjectMock).not.toHaveBeenCalled();
+        expect(insertValuesMock).not.toHaveBeenCalled();
+        expect(flowAddMock).not.toHaveBeenCalled();
       } finally {
         nonOomBadFileSpy.mockRestore();
       }
@@ -4083,6 +4121,9 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
           error: "Failed to decode raw file",
           details: "dcraw string error at [internal]",
         });
+        expect(putObjectMock).not.toHaveBeenCalled();
+        expect(insertValuesMock).not.toHaveBeenCalled();
+        expect(flowAddMock).not.toHaveBeenCalled();
       } finally {
         nonErrorBadFileSpy.mockRestore();
       }
@@ -4131,6 +4172,9 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
       for (const phase of ["validate", "orient"] as const) {
         fakeNow += 11 * 60_000;
         reportErrorMock.mockClear();
+        putObjectMock.mockClear();
+        insertValuesMock.mockClear();
+        flowAddMock.mockClear();
         const log = { error: vi.fn(), warn: vi.fn() };
         if (phase === "validate") {
           vi.mocked(validateImageBuffer).mockRejectedValueOnce(
@@ -4161,6 +4205,9 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
           error: oomMessage,
           code: "ENGINE_UNAVAILABLE",
         });
+        expect(putObjectMock).not.toHaveBeenCalled();
+        expect(insertValuesMock).not.toHaveBeenCalled();
+        expect(flowAddMock).not.toHaveBeenCalled();
         expect(log.warn).toHaveBeenCalledWith(
           expect.objectContaining({
             code: "ENGINE_UNAVAILABLE",
@@ -4279,6 +4326,181 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
         height: 100,
       });
       vi.mocked(autoOrient).mockImplementation(async (buf: Buffer) => buf);
+    }
+  });
+
+  it("returns early without uploading, inserting job rows, or enqueuing a flow when image, OCR, or non-image preprocessing rejects on /api/v1/pipeline/execute (#3913)", async () => {
+    const { decodeHeic } = await import("../../../apps/api/src/lib/heic-converter.js");
+    const { InputValidationError } = await import("../../../apps/api/src/modality/contract.js");
+    const { inputHandlerFor } = await import("../../../apps/api/src/modality/input-handler.js");
+
+    registerToolProcessFn({
+      toolId: "ocr",
+      settingsSchema: {
+        safeParse: (d: unknown) => ({ success: true, data: d ?? {} }),
+        parse: (d: unknown) => d ?? {},
+      } as never,
+      process: async (buf: Buffer) => ({
+        buffer: buf,
+        filename: "out.txt",
+        contentType: "text/plain",
+      }),
+    });
+    registerToolProcessFn({
+      toolId: "rotate-pdf",
+      settingsSchema: {
+        safeParse: (d: unknown) => ({ success: true, data: d ?? {} }),
+        parse: (d: unknown) => d ?? {},
+      } as never,
+      process: async (buf: Buffer) => ({
+        buffer: buf,
+        filename: "out.pdf",
+        contentType: "application/pdf",
+      }),
+    });
+
+    try {
+      // 1. Invalid image buffer (400)
+      vi.clearAllMocks();
+      vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+        valid: false,
+        reason: "File is corrupted or not a supported image format",
+      });
+
+      const invalidImgReply = await invokePipelineExecuteRoute([
+        { type: "file", filename: "corrupt.png", content: Buffer.from("not-an-image") },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: executeTestToolId, settings: {} }],
+          }),
+        },
+      ]);
+
+      expect(invalidImgReply.statusCode).toBe(400);
+      expect(invalidImgReply.payload).toEqual({
+        error: "Invalid image: File is corrupted or not a supported image format",
+      });
+      expect(putObjectMock).not.toHaveBeenCalled();
+      expect(insertValuesMock).not.toHaveBeenCalled();
+      expect(flowAddMock).not.toHaveBeenCalled();
+
+      // 2. Undecodable HEIC file (422)
+      vi.clearAllMocks();
+      vi.mocked(validateImageBuffer).mockResolvedValueOnce({
+        valid: true,
+        format: "heif",
+        width: 100,
+        height: 100,
+      });
+      vi.mocked(decodeHeic).mockRejectedValueOnce(
+        new Error("heif-dec failed at /tmp/snapotter-scratch/secret/photo.heic"),
+      );
+
+      const heicReply = await invokePipelineExecuteRoute([
+        { type: "file", filename: "photo.heic", content: Buffer.from("heic-bytes") },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: executeTestToolId, settings: {} }],
+          }),
+        },
+      ]);
+
+      expect(heicReply.statusCode).toBe(422);
+      expect(heicReply.payload).toEqual({
+        error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
+        details: "heif-dec failed at [internal]",
+      });
+      expect(putObjectMock).not.toHaveBeenCalled();
+      expect(insertValuesMock).not.toHaveBeenCalled();
+      expect(flowAddMock).not.toHaveBeenCalled();
+
+      // 3. OCR image preprocessing InputValidationError (503 with details/code)
+      vi.clearAllMocks();
+      const imageHandler = inputHandlerFor("image");
+      const imagePrepareSpy = vi
+        .spyOn(imageHandler, "prepare")
+        .mockRejectedValueOnce(
+          new InputValidationError(
+            "Image decoder is unavailable",
+            503,
+            "libheif is missing",
+            "ENGINE_UNAVAILABLE",
+          ),
+        );
+      try {
+        const ocrPrepReply = await invokePipelineExecuteRoute([
+          { type: "file", filename: "scan.png", content: Buffer.from("png-bytes") },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: [{ toolId: "ocr", settings: { quality: "fast" } }],
+            }),
+          },
+        ]);
+
+        expect(ocrPrepReply.statusCode).toBe(503);
+        expect(ocrPrepReply.payload).toEqual({
+          error: "Image decoder is unavailable",
+          details: "libheif is missing",
+          code: "ENGINE_UNAVAILABLE",
+        });
+        expect(putObjectMock).not.toHaveBeenCalled();
+        expect(insertValuesMock).not.toHaveBeenCalled();
+        expect(flowAddMock).not.toHaveBeenCalled();
+      } finally {
+        imagePrepareSpy.mockRestore();
+      }
+
+      // 4. Non-image modality preprocessing InputValidationError (503 with details/code)
+      vi.clearAllMocks();
+      const docHandler = inputHandlerFor("document");
+      const docPrepareSpy = vi
+        .spyOn(docHandler, "prepare")
+        .mockRejectedValueOnce(
+          new InputValidationError(
+            "PDF processing is unavailable on this server because qpdf could not be started.",
+            503,
+            "Check QPDF_PATH: it must point at an executable qpdf binary, or be unset to use the one in the container.",
+            "ENGINE_UNAVAILABLE",
+          ),
+        );
+      try {
+        const docPrepReply = await invokePipelineExecuteRoute([
+          { type: "file", filename: "doc.pdf", content: Buffer.from("not-a-pdf") },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: [{ toolId: "rotate-pdf", settings: { angle: 90, range: "1-z" } }],
+            }),
+          },
+        ]);
+
+        expect(docPrepReply.statusCode).toBe(503);
+        expect(docPrepReply.payload).toEqual({
+          error: "PDF processing is unavailable on this server because qpdf could not be started.",
+          details:
+            "Check QPDF_PATH: it must point at an executable qpdf binary, or be unset to use the one in the container.",
+          code: "ENGINE_UNAVAILABLE",
+        });
+        expect(putObjectMock).not.toHaveBeenCalled();
+        expect(insertValuesMock).not.toHaveBeenCalled();
+        expect(flowAddMock).not.toHaveBeenCalled();
+      } finally {
+        docPrepareSpy.mockRestore();
+      }
+    } finally {
+      vi.mocked(validateImageBuffer).mockResolvedValue({
+        valid: true,
+        format: "png",
+        width: 100,
+        height: 100,
+      });
     }
   });
 });

@@ -434,194 +434,167 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
             } finally {
               await rm(file.path, { force: true }).catch(() => {});
             }
-          }
-          const preprocessingReply =
-            firstToolId === "ocr-pdf"
-              ? undefined
-              : await (async () => {
-                  if (!processBuffer) throw new Error("Pipeline input buffer is unavailable");
-                  if (inputModality === "image" && firstToolId === "ocr") {
-                    try {
-                      const prepared = await prepareOcrIngressImage(
-                        processBuffer,
-                        filename,
-                        scratchDir,
-                      );
-                      processBuffer = prepared.buffer;
-                      filename = prepared.filename;
-                    } catch (err) {
-                      if (err instanceof InputValidationError) {
-                        reportEngineUnavailable(err, firstToolId ?? "pipeline", request.log);
-                        const body: Record<string, string> = { error: err.message };
-                        if (err.details) body.details = err.details;
-                        if (err.code) body.code = err.code;
-                        return reply.status(err.statusCode).send(body);
-                      }
-                      throw err;
-                    }
-                  } else if (inputModality === "image") {
-                    // Validate the initial image
-                    let validation: Awaited<ReturnType<typeof validateImageBuffer>>;
-                    try {
-                      validation = await validateImageBuffer(processBuffer, filename);
-                    } catch (rawErr) {
-                      const err = asDecoderOutOfMemory(rawErr);
-                      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
-                        const unavailable = engineUnavailable(err);
-                        reportEngineUnavailable(
-                          unavailable,
-                          firstToolId ?? "pipeline",
-                          request.log,
-                        );
-                        const body: Record<string, string> = { error: unavailable.message };
-                        if (unavailable.details) body.details = unavailable.details;
-                        if (unavailable.code) body.code = unavailable.code;
-                        return reply.status(unavailable.statusCode).send(body);
-                      }
-                      throw rawErr;
-                    }
-                    if (!validation.valid) {
-                      return reply.status(400).send({
-                        error: `Invalid image: ${validation.reason}`,
-                      });
-                    }
+            if (inputModality === "image" && firstToolId === "ocr") {
+              try {
+                const prepared = await prepareOcrIngressImage(processBuffer, filename, scratchDir);
+                processBuffer = prepared.buffer;
+                filename = prepared.filename;
+              } catch (err) {
+                if (err instanceof InputValidationError) {
+                  reportEngineUnavailable(err, firstToolId ?? "pipeline", request.log);
+                  const body: Record<string, string> = { error: err.message };
+                  if (err.details) body.details = err.details;
+                  if (err.code) body.code = err.code;
+                  return reply.status(err.statusCode).send(body);
+                }
+                throw err;
+              }
+            } else if (inputModality === "image") {
+              // Validate the initial image
+              let validation: Awaited<ReturnType<typeof validateImageBuffer>>;
+              try {
+                validation = await validateImageBuffer(processBuffer, filename);
+              } catch (rawErr) {
+                const err = asDecoderOutOfMemory(rawErr);
+                if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+                  const unavailable = engineUnavailable(err);
+                  reportEngineUnavailable(unavailable, firstToolId ?? "pipeline", request.log);
+                  const body: Record<string, string> = { error: unavailable.message };
+                  if (unavailable.details) body.details = unavailable.details;
+                  if (unavailable.code) body.code = unavailable.code;
+                  return reply.status(unavailable.statusCode).send(body);
+                }
+                throw rawErr;
+              }
+              if (!validation.valid) {
+                return reply.status(400).send({
+                  error: `Invalid image: ${validation.reason}`,
+                });
+              }
 
-                    // Decode HEIC/HEIF input via system heif-dec
-                    if (validation.format === "heif") {
-                      try {
-                        processBuffer = await decodeHeic(processBuffer);
-                        const ext = filename.match(/\.[^.]+$/)?.[0];
-                        if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
-                      } catch (rawErr) {
-                        const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
-                        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
-                        return reply.status(422).send({
-                          error:
-                            "Failed to decode HEIC file. Ensure libheif-examples is installed.",
-                          details: stripInternalPaths(
-                            err instanceof Error ? err.message : String(err),
-                          ),
-                        });
-                      }
-                    }
+              // Decode HEIC/HEIF input via system heif-dec
+              if (validation.format === "heif") {
+                try {
+                  processBuffer = await decodeHeic(processBuffer);
+                  const ext = filename.match(/\.[^.]+$/)?.[0];
+                  if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
+                } catch (rawErr) {
+                  const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+                  if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+                  return reply.status(422).send({
+                    error: "Failed to decode HEIC file. Ensure libheif-examples is installed.",
+                    details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
+                  });
+                }
+              }
 
-                    // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
-                    let fallbackFormat: string | undefined;
-                    if (needsCliDecode(validation.format)) {
-                      try {
-                        const fileExt =
-                          extname(filename).toLowerCase().replace(/^\./, "") || undefined;
-                        processBuffer = await decodeToSharpCompat(
-                          processBuffer,
-                          validation.format,
-                          fileExt,
-                        );
-                        const ext = filename.match(/\.[^.]+$/)?.[0];
-                        if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
-                      } catch (rawDecodeErr) {
-                        const decodeErr = normalizeOperationalWriteError(
-                          asDecoderOutOfMemory(rawDecodeErr),
-                        );
-                        if (
-                          decodeErr instanceof DecoderOutOfMemoryError ||
-                          (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
-                        ) {
-                          throw decodeErr;
-                        }
-                        try {
-                          const meta = await sharp(processBuffer).metadata();
-                          fallbackFormat = meta.format;
-                          if (fallbackFormat !== "svg") {
-                            await sharp(processBuffer).resize(1).raw().toBuffer();
-                          }
-                        } catch (rawProbeErr) {
-                          const probeErr = asDecoderOutOfMemory(rawProbeErr);
-                          if (probeErr instanceof DecoderOutOfMemoryError) throw probeErr;
-                          if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
-                            throw decodeErr;
-                          }
-                          return reply.status(422).send({
-                            error: `Failed to decode ${validation.format} file`,
-                            details: stripInternalPaths(
-                              decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
-                            ),
-                          });
-                        }
-                      }
-                    }
-
-                    // Sanitize SVG input and normalize EXIF orientation
-                    if (validation.format === "svg" || fallbackFormat === "svg") {
-                      try {
-                        processBuffer = decompressSvgz(processBuffer);
-                        processBuffer = sanitizeSvg(processBuffer);
-                      } catch (err) {
-                        if (isSvgClientError(err)) {
-                          return reply.status(400).send({
-                            error: err instanceof Error ? err.message : "Invalid SVG",
-                          });
-                        }
-                        const oom = asDecoderOutOfMemory(err);
-                        if (oom instanceof DecoderOutOfMemoryError) {
-                          const unavailable = engineUnavailable(oom);
-                          reportEngineUnavailable(
-                            unavailable,
-                            firstToolId ?? "pipeline",
-                            request.log,
-                          );
-                          const body: Record<string, string> = { error: unavailable.message };
-                          if (unavailable.details) body.details = unavailable.details;
-                          if (unavailable.code) body.code = unavailable.code;
-                          return reply.status(unavailable.statusCode).send(body);
-                        }
-                        throw err;
-                      }
-                    } else {
-                      try {
-                        processBuffer = await autoOrient(processBuffer);
-                      } catch (rawErr) {
-                        const err = asDecoderOutOfMemory(rawErr);
-                        if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
-                          const unavailable = engineUnavailable(err);
-                          reportEngineUnavailable(
-                            unavailable,
-                            firstToolId ?? "pipeline",
-                            request.log,
-                          );
-                          const body: Record<string, string> = { error: unavailable.message };
-                          if (unavailable.details) body.details = unavailable.details;
-                          if (unavailable.code) body.code = unavailable.code;
-                          return reply.status(unavailable.statusCode).send(body);
-                        }
-                        throw rawErr;
-                      }
-                    }
-                  } else {
-                    // Non-image input: validate/decode via the tool's modality handler.
-                    try {
-                      const prepared = await inputHandlerFor(inputModality).prepare(
-                        processBuffer,
-                        filename,
-                        {
-                          scratchDir,
-                          lenient: getToolConfig(firstToolId ?? "")?.skipStructuralValidation,
-                        },
-                      );
-                      processBuffer = prepared.buffer;
-                      filename = prepared.filename;
-                    } catch (err) {
-                      if (err instanceof InputValidationError) {
-                        reportEngineUnavailable(err, firstToolId ?? "pipeline", request.log);
-                        const body: Record<string, string> = { error: err.message };
-                        if (err.details) body.details = err.details;
-                        if (err.code) body.code = err.code;
-                        return reply.status(err.statusCode).send(body);
-                      }
-                      throw err;
-                    }
+              // Decode CLI-decoded formats (RAW, TGA, PSD, EXR, HDR)
+              let fallbackFormat: string | undefined;
+              if (needsCliDecode(validation.format)) {
+                try {
+                  const fileExt = extname(filename).toLowerCase().replace(/^\./, "") || undefined;
+                  processBuffer = await decodeToSharpCompat(
+                    processBuffer,
+                    validation.format,
+                    fileExt,
+                  );
+                  const ext = filename.match(/\.[^.]+$/)?.[0];
+                  if (ext) filename = `${filename.slice(0, -ext.length)}.png`;
+                } catch (rawDecodeErr) {
+                  const decodeErr = normalizeOperationalWriteError(
+                    asDecoderOutOfMemory(rawDecodeErr),
+                  );
+                  if (
+                    decodeErr instanceof DecoderOutOfMemoryError ||
+                    (hasServerErrorStatus(decodeErr) && !isDecoderUnavailable(decodeErr))
+                  ) {
+                    throw decodeErr;
                   }
-                })();
-          if (preprocessingReply) return preprocessingReply;
+                  try {
+                    const meta = await sharp(processBuffer).metadata();
+                    fallbackFormat = meta.format;
+                    if (fallbackFormat !== "svg") {
+                      await sharp(processBuffer).resize(1).raw().toBuffer();
+                    }
+                  } catch (rawProbeErr) {
+                    const probeErr = asDecoderOutOfMemory(rawProbeErr);
+                    if (probeErr instanceof DecoderOutOfMemoryError) throw probeErr;
+                    if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
+                      throw decodeErr;
+                    }
+                    return reply.status(422).send({
+                      error: `Failed to decode ${validation.format} file`,
+                      details: stripInternalPaths(
+                        decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
+                      ),
+                    });
+                  }
+                }
+              }
+
+              // Sanitize SVG input and normalize EXIF orientation
+              if (validation.format === "svg" || fallbackFormat === "svg") {
+                try {
+                  processBuffer = decompressSvgz(processBuffer);
+                  processBuffer = sanitizeSvg(processBuffer);
+                } catch (err) {
+                  if (isSvgClientError(err)) {
+                    return reply.status(400).send({
+                      error: err instanceof Error ? err.message : "Invalid SVG",
+                    });
+                  }
+                  const oom = asDecoderOutOfMemory(err);
+                  if (oom instanceof DecoderOutOfMemoryError) {
+                    const unavailable = engineUnavailable(oom);
+                    reportEngineUnavailable(unavailable, firstToolId ?? "pipeline", request.log);
+                    const body: Record<string, string> = { error: unavailable.message };
+                    if (unavailable.details) body.details = unavailable.details;
+                    if (unavailable.code) body.code = unavailable.code;
+                    return reply.status(unavailable.statusCode).send(body);
+                  }
+                  throw err;
+                }
+              } else {
+                try {
+                  processBuffer = await autoOrient(processBuffer);
+                } catch (rawErr) {
+                  const err = asDecoderOutOfMemory(rawErr);
+                  if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) {
+                    const unavailable = engineUnavailable(err);
+                    reportEngineUnavailable(unavailable, firstToolId ?? "pipeline", request.log);
+                    const body: Record<string, string> = { error: unavailable.message };
+                    if (unavailable.details) body.details = unavailable.details;
+                    if (unavailable.code) body.code = unavailable.code;
+                    return reply.status(unavailable.statusCode).send(body);
+                  }
+                  throw rawErr;
+                }
+              }
+            } else {
+              // Non-image input: validate/decode via the tool's modality handler.
+              try {
+                const prepared = await inputHandlerFor(inputModality).prepare(
+                  processBuffer,
+                  filename,
+                  {
+                    scratchDir,
+                    lenient: getToolConfig(firstToolId ?? "")?.skipStructuralValidation,
+                  },
+                );
+                processBuffer = prepared.buffer;
+                filename = prepared.filename;
+              } catch (err) {
+                if (err instanceof InputValidationError) {
+                  reportEngineUnavailable(err, firstToolId ?? "pipeline", request.log);
+                  const body: Record<string, string> = { error: err.message };
+                  if (err.details) body.details = err.details;
+                  if (err.code) body.code = err.code;
+                  return reply.status(err.statusCode).send(body);
+                }
+                throw err;
+              }
+            }
+          }
 
           // Parse and validate the pipeline definition
           if (!pipelineRaw) {
