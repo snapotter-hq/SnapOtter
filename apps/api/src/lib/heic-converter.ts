@@ -322,8 +322,12 @@ export async function encodeHeic(buffer: Buffer, quality = 80): Promise<Buffer> 
     await writeTempExclusive(inputPath, buffer);
     await execFileAsync("heif-enc", ["-q", String(quality), "-o", outputPath, inputPath], {
       timeout: 120_000,
+    }).catch((err: unknown) => {
+      throw asDecoderUnavailable(asDecoderOutOfMemory(err));
     });
-    return await readFile(outputPath);
+    return await readFile(outputPath).catch((err: unknown) => {
+      throw asDecoderOutOfMemory(err);
+    });
   } finally {
     await rm(inputPath, { force: true }).catch(() => {});
     await rm(outputPath, { force: true }).catch(() => {});

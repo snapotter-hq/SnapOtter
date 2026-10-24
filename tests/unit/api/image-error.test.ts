@@ -401,7 +401,7 @@ describe("withImageEncodeContext and environmental errnos (#1450)", () => {
     },
   );
 
-  it("convert's HEIC path passes a real heif-enc spawn ENOENT through unchanged (#3360)", async () => {
+  it("convert's HEIC path surfaces a real heif-enc spawn ENOENT as a 503 ENGINE_UNAVAILABLE DecoderUnavailableError (#3360, #3784)", async () => {
     const previousPath = process.env.PATH;
     process.env.PATH = "";
     try {
@@ -414,10 +414,16 @@ describe("withImageEncodeContext and environmental errnos (#1450)", () => {
         ?.process(readFixture(fixtures.image.base.png200), { format: "heic" }, "in.png")
         .catch((e: unknown) => e);
 
-      expect(isSafeMessageError(thrown)).toBe(false);
+      expect(isSafeMessageError(thrown)).toBe(true);
       expect(thrown).toMatchObject({
-        code: "ENOENT",
-        syscall: "spawn heif-enc",
+        name: "DecoderUnavailableError",
+        kind: "operational",
+        code: "ENGINE_UNAVAILABLE",
+        statusCode: 503,
+        cause: expect.objectContaining({
+          code: "ENOENT",
+          syscall: "spawn heif-enc",
+        }),
       });
       expect(classifyError(thrown, "worker")).toBe("operational");
     } finally {

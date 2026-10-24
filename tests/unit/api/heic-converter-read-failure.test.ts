@@ -19,8 +19,8 @@ const failures = vi.hoisted(() => ({
   writeFile: null as Error | null,
   close: null as Error | null,
   closedHandles: 0,
-  // Which output read fails: heif-dec's single-image name or the -1 fallback.
-  pattern: /heic-out-(?![^/\\]*-1\.png$)[^/\\]*\.png$/,
+  // Which output read fails: heif-dec's single-image name, the -1 fallback, or heif-enc's .heic output.
+  pattern: /heic-out-(?![^/\\]*-1\.png$)[^/\\]*\.(?:png|heic)$/,
   kill: null as Record<string, unknown> | null,
   probe: null as Record<string, unknown> | null,
   probed: [] as string[],
@@ -133,10 +133,14 @@ vi.mock("node:child_process", async (importOriginal) => {
           );
         }
       }
-      if (failures.kill && argv.some((arg) => /heic-in-[^/\\]*\.heic$/.test(arg))) {
+      if (failures.kill && argv.some((arg) => /heic-in-[^/\\]*\.(?:heic|png)$/.test(arg))) {
         const fields = failures.kill;
         failures.kill = null;
-        return Promise.reject(Object.assign(new Error("Command failed: heif-dec"), fields));
+        const cmdName = file === "heif-enc" ? "heif-enc" : "heif-dec";
+        return Promise.reject(Object.assign(new Error(`Command failed: ${cmdName}`), fields));
+      }
+      if (file === "heif-enc" && failures.next) {
+        return Promise.resolve({ stdout: "", stderr: "" });
       }
       return execFileAsync(file, argv, options);
     },
@@ -147,7 +151,7 @@ vi.mock("node:child_process", async (importOriginal) => {
 const { decodeHeic, encodeHeic } = await import("../../../apps/api/src/lib/heic-converter.js");
 const { isDecoderUnavailable } = await import("../../../apps/api/src/lib/format-decoders.js");
 
-const SINGLE = /heic-out-(?![^/\\]*-1\.png$)[^/\\]*\.png$/;
+const SINGLE = /heic-out-(?![^/\\]*-1\.png$)[^/\\]*\.(?:png|heic)$/;
 const SUFFIXED = /heic-out-[^/\\]*-1\.png$/;
 
 afterEach(() => {
@@ -175,6 +179,15 @@ async function decodeError(
     return err as Error & { cause?: unknown };
   }
   throw new Error("decodeHeic resolved");
+}
+
+async function encodeError(buffer: Buffer, quality?: number): Promise<Error & { cause?: unknown }> {
+  try {
+    await encodeHeic(buffer, quality);
+  } catch (err) {
+    return err as Error & { cause?: unknown };
+  }
+  throw new Error("encodeHeic resolved");
 }
 
 function makeHeicHeaderWithoutIspe(): Buffer {
@@ -673,5 +686,118 @@ describe("writeTempExclusive operational write errors in decodeHeic and encodeHe
       }),
     });
     expect(failures.closedHandles).toBe(3);
+  });
+});
+
+describe("encodeHeic heif-enc and output readFile fault classification (#3784)", () => {
+  const png = () => readFixture(fixtures.image.base.png200);
+
+  it("surfaces a SIGKILL from heif-enc as a 503 DecoderOutOfMemoryError", async () => {
+    failures.kill = { killed: false, code: null, signal: "SIGKILL", stderr: "" };
+    const err = await encodeError(png());
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect(err.name).toBe("DecoderOutOfMemoryError");
+    expect((err.cause as { signal?: string } | undefined)?.signal).toBe("SIGKILL");
+  });
+
+  it("surfaces a thread-creation SIGABRT or libheif allocation failure from heif-enc as a 503 DecoderOutOfMemoryError", async () => {
+    failures.kill = {
+      code: null,
+      signal: "SIGABRT",
+      stderr:
+        "terminate called after throwing an instance of 'std::system_error'\n  what():  Resource temporarily unavailable\n",
+    };
+    const threadErr = await encodeError(png());
+    expect(isDecoderUnavailable(threadErr)).toBe(true);
+    expect(threadErr.name).toBe("DecoderOutOfMemoryError");
+    expect(threadErr.message).toContain("thread or process limit");
+
+    failures.kill = {
+      code: 1,
+      signal: null,
+      stderr:
+        "Could not encode image: Memory allocation error: Unspecified: Allocating 4147215 bytes failed\n",
+    };
+    const allocErr = await encodeError(png());
+    expect(isDecoderUnavailable(allocErr)).toBe(true);
+    expect(allocErr.name).toBe("DecoderOutOfMemoryError");
+    expect(allocErr.message).toContain("ran out of memory");
+  });
+
+  it("surfaces exit 127 or a missing codec plugin from heif-enc as a 503 DecoderUnavailableError", async () => {
+    failures.kill = {
+      code: 127,
+      signal: null,
+      stderr: "heif-enc: error while loading shared libraries\n",
+    };
+    const exit127Err = await encodeError(png());
+    expect(isDecoderUnavailable(exit127Err)).toBe(true);
+    expect(exit127Err.name).toBe("DecoderUnavailableError");
+
+    failures.kill = {
+      code: 1,
+      signal: null,
+      stderr: "Cannot encode image: Unsupported feature: Unsupported codec\n",
+    };
+    const pluginErr = await encodeError(png());
+    expect(isDecoderUnavailable(pluginErr)).toBe(true);
+    expect(pluginErr.name).toBe("DecoderUnavailableError");
+  });
+
+  it("surfaces a V8 buffer allocation RangeError when reading heif-enc's output as a 503 DecoderOutOfMemoryError", async () => {
+    const outOfMemory = new RangeError("Array buffer allocation failed");
+    failures.next = outOfMemory;
+    const err = await encodeError(png());
+    expect(isDecoderUnavailable(err)).toBe(true);
+    expect(err.name).toBe("DecoderOutOfMemoryError");
+    expect(err.cause).toBe(outOfMemory);
+  });
+
+  it("leaves non-OOM heif-enc and readFile failures untouched so withImageEncodeContext still reports genuine encode bugs", async () => {
+    failures.kill = { killed: true, code: null, signal: "SIGTERM", stderr: "" };
+    const timeoutErr = await encodeError(png());
+    expect(isDecoderUnavailable(timeoutErr)).toBe(false);
+    expect((timeoutErr as { signal?: string }).signal).toBe("SIGTERM");
+
+    const eio = Object.assign(new Error("EIO: i/o error, read"), { code: "EIO" });
+    failures.next = eio;
+    const readErr = await encodeError(png());
+    expect(readErr).toBe(eio);
+    expect(isDecoderUnavailable(readErr)).toBe(false);
+  });
+
+  it("passes 503 ENGINE_UNAVAILABLE through withImageEncodeContext instead of wrapping as a bug SafeError", async () => {
+    const { withImageEncodeContext } = await import("../../../apps/api/src/lib/image-error.js");
+    const wrapped = withImageEncodeContext(
+      "Image conversion failed",
+      (s: { format: string }) => s.format,
+      async (inputBuffer) => ({
+        buffer: await encodeHeic(inputBuffer),
+        filename: "out.heic",
+        contentType: "image/heic",
+      }),
+    );
+
+    failures.kill = { killed: false, code: null, signal: "SIGKILL", stderr: "" };
+    const sigkillErr = await wrapped(png(), { format: "heic" }, "in.png").catch((e: unknown) => e);
+    expect(sigkillErr).toMatchObject({
+      name: "DecoderOutOfMemoryError",
+      isSafeMessage: true,
+      kind: "operational",
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+    });
+
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    failures.next = v8Oom;
+    const readOomErr = await wrapped(png(), { format: "heic" }, "in.png").catch((e: unknown) => e);
+    expect(readOomErr).toMatchObject({
+      name: "DecoderOutOfMemoryError",
+      isSafeMessage: true,
+      kind: "operational",
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: v8Oom,
+    });
   });
 });
