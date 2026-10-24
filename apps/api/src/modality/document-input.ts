@@ -72,6 +72,7 @@ export async function validatePdfPath(
 ): Promise<void> {
   opts.signal?.throwIfAborted();
   const handle = await open(filePath, "r");
+  let failed = false;
   try {
     const header = Buffer.alloc(5);
     const { bytesRead } = await handle.read(header, 0, header.length, 0);
@@ -85,8 +86,13 @@ export async function validatePdfPath(
         "This file isn't a valid PDF (missing PDF header). Choose a valid PDF file and try again.",
       );
     }
+  } catch (err) {
+    failed = true;
+    throw err;
   } finally {
-    await handle.close();
+    await handle.close().catch((closeErr: unknown) => {
+      if (!failed) throw closeErr;
+    });
   }
 
   opts.signal?.throwIfAborted();

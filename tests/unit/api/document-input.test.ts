@@ -14,6 +14,7 @@ const qpdf = vi.hoisted(() => ({
 
 const fsPromisesSpy = vi.hoisted(() => ({
   mkdir: vi.fn(),
+  open: vi.fn(),
   writeFile: vi.fn(),
 }));
 
@@ -22,12 +23,16 @@ vi.mock("node:fs/promises", async (importOriginal) => {
   fsPromisesSpy.mkdir.mockImplementation((...args: Parameters<typeof actual.mkdir>) =>
     actual.mkdir(...args),
   );
+  fsPromisesSpy.open.mockImplementation((...args: Parameters<typeof actual.open>) =>
+    actual.open(...args),
+  );
   fsPromisesSpy.writeFile.mockImplementation((...args: Parameters<typeof actual.writeFile>) =>
     actual.writeFile(...args),
   );
   return {
     ...actual,
     mkdir: fsPromisesSpy.mkdir,
+    open: fsPromisesSpy.open,
     writeFile: fsPromisesSpy.writeFile,
   };
 });
@@ -726,6 +731,82 @@ describe("path-backed PDF validation", () => {
 
     expect(qpdf.requiresPassword).not.toHaveBeenCalled();
     expect(readdirSync(scratchDir)).toEqual([]);
+  });
+
+  it("preserves InputValidationError and read errors when handle.close() rejects, and surfaces close errors when header validation succeeds (#3930)", async () => {
+    const actualFs = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+    const closeErr = Object.assign(new Error("EIO: i/o error, close"), {
+      code: "EIO",
+      syscall: "close",
+    });
+
+    // 1. Empty (0-byte) file: InputValidationError preserved over close() rejection
+    const emptyPath = join(scratchDir, "empty-close-fail.pdf");
+    writeFileSync(emptyPath, "");
+    fsPromisesSpy.open.mockImplementationOnce(async (...args: Parameters<typeof actualFs.open>) => {
+      const handle = await actualFs.open(...args);
+      const realClose = handle.close.bind(handle);
+      vi.spyOn(handle, "close").mockImplementationOnce(async () => {
+        await realClose();
+        throw closeErr;
+      });
+      return handle;
+    });
+    await expect(validatePdfPath(emptyPath)).rejects.toMatchObject({
+      name: "InputValidationError",
+      statusCode: 400,
+      message: expect.stringMatching(/empty \(0 bytes\)/i),
+    });
+
+    // 2. Non-PDF header: InputValidationError preserved over close() rejection
+    const nonPdfPath = join(scratchDir, "not-a-pdf-close-fail.pdf");
+    writeFileSync(nonPdfPath, "not a PDF");
+    fsPromisesSpy.open.mockImplementationOnce(async (...args: Parameters<typeof actualFs.open>) => {
+      const handle = await actualFs.open(...args);
+      const realClose = handle.close.bind(handle);
+      vi.spyOn(handle, "close").mockImplementationOnce(async () => {
+        await realClose();
+        throw closeErr;
+      });
+      return handle;
+    });
+    await expect(validatePdfPath(nonPdfPath)).rejects.toMatchObject({
+      name: "InputValidationError",
+      statusCode: 400,
+      message: expect.stringMatching(/missing PDF header/i),
+    });
+
+    // 3. Primary handle.read() failure: read error preserved over close() rejection
+    const readErr = Object.assign(new Error("EIO: i/o error, read"), {
+      code: "EIO",
+      syscall: "read",
+    });
+    const validPath = join(scratchDir, "valid-header-close-fail.pdf");
+    writeFileSync(validPath, "%PDF-1.4");
+    fsPromisesSpy.open.mockImplementationOnce(async (...args: Parameters<typeof actualFs.open>) => {
+      const handle = await actualFs.open(...args);
+      const realClose = handle.close.bind(handle);
+      vi.spyOn(handle, "read").mockRejectedValueOnce(readErr);
+      vi.spyOn(handle, "close").mockImplementationOnce(async () => {
+        await realClose();
+        throw closeErr;
+      });
+      return handle;
+    });
+    await expect(validatePdfPath(validPath)).rejects.toBe(readErr);
+
+    // 4. Header check succeeds: close() rejection still surfaces
+    fsPromisesSpy.open.mockImplementationOnce(async (...args: Parameters<typeof actualFs.open>) => {
+      const handle = await actualFs.open(...args);
+      const realClose = handle.close.bind(handle);
+      vi.spyOn(handle, "close").mockImplementationOnce(async () => {
+        await realClose();
+        throw closeErr;
+      });
+      return handle;
+    });
+    await expect(validatePdfPath(validPath)).rejects.toBe(closeErr);
+    expect(qpdf.requiresPassword).not.toHaveBeenCalled();
   });
 });
 
