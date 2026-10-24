@@ -1556,6 +1556,146 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       expect(editInspectCalls).toBe(3);
       unmount();
     }
+
+    // EditMetadataSettings ignores skipped, underscore-prefixed, and blank entries when computing All Metadata section visibility and EXIF/IPTC/XMP/GPS subsection visibility and badges (#3874).
+    {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("a.jpg"), image("b.jpg"), image("c.jpg")]);
+      let editRawCalls = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          editRawCalls++;
+          if (editRawCalls === 1) {
+            return new Response(
+              JSON.stringify({
+                filename: "a.jpg",
+                fileSize: 1024,
+                exif: {
+                  ExifToolVersion: 12.7,
+                  FileName: "a.jpg",
+                  MakerNote: "<binary>",
+                  _internal: "skip",
+                  Artist: "",
+                  Copyright: null,
+                },
+                iptc: {
+                  City: "",
+                  _iptcInternal: "skip",
+                  FileSize: 1024,
+                },
+                xmp: {
+                  Title: "",
+                  _xmpInternal: "skip",
+                },
+                gps: {
+                  GPSMapDatum: "",
+                  _gpsInternal: "skip",
+                },
+              }),
+              { status: 200 },
+            );
+          }
+          if (editRawCalls === 2) {
+            return new Response(
+              JSON.stringify({
+                filename: "b.jpg",
+                fileSize: 1024,
+                exif: {
+                  Make: "Canon",
+                  Model: "EOS R5",
+                  ExifToolVersion: 12.7,
+                  _internal: "skip",
+                  Artist: "",
+                },
+                iptc: {
+                  City: "",
+                  _iptcInternal: "skip",
+                  FileSize: 1024,
+                },
+                xmp: {
+                  Title: "",
+                  _xmpInternal: "skip",
+                },
+                gps: {
+                  GPSMapDatum: "",
+                  _gpsInternal: "skip",
+                },
+              }),
+              { status: 200 },
+            );
+          }
+          return new Response(
+            JSON.stringify({
+              filename: "c.jpg",
+              fileSize: 1024,
+              exif: {
+                Make: "Canon",
+                Model: "EOS R5",
+                ExifToolVersion: 12.7,
+                _internal: "skip",
+                Artist: "",
+              },
+              iptc: {
+                City: "Berlin",
+                Headline: "",
+                _iptcInternal: "skip",
+                FileName: "c.jpg",
+              },
+              xmp: {
+                Creator: "Ada",
+                Rights: "CC-BY",
+                Description: "Photo",
+                Title: "",
+                _xmpInternal: "skip",
+              },
+              gps: {
+                GPSLatitude: 52.52,
+                GPSLongitude: 13.405,
+                GPSMapDatum: "WGS-84",
+                GPSPosition: "52.52 13.405",
+                _gpsInternal: "skip",
+                GPSProcessingMethod: "",
+              },
+            }),
+            { status: 200 },
+          );
+        }),
+      );
+
+      const { unmount } = render(<EditMetadataSettings />);
+      await waitFor(() => expect(screen.getByText("EXIF/IPTC")).toBeInTheDocument());
+      expect(
+        screen.queryByRole("button", { name: en.toolSettings["edit-metadata"].allMetadata }),
+      ).not.toBeInTheDocument();
+
+      // b.jpg: only EXIF has displayable entries; IPTC, XMP, and GPS have only skipped/blank entries and stay hidden
+      act(() => {
+        useFileStore.getState().setSelectedIndex(1);
+      });
+      const allMetadataBtn = await screen.findByRole("button", {
+        name: en.toolSettings["edit-metadata"].allMetadata,
+      });
+      fireEvent.click(allMetadataBtn);
+      expect(screen.getByRole("button", { name: "EXIF2" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^IPTC/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^XMP/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^GPS/ })).not.toBeInTheDocument();
+
+      // c.jpg: all four sections have displayable entries mixed with skipped/blank entries
+      act(() => {
+        useFileStore.getState().setSelectedIndex(2);
+      });
+      const allMetadataBtnC = await screen.findByRole("button", {
+        name: en.toolSettings["edit-metadata"].allMetadata,
+      });
+      fireEvent.click(allMetadataBtnC);
+      expect(screen.getByRole("button", { name: "EXIF2" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "IPTC1" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "XMP3" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "GPS4" })).toBeInTheDocument();
+      unmount();
+    }
   });
 
   it("sets errorCategory to upload_error on 413 and network failures across compose, compare, watermark-image, beautify, and stitch (#3250)", async () => {

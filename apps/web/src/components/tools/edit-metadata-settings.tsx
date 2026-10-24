@@ -9,7 +9,7 @@ import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
-import { EXIF_LABELS, exifStr, SKIP_KEYS } from "@/lib/metadata-utils";
+import { countDisplayableMetadata, EXIF_LABELS, exifStr } from "@/lib/metadata-utils";
 import { useFileStore } from "@/stores/file-store";
 
 interface InspectResult {
@@ -429,6 +429,11 @@ export function EditMetadataSettings() {
   }, [form, initialForm, fieldsToRemove]);
 
   const hasFile = files.length > 0;
+  const exifCount = countDisplayableMetadata(inspectData?.exif);
+  const iptcCount = countDisplayableMetadata(inspectData?.iptc);
+  const xmpCount = countDisplayableMetadata(inspectData?.xmp);
+  const gpsCount = countDisplayableMetadata(inspectData?.gps);
+  const hasRawMetadata = exifCount + iptcCount + xmpCount + gpsCount > 0;
   const gpsLat = inspectData?.gps?.GPSLatitude as number | undefined;
   const gpsLon = inspectData?.gps?.GPSLongitude as number | undefined;
   const gpsCoords = gpsLat != null && gpsLon != null ? { lat: gpsLat, lon: gpsLon } : null;
@@ -821,14 +826,11 @@ export function EditMetadataSettings() {
       )}
 
       {/* Section 5: All Metadata (raw view) */}
-      {hasFile && inspectData && (
+      {hasFile && inspectData && hasRawMetadata && (
         <CollapsibleSection title={t.toolSettings["edit-metadata"].allMetadata}>
           <div className="space-y-2">
-            {inspectData.exif && Object.keys(inspectData.exif).length > 0 && (
-              <CollapsibleSection
-                title="EXIF"
-                badge={`${Object.keys(inspectData.exif).filter((k) => !SKIP_KEYS.has(k)).length}`}
-              >
+            {inspectData.exif && exifCount > 0 && (
+              <CollapsibleSection title="EXIF" badge={`${exifCount}`}>
                 <MetadataGrid
                   data={inspectData.exif}
                   labelMap={EXIF_LABELS}
@@ -837,8 +839,8 @@ export function EditMetadataSettings() {
                 />
               </CollapsibleSection>
             )}
-            {inspectData.iptc && Object.keys(inspectData.iptc).length > 0 && (
-              <CollapsibleSection title="IPTC" badge={`${Object.keys(inspectData.iptc).length}`}>
+            {inspectData.iptc && iptcCount > 0 && (
+              <CollapsibleSection title="IPTC" badge={`${iptcCount}`}>
                 <MetadataGrid
                   data={inspectData.iptc}
                   labelMap={EXIF_LABELS}
@@ -847,8 +849,8 @@ export function EditMetadataSettings() {
                 />
               </CollapsibleSection>
             )}
-            {inspectData.xmp && Object.keys(inspectData.xmp).length > 0 && (
-              <CollapsibleSection title="XMP" badge={`${Object.keys(inspectData.xmp).length}`}>
+            {inspectData.xmp && xmpCount > 0 && (
+              <CollapsibleSection title="XMP" badge={`${xmpCount}`}>
                 <MetadataGrid
                   data={inspectData.xmp}
                   labelMap={EXIF_LABELS}
@@ -857,8 +859,8 @@ export function EditMetadataSettings() {
                 />
               </CollapsibleSection>
             )}
-            {inspectData.gps && Object.keys(inspectData.gps).length > 0 && (
-              <CollapsibleSection title="GPS">
+            {inspectData.gps && gpsCount > 0 && (
+              <CollapsibleSection title="GPS" badge={`${gpsCount}`}>
                 <MetadataGrid data={inspectData.gps} labelMap={EXIF_LABELS} />
               </CollapsibleSection>
             )}
