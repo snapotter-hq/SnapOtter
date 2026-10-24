@@ -397,6 +397,8 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
                 await discardStaged();
                 return reply.status(400).send({ error: (err as Error).message });
               } else {
+                const oom = asDecoderOutOfMemory(err);
+                if (oom instanceof DecoderOutOfMemoryError) throw oom;
                 request.log.error({ err, filename: part.filename }, "SVG sanitize failed");
                 void reportError(err, {
                   source: "http",
@@ -444,6 +446,8 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
                 await discardStaged();
                 return reply.status(400).send({ error: (err as Error).message });
               }
+              const oom = asDecoderOutOfMemory(err);
+              if (oom instanceof DecoderOutOfMemoryError) throw oom;
               request.log.error({ err, filename: part.filename }, "SVG sanitize failed");
               void reportError(err, {
                 source: "http",
@@ -1092,6 +1096,8 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           request.log.warn({ err, filename }, "SVGZ decompression failed");
           return reply.status(400).send({ error: (err as Error).message });
         } else {
+          const oom = asDecoderOutOfMemory(err);
+          if (oom instanceof DecoderOutOfMemoryError) throw oom;
           request.log.error({ err, filename }, "SVG sanitize failed");
           void reportError(err, {
             source: "http",
@@ -1128,6 +1134,8 @@ export async function userFileRoutes(app: FastifyInstance): Promise<void> {
           request.log.warn({ err, filename }, "SVGZ decompression failed");
           return reply.status(400).send({ error: (err as Error).message });
         }
+        const oom = asDecoderOutOfMemory(err);
+        if (oom instanceof DecoderOutOfMemoryError) throw oom;
         request.log.error({ err, filename }, "SVG sanitize failed");
         void reportError(err, {
           source: "http",

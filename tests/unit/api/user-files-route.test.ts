@@ -3013,6 +3013,108 @@ describe("user files route logic", () => {
           expect(faultSaveReply.statusCode).toBe(500);
           expect(faultSaveReply.payload).toEqual({ error: "Internal server error" });
           saveFaultSpy.mockRestore();
+
+          // 4. V8 RangeError in decompressSvgz or sanitizeSvg on upload and save-result rethrows DecoderOutOfMemoryError (#3910)
+          const oom = () => new RangeError("Array buffer allocation failed");
+          for (const [label, fnName, filename, payload] of [
+            ["decompressSvgz on .svgz", "decompressSvgz", "icon.svgz", dirtySvgz],
+            ["sanitizeSvg on .svg", "sanitizeSvg", "icon.svg", dirtySvg],
+            [
+              "decompressSvgz on disguised .apng SVG",
+              "decompressSvgz",
+              "padded.apng",
+              commentPaddedDirtySvg,
+            ],
+            [
+              "sanitizeSvg on disguised .apng SVG",
+              "sanitizeSvg",
+              "padded.apng",
+              commentPaddedDirtySvg,
+            ],
+          ] as const) {
+            mocks.saveFile.mockClear();
+            mocks.deleteStoredFile.mockClear();
+            mocks.insertedValues = undefined;
+            const oomUploadSpy = vi.spyOn(svgSanitize, fnName).mockImplementationOnce(() => {
+              throw oom();
+            });
+            try {
+              const oomUploadLog = { warn: vi.fn(), error: vi.fn() };
+              const rejectedUpload = await uploadHandler(
+                {
+                  log: oomUploadLog,
+                  parts: async function* () {
+                    yield {
+                      type: "file" as const,
+                      fieldname: "file",
+                      filename: "first.png",
+                      mimetype: "image/png",
+                      file: Readable.from([readFixture(fixtures.image.base.png200)]),
+                    };
+                    yield {
+                      type: "file" as const,
+                      fieldname: "file",
+                      filename,
+                      mimetype: "application/octet-stream",
+                      file: Readable.from([payload]),
+                    };
+                  },
+                },
+                makeReply(),
+              ).catch((err: unknown) => err);
+              expect(rejectedUpload, `upload ${label}`).toBeInstanceOf(
+                formatDecoders.DecoderOutOfMemoryError,
+              );
+              expect(rejectedUpload, `upload ${label}`).toMatchObject({
+                statusCode: 503,
+                code: "ENGINE_UNAVAILABLE",
+                kind: "operational",
+                cause: expect.any(RangeError),
+              });
+              expect(mocks.saveFile, `upload ${label}`).toHaveBeenCalledTimes(1);
+              expect(mocks.deleteStoredFile, `upload ${label}`).toHaveBeenCalledWith(
+                "stored-first.png",
+              );
+              expect(mocks.insertedValues, `upload ${label}`).toBeUndefined();
+              expect(oomUploadLog.error, `upload ${label}`).not.toHaveBeenCalled();
+            } finally {
+              oomUploadSpy.mockRestore();
+            }
+
+            mocks.saveFile.mockClear();
+            mocks.insertedValues = undefined;
+            mocks.parentRows = [
+              makeFileRow({ id: "parent-1", originalName: filename, mimeType: "image/svg+xml" }),
+            ];
+            const oomSaveSpy = vi.spyOn(svgSanitize, fnName).mockImplementationOnce(() => {
+              throw oom();
+            });
+            try {
+              const saveOomReq = makeSaveResultRequest({
+                filename,
+                parentId: "parent-1",
+                toolId: "convert",
+                buffer: payload,
+              });
+              const rejectedSave = await saveResultHandler(saveOomReq, makeReply()).catch(
+                (err: unknown) => err,
+              );
+              expect(rejectedSave, `save-result ${label}`).toBeInstanceOf(
+                formatDecoders.DecoderOutOfMemoryError,
+              );
+              expect(rejectedSave, `save-result ${label}`).toMatchObject({
+                statusCode: 503,
+                code: "ENGINE_UNAVAILABLE",
+                kind: "operational",
+                cause: expect.any(RangeError),
+              });
+              expect(mocks.saveFile, `save-result ${label}`).not.toHaveBeenCalled();
+              expect(mocks.insertedValues, `save-result ${label}`).toBeUndefined();
+              expect(saveOomReq.log.error, `save-result ${label}`).not.toHaveBeenCalled();
+            } finally {
+              oomSaveSpy.mockRestore();
+            }
+          }
         } finally {
           decodeSpy.mockRestore();
           mocks.saveFile.mockImplementation(() => Promise.resolve("stored-result.png"));

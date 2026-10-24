@@ -359,6 +359,8 @@ async function fetchSingleUrl(
           log.warn({ err, filename: rawFilename }, "SVGZ decompression failed");
           return { success: false, url, error: (err as Error).message };
         } else {
+          const oom = asDecoderOutOfMemory(err);
+          if (oom instanceof DecoderOutOfMemoryError) throw oom;
           (log.error ?? log.warn).call(log, { err, filename: rawFilename }, "SVG sanitize failed");
           void reportError(err, {
             source: "http",
@@ -395,6 +397,8 @@ async function fetchSingleUrl(
           log.warn({ err, filename: rawFilename }, "SVGZ decompression failed");
           return { success: false, url, error: (err as Error).message };
         }
+        const oom = asDecoderOutOfMemory(err);
+        if (oom instanceof DecoderOutOfMemoryError) throw oom;
         (log.error ?? log.warn).call(log, { err, filename: rawFilename }, "SVG sanitize failed");
         void reportError(err, {
           source: "http",
@@ -486,6 +490,8 @@ async function fetchSingleUrl(
           log.warn({ err, filename: rawFilename }, "SVGZ decompression failed");
           return { success: false, url, error: (err as Error).message };
         }
+        const oom = asDecoderOutOfMemory(err);
+        if (oom instanceof DecoderOutOfMemoryError) throw oom;
         (log.error ?? log.warn).call(log, { err, filename: rawFilename }, "SVG sanitize failed");
         void reportError(err, {
           source: "http",

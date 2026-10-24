@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   reportError: vi.fn(() => Promise.resolve()),
   requireFileAccess: vi.fn(() => Promise.resolve({ id: "user-1", role: "admin" })),
   requirePermission: vi.fn(() => () => Promise.resolve(true)),
+  decompressSvgz: vi.fn((buf: Buffer) => buf),
   sanitizeSvg: vi.fn((buf: Buffer) => buf),
   validateImageBuffer:
     vi.fn<typeof import("../../../apps/api/src/lib/file-validation.js").validateImageBuffer>(),
@@ -77,9 +78,12 @@ vi.mock("../../../apps/api/src/permissions.js", () => ({
 
 vi.mock("../../../apps/api/src/lib/svg-sanitize.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../apps/api/src/lib/svg-sanitize.js")>();
+  mocks.decompressSvgz.mockImplementation(actual.decompressSvgz);
   mocks.sanitizeSvg.mockImplementation(actual.sanitizeSvg);
   return {
     ...actual,
+    decompressSvgz: (...args: Parameters<typeof actual.decompressSvgz>) =>
+      mocks.decompressSvgz(...args),
     sanitizeSvg: (...args: Parameters<typeof actual.sanitizeSvg>) => mocks.sanitizeSvg(...args),
   };
 });
@@ -823,9 +827,11 @@ describe("files route logic", () => {
       mocks.dbInsertValues.mockResolvedValue(undefined);
       mocks.dbDeleteWhere.mockResolvedValue(undefined);
       mocks.requireFileAccess.mockResolvedValue({ id: "user-1", role: "admin" });
-      const { sanitizeSvg: realSanitizeSvg } = await vi.importActual<
-        typeof import("../../../apps/api/src/lib/svg-sanitize.js")
-      >("../../../apps/api/src/lib/svg-sanitize.js");
+      const { decompressSvgz: realDecompressSvgz, sanitizeSvg: realSanitizeSvg } =
+        await vi.importActual<typeof import("../../../apps/api/src/lib/svg-sanitize.js")>(
+          "../../../apps/api/src/lib/svg-sanitize.js",
+        );
+      mocks.decompressSvgz.mockImplementation(realDecompressSvgz);
       mocks.sanitizeSvg.mockImplementation(realSanitizeSvg);
       const { validateImageBuffer: realValidateImageBuffer } = await vi.importActual<
         typeof import("../../../apps/api/src/lib/file-validation.js")
@@ -1527,6 +1533,84 @@ describe("files route logic", () => {
       expect(faultReply.payload).toEqual({ error: "Internal server error" });
       expect(mocks.reportError).toHaveBeenCalledTimes(1);
       expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
+    });
+
+    it("rethrows DecoderOutOfMemoryError after discarding earlier parts when decompressSvgz or sanitizeSvg throws V8 RangeError on POST /api/v1/upload (#3910)", async () => {
+      const { DecoderOutOfMemoryError } = await import(
+        "../../../apps/api/src/lib/format-decoders.js"
+      );
+      const oom = () => new RangeError("Array buffer allocation failed");
+      const cleanSvg = Buffer.from(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>',
+        "utf-8",
+      );
+      const cleanSvgz = gzipSync(cleanSvg);
+      const commentPaddedSvg = Buffer.from(
+        `<!-- ${"x".repeat(4500)} --><svg xmlns="http://www.w3.org/2000/svg" width="25" height="25"><rect width="25" height="25" fill="red"/></svg>`,
+        "utf-8",
+      );
+
+      for (const [label, setupMock, filename, payload] of [
+        [
+          "decompressSvgz on .svgz",
+          () =>
+            mocks.decompressSvgz.mockImplementationOnce(() => {
+              throw oom();
+            }),
+          "icon.svgz",
+          cleanSvgz,
+        ],
+        [
+          "sanitizeSvg on .svg",
+          () =>
+            mocks.sanitizeSvg.mockImplementationOnce(() => {
+              throw oom();
+            }),
+          "icon.svg",
+          cleanSvg,
+        ],
+        [
+          "decompressSvgz on disguised .apng SVG",
+          () =>
+            mocks.decompressSvgz.mockImplementationOnce(() => {
+              throw oom();
+            }),
+          "padded.apng",
+          commentPaddedSvg,
+        ],
+        [
+          "sanitizeSvg on disguised .apng SVG",
+          () =>
+            mocks.sanitizeSvg.mockImplementationOnce(() => {
+              throw oom();
+            }),
+          "padded.apng",
+          commentPaddedSvg,
+        ],
+      ] as const) {
+        vi.clearAllMocks();
+        setupMock();
+        const log = { warn: vi.fn(), error: vi.fn() };
+        const req = makeRequest(
+          [filePart("first.txt", Buffer.from("hello")), filePart(filename, payload)],
+          log,
+        );
+        const reply = makeReply();
+
+        const rejected = await uploadHandler(req, reply).catch((err: unknown) => err);
+        expect(rejected, label).toBeInstanceOf(DecoderOutOfMemoryError);
+        expect(rejected, label).toMatchObject({
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          kind: "operational",
+          cause: expect.any(RangeError),
+        });
+        expect(mocks.putObject, label).toHaveBeenCalledTimes(1);
+        expect(mocks.deletePrefix, label).toHaveBeenCalledTimes(1);
+        expect(mocks.dbDeleteWhere, label).toHaveBeenCalledTimes(1);
+        expect(mocks.reportError, label).not.toHaveBeenCalled();
+        expect(log.error, label).not.toHaveBeenCalled();
+      }
     });
   });
 

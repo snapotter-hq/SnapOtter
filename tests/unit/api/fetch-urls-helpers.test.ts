@@ -1814,6 +1814,98 @@ describe("registerFetchUrlsRoute nameOnly image validations (#3263)", () => {
         ],
       });
       expect(reportErrorMock).toHaveBeenCalledTimes(2);
+
+      // V8 RangeError in decompressSvgz or sanitizeSvg across .svgz/.svg, disguised .apng, and CLI-fallback .tga/.dng rethrows DecoderOutOfMemoryError and discards earlier fetched uploads (#3910)
+      const oom = () => new RangeError("Array buffer allocation failed");
+      const cleanSvg = Buffer.from(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>',
+        "utf-8",
+      );
+      const cleanSvgz = gzipSync(cleanSvg);
+      for (const [label, fnName, targetSuffix, targetPayload] of [
+        ["decompressSvgz on .svgz", "decompressSvgz", "/target.svgz", cleanSvgz],
+        ["sanitizeSvg on .svg", "sanitizeSvg", "/target.svg", cleanSvg],
+        [
+          "decompressSvgz on disguised .apng SVG",
+          "decompressSvgz",
+          "/padded.apng",
+          commentPaddedDirtySvg,
+        ],
+        [
+          "sanitizeSvg on disguised .apng SVG",
+          "sanitizeSvg",
+          "/padded.apng",
+          commentPaddedDirtySvg,
+        ],
+        [
+          "decompressSvgz on disguised .tga SVG",
+          "decompressSvgz",
+          "/padded.tga",
+          commentPaddedDirtySvg,
+        ],
+        ["sanitizeSvg on disguised .tga SVG", "sanitizeSvg", "/padded.tga", commentPaddedDirtySvg],
+      ] as const) {
+        dbInsertValuesMock.mockClear();
+        dbDeleteWhereMock.mockClear();
+        deletePrefixMock.mockClear();
+        putObjectMock.mockClear();
+        reportErrorMock.mockClear();
+
+        let releaseSecondFetch!: () => void;
+        const secondFetchGate = new Promise<void>((resolve) => {
+          releaseSecondFetch = resolve;
+        });
+        putObjectMock.mockImplementationOnce(async () => {
+          releaseSecondFetch();
+        });
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(async (url: string | URL | Request) => {
+            const href = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+            if (href.endsWith(targetSuffix)) {
+              await secondFetchGate;
+              return new Response(new Uint8Array(targetPayload), {
+                status: 200,
+                headers: { "Content-Type": "application/octet-stream" },
+              });
+            }
+            return new Response("hello world", {
+              status: 200,
+              headers: { "Content-Type": "text/plain" },
+            });
+          }),
+        );
+
+        const oomSpy = vi.spyOn(svgSanitize, fnName).mockImplementationOnce(() => {
+          throw oom();
+        });
+        try {
+          const logOom = { warn: vi.fn(), error: vi.fn() };
+          const rejected = await handler(
+            {
+              body: {
+                urls: ["http://1.2.3.4:9999/first.txt", `http://1.2.3.4:9999${targetSuffix}`],
+              },
+              log: logOom,
+            },
+            makeReply(),
+          ).catch((err: unknown) => err);
+          expect(rejected, label).toBeInstanceOf(formatDecoders.DecoderOutOfMemoryError);
+          expect(rejected, label).toMatchObject({
+            statusCode: 503,
+            code: "ENGINE_UNAVAILABLE",
+            kind: "operational",
+            cause: expect.any(RangeError),
+          });
+          expect(putObjectMock, label).toHaveBeenCalledTimes(1);
+          expect(deletePrefixMock, label).toHaveBeenCalledTimes(1);
+          expect(dbDeleteWhereMock, label).toHaveBeenCalledTimes(1);
+          expect(reportErrorMock, label).not.toHaveBeenCalled();
+          expect(logOom.error, label).not.toHaveBeenCalled();
+        } finally {
+          oomSpy.mockRestore();
+        }
+      }
     } finally {
       resizeSpy.mockRestore();
       decodeSpy.mockRestore();

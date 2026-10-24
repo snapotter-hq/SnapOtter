@@ -201,6 +201,8 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
                 await discardUploads();
                 return reply.status(400).send({ error: (err as Error).message });
               } else {
+                const oom = asDecoderOutOfMemory(err);
+                if (oom instanceof DecoderOutOfMemoryError) throw oom;
                 request.log.error({ err, filename: part.filename }, "SVG sanitize failed");
                 void reportError(err, {
                   source: "http",
@@ -237,6 +239,8 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
                 await discardUploads();
                 return reply.status(400).send({ error: (err as Error).message });
               }
+              const oom = asDecoderOutOfMemory(err);
+              if (oom instanceof DecoderOutOfMemoryError) throw oom;
               request.log.error({ err, filename: part.filename }, "SVG sanitize failed");
               void reportError(err, {
                 source: "http",
