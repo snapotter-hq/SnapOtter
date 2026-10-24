@@ -426,4 +426,95 @@ describe("date formatting in app locale (#924)", () => {
     });
     expect(await screen.findByText(expectedBannerText)).toBeInTheDocument();
   });
+
+  it("guards unparseable timestamps in ApiKeysSection, FileListItem, and AutosaveRecoveryBanner (#3955)", async () => {
+    apiGet.mockImplementation(async (path: string) => {
+      if (path === "/v1/api-keys") {
+        return {
+          apiKeys: [
+            {
+              id: 2,
+              name: "corrupt-key",
+              prefix: "si_bad",
+              createdAt: "not-a-date",
+              permissions: null,
+              expiresAt: "also-not-a-date",
+            },
+          ],
+        };
+      }
+      return {};
+    });
+
+    const { unmount } = renderDe(
+      <>
+        <ApiKeysSection />
+        <ul>
+          <FileListItem
+            file={{
+              id: "file-bad",
+              originalName: "corrupt.pdf",
+              mimeType: "application/pdf",
+              size: 1024,
+              version: 1,
+              parentId: null,
+              toolChain: [],
+              createdAt: "not-a-date",
+            }}
+            index={0}
+            tabStop={true}
+            onNavigate={() => {}}
+          />
+        </ul>
+        <AutosaveRecoveryBanner
+          data={{
+            version: 1,
+            timestamp: Number.NaN,
+            state: {
+              canvasSize: { width: 800, height: 600 },
+              layers: [],
+              objects: [],
+              adjustments: {
+                brightness: 0,
+                contrast: 0,
+                hue: 0,
+                saturation: 0,
+                luminance: 0,
+                exposure: 0,
+                vibrance: 0,
+                warmth: 0,
+              },
+              filters: [],
+              guides: [],
+              sourceImageUrl: null,
+              sourceImageSize: null,
+              foregroundColor: "#000000",
+              backgroundColor: "#ffffff",
+            },
+          }}
+          onRestore={() => {}}
+          onDiscard={() => {}}
+        />
+      </>,
+    );
+
+    const expectedExpires = format(de.settings.apiKeys.expiresPrefix, { date: "---" });
+    const expectedCreated = format(de.settings.apiKeys.createdPrefix, { date: "---" });
+    const expectedBanner = format(de.editor.ui.autosaveRecovery.message, { time: "---" });
+
+    expect(await screen.findByText(expectedExpires)).toBeInTheDocument();
+    expect(
+      screen.getByText((_, el) => el?.textContent?.includes(expectedCreated) ?? false, {
+        selector: "p",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(expectedBanner)).toBeInTheDocument();
+
+    const button = screen.getByRole("button", { name: "corrupt.pdf" });
+    const descId = button.getAttribute("aria-describedby");
+    expect(document.getElementById(descId ?? "")?.textContent).toContain("---");
+    expect(screen.getByText("---")).toBeInTheDocument();
+    expect(screen.queryByText(/Invalid Date/)).not.toBeInTheDocument();
+    unmount();
+  });
 });

@@ -26,6 +26,7 @@ const TIME_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = {
 
 export function formatDate(date: Date | string | number, locale: string): string {
   const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return "---";
   try {
     return d.toLocaleDateString(locale, DATE_FORMAT_OPTIONS);
   } catch {
@@ -35,6 +36,7 @@ export function formatDate(date: Date | string | number, locale: string): string
 
 export function formatDateTime(date: Date | string | number, locale: string): string {
   const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return "---";
   try {
     return `${d.toLocaleDateString(locale, DATE_FORMAT_OPTIONS)} ${d.toLocaleTimeString(locale, TIME_FORMAT_OPTIONS)}`;
   } catch {
