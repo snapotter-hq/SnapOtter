@@ -48,6 +48,14 @@ const fsFaults = vi.hoisted(() => ({
     targetFd: number | null;
     closeCalls: number;
   } | null,
+  fstatSyncErrorOnTargetFd: null as {
+    match: string;
+    code: string;
+    targetFd: number | null;
+    fstatCalls: number;
+    closeCalls: number;
+  } | null,
+  fsyncSyncErrorCode: null as string | null,
 }));
 
 const childProcessFaults = vi.hoisted(() => ({
@@ -177,9 +185,40 @@ vi.mock("node:fs", async (importOriginal) => {
       ) {
         fsFaults.closeSyncErrorOnNextOpenPathMatch.targetFd = fd;
       }
+      if (
+        fsFaults.fstatSyncErrorOnTargetFd &&
+        fsFaults.fstatSyncErrorOnTargetFd.targetFd === null &&
+        String(args[0]).includes(fsFaults.fstatSyncErrorOnTargetFd.match)
+      ) {
+        fsFaults.fstatSyncErrorOnTargetFd.targetFd = fd;
+      }
       return fd;
     },
+    fstatSync: ((...args: Parameters<typeof actual.fstatSync>) => {
+      const fault = fsFaults.fstatSyncErrorOnTargetFd;
+      if (fault && args[0] === fault.targetFd) {
+        fault.fstatCalls += 1;
+        throw Object.assign(new Error(`${fault.code}: fstatSync failed`), {
+          code: fault.code,
+        });
+      }
+      return actual.fstatSync(...args);
+    }) as typeof actual.fstatSync,
+    fsyncSync: (...args: Parameters<typeof actual.fsyncSync>) => {
+      if (fsFaults.fsyncSyncErrorCode !== null) {
+        const code = fsFaults.fsyncSyncErrorCode;
+        fsFaults.fsyncSyncErrorCode = null;
+        throw Object.assign(new Error(`${code}: fsyncSync failed`), { code });
+      }
+      return actual.fsyncSync(...args);
+    },
     closeSync: (...args: Parameters<typeof actual.closeSync>) => {
+      if (
+        fsFaults.fstatSyncErrorOnTargetFd &&
+        args[0] === fsFaults.fstatSyncErrorOnTargetFd.targetFd
+      ) {
+        fsFaults.fstatSyncErrorOnTargetFd.closeCalls += 1;
+      }
       const fault = fsFaults.closeSyncErrorOnNextOpenPathMatch;
       if (fault && args[0] === fault.targetFd) {
         fault.closeCalls += 1;
@@ -223,6 +262,8 @@ beforeEach(async () => {
   fsFaults.bakedBaseVenv = null;
   fsFaults.reseedScript = null;
   fsFaults.closeSyncErrorOnNextOpenPathMatch = null;
+  fsFaults.fstatSyncErrorOnTargetFd = null;
+  fsFaults.fsyncSyncErrorCode = null;
   childProcessFaults.nextKernelLockFailure = null;
   childProcessFaults.nextPipInstallTimeout = false;
   childProcessFaults.reseedOutcomes.length = 0;
@@ -527,6 +568,181 @@ describe("Install lock", () => {
     // The message must point the operator at the volume fix, not just EPERM.
     expect((thrown as Error).message).toMatch(/data volume/i);
     expect((thrown as Error).message).toMatch(/PUID|ownership/i);
+  });
+
+  it("preserves SafeError from openKernelInstallLockFile when closeSync throws in catch (#3929)", () => {
+    writeFileSync(kernelLockPath, "", { mode: 0o666 });
+    chmodSync(kernelLockPath, 0o666);
+    fsFaults.denyOwnerOnlyMutationPath = kernelLockPath;
+    fsFaults.closeSyncErrorOnNextOpenPathMatch = {
+      match: "install.flock",
+      code: "EIO",
+      targetFd: null,
+      closeCalls: 0,
+    };
+
+    let thrown: unknown;
+    try {
+      mod.acquireInstallLock("ocr");
+    } catch (error) {
+      thrown = error;
+    }
+    expect(fsFaults.closeSyncErrorOnNextOpenPathMatch.closeCalls).toBe(1);
+    expect(thrown).toMatchObject({
+      isSafeMessage: true,
+      kind: "operational",
+      code: "install-lock-perms",
+    });
+  });
+
+  it("closes kernelFd once when acquireKernelInstallLock or claimInstallMarker returns false and closeSync throws (#3929)", () => {
+    const externalFd = openSync(kernelLockPath, constants.O_RDWR | constants.O_CREAT, 0o660);
+    acquireKernelFlock(externalFd);
+    fsFaults.closeSyncErrorOnNextOpenPathMatch = {
+      match: "install.flock",
+      code: "EIO",
+      targetFd: null,
+      closeCalls: 0,
+    };
+    try {
+      expect(() => mod.acquireInstallLock("ocr")).toThrow(/EIO: closeSync failed/);
+      expect(fsFaults.closeSyncErrorOnNextOpenPathMatch.closeCalls).toBe(1);
+    } finally {
+      closeSync(externalFd);
+    }
+
+    const oldHolderFd = openSync(
+      lockPath,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL,
+      0o660,
+    );
+    writeFileSync(
+      oldHolderFd,
+      JSON.stringify({ bundleId: "ocr", startedAt: new Date().toISOString() }),
+    );
+    fsFaults.closeSyncErrorOnNextOpenPathMatch = {
+      match: "install.flock",
+      code: "EIO",
+      targetFd: null,
+      closeCalls: 0,
+    };
+    try {
+      expect(() => mod.acquireInstallLock("face-detection")).toThrow(/EIO: closeSync failed/);
+      expect(fsFaults.closeSyncErrorOnNextOpenPathMatch.closeCalls).toBe(1);
+    } finally {
+      closeSync(oldHolderFd);
+      unlinkSync(lockPath);
+    }
+  });
+
+  it("ignores closeSync errors on existing.fd in claimInstallMarker when a fresh legacy marker is held (#3929)", () => {
+    const oldHolderFd = openSync(
+      lockPath,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL,
+      0o660,
+    );
+    writeFileSync(
+      oldHolderFd,
+      JSON.stringify({ bundleId: "ocr", startedAt: new Date().toISOString() }),
+    );
+    fsFaults.closeSyncErrorOnNextOpenPathMatch = {
+      match: "install.lock",
+      code: "EIO",
+      targetFd: null,
+      closeCalls: 0,
+    };
+    try {
+      expect(mod.acquireInstallLock("face-detection")).toBe(false);
+      expect(fsFaults.closeSyncErrorOnNextOpenPathMatch.closeCalls).toBe(1);
+    } finally {
+      closeSync(oldHolderFd);
+      unlinkSync(lockPath);
+    }
+  });
+
+  it("closes marker fd and preserves primary error when fstatSync or fsyncSync fails in createInstallMarker (#3929)", () => {
+    fsFaults.fstatSyncErrorOnTargetFd = {
+      match: "install.lock",
+      code: "EIO",
+      targetFd: null,
+      fstatCalls: 0,
+      closeCalls: 0,
+    };
+    expect(() => mod.acquireInstallLock("ocr")).toThrow(/EIO: fstatSync failed/);
+    expect(fsFaults.fstatSyncErrorOnTargetFd.closeCalls).toBe(1);
+    fsFaults.fstatSyncErrorOnTargetFd = null;
+    if (existsSync(lockPath)) unlinkSync(lockPath);
+
+    fsFaults.fsyncSyncErrorCode = "ENOSPC";
+    fsFaults.closeSyncErrorOnNextOpenPathMatch = {
+      match: "install.lock",
+      code: "EIO",
+      targetFd: null,
+      closeCalls: 0,
+    };
+    expect(() => mod.acquireInstallLock("ocr")).toThrow(/ENOSPC: fsyncSync failed/);
+    expect(fsFaults.closeSyncErrorOnNextOpenPathMatch.closeCalls).toBe(1);
+    expect(existsSync(lockPath)).toBe(false);
+  });
+
+  it("preserves marker validation error in openInstallMarker when closeSync throws in catch (#3929)", () => {
+    writeFileSync(
+      lockPath,
+      JSON.stringify({ bundleId: "ocr", startedAt: new Date().toISOString() }),
+    );
+    const hardlinkPath = join(aiDir, "install.lock.hardlink");
+    // Open a hardlinked install.lock so openInstallMarker rejects nlink !== 1
+    // during claimInstallMarker's fallback path.
+    spawnSync("/bin/ln", [lockPath, hardlinkPath]);
+    fsFaults.closeSyncErrorOnNextOpenPathMatch = {
+      match: "install.lock",
+      code: "EIO",
+      targetFd: null,
+      closeCalls: 0,
+    };
+    try {
+      expect(() => mod.acquireInstallLock("face-detection")).toThrow(
+        /AI install marker path is not a private regular file/,
+      );
+      expect(fsFaults.closeSyncErrorOnNextOpenPathMatch.closeCalls).toBe(1);
+    } finally {
+      if (existsSync(hardlinkPath)) unlinkSync(hardlinkPath);
+      if (existsSync(lockPath)) unlinkSync(lockPath);
+    }
+  });
+
+  it("returns observed status in getInstallingBundle when closeSync throws on kernelFd or marker.fd (#3929)", () => {
+    writeFileSync(
+      lockPath,
+      JSON.stringify({
+        bundleId: "ocr",
+        startedAt: "2026-01-01T00:00:00.000Z",
+      }),
+    );
+
+    fsFaults.closeSyncErrorOnNextOpenPathMatch = {
+      match: "install.flock",
+      code: "EIO",
+      targetFd: null,
+      closeCalls: 0,
+    };
+    expect(mod.getInstallingBundle()).toEqual({
+      bundleId: "ocr",
+      startedAt: "2026-01-01T00:00:00.000Z",
+    });
+    expect(fsFaults.closeSyncErrorOnNextOpenPathMatch.closeCalls).toBe(1);
+
+    fsFaults.closeSyncErrorOnNextOpenPathMatch = {
+      match: "install.lock",
+      code: "EIO",
+      targetFd: null,
+      closeCalls: 0,
+    };
+    expect(mod.getInstallingBundle()).toEqual({
+      bundleId: "ocr",
+      startedAt: "2026-01-01T00:00:00.000Z",
+    });
+    expect(fsFaults.closeSyncErrorOnNextOpenPathMatch.closeCalls).toBe(1);
   });
 
   it("heartbeats an owned lease so a long install cannot be stolen", async () => {
@@ -915,6 +1131,31 @@ describe("AI mutation epoch", () => {
     expect(fsFaults.closeSyncErrorOnNextOpenPathMatch.closeCalls).toBe(1);
     expect(existsSync(mutationEpochPath)).toBe(false);
     expect(readdirSync(aiDir).filter((name) => name.startsWith(".install-mutation."))).toEqual([]);
+  });
+
+  it("ignores closeSync errors in getAiMutationEpoch and preserves primary validation errors (#3929)", () => {
+    expect(mod.acquireInstallLock("__uninstall__")).toBe(true);
+    const next = mod.advanceAiMutationEpoch();
+    mod.releaseInstallLock();
+
+    fsFaults.closeSyncErrorOnNextOpenPathMatch = {
+      match: "install-mutation.epoch",
+      code: "EIO",
+      targetFd: null,
+      closeCalls: 0,
+    };
+    expect(mod.getAiMutationEpoch()).toBe(next);
+    expect(fsFaults.closeSyncErrorOnNextOpenPathMatch.closeCalls).toBe(1);
+
+    writeFileSync(mutationEpochPath, "   \n");
+    fsFaults.closeSyncErrorOnNextOpenPathMatch = {
+      match: "install-mutation.epoch",
+      code: "EIO",
+      targetFd: null,
+      closeCalls: 0,
+    };
+    expect(() => mod.getAiMutationEpoch()).toThrow("AI mutation epoch is empty");
+    expect(fsFaults.closeSyncErrorOnNextOpenPathMatch.closeCalls).toBe(1);
   });
 });
 

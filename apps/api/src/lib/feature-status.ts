@@ -449,7 +449,11 @@ function openKernelInstallLockFile(): number {
     }
     return fd;
   } catch (error) {
-    closeSync(fd);
+    try {
+      closeSync(fd);
+    } catch {
+      // Preserve the lock file validation failure.
+    }
     throw error;
   }
 }
@@ -520,7 +524,11 @@ function openInstallMarker(): InstallMarkerSnapshot {
       lock,
     };
   } catch (error) {
-    closeSync(fd);
+    try {
+      closeSync(fd);
+    } catch {
+      // Preserve the marker validation failure.
+    }
     throw error;
   }
 }
@@ -568,13 +576,17 @@ function createInstallMarker(lock: LockData): InstallMarkerSnapshot {
       lock,
     };
   } catch (error) {
-    const opened = fstatSync(fd);
     try {
+      const opened = fstatSync(fd);
       removeInstallMarker({ dev: opened.dev, ino: opened.ino });
     } catch {
       // Preserve the marker creation failure.
     }
-    closeSync(fd);
+    try {
+      closeSync(fd);
+    } catch {
+      // Preserve the marker creation failure.
+    }
     throw error;
   }
 }
@@ -613,7 +625,11 @@ function claimInstallMarker(lock: LockData): InstallMarkerSnapshot | null {
       }
       return null;
     } finally {
-      closeSync(existing.fd);
+      try {
+        closeSync(existing.fd);
+      } catch {
+        // Preserve the marker claim result or primary failure.
+      }
     }
   }
   return null;
@@ -651,7 +667,9 @@ export function acquireInstallLock(bundleId: string): boolean {
   try {
     kernelFd = openKernelInstallLockFile();
     if (!acquireKernelInstallLock(kernelFd)) {
-      closeSync(kernelFd);
+      const closingKernelFd = kernelFd;
+      kernelFd = null;
+      closeSync(closingKernelFd);
       return false;
     }
     const ownerToken = randomUUID();
@@ -663,7 +681,9 @@ export function acquireInstallLock(bundleId: string): boolean {
     };
     marker = claimInstallMarker(lock);
     if (!marker) {
-      closeSync(kernelFd);
+      const closingKernelFd = kernelFd;
+      kernelFd = null;
+      closeSync(closingKernelFd);
       return false;
     }
     ownedInstallLockFd = kernelFd;
@@ -781,10 +801,20 @@ export function getInstallingBundle(): {
       // marker is abandoned. Install paths surface the operational error.
       return observed;
     } finally {
-      if (kernelFd !== null) closeSync(kernelFd);
+      if (kernelFd !== null) {
+        try {
+          closeSync(kernelFd);
+        } catch {
+          // Preserve the observed install status.
+        }
+      }
     }
   } finally {
-    closeSync(marker.fd);
+    try {
+      closeSync(marker.fd);
+    } catch {
+      // Preserve the observed install status.
+    }
   }
 }
 
@@ -818,7 +848,13 @@ export function getAiMutationEpoch(): string {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return INITIAL_AI_MUTATION_EPOCH;
       throw error;
     } finally {
-      if (fd !== null) closeSync(fd);
+      if (fd !== null) {
+        try {
+          closeSync(fd);
+        } catch {
+          // Preserve the read result or primary failure.
+        }
+      }
     }
   }
   throw new Error("Unable to read a stable AI mutation epoch snapshot");
