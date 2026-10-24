@@ -51,7 +51,10 @@ export function sanitizeValue(v: unknown): unknown {
 /**
  * Parse an EXIF buffer into sanitized sections.
  */
-export function parseExif(exifBuffer: Buffer): {
+export function parseExif(
+  exifBuffer: Buffer,
+  options?: { throwOnError?: boolean },
+): {
   image: Record<string, unknown>;
   photo: Record<string, unknown>;
   iop: Record<string, unknown>;
@@ -90,7 +93,10 @@ export function parseExif(exifBuffer: Buffer): {
       }
     }
   } catch (err) {
-    if (err instanceof RangeError && err.message.startsWith("Array buffer allocation failed")) {
+    if (
+      options?.throwOnError ||
+      (err instanceof RangeError && err.message.startsWith("Array buffer allocation failed"))
+    ) {
       throw err;
     }
     // Return empty sections on parse failure

@@ -400,6 +400,49 @@ describe("Inspect endpoint edge cases", () => {
     // PNG without EXIF should not have exif property
     expect(result.exif).toBeUndefined();
   });
+
+  it("sets exif: null and exifError when JPEG has a corrupt APP1 EXIF segment (#3783)", async () => {
+    const baseJpeg = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 10, g: 20, b: 30 } },
+    })
+      .jpeg()
+      .toBuffer();
+    const exifPayload = Buffer.from("Exif\0\0corrupt-tiff-header", "ascii");
+    const app1Len = Buffer.alloc(2);
+    app1Len.writeUInt16BE(exifPayload.length + 2, 0);
+    const app1Segment = Buffer.concat([Buffer.from([0xff, 0xe1]), app1Len, exifPayload]);
+    const corruptExifJpeg = Buffer.concat([
+      baseJpeg.subarray(0, 2),
+      app1Segment,
+      baseJpeg.subarray(2),
+    ]);
+
+    const { body: payload, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "corrupt-exif.jpg",
+        contentType: "image/jpeg",
+        content: corruptExifJpeg,
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/strip-metadata/inspect",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result).toEqual({
+      filename: "corrupt-exif.jpg",
+      fileSize: corruptExifJpeg.length,
+      exif: null,
+      exifError: "Failed to parse EXIF data",
+    });
+  });
 });
 
 // ── Error handling ────────────────────────────────────────────────

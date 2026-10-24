@@ -170,7 +170,7 @@ export function registerStripMetadata(app: FastifyInstance) {
         // Parse EXIF
         if (metadata.exif) {
           try {
-            const parsed = parseExif(metadata.exif);
+            const parsed = parseExif(metadata.exif, { throwOnError: true });
             const exifData: Record<string, unknown> = {
               ...parsed.image,
               ...parsed.photo,

@@ -886,6 +886,34 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         metaSpy.mockRestore();
       }
     });
+
+    it("returns exif: null and exifError when JPEG APP1 EXIF segment has corrupt TIFF header bytes (#3783)", async () => {
+      const baseJpeg = await sharp({
+        create: { width: 8, height: 8, channels: 3, background: { r: 10, g: 20, b: 30 } },
+      })
+        .jpeg()
+        .toBuffer();
+      const exifPayload = Buffer.from("Exif\0\0corrupt-tiff-header", "ascii");
+      const app1Len = Buffer.alloc(2);
+      app1Len.writeUInt16BE(exifPayload.length + 2, 0);
+      const app1Segment = Buffer.concat([Buffer.from([0xff, 0xe1]), app1Len, exifPayload]);
+      const corruptExifJpeg = Buffer.concat([
+        baseJpeg.subarray(0, 2),
+        app1Segment,
+        baseJpeg.subarray(2),
+      ]);
+
+      const reply = await invokeRoute(handler, [
+        { type: "file", filename: "corrupt-exif.jpg", content: corruptExifJpeg },
+      ]);
+      expect(reply.statusCode).toBe(200);
+      expect(reply.payload).toEqual({
+        filename: "corrupt-exif.jpg",
+        fileSize: corruptExifJpeg.length,
+        exif: null,
+        exifError: "Failed to parse EXIF data",
+      });
+    });
   });
 
   describe("POST /api/v1/tools/image/info", () => {

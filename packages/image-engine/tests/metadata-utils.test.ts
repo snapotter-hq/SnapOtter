@@ -214,6 +214,23 @@ describe("parseExif", () => {
     expect(result).toEqual({ image: {}, photo: {}, iop: {}, gps: {} });
   });
 
+  it("rethrows parse errors when throwOnError is true (#3783)", () => {
+    const malformed = Buffer.from("Exif\0\0corrupt-tiff-header", "ascii");
+    expect(() => parseExif(malformed, { throwOnError: true })).toThrow(/Invalid EXIF data/);
+    expect(parseExif(malformed, { throwOnError: false })).toEqual({
+      image: {},
+      photo: {},
+      iop: {},
+      gps: {},
+    });
+    expect(parseExif(Buffer.alloc(0), { throwOnError: true })).toEqual({
+      image: {},
+      photo: {},
+      iop: {},
+      gps: {},
+    });
+  });
+
   it("rethrows V8 buffer allocation RangeError while swallowing non-OOM RangeError (#3835)", () => {
     const v8Oom = new RangeError("Array buffer allocation failed");
     const exifBuf = Buffer.from("Exif\0\0MM\0*", "ascii");
