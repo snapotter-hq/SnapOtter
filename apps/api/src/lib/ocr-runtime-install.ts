@@ -1579,8 +1579,9 @@ async function downloadArchive(
       if (pinnedPartial.identity.size > BigInt(expectedSize)) {
         await assertPinnedPartialIdentity(pinnedPartial.file, partialPath, pinnedPartial.identity);
         await removeExistingPartial(cache, partialName, pinnedPartial.identity);
-        await pinnedPartial.file.close();
+        const closingPartial = pinnedPartial;
         pinnedPartial = null;
+        await closingPartial.file.close();
       } else {
         offset = Number(pinnedPartial.identity.size);
       }
@@ -1600,8 +1601,9 @@ async function downloadArchive(
       }
       await assertPinnedPartialIdentity(pinnedPartial.file, partialPath, pinnedPartial.identity);
       await removeExistingPartial(cache, partialName, pinnedPartial.identity);
-      await pinnedPartial.file.close();
+      const closingPartial = pinnedPartial;
       pinnedPartial = null;
+      await closingPartial.file.close();
       offset = 0;
     }
 
@@ -1651,8 +1653,9 @@ async function downloadArchive(
             pinnedPartial.identity,
           );
           await removeExistingPartial(cache, partialName, pinnedPartial.identity);
-          await pinnedPartial.file.close();
+          const closingPartial = pinnedPartial;
           pinnedPartial = null;
+          await closingPartial.file.close();
         } catch (error) {
           cancelResponseBody(response);
           throw error;

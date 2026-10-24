@@ -353,8 +353,8 @@ export async function saveThumbnail(storedName: string, buffer: Buffer): Promise
   let closed = false;
   try {
     await handle.writeFile(buffer);
-    await handle.close();
     closed = true;
+    await handle.close();
     await rename(tempPath, finalPath);
   } catch (e) {
     if (!closed) await handle.close().catch(() => {});

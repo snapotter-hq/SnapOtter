@@ -841,8 +841,9 @@ export function advanceAiMutationEpoch(): string {
     applyGroupSharedMode(fd);
     writeFileSync(fd, `${next}\n`, "utf8");
     fsyncSync(fd);
-    closeSync(fd);
+    const closingFd = fd;
     fd = null;
+    closeSync(closingFd);
     renameSync(tempPath, MUTATION_EPOCH_PATH);
     return next;
   } catch (error) {

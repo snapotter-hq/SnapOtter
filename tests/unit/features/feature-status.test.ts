@@ -8,6 +8,7 @@ import {
   mkdirSync,
   mkdtempSync,
   openSync,
+  readdirSync,
   readFileSync,
   realpathSync,
   rmSync,
@@ -41,6 +42,12 @@ const fsFaults = vi.hoisted(() => ({
   // Override existsSync for the two image-only reseed inputs. null = real fs.
   bakedBaseVenv: null as boolean | null,
   reseedScript: null as boolean | null,
+  closeSyncErrorOnNextOpenPathMatch: null as {
+    match: string;
+    code: string;
+    targetFd: number | null;
+    closeCalls: number;
+  } | null,
 }));
 
 const childProcessFaults = vi.hoisted(() => ({
@@ -161,6 +168,30 @@ vi.mock("node:fs", async (importOriginal) => {
       if (args[0] === fsFaults.denyReaddirPath) throw permissionError();
       return actual.readdirSync(...args);
     }) as typeof actual.readdirSync,
+    openSync: (...args: Parameters<typeof actual.openSync>) => {
+      const fd = actual.openSync(...args);
+      if (
+        fsFaults.closeSyncErrorOnNextOpenPathMatch &&
+        fsFaults.closeSyncErrorOnNextOpenPathMatch.targetFd === null &&
+        String(args[0]).includes(fsFaults.closeSyncErrorOnNextOpenPathMatch.match)
+      ) {
+        fsFaults.closeSyncErrorOnNextOpenPathMatch.targetFd = fd;
+      }
+      return fd;
+    },
+    closeSync: (...args: Parameters<typeof actual.closeSync>) => {
+      const fault = fsFaults.closeSyncErrorOnNextOpenPathMatch;
+      if (fault && args[0] === fault.targetFd) {
+        fault.closeCalls += 1;
+        if (fault.closeCalls === 1) {
+          actual.closeSync(...args);
+        }
+        throw Object.assign(new Error(`${fault.code}: closeSync failed`), {
+          code: fault.code,
+        });
+      }
+      return actual.closeSync(...args);
+    },
   };
 });
 
@@ -191,6 +222,7 @@ beforeEach(async () => {
   fsFaults.forceNonDocker = false;
   fsFaults.bakedBaseVenv = null;
   fsFaults.reseedScript = null;
+  fsFaults.closeSyncErrorOnNextOpenPathMatch = null;
   childProcessFaults.nextKernelLockFailure = null;
   childProcessFaults.nextPipInstallTimeout = false;
   childProcessFaults.reseedOutcomes.length = 0;
@@ -868,6 +900,21 @@ describe("AI mutation epoch", () => {
     expect(next).toMatch(/^[0-9a-f-]{36}$/i);
     expect(mod.getAiMutationEpoch()).toBe(next);
     expect(readFileSync(mutationEpochPath, "utf-8").trim()).toBe(next);
+  });
+
+  it("closes the staging descriptor once and removes the temp file when closeSync throws in advanceAiMutationEpoch (#3869)", () => {
+    expect(mod.acquireInstallLock("__uninstall__")).toBe(true);
+    fsFaults.closeSyncErrorOnNextOpenPathMatch = {
+      match: ".install-mutation.",
+      code: "EIO",
+      targetFd: null,
+      closeCalls: 0,
+    };
+
+    expect(() => mod.advanceAiMutationEpoch()).toThrow("EIO: closeSync failed");
+    expect(fsFaults.closeSyncErrorOnNextOpenPathMatch.closeCalls).toBe(1);
+    expect(existsSync(mutationEpochPath)).toBe(false);
+    expect(readdirSync(aiDir).filter((name) => name.startsWith(".install-mutation."))).toEqual([]);
   });
 });
 

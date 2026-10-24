@@ -3470,4 +3470,72 @@ describe("FileHandle close and sync error preservation (#3774)", () => {
     expect(rmCalls).toBe(1);
     expect(existsSync(indexPath)).toBe(false);
   });
+
+  it("closes discarded .part handles once in downloadArchive when close() rejects on oversized, corrupt, or HTTP-200-superseded partials (#3869)", async () => {
+    const fixture = signedIndex();
+
+    for (const scenario of ["oversized", "corrupt", "superseded-200"] as const) {
+      const directory = mkdtempSync(join(tmpdir(), `snapotter-ocr-partial-${scenario}-close-eio-`));
+      temporaryDirectories.push(directory);
+      const downloads = join(directory, "v3", "downloads");
+      mkdirSync(downloads, { recursive: true, mode: 0o770 });
+      const partPath = join(downloads, `${fixture.artifact.archive.sha256}.part`);
+      if (scenario === "oversized") {
+        writeFileSync(partPath, Buffer.concat([ARCHIVE_BYTES, Buffer.from("extra")]), {
+          mode: 0o660,
+        });
+      } else if (scenario === "corrupt") {
+        writeFileSync(partPath, Buffer.alloc(ARCHIVE_BYTES.byteLength, 0x78), {
+          mode: 0o660,
+        });
+      } else {
+        writeFileSync(partPath, ARCHIVE_BYTES.subarray(0, 5), {
+          mode: 0o660,
+        });
+      }
+
+      let closeCalls = 0;
+      fsOpenHoisted.interceptor = (path, handle) => {
+        if (!path.endsWith(".part")) return handle;
+        const origClose = handle.close.bind(handle);
+        return new Proxy(handle, {
+          get(target, prop, receiver) {
+            if (prop === "close") {
+              return async () => {
+                closeCalls += 1;
+                await origClose();
+                throw Object.assign(new Error(`EIO: ${scenario} partial close failed`), {
+                  code: "EIO",
+                });
+              };
+            }
+            return Reflect.get(target, prop, receiver);
+          },
+        });
+      };
+
+      const fetchImpl = vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(new Response(fixture.raw, { status: 200 }));
+      if (scenario === "superseded-200") {
+        fetchImpl.mockResolvedValueOnce(new Response(ARCHIVE_BYTES, { status: 200 }));
+      }
+
+      await expect(
+        downloadVerifiedRuntimeRelease({
+          aiDataDir: directory,
+          bundleRepo: "snapotter-hq/feature-bundles",
+          version: "2.1.0",
+          target: TARGET,
+          trustKeys: [fixture.trustKey],
+          fetchImpl,
+        }),
+      ).rejects.toMatchObject({
+        message: `EIO: ${scenario} partial close failed`,
+        code: "EIO",
+      });
+      expect(closeCalls).toBe(1);
+      expect(existsSync(partPath)).toBe(false);
+    }
+  });
 });

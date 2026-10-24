@@ -50,6 +50,7 @@ const diskState = vi.hoisted(() => ({
   failReadFileWith: "",
   failWriteMidway: false as boolean | string,
   failCloseWith: "",
+  closeCalls: 0,
   failRenameWith: "",
   failUnlink: false as boolean | string,
   partialPath: "",
@@ -97,6 +98,7 @@ vi.mock("node:fs/promises", async (importOriginal) => {
         const close = handle.close.bind(handle);
         Object.assign(handle, {
           close: async () => {
+            diskState.closeCalls += 1;
             diskState.partialPath = String(path);
             await close();
             throw errno(closeCode);
@@ -162,6 +164,7 @@ afterEach(async () => {
   diskState.failReadFileWith = "";
   diskState.failWriteMidway = false;
   diskState.failCloseWith = "";
+  diskState.closeCalls = 0;
   diskState.failRenameWith = "";
   diskState.failUnlink = false;
   diskState.partialPath = "";
@@ -1179,6 +1182,7 @@ describe("saveThumbnail after a failed write (#1633)", () => {
       expect(err?.code).toBe("storage-full");
       expect(err?.statusCode).toBe(503);
       expect(err?.cause).toMatchObject({ code });
+      expect(diskState.closeCalls).toBe(1);
       expect(dirname(diskState.partialPath)).toBe(join(testDir, ".thumbs"));
       expect(existsSync(diskState.partialPath)).toBe(false);
       expect(await thumbFiles()).toEqual(["photo.png.thumb.jpg"]);
