@@ -450,9 +450,10 @@ function CollageCell({
   const handleDoubleClick = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
+      if (!image) return;
       store.resetCellTransform(cellIndex);
     },
-    [cellIndex, store],
+    [cellIndex, image, store],
   );
 
   const handleZoomSlider = useCallback(

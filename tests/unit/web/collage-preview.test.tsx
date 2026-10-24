@@ -11,7 +11,7 @@ vi.mock("@/lib/image-preview", () => ({
 
 import { CollagePreview } from "@/components/tools/collage-preview";
 import { CollageSettings } from "@/components/tools/collage-settings";
-import { useCollageStore } from "@/stores/collage-store";
+import { beginCollageRun, useCollageStore } from "@/stores/collage-store";
 
 function imageFile(name: string) {
   return new File([new ArrayBuffer(64)], name, { type: "image/png" });
@@ -435,6 +435,75 @@ describe("CollagePreview touch and mouse cell reordering (#2596)", () => {
     });
     expect(cell3.className).not.toContain("ring-offset-1");
     expect(cell3.style.touchAction).toBe("auto");
+  });
+
+  it("does not clear result metadata, error banner, or active run when double-clicking an empty placeholder cell (#3893)", () => {
+    useCollageStore.getState().addImages([imageFile("first.png"), imageFile("second.png")]);
+    useCollageStore.getState().setTemplateId("3-h-equal");
+    useCollageStore.getState().setCellTransform(0, { zoom: 2, panX: 10, panY: -5 });
+    useCollageStore.getState().setResult("blob:collage-result", 5000, 10000, "job-123");
+    useCollageStore.getState().setPhase("editing");
+    useCollageStore.getState().setError("Upload failed");
+
+    const abort = vi.fn();
+    const run = beginCollageRun(abort);
+
+    render(<CollagePreview />);
+
+    const cell1 = screen.getByRole("button", { name: "Collage cell 1" });
+    const cell3 = screen.getByRole("button", { name: "Collage cell 3" });
+
+    // Double-clicking empty cell 3 (cellAssignments[2] === -1) is a no-op
+    fireEvent.doubleClick(cell3);
+
+    let state = useCollageStore.getState();
+    expect(state.error).toBe("Upload failed");
+    expect(state.resultUrl).toBe("blob:collage-result");
+    expect(state.resultSize).toBe(5000);
+    expect(state.originalSize).toBe(10000);
+    expect(state.jobId).toBe("job-123");
+    expect(state.cellTransforms[0]).toEqual({
+      zoom: 2,
+      panX: 10,
+      panY: -5,
+      objectFit: "cover",
+    });
+    expect(abort).not.toHaveBeenCalled();
+    expect(run.isCurrent()).toBe(true);
+
+    // Out-of-bounds positive cellAssignments also resolve image to null and ignore double-click
+    act(() => {
+      useCollageStore.getState().setCellAssignment(2, 99);
+      useCollageStore.getState().setResult("blob:collage-result-2", 6000, 12000, "job-456");
+      useCollageStore.getState().setPhase("editing");
+      useCollageStore.getState().setError("Second upload failed");
+    });
+    const abortOutOfBounds = vi.fn();
+    const runOutOfBounds = beginCollageRun(abortOutOfBounds);
+
+    fireEvent.doubleClick(cell3);
+
+    state = useCollageStore.getState();
+    expect(state.error).toBe("Second upload failed");
+    expect(state.resultUrl).toBe("blob:collage-result-2");
+    expect(state.resultSize).toBe(6000);
+    expect(state.originalSize).toBe(12000);
+    expect(state.jobId).toBe("job-456");
+    expect(abortOutOfBounds).not.toHaveBeenCalled();
+    expect(runOutOfBounds.isCurrent()).toBe(true);
+
+    // Double-clicking populated cell 1 still resets its transform and clears result/error/run
+    fireEvent.doubleClick(cell1);
+
+    state = useCollageStore.getState();
+    expect(state.cellTransforms[0]).toBeUndefined();
+    expect(state.error).toBeNull();
+    expect(state.resultUrl).toBeNull();
+    expect(state.resultSize).toBeNull();
+    expect(state.originalSize).toBeNull();
+    expect(state.jobId).toBeNull();
+    expect(abortOutOfBounds).toHaveBeenCalledTimes(1);
+    expect(runOutOfBounds.isCurrent()).toBe(false);
   });
 
   it("submits cells with imageIndex -1 for empty slots and sequential upload indices for populated slots (#3796)", () => {
