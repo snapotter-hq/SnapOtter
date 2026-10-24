@@ -82,9 +82,15 @@ export function CollageSettings() {
   const template = getTemplateById(templateId);
   const imageCount = images.length;
   const hasImages = imageCount > 0;
+  const assignedCount = template
+    ? template.cells.reduce((count, _, i) => {
+        const imgIdx = cellAssignments[i] ?? -1;
+        return imgIdx >= 0 && images[imgIdx] ? count + 1 : count;
+      }, 0)
+    : 0;
 
   const handleProcess = useCallback(async () => {
-    if (!hasImages || !template) return;
+    if (!hasImages || !template || assignedCount === 0) return;
 
     store.setPhase("processing");
     store.setProgress(0);
@@ -254,6 +260,7 @@ export function CollageSettings() {
   }, [
     hasImages,
     template,
+    assignedCount,
     store,
     cellAssignments,
     cellTransforms,
@@ -496,13 +503,13 @@ export function CollageSettings() {
         type="button"
         data-testid="collage-submit"
         onClick={handleProcess}
-        disabled={!hasImages || phase === "processing"}
+        disabled={!hasImages || !template || assignedCount === 0 || phase === "processing"}
         className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         {phase === "processing" && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
         {phase === "processing"
           ? t.toolSettings.collage.creating
-          : format(t.toolSettings.collage.submitWithCount, { count: imageCount })}
+          : format(t.toolSettings.collage.submitWithCount, { count: assignedCount })}
       </button>
 
       {resultUrl && (

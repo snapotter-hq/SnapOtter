@@ -659,4 +659,89 @@ describe("CollagePreview touch and mouse cell reordering (#2596)", () => {
       { imageIndex: 1, panX: 15, panY: -10, zoom: 2, objectFit: "contain" },
     ]);
   });
+
+  it("disables submit and reports populated cell count when template cells are vacated (#3802)", () => {
+    const first = imageFile("first.png");
+    const second = imageFile("second.png");
+    const third = imageFile("third.png");
+    useCollageStore.getState().addImages([first, second, third]);
+    // Switch to a 2-cell template with 3 images loaded: 2 cells populated, 3 images loaded
+    useCollageStore.getState().setTemplateId("2-h-equal");
+
+    const sendSpy = vi.fn();
+    class FakeXhr {
+      upload = { onprogress: null as ((e: ProgressEvent) => void) | null };
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      status = 200;
+      responseText = "";
+      open = vi.fn();
+      setRequestHeader = vi.fn();
+      abort = vi.fn();
+      send = sendSpy;
+    }
+    vi.stubGlobal("XMLHttpRequest", FakeXhr);
+
+    render(<CollageSettings />);
+    expect(screen.getByText("3 images loaded")).toBeInTheDocument();
+    const submitBtn = screen.getByTestId("collage-submit") as HTMLButtonElement;
+    expect(submitBtn).toBeEnabled();
+    expect(submitBtn).toHaveTextContent("Create Collage (2 images)");
+
+    // Vacating one cell updates the submit count to 1 while keeping submit enabled
+    act(() => {
+      useCollageStore.getState().setCellAssignment(0, -1);
+    });
+    expect(submitBtn).toBeEnabled();
+    expect(submitBtn).toHaveTextContent("Create Collage (1 images)");
+
+    // Vacating all cells disables submit and updates the submit count to 0
+    act(() => {
+      useCollageStore.getState().setCellAssignment(1, -1);
+    });
+    expect(submitBtn).toBeDisabled();
+    expect(submitBtn).toHaveTextContent("Create Collage (0 images)");
+
+    // Out-of-bounds positive cellAssignments also resolve to no image and keep submit disabled
+    act(() => {
+      useCollageStore.getState().setCellAssignment(0, 99);
+    });
+    expect(submitBtn).toBeDisabled();
+    expect(submitBtn).toHaveTextContent("Create Collage (0 images)");
+
+    // Truncated cellAssignments or assignments beyond template.cells.length also resolve to 0
+    act(() => {
+      useCollageStore.setState({ cellAssignments: [-1, -1, 0] });
+    });
+    expect(submitBtn).toBeDisabled();
+    expect(submitBtn).toHaveTextContent("Create Collage (0 images)");
+    act(() => {
+      useCollageStore.setState({ cellAssignments: [] });
+    });
+    expect(submitBtn).toBeDisabled();
+    expect(submitBtn).toHaveTextContent("Create Collage (0 images)");
+
+    // Even if the DOM disabled attribute is bypassed, handleProcess is a no-op when assignedCount === 0
+    submitBtn.disabled = false;
+    fireEvent.click(submitBtn);
+    expect(sendSpy).not.toHaveBeenCalled();
+    expect(useCollageStore.getState().phase).toBe("editing");
+
+    // Reassigning a cell re-enables submit
+    act(() => {
+      useCollageStore.getState().setCellAssignment(1, 0);
+    });
+    expect(submitBtn).toBeEnabled();
+    expect(submitBtn).toHaveTextContent("Create Collage (1 images)");
+
+    // An unknown templateId also disables submit and makes handleProcess a no-op
+    act(() => {
+      useCollageStore.setState({ templateId: "unknown-template" });
+    });
+    expect(submitBtn).toBeDisabled();
+    expect(submitBtn).toHaveTextContent("Create Collage (0 images)");
+    submitBtn.disabled = false;
+    fireEvent.click(submitBtn);
+    expect(sendSpy).not.toHaveBeenCalled();
+  });
 });
