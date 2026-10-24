@@ -6534,4 +6534,267 @@ describe("pipeline-step and batch-child failure reporting (#951)", () => {
       },
     );
   });
+
+  it("logs and reports completed batch children without outputRefs and missing fallback step rows (#3959)", async () => {
+    const reportErrorMock = vi.fn();
+    const failBatchJobMock = vi.fn().mockResolvedValue(true);
+    const completeBatchJobMock = vi.fn().mockResolvedValue(undefined);
+    const rowsById: Record<string, Record<string, unknown> | undefined> = {
+      "bf-empty-out-f0": {
+        id: "bf-empty-out-f0",
+        type: "batch-child",
+        status: "completed",
+        inputRefs: ["uploads/bf-empty-out-f0/a.png"],
+        outputRefs: [],
+        error: null,
+      },
+      "bf-pipe-empty-f0": {
+        id: "bf-pipe-empty-f0",
+        type: "pipeline-finalize",
+        status: "completed",
+        inputRefs: ["uploads/bf-pipe-empty-f0-s0/b.pdf"],
+        outputRefs: [],
+        settings: { stepCount: 1 },
+        error: null,
+      },
+      "bf-pipe-empty-f0-s0": {
+        id: "bf-pipe-empty-f0-s0",
+        type: "pipeline-step",
+        status: "completed",
+        inputRefs: ["uploads/bf-pipe-empty-f0-s0/b.pdf"],
+        outputRefs: ["outputs/bf-pipe-empty-f0-s0/b.pdf"],
+        error: null,
+      },
+      "bf-pipe-miss-step-f0": {
+        id: "bf-pipe-miss-step-f0",
+        type: "pipeline-finalize",
+        status: "queued",
+        inputRefs: ["uploads/bf-pipe-miss-step-f0-s0/c.pdf"],
+        outputRefs: [],
+        settings: { stepCount: 2 },
+        error: null,
+      },
+      "bf-pipe-miss-step-f0-s0": {
+        id: "bf-pipe-miss-step-f0-s0",
+        type: "pipeline-step",
+        status: "completed",
+        inputRefs: ["uploads/bf-pipe-miss-step-f0-s0/c.pdf"],
+        outputRefs: ["outputs/bf-pipe-miss-step-f0-s0/c.pdf"],
+        error: null,
+      },
+      "bf-pipe-already-failed-f0": {
+        id: "bf-pipe-already-failed-f0",
+        type: "pipeline-finalize",
+        status: "failed",
+        inputRefs: ["uploads/bf-pipe-already-failed-f0-s0/d.pdf"],
+        outputRefs: [],
+        settings: { stepCount: 1 },
+        error: { message: "Step 1: Step 1 row not found" },
+      },
+    };
+
+    const workerMod = await loadWorker("", () => {
+      vi.doMock("../../../../apps/api/src/db/index.js", () => ({
+        db: {
+          select: vi.fn(() => ({
+            from: vi.fn(() => ({
+              where: vi.fn(async (cond: { val?: string }) => {
+                const row = cond?.val ? rowsById[cond.val] : undefined;
+                return row ? [row] : [];
+              }),
+            })),
+          })),
+        },
+        schema: { jobs: { id: "jobs.id" } },
+      }));
+      vi.doMock("../../../../apps/api/src/lib/error-report.js", () => ({
+        classifyError: vi.fn(() => "bug"),
+        reportError: reportErrorMock,
+        safeFormatTag: vi.fn(),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/batch-progress.js", () => ({
+        isBatchCanceled: vi.fn(async () => false),
+        readBatchCounters: vi.fn(async () => ({ done: 0, failed: 0, errors: [] })),
+        recordChildOutcome: vi.fn(),
+      }));
+      vi.doMock("../../../../apps/api/src/routes/progress.js", () => ({
+        cancelBatchJob: vi.fn(),
+        cancelSingleJobGuarded: vi.fn(),
+        completeBatchJob: completeBatchJobMock,
+        failBatchJob: failBatchJobMock,
+        failSingleJobGuarded: vi.fn(),
+        publishEphemeral: vi.fn(),
+        updateSingleFileProgress: vi.fn(),
+        updateSingleFileProgressAtomically: vi.fn(),
+      }));
+      vi.doMock("@snapotter/media-engine", () => ({
+        HW_ACCEL_FAMILIES: [],
+        hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+        softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+        binaryOverrideWarning: vi.fn(),
+        checkBinaryOverrides: vi.fn(() => []),
+        isBinarySpawnFailure,
+        probeFailureLevel: vi.fn(() => "warn"),
+      }));
+    });
+
+    const { Worker } = await import("bullmq");
+    const { logger } = await import("../../../../apps/api/src/lib/logger.js");
+    workerMod.startWorkers();
+    const workerCalls = (Worker as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    const systemCall = workerCalls.find(([queue]) => String(queue).endsWith("system"));
+    if (!systemCall) throw new Error("system worker not registered");
+    const systemProcessor = systemCall[1] as (job: unknown) => Promise<unknown>;
+
+    // 1. Completed batch-child row with empty outputRefs
+    const res1 = (await systemProcessor({
+      id: "bf-empty-out",
+      name: "batch-finalize",
+      data: {
+        kind: "batch-finalize",
+        jobId: "bf-empty-out",
+        toolId: "resize",
+        userId: null,
+        pool: "system",
+        totalFiles: 1,
+        inputRefs: [],
+        filename: "",
+        settings: { flowChildCount: 1 },
+      },
+    })) as { resultPayload?: { manifest?: unknown } };
+
+    expect(res1.resultPayload?.manifest).toEqual([
+      { index: 0, filename: "a.png", error: "Processing failed" },
+    ]);
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        err: expect.any(Error),
+        jobId: "bf-empty-out",
+        childId: "bf-empty-out-f0",
+      }),
+      expect.any(String),
+    );
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Completed child job has no output" }),
+      {
+        source: "worker",
+        pool: "system",
+        toolId: "resize",
+        jobId: "bf-empty-out",
+      },
+    );
+
+    // 2. Completed pipeline-finalize child row with empty outputRefs and no recovered completedOutputRef
+    reportErrorMock.mockClear();
+    (logger.error as ReturnType<typeof vi.fn>).mockClear();
+    objectStorageMocks.getObjectSize.mockRejectedValueOnce(gone("b.pdf"));
+    objectStorageMocks.verifyS3Bucket.mockResolvedValueOnce(undefined);
+
+    const res2 = (await systemProcessor({
+      id: "bf-pipe-empty",
+      name: "batch-finalize",
+      data: {
+        kind: "batch-finalize",
+        jobId: "bf-pipe-empty",
+        toolId: "pipeline-batch",
+        userId: null,
+        pool: "system",
+        totalFiles: 1,
+        inputRefs: [],
+        filename: "",
+        settings: { flowChildCount: 1, stepCount: 1 },
+      },
+    })) as { resultPayload?: { manifest?: unknown } };
+
+    expect(res2.resultPayload?.manifest).toEqual([
+      { index: 0, filename: "b.pdf", error: "Processing failed" },
+    ]);
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        err: expect.any(Error),
+        jobId: "bf-pipe-empty",
+        childId: "bf-pipe-empty-f0",
+      }),
+      expect.any(String),
+    );
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Completed child job has no output" }),
+      {
+        source: "worker",
+        pool: "system",
+        toolId: "pipeline-batch",
+        jobId: "bf-pipe-empty",
+      },
+    );
+
+    // 3. Non-completed pipeline-finalize child row with error === null and a missing step row
+    reportErrorMock.mockClear();
+    (logger.error as ReturnType<typeof vi.fn>).mockClear();
+
+    const res3 = (await systemProcessor({
+      id: "bf-pipe-miss-step",
+      name: "batch-finalize",
+      data: {
+        kind: "batch-finalize",
+        jobId: "bf-pipe-miss-step",
+        toolId: "pipeline-batch",
+        userId: null,
+        pool: "system",
+        totalFiles: 1,
+        inputRefs: [],
+        filename: "",
+        settings: { flowChildCount: 1, stepCount: 2 },
+      },
+    })) as { resultPayload?: { manifest?: unknown } };
+
+    expect(res3.resultPayload?.manifest).toEqual([
+      { index: 0, filename: "c.pdf", error: "Step 2: Step 2 row not found" },
+    ]);
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        err: expect.any(Error),
+        jobId: "bf-pipe-miss-step",
+        childId: "bf-pipe-miss-step-f0",
+        stepId: "bf-pipe-miss-step-f0-s1",
+      }),
+      expect.any(String),
+    );
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Step 2 row not found" }),
+      {
+        source: "worker",
+        pool: "system",
+        toolId: "pipeline-batch",
+        jobId: "bf-pipe-miss-step",
+      },
+    );
+
+    // 4. Already-failed pipeline-finalize child row does not re-report
+    reportErrorMock.mockClear();
+    (logger.error as ReturnType<typeof vi.fn>).mockClear();
+
+    await systemProcessor({
+      id: "bf-pipe-already-failed",
+      name: "batch-finalize",
+      data: {
+        kind: "batch-finalize",
+        jobId: "bf-pipe-already-failed",
+        toolId: "pipeline-batch",
+        userId: null,
+        pool: "system",
+        totalFiles: 1,
+        inputRefs: [],
+        filename: "",
+        settings: { flowChildCount: 1, stepCount: 1 },
+      },
+    });
+
+    expect(reportErrorMock).not.toHaveBeenCalled();
+    expect(logger.error).not.toHaveBeenCalled();
+  });
 });

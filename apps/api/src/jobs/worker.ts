@@ -2138,6 +2138,7 @@ async function fallbackPipelineChildError(
   canceled: boolean;
   step0InputRef?: string;
   completedOutputRef?: string;
+  missingStep?: { stepId: string; message: string };
 }> {
   const maxSteps =
     typeof stepCount === "number" && stepCount > 0
@@ -2148,16 +2149,18 @@ async function fallbackPipelineChildError(
   let step0InputRef: string | undefined;
   let lastStepOutputRef: string | undefined;
   for (let s = 0; s < maxSteps; s++) {
-    const [stepRow] = await db
-      .select()
-      .from(schema.jobs)
-      .where(eq(schema.jobs.id, `${childId}-s${s}`));
+    const stepId = `${childId}-s${s}`;
+    const [stepRow] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, stepId));
     if (!stepRow) {
       if (typeof stepCount === "number" && stepCount > 0) {
         return {
           error: { message: `Step ${s + 1}: Step ${s + 1} row not found` },
           canceled: false,
           step0InputRef,
+          missingStep: {
+            stepId,
+            message: `Step ${s + 1} row not found`,
+          },
         };
       }
       break;
@@ -2309,6 +2312,31 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
           continue;
         }
         rowError = stepFallback.error;
+      }
+      if (stepFallback?.missingStep) {
+        const err = new Error(stepFallback.missingStep.message);
+        logger.error(
+          { err, jobId: data.jobId, childId, stepId: stepFallback.missingStep.stepId },
+          "pipeline step row not found",
+        );
+        void reportError(err, {
+          source: "worker",
+          pool: data.pool,
+          toolId: data.toolId,
+          jobId: job.id ?? data.jobId,
+        });
+      } else if (row.status === "completed") {
+        const err = new Error("Completed child job has no output");
+        logger.error(
+          { err, jobId: data.jobId, childId },
+          "completed batch child job has no output",
+        );
+        void reportError(err, {
+          source: "worker",
+          pool: data.pool,
+          toolId: data.toolId,
+          jobId: job.id ?? data.jobId,
+        });
       }
       if (row.status === "canceled" || stepFallback?.canceled) canceledChildren++;
       const errorMsg = rowError?.message ?? "Processing failed";

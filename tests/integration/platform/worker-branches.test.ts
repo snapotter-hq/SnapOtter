@@ -2201,6 +2201,24 @@ describe("batch children and finalize", () => {
       error: { message: "child died" },
     });
     // No -f2 row: reported as "Child job row not found".
+    await db.insert(schema.jobs).values({
+      id: `${jobId}-f3`,
+      type: "batch-child",
+      status: "completed",
+      toolId: "wt-echo",
+      pool: "image",
+      inputRefs: ["uploads/seed/empty-out.png"],
+      outputRefs: [],
+    });
+    await db.insert(schema.jobs).values({
+      id: `${jobId}-f4`,
+      type: "pipeline-finalize",
+      status: "queued",
+      toolId: "pipeline",
+      pool: "image",
+      inputRefs: ["uploads/seed/pipe-in.png"],
+      settings: { stepCount: 1 },
+    });
     reported.errors.length = 0;
 
     await enqueueToolJob(
@@ -2209,7 +2227,7 @@ describe("batch children and finalize", () => {
         toolId: "batch",
         kind: "batch-finalize",
         pool: "system",
-        settings: { flowChildCount: 3 },
+        settings: { flowChildCount: 5 },
         filename: "batch.zip",
       }),
     );
@@ -2231,9 +2249,19 @@ describe("batch children and finalize", () => {
       { index: 0, filename: "ok.png", outputRef: "outputs/seed/ok.png" },
       { index: 1, filename: "orig.png", error: "child died" },
       { index: 2, filename: "file-2", error: "Child job row not found" },
+      { index: 3, filename: "empty-out.png", error: "Processing failed" },
+      { index: 4, filename: "pipe-in.png", error: "Step 1: Step 1 row not found" },
     ]);
     expect(
       reported.errors.some((e) => e instanceof Error && e.message === "Child job row not found"),
+    ).toBe(true);
+    expect(
+      reported.errors.some(
+        (e) => e instanceof Error && e.message === "Completed child job has no output",
+      ),
+    ).toBe(true);
+    expect(
+      reported.errors.some((e) => e instanceof Error && e.message === "Step 1 row not found"),
     ).toBe(true);
   });
 
