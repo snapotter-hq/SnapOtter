@@ -1326,6 +1326,7 @@ async function processPipelineStep(job: Job<ToolJobData>): Promise<ToolJobResult
   try {
     return await processToolJob(job);
   } catch (err) {
+    reportToolJobFailure(job, err);
     // Step failed -- return failure marker. processToolJob already
     // updated the DB row to "failed" and emitted a terminal event
     // on the step's own progress channel.
@@ -1945,6 +1946,7 @@ async function processBatchChild(job: Job<ToolJobData>): Promise<ToolJobResult> 
   try {
     result = await processToolJob(job);
   } catch (err) {
+    reportToolJobFailure(job, err);
     const rawError =
       (err as { timeoutMessage?: string } | null)?.timeoutMessage ??
       (err instanceof Error ? err.message : String(err));
@@ -2619,6 +2621,36 @@ function jobAgeMs(job: Job): number | undefined {
 }
 
 /**
+ * Report a tool job failure to Sentry (and log Python sidecar frames when
+ * present). Shared by the worker's `failed` listener (single-file tool jobs
+ * and hard-failed finalizes) and by `processPipelineStep` / `processBatchChild`,
+ * which catch `processToolJob` rejections and return failure markers so their
+ * BullMQ parent flows still settle (#951).
+ */
+function reportToolJobFailure(job: Job<ToolJobData>, err: unknown, poolFallback?: string): void {
+  const data = job.data as ToolJobData | undefined;
+  const pool = poolFallback ?? data?.pool;
+  const jobId = job.id ?? data?.jobId;
+  const failedErr =
+    err instanceof Error && err.name === "UnrecoverableError" && err.cause instanceof Error
+      ? err.cause
+      : err;
+  const pf = (failedErr as { pythonFrames?: unknown } | null)?.pythonFrames;
+  if (Array.isArray(pf) && pf.length) {
+    logger.error({ pool, jobId, pythonFrames: pf }, "sidecar failure");
+  }
+  void reportError(failedErr, {
+    source: "worker",
+    pool,
+    toolId: data?.toolId,
+    jobId,
+    inputFormat: safeFormatTag(data?.inputRefs?.[0]) ?? safeFormatTag(data?.filename),
+    settings: data?.settings,
+    jobAgeMs: jobAgeMs(job),
+  });
+}
+
+/**
  * Whether a pipeline flow's durable step rows show that the first
  * non-completed step was canceled (#836). Mirrors processPipelineFinalize's
  * own step scan so the failed-handler safety net and the finalize agree on
@@ -2830,19 +2862,7 @@ export function startWorkers(): void {
             if (frameId !== data.jobId) void netSettle(data.jobId);
           });
       }
-      const pf = (failedErr as { pythonFrames?: unknown }).pythonFrames;
-      if (Array.isArray(pf) && pf.length) {
-        logger.error({ pool, jobId: job.id, pythonFrames: pf }, "sidecar failure");
-      }
-      void reportError(failedErr, {
-        source: "worker",
-        pool,
-        toolId: data?.toolId,
-        jobId: job.id,
-        inputFormat: safeFormatTag(data?.filename),
-        settings: data?.settings,
-        jobAgeMs: jobAgeMs(job),
-      });
+      reportToolJobFailure(job, failedErr, pool);
     });
 
     workers.push(worker);

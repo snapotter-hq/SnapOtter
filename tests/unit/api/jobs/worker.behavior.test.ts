@@ -5907,3 +5907,341 @@ describe("processToolJob expectedArtifactJobId alias guard (#3408)", () => {
     expect(directStepProgressArg).not.toHaveProperty("expectedPipelineFlowId");
   });
 });
+
+// #951: processPipelineStep and processBatchChild catch processToolJob throws
+// and return failure markers so BullMQ parent flows settle, which meant the
+// worker failed listeners never ran for them and their errors never reached
+// reportError.
+describe("pipeline-step and batch-child failure reporting (#951)", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  async function setupProcessor(prevRow?: Record<string, unknown>) {
+    const processV2Mock = vi.fn();
+    const reportErrorMock = vi.fn();
+    const recordChildOutcomeMock = vi.fn().mockResolvedValue(undefined);
+    const dbSetMock = vi.fn(() => ({
+      where: vi.fn().mockResolvedValue(undefined),
+    }));
+    const actualErrorReport = await vi.importActual<
+      typeof import("../../../../apps/api/src/lib/error-report.js")
+    >("../../../../apps/api/src/lib/error-report.js");
+
+    const workerMod = await loadWorker("", () => {
+      vi.doMock("node:fs/promises", () => ({
+        mkdir: vi.fn().mockResolvedValue(undefined),
+        readFile: vi.fn(),
+        rm: vi.fn().mockResolvedValue(undefined),
+      }));
+      vi.doMock("../../../../apps/api/src/db/index.js", () => ({
+        db: {
+          select: vi.fn(() => ({
+            from: vi.fn(() => ({
+              where: vi.fn().mockResolvedValue(prevRow ? [prevRow] : []),
+            })),
+          })),
+          update: vi.fn(() => ({
+            set: dbSetMock,
+          })),
+        },
+        schema: {
+          jobs: {
+            id: "jobs.id",
+            status: "jobs.status",
+            settings: "jobs.settings",
+            outputRefs: "jobs.outputRefs",
+            error: "jobs.error",
+          },
+        },
+      }));
+      vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+        getToolConfig: vi.fn(() => ({ processV2: processV2Mock })),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/ai-handlers.js", () => ({
+        hasAiJobHandler: vi.fn(() => false),
+        hasAiPathJobHandler: vi.fn(() => false),
+        runAiToolJob: vi.fn(),
+        runAiPathToolJob: vi.fn(),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/batch-progress.js", () => ({
+        isBatchCanceled: vi.fn(async () => false),
+        recordChildOutcome: recordChildOutcomeMock,
+      }));
+      vi.doMock("../../../../apps/api/src/lib/error-report.js", () => ({
+        classifyError: actualErrorReport.classifyError,
+        reportError: reportErrorMock,
+        safeFormatTag: actualErrorReport.safeFormatTag,
+      }));
+      vi.doMock("@snapotter/media-engine", () => ({
+        HW_ACCEL_FAMILIES: [],
+        hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+        softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+        binaryOverrideWarning: vi.fn(),
+        checkBinaryOverrides: vi.fn(() => []),
+        isBinarySpawnFailure,
+        probeFailureLevel: vi.fn(() => "warn"),
+      }));
+    });
+
+    objectStorageMocks.getObjectBuffer.mockResolvedValue(Buffer.from("input-bytes"));
+    objectStorageMocks.putObject.mockResolvedValue(undefined);
+    objectStorageMocks.deletePrefix.mockResolvedValue(undefined);
+
+    const { Worker } = await import("bullmq");
+    const { logger } = await import("../../../../apps/api/src/lib/logger.js");
+    workerMod.startWorkers();
+    const workerCalls = (Worker as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    const imageCall = workerCalls.find(([queue]) => String(queue).endsWith("image"));
+    if (!imageCall) throw new Error("image pool worker not registered");
+    const processor = imageCall[1] as (job: unknown) => Promise<unknown>;
+
+    return { processor, processV2Mock, reportErrorMock, recordChildOutcomeMock, logger };
+  }
+
+  it("reports a failed pipeline step with worker context and unwraps UnrecoverableError causes", async () => {
+    const { processor, processV2Mock, reportErrorMock, logger } = await setupProcessor({
+      status: "completed",
+      outputRefs: ["outputs/pipe-1-s0/converted.webp"],
+      error: null,
+    });
+
+    const bugErr = new Error("sharp pipeline assertion failed");
+    processV2Mock.mockRejectedValueOnce(bugErr);
+
+    const stepResult = await processor({
+      id: "pipe-1-s1",
+      timestamp: 1_000,
+      processedOn: 4_500,
+      attemptsMade: 0,
+      opts: { attempts: 1 },
+      updateProgress: vi.fn(),
+      data: {
+        kind: "pipeline-step",
+        jobId: "pipe-1-s1",
+        prevJobId: "pipe-1-s0",
+        stepIndex: 1,
+        totalSteps: 2,
+        toolId: "image-enhancement",
+        userId: null,
+        pool: "image",
+        inputRefs: [],
+        filename: "photo.jpg",
+        settings: { preset: "vivid" },
+      },
+    });
+
+    expect(stepResult).toMatchObject({
+      outputRefs: [],
+      filename: "photo.jpg",
+      resultPayload: { failed: true, error: "sharp pipeline assertion failed" },
+    });
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+    expect(reportErrorMock).toHaveBeenCalledWith(bugErr, {
+      source: "worker",
+      pool: "image",
+      toolId: "image-enhancement",
+      jobId: "pipe-1-s1",
+      inputFormat: "webp",
+      settings: { preset: "vivid" },
+      jobAgeMs: 3_500,
+    });
+
+    // UnrecoverableError wrapping a sidecar/engine failure unwraps cause and logs pythonFrames.
+    reportErrorMock.mockClear();
+    const { SafeError } = await vi.importActual<
+      typeof import("../../../../packages/shared/src/tool-errors.js")
+    >("../../../../packages/shared/src/tool-errors.js");
+    const sidecarErr = Object.assign(
+      new SafeError("Engine unavailable", {
+        kind: "operational",
+        code: "ENGINE_UNAVAILABLE",
+        statusCode: 503,
+      }),
+      { pythonFrames: [{ file: "enhance.py", line: 42, func: "run" }] },
+    );
+    processV2Mock.mockRejectedValueOnce(sidecarErr);
+
+    await processor({
+      id: "pipe-2-s0",
+      timestamp: 2_000,
+      processedOn: 3_000,
+      attemptsMade: 0,
+      opts: { attempts: 1 },
+      updateProgress: vi.fn(),
+      data: {
+        kind: "pipeline-step",
+        jobId: "pipe-2-s0",
+        stepIndex: 0,
+        totalSteps: 1,
+        toolId: "image-enhancement",
+        userId: null,
+        pool: "ai",
+        inputRefs: ["uploads/pipe-2-s0/photo.png"],
+        filename: "photo.png",
+        settings: {},
+      },
+    });
+
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+    expect(reportErrorMock).toHaveBeenCalledWith(sidecarErr, {
+      source: "worker",
+      pool: "ai",
+      toolId: "image-enhancement",
+      jobId: "pipe-2-s0",
+      inputFormat: "png",
+      settings: {},
+      jobAgeMs: 1_000,
+    });
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pool: "ai",
+        jobId: "pipe-2-s0",
+        pythonFrames: sidecarErr.pythonFrames,
+      }),
+      "sidecar failure",
+    );
+  });
+
+  it("does not report a subsequent pipeline step that skips processing because a previous step failed", async () => {
+    const { processor, processV2Mock, reportErrorMock } = await setupProcessor({
+      status: "failed",
+      outputRefs: [],
+      error: { message: "step 1 boom" },
+    });
+
+    const stepResult = await processor({
+      id: "pipe-skip-s1",
+      attemptsMade: 0,
+      opts: { attempts: 1 },
+      updateProgress: vi.fn(),
+      data: {
+        kind: "pipeline-step",
+        jobId: "pipe-skip-s1",
+        prevJobId: "pipe-skip-s0",
+        stepIndex: 1,
+        totalSteps: 2,
+        toolId: "resize",
+        userId: null,
+        pool: "image",
+        inputRefs: [],
+        filename: "photo.jpg",
+        settings: {},
+      },
+    });
+
+    expect(stepResult).toMatchObject({
+      resultPayload: { failed: true, error: "step 1 boom" },
+    });
+    expect(processV2Mock).not.toHaveBeenCalled();
+    expect(reportErrorMock).not.toHaveBeenCalled();
+  });
+
+  it("reports a failed batch child with worker context and unwraps UnrecoverableError causes", async () => {
+    const { processor, processV2Mock, reportErrorMock, recordChildOutcomeMock, logger } =
+      await setupProcessor();
+
+    const { SafeError } = await vi.importActual<
+      typeof import("../../../../packages/shared/src/tool-errors.js")
+    >("../../../../packages/shared/src/tool-errors.js");
+    const childErr = Object.assign(
+      new SafeError("Engine unavailable", {
+        kind: "operational",
+        code: "ENGINE_UNAVAILABLE",
+        statusCode: 503,
+      }),
+      { pythonFrames: [{ file: "upscale.py", line: 19, func: "main" }] },
+    );
+    processV2Mock.mockRejectedValueOnce(childErr);
+
+    const childResult = await processor({
+      id: "batch-1-f0",
+      timestamp: 500,
+      processedOn: 2_500,
+      attemptsMade: 0,
+      opts: { attempts: 1 },
+      updateProgress: vi.fn(),
+      data: {
+        kind: "batch-child",
+        jobId: "batch-1-f0",
+        parentId: "batch-1",
+        totalFiles: 2,
+        toolId: "upscale",
+        userId: null,
+        pool: "ai",
+        inputRefs: ["uploads/batch-1-f0/frame.tiff"],
+        filename: "frame.tiff",
+        settings: { scale: 2 },
+      },
+    });
+
+    expect(childResult).toMatchObject({
+      outputRefs: [],
+      filename: "frame.tiff",
+      resultPayload: { failed: true, error: "Engine unavailable" },
+    });
+    expect(recordChildOutcomeMock).toHaveBeenCalledWith(
+      "batch-1",
+      2,
+      "frame.tiff",
+      "Engine unavailable",
+    );
+    expect(reportErrorMock).toHaveBeenCalledTimes(1);
+    expect(reportErrorMock).toHaveBeenCalledWith(childErr, {
+      source: "worker",
+      pool: "ai",
+      toolId: "upscale",
+      jobId: "batch-1-f0",
+      inputFormat: "tiff",
+      settings: { scale: 2 },
+      jobAgeMs: 2_000,
+    });
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pool: "ai",
+        jobId: "batch-1-f0",
+        pythonFrames: childErr.pythonFrames,
+      }),
+      "sidecar failure",
+    );
+
+    // When inputRefs[0] has no extension, inputFormat falls back to data.filename.
+    reportErrorMock.mockClear();
+    const fallbackErr = new Error("codec fault");
+    processV2Mock.mockRejectedValueOnce(fallbackErr);
+
+    await processor({
+      id: "batch-1-f1",
+      timestamp: 1_000,
+      processedOn: 2_000,
+      attemptsMade: 0,
+      opts: { attempts: 1 },
+      updateProgress: vi.fn(),
+      data: {
+        kind: "batch-child",
+        jobId: "batch-1-f1",
+        parentId: "batch-1",
+        totalFiles: 2,
+        toolId: "upscale",
+        userId: null,
+        pool: "ai",
+        inputRefs: ["uploads/batch-1-f1/blob"],
+        filename: "frame.tiff",
+        settings: { scale: 2 },
+      },
+    });
+
+    expect(reportErrorMock).toHaveBeenCalledWith(fallbackErr, {
+      source: "worker",
+      pool: "ai",
+      toolId: "upscale",
+      jobId: "batch-1-f1",
+      inputFormat: "tiff",
+      settings: { scale: 2 },
+      jobAgeMs: 1_000,
+    });
+  });
+});

@@ -873,6 +873,44 @@ describe("tool job failure paths", () => {
 });
 
 describe("pipeline finalize", () => {
+  it("reports a failed pipeline step through reportError while returning a failure marker (#951)", async () => {
+    const flowId = `pf-step-${randomUUID()}`;
+    const stepId = `${flowId}-s0`;
+    const inputRef = await seedInput(stepId, "step.png", Buffer.from("step-bytes"));
+    await db.insert(schema.jobs).values({
+      id: stepId,
+      type: "pipeline-step",
+      toolId: "wt-boom",
+      pool: "image",
+      status: "queued",
+      inputRefs: [inputRef],
+    });
+
+    reported.errors.length = 0;
+    await getQueue("image").add(
+      "wt-boom",
+      toolJob({
+        jobId: stepId,
+        toolId: "wt-boom",
+        kind: "pipeline-step",
+        stepIndex: 0,
+        totalSteps: 1,
+        inputRefs: [inputRef],
+        filename: "step.png",
+      }),
+      { jobId: stepId, attempts: 1 },
+    );
+
+    const row = await terminalRow(stepId);
+    expect(row.status).toBe("failed");
+    expect(row.error?.message).toBe("boom");
+
+    const settled = await settledQueueJob("image", stepId);
+    expect(settled.state).toBe("completed");
+    expect(settled.returnvalue?.resultPayload).toEqual({ failed: true, error: "boom" });
+    expect(reported.errors.some((e) => e instanceof Error && e.message === "boom")).toBe(true);
+  });
+
   it("fails the pipeline when a step row is missing", async () => {
     const jobId = `pf-${randomUUID()}`;
 
@@ -1774,6 +1812,7 @@ describe("batch children and finalize", () => {
     const boomId = `${parentId}-f1`;
     const okRef = await seedInput(okId, "a.png", Buffer.from("aaa"));
     const boomRef = await seedInput(boomId, "b.png", Buffer.from("bbb"));
+    reported.errors.length = 0;
 
     await enqueueToolJob(
       toolJob({
@@ -1808,12 +1847,13 @@ describe("batch children and finalize", () => {
     expect(okEvents[0].status).toBe("completed");
 
     // The failed child resolves with a failure marker instead of throwing so
-    // the parent flow still advances.
+    // the parent flow still advances, while still reporting the error (#951).
     const boomResult = await waitFor(async () => {
       const job = await getQueue("image").getJob(boomId);
       return job?.returnvalue ?? undefined;
     });
     expect(boomResult.resultPayload).toEqual({ failed: true, error: "boom" });
+    expect(reported.errors.some((e) => e instanceof Error && e.message === "boom")).toBe(true);
 
     // Child outcomes alone stay nonterminal since #750; only the finalize
     // publishes the terminal frame, once the durable ZIP exists. The ok

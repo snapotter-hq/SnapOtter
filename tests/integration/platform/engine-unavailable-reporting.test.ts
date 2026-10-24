@@ -461,6 +461,7 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
     const entries = (row?.error as { details?: Array<{ filename: string; error: string }> })
       ?.details;
     expect(entries?.at(-1)).toEqual({ filename: "", error: `${engineDown().message}: ${HINT}` });
+    expect(engineReports("resize")).toHaveLength(2);
   });
 
   it("counts a file that failed the same way at upload alongside the worker's", async () => {
@@ -503,6 +504,7 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
     expect(body.code).toBeUndefined();
     // The file that did hit the engine fault still says so.
     expect(body.errors.filter((e) => e.code === "ENGINE_UNAVAILABLE")).toHaveLength(1);
+    expect(engineReports("resize")).toHaveLength(1);
   });
 
   it("pipeline batch answers the shared fault too", async () => {
@@ -524,6 +526,7 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
         { filename: "two.png", code: "ENGINE_UNAVAILABLE" },
       ],
     });
+    expect(engineReports("resize")).toHaveLength(2);
   });
 
   // #2179: single-file execute read only the finalize's resultPayload and
@@ -545,6 +548,7 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
       details: HINT,
       completedSteps: [],
     });
+    expect(engineReports("resize")).toHaveLength(1);
   });
 
   it("pipeline execute keeps the completed steps when a later step hits the fault (#2179)", async () => {
@@ -566,6 +570,7 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
     expect(body.code).toBe("ENGINE_UNAVAILABLE");
     expect(body.error).toBe(`Step 2: ${engineDown().message}`);
     expect(body.completedSteps).toHaveLength(1);
+    expect(engineReports("resize")).toHaveLength(1);
   });
 
   it("pipeline execute still answers 422 for a step that failed for another reason (#2179)", async () => {
