@@ -57,7 +57,7 @@ describe("Zero-byte / empty file uploads", () => {
 
     expect(res.statusCode).toBe(400);
     const json = JSON.parse(res.body);
-    expect(json.error).toBeDefined();
+    expect(json.error).toBe("Invalid image: File is empty");
   });
 
   it("rejects a null-byte-only buffer with 400", async () => {
@@ -160,6 +160,9 @@ describe("Wrong file extension (magic byte detection)", () => {
 
     // Should detect PNG via magic bytes and process successfully
     expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+    expect(json.downloadUrl).toMatch(/\/actually-a-png_resize\.png$/);
   });
 });
 
@@ -182,6 +185,12 @@ describe("Extreme filenames", () => {
     });
 
     expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+    const outFilename = decodeURIComponent(json.downloadUrl.split("/").pop() ?? "");
+    const sanitizedFilename = outFilename.replace(/_resize(?=\.png$)/, "");
+    expect(Buffer.byteLength(sanitizedFilename, "utf8")).toBe(200);
+    expect(outFilename).toBe(`${"a".repeat(196)}_resize.png`);
   });
 
   it("handles a Unicode filename without crashing", async () => {
@@ -198,6 +207,10 @@ describe("Extreme filenames", () => {
     });
 
     expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+    const outFilename = decodeURIComponent(json.downloadUrl.split("/").pop() ?? "");
+    expect(outFilename).toBe("画像テスト_resize.png");
   });
 
   it("handles special characters in filename", async () => {
@@ -219,6 +232,10 @@ describe("Extreme filenames", () => {
     });
 
     expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+    const outFilename = decodeURIComponent(json.downloadUrl.split("/").pop() ?? "");
+    expect(outFilename).toBe("test file (1) [copy]_resize.png");
   });
 
   it("sanitizes path traversal in filename", async () => {
@@ -462,67 +479,9 @@ describe("Unicode and special filenames", () => {
 
     expect(res.statusCode).toBe(200);
     const json = JSON.parse(res.body);
-    expect(json.downloadUrl).toBeDefined();
-  });
-
-  it("handles CJK characters in filename", async () => {
-    const { body, contentType } = createMultipartPayload([
-      {
-        name: "file",
-        filename: "写真.png",
-        content: PNG_200x150,
-        contentType: "image/png",
-      },
-      { name: "settings", content: JSON.stringify({ width: 100 }) },
-    ]);
-
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/resize",
-      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
-      body,
-    });
-
-    expect(res.statusCode).toBe(200);
-  });
-
-  it("handles spaces and special chars in filename", async () => {
-    const { body, contentType } = createMultipartPayload([
-      {
-        name: "file",
-        filename: "my photo (2).png",
-        content: PNG_200x150,
-        contentType: "image/png",
-      },
-      { name: "settings", content: JSON.stringify({ width: 100 }) },
-    ]);
-
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/resize",
-      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
-      body,
-    });
-
-    expect(res.statusCode).toBe(200);
-  });
-
-  it("handles a very long filename (255 chars)", async () => {
-    const longName = `${"a".repeat(251)}.png`;
-    const { body, contentType } = createMultipartPayload([
-      { name: "file", filename: longName, content: PNG_200x150, contentType: "image/png" },
-      { name: "settings", content: JSON.stringify({ width: 100 }) },
-    ]);
-
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/v1/tools/image/resize",
-      headers: { "content-type": contentType, authorization: `Bearer ${adminToken}` },
-      body,
-    });
-
-    // Should succeed — sanitizeFilename may truncate but not crash
-    expect(res.statusCode).toBe(200);
+    expect(json.processedSize).toBeGreaterThan(0);
+    const outFilename = decodeURIComponent(json.downloadUrl.split("/").pop() ?? "");
+    expect(outFilename).toBe("\u{1F3A8}photo_resize.png");
   });
 
   it("handles filename with no extension", async () => {
@@ -545,6 +504,9 @@ describe("Unicode and special filenames", () => {
 
     // Should process via magic byte detection regardless of extension
     expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+    expect(json.downloadUrl).toMatch(/\/noextension_resize$/);
   });
 
   it("handles filename that is only dots", async () => {
@@ -566,6 +528,11 @@ describe("Unicode and special filenames", () => {
     });
 
     expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+    expect(json.downloadUrl).not.toContain("..");
+    // sanitizeFilename("....png") strips both ".." pairs to "png" (#3917)
+    expect(json.downloadUrl).toMatch(/\/png_resize$/);
   });
 });
 
@@ -587,7 +554,7 @@ describe("Zero-byte file to info and border tools", () => {
 
     expect(res.statusCode).toBe(400);
     const json = JSON.parse(res.body);
-    expect(json.error).toBeDefined();
+    expect(json.error).toBe("No image file provided");
   });
 
   it("rejects a zero-byte file to /api/v1/tools/image/sharpening with 400", async () => {
@@ -605,7 +572,7 @@ describe("Zero-byte file to info and border tools", () => {
 
     expect(res.statusCode).toBe(400);
     const json = JSON.parse(res.body);
-    expect(json.error).toBeDefined();
+    expect(json.error).toBe("Invalid image: File is empty");
   });
 });
 
@@ -755,6 +722,9 @@ describe("Wrong extension — additional format mismatches", () => {
 
     // Sharp detects real format via magic bytes
     expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+    expect(json.downloadUrl).toMatch(/\/actually-jpeg_resize\.jpg$/);
   });
 
   it("handles WebP data uploaded with .png extension gracefully", async () => {
@@ -778,6 +748,9 @@ describe("Wrong extension — additional format mismatches", () => {
     });
 
     expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+    expect(json.downloadUrl).toMatch(/\/actually-webp_resize\.webp$/);
   });
 });
 
