@@ -1,9 +1,38 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 
 type Theme = "light" | "dark" | "system";
 
 const USER_THEME_KEY = "snapotter-theme-user-set";
+
+// Remembers an explicit setTheme() call in memory when localStorage.setItem
+// throws so a later applyServerDefault() does not overwrite the user's choice.
+let userSetFallback = false;
+
+const safeLocalStorage: StateStorage = {
+  getItem: (name) => {
+    try {
+      return localStorage.getItem(name);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (name, value) => {
+    try {
+      localStorage.setItem(name, value);
+    } catch {
+      // Storage blocked or full
+    }
+  },
+  removeItem: (name) => {
+    userSetFallback = false;
+    try {
+      localStorage.removeItem(name);
+    } catch {
+      // Storage blocked
+    }
+  },
+};
 
 interface ThemeStore {
   theme: Theme;
@@ -30,15 +59,28 @@ export const useThemeStore = create<ThemeStore>()(
       resolvedTheme: "light" as const,
       setTheme: (theme) => {
         const resolved = applyTheme(theme);
-        localStorage.setItem(USER_THEME_KEY, "1");
+        try {
+          localStorage.setItem(USER_THEME_KEY, "1");
+          userSetFallback = false;
+        } catch {
+          userSetFallback = true;
+        }
         set({ theme, resolvedTheme: resolved });
       },
       applyServerDefault: (theme) => {
-        if (localStorage.getItem(USER_THEME_KEY)) return;
+        if (userSetFallback) return;
+        try {
+          if (localStorage.getItem(USER_THEME_KEY)) return;
+        } catch {
+          // Storage blocked
+        }
         const resolved = applyTheme(theme);
         set({ theme, resolvedTheme: resolved });
       },
     }),
-    { name: "snapotter-theme" },
+    {
+      name: "snapotter-theme",
+      storage: createJSONStorage(() => safeLocalStorage),
+    },
   ),
 );

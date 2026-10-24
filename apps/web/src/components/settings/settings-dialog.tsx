@@ -380,6 +380,14 @@ interface TeamEntry {
 
 /* ────────────────────── General ────────────────────── */
 
+function readStoredUsername(): string {
+  try {
+    return localStorage.getItem("snapotter-username") || "";
+  } catch {
+    return "";
+  }
+}
+
 export function GeneralSection() {
   const { t, locale, setLocale, supportedLocales } = useTranslation();
   const later = useTimeouts();
@@ -398,7 +406,7 @@ export function GeneralSection() {
         .catch(() => {
           setUser({
             id: 0,
-            username: localStorage.getItem("snapotter-username") || "",
+            username: readStoredUsername(),
             // Empty, not "unknown": the render site falls back through
             // `user?.role || t.settings.general.roleUnknown`, and a truthy
             // English sentinel would bypass the translated label.

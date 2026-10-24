@@ -11,6 +11,14 @@ interface AvatarDropdownProps {
   variant?: "light" | "dark";
 }
 
+function readStoredUsername(): string {
+  try {
+    return localStorage.getItem("snapotter-username") || "";
+  } catch {
+    return "";
+  }
+}
+
 export function AvatarDropdown({ onSettingsClick, variant = "light" }: AvatarDropdownProps) {
   const { t } = useTranslation();
   const { authEnabled, loading, username: sessionUsername } = useAuth();
@@ -23,8 +31,7 @@ export function AvatarDropdown({ onSettingsClick, variant = "light" }: AvatarDro
   // localStorage only bridges the gap until the session fetch resolves, and
   // the "admin" terminal fallback (no-auth mode has no session to name) must
   // wait for that fetch; flashing it mid-load is #862's symptom again.
-  const username =
-    sessionUsername || localStorage.getItem("snapotter-username") || (loading ? "" : "admin");
+  const username = sessionUsername || readStoredUsername() || (loading ? "" : "admin");
   const initial = username.charAt(0).toUpperCase();
 
   useEffect(() => {
