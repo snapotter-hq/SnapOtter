@@ -1,9 +1,11 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
+import { track } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format, plural } from "@/lib/format";
@@ -207,6 +209,12 @@ export function ImageToPdfSettings() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: cleanup uses only stable refs and state setters
   const handleProcess = useCallback(() => {
     if (files.length === 0) return;
+
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "image-to-pdf",
+      is_batch: false,
+      file_count: files.length,
+    });
 
     const { entries: startEntries, selectedIndex: capturedIndex } = useFileStore.getState();
     const capturedEntryId = startEntries[capturedIndex]?.id ?? startEntries[0]?.id;

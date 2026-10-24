@@ -1,3 +1,4 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { Download, Lasso, Loader2, Paintbrush, Redo, Sparkles, Trash2, Zap } from "lucide-react";
 import { useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
@@ -5,6 +6,7 @@ import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import { formatShortcut } from "@/hooks/use-keyboard-shortcuts";
+import { track } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { bundleName } from "@/lib/bundle-i18n";
@@ -488,6 +490,12 @@ export function EraseObjectSettings({
       return;
     }
 
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "erase-object",
+      is_batch: false,
+      file_count: 1,
+    });
+
     // Record where the user painted so the comparison slider starts at that location
     const maskCenter = eraserRef.current.getMaskCenter();
     if (maskCenter !== null && onMaskCenter) {
@@ -871,6 +879,12 @@ export function EraseObjectSettings({
       }
     }
     if (work.length === 0) return;
+
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "erase-object",
+      is_batch: work.length > 1,
+      file_count: work.length,
+    });
 
     // Leaving the tool route bumps stopCount (#1994), leaving for another tool
     // resets the file store, and opening library files replaces it. Either way

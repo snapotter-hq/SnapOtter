@@ -1,6 +1,8 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { Download, FolderArchive, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { track } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { formatFileSize } from "@/lib/download";
@@ -132,6 +134,12 @@ export function FindDuplicatesSettings() {
 
   const handleScan = () => {
     if (files.length < 2) return;
+
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "find-duplicates",
+      is_batch: false,
+      file_count: files.length,
+    });
 
     setScanning(true);
     setError(null);

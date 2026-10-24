@@ -1,10 +1,10 @@
-import { type FeedbackErrorCategory, SafeError } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, type FeedbackErrorCategory, SafeError } from "@snapotter/shared";
 import type React from "react";
 import { useRef, useState } from "react";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
-import { captureHandledError } from "@/lib/analytics";
+import { captureHandledError, track } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { type AbandonedJobTracker, trackAbandonedJob } from "@/lib/cancel-abandoned-job";
@@ -308,6 +308,11 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       setError(sp.addFirst);
       return;
     }
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "sign-pdf",
+      is_batch: false,
+      file_count: 1,
+    });
     // The entry this run belongs to, read before anything can await. The
     // thumbnail strip is not gated on the run, so the selection can move while
     // the PDF is being signed; a result written to the live selection would

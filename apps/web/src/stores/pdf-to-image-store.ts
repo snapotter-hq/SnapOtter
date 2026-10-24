@@ -1,5 +1,6 @@
-import { en, type TranslationKeys } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, en, type TranslationKeys } from "@snapotter/shared";
 import { create } from "zustand";
+import { track } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { useFileStore } from "@/stores/file-store";
@@ -372,6 +373,11 @@ export const usePdfToImageStore = create<PdfToImageState>((set, get) => ({
   convert: async (t = en) => {
     const { file, format, dpi, quality, colorMode, pages, selectedPages } = get();
     if (!file) return;
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "pdf-to-image",
+      is_batch: false,
+      file_count: 1,
+    });
     watchFileInStore(
       file,
       () => get().reset(),

@@ -1,10 +1,16 @@
-import { en, type LibrarySaveMode, type TranslationKeys } from "@snapotter/shared";
+import {
+  ANALYTICS_EVENTS,
+  en,
+  type LibrarySaveMode,
+  type TranslationKeys,
+} from "@snapotter/shared";
 import { Check, CheckCircle2, ChevronDown, ChevronRight, Copy, Download, Info } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Link } from "react-router";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useTimeouts } from "@/hooks/use-timeouts";
+import { track } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { trackAbandonedJob } from "@/lib/cancel-abandoned-job";
@@ -430,6 +436,12 @@ export function OcrSettings() {
 
   const handleProcess = async () => {
     if (files.length === 0) return;
+
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "ocr",
+      is_batch: files.length > 1,
+      file_count: files.length,
+    });
 
     const {
       entries: startEntries,

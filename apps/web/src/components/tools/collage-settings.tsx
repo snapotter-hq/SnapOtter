@@ -1,7 +1,9 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { Download, Loader2 } from "lucide-react";
 import { useCallback, useEffect } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
 import { useTranslation } from "@/contexts/i18n-context";
+import { track } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import {
@@ -104,6 +106,12 @@ export function CollageSettings() {
 
   const handleProcess = useCallback(async () => {
     if (!hasImages || !template || assignedCount === 0) return;
+
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "collage",
+      is_batch: false,
+      file_count: assignedCount,
+    });
 
     store.setPhase("processing");
     store.setProgress(0);

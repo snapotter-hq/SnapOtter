@@ -1,7 +1,9 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { Download, Loader2, PackageOpen } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
 import { useTranslation } from "@/contexts/i18n-context";
+import { track } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
@@ -101,6 +103,12 @@ export function SplitSettings() {
 
   const handleProcess = useCallback(async () => {
     if (files.length === 0) return;
+
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "split",
+      is_batch: files.length > 1,
+      file_count: files.length,
+    });
 
     const controller = new AbortController();
     const run = beginSplitRun(() => controller.abort());

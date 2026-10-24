@@ -1,8 +1,10 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { Check, ClipboardCopy, Copy, Loader2, X } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { useTimeouts } from "@/hooks/use-timeouts";
+import { track } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { copyToClipboard } from "@/lib/utils";
@@ -70,6 +72,12 @@ export function ColorPaletteSettings() {
     const targetFile = capturedEntry?.file ?? currentFiles[0];
     if (!targetFile) return;
     const targetEntryKey = capturedEntry?.id ?? FALLBACK_ENTRY_KEY;
+
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "color-palette",
+      is_batch: false,
+      file_count: 1,
+    });
 
     abortRef.current?.abort();
     const controller = new AbortController();

@@ -1193,12 +1193,10 @@ export function useToolProcessor(toolId: string) {
         return;
       }
 
-      import("@/lib/analytics").then(({ track }) => {
-        track(ANALYTICS_EVENTS.TOOL_STARTED, {
-          tool_id: toolId,
-          is_batch: false,
-          file_count: files.length,
-        });
+      track(ANALYTICS_EVENTS.TOOL_STARTED, {
+        tool_id: toolId,
+        is_batch: false,
+        file_count: files.length,
       });
 
       const stateAtStart = useFileStore.getState();
@@ -1731,18 +1729,16 @@ export function useToolProcessor(toolId: string) {
         return;
       }
 
-      import("@/lib/analytics").then(({ track }) => {
-        track(ANALYTICS_EVENTS.TOOL_STARTED, {
-          tool_id: toolId,
-          is_batch: true,
-          file_count: files.length,
-        });
-      });
-
       if (files.length === 1) {
         processFiles(files, Array.isArray(settings) ? settings[0] : settings);
         return;
       }
+
+      track(ANALYTICS_EVENTS.TOOL_STARTED, {
+        tool_id: toolId,
+        is_batch: true,
+        file_count: files.length,
+      });
 
       // batch_processed fires once for the batch as a unit (distinct from the N
       // per-file tool_used events), so batch usage is separable from single runs.

@@ -4,9 +4,23 @@ import {
   detectModalityFromMime,
   type LibrarySaveMode,
   type Modality,
+  TOOLS,
 } from "@snapotter/shared";
 import { create } from "zustand";
+import { track } from "@/lib/analytics";
+import { BASE_PATH } from "@/lib/app-url";
 import { fetchDecodedPreview, needsServerPreview, revokePreviewUrl } from "@/lib/image-preview";
+
+const TOOL_IDS_BY_ROUTE = new Map<string, string>(TOOLS.map((t) => [t.route, t.id]));
+
+function activeToolIdFromLocation(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  const raw = window.location?.pathname ?? "";
+  const path = BASE_PATH && raw.startsWith(`${BASE_PATH}/`) ? raw.slice(BASE_PATH.length) : raw;
+  const normalized =
+    path.length > 1 && path.endsWith("/") ? path.slice(0, -1).toLowerCase() : path.toLowerCase();
+  return TOOL_IDS_BY_ROUTE.get(normalized);
+}
 
 export type PreviewKind = "image" | "video" | "audio" | "document" | "none";
 
@@ -252,8 +266,10 @@ export const useFileStore = create<FileState>((set, get) => ({
   // -- Actions --------------------------------------------------------------
 
   setFiles: (files) => {
-    import("@/lib/analytics").then(({ track }) => {
-      track(ANALYTICS_EVENTS.FILE_ADDED, { file_count: files.length });
+    const toolId = activeToolIdFromLocation();
+    track(ANALYTICS_EVENTS.FILE_ADDED, {
+      ...(toolId ? { tool_id: toolId } : {}),
+      file_count: files.length,
     });
     revokeEntries(get().entries);
     const entries = files.map(createEntry);
@@ -308,8 +324,10 @@ export const useFileStore = create<FileState>((set, get) => ({
   },
 
   addFiles: (files) => {
-    import("@/lib/analytics").then(({ track }) => {
-      track(ANALYTICS_EVENTS.FILE_ADDED, { file_count: files.length });
+    const toolId = activeToolIdFromLocation();
+    track(ANALYTICS_EVENTS.FILE_ADDED, {
+      ...(toolId ? { tool_id: toolId } : {}),
+      file_count: files.length,
     });
     const newEntries = files.map(createEntry);
     const entries = [...get().entries, ...newEntries];

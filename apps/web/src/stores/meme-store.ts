@@ -1,5 +1,6 @@
-import { en, type TranslationKeys } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, en, type TranslationKeys } from "@snapotter/shared";
 import { create } from "zustand";
+import { track } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 
@@ -394,6 +395,11 @@ export const useMemeStore = create<MemeState>((set, get) => ({
   },
 
   generateMeme: async (t = en) => {
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "meme-generator",
+      is_batch: false,
+      file_count: 1,
+    });
     cancelActiveGeneration();
     const controller = new AbortController();
     generateController = controller;

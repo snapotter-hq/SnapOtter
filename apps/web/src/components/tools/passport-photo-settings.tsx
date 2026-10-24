@@ -1,4 +1,5 @@
 import {
+  ANALYTICS_EVENTS,
   PASSPORT_SPECS,
   type PassportDocumentSpec,
   type PassportRegion,
@@ -21,6 +22,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
+import { track } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
@@ -486,6 +488,12 @@ export function PassportPhotoSettings() {
   // Generate
   const handleGenerate = useCallback(async () => {
     if (!analyzeResult) return;
+
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "passport-photo",
+      is_batch: false,
+      file_count: 1,
+    });
 
     const controller = new AbortController();
     const run = beginPassportGenerateRun(() => controller.abort());

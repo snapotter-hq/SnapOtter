@@ -1,4 +1,4 @@
-import type { TranslationKeys } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, type TranslationKeys } from "@snapotter/shared";
 import {
   Contact,
   Download,
@@ -15,6 +15,7 @@ import QRCodeStyling from "qr-code-styling";
 import { useCallback, useRef } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
 import { useTranslation } from "@/contexts/i18n-context";
+import { track } from "@/lib/analytics";
 import {
   type ContentType,
   type CornerDotType,
@@ -370,6 +371,12 @@ export function QrGenerateSettings() {
   const handleDownload = useCallback(() => {
     const data = encodeQrData(store);
     if (!data) return;
+
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "qr-generate",
+      is_batch: false,
+      file_count: 1,
+    });
 
     const qr = new QRCodeStyling({
       width: store.size,

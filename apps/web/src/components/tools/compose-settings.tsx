@@ -1,8 +1,10 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { Loader2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
+import { track } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { FeedbackCategoryError, feedbackCategoryOf } from "@/lib/feedback";
@@ -71,6 +73,12 @@ export function ComposeSettings() {
     const capturedEntry = entries[selectedIndex] ?? entries[0];
     if (!capturedEntry) return;
     const entryId = capturedEntry.id;
+
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "compose",
+      is_batch: false,
+      file_count: 1,
+    });
 
     abortRef.current?.abort();
     const controller = new AbortController();

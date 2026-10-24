@@ -1,4 +1,6 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { create } from "zustand";
+import { track } from "@/lib/analytics";
 import { COLLAGE_TEMPLATES, getDefaultTemplate } from "@/lib/collage-templates";
 import { fetchDecodedPreview, needsServerPreview, revokePreviewUrl } from "@/lib/image-preview";
 
@@ -166,6 +168,10 @@ export const useCollageStore = create<CollageState>((set, get) => ({
 
   addImages: (files) => {
     if (files.length === 0) return;
+    track(ANALYTICS_EVENTS.FILE_ADDED, {
+      tool_id: "collage",
+      file_count: files.length,
+    });
     cancelActiveCollageRun();
     const newImages: CollageImage[] = files.map((f) => ({
       id: `img-${++nextImageId}`,

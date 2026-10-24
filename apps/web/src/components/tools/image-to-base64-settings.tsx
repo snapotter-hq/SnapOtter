@@ -1,6 +1,8 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
+import { track } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format } from "@/lib/format";
@@ -96,6 +98,12 @@ export function ImageToBase64Settings() {
 
   const handleProcess = async () => {
     if (entries.length === 0) return;
+
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "image-to-base64",
+      is_batch: entries.length > 1,
+      file_count: entries.length,
+    });
 
     setProcessing(true);
     setError(null);

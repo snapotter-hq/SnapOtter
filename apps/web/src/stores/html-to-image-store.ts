@@ -1,5 +1,6 @@
-import { en, type TranslationKeys } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, en, type TranslationKeys } from "@snapotter/shared";
 import { create } from "zustand";
+import { track } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 
@@ -87,6 +88,12 @@ export const useHtmlToImageStore = create<HtmlToImageState>((set, get) => ({
     const state = get();
     const hasInput = state.mode === "url" ? state.url : state.htmlContent;
     if (!hasInput || state.capturing) return;
+
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "html-to-image",
+      is_batch: false,
+      file_count: 1,
+    });
 
     captureController?.abort();
     const controller = new AbortController();

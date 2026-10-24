@@ -1,8 +1,10 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
+import { track } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { type FeedbackErrorCategory, feedbackCategoryOf } from "@/lib/feedback";
@@ -74,6 +76,12 @@ export function StitchSettings() {
     const capturedEntry = startEntries[selectedIndex] ?? startEntries[0];
     if (!capturedEntry) return;
     const entryId = capturedEntry.id;
+
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "stitch",
+      is_batch: false,
+      file_count: files.length,
+    });
 
     unsubscribeRef.current?.();
     watchdogRef.current?.clear();

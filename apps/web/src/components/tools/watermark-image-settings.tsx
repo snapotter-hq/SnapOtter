@@ -1,8 +1,10 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { Loader2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
+import { track } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { FeedbackCategoryError, feedbackCategoryOf } from "@/lib/feedback";
@@ -99,6 +101,12 @@ export function WatermarkImageSettings() {
     const capturedEntry =
       files.length === 1 ? (startEntries[selectedIndex] ?? startEntries[0]) : undefined;
     if (files.length === 1 && !capturedEntry) return;
+
+    track(ANALYTICS_EVENTS.TOOL_STARTED, {
+      tool_id: "watermark-image",
+      is_batch: files.length > 1,
+      file_count: files.length,
+    });
 
     unsubscribeRef.current?.();
     abortRef.current?.abort();
