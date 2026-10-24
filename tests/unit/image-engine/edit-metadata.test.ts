@@ -243,4 +243,39 @@ describe("editMetadata", () => {
       }),
     ).rejects.toThrow("Cannot safely edit metadata because existing EXIF data is invalid");
   });
+
+  it("fails safely when existing EXIF has a truncated IFD table during removal (#3882)", async () => {
+    const baseJpeg = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 10, g: 20, b: 30 } },
+    })
+      .jpeg()
+      .toBuffer();
+    const truncatedPayloads = [
+      Buffer.from("4578696600004d4d002a000010000000", "hex"),
+      Buffer.from("4578696600004d4d002a00000008000187690004000000010000100000000000", "hex"),
+      Buffer.from("4578696600004d4d002a00000008000188250004000000010000100000000000", "hex"),
+      Buffer.from(
+        "4578696600004d4d002a00000008000187690004000000010000001a000000000001a0050004000000010000100000000000",
+        "hex",
+      ),
+    ];
+
+    for (const exifPayload of truncatedPayloads) {
+      const app1Len = Buffer.alloc(2);
+      app1Len.writeUInt16BE(exifPayload.length + 2, 0);
+      const app1Segment = Buffer.concat([Buffer.from([0xff, 0xe1]), app1Len, exifPayload]);
+      const truncatedExifJpeg = Buffer.concat([
+        baseJpeg.subarray(0, 2),
+        app1Segment,
+        baseJpeg.subarray(2),
+      ]);
+
+      await expect(
+        editMetadata(sharp(truncatedExifJpeg), {
+          fieldsToRemove: ["Software"],
+          artist: "Survivor",
+        }),
+      ).rejects.toThrow("Cannot safely edit metadata because existing EXIF data is invalid");
+    }
+  });
 });

@@ -71,6 +71,14 @@ export function parseExif(
 
   try {
     const parsed = exifReader(exifBuffer);
+    if (
+      parsed.Image === null ||
+      parsed.Photo === null ||
+      parsed.Iop === null ||
+      parsed.GPSInfo === null
+    ) {
+      throw new Error("Invalid EXIF data: truncated IFD");
+    }
 
     if (parsed.Image) {
       for (const [k, v] of Object.entries(parsed.Image)) {

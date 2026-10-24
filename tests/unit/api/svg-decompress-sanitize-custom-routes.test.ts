@@ -914,6 +914,34 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         exifError: "Failed to parse EXIF data",
       });
     });
+
+    it("returns exif: null and exifError when JPEG APP1 EXIF segment has a truncated IFD table (#3882)", async () => {
+      const baseJpeg = await sharp({
+        create: { width: 8, height: 8, channels: 3, background: { r: 10, g: 20, b: 30 } },
+      })
+        .jpeg()
+        .toBuffer();
+      const exifPayload = Buffer.from("4578696600004d4d002a000010000000", "hex");
+      const app1Len = Buffer.alloc(2);
+      app1Len.writeUInt16BE(exifPayload.length + 2, 0);
+      const app1Segment = Buffer.concat([Buffer.from([0xff, 0xe1]), app1Len, exifPayload]);
+      const truncatedIfdJpeg = Buffer.concat([
+        baseJpeg.subarray(0, 2),
+        app1Segment,
+        baseJpeg.subarray(2),
+      ]);
+
+      const reply = await invokeRoute(handler, [
+        { type: "file", filename: "truncated-ifd.jpg", content: truncatedIfdJpeg },
+      ]);
+      expect(reply.statusCode).toBe(200);
+      expect(reply.payload).toEqual({
+        filename: "truncated-ifd.jpg",
+        fileSize: truncatedIfdJpeg.length,
+        exif: null,
+        exifError: "Failed to parse EXIF data",
+      });
+    });
   });
 
   describe("POST /api/v1/tools/image/info", () => {

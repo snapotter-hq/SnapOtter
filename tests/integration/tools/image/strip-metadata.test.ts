@@ -443,6 +443,49 @@ describe("Inspect endpoint edge cases", () => {
       exifError: "Failed to parse EXIF data",
     });
   });
+
+  it("sets exif: null and exifError when JPEG APP1 EXIF segment has a truncated IFD table (#3882)", async () => {
+    const baseJpeg = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: { r: 10, g: 20, b: 30 } },
+    })
+      .jpeg()
+      .toBuffer();
+    const exifPayload = Buffer.from("4578696600004d4d002a000010000000", "hex");
+    const app1Len = Buffer.alloc(2);
+    app1Len.writeUInt16BE(exifPayload.length + 2, 0);
+    const app1Segment = Buffer.concat([Buffer.from([0xff, 0xe1]), app1Len, exifPayload]);
+    const truncatedIfdJpeg = Buffer.concat([
+      baseJpeg.subarray(0, 2),
+      app1Segment,
+      baseJpeg.subarray(2),
+    ]);
+
+    const { body: payload, contentType } = createMultipartPayload([
+      {
+        name: "file",
+        filename: "truncated-ifd.jpg",
+        contentType: "image/jpeg",
+        content: truncatedIfdJpeg,
+      },
+    ]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/strip-metadata/inspect",
+      payload,
+      headers: {
+        "content-type": contentType,
+        authorization: `Bearer ${adminToken}`,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const result = JSON.parse(res.body);
+    expect(result).toEqual({
+      filename: "truncated-ifd.jpg",
+      fileSize: truncatedIfdJpeg.length,
+      exif: null,
+      exifError: "Failed to parse EXIF data",
+    });
+  });
 });
 
 // ── Error handling ────────────────────────────────────────────────

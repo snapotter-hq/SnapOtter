@@ -229,6 +229,42 @@ describe("parseExif", () => {
     });
   });
 
+  it("rejects truncated EXIF IFD0, Photo, Iop, and GPSInfo tables when exif-reader returns null sections (#3882)", () => {
+    const truncatedIfd0 = Buffer.from("4578696600004d4d002a000010000000", "hex");
+    const truncatedPhoto = Buffer.from(
+      "4578696600004d4d002a00000008000187690004000000010000100000000000",
+      "hex",
+    );
+    const truncatedGps = Buffer.from(
+      "4578696600004d4d002a00000008000188250004000000010000100000000000",
+      "hex",
+    );
+    const truncatedIop = Buffer.from(
+      "4578696600004d4d002a00000008000187690004000000010000001a000000000001a0050004000000010000100000000000",
+      "hex",
+    );
+    const validZeroEntryIfd0 = Buffer.from("4578696600004d4d002a00000008000000000000", "hex");
+
+    for (const buf of [truncatedIfd0, truncatedPhoto, truncatedGps, truncatedIop]) {
+      expect(() => parseExif(buf, { throwOnError: true })).toThrow(
+        "Invalid EXIF data: truncated IFD",
+      );
+      expect(parseExif(buf, { throwOnError: false })).toEqual({
+        image: {},
+        photo: {},
+        iop: {},
+        gps: {},
+      });
+    }
+
+    expect(parseExif(validZeroEntryIfd0, { throwOnError: true })).toEqual({
+      image: {},
+      photo: {},
+      iop: {},
+      gps: {},
+    });
+  });
+
   it("rethrows V8 buffer allocation RangeError instead of returning empty sections (#3835)", () => {
     const v8Oom = new RangeError("Array buffer allocation failed");
     const exifBuf = Buffer.from("Exif\0\0MM\0*", "ascii");

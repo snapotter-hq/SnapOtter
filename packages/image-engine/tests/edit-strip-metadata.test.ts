@@ -245,6 +245,38 @@ describe("editMetadata", () => {
     expect(withExif).not.toHaveBeenCalled();
   });
 
+  it("fails safely when existing EXIF has a truncated IFD0, Photo, Iop, or GPSInfo table during removal (#3882)", async () => {
+    const truncatedIfd0 = Buffer.from("4578696600004d4d002a000010000000", "hex");
+    const truncatedPhoto = Buffer.from(
+      "4578696600004d4d002a00000008000187690004000000010000100000000000",
+      "hex",
+    );
+    const truncatedGps = Buffer.from(
+      "4578696600004d4d002a00000008000188250004000000010000100000000000",
+      "hex",
+    );
+    const truncatedIop = Buffer.from(
+      "4578696600004d4d002a00000008000187690004000000010000001a000000000001a0050004000000010000100000000000",
+      "hex",
+    );
+
+    for (const exif of [truncatedIfd0, truncatedPhoto, truncatedGps, truncatedIop]) {
+      const withExif = vi.fn();
+      const fake = {
+        metadata: vi.fn().mockResolvedValue({ exif }),
+        withExif,
+      } as unknown as Sharp;
+
+      await expect(editMetadata(fake, { fieldsToRemove: ["Software"] })).rejects.toThrow(
+        "Cannot safely edit metadata because existing EXIF data is invalid",
+      );
+      await expect(editMetadata(fake, { clearGps: true })).rejects.toThrow(
+        "Cannot safely edit metadata because existing EXIF data is invalid",
+      );
+      expect(withExif).not.toHaveBeenCalled();
+    }
+  });
+
   it("does not change image dimensions or format", async () => {
     const buf = await (await editMetadata(richImage(), { artist: "DimCheck" })).jpeg().toBuffer();
     const meta = await sharp(buf).metadata();

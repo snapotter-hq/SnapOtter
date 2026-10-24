@@ -87,33 +87,43 @@ export async function editMetadata(
     const existingIFD3: Record<string, string> = {};
 
     if (metadata.exif) {
+      let parsed: ReturnType<typeof exifReader> | undefined;
       try {
-        const parsed = exifReader(metadata.exif);
-        if (parsed.Image) {
-          for (const [k, v] of Object.entries(parsed.Image)) {
-            if (fieldsToRemove.includes(k) || UNSAFE_ROUND_TRIP_KEYS.has(k)) continue;
-            const value = exifString(v);
-            if (value !== undefined) existingIFD0[k] = value;
-          }
-        }
-        if (parsed.Photo) {
-          for (const [k, v] of Object.entries(parsed.Photo)) {
-            if (fieldsToRemove.includes(k) || UNSAFE_ROUND_TRIP_KEYS.has(k)) continue;
-            const value = exifString(v);
-            if (value !== undefined) existingIFD2[k] = value;
-          }
-        }
-        if (parsed.GPSInfo && options.clearGps !== true) {
-          for (const [k, v] of Object.entries(parsed.GPSInfo)) {
-            if (fieldsToRemove.includes(k) || UNSAFE_ROUND_TRIP_KEYS.has(k)) continue;
-            const value = exifString(v);
-            if (value !== undefined) existingIFD3[k] = value;
-          }
-        }
+        parsed = exifReader(metadata.exif);
       } catch {
+        // Handled below alongside truncated IFD sections
+      }
+      if (
+        !parsed ||
+        parsed.Image === null ||
+        parsed.Photo === null ||
+        parsed.Iop === null ||
+        parsed.GPSInfo === null
+      ) {
         throw new ToolInputError(
           "Cannot safely edit metadata because existing EXIF data is invalid",
         );
+      }
+      if (parsed.Image) {
+        for (const [k, v] of Object.entries(parsed.Image)) {
+          if (fieldsToRemove.includes(k) || UNSAFE_ROUND_TRIP_KEYS.has(k)) continue;
+          const value = exifString(v);
+          if (value !== undefined) existingIFD0[k] = value;
+        }
+      }
+      if (parsed.Photo) {
+        for (const [k, v] of Object.entries(parsed.Photo)) {
+          if (fieldsToRemove.includes(k) || UNSAFE_ROUND_TRIP_KEYS.has(k)) continue;
+          const value = exifString(v);
+          if (value !== undefined) existingIFD2[k] = value;
+        }
+      }
+      if (parsed.GPSInfo && options.clearGps !== true) {
+        for (const [k, v] of Object.entries(parsed.GPSInfo)) {
+          if (fieldsToRemove.includes(k) || UNSAFE_ROUND_TRIP_KEYS.has(k)) continue;
+          const value = exifString(v);
+          if (value !== undefined) existingIFD3[k] = value;
+        }
       }
     }
 
