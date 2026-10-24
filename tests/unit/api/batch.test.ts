@@ -749,6 +749,51 @@ describe("batch route spooled multipart ingress (#1239)", () => {
       }),
     );
     expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/mid-batch-read-fail-f0/first.png");
+
+    // V8 allocation RangeError when reading the spooled scratch file converts to DecoderOutOfMemoryError (#3946)
+    mocks.failBatchJob.mockClear();
+    mocks.deleteObject.mockClear();
+    const { DecoderOutOfMemoryError } = await import(
+      "../../../apps/api/src/lib/format-decoders.js"
+    );
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    const oomMessage =
+      "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+    let oomCallCount = 0;
+    mocks.readFile.mockImplementation(async () => {
+      oomCallCount++;
+      if (oomCallCount === 1) return Buffer.from("first-ok");
+      throw v8Oom;
+    });
+
+    const caughtOom = await invokeBatchRoute({
+      section: "image",
+      toolId: "compress",
+      parts: [
+        { type: "file", filename: "first.png", content: Buffer.from("first-ok") },
+        { type: "file", filename: "second.png", content: Buffer.from("second-oom") },
+        { type: "field", fieldname: "settings", value: "{}" },
+        { type: "field", fieldname: "clientJobId", value: "mid-batch-read-oom" },
+      ],
+    }).catch((err: unknown) => err);
+
+    expect(caughtOom).toBeInstanceOf(DecoderOutOfMemoryError);
+    expect(caughtOom).toMatchObject({
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      message: oomMessage,
+      cause: v8Oom,
+    });
+    expect(mocks.failBatchJob).toHaveBeenCalledWith({
+      jobId: "mid-batch-read-oom",
+      totalFiles: 2,
+      completedFiles: 2,
+      failedFiles: 2,
+      errors: [{ filename: "", error: oomMessage }],
+      message: oomMessage,
+      code: "ENGINE_UNAVAILABLE",
+    });
+    expect(mocks.deleteObject).toHaveBeenCalledWith("uploads/mid-batch-read-oom-f0/first.png");
   });
 
   it("answers 413 with the OCR aggregate safety limit message when spooled OCR parts cross the aggregate cap", async () => {

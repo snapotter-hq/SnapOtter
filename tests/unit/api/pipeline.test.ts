@@ -2547,6 +2547,51 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
         errors: [{ filename: "", error: "Internal server error" }],
         message: "Internal server error",
       });
+
+      // V8 allocation RangeError when reading the spooled scratch file converts to DecoderOutOfMemoryError (#3946)
+      failBatchJobMock.mockClear();
+      putObjectMock.mockClear();
+      deleteObjectMock.mockClear();
+      const v8Oom = new RangeError("Array buffer allocation failed");
+      const oomMessage =
+        "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+      const { DecoderOutOfMemoryError } = await import(
+        "../../../apps/api/src/lib/format-decoders.js"
+      );
+      readFileSpy.mockResolvedValueOnce(Buffer.from("first-ok")).mockRejectedValueOnce(v8Oom);
+
+      const caughtOom = await invokePipelineBatchRoute([
+        { type: "file", filename: "first.png", content: Buffer.from("first-ok") },
+        { type: "file", filename: "second.png", content: Buffer.from("second-oom") },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: batchTestToolId, settings: {} }],
+          }),
+        },
+        { type: "field", fieldname: "clientJobId", value: "pipeline-batch-3946-read-oom" },
+      ]).catch((err: unknown) => err);
+
+      expect(caughtOom).toBeInstanceOf(DecoderOutOfMemoryError);
+      expect(caughtOom).toMatchObject({
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        message: oomMessage,
+        cause: v8Oom,
+      });
+      expect(deleteObjectMock).toHaveBeenCalledWith(
+        "uploads/pipeline-batch-3946-read-oom-f0-s0/first.png",
+      );
+      expect(failBatchJobMock).toHaveBeenCalledWith({
+        jobId: "pipeline-batch-3946-read-oom",
+        totalFiles: 2,
+        completedFiles: 2,
+        failedFiles: 2,
+        errors: [{ filename: "", error: oomMessage }],
+        message: oomMessage,
+        code: "ENGINE_UNAVAILABLE",
+      });
     } finally {
       readFileSpy.mockReset();
       rmSpy.mockReset();
@@ -3126,6 +3171,40 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
         ]),
       ).rejects.toBe(readErr);
 
+      expect(
+        rmSpy.mock.calls.some(
+          (call: unknown[]) =>
+            String(call[0]).endsWith("/0-first.png") &&
+            (call[1] as { force?: boolean } | undefined)?.force === true,
+        ),
+      ).toBe(true);
+      expect(putObjectMock).not.toHaveBeenCalled();
+
+      // V8 allocation RangeError when reading the spooled scratch file converts to DecoderOutOfMemoryError (#3946)
+      rmSpy.mockClear();
+      const v8Oom = new RangeError("Array buffer allocation failed");
+      const { DecoderOutOfMemoryError } = await import(
+        "../../../apps/api/src/lib/format-decoders.js"
+      );
+      readFileSpy.mockRejectedValueOnce(v8Oom);
+
+      const caughtOom = await invokePipelineExecuteRoute([
+        { type: "file", filename: "first.png", content: Buffer.from("first-oom") },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: executeTestToolId, settings: {} }],
+          }),
+        },
+      ]).catch((err: unknown) => err);
+
+      expect(caughtOom).toBeInstanceOf(DecoderOutOfMemoryError);
+      expect(caughtOom).toMatchObject({
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: v8Oom,
+      });
       expect(
         rmSpy.mock.calls.some(
           (call: unknown[]) =>
