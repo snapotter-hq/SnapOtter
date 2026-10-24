@@ -1120,8 +1120,9 @@ async function persistVerifiedIndex(
     await applyExactSharedMode(file, DOWNLOAD_CACHE_FILE_MODE, temporaryIndex);
     await writeBufferFully(file, rawIndex);
     await file.sync();
-    await file.close();
+    const pendingFile = file;
     file = undefined;
+    await pendingFile.close();
     await rename(temporaryIndex, indexPath);
     await cache.handle.sync();
     if (!(await cachedFileEquals(indexPath, rawIndex))) {
@@ -1129,7 +1130,7 @@ async function persistVerifiedIndex(
     }
   } finally {
     await file?.close().catch(() => {});
-    await rm(temporaryIndex, { force: true });
+    await rm(temporaryIndex, { force: true }).catch(() => {});
   }
 }
 

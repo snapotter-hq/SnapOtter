@@ -26,8 +26,15 @@ type OpenHandleInterceptor = (
   handle: Awaited<ReturnType<typeof import("node:fs/promises").open>>,
 ) => Awaited<ReturnType<typeof import("node:fs/promises").open>>;
 
+type RmInterceptor = (
+  path: string,
+  options: Parameters<typeof import("node:fs/promises").rm>[1],
+  actualRm: typeof import("node:fs/promises").rm,
+) => Promise<void>;
+
 const fsOpenHoisted = vi.hoisted(() => ({
   interceptor: null as OpenHandleInterceptor | null,
+  rmInterceptor: null as RmInterceptor | null,
 }));
 
 vi.mock("node:fs/promises", async (importOriginal) => {
@@ -45,6 +52,12 @@ vi.mock("node:fs/promises", async (importOriginal) => {
       if (!fsOpenHoisted.interceptor) return handle;
       return fsOpenHoisted.interceptor(String(path), handle);
     }) as typeof actual.open,
+    rm: (async (path: unknown, options?: Parameters<typeof actual.rm>[1]) => {
+      if (!fsOpenHoisted.rmInterceptor) {
+        return actual.rm(path as Parameters<typeof actual.rm>[0], options);
+      }
+      return fsOpenHoisted.rmInterceptor(String(path), options, actual.rm);
+    }) as typeof actual.rm,
   };
 });
 
@@ -123,6 +136,7 @@ afterEach(() => {
   // A test that fakes timers and then times out never reaches its own
   // finally, so restore them here or every later test runs on a frozen clock.
   fsOpenHoisted.interceptor = null;
+  fsOpenHoisted.rmInterceptor = null;
   vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
@@ -3279,5 +3293,181 @@ describe("FileHandle close and sync error preservation (#3774)", () => {
           .mockResolvedValueOnce(new Response(ARCHIVE_BYTES, { status: 200 })),
       }),
     ).rejects.toThrow("EIO: standalone download close failed");
+  });
+
+  it("preserves persistVerifiedIndex write and sync ENOSPC errors when close and rm reject with EIO (#3867)", async () => {
+    const fixture = signedIndex();
+    const writeDir = mkdtempSync(join(tmpdir(), "snapotter-ocr-index-write-enospc-rm-eio-"));
+    temporaryDirectories.push(writeDir);
+    let writeCloseCalls = 0;
+    let writeRmCalls = 0;
+
+    fsOpenHoisted.interceptor = (path, handle) => {
+      if (!path.endsWith(".tmp")) return handle;
+      const origClose = handle.close.bind(handle);
+      return new Proxy(handle, {
+        get(target, prop, receiver) {
+          if (prop === "write") {
+            return async () => {
+              throw Object.assign(new Error("ENOSPC: index write ran out of space"), {
+                code: "ENOSPC",
+              });
+            };
+          }
+          if (prop === "close") {
+            return async () => {
+              writeCloseCalls += 1;
+              await origClose();
+              throw Object.assign(new Error("EIO: index close failed after write ENOSPC"), {
+                code: "EIO",
+              });
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+    };
+    fsOpenHoisted.rmInterceptor = async (path, options, actualRm) => {
+      await actualRm(path, options);
+      if (path.endsWith(".tmp")) {
+        writeRmCalls += 1;
+        throw Object.assign(new Error("EIO: index rm failed after write ENOSPC"), {
+          code: "EIO",
+        });
+      }
+    };
+
+    await expect(
+      downloadVerifiedRuntimeRelease({
+        aiDataDir: writeDir,
+        bundleRepo: "snapotter-hq/feature-bundles",
+        version: "2.1.0",
+        target: TARGET,
+        trustKeys: [fixture.trustKey],
+        fetchImpl: vi
+          .fn<typeof fetch>()
+          .mockResolvedValueOnce(new Response(fixture.raw, { status: 200 })),
+      }),
+    ).rejects.toMatchObject({
+      message: "ENOSPC: index write ran out of space",
+      code: "ENOSPC",
+    });
+    expect(writeCloseCalls).toBe(1);
+    expect(writeRmCalls).toBe(1);
+
+    const syncDir = mkdtempSync(join(tmpdir(), "snapotter-ocr-index-sync-enospc-rm-eio-"));
+    temporaryDirectories.push(syncDir);
+    let syncCloseCalls = 0;
+    let syncRmCalls = 0;
+
+    fsOpenHoisted.interceptor = (path, handle) => {
+      if (!path.endsWith(".tmp")) return handle;
+      const origClose = handle.close.bind(handle);
+      return new Proxy(handle, {
+        get(target, prop, receiver) {
+          if (prop === "sync") {
+            return async () => {
+              throw Object.assign(new Error("ENOSPC: index sync ran out of space"), {
+                code: "ENOSPC",
+              });
+            };
+          }
+          if (prop === "close") {
+            return async () => {
+              syncCloseCalls += 1;
+              await origClose();
+              throw Object.assign(new Error("EIO: index close failed after sync ENOSPC"), {
+                code: "EIO",
+              });
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+    };
+    fsOpenHoisted.rmInterceptor = async (path, options, actualRm) => {
+      await actualRm(path, options);
+      if (path.endsWith(".tmp")) {
+        syncRmCalls += 1;
+        throw Object.assign(new Error("EIO: index rm failed after sync ENOSPC"), {
+          code: "EIO",
+        });
+      }
+    };
+
+    await expect(
+      downloadVerifiedRuntimeRelease({
+        aiDataDir: syncDir,
+        bundleRepo: "snapotter-hq/feature-bundles",
+        version: "2.1.0",
+        target: TARGET,
+        trustKeys: [fixture.trustKey],
+        fetchImpl: vi
+          .fn<typeof fetch>()
+          .mockResolvedValueOnce(new Response(fixture.raw, { status: 200 })),
+      }),
+    ).rejects.toMatchObject({
+      message: "ENOSPC: index sync ran out of space",
+      code: "ENOSPC",
+    });
+    expect(syncCloseCalls).toBe(1);
+    expect(syncRmCalls).toBe(1);
+  });
+
+  it("closes the temporary index handle once without promoting it when persistVerifiedIndex close rejects (#3867)", async () => {
+    const fixture = signedIndex();
+    const directory = mkdtempSync(join(tmpdir(), "snapotter-ocr-index-close-eio-rm-erofs-"));
+    temporaryDirectories.push(directory);
+    const indexDigest = createHash("sha256").update(fixture.raw).digest("hex");
+    const indexPath = join(directory, "v3", "downloads", `${indexDigest}.index.json`);
+    let closeCalls = 0;
+    let rmCalls = 0;
+
+    fsOpenHoisted.interceptor = (path, handle) => {
+      if (!path.endsWith(".tmp")) return handle;
+      const origClose = handle.close.bind(handle);
+      return new Proxy(handle, {
+        get(target, prop, receiver) {
+          if (prop === "close") {
+            return async () => {
+              closeCalls += 1;
+              await origClose();
+              throw Object.assign(new Error("EIO: standalone temporary index close failed"), {
+                code: "EIO",
+              });
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+    };
+    fsOpenHoisted.rmInterceptor = async (path, options, actualRm) => {
+      await actualRm(path, options);
+      if (path.endsWith(".tmp")) {
+        rmCalls += 1;
+        throw Object.assign(new Error("EROFS: temporary index rm failed after close EIO"), {
+          code: "EROFS",
+        });
+      }
+    };
+
+    await expect(
+      downloadVerifiedRuntimeRelease({
+        aiDataDir: directory,
+        bundleRepo: "snapotter-hq/feature-bundles",
+        version: "2.1.0",
+        target: TARGET,
+        trustKeys: [fixture.trustKey],
+        fetchImpl: vi
+          .fn<typeof fetch>()
+          .mockResolvedValueOnce(new Response(fixture.raw, { status: 200 })),
+      }),
+    ).rejects.toMatchObject({
+      message: "EIO: standalone temporary index close failed",
+      code: "EIO",
+    });
+    expect(closeCalls).toBe(1);
+    expect(rmCalls).toBe(1);
+    expect(existsSync(indexPath)).toBe(false);
   });
 });
