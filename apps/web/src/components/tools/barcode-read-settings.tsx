@@ -233,11 +233,11 @@ function scanOneFile(
       xhr.abort();
     });
 
-    xhr.open("POST", appUrl("/api/v1/tools/image/barcode-read"));
-    for (const [key, value] of formatHeaders()) {
-      xhr.setRequestHeader(key, value);
-    }
     try {
+      xhr.open("POST", appUrl("/api/v1/tools/image/barcode-read"));
+      for (const [key, value] of formatHeaders()) {
+        xhr.setRequestHeader(key, value);
+      }
       watchdog.send(formData);
     } catch (err) {
       clearWatchdog();

@@ -1250,5 +1250,38 @@ describe("custom-XHR upload stall and post-upload response watchdog (#3870)", ()
     expect(useDuplicateStore.getState().error).toBeNull();
     expect(vi.getTimerCount()).toBe(0);
     dupView.unmount();
+
+    // 6. BarcodeReadSettings (scanOneFile): clears activeBarcodeWatchdog when open() or setRequestHeader() throws synchronously so remounting does not arm a 120s stall timer (#3936)
+    useFileStore.getState().reset();
+    useFileStore.getState().setFiles([image("code1.png")]);
+    const barcodeView = render(<BarcodeReadSettings />);
+    vi.spyOn(FakeXhr.prototype, "setRequestHeader").mockImplementationOnce(() => {
+      throw new Error("barcode header boom");
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("barcode-read-submit"));
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().error).toBe("code1.png: barcode header boom");
+    expect(vi.getTimerCount()).toBe(0);
+
+    barcodeView.unmount();
+    const remountedBarcodeView = render(<BarcodeReadSettings />);
+    expect(vi.getTimerCount()).toBe(0);
+
+    vi.spyOn(FakeXhr.prototype, "open").mockImplementationOnce(() => {
+      throw "barcode open raw throw";
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("barcode-read-submit"));
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().error).toBe("code1.png: barcode open raw throw");
+    expect(vi.getTimerCount()).toBe(0);
+
+    remountedBarcodeView.unmount();
+    const remountedBarcodeView2 = render(<BarcodeReadSettings />);
+    expect(vi.getTimerCount()).toBe(0);
+    remountedBarcodeView2.unmount();
   });
 });
