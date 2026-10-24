@@ -72,6 +72,23 @@ function stripGhcBacktrace(stderr: string): string {
     .trimEnd();
 }
 
+function pandocSpawnFailure(
+  bin: string,
+  code: null | 126 | 127,
+  signal: NodeJS.Signals | null,
+  output: string,
+): NodeJS.ErrnoException {
+  const errno = code === 127 ? "ENOENT" : code === 126 ? "ENOEXEC" : "ENOMEM";
+  const detail = output.slice(-1000).trim();
+  const msg = detail ? `pandoc exited ${code ?? signal}: ${detail}` : `spawn ${bin} ${errno}`;
+  return Object.assign(new Error(msg), {
+    code: errno,
+    syscall: "spawn",
+    path: bin,
+    ...(signal ? { signal } : {}),
+  });
+}
+
 export function markIfPandocInputError<E extends Error>(
   err: E,
   code: number | null,
@@ -111,9 +128,10 @@ export function runPandoc(
     return Promise.reject(new Error("Canceled"));
   }
   const timeoutMs = opts.timeoutMs ?? 120_000;
+  const bin = pandocBin();
   const args = buildPandocArgs(inPath, outPath, opts);
   return new Promise<void>((resolvePromise, reject) => {
-    const [limBin, limArgs] = wrapWithMemoryLimit(pandocBin(), args);
+    const [limBin, limArgs] = wrapWithMemoryLimit(bin, args);
     const child = spawn(limBin, limArgs, { stdio: ["ignore", "pipe", "pipe"] });
     let err = "";
     let settled = false;
@@ -147,12 +165,17 @@ export function runPandoc(
       settled = true;
       clearTimeout(timer);
       opts.signal?.removeEventListener("abort", onAbort);
-      if (code === 0) resolvePromise();
-      else {
-        const cleanedErr = stripGhcBacktrace(err).slice(-1000);
-        const failure = new Error(`pandoc exited ${code ?? signal}: ${cleanedErr}`);
-        reject(markIfPandocInputError(failure, code, err));
+      if (code === 0) {
+        resolvePromise();
+        return;
       }
+      const cleanedErr = stripGhcBacktrace(err).slice(-1000);
+      if (code === null || code === 126 || code === 127) {
+        reject(pandocSpawnFailure(bin, code, signal, cleanedErr));
+        return;
+      }
+      const failure = new Error(`pandoc exited ${code}: ${cleanedErr}`);
+      reject(markIfPandocInputError(failure, code, err));
     });
     opts.signal?.addEventListener("abort", onAbort, { once: true });
   });

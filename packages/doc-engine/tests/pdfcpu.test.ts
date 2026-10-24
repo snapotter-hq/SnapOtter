@@ -37,23 +37,83 @@ describe("runPdfcpu (shared runner via pdfcpuCropMargin)", () => {
 
   it("rejects on non-zero exit with the stderr tail", async () => {
     h.nextClose({ stderr: "pdfcpu: cannot read file", code: 1 });
-    await expect(
-      import("../src/pdfcpu.js").then((m) => m.pdfcpuCropMargin("/in.pdf", 10, "/out.pdf")),
-    ).rejects.toThrow("pdfcpu exited 1: pdfcpu: cannot read file");
+    const err = await import("../src/pdfcpu.js")
+      .then((m) => m.pdfcpuCropMargin("/in.pdf", 10, "/out.pdf"))
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toBe("pdfcpu exited 1: pdfcpu: cannot read file");
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
   });
 
-  it("falls back to stdout in the error when stderr is empty", async () => {
+  it("falls back to stdout in the error when stderr is empty or whitespace-only", async () => {
     h.nextClose({ stdout: "problem on stdout", code: 2 });
     await expect(
       import("../src/pdfcpu.js").then((m) => m.pdfcpuCropMargin("/in.pdf", 10, "/out.pdf")),
     ).rejects.toThrow("pdfcpu exited 2: problem on stdout");
-  });
 
-  it("reports the signal when code is null", async () => {
-    h.nextClose({ stderr: "killed", code: null, signal: "SIGKILL" });
+    h.nextClose({
+      stderr: "  \n",
+      stdout: "stdout-only diagnostic\n",
+      code: null,
+      signal: "SIGKILL",
+    });
     await expect(
       import("../src/pdfcpu.js").then((m) => m.pdfcpuCropMargin("/in.pdf", 10, "/out.pdf")),
-    ).rejects.toThrow("pdfcpu exited SIGKILL: killed");
+    ).rejects.toMatchObject({
+      message: "pdfcpu exited SIGKILL: stdout-only diagnostic",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/usr/bin/pdfcpu",
+      signal: "SIGKILL",
+    });
+  });
+
+  it("reports the signal and tags as an errno-coded spawn failure when code is null (#3829)", async () => {
+    h.nextClose({ stderr: "killed\n", code: null, signal: "SIGKILL" });
+    await expect(
+      import("../src/pdfcpu.js").then((m) => m.pdfcpuCropMargin("/in.pdf", 10, "/out.pdf")),
+    ).rejects.toMatchObject({
+      message: "pdfcpu exited SIGKILL: killed",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/usr/bin/pdfcpu",
+      signal: "SIGKILL",
+    });
+  });
+
+  it("falls back to a spawn ENOMEM message when a signal kill produces no output (#3829)", async () => {
+    h.nextClose({ stderr: "", stdout: "", code: null, signal: "SIGTERM" });
+    await expect(
+      import("../src/pdfcpu.js").then((m) => m.pdfcpuCropMargin("/in.pdf", 10, "/out.pdf")),
+    ).rejects.toMatchObject({
+      message: "spawn /usr/bin/pdfcpu ENOMEM",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/usr/bin/pdfcpu",
+      signal: "SIGTERM",
+    });
+  });
+
+  it("tags exit codes 126 and 127 as errno-coded spawn failures (#3829)", async () => {
+    h.nextClose({ stderr: "sh: exec format error\n", code: 126 });
+    await expect(
+      import("../src/pdfcpu.js").then((m) => m.pdfcpuCropMargin("/in.pdf", 10, "/out.pdf")),
+    ).rejects.toMatchObject({
+      message: "pdfcpu exited 126: sh: exec format error",
+      code: "ENOEXEC",
+      syscall: "spawn",
+      path: "/usr/bin/pdfcpu",
+    });
+
+    h.nextClose({ stderr: "sh: pdfcpu: not found\n", code: 127 });
+    await expect(
+      import("../src/pdfcpu.js").then((m) => m.pdfcpuNup("/in.pdf", 2, "/out.pdf")),
+    ).rejects.toMatchObject({
+      message: "pdfcpu exited 127: sh: pdfcpu: not found",
+      code: "ENOENT",
+      syscall: "spawn",
+      path: "/usr/bin/pdfcpu",
+    });
   });
 
   it("rejects on an error event", async () => {

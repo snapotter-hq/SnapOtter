@@ -160,20 +160,68 @@ describe("convertDocument success path", () => {
 describe("convertDocument failure paths", () => {
   it("rejects on non-zero exit with the stderr tail", async () => {
     nextClose({ stderr: "source file could not be loaded", code: 1 });
-    await expect(
-      import("../src/libreoffice.js").then((m) =>
-        m.convertDocument("/docs/report.docx", "/outdir", "pdf"),
-      ),
-    ).rejects.toThrow("LibreOffice exited 1: source file could not be loaded");
+    const err = await import("../src/libreoffice.js")
+      .then((m) => m.convertDocument("/docs/report.docx", "/outdir", "pdf"))
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toBe("LibreOffice exited 1: source file could not be loaded");
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
   });
 
-  it("reports the signal when code is null", async () => {
-    nextClose({ stderr: "crashed", code: null, signal: "SIGSEGV" });
+  it("reports the signal and tags as an errno-coded spawn failure when code is null (#3829)", async () => {
+    nextClose({ stderr: "crashed\n", code: null, signal: "SIGSEGV" });
     await expect(
       import("../src/libreoffice.js").then((m) =>
         m.convertDocument("/docs/report.docx", "/outdir", "pdf"),
       ),
-    ).rejects.toThrow("LibreOffice exited SIGSEGV: crashed");
+    ).rejects.toMatchObject({
+      message: "LibreOffice exited SIGSEGV: crashed",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/usr/bin/soffice",
+      signal: "SIGSEGV",
+    });
+  });
+
+  it("falls back to a spawn ENOMEM message when a signal kill produces no output (#3829)", async () => {
+    nextClose({ stderr: "  \n", code: null, signal: "SIGKILL" });
+    await expect(
+      import("../src/libreoffice.js").then((m) =>
+        m.convertDocument("/docs/report.docx", "/outdir", "pdf"),
+      ),
+    ).rejects.toMatchObject({
+      message: "spawn /usr/bin/soffice ENOMEM",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/usr/bin/soffice",
+      signal: "SIGKILL",
+    });
+  });
+
+  it("tags exit codes 126 and 127 as errno-coded spawn failures (#3829)", async () => {
+    nextClose({ stderr: "sh: exec format error\n", code: 126 });
+    await expect(
+      import("../src/libreoffice.js").then((m) =>
+        m.convertDocument("/docs/report.docx", "/outdir", "pdf"),
+      ),
+    ).rejects.toMatchObject({
+      message: "LibreOffice exited 126: sh: exec format error",
+      code: "ENOEXEC",
+      syscall: "spawn",
+      path: "/usr/bin/soffice",
+    });
+
+    nextClose({ stderr: "sh: soffice: not found\n", code: 127 });
+    await expect(
+      import("../src/libreoffice.js").then((m) =>
+        m.convertDocument("/docs/report.docx", "/outdir", "pdf"),
+      ),
+    ).rejects.toMatchObject({
+      message: "LibreOffice exited 127: sh: soffice: not found",
+      code: "ENOENT",
+      syscall: "spawn",
+      path: "/usr/bin/soffice",
+    });
   });
 
   it("rejects on an error event", async () => {

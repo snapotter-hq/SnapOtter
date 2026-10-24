@@ -195,4 +195,109 @@ describe("qpdf exit and signal handling (#1331, #2920)", () => {
       else process.env.PDFCPU_PATH = savedPdfcpuPath;
     }
   });
+
+  it("attaches errno-coded spawn metadata when runFfmpeg, gsCompressPdf, convertDocument, runPandoc, or pdfcpuCropMargin exits 126/127 or dies by signal under SUBPROCESS_MEMORY_LIMIT_MB (#3829)", async () => {
+    const savedFfmpegPath = process.env.FFMPEG_PATH;
+    const savedGsPath = process.env.GS_PATH;
+    const savedSofficePath = process.env.SOFFICE_PATH;
+    const savedPandocPath = process.env.PANDOC_PATH;
+    const savedPdfcpuPath = process.env.PDFCPU_PATH;
+    const savedMemLimit = process.env.SUBPROCESS_MEMORY_LIMIT_MB;
+
+    const ffmpegStub = join(dir, "ffmpeg");
+    const gsStub = join(dir, "gs");
+    const sofficeStub = join(dir, "soffice");
+    const pandocStub = join(dir, "pandoc");
+    const pdfcpuStub = join(dir, "pdfcpu");
+    const stubs = [ffmpegStub, gsStub, sofficeStub, pandocStub, pdfcpuStub];
+
+    process.env.FFMPEG_PATH = ffmpegStub;
+    process.env.GS_PATH = gsStub;
+    process.env.SOFFICE_PATH = sofficeStub;
+    process.env.PANDOC_PATH = pandocStub;
+    process.env.PDFCPU_PATH = pdfcpuStub;
+    process.env.SUBPROCESS_MEMORY_LIMIT_MB = "64";
+    vi.resetModules();
+
+    try {
+      const { convertDocument, gsCompressPdf, pdfcpuCropMargin, runPandoc } = await import(
+        "@snapotter/doc-engine"
+      );
+      const { runFfmpeg } = await import("@snapotter/media-engine");
+
+      const cases: Array<{
+        script: string;
+        expectedErrno: string;
+        expectedSignal?: string;
+      }> = [
+        {
+          script: '#!/bin/sh\necho "Exec format error" >&2\nexit 126\n',
+          expectedErrno: "ENOEXEC",
+        },
+        {
+          script: '#!/bin/sh\necho "not found" >&2\nexit 127\n',
+          expectedErrno: "ENOENT",
+        },
+        {
+          script: "#!/bin/sh\nkill -TERM $$\n",
+          expectedErrno: "ENOMEM",
+          expectedSignal: "SIGTERM",
+        },
+      ];
+
+      for (const c of cases) {
+        for (const p of stubs) {
+          writeFileSync(p, c.script);
+          chmodSync(p, 0o755);
+        }
+
+        const invocations: Array<{ path: string; run: () => Promise<unknown> }> = [
+          {
+            path: ffmpegStub,
+            run: () => runFfmpeg(["-i", pdfPath, join(dir, "out.mp4")]),
+          },
+          {
+            path: gsStub,
+            run: () => gsCompressPdf(pdfPath, join(dir, "gs.pdf"), "ebook"),
+          },
+          {
+            path: sofficeStub,
+            run: () => convertDocument(pdfPath, dir, "pdf"),
+          },
+          {
+            path: pandocStub,
+            run: () => runPandoc(pdfPath, join(dir, "pandoc.html")),
+          },
+          {
+            path: pdfcpuStub,
+            run: () => pdfcpuCropMargin(pdfPath, 10, join(dir, "crop.pdf")),
+          },
+        ];
+
+        for (const inv of invocations) {
+          const err = await inv.run().catch((e: unknown) => e);
+          expect(isBinarySpawnFailure(err)).toBe(true);
+          expect(err).toMatchObject({
+            code: c.expectedErrno,
+            syscall: "spawn",
+            path: inv.path,
+            ...(c.expectedSignal ? { signal: c.expectedSignal } : {}),
+          });
+        }
+      }
+    } finally {
+      if (savedFfmpegPath === undefined) delete process.env.FFMPEG_PATH;
+      else process.env.FFMPEG_PATH = savedFfmpegPath;
+      if (savedGsPath === undefined) delete process.env.GS_PATH;
+      else process.env.GS_PATH = savedGsPath;
+      if (savedSofficePath === undefined) delete process.env.SOFFICE_PATH;
+      else process.env.SOFFICE_PATH = savedSofficePath;
+      if (savedPandocPath === undefined) delete process.env.PANDOC_PATH;
+      else process.env.PANDOC_PATH = savedPandocPath;
+      if (savedPdfcpuPath === undefined) delete process.env.PDFCPU_PATH;
+      else process.env.PDFCPU_PATH = savedPdfcpuPath;
+      if (savedMemLimit === undefined) delete process.env.SUBPROCESS_MEMORY_LIMIT_MB;
+      else process.env.SUBPROCESS_MEMORY_LIMIT_MB = savedMemLimit;
+    }
+  });
 });

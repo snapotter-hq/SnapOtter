@@ -9,6 +9,23 @@ export interface GsOptions {
   signal?: AbortSignal;
 }
 
+function gsSpawnFailure(
+  bin: string,
+  code: null | 126 | 127,
+  signal: NodeJS.Signals | null,
+  output: string,
+): NodeJS.ErrnoException {
+  const errno = code === 127 ? "ENOENT" : code === 126 ? "ENOEXEC" : "ENOMEM";
+  const detail = output.slice(-1000).trim();
+  const msg = detail ? `gs exited ${code ?? signal}: ${detail}` : `spawn ${bin} ${errno}`;
+  return Object.assign(new Error(msg), {
+    code: errno,
+    syscall: "spawn",
+    path: bin,
+    ...(signal ? { signal } : {}),
+  });
+}
+
 /** @internal Shared gs CLI runner; not part of the public package API. */
 function runGs(args: string[], opts: GsOptions = {}): Promise<void> {
   if (opts.signal?.aborted) {
@@ -52,8 +69,15 @@ function runGs(args: string[], opts: GsOptions = {}): Promise<void> {
       settled = true;
       clearTimeout(timer);
       opts.signal?.removeEventListener("abort", onAbort);
-      if (code === 0) resolvePromise();
-      else reject(new Error(`gs exited ${code ?? signal}: ${err.slice(-1000)}`));
+      if (code === 0) {
+        resolvePromise();
+        return;
+      }
+      if (code === null || code === 126 || code === 127) {
+        reject(gsSpawnFailure(bin, code, signal, err));
+        return;
+      }
+      reject(new Error(`gs exited ${code}: ${err.slice(-1000)}`));
     });
     opts.signal?.addEventListener("abort", onAbort, { once: true });
   });

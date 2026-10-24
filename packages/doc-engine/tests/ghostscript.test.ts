@@ -34,16 +34,60 @@ describe("runGs error handling (via gsGrayscalePdf)", () => {
 
   it("rejects on non-zero exit with the stderr tail", async () => {
     h.nextClose({ stderr: "Ghostscript could not open input", code: 1 });
-    await expect(
-      import("../src/ghostscript.js").then((m) => m.gsGrayscalePdf("/in.pdf", "/out.pdf")),
-    ).rejects.toThrow("gs exited 1: Ghostscript could not open input");
+    const err = await import("../src/ghostscript.js")
+      .then((m) => m.gsGrayscalePdf("/in.pdf", "/out.pdf"))
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toBe("gs exited 1: Ghostscript could not open input");
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
   });
 
-  it("reports the signal when code is null", async () => {
-    h.nextClose({ stderr: "boom", code: null, signal: "SIGSEGV" });
+  it("reports the signal and tags as an errno-coded spawn failure when code is null (#3829)", async () => {
+    h.nextClose({ stderr: "boom\n", code: null, signal: "SIGSEGV" });
     await expect(
       import("../src/ghostscript.js").then((m) => m.gsGrayscalePdf("/in.pdf", "/out.pdf")),
-    ).rejects.toThrow("gs exited SIGSEGV: boom");
+    ).rejects.toMatchObject({
+      message: "gs exited SIGSEGV: boom",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/usr/bin/gs",
+      signal: "SIGSEGV",
+    });
+  });
+
+  it("falls back to a spawn ENOMEM message when a signal kill produces no output (#3829)", async () => {
+    h.nextClose({ stderr: "  \n", code: null, signal: "SIGKILL" });
+    await expect(
+      import("../src/ghostscript.js").then((m) => m.gsCompressPdf("/in.pdf", "/out.pdf", "ebook")),
+    ).rejects.toMatchObject({
+      message: "spawn /usr/bin/gs ENOMEM",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/usr/bin/gs",
+      signal: "SIGKILL",
+    });
+  });
+
+  it("tags exit codes 126 and 127 as errno-coded spawn failures (#3829)", async () => {
+    h.nextClose({ stderr: "sh: exec format error\n", code: 126 });
+    await expect(
+      import("../src/ghostscript.js").then((m) => m.gsCompressPdf("/in.pdf", "/out.pdf", "ebook")),
+    ).rejects.toMatchObject({
+      message: "gs exited 126: sh: exec format error",
+      code: "ENOEXEC",
+      syscall: "spawn",
+      path: "/usr/bin/gs",
+    });
+
+    h.nextClose({ stderr: "sh: gs: not found\n", code: 127 });
+    await expect(
+      import("../src/ghostscript.js").then((m) => m.gsPdfaConvert("/in.pdf", "/out.pdf")),
+    ).rejects.toMatchObject({
+      message: "gs exited 127: sh: gs: not found",
+      code: "ENOENT",
+      syscall: "spawn",
+      path: "/usr/bin/gs",
+    });
   });
 
   it("rejects on an error event", async () => {

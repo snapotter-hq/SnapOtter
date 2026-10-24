@@ -266,16 +266,75 @@ describe("runPandoc", () => {
 
   it("rejects on non-zero exit with the stderr tail", async () => {
     h.nextClose({ stderr: "pandoc: unknown reader", code: 43 });
-    await expect(
-      import("../src/pandoc.js").then((m) => m.runPandoc("/in.md", "/out.html")),
-    ).rejects.toThrow("pandoc exited 43: pandoc: unknown reader");
+    const err = await import("../src/pandoc.js")
+      .then((m) => m.runPandoc("/in.md", "/out.html"))
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toBe("pandoc exited 43: pandoc: unknown reader");
+    expect((err as NodeJS.ErrnoException).syscall).toBeUndefined();
   });
 
-  it("reports the signal when code is null", async () => {
-    h.nextClose({ stderr: "died", code: null, signal: "SIGABRT" });
+  it("reports the signal and tags as an errno-coded spawn failure when code is null (#3829)", async () => {
+    h.nextClose({ stderr: "died\n", code: null, signal: "SIGABRT" });
     await expect(
       import("../src/pandoc.js").then((m) => m.runPandoc("/in.md", "/out.html")),
-    ).rejects.toThrow("pandoc exited SIGABRT: died");
+    ).rejects.toMatchObject({
+      message: "pandoc exited SIGABRT: died",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "pandoc",
+      signal: "SIGABRT",
+    });
+  });
+
+  it("falls back to a spawn ENOMEM message when a signal kill produces no output (#3829)", async () => {
+    process.env.PANDOC_PATH = "/opt/pandoc/bin/pandoc";
+    h.nextClose({ stderr: "  \n", code: null, signal: "SIGKILL" });
+    await expect(
+      import("../src/pandoc.js").then((m) => m.runPandoc("/in.md", "/out.html")),
+    ).rejects.toMatchObject({
+      message: "spawn /opt/pandoc/bin/pandoc ENOMEM",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/opt/pandoc/bin/pandoc",
+      signal: "SIGKILL",
+    });
+  });
+
+  it("tags exit codes 126 and 127 as errno-coded spawn failures and never marks them as ToolInputError (#3829)", async () => {
+    process.env.PANDOC_PATH = "/opt/pandoc/bin/pandoc";
+    const mod = await import("../src/pandoc.js");
+
+    h.nextClose({ stderr: "sh: exec format error\n", code: 126 });
+    const err126 = await mod.runPandoc("/in.md", "/out.html").catch((e: unknown) => e);
+    expect(isToolInputError(err126)).toBe(false);
+    expect(err126).toMatchObject({
+      message: "pandoc exited 126: sh: exec format error",
+      code: "ENOEXEC",
+      syscall: "spawn",
+      path: "/opt/pandoc/bin/pandoc",
+    });
+
+    h.nextClose({ stderr: "sh: pandoc: not found\n", code: 127 });
+    const err127 = await mod.runPandoc("/in.md", "/out.html").catch((e: unknown) => e);
+    expect(isToolInputError(err127)).toBe(false);
+    expect(err127).toMatchObject({
+      message: "pandoc exited 127: sh: pandoc: not found",
+      code: "ENOENT",
+      syscall: "spawn",
+      path: "/opt/pandoc/bin/pandoc",
+    });
+
+    h.nextClose({ stderr: "Invalid UTF-8 stream\n", code: null, signal: "SIGKILL" });
+    const errSig = await mod.runPandoc("/in.md", "/out.html").catch((e: unknown) => e);
+    expect(isToolInputError(errSig)).toBe(false);
+    expect(errSig).toMatchObject({
+      message: "pandoc exited SIGKILL: Invalid UTF-8 stream",
+      code: "ENOMEM",
+      syscall: "spawn",
+      path: "/opt/pandoc/bin/pandoc",
+      signal: "SIGKILL",
+    });
   });
 
   it("rejects on an error event", async () => {

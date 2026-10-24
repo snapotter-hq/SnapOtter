@@ -12,6 +12,23 @@ export interface ConvertOptions {
   signal?: AbortSignal;
 }
 
+function libreofficeSpawnFailure(
+  bin: string,
+  code: null | 126 | 127,
+  signal: NodeJS.Signals | null,
+  output: string,
+): NodeJS.ErrnoException {
+  const errno = code === 127 ? "ENOENT" : code === 126 ? "ENOEXEC" : "ENOMEM";
+  const detail = output.slice(-1000).trim();
+  const msg = detail ? `LibreOffice exited ${code ?? signal}: ${detail}` : `spawn ${bin} ${errno}`;
+  return Object.assign(new Error(msg), {
+    code: errno,
+    syscall: "spawn",
+    path: bin,
+    ...(signal ? { signal } : {}),
+  });
+}
+
 /**
  * Split a target string into the output file extension and the full
  * --convert-to argument. Bare extensions ("pdf") pass through unchanged.
@@ -98,8 +115,15 @@ export async function convertDocument(
         settled = true;
         clearTimeout(timer);
         opts.signal?.removeEventListener("abort", onAbort);
-        if (code === 0) resolvePromise();
-        else reject(new Error(`LibreOffice exited ${code ?? signal}: ${err.slice(-1000)}`));
+        if (code === 0) {
+          resolvePromise();
+          return;
+        }
+        if (code === null || code === 126 || code === 127) {
+          reject(libreofficeSpawnFailure(bin, code, signal, err));
+          return;
+        }
+        reject(new Error(`LibreOffice exited ${code}: ${err.slice(-1000)}`));
       });
       opts.signal?.addEventListener("abort", onAbort, { once: true });
     });

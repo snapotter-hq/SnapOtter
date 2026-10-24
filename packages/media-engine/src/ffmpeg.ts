@@ -28,6 +28,23 @@ export function markIfInputError<E extends Error>(err: E, stderr: string): E {
   return INPUT_ERROR_PATTERNS.some((re) => re.test(stderr)) ? markToolInputError(err) : err;
 }
 
+function ffmpegSpawnFailure(
+  bin: string,
+  code: null | 126 | 127,
+  signal: NodeJS.Signals | null,
+  output: string,
+): NodeJS.ErrnoException {
+  const errno = code === 127 ? "ENOENT" : code === 126 ? "ENOEXEC" : "ENOMEM";
+  const detail = output.slice(-1000).trim();
+  const msg = detail ? `ffmpeg exited ${code ?? signal}: ${detail}` : `spawn ${bin} ${errno}`;
+  return Object.assign(new Error(msg), {
+    code: errno,
+    syscall: "spawn",
+    path: bin,
+    ...(signal ? { signal } : {}),
+  });
+}
+
 /**
  * Runs ffmpeg with `-progress pipe:1` appended, parsing progress blocks from
  * stdout. Rejects with the tail of stderr on non-zero exit, timeout or abort.
@@ -101,12 +118,16 @@ export async function runFfmpeg(args: string[], opts: RunFfmpegOptions = {}): Pr
       if (settled) return;
       settled = true;
       cleanup();
-      if (code === 0) resolvePromise(stderrTail);
-      else {
-        const err = new Error(`ffmpeg exited ${code ?? signal}: ${stderrTail}`);
-        if (signal !== null) Object.assign(err, { signal });
-        reject(markIfInputError(err, stderrTail));
+      if (code === 0) {
+        resolvePromise(stderrTail);
+        return;
       }
+      if (code === null || code === 126 || code === 127) {
+        reject(ffmpegSpawnFailure(bin, code, signal, stderrTail));
+        return;
+      }
+      const err = new Error(`ffmpeg exited ${code}: ${stderrTail}`);
+      reject(markIfInputError(err, stderrTail));
     });
   });
 }

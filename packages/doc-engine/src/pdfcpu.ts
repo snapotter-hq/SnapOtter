@@ -7,6 +7,23 @@ export interface PdfcpuOptions {
   signal?: AbortSignal;
 }
 
+function pdfcpuSpawnFailure(
+  bin: string,
+  code: null | 126 | 127,
+  signal: NodeJS.Signals | null,
+  output: string,
+): NodeJS.ErrnoException {
+  const errno = code === 127 ? "ENOENT" : code === 126 ? "ENOEXEC" : "ENOMEM";
+  const detail = output.slice(-1000).trim();
+  const msg = detail ? `pdfcpu exited ${code ?? signal}: ${detail}` : `spawn ${bin} ${errno}`;
+  return Object.assign(new Error(msg), {
+    code: errno,
+    syscall: "spawn",
+    path: bin,
+    ...(signal ? { signal } : {}),
+  });
+}
+
 /**
  * Shared pdfcpu CLI runner. Mirrors runQpdf's spawn/settled/(code, signal)
  * shape. The `-c disable` flag prevents config-dir writes on read-only
@@ -60,11 +77,16 @@ function runPdfcpu(args: string[], opts: PdfcpuOptions = {}): Promise<string> {
       settled = true;
       clearTimeout(timer);
       opts.signal?.removeEventListener("abort", onAbort);
-      if (code === 0) resolvePromise(out);
-      else
-        reject(
-          new Error(`pdfcpu exited ${code ?? signal}: ${err.slice(-1000) || out.slice(-1000)}`),
-        );
+      if (code === 0) {
+        resolvePromise(out);
+        return;
+      }
+      const detail = err.slice(-1000).trim() ? err.slice(-1000) : out.slice(-1000);
+      if (code === null || code === 126 || code === 127) {
+        reject(pdfcpuSpawnFailure(bin, code, signal, detail));
+        return;
+      }
+      reject(new Error(`pdfcpu exited ${code}: ${detail}`));
     });
     opts.signal?.addEventListener("abort", onAbort, { once: true });
   });
