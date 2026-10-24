@@ -742,6 +742,18 @@ describe("encodeHeic heif-enc and output readFile fault classification (#3784)",
     const pluginErr = await encodeError(png());
     expect(isDecoderUnavailable(pluginErr)).toBe(true);
     expect(pluginErr.name).toBe("DecoderUnavailableError");
+
+    for (const stderr of ["No HEVC encoder available.\n", "No AV1 encoder available.\n"]) {
+      failures.kill = {
+        code: 5,
+        signal: null,
+        stderr,
+      };
+      const noEncoderErr = await encodeError(png());
+      expect(isDecoderUnavailable(noEncoderErr)).toBe(true);
+      expect(noEncoderErr.name).toBe("DecoderUnavailableError");
+      expect((noEncoderErr.cause as { stderr?: unknown } | undefined)?.stderr).toBe(stderr);
+    }
   });
 
   it("surfaces a V8 buffer allocation RangeError when reading heif-enc's output as a 503 DecoderOutOfMemoryError", async () => {
@@ -798,6 +810,18 @@ describe("encodeHeic heif-enc and output readFile fault classification (#3784)",
       statusCode: 503,
       code: "ENGINE_UNAVAILABLE",
       cause: v8Oom,
+    });
+
+    failures.kill = { code: 5, signal: null, stderr: "No HEVC encoder available.\n" };
+    const noEncoderErr = await wrapped(png(), { format: "heic" }, "in.png").catch(
+      (e: unknown) => e,
+    );
+    expect(noEncoderErr).toMatchObject({
+      name: "DecoderUnavailableError",
+      isSafeMessage: true,
+      kind: "operational",
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
     });
   });
 });

@@ -120,13 +120,13 @@ const GHOSTSCRIPT_VERDICT =
 /**
  * The decoder ran but can't handle the format at all, so it never judged the
  * file: ImageMagick without the delegate, blocked by policy.xml, or missing
- * Ghostscript (#1461), or libheif without its HEVC plugin (newer and 1.15-1.17
- * wording, and a build without plugin loading). Only stderr is read: the
- * command line in the error message carries a temp path derived from the
- * upload (#1429).
+ * Ghostscript (#1461), or libheif without its HEVC/AV1 plugin (newer and
+ * 1.15-1.17 wording, heif-enc missing an encoder plugin (#3884), and a build
+ * without plugin loading). Only stderr is read: the command line in the error
+ * message carries a temp path derived from the upload (#1429).
  */
 const MISSING_SUPPORT =
-  /no decode delegate for this image format|delegate library support not built-in|not allowed by the security policy|FailedToExecuteCommand\s+[`"']*gs\b|No decoding plugin installed|No decoder for this image format|Unsupported feature: Unsupported codec|Support for this compression format has not been built in/i;
+  /no decode delegate for this image format|delegate library support not built-in|not allowed by the security policy|FailedToExecuteCommand\s+[`"']*gs\b|No decoding plugin installed|No decoder for this image format|No [A-Z0-9]+ encoder available|Unsupported feature: Unsupported codec|Support for this compression format has not been built in/i;
 
 function blockedBySecurityPolicy(err: unknown): boolean {
   const stderr = (err as { stderr?: unknown } | null)?.stderr;

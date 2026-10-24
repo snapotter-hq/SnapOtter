@@ -654,6 +654,8 @@ describe("asDecoderUnavailable classification (#1429)", () => {
     "Could not decode image: No decoding plugin installed for this compression format",
     "Could not decode image: Unsupported feature: Unsupported codec",
     "Support for this compression format has not been built in",
+    "No HEVC encoder available.",
+    "No AV1 encoder available.",
     "MAGICK: NO DECODE DELEGATE FOR THIS IMAGE FORMAT",
     "convert: FailedToExecuteCommand `'gs' -sstdout=%stderr -dQUIET'",
     'convert: FailedToExecuteCommand `"gs" -sstdout=%stderr -dQUIET\'',
