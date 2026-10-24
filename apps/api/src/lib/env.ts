@@ -1,6 +1,12 @@
 import { availableParallelism } from "node:os";
+import { SUPPORTED_LOCALES } from "@snapotter/shared";
 import { z } from "zod";
 import { DEFAULT_TRUST_PROXY, parseTrustProxy } from "./trust-proxy.js";
+
+const SUPPORTED_LOCALE_CODES: ReadonlySet<string> = new Set(
+  SUPPORTED_LOCALES.map((locale) => locale.code),
+);
+const SUPPORTED_LOCALE_MESSAGE = `Must be a supported locale (${SUPPORTED_LOCALES.map((locale) => locale.code).join(", ")})`;
 
 /**
  * Whether a URL is https, read from the parsed scheme rather than a string
@@ -120,7 +126,10 @@ const envSchema = z
     FILES_STORAGE_PATH: z.string().default("./data/files"),
     WORKSPACE_PATH: z.string().default("./tmp/workspace"),
     DEFAULT_THEME: z.enum(["light", "dark", "system"]).default("light"),
-    DEFAULT_LOCALE: z.string().default("en"),
+    DEFAULT_LOCALE: z
+      .string()
+      .default("en")
+      .refine((value) => SUPPORTED_LOCALE_CODES.has(value), SUPPORTED_LOCALE_MESSAGE),
     DEFAULT_TOOL_VIEW: z.enum(["sidebar", "fullscreen"]).default("sidebar"),
     CORS_ORIGIN: z.string().default(""),
     MAX_USERS: z.coerce.number().default(0),

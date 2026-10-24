@@ -1,4 +1,6 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { SUPPORTED_LOCALES } from "@snapotter/shared";
+import Fastify from "fastify";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   loadEnv,
   resolveConcurrency,
@@ -665,4 +667,128 @@ describe("loadEnv GDPR_EXPORT_TIMEOUT_MS (#1497)", () => {
       loadEnv({ ...withoutTimeout, GDPR_EXPORT_TIMEOUT_MS: "45000" }).GDPR_EXPORT_TIMEOUT_MS,
     ).toBe(45_000);
   });
+});
+
+describe("loadEnv DEFAULT_LOCALE validation (#3958)", () => {
+  it("defaults DEFAULT_LOCALE to en when unset", () => {
+    const { DEFAULT_LOCALE: _omitted, ...withoutDefaultLocale } = originalEnv;
+    expect(loadEnv(withoutDefaultLocale).DEFAULT_LOCALE).toBe("en");
+  });
+
+  it("accepts every locale code in SUPPORTED_LOCALES", () => {
+    for (const { code } of SUPPORTED_LOCALES) {
+      expect(loadEnv({ ...originalEnv, DEFAULT_LOCALE: code }).DEFAULT_LOCALE).toBe(code);
+    }
+  });
+
+  it.each(["", "   ", " de ", "de_DE", "french", "xx-invalid", "ZH-CN", "en-US"])(
+    "rejects unsupported DEFAULT_LOCALE %j and lists valid codes (#3958)",
+    (locale) => {
+      expectLoadEnvError(
+        { DEFAULT_LOCALE: locale },
+        "Must be a supported locale (en, zh-CN, zh-TW,",
+        ["DEFAULT_LOCALE"],
+      );
+    },
+  );
+});
+
+describe("configRoutes GET /api/v1/config/locale (#3958)", () => {
+  async function injectConfigLocale(
+    storedValue?: string,
+    envDefaultLocale = "en",
+  ): Promise<{
+    statusCode: number;
+    body: { defaultLocale: string };
+    whereCalls: unknown[];
+    warnCalls: unknown[][];
+  }> {
+    vi.resetModules();
+    const whereCalls: unknown[] = [];
+    const warnCalls: unknown[][] = [];
+
+    vi.doMock("drizzle-orm", () => ({
+      eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+    }));
+    vi.doMock("../../../../apps/api/src/config.js", () => ({
+      env: {
+        AUTH_ENABLED: true,
+        DEFAULT_LOCALE: envDefaultLocale,
+        OIDC_ENABLED: false,
+        SAML_ENABLED: false,
+      },
+    }));
+    vi.doMock("../../../../apps/api/src/db/index.js", () => ({
+      db: {
+        select: () => ({
+          from: () => ({
+            where: (predicate: unknown) => {
+              whereCalls.push(predicate);
+              return Promise.resolve(
+                storedValue === undefined ? [] : [{ key: "defaultLocale", value: storedValue }],
+              );
+            },
+          }),
+        }),
+      },
+      schema: { settings: { key: "settings.key", value: "settings.value" } },
+    }));
+
+    const { configRoutes } = await import("../../../../apps/api/src/routes/config.js");
+    const app = Fastify();
+    await configRoutes(app);
+    await app.ready();
+    vi.spyOn(app.log, "warn").mockImplementation((...args: unknown[]) => {
+      warnCalls.push(args);
+    });
+    try {
+      const res = await app.inject({ method: "GET", url: "/api/v1/config/locale" });
+      return { statusCode: res.statusCode, body: res.json(), whereCalls, warnCalls };
+    } finally {
+      await app.close();
+      vi.doUnmock("drizzle-orm");
+      vi.doUnmock("../../../../apps/api/src/config.js");
+      vi.doUnmock("../../../../apps/api/src/db/index.js");
+      vi.restoreAllMocks();
+    }
+  }
+
+  it("returns en (or env.DEFAULT_LOCALE) without logging a warning when no defaultLocale row is stored", async () => {
+    const res = await injectConfigLocale(undefined);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ defaultLocale: "en" });
+    expect(res.whereCalls).toEqual([{ op: "eq", col: "settings.key", val: "defaultLocale" }]);
+    expect(res.warnCalls).toEqual([]);
+
+    const customEnvRes = await injectConfigLocale(undefined, "de");
+    expect(customEnvRes.statusCode).toBe(200);
+    expect(customEnvRes.body).toEqual({ defaultLocale: "de" });
+    expect(customEnvRes.warnCalls).toEqual([]);
+  });
+
+  it("returns every stored locale code in SUPPORTED_LOCALES without warning", async () => {
+    for (const { code } of SUPPORTED_LOCALES) {
+      const res = await injectConfigLocale(code);
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toEqual({ defaultLocale: code });
+      expect(res.whereCalls).toEqual([{ op: "eq", col: "settings.key", val: "defaultLocale" }]);
+      expect(res.warnCalls).toEqual([]);
+    }
+  });
+
+  it.each(["", "   ", " de ", "de_DE", "french", "xx-invalid", "ZH-CN", "en-US"])(
+    "logs a warning and falls back to env.DEFAULT_LOCALE when a legacy defaultLocale row holds unsupported value %j",
+    async (legacyValue) => {
+      const res = await injectConfigLocale(legacyValue, "fr");
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toEqual({ defaultLocale: "fr" });
+      expect(res.whereCalls).toEqual([{ op: "eq", col: "settings.key", val: "defaultLocale" }]);
+      expect(res.warnCalls).toEqual([
+        [
+          { value: legacyValue, fallbackLocale: "fr" },
+          "defaultLocale setting holds an unsupported value; using fallback",
+        ],
+      ]);
+    },
+  );
 });
