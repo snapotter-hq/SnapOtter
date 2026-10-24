@@ -1612,6 +1612,61 @@ describe("files route logic", () => {
         expect(log.error, label).not.toHaveBeenCalled();
       }
     });
+
+    it("rethrows DecoderOutOfMemoryError after discarding earlier parts when Buffer.concat or part.file throws V8 RangeError on POST /api/v1/upload (#3903)", async () => {
+      const { DecoderOutOfMemoryError } = await import(
+        "../../../apps/api/src/lib/format-decoders.js"
+      );
+      const v8Oom = new RangeError("Array buffer allocation failed");
+      const origConcat = Buffer.concat;
+      let concatCalls = 0;
+      const concatSpy = vi.spyOn(Buffer, "concat").mockImplementation((...args) => {
+        concatCalls += 1;
+        if (concatCalls === 2) throw v8Oom;
+        return origConcat(...args);
+      });
+      try {
+        const req = makeRequest([
+          filePart("first.txt", Buffer.from("hello")),
+          filePart("second.txt", Buffer.from("world")),
+        ]);
+        const reply = makeReply();
+
+        const rejected = await uploadHandler(req, reply).catch((err: unknown) => err);
+        expect(rejected).toBeInstanceOf(DecoderOutOfMemoryError);
+        expect(rejected).toMatchObject({
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          kind: "operational",
+          cause: v8Oom,
+        });
+        expect(mocks.putObject).toHaveBeenCalledTimes(1);
+        expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
+        expect(mocks.dbDeleteWhere).toHaveBeenCalledTimes(1);
+      } finally {
+        concatSpy.mockRestore();
+      }
+
+      vi.clearAllMocks();
+      const streamOom = new RangeError("Array buffer allocation failed");
+      const streamReq = makeRequest([
+        filePart("first.txt", Buffer.from("hello")),
+        filePart("second.txt", streamOom),
+      ]);
+      const streamRejected = await uploadHandler(streamReq, makeReply()).catch(
+        (err: unknown) => err,
+      );
+      expect(streamRejected).toBeInstanceOf(DecoderOutOfMemoryError);
+      expect(streamRejected).toMatchObject({
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: streamOom,
+      });
+      expect(mocks.putObject).toHaveBeenCalledTimes(1);
+      expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
+      expect(mocks.dbDeleteWhere).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("POST /api/v1/preview RAW extension extraction (#3246)", () => {
@@ -2337,6 +2392,68 @@ describe("files route logic", () => {
         ),
       ).rejects.toBe(unexpectedSanitizeErr);
       expect(formatDecoders).toBeDefined();
+    });
+
+    it("rethrows DecoderOutOfMemoryError when data.toBuffer() rejects with V8 RangeError on POST /api/v1/preview, while preserving non-OOM rejections (#3903)", async () => {
+      const { DecoderOutOfMemoryError } = await import(
+        "../../../apps/api/src/lib/format-decoders.js"
+      );
+      const v8Oom = new RangeError("Array buffer allocation failed");
+      const rejectedOom = await previewHandler(
+        {
+          log: { warn: vi.fn(), error: vi.fn() },
+          file: async () => ({
+            filename: "photo.heic",
+            toBuffer: async () => {
+              throw v8Oom;
+            },
+          }),
+        },
+        makePreviewReply(),
+      ).catch((err: unknown) => err);
+
+      expect(rejectedOom).toBeInstanceOf(DecoderOutOfMemoryError);
+      expect(rejectedOom).toMatchObject({
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
+
+      const tooLarge = Object.assign(new Error("request file too large"), {
+        statusCode: 413,
+        code: "FST_REQ_FILE_TOO_LARGE",
+      });
+      await expect(
+        previewHandler(
+          {
+            log: { warn: vi.fn(), error: vi.fn() },
+            file: async () => ({
+              filename: "photo.heic",
+              toBuffer: async () => {
+                throw tooLarge;
+              },
+            }),
+          },
+          makePreviewReply(),
+        ),
+      ).rejects.toBe(tooLarge);
+
+      const nonOomRange = new RangeError("Invalid array length");
+      await expect(
+        previewHandler(
+          {
+            log: { warn: vi.fn(), error: vi.fn() },
+            file: async () => ({
+              filename: "photo.heic",
+              toBuffer: async () => {
+                throw nonOomRange;
+              },
+            }),
+          },
+          makePreviewReply(),
+        ),
+      ).rejects.toBe(nonOomRange);
     });
   });
 });

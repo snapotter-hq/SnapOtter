@@ -18,6 +18,7 @@ import {
   needsCliDecode,
 } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
+import { readFilePart } from "../lib/multipart-parts.js";
 import {
   deletePrefix,
   getObjectSize,
@@ -154,11 +155,7 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
           if (part.type !== "file") continue;
 
           // Consume buffer from the stream
-          const chunks: Buffer[] = [];
-          for await (const chunk of part.file) {
-            chunks.push(chunk);
-          }
-          const buffer = Buffer.concat(chunks);
+          const buffer = await readFilePart(part.file);
 
           // Skip empty parts (e.g. empty file field)
           if (buffer.length === 0) continue;
@@ -417,7 +414,9 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
     if (!data) {
       return reply.status(400).send({ error: "No file provided" });
     }
-    const originalBuffer = await data.toBuffer();
+    const originalBuffer = await data.toBuffer().catch((err) => {
+      throw asDecoderOutOfMemory(err);
+    });
     let buffer = originalBuffer;
     const ext = data.filename
       ? extname(data.filename).toLowerCase().replace(/^\./, "") || undefined

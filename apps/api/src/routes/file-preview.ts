@@ -33,6 +33,7 @@ import { friendlyError } from "../lib/errors.js";
 import { getStoredFilePath, isStorageServiceFault, streamStoredFile } from "../lib/file-storage.js";
 import { logger } from "../lib/logger.js";
 import { mp4TimescaleArgs } from "../lib/media-tool.js";
+import { readFilePart } from "../lib/multipart-parts.js";
 import {
   normalizeOperationalWriteError,
   STORAGE_UNAVAILABLE_MESSAGE,
@@ -592,11 +593,7 @@ export async function filePreviewRoutes(app: FastifyInstance): Promise<void> {
 
       for await (const part of parts) {
         if (part.type !== "file") continue;
-        const chunks: Buffer[] = [];
-        for await (const chunk of part.file) {
-          chunks.push(chunk);
-        }
-        fileBuffer = Buffer.concat(chunks);
+        fileBuffer = await readFilePart(part.file);
         filename = part.filename ?? "input";
         break; // only process the first file
       }

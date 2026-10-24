@@ -617,4 +617,147 @@ describe("ensurePreviewDir startup sweep (#1320)", () => {
     expect(Buffer.isBuffer(okPayload) && okPayload.toString()).toBe("encoded-mp4");
     expect(previewMocks.runFfmpeg).toHaveBeenCalledTimes(1);
   });
+
+  it("converts a V8 buffer allocation failure in Buffer.concat or part.file to DecoderOutOfMemoryError on POST /api/v1/preview/generate, while preserving non-OOM errors (#3903)", async () => {
+    const { Readable } = await import("node:stream");
+    const { DecoderOutOfMemoryError } = await import(
+      "../../../apps/api/src/lib/format-decoders.js"
+    );
+    const { filePreviewRoutes } = await import("../../../apps/api/src/routes/file-preview.js");
+
+    type RouteHandler = (request: unknown, reply: unknown) => Promise<unknown>;
+    let generateHandler: RouteHandler | undefined;
+    const fakeApp = {
+      log: loggerMock,
+      get: vi.fn(),
+      post: vi.fn((path: string, _opts: unknown, handler?: RouteHandler) => {
+        if (path === "/api/v1/preview/generate") {
+          generateHandler = (typeof _opts === "function" ? _opts : handler) as RouteHandler;
+        }
+      }),
+    };
+    await filePreviewRoutes(fakeApp as never);
+    expect(generateHandler).toBeTypeOf("function");
+
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    const concatSpy = vi.spyOn(Buffer, "concat").mockImplementationOnce(() => {
+      throw v8Oom;
+    });
+    try {
+      const reply = {
+        raw: {
+          destroyed: false,
+          writableEnded: false,
+          on: vi.fn(),
+          off: vi.fn(),
+          once: vi.fn(),
+          removeListener: vi.fn(),
+        },
+        status: vi.fn().mockReturnThis(),
+        header: vi.fn().mockReturnThis(),
+        send: vi.fn().mockReturnThis(),
+      };
+      const req = {
+        raw: {
+          destroyed: false,
+          socket: { destroyed: false },
+          on: vi.fn(),
+          off: vi.fn(),
+          once: vi.fn(),
+          removeListener: vi.fn(),
+        },
+        log: loggerMock,
+        async *parts() {
+          yield {
+            type: "file" as const,
+            fieldname: "file",
+            filename: "clip.mp4",
+            file: Readable.from([Buffer.from("mp4-bytes")]),
+          };
+        },
+      };
+
+      const rejected = await generateHandler?.(req, reply).catch((err: unknown) => err);
+      expect(rejected).toBeInstanceOf(DecoderOutOfMemoryError);
+      expect(rejected).toMatchObject({
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
+      expect(previewMocks.runFfmpeg).not.toHaveBeenCalled();
+    } finally {
+      concatSpy.mockRestore();
+    }
+
+    const streamOom = new RangeError("Array buffer allocation failed");
+    const streamReply = {
+      raw: {
+        destroyed: false,
+        writableEnded: false,
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeListener: vi.fn(),
+      },
+      status: vi.fn().mockReturnThis(),
+      header: vi.fn().mockReturnThis(),
+      send: vi.fn().mockReturnThis(),
+    };
+    const streamReq = {
+      raw: {
+        destroyed: false,
+        socket: { destroyed: false },
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeListener: vi.fn(),
+      },
+      log: loggerMock,
+      async *parts() {
+        yield {
+          type: "file" as const,
+          fieldname: "file",
+          filename: "clip.mp4",
+          file: new Readable({
+            read() {
+              this.destroy(streamOom);
+            },
+          }),
+        };
+      },
+    };
+    const streamRejected = await generateHandler?.(streamReq, streamReply).catch(
+      (err: unknown) => err,
+    );
+    expect(streamRejected).toBeInstanceOf(DecoderOutOfMemoryError);
+    expect(streamRejected).toMatchObject({
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      kind: "operational",
+      cause: streamOom,
+    });
+    expect(previewMocks.runFfmpeg).not.toHaveBeenCalled();
+
+    const tooLarge = Object.assign(new Error("request file too large"), {
+      statusCode: 413,
+      code: "FST_REQ_FILE_TOO_LARGE",
+    });
+    const tooLargeReq = {
+      ...streamReq,
+      async *parts() {
+        yield {
+          type: "file" as const,
+          fieldname: "file",
+          filename: "clip.mp4",
+          file: new Readable({
+            read() {
+              this.destroy(tooLarge);
+            },
+          }),
+        };
+      },
+    };
+    await expect(generateHandler?.(tooLargeReq, streamReply)).rejects.toBe(tooLarge);
+  });
 });
