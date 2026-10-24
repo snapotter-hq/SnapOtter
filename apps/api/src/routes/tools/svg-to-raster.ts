@@ -298,9 +298,11 @@ export function registerSvgToRasterRoute(
               ...(unavailable.code && { code: unavailable.code }),
             });
           } else if (isSvgClientError(err)) {
+            const error = err instanceof Error ? err.message : "Invalid SVGZ file";
+            faults.push({ filename: file.filename, error });
             errors.push({
               filename: file.filename,
-              error: err instanceof Error ? err.message : "Invalid SVGZ file",
+              error,
             });
           } else {
             throw err;
@@ -318,7 +320,9 @@ export function registerSvgToRasterRoute(
         }
 
         if (!isSvgBuffer(decompressed)) {
-          errors.push({ filename: file.filename, error: "Not a valid SVG file" });
+          const error = "Not a valid SVG file";
+          faults.push({ filename: file.filename, error });
+          errors.push({ filename: file.filename, error });
           completedFiles++;
           updateJobProgress({
             jobId,
@@ -350,9 +354,11 @@ export function registerSvgToRasterRoute(
               ...(unavailable.code && { code: unavailable.code }),
             });
           } else if (isSvgClientError(err)) {
+            const error = err instanceof Error ? err.message : "Invalid SVG";
+            faults.push({ filename: file.filename, error });
             errors.push({
               filename: file.filename,
-              error: err instanceof Error ? err.message : "Invalid SVG",
+              error,
             });
           } else {
             throw err;
@@ -412,6 +418,15 @@ export function registerSvgToRasterRoute(
       await Promise.all(tasks);
     } catch (err) {
       queue.clear();
+      const statusCode =
+        typeof (err as { statusCode?: unknown })?.statusCode === "number"
+          ? (err as { statusCode: number }).statusCode
+          : 500;
+      const safe = isSafeMessageError(err) && err.statusCode !== undefined;
+      const message =
+        statusCode >= 500 && !safe
+          ? "Internal server error"
+          : friendlyError(err instanceof Error ? err.message : String(err));
       const applied = await failBatchJob({
         jobId,
         totalFiles: files.length,
@@ -419,9 +434,10 @@ export function registerSvgToRasterRoute(
         failedFiles: files.length,
         errors: [
           ...errors.map(({ filename, error }) => ({ filename, error })),
-          { filename: "", error: "Internal server error" },
+          { filename: "", error: message },
         ],
-        message: "Internal server error",
+        message,
+        ...(safe && err.code ? { code: err.code } : {}),
       }).catch((settleErr) => {
         request.log.error({ err: settleErr, jobId }, "failed to settle a faulted SVG batch");
         return null;

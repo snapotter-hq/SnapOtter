@@ -88,8 +88,10 @@ vi.mock("../../../apps/api/src/permissions.js", async (importOriginal) => {
   return { ...actual, requireToolAccess: async () => ({ id: "user-1" }) };
 });
 
+import { SafeError } from "@snapotter/shared";
 import sharp from "sharp";
 import { env } from "../../../apps/api/src/config.js";
+import * as engineUnavailableMod from "../../../apps/api/src/lib/engine-unavailable.js";
 import { DecoderOutOfMemoryError } from "../../../apps/api/src/lib/format-decoders.js";
 import { registerBarcodeRead } from "../../../apps/api/src/routes/tools/barcode-read.js";
 import { registerCollage } from "../../../apps/api/src/routes/tools/collage.js";
@@ -1527,6 +1529,124 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
           ],
         }),
       );
+    });
+
+    it("POST /api/v1/tools/image/svg-to-raster/batch records client SVG rejections in faults and preserves status-bearing SafeError message and code in failBatchJob (#3911)", async () => {
+      const batchHandler = routes.get("/api/v1/tools/image/svg-to-raster/batch");
+      const allFailedFaultSpy = vi.spyOn(engineUnavailableMod, "allFailedFault");
+
+      try {
+        const clientFailReply = await invokeRoute(batchHandler, [
+          { type: "file", filename: "bad.svgz", content: NOT_SVG_SVGZ },
+          {
+            type: "file",
+            filename: "not-svg.svg",
+            content: Buffer.from("not an svg document", "utf-8"),
+          },
+          { type: "file", filename: "too-many.svg", content: OVER_ELEMENT_SVG },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ]);
+        expect(clientFailReply.statusCode).toBe(422);
+        const expectedClientEntries = [
+          {
+            filename: "bad.svgz",
+            error: "SVGZ file does not contain valid SVG content after decompression",
+          },
+          {
+            filename: "not-svg.svg",
+            error: "Not a valid SVG file",
+          },
+          {
+            filename: "too-many.svg",
+            error: "SVG exceeds maximum element count of 5000",
+          },
+        ];
+        expect(clientFailReply.payload).toEqual({
+          error: "All files failed processing",
+          errors: expectedClientEntries,
+        });
+        expect(allFailedFaultSpy).toHaveBeenCalledWith([], 0, expectedClientEntries, 3);
+
+        mocks.failBatchJob.mockClear();
+        const workspaceCap = new SafeError("Workspace storage limit reached", {
+          statusCode: 503,
+          code: "workspace-cap",
+        });
+        mocks.sanitizeSvg.mockImplementationOnce(() => {
+          throw workspaceCap;
+        });
+        await expect(
+          invokeRoute(batchHandler, [
+            {
+              type: "file",
+              filename: "bad.svg",
+              content: Buffer.from("not an svg document", "utf-8"),
+            },
+            { type: "file", filename: "icon.svg", content: SCRIPT_LT_SVG },
+            { type: "field", fieldname: "settings", value: "{}" },
+          ]),
+        ).rejects.toThrow(workspaceCap);
+        expect(mocks.failBatchJob).toHaveBeenCalledWith({
+          jobId: expect.any(String),
+          totalFiles: 2,
+          completedFiles: 2,
+          failedFiles: 2,
+          message: "Workspace storage limit reached",
+          code: "workspace-cap",
+          errors: [
+            { filename: "bad.svg", error: "Not a valid SVG file" },
+            { filename: "", error: "Workspace storage limit reached" },
+          ],
+        });
+
+        for (const maskedFault of [
+          new SafeError("sidecar stderr leak", { code: "INTERNAL_CODE" }),
+          Object.assign(new Error("upstream gateway failure"), { statusCode: 502 }),
+        ]) {
+          mocks.failBatchJob.mockClear();
+          mocks.decompressSvgz.mockImplementationOnce(() => {
+            throw maskedFault;
+          });
+          await expect(
+            invokeRoute(batchHandler, [
+              { type: "file", filename: "icon.svgz", content: SCRIPT_LT_SVGZ },
+              { type: "field", fieldname: "settings", value: "{}" },
+            ]),
+          ).rejects.toThrow(maskedFault);
+          expect(mocks.failBatchJob).toHaveBeenCalledWith({
+            jobId: expect.any(String),
+            totalFiles: 1,
+            completedFiles: 1,
+            failedFiles: 1,
+            message: "Internal server error",
+            errors: [{ filename: "", error: "Internal server error" }],
+          });
+        }
+
+        mocks.failBatchJob.mockClear();
+        const clientStatusFault = Object.assign(new Error("Rate limit exceeded"), {
+          statusCode: 429,
+        });
+        mocks.sanitizeSvg.mockImplementationOnce(() => {
+          throw clientStatusFault;
+        });
+        await expect(
+          invokeRoute(batchHandler, [
+            { type: "file", filename: "icon.svg", content: SCRIPT_LT_SVG },
+            { type: "field", fieldname: "settings", value: "{}" },
+          ]),
+        ).rejects.toThrow(clientStatusFault);
+        expect(mocks.failBatchJob).toHaveBeenCalledWith({
+          jobId: expect.any(String),
+          totalFiles: 1,
+          completedFiles: 1,
+          failedFiles: 1,
+          message: "Rate limit exceeded",
+          errors: [{ filename: "", error: "Rate limit exceeded" }],
+        });
+      } finally {
+        allFailedFaultSpy.mockRestore();
+      }
     });
 
     it("POST /api/v1/tools/image/find-duplicates skips client SVG/SVGZ rejections and rethrows unexpected TypeError faults (#3733)", async () => {
