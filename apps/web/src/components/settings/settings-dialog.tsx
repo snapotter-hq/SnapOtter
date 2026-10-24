@@ -394,7 +394,7 @@ export function GeneralSection() {
   const { authEnabled } = useAuth();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [defaultToolView, setDefaultToolView] = useState("sidebar");
+  const [defaultToolView, setDefaultToolView] = useState<"sidebar" | "fullscreen">("sidebar");
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [logoutFailed, setLogoutFailed] = useState(false);
@@ -415,7 +415,10 @@ export function GeneralSection() {
         }),
       apiGet<{ preferences: Record<string, unknown> }>("/v1/preferences")
         .then((data) => {
-          if (typeof data.preferences.defaultToolView === "string") {
+          if (
+            data.preferences.defaultToolView === "sidebar" ||
+            data.preferences.defaultToolView === "fullscreen"
+          ) {
             setDefaultToolView(data.preferences.defaultToolView);
           }
         })
@@ -443,7 +446,7 @@ export function GeneralSection() {
       await apiPut("/v1/preferences", { defaultToolView });
       setSaveMsg({ type: "success", text: t.settings.general.saveSuccess });
       useSettingsStore.setState({
-        defaultToolView: defaultToolView as "sidebar" | "fullscreen",
+        defaultToolView,
       });
     } catch (err) {
       setSaveMsg({
@@ -507,7 +510,11 @@ export function GeneralSection() {
       >
         <select
           value={defaultToolView}
-          onChange={(e) => setDefaultToolView(e.target.value)}
+          onChange={(e) => {
+            if (e.target.value === "sidebar" || e.target.value === "fullscreen") {
+              setDefaultToolView(e.target.value);
+            }
+          }}
           aria-label={t.settings.general.defaultToolViewLabel}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground"
         >
@@ -1151,6 +1158,8 @@ function securitySettingLabel(t: TranslationKeys, key: string): string | undefin
   return labels[key];
 }
 
+const VALID_MFA_POLICIES = new Set<string>(["optional", "admins_only", "required"]);
+
 export function AdminSecuritySettings() {
   const { t } = useTranslation();
   const later = useTimeouts();
@@ -1289,7 +1298,11 @@ export function AdminSecuritySettings() {
         description={t.settings.security.mfaPolicyDesc}
       >
         <select
-          value={settings.mfaPolicy || "optional"}
+          value={
+            settings.mfaPolicy && VALID_MFA_POLICIES.has(settings.mfaPolicy)
+              ? settings.mfaPolicy
+              : "optional"
+          }
           onChange={(e) => updateSetting("mfaPolicy", e.target.value)}
           aria-label={t.settings.security.mfaPolicy}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground"

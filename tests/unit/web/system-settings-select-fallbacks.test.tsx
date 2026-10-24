@@ -22,13 +22,28 @@ vi.mock("@/hooks/use-auth", () => ({
   }),
 }));
 
-import { SystemSection } from "@/components/settings/settings-dialog";
+import {
+  AdminSecuritySettings,
+  GeneralSection,
+  SystemSection,
+} from "@/components/settings/settings-dialog";
+import { useSettingsStore } from "@/stores/settings-store";
 import { useThemeStore } from "@/stores/theme-store";
 
+const g = en.settings.general;
 const s = en.settings.system;
+const sec = en.settings.security;
+
+function getReactSelectValue(select: HTMLSelectElement): string | undefined {
+  const reactPropsKey = Object.keys(select).find((k) => k.startsWith("__reactProps$"));
+  return reactPropsKey
+    ? (select as unknown as Record<string, { value?: string }>)[reactPropsKey]?.value
+    : undefined;
+}
 
 beforeEach(() => {
   useThemeStore.setState({ theme: "dark", resolvedTheme: "dark" });
+  useSettingsStore.setState({ defaultToolView: "sidebar" });
   apiPut.mockResolvedValue({ ok: true });
 });
 
@@ -54,14 +69,10 @@ describe("SystemSection select fallbacks for invalid stored settings (#3964)", (
     const localeSelect = (await screen.findByLabelText(s.languageLabel)) as HTMLSelectElement;
     const themeSelect = screen.getByLabelText(s.defaultThemeLabel) as HTMLSelectElement;
 
-    const reactPropsKey = Object.keys(localeSelect).find((k) => k.startsWith("__reactProps$"));
-    const localeReactProps = reactPropsKey
-      ? (localeSelect as unknown as Record<string, { value?: string }>)[reactPropsKey]
-      : undefined;
-
     expect(localeSelect.value).toBe("en");
-    expect(localeReactProps?.value).toBe("en");
+    expect(getReactSelectValue(localeSelect)).toBe("en");
     expect(themeSelect.value).toBe("system");
+    expect(getReactSelectValue(themeSelect)).toBe("system");
   });
 
   it("preserves supported defaultLocale and defaultTheme values", async () => {
@@ -129,4 +140,141 @@ describe("SystemSection select fallbacks for invalid stored settings (#3964)", (
     });
     expect(useThemeStore.getState().theme).toBe("light");
   });
+});
+
+describe("GeneralSection select fallbacks for invalid stored preferences (#3967)", () => {
+  it("falls back to 'sidebar' when preferences.defaultToolView holds an unsupported string and saves 'sidebar'", async () => {
+    apiGet.mockImplementation((path: string) => {
+      if (path === "/auth/session") {
+        return Promise.resolve({ user: { id: 1, username: "alice", role: "admin" } });
+      }
+      if (path === "/v1/preferences") {
+        return Promise.resolve({ preferences: { defaultToolView: "grid" } });
+      }
+      return Promise.resolve({});
+    });
+
+    render(<GeneralSection />);
+
+    await screen.findByText("alice");
+    const viewSelect = screen.getByLabelText(g.defaultToolViewLabel) as HTMLSelectElement;
+
+    expect(viewSelect.value).toBe("sidebar");
+    expect(getReactSelectValue(viewSelect)).toBe("sidebar");
+
+    fireEvent.click(screen.getByRole("button", { name: g.saveButton }));
+
+    await waitFor(() => {
+      expect(apiPut).toHaveBeenCalledWith("/v1/preferences", { defaultToolView: "sidebar" });
+    });
+    expect(useSettingsStore.getState().defaultToolView).toBe("sidebar");
+  });
+
+  it("preserves a supported preferences.defaultToolView value ('fullscreen')", async () => {
+    apiGet.mockImplementation((path: string) => {
+      if (path === "/auth/session") {
+        return Promise.resolve({ user: { id: 1, username: "alice", role: "admin" } });
+      }
+      if (path === "/v1/preferences") {
+        return Promise.resolve({ preferences: { defaultToolView: "fullscreen" } });
+      }
+      return Promise.resolve({});
+    });
+
+    render(<GeneralSection />);
+
+    await screen.findByText("alice");
+    const viewSelect = screen.getByLabelText(g.defaultToolViewLabel) as HTMLSelectElement;
+
+    expect(viewSelect.value).toBe("fullscreen");
+    expect(getReactSelectValue(viewSelect)).toBe("fullscreen");
+
+    fireEvent.click(screen.getByRole("button", { name: g.saveButton }));
+
+    await waitFor(() => {
+      expect(apiPut).toHaveBeenCalledWith("/v1/preferences", { defaultToolView: "fullscreen" });
+    });
+    expect(useSettingsStore.getState().defaultToolView).toBe("fullscreen");
+  });
+
+  it("lets the user select 'fullscreen' after an invalid stored preference and ignores invalid onChange values", async () => {
+    apiGet.mockImplementation((path: string) => {
+      if (path === "/auth/session") {
+        return Promise.resolve({ user: { id: 1, username: "alice", role: "admin" } });
+      }
+      if (path === "/v1/preferences") {
+        return Promise.resolve({ preferences: { defaultToolView: "grid" } });
+      }
+      return Promise.resolve({});
+    });
+
+    render(<GeneralSection />);
+
+    await screen.findByText("alice");
+    const viewSelect = screen.getByLabelText(g.defaultToolViewLabel) as HTMLSelectElement;
+
+    fireEvent.change(viewSelect, { target: { value: "fullscreen" } });
+    expect(viewSelect.value).toBe("fullscreen");
+
+    fireEvent.change(viewSelect, { target: { value: "sidebar" } });
+    expect(viewSelect.value).toBe("sidebar");
+
+    fireEvent.change(viewSelect, { target: { value: "fullscreen" } });
+    expect(viewSelect.value).toBe("fullscreen");
+
+    fireEvent.change(viewSelect, { target: { value: "bogus" } });
+    expect(viewSelect.value).toBe("fullscreen");
+
+    fireEvent.click(screen.getByRole("button", { name: g.saveButton }));
+
+    await waitFor(() => {
+      expect(apiPut).toHaveBeenCalledWith("/v1/preferences", { defaultToolView: "fullscreen" });
+    });
+    expect(useSettingsStore.getState().defaultToolView).toBe("fullscreen");
+  });
+});
+
+describe("AdminSecuritySettings mfaPolicy select fallbacks for invalid stored settings (#3967)", () => {
+  it("falls back to 'optional' when settings.mfaPolicy holds an unsupported value and saves a newly selected valid policy", async () => {
+    apiGet.mockResolvedValue({
+      settings: {
+        mfaPolicy: "strict",
+        sessionIdleTimeoutMinutes: "0",
+      },
+    });
+
+    render(<AdminSecuritySettings />);
+
+    const mfaSelect = (await screen.findByLabelText(sec.mfaPolicy)) as HTMLSelectElement;
+
+    expect(mfaSelect.value).toBe("optional");
+    expect(getReactSelectValue(mfaSelect)).toBe("optional");
+
+    fireEvent.change(mfaSelect, { target: { value: "required" } });
+    expect(mfaSelect.value).toBe("required");
+
+    fireEvent.click(screen.getByRole("button", { name: s.saveButton }));
+
+    await waitFor(() => {
+      expect(apiPut).toHaveBeenCalledWith("/v1/settings", { mfaPolicy: "required" });
+    });
+  });
+
+  it.each(["optional", "admins_only", "required"] as const)(
+    "preserves supported mfaPolicy value %j",
+    async (validPolicy) => {
+      apiGet.mockResolvedValue({
+        settings: {
+          mfaPolicy: validPolicy,
+        },
+      });
+
+      render(<AdminSecuritySettings />);
+
+      const mfaSelect = (await screen.findByLabelText(sec.mfaPolicy)) as HTMLSelectElement;
+
+      expect(mfaSelect.value).toBe(validPolicy);
+      expect(getReactSelectValue(mfaSelect)).toBe(validPolicy);
+    },
+  );
 });
