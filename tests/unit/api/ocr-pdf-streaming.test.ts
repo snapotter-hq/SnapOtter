@@ -85,6 +85,7 @@ import {
   INVALID_SAVE_MODE_ERROR,
   type ToolJobData,
 } from "../../../apps/api/src/jobs/types.js";
+import { DecoderOutOfMemoryError } from "../../../apps/api/src/lib/format-decoders.js";
 import { logger } from "../../../apps/api/src/lib/logger.js";
 import { resolveOcrEncodedInputLimit } from "../../../apps/api/src/lib/ocr-limits.js";
 import { storeValidatedOcrPdf } from "../../../apps/api/src/lib/ocr-pdf-ingress.js";
@@ -346,6 +347,52 @@ describe("OCR PDF path-backed processing", () => {
       expect(reply.payload).toBeUndefined();
     },
   );
+
+  it("converts a V8 buffer allocation failure during multipart upload into DecoderOutOfMemoryError and rethrows (#3902)", async () => {
+    let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;
+    registerOcrPdf({
+      post: vi.fn((_path, handler) => {
+        routeHandler = handler;
+      }),
+    } as never);
+
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    mocks.receiveUpload.mockRejectedValueOnce(v8Oom);
+
+    const request = {
+      headers: {},
+      log: { error: vi.fn(), warn: vi.fn() },
+      raw: {
+        aborted: false,
+        once: vi.fn(),
+        removeListener: vi.fn(),
+      },
+      parts: async function* () {
+        yield { type: "file", filename: "scan.pdf", file: {} };
+      },
+    };
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      send(payload: unknown) {
+        this.payload = payload;
+        return payload;
+      },
+    };
+
+    const err = await routeHandler?.(request, reply).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(DecoderOutOfMemoryError);
+    expect(err).toMatchObject({
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: v8Oom,
+    });
+    expect(reply.payload).toBeUndefined();
+  });
 
   it("deletes a staged upload before rethrowing when a subsequent multipart part fails with 5xx (#1642)", async () => {
     let routeHandler: ((request: unknown, reply: unknown) => Promise<unknown>) | undefined;

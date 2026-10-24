@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DecoderOutOfMemoryError } from "../../../apps/api/src/lib/format-decoders.js";
 import {
   findOcrEncodedInputViolation,
   OCR_MAX_ENCODED_INPUT_BYTES,
@@ -98,6 +99,22 @@ describe("findOcrEncodedInputViolation aggregate boundary (line 47)", () => {
 });
 
 describe("ocrUploadErrorStatus 5xx rethrow branch (lines 55-58)", () => {
+  it("converts and rethrows a V8 buffer allocation failure before inspecting statusCode (#3902)", () => {
+    const v8Oom = new RangeError("Array buffer allocation failed: file too large");
+    let caught: unknown;
+    try {
+      ocrUploadErrorStatus(v8Oom);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(DecoderOutOfMemoryError);
+    expect(caught).toMatchObject({
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: v8Oom,
+    });
+  });
+
   it("rethrows an error carrying statusCode === 503", () => {
     const err = Object.assign(new Error("storage unavailable"), { statusCode: 503 });
     expect(() => ocrUploadErrorStatus(err)).toThrow(err);

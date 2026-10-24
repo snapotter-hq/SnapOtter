@@ -1,5 +1,6 @@
 import { SafeError } from "@snapotter/shared";
 import { describe, expect, it } from "vitest";
+import { DecoderOutOfMemoryError } from "../../../apps/api/src/lib/format-decoders.js";
 import {
   findOcrEncodedInputViolation,
   OCR_MAX_BATCH_ENCODED_INPUT_BYTES,
@@ -69,5 +70,24 @@ describe("OCR ingress limits", () => {
 
     expect(ocrUploadErrorMessage(413)).toBe("Upload exceeds the allowed size");
     expect(ocrUploadErrorMessage(400)).toBe("Failed to parse multipart request");
+  });
+
+  it("converts a V8 buffer allocation failure into DecoderOutOfMemoryError and rethrows it (#3902)", () => {
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    let caught: unknown;
+    try {
+      ocrUploadErrorStatus(v8Oom);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(DecoderOutOfMemoryError);
+    expect(caught).toMatchObject({
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: v8Oom,
+    });
+
+    const otherRange = new RangeError("Invalid array length");
+    expect(ocrUploadErrorStatus(otherRange)).toBe(400);
   });
 });
