@@ -98,6 +98,9 @@ describe("1x1 pixel image handling", () => {
     });
 
     expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+    expect(json.downloadUrl).toMatch(/\/tiny_resize\.png$/);
   });
 
   it("crops a 1x1 image gracefully", async () => {
@@ -133,6 +136,9 @@ describe("1x1 pixel image handling", () => {
     });
 
     expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+    expect(json.downloadUrl).toMatch(/\/tiny_rotate\.png$/);
   });
 });
 
@@ -384,6 +390,9 @@ describe("Settings field edge cases", () => {
 
     // Zod default behavior strips unknown keys — should succeed
     expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+    expect(json.downloadUrl).toMatch(/\/test_resize\.png$/);
   });
 });
 
@@ -405,6 +414,9 @@ describe("1x1 pixel image through additional tools", () => {
     });
 
     expect(res.statusCode).toBe(200);
+    const json = JSON.parse(res.body);
+    expect(json.processedSize).toBeGreaterThan(0);
+    expect(json.downloadUrl).toMatch(/\/tiny_compress\.png$/);
   });
 
   it("gets info for a 1x1 image", async () => {
