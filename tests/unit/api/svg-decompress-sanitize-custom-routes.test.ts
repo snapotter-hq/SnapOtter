@@ -406,6 +406,112 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
 
       expect(mocks.inspectMetadata).not.toHaveBeenCalled();
     });
+
+    it("sanitizes comment-padded SVGs (> 4KB leading comment) uploaded as .svg, .apng, .tga, or .dng before calling inspectMetadata, returns 400 on client SVG errors, and rethrows unexpected or OOM faults (#3855)", async () => {
+      const paddedXmpSvg = Buffer.from(
+        `<!-- ${"x".repeat(4500)} -->${XMP_SVG.toString("utf-8")}`,
+        "utf-8",
+      );
+      const paddedOverCapSvg = Buffer.from(
+        `<!-- ${"x".repeat(4500)} -->${OVER_ELEMENT_SVG.toString("utf-8")}`,
+        "utf-8",
+      );
+
+      for (const ext of ["svg", "apng", "tga", "dng"]) {
+        mocks.inspectMetadata.mockClear();
+        const reply = await invokeRoute(handler, [
+          { type: "file", filename: `padded.${ext}`, content: paddedXmpSvg },
+        ]);
+        expect(reply.statusCode).toBe(200);
+        expect(mocks.inspectMetadata).toHaveBeenCalledTimes(1);
+        const [passedBuf] = mocks.inspectMetadata.mock.calls[0] as [Buffer, string];
+        const passedXml = passedBuf.toString("utf-8");
+        expect(passedXml).toContain("<svg");
+        expect(passedXml).not.toContain("<script");
+        expect(reply.payload).toMatchObject({
+          filename: `padded.${ext}`,
+          fileSize: paddedXmpSvg.length,
+        });
+      }
+
+      mocks.inspectMetadata.mockClear();
+      for (const ext of ["svg", "apng", "tga", "dng"]) {
+        const overCapReply = await invokeRoute(handler, [
+          { type: "file", filename: `padded-over.${ext}`, content: paddedOverCapSvg },
+        ]);
+        expect(overCapReply.statusCode).toBe(400);
+        expect(overCapReply.payload).toEqual({
+          error: "SVG exceeds maximum element count of 5000",
+        });
+      }
+
+      const sanitizeFault = new TypeError("unexpected sanitizer fault on padded SVG");
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw sanitizeFault;
+      });
+      await expect(
+        invokeRoute(handler, [{ type: "file", filename: "padded.svg", content: paddedXmpSvg }]),
+      ).rejects.toThrow(sanitizeFault);
+
+      const decompressFault = new TypeError("unexpected gunzip fault on padded SVG");
+      mocks.decompressSvgz.mockImplementationOnce(() => {
+        throw decompressFault;
+      });
+      await expect(
+        invokeRoute(handler, [{ type: "file", filename: "padded.apng", content: paddedXmpSvg }]),
+      ).rejects.toThrow(decompressFault);
+
+      const v8Oom = new RangeError("Array buffer allocation failed");
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      await expect(
+        invokeRoute(handler, [{ type: "file", filename: "padded.svg", content: paddedXmpSvg }]),
+      ).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
+
+      const metaSpy = vi.spyOn(sharp.prototype, "metadata").mockRejectedValueOnce(v8Oom);
+      try {
+        await expect(
+          invokeRoute(handler, [{ type: "file", filename: "padded.svg", content: paddedXmpSvg }]),
+        ).rejects.toMatchObject({
+          name: "DecoderOutOfMemoryError",
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          cause: v8Oom,
+        });
+      } finally {
+        metaSpy.mockRestore();
+      }
+
+      expect(mocks.inspectMetadata).not.toHaveBeenCalled();
+
+      const exifJpg = readFixture(fixtures.image.exifGps);
+      const rasterReply = await invokeRoute(handler, [
+        { type: "file", filename: "sample.jpg", content: exifJpg },
+      ]);
+      expect(rasterReply.statusCode).toBe(200);
+      expect(mocks.inspectMetadata).toHaveBeenCalledTimes(1);
+
+      mocks.inspectMetadata.mockClear();
+      const nonOomMetaSpy = vi
+        .spyOn(sharp.prototype, "metadata")
+        .mockRejectedValueOnce(new Error("Input buffer contains unsupported image format"));
+      try {
+        const cliOnlyReply = await invokeRoute(handler, [
+          { type: "file", filename: "sample.tga", content: exifJpg },
+        ]);
+        expect(cliOnlyReply.statusCode).toBe(200);
+        expect(mocks.inspectMetadata).toHaveBeenCalledTimes(1);
+      } finally {
+        nonOomMetaSpy.mockRestore();
+      }
+    });
   });
 
   describe("POST /api/v1/tools/image/edit-metadata", () => {
@@ -575,6 +681,96 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         statusCode: 503,
         code: "ENGINE_UNAVAILABLE",
         kind: "operational",
+        cause: v8Oom,
+      });
+
+      expect(mocks.writeMetadata).not.toHaveBeenCalled();
+      expect(mocks.putObject).not.toHaveBeenCalled();
+    });
+
+    it("sanitizes comment-padded SVGs disguised as .tga or .dng before writeMetadata, putObject, and preview.webp generation, skips the 1x1 pixel probe, and propagates metadata OOM (#3855)", async () => {
+      const paddedDirtySvg = Buffer.from(
+        `<!-- ${"x".repeat(4500)} -->${DIRTY_SVG.toString("utf-8")}`,
+        "utf-8",
+      );
+
+      for (const ext of ["tga", "dng"]) {
+        mocks.writeMetadata.mockClear();
+        mocks.putObject.mockClear();
+        const resizeSpy = vi.spyOn(sharp.prototype, "resize");
+        try {
+          const reply = await invokeRoute(handler, [
+            { type: "file", filename: `padded.${ext}`, content: paddedDirtySvg },
+            {
+              type: "field",
+              fieldname: "settings",
+              value: JSON.stringify({ title: "Sanitized SVG" }),
+            },
+          ]);
+          expect(reply.statusCode).toBe(200);
+          expect(resizeSpy).not.toHaveBeenCalled();
+          expect(mocks.writeMetadata).toHaveBeenCalledTimes(1);
+          const [passedBuf] = mocks.writeMetadata.mock.calls[0] as [Buffer, string, string[]];
+          const passedXml = passedBuf.toString("utf-8");
+          expect(passedXml).toContain("<svg");
+          expect(passedXml).not.toContain("<script");
+          expect(passedXml).not.toContain("169.254.169.254");
+
+          expect(mocks.putObject).toHaveBeenCalledTimes(2);
+          const [, storedBuf] = mocks.putObject.mock.calls[0] as [string, Buffer];
+          expect(storedBuf.toString("utf-8")).toBe(passedXml);
+          const [previewKey, previewBytes] = mocks.putObject.mock.calls[1] as [string, Buffer];
+          expect(previewKey).toMatch(/^outputs\/[^/]+\/preview\.webp$/);
+          const previewMeta = await sharp(previewBytes).metadata();
+          expect(previewMeta.format).toBe("webp");
+        } finally {
+          resizeSpy.mockRestore();
+        }
+      }
+
+      mocks.writeMetadata.mockClear();
+      mocks.putObject.mockClear();
+      const v8Oom = new RangeError("Array buffer allocation failed");
+      const metaSpy = vi.spyOn(sharp.prototype, "metadata").mockRejectedValueOnce(v8Oom);
+      try {
+        await expect(
+          invokeRoute(handler, [
+            { type: "file", filename: "padded.tga", content: paddedDirtySvg },
+            { type: "field", fieldname: "settings", value: "{}" },
+          ]),
+        ).rejects.toMatchObject({
+          name: "DecoderOutOfMemoryError",
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          cause: v8Oom,
+        });
+      } finally {
+        metaSpy.mockRestore();
+      }
+
+      const decompressFault = new TypeError("unexpected gunzip fault on disguised TGA");
+      mocks.decompressSvgz.mockImplementationOnce(() => {
+        throw decompressFault;
+      });
+      await expect(
+        invokeRoute(handler, [
+          { type: "file", filename: "padded.tga", content: paddedDirtySvg },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ]),
+      ).rejects.toThrow(decompressFault);
+
+      mocks.decompressSvgz.mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      await expect(
+        invokeRoute(handler, [
+          { type: "file", filename: "padded.dng", content: paddedDirtySvg },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ]),
+      ).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
         cause: v8Oom,
       });
 
@@ -979,6 +1175,127 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         exif: null,
         exifError: "Failed to parse EXIF data",
       });
+    });
+
+    it("sanitizes comment-padded SVGs (> 4KB leading comment) uploaded as .svg, .apng, .tga, or .dng before metadata extraction, returns 400 on client SVG errors, and rethrows unexpected or OOM faults (#3855)", async () => {
+      const paddedDirtySvg = Buffer.from(
+        `<!-- ${"x".repeat(4500)} -->${DIRTY_SVG.toString("utf-8")}`,
+        "utf-8",
+      );
+      const paddedOverCapSvg = Buffer.from(
+        `<!-- ${"x".repeat(4500)} -->${OVER_ELEMENT_SVG.toString("utf-8")}`,
+        "utf-8",
+      );
+
+      for (const ext of ["svg", "apng", "tga", "dng"]) {
+        const sanitizedInputs: Buffer[] = [];
+        mocks.sanitizeSvg.mockImplementationOnce((buf: Buffer) => {
+          sanitizedInputs.push(buf);
+          return Buffer.from(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="80"><rect width="100" height="80" fill="red"/></svg>',
+            "utf-8",
+          );
+        });
+        const reply = await invokeRoute(handler, [
+          { type: "file", filename: `padded.${ext}`, content: paddedDirtySvg },
+        ]);
+        expect(reply.statusCode).toBe(200);
+        expect(sanitizedInputs).toHaveLength(1);
+        expect(sanitizedInputs[0]?.toString("utf-8")).toContain("169.254.169.254");
+        expect(reply.payload).toEqual({
+          filename: `padded.${ext}`,
+          fileSize: paddedDirtySvg.length,
+        });
+      }
+
+      const paddedXmpSvg = Buffer.from(
+        `<!-- ${"x".repeat(4500)} -->${XMP_SVG.toString("utf-8")}`,
+        "utf-8",
+      );
+      const xmpReply = await invokeRoute(handler, [
+        { type: "file", filename: "padded-xmp.svg", content: paddedXmpSvg },
+      ]);
+      expect(xmpReply.statusCode).toBe(200);
+      expect(xmpReply.payload).toMatchObject({
+        filename: "padded-xmp.svg",
+        fileSize: paddedXmpSvg.length,
+      });
+
+      for (const ext of ["svg", "apng", "tga", "dng"]) {
+        const overCapReply = await invokeRoute(handler, [
+          { type: "file", filename: `padded-over.${ext}`, content: paddedOverCapSvg },
+        ]);
+        expect(overCapReply.statusCode).toBe(400);
+        expect(overCapReply.payload).toEqual({
+          error: "SVG exceeds maximum element count of 5000",
+        });
+      }
+
+      const sanitizeFault = new TypeError("unexpected sanitizer fault on padded SVG");
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw sanitizeFault;
+      });
+      await expect(
+        invokeRoute(handler, [{ type: "file", filename: "padded.svg", content: paddedDirtySvg }]),
+      ).rejects.toThrow(sanitizeFault);
+
+      const decompressFault = new TypeError("unexpected gunzip fault on padded SVG");
+      mocks.decompressSvgz.mockImplementationOnce(() => {
+        throw decompressFault;
+      });
+      await expect(
+        invokeRoute(handler, [{ type: "file", filename: "padded.apng", content: paddedDirtySvg }]),
+      ).rejects.toThrow(decompressFault);
+
+      const v8Oom = new RangeError("Array buffer allocation failed");
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      await expect(
+        invokeRoute(handler, [{ type: "file", filename: "padded.svg", content: paddedDirtySvg }]),
+      ).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
+
+      const paddedEntitySvg = Buffer.from(
+        `<!-- ${"x".repeat(4500)} --><!DOCTYPE svg [ <!ENTITY foo "bar"> ]><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><text>&foo;</text></svg>`,
+        "utf-8",
+      );
+      const strippedEntityReply = await invokeRoute(handler, [
+        { type: "file", filename: "padded-entity.svg", content: paddedEntitySvg },
+      ]);
+      expect(strippedEntityReply.statusCode).toBe(422);
+      expect(strippedEntityReply.payload).toMatchObject({
+        error: "Failed to read image metadata",
+      });
+
+      const origMeta = sharp.prototype.metadata;
+      let metaCalls = 0;
+      const postSanitizeMetaSpy = vi
+        .spyOn(sharp.prototype, "metadata")
+        .mockImplementation(function (this: sharp.Sharp) {
+          metaCalls++;
+          if (metaCalls === 2) {
+            return Promise.reject(v8Oom);
+          }
+          return origMeta.call(this);
+        });
+      try {
+        await expect(
+          invokeRoute(handler, [{ type: "file", filename: "padded.svg", content: paddedDirtySvg }]),
+        ).rejects.toMatchObject({
+          name: "DecoderOutOfMemoryError",
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          cause: v8Oom,
+        });
+      } finally {
+        postSanitizeMetaSpy.mockRestore();
+      }
     });
   });
 
@@ -1983,6 +2300,14 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         url: "/api/v1/tools/image/info",
         makeParts: (filename: string, content: Buffer) => [
           { type: "file" as const, filename, content },
+        ],
+      },
+      {
+        name: "POST /api/v1/tools/image/edit-metadata",
+        url: "/api/v1/tools/image/edit-metadata",
+        makeParts: (filename: string, content: Buffer) => [
+          { type: "file" as const, filename, content },
+          { type: "field" as const, fieldname: "settings", value: "{}" },
         ],
       },
     ])(

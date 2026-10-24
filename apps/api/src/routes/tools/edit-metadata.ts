@@ -19,6 +19,7 @@ import {
   DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
+  needsCliDecode,
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
@@ -26,7 +27,7 @@ import { normalizeOperationalWriteError, putObject } from "../../lib/object-stor
 import {
   decompressSvgz,
   isSvgBuffer,
-  isSvgzClientError,
+  isSvgClientError,
   sanitizeSvg,
 } from "../../lib/svg-sanitize.js";
 import { engineUnavailable } from "../../modality/image-input.js";
@@ -178,15 +179,34 @@ export function registerEditMetadata(app: FastifyInstance) {
             }
           }
         } catch (err) {
-          if (
-            isSvgzClientError(err) ||
-            (err instanceof Error && err.message.includes("SVGZ file does not contain"))
-          ) {
+          if (isSvgClientError(err)) {
             return reply.status(400).send({
               error: err instanceof Error ? err.message : "Invalid SVG",
             });
           }
           throw asDecoderOutOfMemory(err);
+        }
+      } else {
+        let isDisguisedSvg = false;
+        try {
+          const meta = await sharp(inspectBuffer).metadata();
+          isDisguisedSvg = meta.format === "svg";
+        } catch (rawMetaErr) {
+          const metaErr = asDecoderOutOfMemory(rawMetaErr);
+          if (isDecoderUnavailable(metaErr)) throw metaErr;
+        }
+        if (isDisguisedSvg) {
+          try {
+            inspectBuffer = decompressSvgz(inspectBuffer);
+            inspectBuffer = sanitizeSvg(inspectBuffer);
+          } catch (err) {
+            if (isSvgClientError(err)) {
+              return reply.status(400).send({
+                error: err instanceof Error ? err.message : "Invalid SVG",
+              });
+            }
+            throw asDecoderOutOfMemory(err);
+          }
         }
       }
 
@@ -241,15 +261,23 @@ export function registerEditMetadata(app: FastifyInstance) {
         return reply.status(400).send({ error: `Invalid image: ${validation.reason}` });
       }
 
-      if (validation.format === "svg") {
+      let isSvg = validation.format === "svg";
+      if (!isSvg && needsCliDecode(validation.format)) {
+        try {
+          const meta = await sharp(fileBuffer).metadata();
+          isSvg = meta.format === "svg";
+        } catch (rawMetaErr) {
+          const metaErr = asDecoderOutOfMemory(rawMetaErr);
+          if (isDecoderUnavailable(metaErr)) throw metaErr;
+        }
+      }
+
+      if (isSvg) {
         try {
           fileBuffer = decompressSvgz(fileBuffer);
           fileBuffer = sanitizeSvg(fileBuffer);
         } catch (err) {
-          if (
-            isSvgzClientError(err) ||
-            (err instanceof Error && err.message.includes("SVGZ file does not contain"))
-          ) {
+          if (isSvgClientError(err)) {
             return reply.status(400).send({
               error: err instanceof Error ? err.message : "Invalid SVG",
             });
@@ -319,8 +347,10 @@ export function registerEditMetadata(app: FastifyInstance) {
                   // Sharp reads some TIFF-headed RAW files (such as .dng) itself;
                   // only surface a CLI decode failure if Sharp cannot read it either.
                   try {
-                    await sharp(outputBuffer).metadata();
-                    await sharp(outputBuffer).resize(1).raw().toBuffer();
+                    const meta = await sharp(outputBuffer).metadata();
+                    if (meta.format !== "svg") {
+                      await sharp(outputBuffer).resize(1).raw().toBuffer();
+                    }
                   } catch (rawProbeErr) {
                     const probeErr = asDecoderOutOfMemory(rawProbeErr);
                     if (probeErr instanceof DecoderOutOfMemoryError) {

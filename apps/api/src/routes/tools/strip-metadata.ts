@@ -1,7 +1,7 @@
 import { extname } from "node:path";
 import { parseExif, parseGps, parseXmp, stripMetadata } from "@snapotter/image-engine";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import sharp from "sharp";
+import sharp, { type Metadata } from "sharp";
 import { z } from "zod";
 import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
@@ -12,7 +12,7 @@ import { multipartFailure } from "../../lib/multipart-parts.js";
 import {
   decompressSvgz,
   isSvgBuffer,
-  isSvgzClientError,
+  isSvgClientError,
   sanitizeSvg,
 } from "../../lib/svg-sanitize.js";
 import { createToolRoute } from "../tool-factory.js";
@@ -135,7 +135,9 @@ export function registerStripMetadata(app: FastifyInstance) {
       }
 
       let inspectBuffer = fileBuffer;
-      if (extname(filename).toLowerCase() === ".svgz" || isSvgBuffer(fileBuffer)) {
+      const sanitizedUpFront =
+        extname(filename).toLowerCase() === ".svgz" || isSvgBuffer(fileBuffer);
+      if (sanitizedUpFront) {
         try {
           inspectBuffer = decompressSvgz(fileBuffer);
           if (isSvgBuffer(inspectBuffer)) {
@@ -147,10 +149,33 @@ export function registerStripMetadata(app: FastifyInstance) {
             }
           }
         } catch (err) {
-          if (
-            isSvgzClientError(err) ||
-            (err instanceof Error && err.message.includes("SVGZ file does not contain"))
-          ) {
+          if (isSvgClientError(err)) {
+            return reply.status(400).send({
+              error: err instanceof Error ? err.message : "Invalid SVG",
+            });
+          }
+          throw asDecoderOutOfMemory(err);
+        }
+      }
+
+      let metadata: Metadata;
+      try {
+        metadata = await sharp(inspectBuffer).metadata();
+      } catch (err) {
+        const oomErr = asDecoderOutOfMemory(err);
+        if (isDecoderUnavailable(oomErr)) throw oomErr;
+        return reply.status(422).send({
+          error: "Failed to read image metadata",
+          details: err instanceof Error ? err.message : "Unknown error",
+        });
+      }
+
+      if (!sanitizedUpFront && metadata.format === "svg") {
+        try {
+          inspectBuffer = decompressSvgz(inspectBuffer);
+          inspectBuffer = sanitizeSvg(inspectBuffer);
+        } catch (err) {
+          if (isSvgClientError(err)) {
             return reply.status(400).send({
               error: err instanceof Error ? err.message : "Invalid SVG",
             });
@@ -160,7 +185,9 @@ export function registerStripMetadata(app: FastifyInstance) {
       }
 
       try {
-        const metadata = await sharp(inspectBuffer).metadata();
+        if (!sanitizedUpFront && metadata.format === "svg") {
+          metadata = await sharp(inspectBuffer).metadata();
+        }
 
         const result: Record<string, unknown> = {
           filename,
