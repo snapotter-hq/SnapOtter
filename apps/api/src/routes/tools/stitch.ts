@@ -149,7 +149,7 @@ export function registerStitch(app: FastifyInstance) {
               error: `Invalid SVG "${file.filename}": ${err instanceof Error ? err.message : "Unknown error"}`,
             });
           }
-          throw err;
+          throw asDecoderOutOfMemory(err);
         }
       } else {
         file.buffer = await autoOrient(file.buffer);

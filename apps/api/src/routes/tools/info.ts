@@ -85,7 +85,7 @@ export function registerInfo(app: FastifyInstance) {
             error: err instanceof Error ? err.message : "Invalid SVG",
           });
         }
-        throw err;
+        throw asDecoderOutOfMemory(err);
       }
     } else if (ext === "svgz" && !validation.valid) {
       return reply.status(400).send({ error: "Invalid SVGZ file" });

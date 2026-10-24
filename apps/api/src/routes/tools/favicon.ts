@@ -188,7 +188,7 @@ export function registerFavicon(app: FastifyInstance) {
           buf = decompressSvgz(buf);
           buf = sanitizeSvg(buf);
         } catch (err) {
-          if (!isSvgClientError(err)) throw err;
+          if (!isSvgClientError(err)) throw asDecoderOutOfMemory(err);
           const reason = err instanceof Error ? err.message : "Unknown decode error";
           skippedFiles.push({ filename: file.filename, reason });
           continue;

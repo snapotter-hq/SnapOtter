@@ -1140,6 +1140,92 @@ describe("batch route spooled multipart ingress (#1239)", () => {
           message: "Internal server error",
         }),
       );
+
+      // V8 allocation RangeError inside decompressSvgz or sanitizeSvg records a 503 preFailure (#3819)
+      const oomMessage =
+        "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+      const v8Oom = new RangeError("Array buffer allocation failed");
+      mocks.failBatchJob.mockClear();
+      mocks.flowAdd.mockClear();
+      mocks.validateImageBuffer
+        .mockResolvedValueOnce({ valid: true, format: "svg" })
+        .mockResolvedValueOnce({ valid: true, format: "svg" })
+        .mockResolvedValueOnce({ valid: true, format: "png" });
+      decompressSpy.mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      sanitizeSpy.mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      const logOom = { error: vi.fn(), warn: vi.fn() };
+      const partialOomReply = await invokeBatchRoute({
+        section: "image",
+        toolId: "resize",
+        log: logOom,
+        parts: [
+          { type: "file", filename: "decompress-oom.svgz", content: Buffer.from("<svg/>") },
+          { type: "file", filename: "sanitize-oom.svg", content: Buffer.from("<svg/>") },
+          { type: "file", filename: "ok.png", content: Buffer.from("ok-png") },
+          { type: "field", fieldname: "settings", value: '{"width":100}' },
+        ],
+      });
+      expect(partialOomReply.statusCode).toBe(202);
+      expect(logOom.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: "ENGINE_UNAVAILABLE",
+          cause: "DecoderOutOfMemoryError",
+          toolId: "resize",
+        }),
+        "Tool engine unavailable during input preparation",
+      );
+      expect(mocks.flowAdd).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            settings: expect.objectContaining({
+              flowChildCount: 1,
+              fileIndexMap: [2],
+              preFailureFaults: [
+                {
+                  filename: "decompress-oom.svgz",
+                  error: oomMessage,
+                  statusCode: 503,
+                  code: "ENGINE_UNAVAILABLE",
+                },
+                {
+                  filename: "sanitize-oom.svg",
+                  error: oomMessage,
+                  statusCode: 503,
+                  code: "ENGINE_UNAVAILABLE",
+                },
+              ],
+            }),
+          }),
+        }),
+      );
+
+      decompressSpy.mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      const allSvgOomReply = await invokeBatchRoute({
+        section: "image",
+        toolId: "resize",
+        parts: [
+          { type: "file", filename: "only.svgz", content: Buffer.from("<svg/>") },
+          { type: "field", fieldname: "settings", value: '{"width":100}' },
+        ],
+      });
+      expect(allSvgOomReply.statusCode).toBe(503);
+      expect(allSvgOomReply.payload).toMatchObject({
+        error: oomMessage,
+        code: "ENGINE_UNAVAILABLE",
+        errors: [
+          {
+            filename: "only.svgz",
+            error: oomMessage,
+            code: "ENGINE_UNAVAILABLE",
+          },
+        ],
+      });
     } finally {
       sanitizeSpy.mockRestore();
       decompressSpy.mockRestore();

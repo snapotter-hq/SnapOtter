@@ -2105,6 +2105,98 @@ describe("POST /api/v1/pipeline/batch ingress (#2684, #2685, #2879)", () => {
           message: "Internal server error",
         }),
       );
+
+      // V8 allocation RangeError inside decompressSvgz or sanitizeSvg records a 503 preFailure (#3819)
+      const oomMessage =
+        "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+      const v8Oom = new RangeError("Array buffer allocation failed");
+      failBatchJobMock.mockClear();
+      flowAddMock.mockClear();
+      vi.mocked(validateImageBuffer)
+        .mockResolvedValueOnce({ valid: true, format: "svg", width: 100, height: 100 })
+        .mockResolvedValueOnce({ valid: true, format: "svg", width: 100, height: 100 })
+        .mockResolvedValueOnce({ valid: true, format: "png", width: 100, height: 100 });
+      vi.mocked(svgSanitize.decompressSvgz).mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      vi.mocked(svgSanitize.sanitizeSvg).mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      const batchLog = { error: vi.fn(), warn: vi.fn() };
+      const partialBatchReply = await invokePipelineBatchRoute(
+        [
+          { type: "file", filename: "decompress-oom.svgz", content: Buffer.from("<svg/>") },
+          { type: "file", filename: "sanitize-oom.svg", content: Buffer.from("<svg/>") },
+          { type: "file", filename: "ok.png", content: Buffer.from("ok-png") },
+          {
+            type: "field",
+            fieldname: "pipeline",
+            value: JSON.stringify({
+              steps: [{ toolId: batchTestToolId, settings: {} }],
+            }),
+          },
+        ],
+        batchLog,
+      );
+      expect(partialBatchReply.statusCode).toBe(202);
+      expect(batchLog.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: "ENGINE_UNAVAILABLE",
+          cause: "DecoderOutOfMemoryError",
+          toolId: batchTestToolId,
+        }),
+        "Tool engine unavailable during input preparation",
+      );
+      expect(flowAddMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            settings: expect.objectContaining({
+              flowChildCount: 1,
+              fileIndexMap: [2],
+              preFailureFaults: [
+                {
+                  filename: "decompress-oom.svgz",
+                  error: oomMessage,
+                  statusCode: 503,
+                  code: "ENGINE_UNAVAILABLE",
+                },
+                {
+                  filename: "sanitize-oom.svg",
+                  error: oomMessage,
+                  statusCode: 503,
+                  code: "ENGINE_UNAVAILABLE",
+                },
+              ],
+            }),
+          }),
+        }),
+      );
+
+      vi.mocked(svgSanitize.decompressSvgz).mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      const allSvgOomReply = await invokePipelineBatchRoute([
+        { type: "file", filename: "only.svgz", content: Buffer.from("<svg/>") },
+        {
+          type: "field",
+          fieldname: "pipeline",
+          value: JSON.stringify({
+            steps: [{ toolId: batchTestToolId, settings: {} }],
+          }),
+        },
+      ]);
+      expect(allSvgOomReply.statusCode).toBe(503);
+      expect(allSvgOomReply.payload).toMatchObject({
+        error: oomMessage,
+        code: "ENGINE_UNAVAILABLE",
+        errors: [
+          {
+            filename: "only.svgz",
+            error: oomMessage,
+            code: "ENGINE_UNAVAILABLE",
+          },
+        ],
+      });
     } finally {
       vi.mocked(validateImageBuffer).mockResolvedValue({
         valid: true,
@@ -3437,6 +3529,55 @@ describe("POST /api/v1/pipeline/execute upload faults (#1642, #2860)", () => {
           },
         ]),
       ).rejects.toBe(decompressFault);
+
+      const oomMessage =
+        "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+      const v8Oom = new RangeError("Array buffer allocation failed");
+      let fakeNow = Date.now() + 80 * 60_000;
+      const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => fakeNow);
+      try {
+        for (const fn of ["decompressSvgz", "sanitizeSvg"] as const) {
+          fakeNow += 11 * 60_000;
+          if (fn === "decompressSvgz") {
+            vi.mocked(svgSanitize.decompressSvgz).mockImplementationOnce(() => {
+              throw v8Oom;
+            });
+          } else {
+            vi.mocked(svgSanitize.sanitizeSvg).mockImplementationOnce(() => {
+              throw v8Oom;
+            });
+          }
+          const execLog = { error: vi.fn(), warn: vi.fn() };
+          const oomReply = await invokePipelineExecuteRoute(
+            [
+              { type: "file", filename: "icon.svg", content: Buffer.from("<svg/>") },
+              {
+                type: "field",
+                fieldname: "pipeline",
+                value: JSON.stringify({
+                  steps: [{ toolId: executeTestToolId, settings: {} }],
+                }),
+              },
+            ],
+            execLog,
+          );
+          expect(oomReply.statusCode).toBe(503);
+          expect(oomReply.payload).toEqual({
+            error: oomMessage,
+            code: "ENGINE_UNAVAILABLE",
+          });
+          expect(execLog.warn).toHaveBeenCalledWith(
+            expect.objectContaining({
+              code: "ENGINE_UNAVAILABLE",
+              cause: "DecoderOutOfMemoryError",
+              toolId: executeTestToolId,
+            }),
+            "Tool engine unavailable during input preparation",
+          );
+        }
+      } finally {
+        nowSpy.mockRestore();
+      }
     } finally {
       vi.mocked(validateImageBuffer).mockResolvedValue({
         valid: true,

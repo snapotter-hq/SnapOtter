@@ -381,14 +381,26 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
       });
       await expect(
         invokeRoute(handler, [{ type: "file", filename: "icon.svgz", content: XMP_SVGZ }]),
-      ).rejects.toThrow(v8Oom);
+      ).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
 
       mocks.sanitizeSvg.mockImplementationOnce(() => {
         throw v8Oom;
       });
       await expect(
         invokeRoute(handler, [{ type: "file", filename: "icon.svg", content: XMP_SVG }]),
-      ).rejects.toThrow(v8Oom);
+      ).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
 
       expect(mocks.inspectMetadata).not.toHaveBeenCalled();
     });
@@ -540,7 +552,13 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
           { type: "file", filename: "icon.svgz", content: DIRTY_SVGZ },
           { type: "field", fieldname: "settings", value: "{}" },
         ]),
-      ).rejects.toThrow(v8Oom);
+      ).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
 
       mocks.sanitizeSvg.mockImplementationOnce(() => {
         throw v8Oom;
@@ -550,7 +568,13 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
           { type: "file", filename: "dirty.svg", content: DIRTY_SVG },
           { type: "field", fieldname: "settings", value: "{}" },
         ]),
-      ).rejects.toThrow(v8Oom);
+      ).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
 
       expect(mocks.writeMetadata).not.toHaveBeenCalled();
       expect(mocks.putObject).not.toHaveBeenCalled();
@@ -694,14 +718,26 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
       });
       await expect(
         invokeRoute(handler, [{ type: "file", filename: "icon.svgz", content: SCRIPT_LT_SVGZ }]),
-      ).rejects.toThrow(v8Oom);
+      ).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
 
       mocks.sanitizeSvg.mockImplementationOnce(() => {
         throw v8Oom;
       });
       await expect(
         invokeRoute(handler, [{ type: "file", filename: "icon.svg", content: SCRIPT_LT_SVG }]),
-      ).rejects.toThrow(v8Oom);
+      ).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
     });
 
     it("rethrows DecoderOutOfMemoryError when sharp.prototype.metadata hits a V8 or libheif allocation failure on raster or SVG input (#3727)", async () => {
@@ -1092,14 +1128,26 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
       });
       await expect(
         invokeRoute(handler, [{ type: "file", filename: "icon.svgz", content: SCRIPT_LT_SVGZ }]),
-      ).rejects.toThrow(v8Oom);
+      ).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
 
       mocks.sanitizeSvg.mockImplementationOnce(() => {
         throw v8Oom;
       });
       await expect(
         invokeRoute(handler, [{ type: "file", filename: "icon.svg", content: SCRIPT_LT_SVG }]),
-      ).rejects.toThrow(v8Oom);
+      ).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
     });
 
     it("propagates DecoderOutOfMemoryError when validateImageBuffer hits a V8 allocation RangeError (#3717)", async () => {
@@ -1309,20 +1357,28 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
         mocks.decompressSvgz.mockImplementationOnce(() => {
           throw v8Oom;
         });
-        if (url === "/api/v1/tools/image/meme-generator") {
-          await expect(
-            invokeRoute(routeHandler, makeParts("icon.svgz", DIRTY_SVGZ)),
-          ).rejects.toMatchObject({
-            name: "DecoderOutOfMemoryError",
-            statusCode: 503,
-            code: "ENGINE_UNAVAILABLE",
-            cause: v8Oom,
-          });
-        } else {
-          await expect(
-            invokeRoute(routeHandler, makeParts("icon.svgz", DIRTY_SVGZ)),
-          ).rejects.toThrow(v8Oom);
-        }
+        await expect(
+          invokeRoute(routeHandler, makeParts("icon.svgz", DIRTY_SVGZ)),
+        ).rejects.toMatchObject({
+          name: "DecoderOutOfMemoryError",
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          kind: "operational",
+          cause: v8Oom,
+        });
+
+        mocks.sanitizeSvg.mockImplementationOnce(() => {
+          throw v8Oom;
+        });
+        await expect(
+          invokeRoute(routeHandler, makeParts("icon.svg", DIRTY_SVG)),
+        ).rejects.toMatchObject({
+          name: "DecoderOutOfMemoryError",
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          kind: "operational",
+          cause: v8Oom,
+        });
 
         expect(mocks.putObject).not.toHaveBeenCalled();
       },
@@ -1390,6 +1446,85 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
           failedFiles: 1,
           message: "Internal server error",
           errors: [{ filename: "", error: "Internal server error" }],
+        }),
+      );
+
+      const oomMessage =
+        "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+      const v8Oom = new RangeError("Array buffer allocation failed");
+      mocks.failBatchJob.mockClear();
+      mocks.decompressSvgz.mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      const decompressOomReply = await invokeRoute(batchHandler, [
+        { type: "file", filename: "icon.svgz", content: SCRIPT_LT_SVGZ },
+        { type: "field", fieldname: "settings", value: "{}" },
+      ]);
+      expect(decompressOomReply.statusCode).toBe(503);
+      expect(decompressOomReply.payload).toEqual({
+        error: oomMessage,
+        code: "ENGINE_UNAVAILABLE",
+        errors: [
+          {
+            filename: "icon.svgz",
+            error: oomMessage,
+            code: "ENGINE_UNAVAILABLE",
+          },
+        ],
+      });
+      expect(mocks.failBatchJob).toHaveBeenCalledWith(
+        expect.objectContaining({
+          totalFiles: 1,
+          completedFiles: 1,
+          failedFiles: 1,
+          message: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+          errors: [
+            {
+              filename: "icon.svgz",
+              error: oomMessage,
+              code: "ENGINE_UNAVAILABLE",
+            },
+            { filename: "", error: oomMessage },
+          ],
+        }),
+      );
+
+      mocks.failBatchJob.mockClear();
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      const sanitizeOomReply = await invokeRoute(batchHandler, [
+        { type: "file", filename: "icon.svg", content: SCRIPT_LT_SVG },
+        { type: "field", fieldname: "settings", value: "{}" },
+      ]);
+      expect(sanitizeOomReply.statusCode).toBe(503);
+      expect(sanitizeOomReply.payload).toEqual({
+        error: oomMessage,
+        code: "ENGINE_UNAVAILABLE",
+        errors: [
+          {
+            filename: "icon.svg",
+            error: oomMessage,
+            code: "ENGINE_UNAVAILABLE",
+          },
+        ],
+      });
+      expect(mocks.failBatchJob).toHaveBeenCalledWith(
+        expect.objectContaining({
+          totalFiles: 1,
+          completedFiles: 1,
+          failedFiles: 1,
+          message: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+          errors: [
+            {
+              filename: "icon.svg",
+              error: oomMessage,
+              code: "ENGINE_UNAVAILABLE",
+            },
+            { filename: "", error: oomMessage },
+          ],
         }),
       );
     });
@@ -1461,6 +1596,41 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
           { type: "field", fieldname: "settings", value: "{}" },
         ]),
       ).rejects.toThrow(decompressFault);
+
+      const v8Oom = new RangeError("Array buffer allocation failed");
+      mocks.decompressSvgz.mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      await expect(
+        invokeRoute(findDuplicatesHandler, [
+          { type: "file", filename: "first.svgz", content: DIRTY_SVGZ },
+          { type: "file", filename: "second.svg", content: DIRTY_SVG },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ]),
+      ).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
+
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      await expect(
+        invokeRoute(findDuplicatesHandler, [
+          { type: "file", filename: "first.svg", content: DIRTY_SVG },
+          { type: "file", filename: "second.svg", content: DIRTY_SVG },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ]),
+      ).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
     });
 
     it("POST /api/v1/tools/image/favicon returns skipped list when multiple SVGs fail client validation and rethrows when a second SVG faults (#3733)", async () => {
@@ -1580,6 +1750,39 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
           { type: "field", fieldname: "settings", value: "{}" },
         ]),
       ).rejects.toThrow(decompressFault);
+
+      const v8Oom = new RangeError("Array buffer allocation failed");
+      mocks.decompressSvgz.mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      await expect(
+        invokeRoute(base64Handler, [
+          { type: "file", filename: "icon.svgz", content: DIRTY_SVGZ },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ]),
+      ).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
+
+      mocks.sanitizeSvg.mockImplementationOnce(() => {
+        throw v8Oom;
+      });
+      await expect(
+        invokeRoute(base64Handler, [
+          { type: "file", filename: "padded.apng", content: commentPaddedSvg },
+          { type: "field", fieldname: "settings", value: "{}" },
+        ]),
+      ).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        kind: "operational",
+        cause: v8Oom,
+      });
     });
 
     it.each([
@@ -1746,6 +1949,20 @@ describe("SVG/SVGZ decompression and sanitization across edit-metadata, strip-me
           await expect(
             invokeRoute(routeHandler, makeParts(`padded.${ext}`, commentPaddedDirtySvg)),
           ).rejects.toThrow(sanitizeFault);
+
+          const v8Oom = new RangeError("Array buffer allocation failed");
+          mocks.sanitizeSvg.mockImplementationOnce(() => {
+            throw v8Oom;
+          });
+          await expect(
+            invokeRoute(routeHandler, makeParts(`padded.${ext}`, commentPaddedDirtySvg)),
+          ).rejects.toMatchObject({
+            name: "DecoderOutOfMemoryError",
+            statusCode: 503,
+            code: "ENGINE_UNAVAILABLE",
+            kind: "operational",
+            cause: v8Oom,
+          });
         }
       },
     );

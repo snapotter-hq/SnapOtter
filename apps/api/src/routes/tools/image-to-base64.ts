@@ -124,7 +124,7 @@ export function registerImageToBase64(app: FastifyInstance) {
             if (!isSvgClientError(err)) {
               unexpectedSvgFault = true;
             }
-            throw err;
+            throw asDecoderOutOfMemory(err);
           }
         };
         try {

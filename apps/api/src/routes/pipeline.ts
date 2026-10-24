@@ -561,6 +561,19 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                             error: err instanceof Error ? err.message : "Invalid SVG",
                           });
                         }
+                        const oom = asDecoderOutOfMemory(err);
+                        if (oom instanceof DecoderOutOfMemoryError) {
+                          const unavailable = engineUnavailable(oom);
+                          reportEngineUnavailable(
+                            unavailable,
+                            firstToolId ?? "pipeline",
+                            request.log,
+                          );
+                          const body: Record<string, string> = { error: unavailable.message };
+                          if (unavailable.details) body.details = unavailable.details;
+                          if (unavailable.code) body.code = unavailable.code;
+                          return reply.status(unavailable.statusCode).send(body);
+                        }
                         throw err;
                       }
                     } else {
@@ -1761,6 +1774,22 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
                         originalIndex: fi,
                         filename: file.filename,
                         error: err instanceof Error ? err.message : "Invalid SVG",
+                      });
+                      continue;
+                    }
+                    const oom = asDecoderOutOfMemory(err);
+                    if (oom instanceof DecoderOutOfMemoryError) {
+                      const unavailable = engineUnavailable(oom);
+                      reportEngineUnavailable(
+                        unavailable,
+                        parsedSteps[0]?.resolvedToolId ?? "pipeline",
+                        request.log,
+                      );
+                      preFailures.push({
+                        originalIndex: fi,
+                        filename: file.filename,
+                        error: unavailable.message,
+                        ...preFailureFaultFields(unavailable),
                       });
                       continue;
                     }

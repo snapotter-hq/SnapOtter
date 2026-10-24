@@ -642,6 +642,18 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
                       });
                       continue;
                     }
+                    const oom = asDecoderOutOfMemory(err);
+                    if (oom instanceof DecoderOutOfMemoryError) {
+                      const unavailable = engineUnavailable(oom);
+                      reportEngineUnavailable(unavailable, toolId, request.log);
+                      preFailures.push({
+                        originalIndex: i,
+                        filename: file.filename,
+                        error: unavailable.message,
+                        ...preFailureFaultFields(unavailable),
+                      });
+                      continue;
+                    }
                     throw err;
                   }
                 } else if (!skipPreprocess) {

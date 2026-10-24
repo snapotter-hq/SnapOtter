@@ -278,7 +278,7 @@ export function registerImageToPdfRoute(
               error: `Invalid SVG "${file.filename}": ${err instanceof Error ? err.message : "unknown error"}`,
             });
           }
-          throw err;
+          throw asDecoderOutOfMemory(err);
         }
         preparedBuffers.push(buf);
       } else {

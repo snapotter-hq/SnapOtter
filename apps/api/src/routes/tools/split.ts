@@ -201,7 +201,7 @@ export function registerSplit(app: FastifyInstance) {
             error: err instanceof Error ? err.message : "Invalid SVG",
           });
         }
-        throw err;
+        throw asDecoderOutOfMemory(err);
       }
     }
 

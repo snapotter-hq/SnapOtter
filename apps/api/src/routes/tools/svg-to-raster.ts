@@ -20,6 +20,7 @@ import { formatZodErrors, friendlyError } from "../../lib/errors.js";
 import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
 import {
   asDecoderOutOfMemory,
+  DecoderOutOfMemoryError,
   decodeToSharpCompat,
   isDecoderUnavailable,
 } from "../../lib/format-decoders.js";
@@ -282,11 +283,28 @@ export function registerSvgToRasterRoute(
         try {
           decompressed = decompressSvgz(file.buffer);
         } catch (err) {
-          if (!isSvgClientError(err)) throw err;
-          errors.push({
-            filename: file.filename,
-            error: err instanceof Error ? err.message : "Invalid SVGZ file",
-          });
+          const oom = asDecoderOutOfMemory(err);
+          if (oom instanceof DecoderOutOfMemoryError) {
+            const unavailable = engineUnavailable(oom);
+            reportEngineUnavailable(unavailable, opts.toolId, request.log);
+            faults.push({
+              filename: file.filename,
+              error: unavailable.message,
+              ...preFailureFaultFields(unavailable),
+            });
+            errors.push({
+              filename: file.filename,
+              error: unavailable.message,
+              ...(unavailable.code && { code: unavailable.code }),
+            });
+          } else if (isSvgClientError(err)) {
+            errors.push({
+              filename: file.filename,
+              error: err instanceof Error ? err.message : "Invalid SVGZ file",
+            });
+          } else {
+            throw err;
+          }
           completedFiles++;
           updateJobProgress({
             jobId,
@@ -317,11 +335,28 @@ export function registerSvgToRasterRoute(
         try {
           sanitized = sanitizeSvg(decompressed);
         } catch (err) {
-          if (!isSvgClientError(err)) throw err;
-          errors.push({
-            filename: file.filename,
-            error: err instanceof Error ? err.message : "Invalid SVG",
-          });
+          const oom = asDecoderOutOfMemory(err);
+          if (oom instanceof DecoderOutOfMemoryError) {
+            const unavailable = engineUnavailable(oom);
+            reportEngineUnavailable(unavailable, opts.toolId, request.log);
+            faults.push({
+              filename: file.filename,
+              error: unavailable.message,
+              ...preFailureFaultFields(unavailable),
+            });
+            errors.push({
+              filename: file.filename,
+              error: unavailable.message,
+              ...(unavailable.code && { code: unavailable.code }),
+            });
+          } else if (isSvgClientError(err)) {
+            errors.push({
+              filename: file.filename,
+              error: err instanceof Error ? err.message : "Invalid SVG",
+            });
+          } else {
+            throw err;
+          }
           completedFiles++;
           updateJobProgress({
             jobId,
@@ -636,7 +671,7 @@ export function registerSvgToRasterRoute(
           error: err instanceof Error ? err.message : "Invalid SVGZ file",
         });
       }
-      throw err;
+      throw asDecoderOutOfMemory(err);
     }
 
     if (!isSvgBuffer(fileBuffer)) {
@@ -653,7 +688,7 @@ export function registerSvgToRasterRoute(
           error: err instanceof Error ? err.message : "Invalid SVG",
         });
       }
-      throw err;
+      throw asDecoderOutOfMemory(err);
     }
 
     let settings: z.infer<typeof settingsSchema>;

@@ -250,7 +250,7 @@ export function registerFindDuplicates(app: FastifyInstance) {
           file.buffer = decompressSvgz(file.buffer);
           file.buffer = sanitizeSvg(file.buffer);
         } catch (err) {
-          if (!isSvgClientError(err)) throw err;
+          if (!isSvgClientError(err)) throw asDecoderOutOfMemory(err);
           logger.warn(
             { err, filename: file.filename, format: validation.format },
             "find-duplicates: skipping file, SVG sanitize failed",

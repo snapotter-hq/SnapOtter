@@ -155,7 +155,7 @@ export function registerStripMetadata(app: FastifyInstance) {
               error: err instanceof Error ? err.message : "Invalid SVG",
             });
           }
-          throw err;
+          throw asDecoderOutOfMemory(err);
         }
       }
 
