@@ -461,4 +461,171 @@ describe("blocked browser storage resilience (#2318)", () => {
       expect(useThemeStore.getState().resolvedTheme).toBe("dark");
     });
   });
+
+  describe("usePipelineStore with blocked or full storage (#3941)", () => {
+    it("updates pipeline state in memory when window.sessionStorage getter throws SecurityError", async () => {
+      Object.defineProperty(window, "sessionStorage", {
+        get() {
+          throw new DOMException("Access is denied", "SecurityError");
+        },
+        configurable: true,
+      });
+
+      const { usePipelineStore } = await import("@/stores/pipeline-store");
+
+      expect(() => usePipelineStore.getState().addStep("resize")).not.toThrow();
+      expect(() => usePipelineStore.getState().addStep("compress")).not.toThrow();
+      const steps = usePipelineStore.getState().steps;
+      expect(steps).toHaveLength(2);
+      expect(usePipelineStore.getState().expandedStepId).toBe(steps[1].id);
+
+      expect(() =>
+        usePipelineStore.getState().updateStepSettings(steps[0].id, { width: 800 }),
+      ).not.toThrow();
+      expect(usePipelineStore.getState().steps[0].settings).toEqual({ width: 800 });
+
+      expect(() =>
+        usePipelineStore.getState().reorderSteps(steps[0].id, steps[1].id),
+      ).not.toThrow();
+      expect(usePipelineStore.getState().steps.map((s) => s.toolId)).toEqual([
+        "compress",
+        "resize",
+      ]);
+
+      expect(() => usePipelineStore.getState().setExpandedStep(null)).not.toThrow();
+      expect(usePipelineStore.getState().expandedStepId).toBeNull();
+
+      expect(() => usePipelineStore.getState().removeStep(steps[0].id)).not.toThrow();
+      expect(usePipelineStore.getState().steps).toHaveLength(1);
+
+      expect(() =>
+        usePipelineStore
+          .getState()
+          .loadSteps([{ toolId: "convert", settings: { format: "webp" } }]),
+      ).not.toThrow();
+      expect(usePipelineStore.getState().steps).toHaveLength(1);
+      expect(usePipelineStore.getState().steps[0].toolId).toBe("convert");
+
+      expect(() => usePipelineStore.getState().reset()).not.toThrow();
+      expect(usePipelineStore.getState().steps).toEqual([]);
+
+      expect(() => usePipelineStore.persist.clearStorage()).not.toThrow();
+    });
+
+    it("updates pipeline state in memory when sessionStorage.getItem, setItem, or removeItem throws QuotaExceededError or SecurityError", async () => {
+      const throwingStorage = {
+        getItem: vi.fn(() => {
+          throw new DOMException("Access is denied", "SecurityError");
+        }),
+        setItem: vi.fn(() => {
+          throw new DOMException("QuotaExceededError", "QuotaExceededError");
+        }),
+        removeItem: vi.fn(() => {
+          throw new DOMException("Access is denied", "SecurityError");
+        }),
+        clear: vi.fn(),
+        key: vi.fn(() => null),
+        length: 0,
+      };
+      vi.stubGlobal("sessionStorage", throwingStorage);
+
+      const { usePipelineStore } = await import("@/stores/pipeline-store");
+
+      expect(() => usePipelineStore.getState().addStep("resize")).not.toThrow();
+      expect(() => usePipelineStore.getState().addStep("compress")).not.toThrow();
+      const steps = usePipelineStore.getState().steps;
+      expect(steps).toHaveLength(2);
+      expect(usePipelineStore.getState().expandedStepId).toBe(steps[1].id);
+
+      expect(() =>
+        usePipelineStore.getState().updateStepSettings(steps[0].id, { width: 800 }),
+      ).not.toThrow();
+      expect(usePipelineStore.getState().steps[0].settings).toEqual({ width: 800 });
+
+      expect(() =>
+        usePipelineStore.getState().reorderSteps(steps[0].id, steps[1].id),
+      ).not.toThrow();
+      expect(usePipelineStore.getState().steps.map((s) => s.toolId)).toEqual([
+        "compress",
+        "resize",
+      ]);
+
+      expect(() => usePipelineStore.getState().setExpandedStep(null)).not.toThrow();
+      expect(usePipelineStore.getState().expandedStepId).toBeNull();
+
+      expect(() => usePipelineStore.getState().removeStep(steps[0].id)).not.toThrow();
+      expect(usePipelineStore.getState().steps).toHaveLength(1);
+
+      expect(() =>
+        usePipelineStore
+          .getState()
+          .loadSteps([{ toolId: "convert", settings: { format: "webp" } }]),
+      ).not.toThrow();
+      expect(usePipelineStore.getState().steps).toHaveLength(1);
+      expect(usePipelineStore.getState().steps[0].toolId).toBe("convert");
+
+      expect(() => usePipelineStore.getState().reset()).not.toThrow();
+      expect(usePipelineStore.getState().steps).toEqual([]);
+
+      expect(() => usePipelineStore.persist.clearStorage()).not.toThrow();
+    });
+  });
+
+  describe("redirectIfUnprefixed with blocked or full storage (#3941)", () => {
+    afterEach(() => {
+      document.head.innerHTML = "";
+    });
+
+    it("redirects unprefixed URLs and leaves prefixed URLs alone when window.sessionStorage getter throws SecurityError", async () => {
+      document.head.innerHTML = '<base href="/snapotter/">';
+      Object.defineProperty(window, "sessionStorage", {
+        get() {
+          throw new DOMException("Access is denied", "SecurityError");
+        },
+        configurable: true,
+      });
+
+      const { redirectIfUnprefixed } = await import("@/lib/app-url");
+
+      const prefixed = { pathname: "/snapotter/files", search: "", hash: "", replace: vi.fn() };
+      expect(redirectIfUnprefixed(prefixed)).toBe(false);
+      expect(prefixed.replace).not.toHaveBeenCalled();
+
+      const unprefixed = { pathname: "/files", search: "?job=x", hash: "#top", replace: vi.fn() };
+      expect(redirectIfUnprefixed(unprefixed, undefined, 1_000_000)).toBe(true);
+      expect(unprefixed.replace).toHaveBeenCalledExactlyOnceWith("/snapotter/files?job=x#top");
+    });
+
+    it("redirects unprefixed URLs and leaves prefixed URLs alone when sessionStorage.getItem, setItem, or removeItem throws QuotaExceededError or SecurityError", async () => {
+      document.head.innerHTML = '<base href="/snapotter/">';
+      const throwingStorage = {
+        getItem: vi.fn(() => {
+          throw new DOMException("Access is denied", "SecurityError");
+        }),
+        setItem: vi.fn(() => {
+          throw new DOMException("QuotaExceededError", "QuotaExceededError");
+        }),
+        removeItem: vi.fn(() => {
+          throw new DOMException("Access is denied", "SecurityError");
+        }),
+        clear: vi.fn(),
+        key: vi.fn(() => null),
+        length: 0,
+      };
+      vi.stubGlobal("sessionStorage", throwingStorage);
+
+      const { redirectIfUnprefixed } = await import("@/lib/app-url");
+
+      const prefixed = { pathname: "/snapotter/files", search: "", hash: "", replace: vi.fn() };
+      expect(redirectIfUnprefixed(prefixed)).toBe(false);
+      expect(prefixed.replace).not.toHaveBeenCalled();
+      expect(throwingStorage.removeItem).toHaveBeenCalledWith("snapotter-prefix-redirect");
+
+      const unprefixed = { pathname: "/files", search: "?job=x", hash: "#top", replace: vi.fn() };
+      expect(redirectIfUnprefixed(unprefixed, undefined, 1_000_000)).toBe(true);
+      expect(unprefixed.replace).toHaveBeenCalledExactlyOnceWith("/snapotter/files?job=x#top");
+      expect(throwingStorage.getItem).toHaveBeenCalledWith("snapotter-prefix-redirect");
+      expect(throwingStorage.setItem).toHaveBeenCalledWith("snapotter-prefix-redirect", "1000000");
+    });
+  });
 });

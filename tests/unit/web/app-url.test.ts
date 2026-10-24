@@ -151,6 +151,29 @@ describe("redirectIfUnprefixed (#1275 case A)", () => {
     expect(redirectIfUnprefixed(location, null)).toBe(true);
     expect(location.replace).toHaveBeenCalledWith("/snapotter/");
   });
+
+  it("still redirects or returns false when storage methods throw SecurityError or QuotaExceededError", async () => {
+    document.head.innerHTML = '<base href="/snapotter/">';
+    const { redirectIfUnprefixed } = await import("../../../apps/web/src/lib/app-url");
+    const throwingStorage = {
+      getItem: () => {
+        throw new DOMException("Access is denied", "SecurityError");
+      },
+      setItem: () => {
+        throw new DOMException("QuotaExceededError", "QuotaExceededError");
+      },
+      removeItem: () => {
+        throw new DOMException("Access is denied", "SecurityError");
+      },
+    };
+    const prefixed = fakeLocation("/snapotter/files");
+    expect(redirectIfUnprefixed(prefixed, throwingStorage, 1_000_000)).toBe(false);
+    expect(prefixed.replace).not.toHaveBeenCalled();
+
+    const unprefixed = fakeLocation("/files", "?job=x", "#top");
+    expect(redirectIfUnprefixed(unprefixed, throwingStorage, 1_000_000)).toBe(true);
+    expect(unprefixed.replace).toHaveBeenCalledExactlyOnceWith("/snapotter/files?job=x#top");
+  });
 });
 
 it("main.tsx mounts the app only when no redirect happened", () => {
