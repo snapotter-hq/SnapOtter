@@ -231,6 +231,123 @@ describe("date formatting in app locale (#924)", () => {
     }
   });
 
+  it("localizes audit log relative timestamps under 7 days and guards unparseable dates across desktop and mobile (#3951)", async () => {
+    const now = Date.now();
+    const isoAt = (offsetMs: number) => new Date(now - offsetMs).toISOString();
+    apiGet.mockImplementation(async (path: string) => {
+      if (path.startsWith("/v1/audit-log")) {
+        return {
+          entries: [
+            {
+              id: "audit-just-now",
+              actorId: "u1",
+              actorUsername: "ada",
+              action: "LOGIN_SUCCESS",
+              targetType: null,
+              targetId: null,
+              details: null,
+              ipAddress: "127.0.0.1",
+              requestId: null,
+              createdAt: isoAt(30_000),
+            },
+            {
+              id: "audit-mins",
+              actorId: "u1",
+              actorUsername: "ada",
+              action: "LOGIN_SUCCESS",
+              targetType: null,
+              targetId: null,
+              details: null,
+              ipAddress: "127.0.0.1",
+              requestId: null,
+              createdAt: isoAt(15 * 60_000),
+            },
+            {
+              id: "audit-hrs",
+              actorId: "u1",
+              actorUsername: "ada",
+              action: "LOGIN_SUCCESS",
+              targetType: null,
+              targetId: null,
+              details: null,
+              ipAddress: "127.0.0.1",
+              requestId: null,
+              createdAt: isoAt(3 * 60 * 60_000),
+            },
+            {
+              id: "audit-days",
+              actorId: "u1",
+              actorUsername: "ada",
+              action: "LOGIN_SUCCESS",
+              targetType: null,
+              targetId: null,
+              details: null,
+              ipAddress: "127.0.0.1",
+              requestId: null,
+              createdAt: isoAt(2 * 24 * 60 * 60_000),
+            },
+            {
+              id: "audit-invalid",
+              actorId: "u1",
+              actorUsername: "grace",
+              action: "LOGOUT",
+              targetType: "user",
+              targetId: "u1",
+              details: null,
+              ipAddress: "127.0.0.1",
+              requestId: null,
+              createdAt: "not-a-timestamp",
+            },
+          ],
+          total: 5,
+        };
+      }
+      return {};
+    });
+
+    const expectedJustNow = de.settings.auditLog.justNow;
+    const expectedMins = format(de.settings.auditLog.minutesAgo, { mins: 15 });
+    const expectedHrs = format(de.settings.auditLog.hoursAgo, { hrs: 3 });
+    const expectedDays = format(de.settings.auditLog.daysAgo, { days: 2 });
+
+    const assertLocalizedRelativeTimes = async () => {
+      expect(await screen.findByText(de.settings.auditLog.heading)).toBeInTheDocument();
+      expect(await screen.findByText(expectedJustNow)).toBeInTheDocument();
+      expect(screen.getByText(expectedMins)).toBeInTheDocument();
+      expect(screen.getByText(expectedHrs)).toBeInTheDocument();
+      expect(screen.getByText(expectedDays)).toBeInTheDocument();
+      expect(screen.queryByText("just now")).not.toBeInTheDocument();
+      expect(screen.queryByText("15m ago")).not.toBeInTheDocument();
+      expect(screen.queryByText("3h ago")).not.toBeInTheDocument();
+      expect(screen.queryByText("2d ago")).not.toBeInTheDocument();
+      expect(screen.queryByText("Invalid Date")).not.toBeInTheDocument();
+    };
+
+    const { unmount } = renderDe(<AuditLogSection />);
+    await assertLocalizedRelativeTimes();
+    const invalidRow = screen.getByText("grace").closest("tr");
+    expect(invalidRow?.querySelector("td")?.textContent).toBe("---");
+    unmount();
+
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: true,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+    try {
+      renderDe(<AuditLogSection />);
+      await assertLocalizedRelativeTimes();
+      const mobileInvalidButton = screen.getByText("grace").closest("button");
+      expect(mobileInvalidButton?.textContent).toContain("---");
+    } finally {
+      window.matchMedia = originalMatchMedia;
+    }
+  });
+
   it("formats FileListItem visible and screen-reader dates in the active app locale", async () => {
     renderDe(
       <ul>

@@ -3621,15 +3621,21 @@ interface AuditEntry {
   createdAt: string;
 }
 
-function formatRelativeTime(iso: string, locale: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
+function formatRelativeTime(
+  iso: string,
+  locale: string,
+  auditLogT: TranslationKeys["settings"]["auditLog"],
+): string {
+  const parsed = new Date(iso).getTime();
+  if (Number.isNaN(parsed)) return "---";
+  const diff = Date.now() - parsed;
   const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return auditLogT.justNow;
+  if (mins < 60) return format(auditLogT.minutesAgo, { mins });
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return format(auditLogT.hoursAgo, { hrs });
   const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
+  if (days < 7) return format(auditLogT.daysAgo, { days });
   return formatDate(iso, locale);
 }
 
@@ -3722,7 +3728,7 @@ export function AuditLogSection() {
                         {entry.action}
                       </span>
                       <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {formatRelativeTime(entry.createdAt, locale)}
+                        {formatRelativeTime(entry.createdAt, locale, t.settings.auditLog)}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 mt-1">
@@ -3777,7 +3783,7 @@ export function AuditLogSection() {
                       onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
                     >
                       <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
-                        {formatRelativeTime(entry.createdAt, locale)}
+                        {formatRelativeTime(entry.createdAt, locale, t.settings.auditLog)}
                       </td>
                       <td className="px-3 py-2 text-foreground">{entry.actorUsername}</td>
                       <td className="px-3 py-2 font-mono text-xs text-muted-foreground tabular-nums whitespace-nowrap">
