@@ -100,6 +100,12 @@ describe("bulk-rename deduplicates colliding ZIP entry names (#3024)", () => {
             { filename: "ma\u{00df}e.png", contentType: "image/png", content: TINY_PNG },
             { filename: "post.png", contentType: "image/png", content: PNG },
             { filename: "po\u{fb05}.png", contentType: "image/png", content: TINY_PNG },
+            { filename: "\u{03bf}\u{03c2}.png", contentType: "image/png", content: PNG },
+            { filename: "\u{03bf}\u{03c3}.png", contentType: "image/png", content: TINY_PNG },
+            { filename: "10\u{00b5}m.png", contentType: "image/png", content: PNG },
+            { filename: "10\u{03bc}m.png", contentType: "image/png", content: TINY_PNG },
+            { filename: "\u{0587}.png", contentType: "image/png", content: PNG },
+            { filename: "\u{0565}\u{0582}.png", contentType: "image/png", content: TINY_PNG },
           ],
           { pattern: "{{original}}" },
         ),
@@ -119,6 +125,12 @@ describe("bulk-rename deduplicates colliding ZIP entry names (#3024)", () => {
         "ma\u{00df}e_1.png",
         "post.png",
         "po\u{fb05}_1.png",
+        "\u{03bf}\u{03c2}.png",
+        "\u{03bf}\u{03c3}_1.png",
+        "10\u{00b5}m.png",
+        "10\u{03bc}m_1.png",
+        "\u{0587}.png",
+        "\u{0565}\u{0582}_1.png",
       ]);
       expect(entries[0].getData().equals(PNG)).toBe(true);
       expect(entries[1].getData().equals(TINY_PNG)).toBe(true);
@@ -130,6 +142,12 @@ describe("bulk-rename deduplicates colliding ZIP entry names (#3024)", () => {
       expect(entries[7].getData().equals(TINY_PNG)).toBe(true);
       expect(entries[8].getData().equals(PNG)).toBe(true);
       expect(entries[9].getData().equals(TINY_PNG)).toBe(true);
+      expect(entries[10].getData().equals(PNG)).toBe(true);
+      expect(entries[11].getData().equals(TINY_PNG)).toBe(true);
+      expect(entries[12].getData().equals(PNG)).toBe(true);
+      expect(entries[13].getData().equals(TINY_PNG)).toBe(true);
+      expect(entries[14].getData().equals(PNG)).toBe(true);
+      expect(entries[15].getData().equals(TINY_PNG)).toBe(true);
     } finally {
       await app.close();
     }

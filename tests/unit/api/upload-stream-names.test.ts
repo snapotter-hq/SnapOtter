@@ -23,6 +23,9 @@ describe("multipart upload name collisions", () => {
     ["song.pdf", "\u{017f}ong.pdf"],
     ["masse.pdf", "ma\u{00df}e.pdf"],
     ["post.pdf", "po\u{fb05}.pdf"],
+    ["\u{03bf}\u{03c2}.pdf", "\u{03bf}\u{03c3}.pdf"],
+    ["10\u{00b5}m.pdf", "10\u{03bc}m.pdf"],
+    ["\u{0587}.pdf", "\u{0565}\u{0582}.pdf"],
   ])("preserves both streams for %s and %s", async (first, second) => {
     const uniqueName = createUniqueNamer();
     const upload = (filename: string, text: string) =>

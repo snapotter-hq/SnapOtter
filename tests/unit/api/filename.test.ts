@@ -55,6 +55,69 @@ describe("createUniqueNamer", () => {
     expect(unique("diagram.svg")).toBe("diagram.svg");
     expect(unique("diagram.\u{017f}vg")).toBe("diagram_1.\u{017f}vg");
   });
+
+  it("folds non-Latin APFS case-folding pairs when deduplicating (#3827)", () => {
+    const unique = createUniqueNamer();
+
+    // Greek final sigma (U+03C2, including word-final U+03A3 before non-cased chars) vs medial sigma (U+03C3)
+    expect(unique("\u{03bf}\u{03c2}.pdf")).toBe("\u{03bf}\u{03c2}.pdf");
+    expect(unique("\u{03bf}\u{03c3}.pdf")).toBe("\u{03bf}\u{03c3}_1.pdf");
+    expect(unique("\u{039f}\u{03a3}.pdf")).toBe("\u{039f}\u{03a3}_2.pdf");
+    expect(unique("\u{039f}\u{03a3}-1.pdf")).toBe("\u{039f}\u{03a3}-1.pdf");
+    expect(unique("\u{03bf}\u{03c3}-1.pdf")).toBe("\u{03bf}\u{03c3}-1_1.pdf");
+
+    // Micro sign (U+00B5) vs Greek small letter mu (U+03BC) / capital mu (U+039C)
+    expect(unique("10\u{00b5}m.png")).toBe("10\u{00b5}m.png");
+    expect(unique("10\u{03bc}m.png")).toBe("10\u{03bc}m_1.png");
+    expect(unique("10\u{039c}m.png")).toBe("10\u{039c}m_2.png");
+
+    // Combining Greek ypogegrammeni (U+0345) and precomposed polytonic forms vs iota (U+03B9)
+    expect(unique("\u{03b1}\u{0345}.txt")).toBe("\u{03b1}\u{0345}.txt");
+    expect(unique("\u{03b1}\u{03b9}.txt")).toBe("\u{03b1}\u{03b9}_1.txt");
+    expect(unique("\u{1fb3}.txt")).toBe("\u{1fb3}_2.txt");
+    expect(unique("\u{1fbc}.txt")).toBe("\u{1fbc}_3.txt");
+    expect(unique("\u{1f80}.txt")).toBe("\u{1f80}.txt");
+    expect(unique("\u{1f00}\u{03b9}.txt")).toBe("\u{1f00}\u{03b9}_1.txt");
+    expect(unique("\u{1f88}.txt")).toBe("\u{1f88}_2.txt");
+
+    // Greek symbol variants (U+03D0, U+03D1, U+03D5, U+03D6, U+03F0, U+03F1, U+03F5)
+    expect(unique("\u{03d0}\u{03d1}\u{03d5}\u{03d6}\u{03f0}\u{03f1}\u{03f5}.svg")).toBe(
+      "\u{03d0}\u{03d1}\u{03d5}\u{03d6}\u{03f0}\u{03f1}\u{03f5}.svg",
+    );
+    expect(unique("\u{03b2}\u{03b8}\u{03c6}\u{03c0}\u{03ba}\u{03c1}\u{03b5}.svg")).toBe(
+      "\u{03b2}\u{03b8}\u{03c6}\u{03c0}\u{03ba}\u{03c1}\u{03b5}_1.svg",
+    );
+    expect(unique("\u{0392}\u{0398}\u{03a6}\u{03a0}\u{039a}\u{03a1}\u{0395}.svg")).toBe(
+      "\u{0392}\u{0398}\u{03a6}\u{03a0}\u{039a}\u{03a1}\u{0395}_2.svg",
+    );
+
+    // Armenian ligature ech-yiwn (U+0587) and presentation ligatures (U+FB13..U+FB17)
+    expect(unique("\u{0587}.doc")).toBe("\u{0587}.doc");
+    expect(unique("\u{0565}\u{0582}.doc")).toBe("\u{0565}\u{0582}_1.doc");
+    expect(unique("\u{0535}\u{0552}.doc")).toBe("\u{0535}\u{0552}_2.doc");
+    expect(unique("\u{fb13}-\u{fb14}-\u{fb15}-\u{fb16}-\u{fb17}.doc")).toBe(
+      "\u{fb13}-\u{fb14}-\u{fb15}-\u{fb16}-\u{fb17}.doc",
+    );
+    expect(
+      unique(
+        "\u{0574}\u{0576}-\u{0574}\u{0565}-\u{0574}\u{056b}-\u{057e}\u{0576}-\u{0574}\u{056d}.doc",
+      ),
+    ).toBe(
+      "\u{0574}\u{0576}-\u{0574}\u{0565}-\u{0574}\u{056b}-\u{057e}\u{0576}-\u{0574}\u{056d}_1.doc",
+    );
+
+    // Cyrillic tall/narrow variants (U+1C80..U+1C88)
+    expect(
+      unique("\u{1c80}\u{1c81}\u{1c82}\u{1c83}\u{1c84}\u{1c85}\u{1c86}\u{1c87}\u{1c88}.txt"),
+    ).toBe("\u{1c80}\u{1c81}\u{1c82}\u{1c83}\u{1c84}\u{1c85}\u{1c86}\u{1c87}\u{1c88}.txt");
+    expect(
+      unique("\u{0432}\u{0434}\u{043e}\u{0441}\u{0442}\u{0442}\u{044a}\u{0463}\u{a64b}.txt"),
+    ).toBe("\u{0432}\u{0434}\u{043e}\u{0441}\u{0442}\u{0442}\u{044a}\u{0463}\u{a64b}_1.txt");
+
+    // Latin U+0149 ('n) and U+1E9A (a with right half ring)
+    expect(unique("\u{0149}-\u{1e9a}.txt")).toBe("\u{0149}-\u{1e9a}.txt");
+    expect(unique("\u{02bc}n-a\u{02be}.txt")).toBe("\u{02bc}n-a\u{02be}_1.txt");
+  });
 });
 
 describe("sanitizeFilename", () => {

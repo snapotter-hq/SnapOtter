@@ -255,6 +255,97 @@ describe("BulkRenameSettings collision preview and React keys (#3035)", () => {
       "MA\u{1e9e}E_1.png",
     ]);
 
+    act(() => {
+      useFileStore
+        .getState()
+        .setFiles([
+          makeFile("\u{03bf}\u{03c2}.png", "image/png"),
+          makeFile("\u{03bf}\u{03c3}.png", "image/png"),
+          makeFile("10\u{00b5}m.png", "image/png"),
+          makeFile("10\u{03bc}m.png", "image/png"),
+          makeFile("\u{0587}.png", "image/png"),
+        ]);
+    });
+    const ninthRows = Array.from(container.querySelectorAll(".font-mono"), (el) => el.textContent);
+    expect(ninthRows).toEqual([
+      "\u{03bf}\u{03c2}.png",
+      "\u{03bf}\u{03c3}_1.png",
+      "10\u{00b5}m.png",
+      "10\u{03bc}m_1.png",
+      "\u{0587}.png",
+    ]);
+
+    act(() => {
+      useFileStore
+        .getState()
+        .setFiles([
+          makeFile("\u{0587}.png", "image/png"),
+          makeFile("\u{0565}\u{0582}.png", "image/png"),
+          makeFile("\u{1f80}.png", "image/png"),
+          makeFile("\u{1f00}\u{03b9}.png", "image/png"),
+          makeFile("\u{0149}-\u{1e9a}.png", "image/png"),
+        ]);
+    });
+    const tenthRows = Array.from(container.querySelectorAll(".font-mono"), (el) => el.textContent);
+    expect(tenthRows).toEqual([
+      "\u{0587}.png",
+      "\u{0565}\u{0582}_1.png",
+      "\u{1f80}.png",
+      "\u{1f00}\u{03b9}_1.png",
+      "\u{0149}-\u{1e9a}.png",
+    ]);
+
+    act(() => {
+      useFileStore
+        .getState()
+        .setFiles([
+          makeFile("\u{0149}-\u{1e9a}.png", "image/png"),
+          makeFile("\u{02bc}n-a\u{02be}.png", "image/png"),
+          makeFile("\u{03d0}\u{03d1}\u{03d5}\u{03d6}\u{03f0}\u{03f1}\u{03f5}.png", "image/png"),
+          makeFile("\u{03b2}\u{03b8}\u{03c6}\u{03c0}\u{03ba}\u{03c1}\u{03b5}.png", "image/png"),
+        ]);
+    });
+    const eleventhRows = Array.from(
+      container.querySelectorAll(".font-mono"),
+      (el) => el.textContent,
+    );
+    expect(eleventhRows).toEqual([
+      "\u{0149}-\u{1e9a}.png",
+      "\u{02bc}n-a\u{02be}_1.png",
+      "\u{03d0}\u{03d1}\u{03d5}\u{03d6}\u{03f0}\u{03f1}\u{03f5}.png",
+      "\u{03b2}\u{03b8}\u{03c6}\u{03c0}\u{03ba}\u{03c1}\u{03b5}_1.png",
+    ]);
+
+    act(() => {
+      useFileStore
+        .getState()
+        .setFiles([
+          makeFile("\u{fb13}-\u{fb14}-\u{fb15}-\u{fb16}-\u{fb17}.png", "image/png"),
+          makeFile(
+            "\u{0574}\u{0576}-\u{0574}\u{0565}-\u{0574}\u{056b}-\u{057e}\u{0576}-\u{0574}\u{056d}.png",
+            "image/png",
+          ),
+          makeFile(
+            "\u{1c80}\u{1c81}\u{1c82}\u{1c83}\u{1c84}\u{1c85}\u{1c86}\u{1c87}\u{1c88}.png",
+            "image/png",
+          ),
+          makeFile(
+            "\u{0432}\u{0434}\u{043e}\u{0441}\u{0442}\u{0442}\u{044a}\u{0463}\u{a64b}.png",
+            "image/png",
+          ),
+        ]);
+    });
+    const twelfthRows = Array.from(
+      container.querySelectorAll(".font-mono"),
+      (el) => el.textContent,
+    );
+    expect(twelfthRows).toEqual([
+      "\u{fb13}-\u{fb14}-\u{fb15}-\u{fb16}-\u{fb17}.png",
+      "\u{0574}\u{0576}-\u{0574}\u{0565}-\u{0574}\u{056b}-\u{057e}\u{0576}-\u{0574}\u{056d}_1.png",
+      "\u{1c80}\u{1c81}\u{1c82}\u{1c83}\u{1c84}\u{1c85}\u{1c86}\u{1c87}\u{1c88}.png",
+      "\u{0432}\u{0434}\u{043e}\u{0441}\u{0442}\u{0442}\u{044a}\u{0463}\u{a64b}_1.png",
+    ]);
+
     const keyWarnings = errorSpy.mock.calls.filter((args) =>
       args.some((arg) => typeof arg === "string" && arg.includes("same key")),
     );
