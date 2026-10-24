@@ -797,6 +797,23 @@ describe("lifecycle-sweep checkPipelineCrossModality", () => {
     expect(sseErrorRun.checks).toEqual([
       expect.objectContaining({ id: "pipeline-incoherent-steps", verdict: "fail" }),
     ]);
+
+    submitMock.mockResolvedValue({
+      path: "/api/v1/pipeline/execute",
+      httpStatus: 202,
+      responseContentType: "application/json",
+      async: true,
+      jobId: "pipe-cross-4",
+      asyncOutcome: "failed",
+      asyncError: "SSE stream closed before terminal frame",
+      sseFrames: [],
+      durationMs: 10,
+    });
+    const sseClosedRun = await executeSweep(["pipeline-cross"]);
+    expect(sseClosedRun.exitCode).toBe(1);
+    expect(sseClosedRun.checks).toEqual([
+      expect.objectContaining({ id: "pipeline-incoherent-steps", verdict: "fail" }),
+    ]);
   });
 });
 
@@ -920,5 +937,42 @@ describe("lifecycle-sweep checkUnknownJobProgress", () => {
     expect(checks).toEqual([
       expect.objectContaining({ id: "unknown-job-progress", verdict: "fail" }),
     ]);
+  });
+
+  it("QaClient.followProgress returns failed when the SSE stream closes without a terminal frame before the deadline", async () => {
+    const { QaClient: RealQaClient } = await vi.importActual<
+      typeof import("../../qa/lib/container.js")
+    >("../../qa/lib/container.js");
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('data: {"type":"heartbeat"}\n\n'));
+        controller.close();
+      },
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(stream, { status: 200 })));
+
+    const qaClient = new RealQaClient({ baseUrl: "http://localhost:13490", token: "tok" });
+    const res = await qaClient.followProgress("00000000-0000-4000-8000-000000000000", 20_000);
+
+    expect(res.outcome).toBe("failed");
+    expect(res.error).toBe("SSE stream closed before terminal frame");
+    expect(res.frames).toHaveLength(1);
+
+    // When the abort timer fires at the deadline, followProgress still reports timeout.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+        const hangingStream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            init?.signal?.addEventListener("abort", () => {
+              controller.error(new Error("This operation was aborted"));
+            });
+          },
+        });
+        return new Response(hangingStream, { status: 200 });
+      }),
+    );
+    const timeoutRes = await qaClient.followProgress("00000000-0000-4000-8000-000000000000", 50);
+    expect(timeoutRes.outcome).toBe("timeout");
   });
 });

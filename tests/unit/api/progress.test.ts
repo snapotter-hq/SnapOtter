@@ -16,14 +16,39 @@ const dbMocks = vi.hoisted(() => ({
 }));
 
 const redisMocks = vi.hoisted(() => ({
+  get: vi.fn(async () => null as string | null),
   setex: vi.fn(async () => "OK"),
   publish: vi.fn(async () => 1),
   del: vi.fn(async () => 1),
 }));
 
+const authMocks = vi.hoisted(() => ({
+  user: { id: "user-1", username: "alice", role: "admin" } as {
+    id: string;
+    username: string;
+    role: string;
+  } | null,
+  filesAll: true,
+  permissionError: null as Error | null,
+}));
+
 vi.mock("../../../apps/api/src/jobs/connection.js", () => ({
   sharedRedis: () => redisMocks,
-  createRedisSubscriberConnection: vi.fn(),
+  createRedisSubscriberConnection: vi.fn(() => ({
+    on: vi.fn(),
+    subscribe: vi.fn(async () => 1),
+  })),
+}));
+
+vi.mock("../../../apps/api/src/plugins/auth.js", () => ({
+  requireAuth: () => authMocks.user,
+}));
+
+vi.mock("../../../apps/api/src/permissions.js", () => ({
+  hasEffectivePermission: vi.fn(async (_user: unknown, perm: string) => {
+    if (authMocks.permissionError) throw authMocks.permissionError;
+    return perm === "files:all" ? authMocks.filesAll : false;
+  }),
 }));
 
 // Mock DB
@@ -79,6 +104,7 @@ import {
   clearTerminalReplayKey,
   failSingleJobGuarded,
   refreshFeatureInstallStream,
+  registerProgressRoutes,
   updateJobProgress,
   updateSingleFileProgress,
   updateSingleFileProgressAtomically,
@@ -845,5 +871,204 @@ describe("expectedPipelineFlowId pointer guard (#2741)", () => {
     expect(redisMocks.publish).toHaveBeenCalledTimes(1);
     const publishedJson = (redisMocks.publish.mock.calls[0] as unknown[])[1] as string;
     expect(JSON.parse(publishedJson)).not.toHaveProperty("expectedArtifactJobId");
+  });
+});
+
+describe("registerProgressRoutes idle unknown-job stream closure (#3853)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    dbMocks.failure = null;
+    dbMocks.existing = [];
+    redisMocks.get.mockResolvedValue(null);
+    authMocks.user = { id: "user-1", username: "admin", role: "admin" };
+    authMocks.filesAll = true;
+    authMocks.permissionError = null;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    dbMocks.existing = [];
+    authMocks.permissionError = null;
+  });
+
+  async function openStream(jobId: string) {
+    let routeHandler:
+      | ((req: Record<string, unknown>, rep: Record<string, unknown>) => Promise<unknown>)
+      | undefined;
+    await registerProgressRoutes({
+      get: (_url: string, _opts: unknown, handler: typeof routeHandler) => {
+        routeHandler = handler;
+      },
+    } as never);
+
+    const closeHandlers: Array<() => void> = [];
+    const writes: string[] = [];
+    const warn = vi.fn();
+    const end = vi.fn();
+    const request = {
+      params: { jobId },
+      log: { warn },
+      raw: {
+        destroyed: false,
+        socket: { setTimeout: vi.fn() },
+        on: (event: string, cb: () => void) => {
+          if (event === "close") closeHandlers.push(cb);
+        },
+      },
+    };
+    const reply = {
+      hijack: vi.fn(),
+      status: vi.fn().mockReturnThis(),
+      send: vi.fn(),
+      raw: {
+        destroyed: false,
+        writeHead: vi.fn(),
+        write: vi.fn((chunk: string) => {
+          writes.push(chunk);
+        }),
+        end,
+      },
+    };
+    await routeHandler?.(request, reply);
+    return {
+      writes,
+      warn,
+      end,
+      disconnect: () => {
+        for (const cb of closeHandlers) cb();
+      },
+    };
+  }
+
+  it("closes an idle stream after the pre-upload grace window when no job row or frame appears for an admin or non-admin caller", async () => {
+    for (const filesAll of [true, false]) {
+      authMocks.filesAll = filesAll;
+      const stream = await openStream(`unknown-${filesAll}`);
+
+      await vi.advanceTimersByTimeAsync(9_500);
+      expect(stream.end).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(500);
+      expect(stream.end).toHaveBeenCalledTimes(1);
+      expect(stream.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ jobId: `unknown-${filesAll}` }),
+        expect.stringContaining("no job row appeared"),
+      );
+      stream.disconnect();
+    }
+  });
+
+  it("replays a queued row that appears during the grace window and keeps the stream open", async () => {
+    authMocks.filesAll = false;
+    const stream = await openStream("late-queued-job");
+
+    dbMocks.existing = [
+      {
+        id: "late-queued-job",
+        userId: "user-1",
+        type: "single",
+        status: "queued",
+        progress: { percent: 15, stage: "Queued" },
+        settings: {},
+      },
+    ];
+
+    await vi.advanceTimersByTimeAsync(500);
+    expect(stream.end).not.toHaveBeenCalled();
+    expect(stream.writes).toEqual([
+      `data: ${JSON.stringify({
+        jobId: "late-queued-job",
+        type: "single",
+        phase: "processing",
+        percent: 15,
+        stage: "Queued",
+      })}\n\n`,
+    ]);
+
+    // Stream remains open past the grace window once the job row exists.
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(stream.end).not.toHaveBeenCalled();
+    stream.disconnect();
+  });
+
+  it("replays a completed row that appears during the grace window and closes the stream", async () => {
+    authMocks.filesAll = false;
+    const stream = await openStream("late-completed-job");
+
+    dbMocks.existing = [
+      {
+        id: "late-completed-job",
+        userId: "user-1",
+        type: "single",
+        status: "completed",
+        progress: { percent: 100, result: { downloadUrl: "/api/v1/download/late/out.png" } },
+        settings: {},
+      },
+    ];
+
+    await vi.advanceTimersByTimeAsync(500);
+    expect(stream.end).toHaveBeenCalledTimes(1);
+    expect(stream.writes).toEqual([
+      `data: ${JSON.stringify({
+        jobId: "late-completed-job",
+        type: "single",
+        phase: "complete",
+        percent: 100,
+        result: { downloadUrl: "/api/v1/download/late/out.png" },
+      })}\n\n`,
+    ]);
+    stream.disconnect();
+  });
+
+  it("closes without emitting frames when a row owned by another user appears during the grace window", async () => {
+    authMocks.filesAll = false;
+    const stream = await openStream("stranger-job");
+
+    dbMocks.existing = [
+      {
+        id: "stranger-job",
+        userId: "other-user",
+        type: "single",
+        status: "queued",
+        progress: { percent: 50 },
+        settings: {},
+      },
+    ];
+
+    await vi.advanceTimersByTimeAsync(500);
+    expect(stream.end).toHaveBeenCalledTimes(1);
+    expect(stream.writes).toEqual([]);
+    stream.disconnect();
+  });
+
+  it("retries on the next recheck tick when streamAccess throws a transient DB error", async () => {
+    authMocks.filesAll = false;
+    const stream = await openStream("transient-role-err-job");
+
+    dbMocks.existing = [
+      {
+        id: "transient-role-err-job",
+        userId: null,
+        type: "single",
+        status: "completed",
+        progress: { percent: 100, result: { downloadUrl: "/api/v1/download/late/out.png" } },
+        settings: {},
+      },
+    ];
+    authMocks.permissionError = new Error("role lookup failed");
+
+    await vi.advanceTimersByTimeAsync(500);
+    expect(stream.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ jobId: "transient-role-err-job" }),
+      "progress stream: access check failed",
+    );
+    expect(stream.end).not.toHaveBeenCalled();
+
+    authMocks.permissionError = null;
+    authMocks.filesAll = true;
+    await vi.advanceTimersByTimeAsync(500);
+    expect(stream.end).toHaveBeenCalledTimes(1);
+    expect(stream.writes).toHaveLength(1);
+    stream.disconnect();
   });
 });

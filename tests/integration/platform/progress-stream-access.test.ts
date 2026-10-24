@@ -269,6 +269,18 @@ describe("progress stream access", () => {
       expect(res.statusCode).toBe(200);
       expect(dataFrames(res.body).at(-1)).toMatchObject({ jobId, phase: "complete" });
     });
+
+    it("closes an idle stream after the grace window when no job row or frame ever appears (#3853)", async () => {
+      const [adminRes, ownerRes] = await Promise.all([
+        watch(randomUUID(), adminToken),
+        watch(randomUUID(), owner.token),
+      ]);
+
+      expect(adminRes.statusCode).toBe(200);
+      expect(dataFrames(adminRes.body)).toEqual([]);
+      expect(ownerRes.statusCode).toBe(200);
+      expect(dataFrames(ownerRes.body)).toEqual([]);
+    });
   });
 
   // Analyze publishes under the caller's clientJobId, so it reserves that id

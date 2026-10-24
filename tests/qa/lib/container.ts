@@ -281,10 +281,21 @@ export class QaClient {
       } finally {
         await reader.cancel().catch(() => {});
       }
+      if (Date.now() < deadline && !controller.signal.aborted) {
+        return {
+          outcome: "failed",
+          error: "SSE stream closed before terminal frame",
+          frames,
+        };
+      }
       return { outcome: "timeout", frames };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      return { outcome: Date.now() >= deadline ? "timeout" : "failed", error: message, frames };
+      return {
+        outcome: controller.signal.aborted || Date.now() >= deadline ? "timeout" : "failed",
+        error: message,
+        frames,
+      };
     } finally {
       clearTimeout(timer);
     }

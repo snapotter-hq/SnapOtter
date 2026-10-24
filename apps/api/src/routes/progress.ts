@@ -936,7 +936,10 @@ async function streamAccess(
   return "denied";
 }
 
-async function jobStreamAccess(jobId: string, user: AuthUser): Promise<StreamAccess> {
+async function jobStreamAccess(
+  jobId: string,
+  user: AuthUser,
+): Promise<{ access: StreamAccess; hasRow: boolean }> {
   const [row] = await db
     .select({ userId: schema.jobs.userId, settings: schema.jobs.settings })
     .from(schema.jobs)
@@ -944,9 +947,12 @@ async function jobStreamAccess(jobId: string, user: AuthUser): Promise<StreamAcc
   if (!row) {
     // files:all may watch any job, so there's no owner to wait for. Some
     // frames never get a row at all (publishEphemeral doesn't persist).
-    return (await hasEffectivePermission(user, "files:all")) ? "allowed" : "missing";
+    return {
+      access: (await hasEffectivePermission(user, "files:all")) ? "allowed" : "missing",
+      hasRow: false,
+    };
   }
-  return streamAccess(row, user);
+  return { access: await streamAccess(row, user), hasRow: true };
 }
 
 function isFeatureInstallRow(settings: unknown): boolean {
@@ -1038,7 +1044,9 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
 
       const { jobId } = request.params;
 
-      let access = await jobStreamAccess(jobId, user);
+      const initialAccess = await jobStreamAccess(jobId, user);
+      let access = initialAccess.access;
+      let hasJobRow = initialAccess.hasRow;
       if (access === "denied") {
         return reply.status(404).send({ error: "Job not found" });
       }
@@ -1083,6 +1091,7 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
       // published after the cache read but before listener registration can be
       // missed forever even though both transport layers behaved correctly.
       let ended = false;
+      let deliveredFrame = false;
 
       const endStream = () => {
         ended = true;
@@ -1114,36 +1123,135 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
         }
       };
 
+      const replayRow = (row: typeof schema.jobs.$inferSelect) => {
+        // A live (queued/processing) single-file row replays a nonterminal
+        // frame: a reconnecting client must be able to tell "the job exists
+        // and is working" apart from "no such job", and heartbeats carry no
+        // evidence. Queued jobs publish nothing until the worker picks them
+        // up, so without this replay a busy pool looks identical to a job
+        // that never existed, and a client that degraded a dead upload
+        // socket to the async path gives up on it (#722).
+        if (
+          !deliveredFrame &&
+          row.type !== "batch" &&
+          (row.status === "queued" || row.status === "processing")
+        ) {
+          const progress: Record<string, unknown> = isRecord(row.progress) ? row.progress : {};
+          const storedPercent = progress.percent;
+          const synthetic: SingleFileProgress = {
+            jobId,
+            type: "single",
+            phase: "processing",
+            percent:
+              typeof storedPercent === "number" && Number.isFinite(storedPercent)
+                ? storedPercent
+                : 0,
+            ...(typeof progress.stage === "string" ? { stage: progress.stage } : {}),
+          };
+          deliveredFrame = true;
+          sendFrame(JSON.stringify(synthetic));
+        }
+        // Live batch parents replay a nonterminal frame for the same reason
+        // the single path does (#722): a client that degraded a dead batch
+        // POST needs proof the batch exists, and heartbeats carry none. The
+        // finalize can also take a while after the last child (ZIP packaging),
+        // where this replay is the only evidence available (#750).
+        if (
+          !deliveredFrame &&
+          row.type === "batch" &&
+          (row.status === "queued" || row.status === "processing")
+        ) {
+          deliveredFrame = true;
+          sendFrame(
+            JSON.stringify(
+              buildBatchReplayEvent({
+                jobId,
+                status: row.status,
+                progress: row.progress,
+                error: row.error,
+              }),
+            ),
+          );
+        }
+        if (row.status === "completed" || row.status === "failed" || row.status === "canceled") {
+          const replayEvent =
+            row.type !== "batch"
+              ? buildSingleFileReplayEvent({
+                  jobId,
+                  status: row.status,
+                  progress: row.progress,
+                  error: row.error,
+                })
+              : buildBatchReplayEvent({
+                  jobId,
+                  status: row.status,
+                  progress: row.progress,
+                  error: row.error,
+                });
+          callback(JSON.stringify(replayEvent));
+        }
+      };
+
+      const scheduleRecheck = () => {
+        if (
+          ended ||
+          checking ||
+          heldRecheckTimer ||
+          hasJobRow ||
+          (access === "allowed" && deliveredFrame)
+        ) {
+          return;
+        }
+        heldRechecks++;
+        heldRecheckTimer = setTimeout(() => {
+          heldRecheckTimer = null;
+          void recheckHeld();
+        }, HELD_RECHECK_MS);
+      };
+
       const recheckHeld = async () => {
-        if (checking || ended || access !== "missing") return;
+        if (checking || ended || hasJobRow || (access === "allowed" && deliveredFrame)) return;
+        if (heldRecheckTimer) {
+          clearTimeout(heldRecheckTimer);
+          heldRecheckTimer = null;
+        }
         checking = true;
         const receivedBefore = heldReceived;
         try {
-          settleAccess(await jobStreamAccess(jobId, user));
+          const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
+          if (ended) return;
+          if (row) {
+            if (access === "missing") {
+              settleAccess(await streamAccess(row, user));
+              if (ended) return;
+            }
+            hasJobRow = true;
+            if (access === "allowed") {
+              replayRow(row);
+              if (ended) return;
+            }
+          }
         } catch (err) {
           // DB unavailable: keep holding and try again below.
           request.log.warn({ err, jobId }, "progress stream: access check failed");
         } finally {
           checking = false;
         }
-        if (ended || access !== "missing" || held.length === 0) return;
+        if (ended || hasJobRow || (access === "allowed" && deliveredFrame)) return;
         if (heldReceived > receivedBefore) {
           void recheckHeld();
         } else if (heldRechecks >= HELD_RECHECK_LIMIT) {
-          // Still no row to say whose job this is. End the stream rather than
-          // hold its frames behind heartbeats forever; the client reconnects
-          // and the connect-time replay picks up whatever has landed by then.
+          // Still no row to say whose job this is (or whether it exists at all).
+          // End the stream rather than hold the connection behind heartbeats
+          // forever; a live client reconnects and the connect-time replay picks
+          // up whatever has landed by then.
           request.log.warn(
             { jobId, heldFrames: held.length },
             "progress stream: no job row appeared for held frames",
           );
           endStream();
-        } else if (!heldRecheckTimer) {
-          heldRechecks++;
-          heldRecheckTimer = setTimeout(() => {
-            heldRecheckTimer = null;
-            void recheckHeld();
-          }, HELD_RECHECK_MS);
+        } else {
+          scheduleRecheck();
         }
       };
 
@@ -1153,6 +1261,7 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
           deliver(json);
           return;
         }
+        if (heldReceived === 0) heldRechecks = 0;
         if (held.length >= MAX_HELD_FRAMES) held.shift();
         held.push(json);
         heldReceived++;
@@ -1161,6 +1270,11 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
 
       const deliver = (json: string) => {
         if (ended) return;
+        deliveredFrame = true;
+        if (access === "allowed" && heldRecheckTimer) {
+          clearTimeout(heldRecheckTimer);
+          heldRecheckTimer = null;
+        }
         sendFrame(json);
 
         // End the stream on terminal events
@@ -1221,82 +1335,24 @@ export async function registerProgressRoutes(app: FastifyInstance): Promise<void
       try {
         const [row] = await db.select().from(schema.jobs).where(eq(schema.jobs.id, jobId));
         if (ended) return;
-        // The row may have appeared since the connect-time check. Its owner
-        // decides whether this stream sees anything, replay included.
-        if (row && access === "missing") {
-          settleAccess(await streamAccess(row, user));
-          if (ended) return;
-        }
-        if (access !== "allowed") return;
-        // A live (queued/processing) single-file row replays a nonterminal
-        // frame: a reconnecting client must be able to tell "the job exists
-        // and is working" apart from "no such job", and heartbeats carry no
-        // evidence. Queued jobs publish nothing until the worker picks them
-        // up, so without this replay a busy pool looks identical to a job
-        // that never existed, and a client that degraded a dead upload
-        // socket to the async path gives up on it (#722).
-        if (
-          row &&
-          row.type !== "batch" &&
-          (row.status === "queued" || row.status === "processing")
-        ) {
-          const progress: Record<string, unknown> = isRecord(row.progress) ? row.progress : {};
-          const storedPercent = progress.percent;
-          const synthetic: SingleFileProgress = {
-            jobId,
-            type: "single",
-            phase: "processing",
-            percent:
-              typeof storedPercent === "number" && Number.isFinite(storedPercent)
-                ? storedPercent
-                : 0,
-            ...(typeof progress.stage === "string" ? { stage: progress.stage } : {}),
-          };
-          sendFrame(JSON.stringify(synthetic));
-        }
-        // Live batch parents replay a nonterminal frame for the same reason
-        // the single path does (#722): a client that degraded a dead batch
-        // POST needs proof the batch exists, and heartbeats carry none. The
-        // finalize can also take a while after the last child (ZIP packaging),
-        // where this replay is the only evidence available (#750).
-        if (
-          row &&
-          row.type === "batch" &&
-          (row.status === "queued" || row.status === "processing")
-        ) {
-          sendFrame(
-            JSON.stringify(
-              buildBatchReplayEvent({
-                jobId,
-                status: row.status,
-                progress: row.progress,
-                error: row.error,
-              }),
-            ),
-          );
-        }
-        if (
-          row &&
-          (row.status === "completed" || row.status === "failed" || row.status === "canceled")
-        ) {
-          const replayEvent =
-            row.type !== "batch"
-              ? buildSingleFileReplayEvent({
-                  jobId,
-                  status: row.status,
-                  progress: row.progress,
-                  error: row.error,
-                })
-              : buildBatchReplayEvent({
-                  jobId,
-                  status: row.status,
-                  progress: row.progress,
-                  error: row.error,
-                });
-          callback(JSON.stringify(replayEvent));
+        if (row) {
+          // The row may have appeared since the connect-time check. Its owner
+          // decides whether this stream sees anything, replay included.
+          if (access === "missing") {
+            settleAccess(await streamAccess(row, user));
+            if (ended) return;
+          }
+          hasJobRow = true;
+          if (access === "allowed") {
+            replayRow(row);
+            if (ended) return;
+          }
         }
       } catch {
         // DB unavailable; the listener continues with live updates.
+      }
+      if (!ended && !hasJobRow && (access === "missing" || !deliveredFrame)) {
+        scheduleRecheck();
       }
     },
   );

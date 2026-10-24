@@ -461,7 +461,8 @@ async function checkPipelineCrossModality(): Promise<void> {
   }
   const status = outcome.httpStatus ?? 0;
   const hasMessage = error.trim().length > 0;
-  const noStackTrace = !/(?:\r?\n|\\n)\s+at\s/.test(error) && !/^SSE returned \d+$/u.test(error);
+  const noStackTrace =
+    !/(?:\r?\n|\\n)\s+at\s/.test(error) && !/^SSE (?:returned \d+|stream closed)/u.test(error);
   const cleanlyRefused =
     hasMessage && noStackTrace && ((status >= 400 && status < 500) || terminal === "failed");
   report(
