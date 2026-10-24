@@ -52,6 +52,7 @@ import { requestDuration } from "./lib/metrics.js";
 import { purgeOcrRuntimeDownloads, runOcrRuntimeMaintenance } from "./lib/ocr-runtime-install.js";
 import { posthogProxyEnabled } from "./lib/posthog-proxy.js";
 import { redactUrl } from "./lib/redact-url.js";
+import { ensureDefaultSettings } from "./lib/settings-helpers.js";
 import { assertStorageWritable } from "./lib/storage-writable.js";
 import { gatherSystemProperties } from "./lib/system-info.js";
 import { parseTrustProxy } from "./lib/trust-proxy.js";
@@ -257,20 +258,6 @@ async function ensureInstanceId(): Promise<string> {
 // broken install from the whole fleet, and cross-reference an event to the same
 // instance_id used by the PostHog server-side stream.
 await setSentryInstanceTag(await ensureInstanceId());
-
-async function ensureDefaultSettings() {
-  const defaults: Record<string, string> = {
-    defaultTheme: env.DEFAULT_THEME,
-    defaultLocale: env.DEFAULT_LOCALE,
-    defaultToolView: env.DEFAULT_TOOL_VIEW,
-  };
-  for (const [key, value] of Object.entries(defaults)) {
-    const [existing] = await db.select().from(schema.settings).where(eq(schema.settings.key, key));
-    if (!existing) {
-      await db.insert(schema.settings).values({ key, value });
-    }
-  }
-}
 
 await ensureDefaultSettings();
 

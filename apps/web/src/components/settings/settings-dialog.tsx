@@ -570,6 +570,9 @@ export function GeneralSection() {
 
 /* ────────────────────── System ────────────────────── */
 
+const VALID_DEFAULT_THEMES = new Set<string>(["light", "dark", "system"]);
+const SUPPORTED_LOCALE_CODES = new Set<string>(SUPPORTED_LOCALES.map((l) => l.code));
+
 export function SystemSection() {
   const { t } = useTranslation();
   const later = useTimeouts();
@@ -641,7 +644,7 @@ export function SystemSection() {
         // surfaces visible (and silently drop their submissions) until a refocus.
         useAnalyticsStore.getState().fetchConfig();
       }
-      if (settings.defaultTheme) {
+      if (settings.defaultTheme && VALID_DEFAULT_THEMES.has(settings.defaultTheme)) {
         const theme = settings.defaultTheme as "light" | "dark" | "system";
         useThemeStore.getState().setTheme(theme);
       }
@@ -702,7 +705,11 @@ export function SystemSection() {
         description={t.settings.system.defaultThemeDescription}
       >
         <select
-          value={settings.defaultTheme || "system"}
+          value={
+            settings.defaultTheme && VALID_DEFAULT_THEMES.has(settings.defaultTheme)
+              ? settings.defaultTheme
+              : "system"
+          }
           onChange={(e) => updateSetting("defaultTheme", e.target.value)}
           aria-label={t.settings.system.defaultThemeLabel}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground"
@@ -718,7 +725,11 @@ export function SystemSection() {
         description={t.settings.system.languageDescription}
       >
         <select
-          value={settings.defaultLocale || "en"}
+          value={
+            settings.defaultLocale && SUPPORTED_LOCALE_CODES.has(settings.defaultLocale)
+              ? settings.defaultLocale
+              : "en"
+          }
           onChange={(e) => updateSetting("defaultLocale", e.target.value)}
           aria-label={t.settings.system.languageLabel}
           className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground"

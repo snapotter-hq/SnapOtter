@@ -1,7 +1,8 @@
 import { eq } from "drizzle-orm";
+import { env } from "../config.js";
 import { db, schema } from "../db/index.js";
 import { logger } from "./logger.js";
-import { getSettingPolicy } from "./settings-policy.js";
+import { getSettingPolicy, prepareSetting } from "./settings-policy.js";
 
 /**
  * Atomically insert or update a setting using Postgres ON CONFLICT DO UPDATE.
@@ -98,4 +99,31 @@ export async function getSettingStrict(key: string): Promise<string | undefined>
     .where(eq(schema.settings.key, key))
     .limit(1);
   return row?.value;
+}
+
+/**
+ * Seed defaultTheme, defaultLocale, and defaultToolView from env when absent,
+ * and repair any existing row whose stored value fails its setting policy
+ * schema (#3964).
+ */
+export async function ensureDefaultSettings(): Promise<void> {
+  const defaults: Record<string, string> = {
+    defaultTheme: env.DEFAULT_THEME,
+    defaultLocale: env.DEFAULT_LOCALE,
+    defaultToolView: env.DEFAULT_TOOL_VIEW,
+  };
+  for (const [key, value] of Object.entries(defaults)) {
+    const existing = await getSettingStrict(key);
+    if (existing === undefined) {
+      await setSettingIfAbsent(key, value);
+      continue;
+    }
+    if (!prepareSetting(key, existing).success) {
+      logger.warn(
+        { key, value: existing, replacement: value },
+        "invalid default setting, resetting to env default",
+      );
+      await upsertSetting(key, value);
+    }
+  }
 }
