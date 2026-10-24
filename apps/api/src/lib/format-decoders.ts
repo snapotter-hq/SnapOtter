@@ -1193,6 +1193,8 @@ async function decodeEps(buffer: Buffer, options: DecodeSafetyOptions): Promise<
           await execFileAsync("gs", ["--version"], commandOptions(options, 5_000));
         } catch (gsErr) {
           options.signal?.throwIfAborted();
+          const outOfMemory = asDecoderOutOfMemory(gsErr);
+          if (outOfMemory !== gsErr) throw outOfMemory;
           if (cannotStart(gsErr)) throw gsErr;
         }
       }

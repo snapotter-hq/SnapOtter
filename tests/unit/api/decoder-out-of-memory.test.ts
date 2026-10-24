@@ -122,13 +122,18 @@ vi.mock("node:child_process", async (importOriginal) => {
   // the decode itself fails, not the `--version` probe, and only once.
   const execFile = Object.assign((...args: unknown[]) => actual.execFile(...(args as [string])), {
     [promisify.custom]: async (file: string, argv: string[], options?: unknown) => {
+      const binary = String(file).split(/[/\\]/).pop() as string;
+      if (argv.includes("--version") && failures.byCommand[`${binary}:--version`]) {
+        const fields = failures.byCommand[`${binary}:--version`];
+        delete failures.byCommand[`${binary}:--version`];
+        throw Object.assign(new Error(`Command failed: ${file} --version`), fields);
+      }
       if (failures.probe && argv.includes("--version")) {
         const fields = failures.probe;
         failures.probe = null;
         throw Object.assign(new Error(`Command failed: ${file} --version`), fields);
       }
       const decoding = !argv.includes("--version");
-      const binary = String(file).split(/[/\\]/).pop() as string;
       if (decoding) failures.spawned.push(binary);
       const taggedKey = argv.includes("-PreviewImage") ? `${binary}:-PreviewImage` : binary;
       const chained = failures.byCommand[taggedKey] ?? failures.byCommand[binary];
@@ -419,6 +424,42 @@ describe("decoders that run ImageMagick (#1751)", () => {
     expect(isDecoderUnavailable(err)).toBe(false);
     expect((err as { stderr?: unknown }).stderr).toBe(corrupt.stderr);
   });
+
+  it.each([
+    ["is killed with SIGKILL", { code: null, signal: "SIGKILL", stderr: "" }, /ran out of memory/],
+    [
+      "aborts on thread creation",
+      { code: null, signal: "SIGABRT", stderr: THREAD_ABORT },
+      /thread or process limit/,
+    ],
+    [
+      "hits a libgomp OpenMP thread limit",
+      { code: 1, signal: null, stderr: LIBGOMP },
+      /thread or process limit/,
+    ],
+  ])(
+    "answers decodeEps as a 503 DecoderOutOfMemoryError when ImageMagick exits 1 without a Ghostscript banner and the gs --version probe %s (#3785)",
+    async (_label, gsProbeFailure, expectedMessage) => {
+      const genericMagickExit1 = {
+        code: 1,
+        signal: null,
+        stderr:
+          "convert: no images defined `eps-out.png' @ error/convert.c/ConvertImageCommand/3229.\n",
+      };
+      failures.byCommand.magick = genericMagickExit1;
+      failures.byCommand.convert = genericMagickExit1;
+      failures.byCommand["gs:--version"] = gsProbeFailure;
+
+      const err = (await decodeToSharpCompat(Buffer.from("%!PS-Adobe-3.0 EPSF-3.0\n"), "eps").catch(
+        (e: unknown) => e,
+      )) as Error;
+
+      expect(isDecoderUnavailable(err)).toBe(true);
+      expect(err.name).toBe("DecoderOutOfMemoryError");
+      expect(err.message).toMatch(expectedMessage);
+      expect(err.cause).toMatchObject(gsProbeFailure);
+    },
+  );
 });
 
 describe("decodeRaw and preflight/post-decode fault handling (#1758)", () => {
