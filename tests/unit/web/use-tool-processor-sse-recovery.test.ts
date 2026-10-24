@@ -31,7 +31,10 @@ interface MockXhr {
   status: number;
   responseText: string;
   timeout: number;
-  upload: { onprogress?: unknown; onload?: unknown };
+  upload: {
+    onprogress?: ((event: ProgressEvent) => void) | null;
+    onload?: (() => void) | null;
+  };
   onload?: () => void;
   onerror?: (() => void) | null;
   ontimeout?: (() => void) | null;
@@ -471,6 +474,217 @@ describe("useToolProcessor SSE recovery", () => {
         MockEventSource.instances[0].onmessage?.(COMPLETE_FRAME);
       });
       expect(useFileStore.getState().entries[0].status).toBe("completed");
+
+      unmount();
+    });
+  });
+
+  // #3923: when an upload takes longer than the 10-second pre-upload grace
+  // window on GET /api/v1/jobs/:jobId/progress (or the SSE socket drops during
+  // upload), es.onerror closes the EventSource and nulls eventSourceRef while
+  // asyncModeRef.current is false. Both upload completion and a single-file 202
+  // response must reopen a closed stream so live progress and terminal frames
+  // reach the client without waiting 5 minutes for SSE_STALL_TIMEOUT_MS.
+  describe("slow-upload SSE close recovery (#3923)", () => {
+    it("reopens SSE on a single-file 202 response and settles immediately from the terminal frame", () => {
+      const file = new File([new ArrayBuffer(64)], "photo.png", { type: "image/png" });
+      useFileStore.getState().setFiles([file]);
+      const { result, unmount } = renderHook(() => useToolProcessor("upscale"));
+
+      act(() => {
+        result.current.processFiles([file], {});
+      });
+      expect(MockEventSource.instances).toHaveLength(1);
+
+      // Pre-upload SSE closes on error while asyncModeRef is false.
+      act(() => {
+        MockEventSource.instances[0].onerror?.();
+      });
+      expect(MockEventSource.instances[0].close).toHaveBeenCalledOnce();
+
+      // Upload finishes, reopening SSE, then SSE drops again before 202 arrives.
+      act(() => {
+        xhrs[0].upload.onload?.();
+      });
+      expect(MockEventSource.instances).toHaveLength(2);
+      act(() => {
+        MockEventSource.instances[1].onerror?.();
+      });
+      expect(MockEventSource.instances[1].close).toHaveBeenCalledOnce();
+
+      act(() => {
+        xhrs[0].status = 202;
+        xhrs[0].responseText = JSON.stringify({ jobId: "server-job", async: true });
+        xhrs[0].onload?.();
+      });
+
+      expect(MockEventSource.instances).toHaveLength(3);
+
+      act(() => {
+        MockEventSource.instances[2].onmessage?.({
+          data: JSON.stringify({
+            type: "single",
+            phase: "complete",
+            percent: 100,
+            result: {
+              jobId: "server-job",
+              downloadUrl: "/api/v1/download/server-job/upscaled.png",
+              originalSize: 64,
+              processedSize: 128,
+            },
+          }),
+        } as MessageEvent);
+      });
+
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(useFileStore.getState().entries[0]).toMatchObject({
+        status: "completed",
+        processedUrl: "/api/v1/download/server-job/upscaled.png",
+      });
+
+      unmount();
+    });
+
+    it("reopens a closed SSE stream once when upload finishes on a single-file sync run and preserves live progress across delayed upload.onload", () => {
+      const file = new File([new ArrayBuffer(64)], "photo.png", { type: "image/png" });
+      useFileStore.getState().setFiles([file]);
+      const { result, unmount } = renderHook(() => useToolProcessor("resize"));
+
+      act(() => {
+        result.current.processFiles([file], { width: 100 });
+      });
+      expect(MockEventSource.instances).toHaveLength(1);
+
+      act(() => {
+        MockEventSource.instances[0].onerror?.();
+      });
+      expect(MockEventSource.instances[0].close).toHaveBeenCalledOnce();
+
+      act(() => {
+        xhrs[0].upload.onprogress?.(
+          new ProgressEvent("progress", { lengthComputable: true, loaded: 64, total: 64 }),
+        );
+      });
+
+      // Reopened on the final upload progress.
+      expect(MockEventSource.instances).toHaveLength(2);
+      expect(MockEventSource.instances[1].close).not.toHaveBeenCalled();
+
+      // In Firefox (#2136), live SSE frames can arrive during waitForJob before upload.onload fires.
+      act(() => {
+        MockEventSource.instances[1].onmessage?.({
+          data: JSON.stringify({
+            type: "single",
+            phase: "processing",
+            percent: 50,
+            stage: "Resizing...",
+          }),
+        } as MessageEvent);
+        xhrs[0].upload.onload?.();
+      });
+
+      expect(MockEventSource.instances).toHaveLength(2);
+      expect(result.current.progress).toMatchObject({
+        phase: "processing",
+        percent: 57.5,
+        stage: "Resizing...",
+      });
+
+      unmount();
+    });
+
+    it("reopens a closed SSE stream in upload.onload on single and batch runs when onprogress was not lengthComputable", () => {
+      const file = new File([new ArrayBuffer(64)], "photo.png", { type: "image/png" });
+      useFileStore.getState().setFiles([file]);
+      const { result, unmount } = renderHook(() => useToolProcessor("resize"));
+
+      act(() => {
+        result.current.processFiles([file], { width: 100 });
+      });
+      act(() => {
+        MockEventSource.instances[0].onerror?.();
+      });
+      expect(MockEventSource.instances[0].close).toHaveBeenCalledOnce();
+
+      act(() => {
+        xhrs[0].upload.onload?.();
+      });
+
+      expect(MockEventSource.instances).toHaveLength(2);
+      expect(MockEventSource.instances[1].close).not.toHaveBeenCalled();
+
+      const files = [
+        new File([new ArrayBuffer(32)], "a.png", { type: "image/png" }),
+        new File([new ArrayBuffer(32)], "b.png", { type: "image/png" }),
+      ];
+      useFileStore.getState().setFiles(files);
+
+      act(() => {
+        void result.current.processAllFiles(files, { width: 100 });
+      });
+      expect(MockEventSource.instances).toHaveLength(3);
+
+      act(() => {
+        MockEventSource.instances[2].onerror?.();
+      });
+      expect(MockEventSource.instances[2].close).toHaveBeenCalledOnce();
+
+      act(() => {
+        xhrs[1].upload.onload?.();
+      });
+
+      expect(MockEventSource.instances).toHaveLength(4);
+      expect(MockEventSource.instances[3].close).not.toHaveBeenCalled();
+
+      unmount();
+    });
+
+    it("reopens a closed SSE stream once when upload finishes on a batch run", () => {
+      const files = [
+        new File([new ArrayBuffer(32)], "a.png", { type: "image/png" }),
+        new File([new ArrayBuffer(32)], "b.png", { type: "image/png" }),
+      ];
+      useFileStore.getState().setFiles(files);
+      const { result, unmount } = renderHook(() => useToolProcessor("resize"));
+
+      act(() => {
+        void result.current.processAllFiles(files, { width: 100 });
+      });
+      expect(MockEventSource.instances).toHaveLength(1);
+
+      act(() => {
+        MockEventSource.instances[0].onerror?.();
+      });
+      expect(MockEventSource.instances[0].close).toHaveBeenCalledOnce();
+
+      act(() => {
+        xhrs[0].upload.onprogress?.(
+          new ProgressEvent("progress", { lengthComputable: true, loaded: 64, total: 64 }),
+        );
+        xhrs[0].upload.onload?.();
+      });
+
+      expect(MockEventSource.instances).toHaveLength(2);
+      expect(MockEventSource.instances[1].close).not.toHaveBeenCalled();
+
+      act(() => {
+        MockEventSource.instances[1].onmessage?.({
+          data: JSON.stringify({
+            type: "batch",
+            status: "processing",
+            totalFiles: 2,
+            completedFiles: 1,
+            failedFiles: 0,
+            currentFile: "b.png",
+            errors: [],
+          }),
+        } as MessageEvent);
+      });
+
+      expect(result.current.progress).toMatchObject({
+        phase: "processing",
+        stage: "Processing b.png (1/2)",
+      });
 
       unmount();
     });

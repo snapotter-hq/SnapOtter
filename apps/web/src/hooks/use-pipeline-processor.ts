@@ -896,8 +896,11 @@ export function usePipelineProcessor() {
             // final progress event also counts as the body having left the
             // browser (#2136, #2240).
             if (event.loaded >= event.total) {
-              uploadedFully = true;
-              clearRequestTimer();
+              if (!uploadedFully) {
+                uploadedFully = true;
+                clearRequestTimer();
+                if (!eventSourceRef.current) reconnectSSE(true);
+              }
             }
             const uploadPercent = (event.loaded / event.total) * UPLOAD_WEIGHT;
             setProgress((prev) => {
@@ -913,12 +916,17 @@ export function usePipelineProcessor() {
           }
           uploadedFully = true;
           clearRequestTimer();
-          setProgress((prev) => ({
-            ...prev,
-            phase: "processing",
-            percent: UPLOAD_WEIGHT,
-            stage: "Processing...",
-          }));
+          if (!eventSourceRef.current) reconnectSSE(true);
+          setProgress((prev) =>
+            prev.phase === "processing"
+              ? prev
+              : {
+                  ...prev,
+                  phase: "processing",
+                  percent: UPLOAD_WEIGHT,
+                  stage: "Processing...",
+                },
+          );
         };
 
         // A dead response after a finished upload does not mean a dead flow:
@@ -1524,8 +1532,11 @@ export function usePipelineProcessor() {
             // final progress event also counts as the body having left the
             // browser (#2136, #2240).
             if (event.loaded >= event.total) {
-              uploadedFully = true;
-              clearRequestTimer();
+              if (!uploadedFully) {
+                uploadedFully = true;
+                clearRequestTimer();
+                if (!eventSourceRef.current) reconnectSSE(true);
+              }
             }
             const uploadPercent = (event.loaded / event.total) * UPLOAD_WEIGHT;
             setProgress((prev) => {
@@ -1541,12 +1552,17 @@ export function usePipelineProcessor() {
           }
           uploadedFully = true;
           clearRequestTimer();
-          setProgress((prev) => ({
-            ...prev,
-            phase: "processing",
-            percent: UPLOAD_WEIGHT,
-            stage: "Processing...",
-          }));
+          if (!eventSourceRef.current) reconnectSSE(true);
+          setProgress((prev) =>
+            prev.phase === "processing"
+              ? prev
+              : {
+                  ...prev,
+                  phase: "processing",
+                  percent: UPLOAD_WEIGHT,
+                  stage: "Processing...",
+                },
+          );
         };
 
         const degradeToAsync = (trigger: "socket" | "timeout" | "http-502" | "http-504") => {

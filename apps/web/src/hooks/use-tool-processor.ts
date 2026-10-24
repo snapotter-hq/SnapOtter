@@ -1365,6 +1365,7 @@ export function useToolProcessor(toolId: string) {
                 uploadedFully = true;
                 uploadedFullyRef.current = true;
                 armResponseTimer();
+                if (!eventSourceRef.current) reconnectSSE(true);
               }
             }
             const uploadPercent = (event.loaded / event.total) * UPLOAD_WEIGHT;
@@ -1382,12 +1383,17 @@ export function useToolProcessor(toolId: string) {
           uploadedFully = true;
           uploadedFullyRef.current = true;
           armResponseTimer();
-          setProgress((prev) => ({
-            ...prev,
-            phase: "processing",
-            percent: UPLOAD_WEIGHT,
-            stage: "Processing...",
-          }));
+          if (!eventSourceRef.current) reconnectSSE(true);
+          setProgress((prev) =>
+            prev.phase === "processing"
+              ? prev
+              : {
+                  ...prev,
+                  phase: "processing",
+                  percent: UPLOAD_WEIGHT,
+                  stage: "Processing...",
+                },
+          );
         };
 
         // The POST socket died or timed out after the whole body left the
@@ -1534,6 +1540,7 @@ export function useToolProcessor(toolId: string) {
           if (xhr.status === 202) {
             asyncModeRef.current = true;
             setActiveJob(clientJobId, cancelCurrentJob);
+            if (!eventSourceRef.current) reconnectSSE(true);
             resetStallTimer();
             return;
           }
@@ -2259,9 +2266,12 @@ export function useToolProcessor(toolId: string) {
             // final progress event also counts as the body having left the
             // browser (#2136, #2240).
             if (event.loaded >= event.total) {
-              uploadedFully = true;
-              uploadedFullyRef.current = true;
-              clearRequestTimer();
+              if (!uploadedFully) {
+                uploadedFully = true;
+                uploadedFullyRef.current = true;
+                clearRequestTimer();
+                if (!eventSourceRef.current) reconnectSSE(true);
+              }
             }
             const uploadPercent = (event.loaded / event.total) * UPLOAD_WEIGHT;
             setProgress((prev) => {
@@ -2278,12 +2288,17 @@ export function useToolProcessor(toolId: string) {
           uploadedFully = true;
           uploadedFullyRef.current = true;
           clearRequestTimer();
-          setProgress((prev) => ({
-            ...prev,
-            phase: "processing",
-            percent: UPLOAD_WEIGHT,
-            stage: "Processing...",
-          }));
+          if (!eventSourceRef.current) reconnectSSE(true);
+          setProgress((prev) =>
+            prev.phase === "processing"
+              ? prev
+              : {
+                  ...prev,
+                  phase: "processing",
+                  percent: UPLOAD_WEIGHT,
+                  stage: "Processing...",
+                },
+          );
         };
 
         // Same shape as the single-run degrade (#722): a dead response after a

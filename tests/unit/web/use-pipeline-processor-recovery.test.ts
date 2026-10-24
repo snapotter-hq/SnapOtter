@@ -4018,3 +4018,108 @@ describe("usePipelineProcessor entry-identity settle (#944)", () => {
     unmount();
   });
 });
+
+describe("usePipelineProcessor slow-upload SSE close recovery (#3923)", () => {
+  it("reopens a closed SSE stream once when upload finishes on a single pipeline run", () => {
+    const { result, unmount } = startSingleRun();
+    expect(MockEventSource.instances).toHaveLength(1);
+
+    act(() => {
+      MockEventSource.instances[0].onerror?.();
+    });
+    expect(MockEventSource.instances[0].close).toHaveBeenCalledOnce();
+
+    act(() => {
+      (xhrs[0].upload.onprogress as ((e: ProgressEvent) => void) | undefined)?.(
+        new ProgressEvent("progress", { lengthComputable: true, loaded: 64, total: 64 }),
+      );
+      xhrs[0].upload.onload?.();
+    });
+
+    expect(MockEventSource.instances).toHaveLength(2);
+    expect(MockEventSource.instances[1].close).not.toHaveBeenCalled();
+
+    act(() => {
+      sendSingleFrame({ phase: "processing", percent: 50, stage: "Step 1/1: Resizing..." });
+    });
+
+    expect(result.current.progress).toMatchObject({
+      phase: "processing",
+      stage: "Step 1/1: Resizing...",
+    });
+
+    unmount();
+  });
+
+  it("reopens a closed SSE stream in upload.onload on single and batch pipeline runs when onprogress did not fire", () => {
+    const { unmount: unmountSingle } = startSingleRun();
+
+    act(() => {
+      MockEventSource.instances[0].onerror?.();
+    });
+    expect(MockEventSource.instances[0].close).toHaveBeenCalledOnce();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+    });
+
+    expect(MockEventSource.instances).toHaveLength(2);
+    expect(MockEventSource.instances[1].close).not.toHaveBeenCalled();
+    unmountSingle();
+
+    const { unmount: unmountBatch } = startBatchRun();
+    expect(MockEventSource.instances).toHaveLength(3);
+
+    act(() => {
+      MockEventSource.instances[2].onerror?.();
+    });
+    expect(MockEventSource.instances[2].close).toHaveBeenCalledOnce();
+
+    act(() => {
+      xhrs[1].upload.onload?.();
+    });
+
+    expect(MockEventSource.instances).toHaveLength(4);
+    expect(MockEventSource.instances[3].close).not.toHaveBeenCalled();
+
+    unmountBatch();
+  });
+
+  it("reopens a closed SSE stream once when upload finishes on a batch pipeline run", () => {
+    const { result, unmount } = startBatchRun();
+    expect(MockEventSource.instances).toHaveLength(1);
+
+    act(() => {
+      MockEventSource.instances[0].onerror?.();
+    });
+    expect(MockEventSource.instances[0].close).toHaveBeenCalledOnce();
+
+    act(() => {
+      (xhrs[0].upload.onprogress as ((e: ProgressEvent) => void) | undefined)?.(
+        new ProgressEvent("progress", { lengthComputable: true, loaded: 32, total: 32 }),
+      );
+      xhrs[0].upload.onload?.();
+    });
+
+    expect(MockEventSource.instances).toHaveLength(2);
+    expect(MockEventSource.instances[1].close).not.toHaveBeenCalled();
+
+    act(() => {
+      sendBatchFrame({
+        status: "processing",
+        totalFiles: 2,
+        completedFiles: 1,
+        failedFiles: 0,
+        currentFile: "second.jpg",
+        errors: [],
+      });
+    });
+
+    expect(result.current.progress).toMatchObject({
+      phase: "processing",
+      stage: "Processing second.jpg (1/2)",
+    });
+
+    unmount();
+  });
+});
