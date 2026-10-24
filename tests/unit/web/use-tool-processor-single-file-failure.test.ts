@@ -278,6 +278,195 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
     unmount();
   });
 
+  it("keeps a slow upload with steady progress past 120s alive until it completes (#3779)", () => {
+    const { unmount } = startRun();
+
+    expect(xhrs[0].timeout).toBe(0);
+
+    const fireProgress = (loaded: number, lengthComputable = true) => {
+      (xhrs[0].upload.onprogress as ((e: ProgressEvent) => void) | undefined)?.(
+        new ProgressEvent("progress", {
+          lengthComputable,
+          loaded,
+          total: lengthComputable ? 64 : 0,
+        }),
+      );
+    };
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+      fireProgress(16);
+      vi.advanceTimersByTime(60_000);
+      fireProgress(32, false);
+      vi.advanceTimersByTime(60_000);
+      fireProgress(48);
+    });
+
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().entries[0].status).toBe("processing");
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 200;
+      xhrs[0].responseText = JSON.stringify({
+        jobId: JOB_ID,
+        downloadUrl: "/api/v1/download/server-job/clip_trimmed.mp4",
+        originalSize: 64,
+        processedSize: 32,
+      });
+      xhrs[0].onload?.();
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "completed",
+      processedUrl: "/api/v1/download/server-job/clip_trimmed.mp4",
+      error: null,
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+
+  it("fails the run and aborts the XHR when upload progress stalls for 120s (#3779)", () => {
+    const { unmount } = startRun();
+
+    const fireProgress = (loaded: number) => {
+      (xhrs[0].upload.onprogress as ((e: ProgressEvent) => void) | undefined)?.(
+        new ProgressEvent("progress", { lengthComputable: true, loaded, total: 64 }),
+      );
+    };
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+      fireProgress(20);
+      // A progress event that does not advance loaded bytes does not reset the stall window.
+      vi.advanceTimersByTime(60_000);
+      fireProgress(20);
+    });
+
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().error).toBeNull();
+
+    // Even if xhr.abort throws, the stall timeout still settles the run.
+    xhrs[0].abort.mockImplementationOnce(() => {
+      throw new Error("abort failed");
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    expect(xhrs[0].abort).toHaveBeenCalledOnce();
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "The upload timed out. Check your connection or try a smaller file.",
+      errorCategory: "timeout",
+    });
+    expect(useFileStore.getState().error).toBe(
+      "The upload timed out. Check your connection or try a smaller file.",
+    );
+    expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+
+  it("starts the 120s response window after the upload finishes and degrades to async on expiry (#3779)", () => {
+    const { unmount } = startRun();
+
+    const fireProgress = (loaded: number) => {
+      (xhrs[0].upload.onprogress as ((e: ProgressEvent) => void) | undefined)?.(
+        new ProgressEvent("progress", { lengthComputable: true, loaded, total: 64 }),
+      );
+    };
+
+    act(() => {
+      vi.advanceTimersByTime(80_000);
+      fireProgress(32);
+      vi.advanceTimersByTime(80_000);
+      xhrs[0].upload.onload?.();
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(119_999);
+    });
+    expect(useFileStore.getState().activeJobId).toBeNull();
+    expect(useFileStore.getState().processing).toBe(true);
+
+    act(() => {
+      vi.advanceTimersByTime(2);
+    });
+    expect(xhrs[0].abort).toHaveBeenCalledOnce();
+    expect(useFileStore.getState().activeJobId).toBe(JOB_ID);
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().error).toBeNull();
+
+    act(() => {
+      sendSingleFrame({
+        phase: "complete",
+        percent: 100,
+        result: {
+          jobId: JOB_ID,
+          downloadUrl: "/api/v1/download/server-job/clip_trimmed.mp4",
+          originalSize: 64,
+          processedSize: 32,
+        },
+      });
+    });
+    expect(useFileStore.getState().entries[0].status).toBe("completed");
+    expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+
+  it("uses the 600s post-upload response window for AI and long-running tools (#3779)", () => {
+    const file = new File([new ArrayBuffer(64)], "photo.png", { type: "image/png" });
+    useFileStore.getState().setFiles([file]);
+    const { result, unmount } = renderHook(() => useToolProcessor("content-aware-resize"));
+    act(() => {
+      result.current.processFiles([file], { width: 100, height: 100 });
+    });
+
+    expect(xhrs[0].timeout).toBe(0);
+
+    act(() => {
+      (xhrs[0].upload.onprogress as ((e: ProgressEvent) => void) | undefined)?.(
+        new ProgressEvent("progress", { lengthComputable: true, loaded: 64, total: 64 }),
+      );
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(120_001);
+    });
+    expect(useFileStore.getState().activeJobId).toBeNull();
+    expect(useFileStore.getState().processing).toBe(true);
+
+    act(() => {
+      vi.advanceTimersByTime(480_000);
+    });
+    expect(xhrs[0].abort).toHaveBeenCalledOnce();
+    expect(useFileStore.getState().activeJobId).toBe(JOB_ID);
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().error).toBeNull();
+
+    act(() => {
+      sendSingleFrame({
+        phase: "complete",
+        percent: 100,
+        result: {
+          jobId: JOB_ID,
+          downloadUrl: "/api/v1/download/server-job/photo_resized.png",
+          originalSize: 64,
+          processedSize: 32,
+        },
+      });
+    });
+    expect(useFileStore.getState().entries[0].status).toBe("completed");
+    expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+
   it("keeps the entry processing when a post-upload socket drop degrades to async", () => {
     const { unmount } = startRun();
 

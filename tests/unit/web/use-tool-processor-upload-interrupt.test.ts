@@ -346,7 +346,11 @@ describe("useToolProcessor upload interruption (#722)", () => {
     });
 
     act(() => {
-      vi.advanceTimersByTime(120_000);
+      vi.advanceTimersByTime(60_000);
+      (xhrs[1].upload.onprogress as ((e: ProgressEvent) => void) | undefined)?.(
+        new ProgressEvent("progress", { lengthComputable: true, loaded: 32, total: 64 }),
+      );
+      vi.advanceTimersByTime(60_000);
     });
 
     expect(useFileStore.getState().error).toBeNull();

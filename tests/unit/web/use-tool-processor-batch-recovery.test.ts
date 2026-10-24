@@ -357,6 +357,65 @@ describe("useToolProcessor batch recovery (#750)", () => {
     unmount();
   });
 
+  it("keeps a slow batch upload with steady progress past 120s alive and fails when progress stalls for 120s (#3779)", () => {
+    vi.useFakeTimers();
+    const { result, unmount } = startBatchRun();
+
+    const fireProgress = (xhrIndex: number, loaded: number) => {
+      (xhrs[xhrIndex].upload.onprogress as ((e: ProgressEvent) => void) | undefined)?.(
+        new ProgressEvent("progress", { lengthComputable: true, loaded, total: 32 }),
+      );
+    };
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+      fireProgress(0, 8);
+      vi.advanceTimersByTime(60_000);
+      fireProgress(0, 16);
+      vi.advanceTimersByTime(60_000);
+      fireProgress(0, 16);
+    });
+
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().error).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    expect(xhrs[0].abort).toHaveBeenCalledOnce();
+    expect(useFileStore.getState().error).toBe(
+      "The upload timed out. Check your connection or try a smaller file.",
+    );
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "The upload timed out. Check your connection or try a smaller file.",
+      errorCategory: "timeout",
+    });
+    expect(useFileStore.getState().entries[1]).toMatchObject({
+      status: "failed",
+      error: "The upload timed out. Check your connection or try a smaller file.",
+      errorCategory: "timeout",
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+
+    // Once the final progress event reports the full body sent, the upload
+    // stall timer is cleared so a long batch sync wait does not time out.
+    act(() => {
+      void result.current.processAllFiles(useFileStore.getState().files, { width: 50 });
+    });
+    act(() => {
+      fireProgress(1, 32);
+      vi.advanceTimersByTime(240_000);
+    });
+
+    expect(xhrs[1].abort).not.toHaveBeenCalled();
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().error).toBeNull();
+
+    unmount();
+  });
+
   it("surfaces the never-confirmed error when no batch evidence ever arrives", () => {
     vi.useFakeTimers();
     const { unmount } = startBatchRun();

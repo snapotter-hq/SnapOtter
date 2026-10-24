@@ -72,6 +72,9 @@ const AI_PYTHON_TOOLS = new Set<string>(PYTHON_SIDECAR_TOOLS);
 const LONG_RUNNING_TOOLS = new Set<string>(["content-aware-resize", "ai-canvas-expand"]);
 
 const UPLOAD_WEIGHT = 15;
+const UPLOAD_STALL_TIMEOUT_MS = 120_000;
+const SYNC_RESPONSE_TIMEOUT_MS = 120_000;
+const LONG_RESPONSE_TIMEOUT_MS = 600_000;
 const SSE_STALL_TIMEOUT_MS = 300_000;
 
 type DegradeTrigger = ToolRunDegradedProperties["trigger"];
@@ -134,6 +137,7 @@ export function useToolProcessor(toolId: string) {
   const resultEntryRef = useRef<{ id: string; file: File; processedUrl: string } | null>(null);
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const requestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const stallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeJobIdRef = useRef<string | null>(null);
@@ -217,6 +221,13 @@ export function useToolProcessor(toolId: string) {
     setActiveJob(null, null);
   }, [setActiveJob]);
 
+  const clearRequestTimer = useCallback(() => {
+    if (requestTimerRef.current) {
+      clearTimeout(requestTimerRef.current);
+      requestTimerRef.current = null;
+    }
+  }, []);
+
   const clearStallTimer = useCallback(() => {
     if (stallTimerRef.current) {
       clearTimeout(stallTimerRef.current);
@@ -298,6 +309,7 @@ export function useToolProcessor(toolId: string) {
         eventSourceRef.current = null;
       }
     }
+    clearRequestTimer();
     clearJobEvidenceTimer();
     clearStallTimer();
     if (elapsedRef.current) {
@@ -337,6 +349,7 @@ export function useToolProcessor(toolId: string) {
   }, [
     cancelStoppedJob,
     clearJobEvidenceTimer,
+    clearRequestTimer,
     clearStallTimer,
     setActiveJob,
     setProcessing,
@@ -476,6 +489,7 @@ export function useToolProcessor(toolId: string) {
       // run ends through its own failure path, which clears the closure and
       // reports the outcome to batch_processed (#1161).
       if (batchRunRef.current?.abandon(message, "unconfirmed", "upload_error")) return;
+      clearRequestTimer();
       clearStallTimer();
       if (elapsedRef.current) clearInterval(elapsedRef.current);
       if (eventSourceRef.current) {
@@ -496,6 +510,7 @@ export function useToolProcessor(toolId: string) {
     }, JOB_EVIDENCE_TIMEOUT_MS);
   }, [
     clearJobEvidenceTimer,
+    clearRequestTimer,
     clearStallTimer,
     clearActiveJob,
     settleProcessingEntries,
@@ -549,6 +564,7 @@ export function useToolProcessor(toolId: string) {
       // run spinning with its cancel button already gone (#1814).
       let teardownError: { cause: unknown } | null = null;
       try {
+        clearRequestTimer();
         clearJobEvidenceTimer();
         clearStallTimer();
         if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -574,6 +590,7 @@ export function useToolProcessor(toolId: string) {
   }, [
     toolId,
     clearJobEvidenceTimer,
+    clearRequestTimer,
     clearStallTimer,
     clearActiveJob,
     settleProcessingEntries,
@@ -598,6 +615,7 @@ export function useToolProcessor(toolId: string) {
       resultEntryRef.current = null;
       setWarning(null);
       setResultPayload(null);
+      clearRequestTimer();
       clearStallTimer();
       clearJobEvidenceTimer();
       if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -631,6 +649,7 @@ export function useToolProcessor(toolId: string) {
     },
     [
       toolId,
+      clearRequestTimer,
       clearStallTimer,
       clearJobEvidenceTimer,
       clearActiveJob,
@@ -652,6 +671,7 @@ export function useToolProcessor(toolId: string) {
       entryIds: ReadonlySet<string> | null = activeEntryIdsRef.current,
       entryFiles: ReadonlyMap<string, File> | null = activeEntryFilesRef.current,
     ) => {
+      clearRequestTimer();
       clearStallTimer();
       clearJobEvidenceTimer();
       if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -678,6 +698,7 @@ export function useToolProcessor(toolId: string) {
     },
     [
       toolId,
+      clearRequestTimer,
       clearStallTimer,
       clearJobEvidenceTimer,
       clearActiveJob,
@@ -802,6 +823,7 @@ export function useToolProcessor(toolId: string) {
               // frame always precedes the streamed ZIP, so acting on it here
               // would settle the run twice.
               if (!asyncModeRef.current) return;
+              clearRequestTimer();
               clearStallTimer();
               es.close();
               eventSourceRef.current = null;
@@ -845,6 +867,7 @@ export function useToolProcessor(toolId: string) {
             // Ends the run on the server's word: a failed frame, or a
             // completed one with nothing to download.
             const endFailedRun = (message: string, category?: FeedbackErrorCategory) => {
+              clearRequestTimer();
               clearStallTimer();
               if (elapsedRef.current) clearInterval(elapsedRef.current);
               es.close();
@@ -883,6 +906,7 @@ export function useToolProcessor(toolId: string) {
                 endFailedRun(tRef.current.errors.invalidServerResponse, "processing_error");
                 return;
               }
+              clearRequestTimer();
               clearStallTimer();
               if (elapsedRef.current) clearInterval(elapsedRef.current);
               es.close();
@@ -995,6 +1019,7 @@ export function useToolProcessor(toolId: string) {
     },
     [
       clearActiveJob,
+      clearRequestTimer,
       clearStallTimer,
       clearJobEvidenceTimer,
       failRunOnHandlerError,
@@ -1029,6 +1054,7 @@ export function useToolProcessor(toolId: string) {
       // settle, and an error written now would land on whatever the user does
       // next (#2637).
       if (storeWasReset()) return;
+      clearRequestTimer();
       // Once the server has accepted the job (a 202 response, a degraded
       // post-upload wait, or any progress frame), the alias row exists and
       // can be canceled immediately. After the upload finished and before
@@ -1131,6 +1157,7 @@ export function useToolProcessor(toolId: string) {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (elapsedRef.current) clearInterval(elapsedRef.current);
+      if (requestTimerRef.current) clearTimeout(requestTimerRef.current);
       if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
       if (jobEvidenceTimerRef.current) clearTimeout(jobEvidenceTimerRef.current);
       // This runs on unmount, but also whenever reconnectSSE changes, which it
@@ -1242,6 +1269,7 @@ export function useToolProcessor(toolId: string) {
         setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
         // A stale evidence timer from a previous degraded run must not fire
         // into this run, and evidence never carries across runs (#722).
+        clearRequestTimer();
         clearJobEvidenceTimer();
         sawJobEvidenceRef.current = false;
         uploadedFullyRef.current = false;
@@ -1288,20 +1316,56 @@ export function useToolProcessor(toolId: string) {
         const xhr = new XMLHttpRequest();
         xhrRef.current = xhr;
 
-        xhr.timeout = isAiTool || LONG_RUNNING_TOOLS.has(toolId) ? 600_000 : 120_000;
+        // Bound upload stall and post-upload response wait separately instead
+        // of setting a wall-clock xhr.timeout across the whole request, which
+        // kills slow uploads that are still making steady progress (#3779).
+        xhr.timeout = 0;
 
+        const responseTimeoutMs =
+          isAiTool || LONG_RUNNING_TOOLS.has(toolId)
+            ? LONG_RESPONSE_TIMEOUT_MS
+            : SYNC_RESPONSE_TIMEOUT_MS;
         let uploadedFully = false;
+        let lastUploadedBytes = 0;
+        const fireRequestTimeout = () => {
+          requestTimerRef.current = null;
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          try {
+            xhr.abort();
+          } catch (_e) {
+            console.debug("Ignored xhr.abort error:", _e);
+          }
+          xhr.ontimeout?.(new ProgressEvent("timeout"));
+        };
+        const armUploadStallTimer = () => {
+          clearRequestTimer();
+          requestTimerRef.current = setTimeout(fireRequestTimeout, UPLOAD_STALL_TIMEOUT_MS);
+        };
+        const armResponseTimer = () => {
+          clearRequestTimer();
+          requestTimerRef.current = setTimeout(fireRequestTimeout, responseTimeoutMs);
+        };
+
         xhr.upload.onprogress = (event) => {
           if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId || storeWasReset()) {
             return;
+          }
+          if (event.loaded > lastUploadedBytes) {
+            lastUploadedBytes = event.loaded;
+            if (!uploadedFully) {
+              armUploadStallTimer();
+            }
           }
           if (event.lengthComputable) {
             // Firefox fires upload.onload only once the response starts, so the
             // final progress event also counts as the body having left the
             // browser (#2136, #2240).
             if (event.loaded >= event.total) {
-              uploadedFully = true;
-              uploadedFullyRef.current = true;
+              if (!uploadedFully) {
+                uploadedFully = true;
+                uploadedFullyRef.current = true;
+                armResponseTimer();
+              }
             }
             const uploadPercent = (event.loaded / event.total) * UPLOAD_WEIGHT;
             setProgress((prev) => {
@@ -1317,6 +1381,7 @@ export function useToolProcessor(toolId: string) {
           }
           uploadedFully = true;
           uploadedFullyRef.current = true;
+          armResponseTimer();
           setProgress((prev) => ({
             ...prev,
             phase: "processing",
@@ -1334,6 +1399,7 @@ export function useToolProcessor(toolId: string) {
         // retry while every "failed" job actually completes.
         const degradeToAsync = (trigger: "socket" | "timeout" | "http-502" | "http-504") => {
           if (!uploadedFully || activeJobIdRef.current !== clientJobId) return false;
+          clearRequestTimer();
           asyncModeRef.current = true;
           trackDegrade(trigger, false);
           setActiveJob(clientJobId, cancelCurrentJob);
@@ -1394,6 +1460,7 @@ export function useToolProcessor(toolId: string) {
         const endSyncRun = (
           failure: { message: string; category?: FeedbackErrorCategory } | null,
         ): { cause: unknown } | null => {
+          clearRequestTimer();
           setProgress(IDLE_PROGRESS);
           const firstError = runEndWrites([
             clearActiveJob,
@@ -1460,6 +1527,7 @@ export function useToolProcessor(toolId: string) {
             return;
           }
           if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          clearRequestTimer();
           uploadedFullyRef.current = false;
           if (storeWasReset()) return;
 
@@ -1569,6 +1637,7 @@ export function useToolProcessor(toolId: string) {
           // newer run took over: a late socket event must neither error a
           // finished result nor tear down the successor's state.
           if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          clearRequestTimer();
           uploadedFullyRef.current = false;
           if (storeWasReset()) return;
           if (degradeToAsync("socket")) return;
@@ -1594,6 +1663,7 @@ export function useToolProcessor(toolId: string) {
             return;
           }
           if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          clearRequestTimer();
           uploadedFullyRef.current = false;
           if (storeWasReset()) return;
           if (degradeToAsync("timeout")) return;
@@ -1614,6 +1684,7 @@ export function useToolProcessor(toolId: string) {
         formatHeaders().forEach((value, key) => {
           xhr.setRequestHeader(key, value);
         });
+        armUploadStallTimer();
         xhr.send(formData);
       } catch (cause) {
         if (claimed) endRunAtStart(runEntryIds, runEntryFiles);
@@ -1633,6 +1704,7 @@ export function useToolProcessor(toolId: string) {
       setActiveJob,
       clearActiveJob,
       cancelCurrentJob,
+      clearRequestTimer,
       clearStallTimer,
       reconnectSSE,
       resetStallTimer,
@@ -1755,6 +1827,7 @@ export function useToolProcessor(toolId: string) {
         setProgress({ phase: "uploading", percent: 0, elapsed: 0 });
         // A stale evidence timer from a previous degraded run must not fire
         // into this run, and evidence never carries across runs (#722).
+        clearRequestTimer();
         clearJobEvidenceTimer();
         sawJobEvidenceRef.current = false;
         uploadedFullyRef.current = false;
@@ -1778,6 +1851,7 @@ export function useToolProcessor(toolId: string) {
         // Stops everything that could still act on the run: its timers, its
         // stream and its batch closure. No store writes.
         const releaseRun = () => {
+          clearRequestTimer();
           clearJobEvidenceTimer();
           clearStallTimer();
           if (elapsedRef.current) clearInterval(elapsedRef.current);
@@ -2148,14 +2222,37 @@ export function useToolProcessor(toolId: string) {
         const xhr = new XMLHttpRequest();
         xhrRef.current = xhr;
         xhr.responseType = "blob";
-        // Batches legitimately hold the sync response for many minutes; the
-        // stall and evidence timers own liveness, not a wall-clock cap.
+        // Batches legitimately hold the sync response for many minutes; an
+        // upload stall watchdog bounds silent uploads (#3779), and the stall
+        // and evidence timers own liveness once the body is sent.
         xhr.timeout = 0;
 
         let uploadedFully = false;
+        let lastUploadedBytes = 0;
+        const fireUploadStallTimeout = () => {
+          requestTimerRef.current = null;
+          if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          try {
+            xhr.abort();
+          } catch (_e) {
+            console.debug("Ignored xhr.abort error:", _e);
+          }
+          xhr.ontimeout?.(new ProgressEvent("timeout"));
+        };
+        const armUploadStallTimer = () => {
+          clearRequestTimer();
+          requestTimerRef.current = setTimeout(fireUploadStallTimeout, UPLOAD_STALL_TIMEOUT_MS);
+        };
+
         xhr.upload.onprogress = (event) => {
           if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId || storeWasReset()) {
             return;
+          }
+          if (event.loaded > lastUploadedBytes) {
+            lastUploadedBytes = event.loaded;
+            if (!uploadedFully) {
+              armUploadStallTimer();
+            }
           }
           if (event.lengthComputable) {
             // Firefox fires upload.onload only once the response starts, so the
@@ -2164,6 +2261,7 @@ export function useToolProcessor(toolId: string) {
             if (event.loaded >= event.total) {
               uploadedFully = true;
               uploadedFullyRef.current = true;
+              clearRequestTimer();
             }
             const uploadPercent = (event.loaded / event.total) * UPLOAD_WEIGHT;
             setProgress((prev) => {
@@ -2179,6 +2277,7 @@ export function useToolProcessor(toolId: string) {
           }
           uploadedFully = true;
           uploadedFullyRef.current = true;
+          clearRequestTimer();
           setProgress((prev) => ({
             ...prev,
             phase: "processing",
@@ -2193,6 +2292,7 @@ export function useToolProcessor(toolId: string) {
         // download URL, so the run can settle without the HTTP response (#750).
         const degradeToAsync = (trigger: DegradeTrigger) => {
           if (!uploadedFully || activeJobIdRef.current !== clientJobId) return false;
+          clearRequestTimer();
           asyncModeRef.current = true;
           trackDegrade(trigger, true);
           reconnectSSE(true);
@@ -2210,6 +2310,7 @@ export function useToolProcessor(toolId: string) {
             return;
           }
           if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          clearRequestTimer();
           uploadedFullyRef.current = false;
           if (storeWasReset()) return;
 
@@ -2311,6 +2412,7 @@ export function useToolProcessor(toolId: string) {
           // Settled runs and successor runs must not be touched by late socket
           // events (#722 run-identity guard).
           if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          clearRequestTimer();
           uploadedFullyRef.current = false;
           if (storeWasReset()) return;
           if (degradeToAsync("socket")) return;
@@ -2324,6 +2426,7 @@ export function useToolProcessor(toolId: string) {
             return;
           }
           if (xhrRef.current !== xhr || activeJobIdRef.current !== clientJobId) return;
+          clearRequestTimer();
           uploadedFullyRef.current = false;
           if (storeWasReset()) return;
           if (degradeToAsync("timeout")) return;
@@ -2334,6 +2437,7 @@ export function useToolProcessor(toolId: string) {
         formatHeaders().forEach((value, key) => {
           xhr.setRequestHeader(key, value);
         });
+        armUploadStallTimer();
         xhr.send(formData);
       } catch (cause) {
         if (claimed) endRunAtStart(runEntryIds, runEntryFiles);
@@ -2354,6 +2458,7 @@ export function useToolProcessor(toolId: string) {
       cancelCurrentJob,
       clearActiveJob,
       clearJobEvidenceTimer,
+      clearRequestTimer,
       clearStallTimer,
       reconnectSSE,
       resetStallTimer,
