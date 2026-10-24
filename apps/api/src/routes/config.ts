@@ -6,9 +6,12 @@ import { db, schema } from "../db/index.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { getSettingStrict } from "../lib/settings-helpers.js";
 
-const SUPPORTED_LOCALE_CODES: ReadonlySet<string> = new Set(
-  SUPPORTED_LOCALES.map((locale) => locale.code),
-);
+let supportedLocaleCodes: ReadonlySet<string> | undefined;
+
+function isSupportedLocale(value: string): boolean {
+  supportedLocaleCodes ??= new Set(SUPPORTED_LOCALES.map((locale) => locale.code));
+  return supportedLocaleCodes.has(value);
+}
 
 export async function configRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/v1/config/locale", async (request, reply) => {
@@ -17,13 +20,11 @@ export async function configRoutes(app: FastifyInstance): Promise<void> {
       .from(schema.settings)
       .where(eq(schema.settings.key, "defaultLocale"));
     const fallbackLocale =
-      env.DEFAULT_LOCALE && SUPPORTED_LOCALE_CODES.has(env.DEFAULT_LOCALE)
-        ? env.DEFAULT_LOCALE
-        : "en";
+      env.DEFAULT_LOCALE && isSupportedLocale(env.DEFAULT_LOCALE) ? env.DEFAULT_LOCALE : "en";
     if (!row) {
       return reply.send({ defaultLocale: fallbackLocale });
     }
-    if (!SUPPORTED_LOCALE_CODES.has(row.value)) {
+    if (!isSupportedLocale(row.value)) {
       request.log.warn(
         { value: row.value, fallbackLocale },
         "defaultLocale setting holds an unsupported value; using fallback",

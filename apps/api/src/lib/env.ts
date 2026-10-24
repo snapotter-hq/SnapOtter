@@ -3,10 +3,12 @@ import { SUPPORTED_LOCALES } from "@snapotter/shared";
 import { z } from "zod";
 import { DEFAULT_TRUST_PROXY, parseTrustProxy } from "./trust-proxy.js";
 
-const SUPPORTED_LOCALE_CODES: ReadonlySet<string> = new Set(
-  SUPPORTED_LOCALES.map((locale) => locale.code),
-);
-const SUPPORTED_LOCALE_MESSAGE = `Must be a supported locale (${SUPPORTED_LOCALES.map((locale) => locale.code).join(", ")})`;
+let supportedLocaleCodes: ReadonlySet<string> | undefined;
+
+function isSupportedLocale(value: string): boolean {
+  supportedLocaleCodes ??= new Set(SUPPORTED_LOCALES.map((locale) => locale.code));
+  return supportedLocaleCodes.has(value);
+}
 
 /**
  * Whether a URL is https, read from the parsed scheme rather than a string
@@ -129,7 +131,9 @@ const envSchema = z
     DEFAULT_LOCALE: z
       .string()
       .default("en")
-      .refine((value) => SUPPORTED_LOCALE_CODES.has(value), SUPPORTED_LOCALE_MESSAGE),
+      .refine(isSupportedLocale, () => ({
+        message: `Must be a supported locale (${SUPPORTED_LOCALES.map((locale) => locale.code).join(", ")})`,
+      })),
     DEFAULT_TOOL_VIEW: z.enum(["sidebar", "fullscreen"]).default("sidebar"),
     CORS_ORIGIN: z.string().default(""),
     MAX_USERS: z.coerce.number().default(0),
