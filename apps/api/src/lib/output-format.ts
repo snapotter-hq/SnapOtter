@@ -1,5 +1,6 @@
 import type { SharpFormat } from "@snapotter/image-engine";
 import sharp from "sharp";
+import { asDecoderOutOfMemory, DecoderOutOfMemoryError } from "./format-decoders.js";
 
 export interface OutputFormat {
   format: SharpFormat;
@@ -79,7 +80,9 @@ export async function resolveOutputFormat(
   try {
     const meta = await sharp(inputBuffer).metadata();
     detected = meta.format;
-  } catch {
+  } catch (err) {
+    const oom = asDecoderOutOfMemory(err);
+    if (oom instanceof DecoderOutOfMemoryError) throw oom;
     // format detection failed
   }
 

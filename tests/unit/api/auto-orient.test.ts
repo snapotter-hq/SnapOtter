@@ -576,6 +576,27 @@ describe("autoOrient", () => {
       } finally {
         toBufferSpy.mockRestore();
       }
+
+      const realMetadata = sharp.prototype.metadata;
+      const secondMetaSpy = vi
+        .spyOn(sharp.prototype, "metadata")
+        .mockImplementationOnce(function (this: sharp.Sharp) {
+          return realMetadata.call(this);
+        })
+        .mockRejectedValueOnce(oomErr);
+      try {
+        const thrown = await autoOrient(buf).catch((e: unknown) => e);
+        expect(thrown).toBeInstanceOf(DecoderOutOfMemoryError);
+        expect(thrown).toMatchObject({
+          name: "DecoderOutOfMemoryError",
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          cause: oomErr,
+        });
+        expect(loggerMock.warn).not.toHaveBeenCalled();
+      } finally {
+        secondMetaSpy.mockRestore();
+      }
     }
   });
 });

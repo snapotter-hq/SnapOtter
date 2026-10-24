@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import sharp from "sharp";
+import { describe, expect, it, vi } from "vitest";
+import { DecoderOutOfMemoryError } from "../../../apps/api/src/lib/format-decoders.js";
 import { outputFormatFor, resolveOutputFormat } from "../../../apps/api/src/lib/output-format.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 
@@ -72,6 +74,27 @@ describe("resolveOutputFormat", () => {
     expect(fallbackResult.format).toBe("png");
     expect(fallbackResult.quality).toBeUndefined();
     expect(fallbackResult.encoderOptions).toEqual({ quality: undefined });
+  });
+
+  it("rethrows DecoderOutOfMemoryError when sharp.metadata() hits OOM (#3809)", async () => {
+    for (const oomErr of [
+      new RangeError("Array buffer allocation failed"),
+      new Error("heif: Memory allocation error: Unspecified: Allocating 4147215 bytes failed"),
+    ]) {
+      const metaSpy = vi.spyOn(sharp.prototype, "metadata").mockRejectedValueOnce(oomErr);
+      try {
+        const thrown = await resolveOutputFormat(JPG, "photo.jpg").catch((e: unknown) => e);
+        expect(thrown).toBeInstanceOf(DecoderOutOfMemoryError);
+        expect(thrown).toMatchObject({
+          name: "DecoderOutOfMemoryError",
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          cause: oomErr,
+        });
+      } finally {
+        metaSpy.mockRestore();
+      }
+    }
   });
 });
 
