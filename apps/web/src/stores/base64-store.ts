@@ -1,11 +1,6 @@
 import { create } from "zustand";
 import { useFileStore } from "@/stores/file-store";
-import {
-  base64ResultKey,
-  claimToolResult,
-  isUnclaimed,
-  useToolResultClaims,
-} from "@/stores/tool-result-claims";
+import { base64ResultKey, isUnclaimed, useToolResultClaims } from "@/stores/tool-result-claims";
 
 export interface Base64Result {
   /**
@@ -141,6 +136,6 @@ useFileStore.subscribe((state, prevState) => {
   });
 
   if (wholeClaimed) {
-    claimToolResult("image-to-base64", base64ResultKey(nextResults));
+    useToolResultClaims.getState().claim("image-to-base64", base64ResultKey(nextResults));
   }
 });

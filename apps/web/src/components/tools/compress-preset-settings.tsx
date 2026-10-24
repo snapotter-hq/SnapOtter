@@ -104,7 +104,9 @@ export function CompressPresetSettings() {
       )}
 
       {/* Download */}
-      {downloadUrl && <ResultDownloadLink href={downloadUrl} testId="compress-download" />}
+      {downloadUrl && (
+        <ResultDownloadLink href={downloadUrl} toolId={toolId} testId="compress-download" />
+      )}
     </form>
   );
 }

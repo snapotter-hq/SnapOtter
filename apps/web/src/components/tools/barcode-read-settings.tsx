@@ -634,6 +634,7 @@ export function BarcodeReadSettings() {
 
   const handleExportCsv = () => {
     const targets = captureEntryUrls();
+    track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: "barcode-read" });
     const header = "File,Type,Value\n";
     const rows = results
       .flatMap((r) =>

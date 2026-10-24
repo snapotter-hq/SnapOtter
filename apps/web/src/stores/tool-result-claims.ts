@@ -1,4 +1,6 @@
+import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { create } from "zustand";
+import { track } from "@/lib/analytics";
 import type { Base64Result } from "@/stores/base64-store";
 import type { DuplicateResult } from "@/stores/duplicate-store";
 import type { GenerateResult } from "@/stores/passport-photo-store";
@@ -117,6 +119,9 @@ export const useToolResultClaims = create<ToolResultClaimsState>((set) => ({
  * claimToolResultItem instead.
  */
 export function claimToolResult(toolId: string, key: ResultKey): void {
+  if (key !== null) {
+    track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: toolId });
+  }
   useToolResultClaims.getState().claim(toolId, key);
 }
 
@@ -130,6 +135,9 @@ export function claimToolResult(toolId: string, key: ResultKey): void {
  * same thing again.
  */
 export function claimToolResultItem(toolId: string, key: ResultKey): void {
+  if (key !== null) {
+    track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: toolId });
+  }
   useToolResultClaims.getState().claimItem(toolId, key);
 }
 

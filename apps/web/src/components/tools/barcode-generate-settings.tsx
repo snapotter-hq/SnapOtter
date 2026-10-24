@@ -222,6 +222,9 @@ export function BarcodeGenerateSettings() {
             href={resultUrl}
             download="barcode.png"
             data-testid="barcode-generate-download"
+            onClick={() =>
+              track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: "barcode-generate" })
+            }
             className="w-full py-2.5 rounded-lg border border-primary text-primary-ink font-medium flex items-center justify-center gap-2 hover:bg-primary/5"
           >
             <Download className="h-4 w-4" />

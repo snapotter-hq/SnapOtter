@@ -48,6 +48,7 @@ import { useIntakeGuard } from "@/hooks/use-intake-guard";
 import { useMobile } from "@/hooks/use-mobile";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { recordRecentTool } from "@/hooks/use-recent-tools";
+import { track } from "@/lib/analytics";
 import { downloadBlob, formatFileSize } from "@/lib/download";
 import { classifyFeedbackError } from "@/lib/feedback";
 import { format } from "@/lib/format";
@@ -847,9 +848,12 @@ function ToolPageContent({
 
   const handleDownloadAll = useCallback(() => {
     if (!batchZipBlob) return;
+    if (toolId) {
+      track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: toolId });
+    }
     downloadBlob(batchZipBlob, batchZipFilename ?? "processed-files.zip");
     useFileStore.getState().markBatchClaimed();
-  }, [batchZipBlob, batchZipFilename]);
+  }, [batchZipBlob, batchZipFilename, toolId]);
 
   if (isToolDisabled) {
     return (

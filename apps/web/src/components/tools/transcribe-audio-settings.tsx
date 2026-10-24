@@ -110,7 +110,13 @@ export function TranscribeAudioSettings() {
       )}
 
       {/* Download */}
-      {downloadUrl && <ResultDownloadLink href={downloadUrl} className={SOLID_CLASS_NAME} />}
+      {downloadUrl && (
+        <ResultDownloadLink
+          href={downloadUrl}
+          toolId="transcribe-audio"
+          className={SOLID_CLASS_NAME}
+        />
+      )}
     </form>
   );
 }

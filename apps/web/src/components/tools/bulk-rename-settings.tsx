@@ -154,6 +154,7 @@ export function BulkRenameSettings() {
       a.download = "renamed.zip";
       a.click();
       URL.revokeObjectURL(url);
+      track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: "bulk-rename" });
       setDownloadReady(true);
     } catch (err) {
       if (

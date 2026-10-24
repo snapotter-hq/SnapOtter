@@ -133,7 +133,9 @@ export function OcrPdfSettings() {
       )}
 
       {/* Download */}
-      {downloadUrl && <ResultDownloadLink href={downloadUrl} className={SOLID_CLASS_NAME} />}
+      {downloadUrl && (
+        <ResultDownloadLink href={downloadUrl} toolId="ocr-pdf" className={SOLID_CLASS_NAME} />
+      )}
     </form>
   );
 }

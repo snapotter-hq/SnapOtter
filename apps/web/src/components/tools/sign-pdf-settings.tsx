@@ -796,6 +796,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       {effectiveDownloadUrl ? (
         <ResultDownloadLink
           href={effectiveDownloadUrl}
+          toolId="sign-pdf"
           className="block w-full rounded-lg bg-primary py-2.5 text-center font-semibold text-primary-foreground"
         >
           {sp.downloadSigned}

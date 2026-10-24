@@ -161,7 +161,9 @@ export function ConversionPresetSettings() {
         </button>
       )}
 
-      {downloadUrl && <ResultDownloadLink href={downloadUrl} testId="preset-download" />}
+      {downloadUrl && (
+        <ResultDownloadLink href={downloadUrl} toolId={toolId} testId="preset-download" />
+      )}
     </form>
   );
 }

@@ -420,6 +420,7 @@ export function QrGenerateSettings() {
       name: "qrcode",
       extension: store.downloadFormat,
     });
+    track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: "qr-generate" });
   }, [store]);
 
   const handleLogoUpload = useCallback(

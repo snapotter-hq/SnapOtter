@@ -750,6 +750,7 @@ export function OcrSettings() {
 
   const handleDownload = () => {
     if (text === null) return;
+    track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: "ocr" });
     const blob = new Blob([text], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

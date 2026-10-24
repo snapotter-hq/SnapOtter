@@ -109,7 +109,13 @@ export function AutoSubtitlesSettings() {
       )}
 
       {/* Download */}
-      {downloadUrl && <ResultDownloadLink href={downloadUrl} className={SOLID_CLASS_NAME} />}
+      {downloadUrl && (
+        <ResultDownloadLink
+          href={downloadUrl}
+          toolId="auto-subtitles"
+          className={SOLID_CLASS_NAME}
+        />
+      )}
     </form>
   );
 }

@@ -446,7 +446,7 @@ export function ColorSettings({ toolId, onPreviewFilter }: ColorSettingsProps) {
 
       {/* Download (single-file only - batch uses Download All ZIP in tool-page) */}
       {downloadUrl && files.length <= 1 && (
-        <ResultDownloadLink href={downloadUrl} testId="adjust-colors-download" />
+        <ResultDownloadLink href={downloadUrl} toolId={toolId} testId="adjust-colors-download" />
       )}
     </form>
   );

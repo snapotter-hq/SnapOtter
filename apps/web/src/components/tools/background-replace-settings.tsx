@@ -246,7 +246,13 @@ export function BackgroundReplaceSettings() {
       )}
 
       {/* Download */}
-      {downloadUrl && <ResultDownloadLink href={downloadUrl} className={SOLID_CLASS_NAME} />}
+      {downloadUrl && (
+        <ResultDownloadLink
+          href={downloadUrl}
+          toolId="background-replace"
+          className={SOLID_CLASS_NAME}
+        />
+      )}
     </form>
   );
 }

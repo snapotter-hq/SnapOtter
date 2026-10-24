@@ -503,7 +503,7 @@ export function OptimizeForWebSettings({ onComparisonPreview }: OptimizeForWebSe
         </button>
       )}
 
-      {downloadUrl && <ResultDownloadLink href={downloadUrl} />}
+      {downloadUrl && <ResultDownloadLink href={downloadUrl} toolId="optimize-for-web" />}
     </form>
   );
 }
