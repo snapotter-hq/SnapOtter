@@ -292,14 +292,14 @@ function CollageCanvas({ template }: { template: CollageTemplate }) {
           >
             {template.cells.map((cell, i) => {
               const imgIndex = cellAssignments[i] ?? -1;
-              const img = imgIndex >= 0 ? images[imgIndex] : null;
+              const img = imgIndex >= 0 ? (images[imgIndex] ?? null) : null;
               const transform = cellTransforms[i] ?? {
                 panX: 0,
                 panY: 0,
                 zoom: 1,
                 objectFit: "cover" as const,
               };
-              const isSelected = selectedCell === i;
+              const isSelected = selectedCell === i && img !== null;
               const isDragSource = activeDragCell === i;
 
               return (
@@ -441,9 +441,10 @@ function CollageCell({
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
+      if (!image) return;
       store.setSelectedCell(cellIndex);
     },
-    [cellIndex, store],
+    [cellIndex, image, store],
   );
 
   const handleDoubleClick = useCallback(
