@@ -56,7 +56,7 @@ import {
 } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { canRecordFeedback, shouldShowInstallFeedbackCard } from "@/lib/feedback";
-import { format, plural } from "@/lib/format";
+import { format, formatDate, plural } from "@/lib/format";
 import { generatePassword, passwordLengthFor } from "@/lib/generate-password";
 import { logout } from "@/lib/logout";
 import { passwordErrorMessages } from "@/lib/password-errors";
@@ -2361,7 +2361,7 @@ export function PeopleSection() {
 /* ────────────────────── API Keys ────────────────────── */
 
 export function ApiKeysSection() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const later = useTimeouts();
   const [keys, setKeys] = useState<ApiKeyEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2614,7 +2614,7 @@ export function ApiKeysSection() {
                 <p className="text-xs text-muted-foreground font-mono">
                   {k.prefix}... &middot;{" "}
                   {format(t.settings.apiKeys.createdPrefix, {
-                    date: new Date(k.createdAt).toLocaleDateString(),
+                    date: formatDate(k.createdAt, locale),
                   })}
                 </p>
                 {Array.isArray(k.permissions) && k.permissions.length > 0 && (
@@ -2625,7 +2625,7 @@ export function ApiKeysSection() {
                 {k.expiresAt && (
                   <span className="text-xs text-amber-700 dark:text-amber-400">
                     {format(t.settings.apiKeys.expiresPrefix, {
-                      date: new Date(k.expiresAt).toLocaleDateString(),
+                      date: formatDate(k.expiresAt, locale),
                     })}
                   </span>
                 )}
@@ -3621,7 +3621,7 @@ interface AuditEntry {
   createdAt: string;
 }
 
-function formatRelativeTime(iso: string): string {
+function formatRelativeTime(iso: string, locale: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60_000);
   if (mins < 1) return "just now";
@@ -3630,11 +3630,11 @@ function formatRelativeTime(iso: string): string {
   if (hrs < 24) return `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
   if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
+  return formatDate(iso, locale);
 }
 
 export function AuditLogSection() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const isMobile = useMobile();
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [total, setTotal] = useState(0);
@@ -3722,7 +3722,7 @@ export function AuditLogSection() {
                         {entry.action}
                       </span>
                       <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {formatRelativeTime(entry.createdAt)}
+                        {formatRelativeTime(entry.createdAt, locale)}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 mt-1">
@@ -3777,7 +3777,7 @@ export function AuditLogSection() {
                       onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
                     >
                       <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
-                        {formatRelativeTime(entry.createdAt)}
+                        {formatRelativeTime(entry.createdAt, locale)}
                       </td>
                       <td className="px-3 py-2 text-foreground">{entry.actorUsername}</td>
                       <td className="px-3 py-2 font-mono text-xs text-muted-foreground tabular-nums whitespace-nowrap">

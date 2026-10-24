@@ -13,15 +13,31 @@ export function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
-export function formatDate(date: Date | string, locale: string): string {
-  return new Date(date).toLocaleDateString(locale, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+const DATE_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+};
+
+const TIME_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = {
+  hour: "2-digit",
+  minute: "2-digit",
+};
+
+export function formatDate(date: Date | string | number, locale: string): string {
+  const d = new Date(date);
+  try {
+    return d.toLocaleDateString(locale, DATE_FORMAT_OPTIONS);
+  } catch {
+    return d.toLocaleDateString("en", DATE_FORMAT_OPTIONS);
+  }
 }
 
-export function formatDateTime(date: Date | string, locale: string): string {
+export function formatDateTime(date: Date | string | number, locale: string): string {
   const d = new Date(date);
-  return `${d.toLocaleDateString(locale, { year: "numeric", month: "short", day: "numeric" })} ${d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}`;
+  try {
+    return `${d.toLocaleDateString(locale, DATE_FORMAT_OPTIONS)} ${d.toLocaleTimeString(locale, TIME_FORMAT_OPTIONS)}`;
+  } catch {
+    return `${d.toLocaleDateString("en", DATE_FORMAT_OPTIONS)} ${d.toLocaleTimeString("en", TIME_FORMAT_OPTIONS)}`;
+  }
 }

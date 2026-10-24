@@ -46,7 +46,7 @@ import { useTranslation } from "@/contexts/i18n-context";
 import { useTimeouts } from "@/hooks/use-timeouts";
 import { captureHandledError, track } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
-import { format } from "@/lib/format";
+import { format, formatDateTime } from "@/lib/format";
 import {
   checkToolResult,
   frameFailure,
@@ -2410,8 +2410,8 @@ export function AutosaveRecoveryBanner({
   onRestore: () => void;
   onDiscard: () => void;
 }) {
-  const { t } = useTranslation();
-  const timeStr = new Date(data.timestamp).toLocaleString();
+  const { t, locale } = useTranslation();
+  const timeStr = formatDateTime(data.timestamp, locale);
 
   return (
     <div className="flex items-center gap-3 px-4 py-2 bg-yellow-500/10 border-b border-yellow-500/30 text-xs">

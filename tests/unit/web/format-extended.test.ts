@@ -30,6 +30,16 @@ describe("formatDate", () => {
     expect(result).toContain("Dec");
     expect(result).toContain("2024");
   });
+
+  it("formats a numeric epoch timestamp", () => {
+    const ts = Date.UTC(2026, 7, 27, 14, 30);
+    expect(formatDate(ts, "de")).toBe(formatDate(new Date(ts), "de"));
+  });
+
+  it("falls back to English when given a malformed locale tag instead of throwing RangeError", () => {
+    const ts = Date.UTC(2026, 7, 27, 14, 30);
+    expect(formatDate(ts, "en_US")).toBe(formatDate(ts, "en"));
+  });
 });
 
 describe("formatDateTime", () => {
@@ -56,5 +66,15 @@ describe("formatDateTime", () => {
     expect(result).toContain("Jun");
     expect(result).toContain("2025");
     expect(result).toMatch(/\d{1,2}:\d{2}/);
+  });
+
+  it("formats a numeric epoch timestamp", () => {
+    const ts = Date.UTC(2026, 7, 27, 14, 30);
+    expect(formatDateTime(ts, "de")).toBe(formatDateTime(new Date(ts), "de"));
+  });
+
+  it("falls back to English when given a malformed locale tag instead of throwing RangeError", () => {
+    const ts = Date.UTC(2026, 7, 27, 14, 30);
+    expect(formatDateTime(ts, "en_US")).toBe(formatDateTime(ts, "en"));
   });
 });
