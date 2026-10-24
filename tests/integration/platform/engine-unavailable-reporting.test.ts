@@ -1659,10 +1659,28 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
     const expiredNow = Date.now() + 50 * 60_000;
     const nowSpy = vi.spyOn(Date, "now").mockReturnValue(expiredNow);
     const oom = () => new RangeError("Array buffer allocation failed");
+    const origMeta = sharpMod.prototype.metadata;
+    const firstPng = Buffer.concat([PNG, Buffer.from([0])]);
+    const firstPngPart = (filename: string) => ({
+      name: "file",
+      filename,
+      contentType: "image/png",
+      content: firstPng,
+    });
+    const rejectFirstPngMeta = function (this: import("sharp").Sharp) {
+      const inputBuf = (this as unknown as { options?: { input?: { buffer?: Buffer } } }).options
+        ?.input?.buffer;
+      if (Buffer.isBuffer(inputBuf) && inputBuf.equals(firstPng)) {
+        return Promise.reject(oom());
+      }
+      return origMeta.call(this);
+    };
 
     try {
       // 1. Single-file tool-factory route (ImageInputHandler.prepare -> validateImageBuffer)
-      const singleMetaSpy = vi.spyOn(sharpMod.prototype, "metadata").mockRejectedValueOnce(oom());
+      const singleMetaSpy = vi
+        .spyOn(sharpMod.prototype, "metadata")
+        .mockImplementation(() => Promise.reject(oom()));
       try {
         const singleRes = await post("/api/v1/tools/image/resize", [
           pngPart("one.png"),
@@ -1680,11 +1698,15 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
       mocks.reportError.mockReset();
       mocks.reportEngineUnavailable.mockClear();
       nowSpy.mockReturnValue(expiredNow + 11 * 60_000);
-      const batchMetaSpy = vi.spyOn(sharpMod.prototype, "metadata").mockRejectedValueOnce(oom());
-      const orientSpy = vi.spyOn(autoOrientMod, "autoOrient").mockRejectedValueOnce(oom());
+      const batchMetaSpy = vi
+        .spyOn(sharpMod.prototype, "metadata")
+        .mockImplementation(rejectFirstPngMeta);
+      const orientSpy = vi
+        .spyOn(autoOrientMod, "autoOrient")
+        .mockImplementation(() => Promise.reject(oom()));
       try {
         const batchRes = await post("/api/v1/tools/image/resize/batch", [
-          pngPart("a.png"),
+          firstPngPart("a.png"),
           pngPart("b.png"),
           { name: "settings", content: JSON.stringify({ width: 50 }) },
         ]);
@@ -1696,6 +1718,7 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
             { filename: "b.png", code: "ENGINE_UNAVAILABLE" },
           ],
         });
+        expect(orientSpy).toHaveBeenCalledTimes(1);
         expect(helperSawEngineDown("resize")).toBe(true);
         expect(engineReports("resize")).toHaveLength(1);
       } finally {
@@ -1707,7 +1730,9 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
       mocks.reportError.mockReset();
       mocks.reportEngineUnavailable.mockClear();
       nowSpy.mockReturnValue(expiredNow + 22 * 60_000);
-      const pipeMetaSpy = vi.spyOn(sharpMod.prototype, "metadata").mockRejectedValueOnce(oom());
+      const pipeMetaSpy = vi
+        .spyOn(sharpMod.prototype, "metadata")
+        .mockImplementation(() => Promise.reject(oom()));
       try {
         const pipeExecRes = await post("/api/v1/pipeline/execute", [
           pngPart("one.png"),
@@ -1729,11 +1754,13 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
       nowSpy.mockReturnValue(expiredNow + 33 * 60_000);
       const pipeBatchMetaSpy = vi
         .spyOn(sharpMod.prototype, "metadata")
-        .mockRejectedValueOnce(oom());
-      const pipeBatchOrientSpy = vi.spyOn(autoOrientMod, "autoOrient").mockRejectedValueOnce(oom());
+        .mockImplementation(rejectFirstPngMeta);
+      const pipeBatchOrientSpy = vi
+        .spyOn(autoOrientMod, "autoOrient")
+        .mockImplementation(() => Promise.reject(oom()));
       try {
         const pipeBatchRes = await post("/api/v1/pipeline/batch", [
-          pngPart("one.png"),
+          firstPngPart("one.png"),
           pngPart("two.png"),
           {
             name: "pipeline",
@@ -1748,6 +1775,7 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
             { filename: "two.png", code: "ENGINE_UNAVAILABLE" },
           ],
         });
+        expect(pipeBatchOrientSpy).toHaveBeenCalledTimes(1);
         expect(helperSawEngineDown("resize")).toBe(true);
         expect(engineReports("resize")).toHaveLength(1);
       } finally {
@@ -1761,13 +1789,14 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
       nowSpy.mockReturnValue(expiredNow + 44 * 60_000);
       const previewMetaSpy = vi
         .spyOn(sharpMod.prototype, "metadata")
-        .mockRejectedValueOnce(oom())
-        .mockRejectedValueOnce(oom());
+        .mockImplementation(() => Promise.reject(oom()));
       try {
-        for (const res of [
-          await post("/api/v1/preview", [pngPart("one.png")]),
-          await post("/api/v1/preview", [pngPart("two.png")]),
-        ]) {
+        const firstPreviewRes = await post("/api/v1/preview", [pngPart("one.png")]);
+        await sharpMod(PNG)
+          .metadata()
+          .catch(() => {});
+        const secondPreviewRes = await post("/api/v1/preview", [pngPart("two.png")]);
+        for (const res of [firstPreviewRes, secondPreviewRes]) {
           expect(res.statusCode, res.body).toBe(503);
           expect(res.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
         }
@@ -1796,13 +1825,18 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
       mocks.reportEngineUnavailable.mockClear();
       const optMetaSpy = vi
         .spyOn(sharpMod.prototype, "metadata")
-        .mockRejectedValueOnce(oom())
-        .mockRejectedValueOnce(oom());
+        .mockImplementation(() => Promise.reject(oom()));
       try {
-        for (const res of [
-          await post("/api/v1/tools/image/optimize-for-web/preview", [pngPart("one.png")]),
-          await post("/api/v1/tools/image/optimize-for-web/preview", [pngPart("two.png")]),
-        ]) {
+        const firstOptRes = await post("/api/v1/tools/image/optimize-for-web/preview", [
+          pngPart("one.png"),
+        ]);
+        await sharpMod(PNG)
+          .metadata()
+          .catch(() => {});
+        const secondOptRes = await post("/api/v1/tools/image/optimize-for-web/preview", [
+          pngPart("two.png"),
+        ]);
+        for (const res of [firstOptRes, secondOptRes]) {
           expect(res.statusCode, res.body).toBe(503);
           expect(res.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
         }
@@ -1821,13 +1855,18 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
       nowSpy.mockReturnValue(expiredNow + 11 * 60_000);
       const enhMetaSpy = vi
         .spyOn(sharpMod.prototype, "metadata")
-        .mockRejectedValueOnce(oom())
-        .mockRejectedValueOnce(oom());
+        .mockImplementation(() => Promise.reject(oom()));
       try {
-        for (const res of [
-          await post("/api/v1/tools/image/image-enhancement/analyze", [pngPart("one.png")]),
-          await post("/api/v1/tools/image/image-enhancement/analyze", [pngPart("two.png")]),
-        ]) {
+        const firstEnhMetaRes = await post("/api/v1/tools/image/image-enhancement/analyze", [
+          pngPart("one.png"),
+        ]);
+        await sharpMod(PNG)
+          .metadata()
+          .catch(() => {});
+        const secondEnhMetaRes = await post("/api/v1/tools/image/image-enhancement/analyze", [
+          pngPart("two.png"),
+        ]);
+        for (const res of [firstEnhMetaRes, secondEnhMetaRes]) {
           expect(res.statusCode, res.body).toBe(503);
           expect(res.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
         }
@@ -1846,13 +1885,18 @@ describe("a batch whose files all fail in the worker on one engine fault (#1627)
       nowSpy.mockReturnValue(expiredNow + 22 * 60_000);
       const enhStatsSpy = vi
         .spyOn(sharpMod.prototype, "stats")
-        .mockRejectedValueOnce(oom())
-        .mockRejectedValueOnce(oom());
+        .mockImplementation(() => Promise.reject(oom()));
       try {
-        for (const res of [
-          await post("/api/v1/tools/image/image-enhancement/analyze", [pngPart("one.png")]),
-          await post("/api/v1/tools/image/image-enhancement/analyze", [pngPart("two.png")]),
-        ]) {
+        const firstEnhStatsRes = await post("/api/v1/tools/image/image-enhancement/analyze", [
+          pngPart("one.png"),
+        ]);
+        await sharpMod(PNG)
+          .stats()
+          .catch(() => {});
+        const secondEnhStatsRes = await post("/api/v1/tools/image/image-enhancement/analyze", [
+          pngPart("two.png"),
+        ]);
+        for (const res of [firstEnhStatsRes, secondEnhStatsRes]) {
           expect(res.statusCode, res.body).toBe(503);
           expect(res.json()).toMatchObject({ code: "ENGINE_UNAVAILABLE" });
         }
