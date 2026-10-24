@@ -60,6 +60,11 @@ import {
 } from "../../../apps/api/src/lib/format-decoders.js";
 import * as formatEncoders from "../../../apps/api/src/lib/format-encoders.js";
 import * as heicConverter from "../../../apps/api/src/lib/heic-converter.js";
+import { InputValidationError } from "../../../apps/api/src/modality/contract.js";
+import {
+  engineUnavailable,
+  ImageInputHandler,
+} from "../../../apps/api/src/modality/image-input.js";
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerBeautify } from "../../../apps/api/src/routes/tools/beautify.js";
@@ -75,6 +80,7 @@ import { registerQrGenerate } from "../../../apps/api/src/routes/tools/qr-genera
 import { registerSplit } from "../../../apps/api/src/routes/tools/split.js";
 import { registerStitch } from "../../../apps/api/src/routes/tools/stitch.js";
 import { registerSvgToRaster } from "../../../apps/api/src/routes/tools/svg-to-raster.js";
+import { registerWatermarkImage } from "../../../apps/api/src/routes/tools/watermark-image.js";
 
 const SVG = Buffer.from(
   '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect width="20" height="20" fill="red"/></svg>',
@@ -90,15 +96,16 @@ async function buildApp(register: (app: ReturnType<typeof Fastify>) => void) {
 }
 
 function multipartBody(
-  files: { name: string; type: string; data: Buffer }[],
+  files: { field?: string; name: string; type: string; data: Buffer }[],
   settings?: Record<string, unknown>,
 ) {
   const boundary = "----unit";
   const chunks: Buffer[] = [];
   for (const f of files) {
+    const fieldName = f.field ?? "file";
     chunks.push(
       Buffer.from(
-        `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${f.name}"\r\nContent-Type: ${f.type}\r\n\r\n`,
+        `--${boundary}\r\nContent-Disposition: form-data; name="${fieldName}"; filename="${f.name}"\r\nContent-Type: ${f.type}\r\n\r\n`,
       ),
       f.data,
       Buffer.from("\r\n"),
@@ -310,6 +317,205 @@ describe("compare", () => {
     expect(res.statusCode).toBe(422);
     expect(res.json().error).toBe("Comparison failed");
     await app.close();
+  });
+
+  it("preserves InputValidationError cause and avoids upload attribution on 503 engineUnavailable errors while attributing 4xx/422 errors in compare and watermark-image (#3818)", async () => {
+    const png = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: "#f00" },
+    })
+      .png()
+      .toBuffer();
+
+    const logLines: string[] = [];
+    const app = Fastify({
+      logger: { level: "warn", stream: { write: (line: string) => void logLines.push(line) } },
+    });
+    await app.register(multipart);
+    registerErrorHandler(app);
+    registerCompare(app);
+    registerWatermarkImage(app);
+    await app.ready();
+
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 240 * 60_000);
+    const sendSpy = vi.spyOn(engineUnavailableMod, "sendInputValidationError");
+    const oomCause = new DecoderOutOfMemoryError("The image decoder ran out of memory.");
+    const unavailableCause = new DecoderUnavailableError("No HEIF decoder found.");
+    const clientCauseA = new Error("corrupt header a");
+    const clientCauseB = new Error("corrupt avif b");
+    const clientCauseWm = new Error("corrupt watermark");
+    const clientCauseWm422 = new Error("corrupt avif watermark");
+
+    const clientErrA = new InputValidationError("Invalid image: corrupt header");
+    clientErrA.cause = clientCauseA;
+    const clientErrB = new InputValidationError("Failed to decode AVIF file", 422, "bad bitstream");
+    clientErrB.cause = clientCauseB;
+    const clientErrWm = new InputValidationError("Invalid image: corrupt watermark");
+    clientErrWm.cause = clientCauseWm;
+    const clientErrWm422 = new InputValidationError(
+      "Failed to decode AVIF file",
+      422,
+      "bad watermark bitstream",
+    );
+    clientErrWm422.cause = clientCauseWm422;
+
+    const origPrepare = ImageInputHandler.prototype.prepare;
+    const prepareSpy = vi
+      .spyOn(ImageInputHandler.prototype, "prepare")
+      // 1. compare first image 503 DecoderOutOfMemoryError
+      .mockRejectedValueOnce(engineUnavailable(oomCause))
+      // 2. compare second image 503 DecoderUnavailableError
+      .mockImplementationOnce(origPrepare)
+      .mockRejectedValueOnce(engineUnavailable(unavailableCause))
+      // 3. watermark-image watermark 503 DecoderOutOfMemoryError
+      .mockImplementationOnce(origPrepare)
+      .mockRejectedValueOnce(engineUnavailable(oomCause))
+      // 4. watermark-image watermark 503 DecoderUnavailableError
+      .mockImplementationOnce(origPrepare)
+      .mockRejectedValueOnce(engineUnavailable(unavailableCause))
+      // 5. compare first image 400 with cause
+      .mockRejectedValueOnce(clientErrA)
+      // 6. compare second image 422 with cause
+      .mockImplementationOnce(origPrepare)
+      .mockRejectedValueOnce(clientErrB)
+      // 7. watermark-image watermark 400 with cause
+      .mockImplementationOnce(origPrepare)
+      .mockRejectedValueOnce(clientErrWm)
+      // 8. watermark-image watermark 422 with cause
+      .mockImplementationOnce(origPrepare)
+      .mockRejectedValueOnce(clientErrWm422);
+
+    try {
+      const sendCompare = () =>
+        app.inject({
+          method: "POST",
+          url: "/api/v1/tools/image/compare",
+          ...multipartBody([
+            { name: "a.png", type: "image/png", data: png },
+            { name: "b.png", type: "image/png", data: png },
+          ]),
+        });
+      const sendWatermark = () =>
+        app.inject({
+          method: "POST",
+          url: "/api/v1/tools/image/watermark-image",
+          ...multipartBody([
+            { field: "file", name: "main.png", type: "image/png", data: png },
+            { field: "watermark", name: "wm.png", type: "image/png", data: png },
+          ]),
+        });
+
+      const compareOomRes = await sendCompare();
+      expect(compareOomRes.statusCode).toBe(503);
+      expect(compareOomRes.json()).toEqual({
+        error: "The image decoder ran out of memory.",
+        code: "ENGINE_UNAVAILABLE",
+      });
+      expect(sendSpy.mock.calls[0]?.[1]).toMatchObject({
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: oomCause,
+      });
+
+      const compareUnavailRes = await sendCompare();
+      expect(compareUnavailRes.statusCode).toBe(503);
+      expect(compareUnavailRes.json()).toEqual({
+        error: "No HEIF decoder found.",
+        code: "ENGINE_UNAVAILABLE",
+      });
+      expect(sendSpy.mock.calls[1]?.[1]).toMatchObject({
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: unavailableCause,
+      });
+
+      const wmOomRes = await sendWatermark();
+      expect(wmOomRes.statusCode).toBe(503);
+      expect(wmOomRes.json()).toEqual({
+        error: "The image decoder ran out of memory.",
+        code: "ENGINE_UNAVAILABLE",
+      });
+      expect(sendSpy.mock.calls[2]?.[1]).toMatchObject({
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: oomCause,
+      });
+
+      const wmUnavailRes = await sendWatermark();
+      expect(wmUnavailRes.statusCode).toBe(503);
+      expect(wmUnavailRes.json()).toEqual({
+        error: "No HEIF decoder found.",
+        code: "ENGINE_UNAVAILABLE",
+      });
+      expect(sendSpy.mock.calls[3]?.[1]).toMatchObject({
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: unavailableCause,
+      });
+
+      // Because cause was preserved, all 4 distinct (toolId, cause.name) pairs logged a warn line
+      const engineWarnLines = logLines
+        .filter((line) => line.includes("Tool engine unavailable during input preparation"))
+        .map((line) => JSON.parse(line) as { toolId?: string; cause?: string });
+      expect(engineWarnLines).toEqual([
+        expect.objectContaining({ toolId: "compare", cause: "DecoderOutOfMemoryError" }),
+        expect.objectContaining({ toolId: "compare", cause: "DecoderUnavailableError" }),
+        expect.objectContaining({ toolId: "watermark-image", cause: "DecoderOutOfMemoryError" }),
+        expect.objectContaining({ toolId: "watermark-image", cause: "DecoderUnavailableError" }),
+      ]);
+
+      const compare400Res = await sendCompare();
+      expect(compare400Res.statusCode).toBe(400);
+      expect(compare400Res.json()).toEqual({
+        error: "Invalid first image: corrupt header",
+      });
+      expect(sendSpy.mock.calls[4]?.[1]).toMatchObject({
+        statusCode: 400,
+        message: "Invalid first image: corrupt header",
+        cause: clientCauseA,
+      });
+
+      const compare422Res = await sendCompare();
+      expect(compare422Res.statusCode).toBe(422);
+      expect(compare422Res.json()).toEqual({
+        error: "Failed to decode AVIF file (second image)",
+        details: "bad bitstream",
+      });
+      expect(sendSpy.mock.calls[5]?.[1]).toMatchObject({
+        statusCode: 422,
+        message: "Failed to decode AVIF file (second image)",
+        details: "bad bitstream",
+        cause: clientCauseB,
+      });
+
+      const wm400Res = await sendWatermark();
+      expect(wm400Res.statusCode).toBe(400);
+      expect(wm400Res.json()).toEqual({
+        error: "Invalid watermark image: corrupt watermark",
+      });
+      expect(sendSpy.mock.calls[6]?.[1]).toMatchObject({
+        statusCode: 400,
+        message: "Invalid watermark image: corrupt watermark",
+        cause: clientCauseWm,
+      });
+
+      const wm422Res = await sendWatermark();
+      expect(wm422Res.statusCode).toBe(422);
+      expect(wm422Res.json()).toEqual({
+        error: "Failed to decode AVIF file (watermark)",
+        details: "bad watermark bitstream",
+      });
+      expect(sendSpy.mock.calls[7]?.[1]).toMatchObject({
+        statusCode: 422,
+        message: "Failed to decode AVIF file (watermark)",
+        details: "bad watermark bitstream",
+        cause: clientCauseWm422,
+      });
+    } finally {
+      prepareSpy.mockRestore();
+      sendSpy.mockRestore();
+      nowSpy.mockRestore();
+      await app.close();
+    }
   });
 });
 

@@ -57,11 +57,18 @@ export function registerCompare(app: FastifyInstance) {
         try {
           return (await imageHandler.prepare(buffer, filename, { scratchDir: tmpdir() })).buffer;
         } catch (err) {
-          if (err instanceof InputValidationError) {
+          if (err instanceof InputValidationError && err.statusCode < 500) {
             const message = err.message.startsWith("Invalid image")
               ? err.message.replace("Invalid image", `Invalid ${which} image`)
               : `${err.message} (${which} image)`;
-            throw new InputValidationError(message, err.statusCode, err.details, err.code);
+            const rewrapped = new InputValidationError(
+              message,
+              err.statusCode,
+              err.details,
+              err.code,
+            );
+            if (err.cause !== undefined) rewrapped.cause = err.cause;
+            throw rewrapped;
           }
           throw err;
         }

@@ -101,11 +101,18 @@ export function registerWatermarkImage(app: FastifyInstance) {
         // Attribute validation failures to the watermark upload so the user
         // knows which of the two files was rejected, preserving the route's
         // established "Invalid watermark image: ..." message contract.
-        if (err instanceof InputValidationError) {
+        if (err instanceof InputValidationError && err.statusCode < 500) {
           const message = err.message.startsWith("Invalid image")
             ? err.message.replace("Invalid image", "Invalid watermark image")
             : `${err.message} (watermark)`;
-          throw new InputValidationError(message, err.statusCode, err.details, err.code);
+          const rewrapped = new InputValidationError(
+            message,
+            err.statusCode,
+            err.details,
+            err.code,
+          );
+          if (err.cause !== undefined) rewrapped.cause = err.cause;
+          throw rewrapped;
         }
         throw err;
       }
