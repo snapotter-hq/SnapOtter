@@ -24,6 +24,7 @@ import { OcrSettings, ocrOneFile, resetOcrResult } from "@/components/tools/ocr-
 import type { SignCanvasRef, SignPlacement } from "@/components/tools/sign-canvas";
 import { SignPdfSettings } from "@/components/tools/sign-pdf-settings";
 import { StitchSettings } from "@/components/tools/stitch-settings";
+import { getDistinctId } from "@/lib/analytics";
 import { apiUploadUserFiles } from "@/lib/api";
 import { useCollageStore } from "@/stores/collage-store";
 import { useDuplicateStore } from "@/stores/duplicate-store";
@@ -974,5 +975,280 @@ describe("custom-XHR upload stall and post-upload response watchdog (#3870)", ()
     expect(useCollageStore.getState().error).toBe(en.errors.requestTimedOut);
     expect(vi.getTimerCount()).toBe(0);
     remountedView.unmount();
+  });
+
+  it("closes SSE streams, clears timers, and settles processing/scanning state when xhr.open, setRequestHeader, or send throws synchronously (#3877)", async () => {
+    vi.mocked(getDistinctId).mockReturnValue("dist-1");
+
+    // 1. ocrOneFile + OcrSettings: synchronous open(), setRequestHeader(), and send() throws close EventSource, clear activeOcrWatchdog across remounts, and support non-Error fallbacks
+    vi.spyOn(FakeXhr.prototype, "open").mockImplementationOnce(() => {
+      throw new Error("ocr open boom");
+    });
+    await expect(
+      ocrOneFile(
+        image("scan.png"),
+        { quality: "fast", language: "en", enhance: false },
+        { onUploadProgress: vi.fn(), onProcessingProgress: vi.fn() },
+        { t: en },
+      ),
+    ).rejects.toThrow("ocr open boom");
+    expect(FakeEventSource.instances[0].closed).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+
+    vi.spyOn(FakeXhr.prototype, "send").mockImplementationOnce(() => {
+      throw "ocr raw string throw";
+    });
+    await expect(
+      ocrOneFile(
+        image("scan-raw.png"),
+        { quality: "fast", language: "en", enhance: false },
+        { onUploadProgress: vi.fn(), onProcessingProgress: vi.fn() },
+        { networkError: "Custom OCR network fallback", t: en },
+      ),
+    ).rejects.toThrow("Custom OCR network fallback");
+    expect(FakeEventSource.instances[1].closed).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+
+    vi.spyOn(FakeXhr.prototype, "setRequestHeader").mockImplementationOnce(() => {
+      throw new Error("ocr header boom");
+    });
+    useFeaturesStore.setState({ loaded: true, loadError: false, bundles: [] });
+    useFileStore.getState().setFiles([image("scan2.png")]);
+    const ocrView = render(<OcrSettings />);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("ocr-submit"));
+    });
+    expect(FakeEventSource.instances[2].closed).toBe(true);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().error).toBe("scan2.png: ocr header boom");
+    expect(vi.getTimerCount()).toBe(0);
+    ocrView.unmount();
+    const remountedOcrView = render(<OcrSettings />);
+    expect(vi.getTimerCount()).toBe(0);
+    remountedOcrView.unmount();
+
+    // 2. EraseObjectSettings single-file (handleProcess): closes EventSource, clears stall & elapsed timers, settles processing, and handles non-Error throws + store reset during send
+    useFileStore.getState().reset();
+    useFileStore.getState().setFiles([image("photo1.png"), image("photo2.png")]);
+    const eraseView = render(
+      <EraseObjectSettings
+        eraserRef={{ current: fakeEraser() }}
+        hasStrokes
+        brushSize={30}
+        onBrushSizeChange={vi.fn()}
+        mode="brush"
+        onModeChange={vi.fn()}
+        maskedFileCount={1}
+      />,
+    );
+    vi.spyOn(FakeXhr.prototype, "send").mockImplementationOnce(() => {
+      throw new Error("erase single send boom");
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("erase-object-submit"));
+    });
+    expect(FakeEventSource.instances[3].closed).toBe(true);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().error).toBe("erase single send boom");
+    expect(vi.getTimerCount()).toBe(0);
+
+    vi.spyOn(FakeXhr.prototype, "open").mockImplementationOnce(() => {
+      throw "erase raw string";
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("erase-object-submit"));
+    });
+    expect(FakeEventSource.instances[4].closed).toBe(true);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().error).toBe(en.errors.network);
+    expect(vi.getTimerCount()).toBe(0);
+
+    // Store reset synchronously inside send() hits the abandoned || settled guard without writing error onto the reset store
+    vi.spyOn(FakeXhr.prototype, "send").mockImplementationOnce(() => {
+      useFileStore.getState().reset();
+      throw new Error("erase after reset boom");
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("erase-object-submit"));
+    });
+    expect(FakeEventSource.instances[5].closed).toBe(true);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().error).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+
+    // 3. EraseObjectSettings batch (processOneFile): closes EventSource, clears 300s stall timer, and still rejects in finally if EventSource.close throws
+    act(() => {
+      useFileStore.getState().setFiles([image("photo1.png"), image("photo2.png")]);
+    });
+    eraseView.rerender(
+      <EraseObjectSettings
+        eraserRef={{ current: fakeEraser() }}
+        hasStrokes
+        brushSize={30}
+        onBrushSizeChange={vi.fn()}
+        mode="brush"
+        onModeChange={vi.fn()}
+        maskedFileCount={2}
+      />,
+    );
+    vi.spyOn(FakeXhr.prototype, "setRequestHeader").mockImplementationOnce(() => {
+      throw new Error("erase batch 1 header boom");
+    });
+    vi.spyOn(FakeXhr.prototype, "send").mockImplementationOnce(() => {
+      throw "erase batch 2 raw throw";
+    });
+    vi.spyOn(FakeEventSource.prototype, "close").mockImplementationOnce(function (
+      this: FakeEventSource,
+    ) {
+      this.closed = true;
+      throw new Error("close stream boom");
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("erase-object-submit"));
+    });
+    expect(FakeEventSource.instances[6].closed).toBe(true);
+    expect(FakeEventSource.instances[7].closed).toBe(true);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "erase batch 1 header boom",
+    });
+    expect(useFileStore.getState().entries[1]).toMatchObject({
+      status: "failed",
+      error: en.errors.network,
+    });
+    expect(vi.getTimerCount()).toBe(0);
+    eraseView.unmount();
+
+    // 4. SignPdfSettings (handleApply): closes EventSource, clears 300s stall timer, settles processing and entry status, re-enables Apply button, and does not overwrite error on unmount
+    useFileStore.getState().reset();
+    useFileStore.getState().setFiles([pdf("contract.pdf")]);
+    const signView = render(
+      <SignPdfSettings
+        signProps={{
+          canvasRef: { current: fakeSignCanvas() },
+          hasSelection: false,
+          placementCount: 1,
+        }}
+      />,
+    );
+    vi.spyOn(FakeXhr.prototype, "send").mockImplementationOnce(() => {
+      throw new Error("sign send boom");
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /apply & download/i }));
+    });
+    expect(FakeEventSource.instances[8].closed).toBe(true);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "sign send boom",
+      errorCategory: "upload_error",
+    });
+    expect(screen.getByText("sign send boom")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /apply & download/i })).toBeEnabled();
+    expect(vi.getTimerCount()).toBe(0);
+
+    // Non-Error throw in SignPdfSettings falls back to t.errors.network
+    vi.spyOn(FakeXhr.prototype, "open").mockImplementationOnce(() => {
+      throw "sign raw throw";
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /apply & download/i }));
+    });
+    expect(FakeEventSource.instances[9].closed).toBe(true);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: en.errors.network,
+      errorCategory: "upload_error",
+    });
+    expect(vi.getTimerCount()).toBe(0);
+    signView.unmount();
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: en.errors.network,
+      errorCategory: "upload_error",
+    });
+
+    // 5. FindDuplicatesSettings (handleScan): resets scanning to false and sets error when open/setRequestHeader/send throws, including non-Error throws, store replacement during send, and setError listener throws
+    useFileStore.getState().reset();
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    const dupView = render(<FindDuplicatesSettings />);
+    vi.spyOn(FakeXhr.prototype, "send").mockImplementationOnce(() => {
+      throw new Error("dup send boom");
+    });
+    act(() => {
+      fireEvent.click(screen.getByTestId("find-duplicates-submit"));
+    });
+    expect(useDuplicateStore.getState().scanning).toBe(false);
+    expect(useDuplicateStore.getState().error).toBe("dup send boom");
+    expect(vi.getTimerCount()).toBe(0);
+
+    vi.spyOn(FakeXhr.prototype, "setRequestHeader").mockImplementationOnce(() => {
+      throw new Error("dup header boom");
+    });
+    act(() => {
+      fireEvent.click(screen.getByTestId("find-duplicates-submit"));
+    });
+    expect(useDuplicateStore.getState().scanning).toBe(false);
+    expect(useDuplicateStore.getState().error).toBe("dup header boom");
+    expect(vi.getTimerCount()).toBe(0);
+
+    vi.spyOn(FakeXhr.prototype, "open").mockImplementationOnce(() => {
+      throw "dup raw throw";
+    });
+    act(() => {
+      fireEvent.click(screen.getByTestId("find-duplicates-submit"));
+    });
+    expect(useDuplicateStore.getState().scanning).toBe(false);
+    expect(useDuplicateStore.getState().error).toBe(
+      en.toolSettings["find-duplicates"].networkErrorUpload,
+    );
+    expect(vi.getTimerCount()).toBe(0);
+
+    // If a subscriber on useDuplicateStore throws when setError runs, finally still resets scanning to false
+    let threwOnError = false;
+    const unsubDup = useDuplicateStore.subscribe((state) => {
+      if (state.error === "dup listener boom" && !threwOnError) {
+        threwOnError = true;
+        throw new Error("dup subscriber threw");
+      }
+    });
+    vi.spyOn(FakeXhr.prototype, "send").mockImplementationOnce(() => {
+      throw new Error("dup listener boom");
+    });
+    const windowErrors: unknown[] = [];
+    const onWindowError = (event: ErrorEvent) => {
+      event.preventDefault();
+      windowErrors.push(event.error);
+    };
+    window.addEventListener("error", onWindowError);
+    try {
+      act(() => {
+        fireEvent.click(screen.getByTestId("find-duplicates-submit"));
+      });
+      expect(windowErrors).toEqual([expect.objectContaining({ message: "dup subscriber threw" })]);
+      expect(useDuplicateStore.getState().scanning).toBe(false);
+      expect(useDuplicateStore.getState().error).toBe("dup listener boom");
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      window.removeEventListener("error", onWindowError);
+      unsubDup();
+    }
+
+    // Replacing files synchronously inside send() hits !stillLoaded() guard without writing error onto the replacement files
+    vi.spyOn(FakeXhr.prototype, "send").mockImplementationOnce(() => {
+      useFileStore.getState().setFiles([image("three.png"), image("four.png")]);
+      throw new Error("dup replaced boom");
+    });
+    act(() => {
+      fireEvent.click(screen.getByTestId("find-duplicates-submit"));
+    });
+    expect(useDuplicateStore.getState().scanning).toBe(false);
+    expect(useDuplicateStore.getState().error).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+    dupView.unmount();
   });
 });

@@ -692,11 +692,22 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       if (settled) return;
       failRun(sp.timeout, "timeout");
     };
-    xhr.open("POST", appUrl("/api/v1/tools/pdf/sign-pdf"));
-    formatHeaders().forEach((value, key) => {
-      xhr.setRequestHeader(key, value);
-    });
-    watchdog.send(form);
+    try {
+      xhr.open("POST", appUrl("/api/v1/tools/pdf/sign-pdf"));
+      formatHeaders().forEach((value, key) => {
+        xhr.setRequestHeader(key, value);
+      });
+      watchdog.send(form);
+    } catch (err) {
+      watchdog?.clear();
+      try {
+        stopProgress();
+      } finally {
+        if (!settled) {
+          failRun(err instanceof Error ? err.message : t.errors.network, "upload_error");
+        }
+      }
+    }
   };
 
   const downloadUrl =

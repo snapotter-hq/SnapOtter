@@ -243,16 +243,23 @@ export function FindDuplicatesSettings() {
       setScanning(false);
     };
 
-    xhr.open("POST", appUrl("/api/v1/tools/image/find-duplicates"));
-    const headers = formatHeaders();
-    headers.forEach((value, key) => {
-      xhr.setRequestHeader(key, value);
-    });
     try {
+      xhr.open("POST", appUrl("/api/v1/tools/image/find-duplicates"));
+      const headers = formatHeaders();
+      headers.forEach((value, key) => {
+        xhr.setRequestHeader(key, value);
+      });
       watchdog.send(formData);
     } catch (err) {
       cleanup();
-      throw err;
+      if (!stillLoaded()) return;
+      try {
+        setError(
+          err instanceof Error ? err.message : t.toolSettings["find-duplicates"].networkErrorUpload,
+        );
+      } finally {
+        setScanning(false);
+      }
     }
   };
 

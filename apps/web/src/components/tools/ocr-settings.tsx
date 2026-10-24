@@ -276,15 +276,14 @@ export function ocrOneFile(
       rejectOnce(new Error("OCR scan stopped"));
       if (!keepRequest) xhr.abort();
     });
-    xhr.open("POST", appUrl("/api/v1/tools/image/ocr"));
-    for (const [key, value] of formatHeaders()) {
-      xhr.setRequestHeader(key, value);
-    }
     try {
+      xhr.open("POST", appUrl("/api/v1/tools/image/ocr"));
+      for (const [key, value] of formatHeaders()) {
+        xhr.setRequestHeader(key, value);
+      }
       watchdog.send(formData);
     } catch (err) {
-      clearWatchdog();
-      throw err;
+      rejectOnce(err instanceof Error ? err : new Error(messages.networkError ?? "Network error"));
     }
   });
 }

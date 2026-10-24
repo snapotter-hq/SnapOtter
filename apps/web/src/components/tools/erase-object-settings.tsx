@@ -446,11 +446,19 @@ export function EraseObjectSettings({
         stopProgress();
         rejectOnce(new FeedbackCategoryError(t.errors.requestTimedOut, "timeout"));
       };
-      xhr.open("POST", appUrl("/api/v1/tools/image/erase-object"));
-      for (const [key, value] of formatHeaders()) {
-        xhr.setRequestHeader(key, value);
+      try {
+        xhr.open("POST", appUrl("/api/v1/tools/image/erase-object"));
+        for (const [key, value] of formatHeaders()) {
+          xhr.setRequestHeader(key, value);
+        }
+        watchdog.send(formData);
+      } catch (err) {
+        try {
+          stopProgress();
+        } finally {
+          rejectOnce(err instanceof Error ? err : new Error(t.errors.network));
+        }
       }
-      watchdog.send(formData);
     });
   };
 
@@ -825,11 +833,21 @@ export function EraseObjectSettings({
       stopProgress();
       endRunWithError(t.toolSettings["erase-object"].timeoutOverloaded);
     };
-    xhr.open("POST", appUrl("/api/v1/tools/image/erase-object"));
-    formatHeaders().forEach((value, key) => {
-      xhr.setRequestHeader(key, value);
-    });
-    watchdog.send(formData);
+    try {
+      xhr.open("POST", appUrl("/api/v1/tools/image/erase-object"));
+      formatHeaders().forEach((value, key) => {
+        xhr.setRequestHeader(key, value);
+      });
+      watchdog.send(formData);
+    } catch (err) {
+      watchdog?.clear();
+      if (abandoned || settled) {
+        stopProgress();
+        return;
+      }
+      endWatch();
+      endRunWithError(err instanceof Error ? err.message : t.errors.network, stopProgress);
+    }
   };
 
   const handleProcessAll = async () => {
