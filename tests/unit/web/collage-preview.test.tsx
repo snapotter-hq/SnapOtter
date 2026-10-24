@@ -437,6 +437,114 @@ describe("CollagePreview touch and mouse cell reordering (#2596)", () => {
     expect(cell3.style.touchAction).toBe("auto");
   });
 
+  it("calls preventDefault on Enter and Space keyboard activation and marks empty placeholder cells non-focusable and aria-disabled (#3894)", () => {
+    useCollageStore.getState().addImages([imageFile("first.png"), imageFile("second.png")]);
+    useCollageStore.getState().setTemplateId("3-h-equal");
+    render(<CollagePreview />);
+
+    const cell1 = screen.getByRole("button", { name: "Collage cell 1" });
+    const cell2 = screen.getByRole("button", { name: "Collage cell 2" });
+    const cell3 = screen.getByRole("button", { name: "Collage cell 3" });
+
+    // Populated cells are focusable and not aria-disabled; empty placeholder cell is neither focusable nor enabled
+    expect(cell1).toHaveAttribute("tabindex", "0");
+    expect(cell1).not.toHaveAttribute("aria-disabled");
+    expect(cell2).toHaveAttribute("tabindex", "0");
+    expect(cell2).not.toHaveAttribute("aria-disabled");
+    expect(cell3).toHaveAttribute("tabindex", "-1");
+    expect(cell3).toHaveAttribute("aria-disabled", "true");
+
+    // Space keydown on populated cell 1 prevents default scrolling and selects cell 1
+    const spaceEvent = new KeyboardEvent("keydown", {
+      key: " ",
+      code: "Space",
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => {
+      cell1.dispatchEvent(spaceEvent);
+    });
+    expect(spaceEvent.defaultPrevented).toBe(true);
+    expect(useCollageStore.getState().selectedCell).toBe(0);
+
+    // Enter keydown on populated cell 2 prevents default and selects cell 2
+    const enterEvent = new KeyboardEvent("keydown", {
+      key: "Enter",
+      code: "Enter",
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => {
+      cell2.dispatchEvent(enterEvent);
+    });
+    expect(enterEvent.defaultPrevented).toBe(true);
+    expect(useCollageStore.getState().selectedCell).toBe(1);
+
+    // Non-activation keys do not prevent default
+    const tabEvent = new KeyboardEvent("keydown", {
+      key: "Tab",
+      code: "Tab",
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => {
+      cell2.dispatchEvent(tabEvent);
+    });
+    expect(tabEvent.defaultPrevented).toBe(false);
+
+    // Space/Enter on an empty placeholder cell does not call preventDefault
+    const emptySpaceEvent = new KeyboardEvent("keydown", {
+      key: " ",
+      code: "Space",
+      bubbles: true,
+      cancelable: true,
+    });
+    const emptyEnterEvent = new KeyboardEvent("keydown", {
+      key: "Enter",
+      code: "Enter",
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => {
+      cell3.dispatchEvent(emptySpaceEvent);
+      cell3.dispatchEvent(emptyEnterEvent);
+    });
+    expect(emptySpaceEvent.defaultPrevented).toBe(false);
+    expect(emptyEnterEvent.defaultPrevented).toBe(false);
+
+    // Bubbled keydown from a descendant element (e.target !== e.currentTarget) is ignored
+    const cell1Img = cell1.querySelector("img");
+    expect(cell1Img).not.toBeNull();
+    const childSpaceEvent = new KeyboardEvent("keydown", {
+      key: " ",
+      code: "Space",
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => {
+      cell1Img?.dispatchEvent(childSpaceEvent);
+    });
+    expect(childSpaceEvent.defaultPrevented).toBe(false);
+    expect(useCollageStore.getState().selectedCell).toBe(1);
+
+    // Out-of-bounds positive cellAssignments also resolve image to null and mark the cell disabled
+    act(() => {
+      useCollageStore.getState().setCellAssignment(2, 99);
+    });
+    expect(cell3).toHaveAttribute("tabindex", "-1");
+    expect(cell3).toHaveAttribute("aria-disabled", "true");
+
+    // Swapping cell 0 into empty cell 2 updates tabIndex and aria-disabled to follow the image
+    act(() => {
+      useCollageStore.getState().setCellAssignment(2, -1);
+      useCollageStore.getState().swapCells(0, 2);
+    });
+    expect(cell1).toHaveAttribute("tabindex", "-1");
+    expect(cell1).toHaveAttribute("aria-disabled", "true");
+    expect(cell3).toHaveAttribute("tabindex", "0");
+    expect(cell3).not.toHaveAttribute("aria-disabled");
+  });
+
   it("does not clear result metadata, error banner, or active run when double-clicking an empty placeholder cell (#3893)", () => {
     useCollageStore.getState().addImages([imageFile("first.png"), imageFile("second.png")]);
     useCollageStore.getState().setTemplateId("3-h-equal");

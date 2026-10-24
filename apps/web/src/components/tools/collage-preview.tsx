@@ -496,7 +496,8 @@ function CollageCell({
     <div
       ref={mergedRef}
       role="button"
-      tabIndex={0}
+      tabIndex={image ? 0 : -1}
+      aria-disabled={!image || undefined}
       aria-label={format(t.toolSettings.collage.collageCell, { index: cellIndex + 1 })}
       className={cn(
         "relative overflow-hidden transition-shadow",
@@ -518,7 +519,11 @@ function CollageCell({
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") handleClick(e as unknown as React.MouseEvent);
+        if (!image || e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleClick(e as unknown as React.MouseEvent);
+        }
       }}
       {...(isSelected ? { ...bindDrag(), ...bindPinch() } : {})}
     >
