@@ -2,6 +2,7 @@ import { en, type TranslationKeys } from "@snapotter/shared";
 import { getDistinctId } from "@/lib/analytics";
 import { appUrl } from "@/lib/app-url";
 import { featureNotInstalledMessage } from "@/lib/bundle-i18n";
+import { createXhrWatchdog } from "@/lib/xhr-watchdog";
 import { useConnectionStore } from "@/stores/connection-store";
 
 const API_BASE = appUrl("/api");
@@ -345,7 +346,7 @@ export function apiUploadUserFiles(
 
     const xhr = new XMLHttpRequest();
     xhr.open("POST", appUrl("/api/v1/files/upload"));
-    xhr.timeout = 120_000;
+    const watchdog = createXhrWatchdog(xhr, 120_000);
 
     const headers = formatHeaders();
     headers.forEach((value, key) => {
@@ -354,15 +355,19 @@ export function apiUploadUserFiles(
       }
     });
 
-    if (onProgress) {
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) {
-          onProgress(Math.round((e.loaded / e.total) * 100));
-        }
-      };
-    }
+    xhr.upload.onprogress = (e) => {
+      watchdog.onUploadProgress(e);
+      if (onProgress && e.lengthComputable) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    };
+
+    xhr.upload.onload = () => {
+      watchdog.onUploadLoad();
+    };
 
     xhr.onload = () => {
+      watchdog.clear();
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           resolve(JSON.parse(xhr.responseText));
@@ -395,15 +400,21 @@ export function apiUploadUserFiles(
     };
 
     xhr.onerror = () => {
+      watchdog.clear();
       useConnectionStore.getState().setDisconnected();
       reject(new TypeError("Network error"));
     };
 
     xhr.ontimeout = () => {
+      watchdog.clear();
       reject(new Error("Upload timed out"));
     };
 
-    xhr.send(formData);
+    xhr.onabort = () => {
+      watchdog.clear();
+    };
+
+    watchdog.send(formData);
   });
 }
 

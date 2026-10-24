@@ -13,6 +13,7 @@ import { failedFrameMessage, type ProgressFrame } from "@/lib/progress-frames";
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { useRunProgress } from "@/lib/run-progress";
 import { copyToClipboard, generateId } from "@/lib/utils";
+import { createXhrWatchdog, type XhrWatchdog } from "@/lib/xhr-watchdog";
 import { useFileStore } from "@/stores/file-store";
 import { type OcrQuality, OcrQualityControl, useOcrQuality } from "./ocr-quality-control";
 
@@ -35,6 +36,8 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 const OCR_ASYNC_STALL_TIMEOUT_MS = 5 * 60_000;
+let activeOcrWatchdog: XhrWatchdog | null = null;
+let ocrPanelPaused = false;
 
 /** Send one file to the OCR API and return the extracted text. */
 export function ocrOneFile(
@@ -64,8 +67,17 @@ export function ocrOneFile(
     const abandonedJob = trackAbandonedJob(clientJobId, "ocr");
     let stallTimer: ReturnType<typeof setTimeout> | null = null;
     let es: EventSource | null = null;
+    let watchdog: XhrWatchdog | null = null;
+
+    const clearWatchdog = () => {
+      watchdog?.clear();
+      if (activeOcrWatchdog === watchdog) {
+        activeOcrWatchdog = null;
+      }
+    };
 
     const cleanup = () => {
+      clearWatchdog();
       if (stallTimer) clearTimeout(stallTimer);
       stallTimer = null;
       es?.close();
@@ -135,6 +147,7 @@ export function ocrOneFile(
           return;
         }
         if (data.type !== "single") return;
+        watchdog?.onUploadLoad();
         armStallTimer();
         if (data.phase === "complete" && data.result) {
           resolveOnce({
@@ -191,8 +204,13 @@ export function ocrOneFile(
     }
 
     const xhr = new XMLHttpRequest();
-    xhr.timeout = 600_000;
+    watchdog = createXhrWatchdog(xhr, 600_000, () => !settled && !asyncMode);
+    if (ocrPanelPaused) {
+      watchdog.pause();
+    }
+    activeOcrWatchdog = watchdog;
     xhr.upload.onprogress = (e) => {
+      watchdog?.onUploadProgress(e);
       if (!e.lengthComputable) return;
       abandonedJob.onUploadProgress(e);
       if (settled) return;
@@ -200,8 +218,10 @@ export function ocrOneFile(
     };
     xhr.upload.onload = () => {
       abandonedJob.onUploadLoad();
+      watchdog?.onUploadLoad();
     };
     xhr.onload = () => {
+      clearWatchdog();
       // The BullMQ worker owns long OCR jobs. Keep the progress subscription
       // alive and resolve from buildLegacyResultPayload(resultPayload).text.
       if (xhr.status === 202) {
@@ -260,7 +280,12 @@ export function ocrOneFile(
     for (const [key, value] of formatHeaders()) {
       xhr.setRequestHeader(key, value);
     }
-    xhr.send(formData);
+    try {
+      watchdog.send(formData);
+    } catch (err) {
+      clearWatchdog();
+      throw err;
+    }
   });
 }
 
@@ -304,6 +329,9 @@ function updateOcrResult(patch: Partial<OcrResultSnapshot>) {
 }
 
 export function resetOcrResult() {
+  ocrPanelPaused = false;
+  activeOcrWatchdog?.clear();
+  activeOcrWatchdog = null;
   ocrRunFiles = null;
   ocrRunEntryIds = null;
   if (currentOcrResult === IDLE_OCR_RESULT) return;
@@ -354,6 +382,15 @@ export function OcrSettings() {
   );
   const [copyStatus, setCopyStatus] = useState<"copied" | "failed" | null>(null);
   const later = useTimeouts();
+
+  useEffect(() => {
+    ocrPanelPaused = false;
+    activeOcrWatchdog?.resume();
+    return () => {
+      ocrPanelPaused = true;
+      activeOcrWatchdog?.pause();
+    };
+  }, []);
 
   const ocrFilenameFor = (currentFiles: File[]) => {
     const baseName =

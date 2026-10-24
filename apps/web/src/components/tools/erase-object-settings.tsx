@@ -23,6 +23,7 @@ import {
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { useRunProgress } from "@/lib/run-progress";
 import { generateId } from "@/lib/utils";
+import { createXhrWatchdog, type XhrWatchdog } from "@/lib/xhr-watchdog";
 import { useFeaturesStore } from "@/stores/features-store";
 import { useFileStore } from "@/stores/file-store";
 import type { EraserCanvasRef } from "./eraser-canvas";
@@ -297,12 +298,15 @@ export function EraseObjectSettings({
       let abandoned = false;
       let settled = false;
       const abandonedJob = trackAbandonedJob(clientJobId, "erase-object");
+      const watchdog = createXhrWatchdog(xhr, 600_000, () => !abandoned && !settled);
       const resolveOnce = () => {
+        watchdog.clear();
         if (settled) return;
         settled = true;
         resolve();
       };
       const rejectOnce = (err: Error) => {
+        watchdog.clear();
         if (settled) return;
         settled = true;
         reject(err);
@@ -317,6 +321,7 @@ export function EraseObjectSettings({
         onProgress: (percent) => {
           if (abandoned || settled) return;
           abandonedJob.onAccepted();
+          watchdog.onUploadLoad();
           onProgress(percent);
         },
         onComplete: (r) => {
@@ -364,18 +369,21 @@ export function EraseObjectSettings({
       formData.append("quality", String(quality));
       formData.append("qualityMode", qualityMode);
 
-      xhr.timeout = 600_000;
       // The stall timer is armed before the upload starts, and on a quiet
       // stream only this keeps it from cutting off an image that is still
-      // uploading (#1959). xhr.timeout still bounds the request as a whole.
+      // uploading (#1959). The XHR watchdog bounds upload stalls at 120s and
+      // the post-upload response wait at 600s (#3870).
       xhr.upload.onprogress = (e) => {
         subscription.touch();
         abandonedJob.onUploadProgress(e);
+        watchdog.onUploadProgress(e);
       };
       xhr.upload.onload = () => {
         abandonedJob.onUploadLoad();
+        watchdog.onUploadLoad();
       };
       xhr.onload = () => {
+        watchdog.clear();
         if (xhr.status === 202) abandonedJob.onAccepted();
         if (abandoned || settled || xhr.status === 202) return;
         stopProgress();
@@ -427,11 +435,13 @@ export function EraseObjectSettings({
         }
       };
       xhr.onerror = () => {
+        watchdog.clear();
         if (abandoned || settled) return;
         stopProgress();
         rejectOnce(new Error(t.errors.network));
       };
       xhr.ontimeout = () => {
+        watchdog.clear();
         if (abandoned || settled) return;
         stopProgress();
         rejectOnce(new FeedbackCategoryError(t.errors.requestTimedOut, "timeout"));
@@ -440,7 +450,7 @@ export function EraseObjectSettings({
       for (const [key, value] of formatHeaders()) {
         xhr.setRequestHeader(key, value);
       }
-      xhr.send(formData);
+      watchdog.send(formData);
     });
   };
 
@@ -541,11 +551,13 @@ export function EraseObjectSettings({
     // endWatch first, before any store write that could throw, so a failing
     // write can't leave a dead run's watch behind to abort someone else's.
     let unwatchFiles: (() => void) | null = null;
+    let watchdog: XhrWatchdog | null = null;
     const endWatch = () => {
       unwatchFiles?.();
       unwatchFiles = null;
     };
     const finishUi = () => {
+      watchdog?.clear();
       endWatch();
       clearRunProgressTimer(runTimer);
       setProcessing(false);
@@ -603,12 +615,15 @@ export function EraseObjectSettings({
     const xhr = new XMLHttpRequest();
     let abandoned = false;
     const abandonedJob = trackAbandonedJob(clientJobId, "erase-object");
+    watchdog = createXhrWatchdog(xhr, 600_000, () => !abandoned && !settled);
     const abandonRequest = () => {
+      watchdog?.clear();
       settled = true;
       abandoned = true;
       xhr.abort();
     };
     const dropRequest = () => {
+      watchdog?.clear();
       if (abandonedJob.keepRequestOnStop()) {
         settled = true;
         abandoned = true;
@@ -621,6 +636,7 @@ export function EraseObjectSettings({
       onProgress: (percent) => {
         if (abandoned || settled) return;
         abandonedJob.onAccepted();
+        watchdog?.onUploadLoad();
         setProgressPhase("processing");
         setProgressPercent(15 + (percent / 100) * 85);
       },
@@ -700,18 +716,19 @@ export function EraseObjectSettings({
       formData.append("saveMode", saveMode);
     }
 
-    xhr.timeout = 600_000;
     xhr.upload.onprogress = (e) => {
       // See the batch path: upload bytes moving keep the stall timer from
       // cutting the upload off (#1959).
       subscription.touch();
       abandonedJob.onUploadProgress(e);
+      watchdog?.onUploadProgress(e);
       if (e.lengthComputable && !abandoned && !settled) {
         setProgressPercent((e.loaded / e.total) * 15);
       }
     };
     xhr.upload.onload = () => {
       abandonedJob.onUploadLoad();
+      watchdog?.onUploadLoad();
       // Firefox fires this after a stop, once the answer starts: the run is over,
       // and a new one may be on the panel by now.
       if (abandoned || settled) return;
@@ -719,6 +736,7 @@ export function EraseObjectSettings({
       setProgressPercent(15);
     };
     xhr.onload = () => {
+      watchdog?.clear();
       // 202 = async: the progress subscription drives completion via SSE.
       if (xhr.status === 202) abandonedJob.onAccepted();
       if (abandoned || settled || xhr.status === 202) return;
@@ -794,12 +812,14 @@ export function EraseObjectSettings({
       finishUi();
     };
     xhr.onerror = () => {
+      watchdog?.clear();
       if (abandoned || settled) return;
       endWatch();
       stopProgress();
       endRunWithError(t.errors.network);
     };
     xhr.ontimeout = () => {
+      watchdog?.clear();
       if (abandoned || settled) return;
       endWatch();
       stopProgress();
@@ -809,7 +829,7 @@ export function EraseObjectSettings({
     formatHeaders().forEach((value, key) => {
       xhr.setRequestHeader(key, value);
     });
-    xhr.send(formData);
+    watchdog.send(formData);
   };
 
   const handleProcessAll = async () => {

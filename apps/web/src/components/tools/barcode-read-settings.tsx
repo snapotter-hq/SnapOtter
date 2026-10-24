@@ -1,6 +1,6 @@
 import type { TranslationKeys } from "@snapotter/shared";
 import { Check, Copy, Download, Search, X } from "lucide-react";
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useTimeouts } from "@/hooks/use-timeouts";
@@ -15,6 +15,7 @@ import {
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { useRunProgress } from "@/lib/run-progress";
 import { copyToClipboard } from "@/lib/utils";
+import { createXhrWatchdog, type XhrWatchdog } from "@/lib/xhr-watchdog";
 import { useFileStore } from "@/stores/file-store";
 
 interface BarcodeResult {
@@ -123,6 +124,9 @@ function parseBarcodeAnswer(text: string): BarcodeReadAnswer {
  * after #1354). `onStoppable` gets a stop that drops the request where it
  * stands.
  */
+let activeBarcodeWatchdog: XhrWatchdog | null = null;
+let barcodePanelPaused = false;
+
 function scanOneFile(
   file: File,
   tryHarder: boolean,
@@ -137,17 +141,35 @@ function scanOneFile(
     formData.append("settings", JSON.stringify({ tryHarder }));
 
     const xhr = new XMLHttpRequest();
-    xhr.timeout = 300_000;
 
     // Set once the scan stops: an answer arriving after that, from a request
     // the abort didn't reach, must not land on entries that aren't ours.
     let stopped = false;
+    const watchdog = createXhrWatchdog(xhr, 300_000, () => !stopped);
+    if (barcodePanelPaused) {
+      watchdog.pause();
+    }
+    activeBarcodeWatchdog = watchdog;
+    const clearWatchdog = () => {
+      watchdog.clear();
+      if (activeBarcodeWatchdog === watchdog) {
+        activeBarcodeWatchdog = null;
+      }
+    };
 
     xhr.upload.onprogress = (e) => {
-      if (!stopped && e.lengthComputable) onUploadProgress((e.loaded / e.total) * 100);
+      if (stopped) return;
+      watchdog.onUploadProgress(e);
+      if (e.lengthComputable) onUploadProgress((e.loaded / e.total) * 100);
+    };
+
+    xhr.upload.onload = () => {
+      if (stopped) return;
+      watchdog.onUploadLoad();
     };
 
     xhr.onload = () => {
+      clearWatchdog();
       if (stopped) return;
       if (xhr.status >= 200 && xhr.status < 300) {
         let answer: BarcodeReadAnswer;
@@ -194,12 +216,19 @@ function scanOneFile(
         }
       }
     };
-    xhr.onerror = () => reject(new Error(t.errors.network));
-    xhr.ontimeout = () => reject(new Error(t.errors.requestTimedOut));
+    xhr.onerror = () => {
+      clearWatchdog();
+      reject(new Error(t.errors.network));
+    };
+    xhr.ontimeout = () => {
+      clearWatchdog();
+      reject(new Error(t.errors.requestTimedOut));
+    };
     // The error only settles the promise and never reaches the UI: the scan
     // has already decided to write nothing more for this file.
     onStoppable(() => {
       stopped = true;
+      clearWatchdog();
       reject(new Error("Barcode scan stopped"));
       xhr.abort();
     });
@@ -208,7 +237,12 @@ function scanOneFile(
     for (const [key, value] of formatHeaders()) {
       xhr.setRequestHeader(key, value);
     }
-    xhr.send(formData);
+    try {
+      watchdog.send(formData);
+    } catch (err) {
+      clearWatchdog();
+      throw err;
+    }
   });
 }
 
@@ -247,6 +281,9 @@ function setBarcodeResults(next: FileResult[]) {
 }
 
 export function resetBarcodeResults() {
+  barcodePanelPaused = false;
+  activeBarcodeWatchdog?.clear();
+  activeBarcodeWatchdog = null;
   barcodeRunFiles = null;
   barcodeRunEntryIds = null;
   barcodeCopiedRows.clear();
@@ -286,6 +323,15 @@ export function BarcodeReadSettings() {
   const [rowCopy, setRowCopy] = useState<{ idx: number; ok: boolean } | null>(null);
   const [allCopy, setAllCopy] = useState<"copied" | "failed" | null>(null);
   const later = useTimeouts();
+
+  useEffect(() => {
+    barcodePanelPaused = false;
+    activeBarcodeWatchdog?.resume();
+    return () => {
+      barcodePanelPaused = true;
+      activeBarcodeWatchdog?.pause();
+    };
+  }, []);
 
   // Unmounting stops the elapsed counter. The scan itself stops only once its
   // files leave the store (see handleProcess), and shared progress state lets a

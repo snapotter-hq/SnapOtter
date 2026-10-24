@@ -27,6 +27,7 @@ import {
 } from "@/lib/signature-store";
 import { generateId } from "@/lib/utils";
 import { safeRandomUUID } from "@/lib/uuid";
+import { createXhrWatchdog, type XhrWatchdog } from "@/lib/xhr-watchdog";
 import { useFileStore } from "@/stores/file-store";
 import type { SignCanvasRef } from "./sign-canvas";
 import { SignaturePad } from "./signature-pad";
@@ -320,6 +321,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     let settled = false;
     let landed = false;
     let landingResult = false;
+    let watchdog: XhrWatchdog | null = null;
 
     const failEntry = (message: string, category?: FeedbackErrorCategory) => {
       try {
@@ -356,6 +358,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     /** Both copies of the flag, together. One cleared without the other leaves
      *  the guard warning about a run that is over, with no way to answer it. */
     const endRun = () => {
+      watchdog?.clear();
       runOwnedRef.current = false;
       signingEntryIdRef.current = null;
       setProcessing(false);
@@ -380,6 +383,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
      * and that retry must not replace the server's message (#2498).
      */
     const failRun = (message: string, category?: FeedbackErrorCategory) => {
+      watchdog?.clear();
       if (runFailed) return;
       runFailed = true;
       settled = true;
@@ -501,7 +505,9 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     // so an unmount after the upload keeps the request open until the 202 and
     // cancels the job (#2239, #2313).
     const abandonedJob = trackAbandonedJob(clientJobId, "sign-pdf");
+    watchdog = createXhrWatchdog(xhr, 600_000, () => !abandoned && !settled);
     const abandonRequest = (keepRequest = false) => {
+      watchdog?.clear();
       settled = true;
       abandoned = true;
       if (keepRequest) return;
@@ -516,6 +522,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       onProgress: (percent) => {
         if (settled && !abandoned) return;
         abandonedJob.onAccepted();
+        watchdog?.onUploadLoad();
         if (abandoned) {
           stopProgress();
           abandonRequest();
@@ -593,18 +600,21 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       form.append(`sig${i}`, new File([png], `sig${i}.png`, { type: "image/png" }));
     });
 
-    xhr.timeout = 600_000;
     // The stall timer is armed before the upload starts, and on a quiet stream
     // only this keeps it from cutting off a large PDF that is still uploading
-    // (#1968). xhr.timeout still bounds the request as a whole.
+    // (#1968). The XHR watchdog bounds upload stalls at 120s and the
+    // post-upload response wait at 600s (#3870).
     xhr.upload.onprogress = (e) => {
       subscription.touch();
       abandonedJob.onUploadProgress(e);
+      watchdog?.onUploadProgress(e);
     };
     xhr.upload.onload = () => {
       abandonedJob.onUploadLoad();
+      watchdog?.onUploadLoad();
     };
     xhr.onload = () => {
+      watchdog?.clear();
       // 202 = async: the progress subscription drives completion via SSE.
       if (xhr.status === 202) abandonedJob.onAccepted();
       // Once the stream has settled the run (landed the result, failed, or
@@ -671,11 +681,13 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
       failRun(message, xhr.status === 413 ? "upload_error" : undefined);
     };
     xhr.onerror = () => {
+      watchdog?.clear();
       stopProgress();
       if (settled) return;
       failRun(t.errors.network, "upload_error");
     };
     xhr.ontimeout = () => {
+      watchdog?.clear();
       stopProgress();
       if (settled) return;
       failRun(sp.timeout, "timeout");
@@ -684,7 +696,7 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
     formatHeaders().forEach((value, key) => {
       xhr.setRequestHeader(key, value);
     });
-    xhr.send(form);
+    watchdog.send(form);
   };
 
   const downloadUrl =

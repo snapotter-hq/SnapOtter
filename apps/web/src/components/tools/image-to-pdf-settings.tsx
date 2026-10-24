@@ -10,6 +10,7 @@ import { format, plural } from "@/lib/format";
 import { parseResultBody, reportMalformedResult } from "@/lib/progress-frames";
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { runEndWrites } from "@/lib/run-teardown";
+import { createXhrWatchdog, type XhrWatchdog } from "@/lib/xhr-watchdog";
 import { useFileStore } from "@/stores/file-store";
 
 interface ImageToPdfResult {
@@ -159,6 +160,7 @@ export function ImageToPdfSettings() {
   });
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const processingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const watchdogRef = useRef<XhrWatchdog | null>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
 
@@ -166,14 +168,17 @@ export function ImageToPdfSettings() {
     return () => {
       if (elapsedRef.current) clearInterval(elapsedRef.current);
       if (processingTimerRef.current) clearInterval(processingTimerRef.current);
+      watchdogRef.current?.clear();
     };
   }, []);
 
   const stopTimers = () => {
     if (elapsedRef.current) clearInterval(elapsedRef.current);
     if (processingTimerRef.current) clearInterval(processingTimerRef.current);
+    watchdogRef.current?.clear();
     elapsedRef.current = null;
     processingTimerRef.current = null;
+    watchdogRef.current = null;
   };
 
   // An abort fires neither onload nor onerror, so a run the unmount cuts off has to
@@ -285,10 +290,12 @@ export function ImageToPdfSettings() {
       }
       formData.append("settings", JSON.stringify(settings));
 
-      xhr.timeout = 300_000;
+      const watchdog = createXhrWatchdog(xhr, 300_000, () => xhrRef.current === xhr && !storeReset);
+      watchdogRef.current = watchdog;
 
       xhr.upload.onprogress = (event) => {
         if (xhrRef.current !== xhr || storeReset) return;
+        watchdog.onUploadProgress(event);
         if (event.lengthComputable) {
           const uploadPercent = (event.loaded / event.total) * 40;
           setProgress((prev) =>
@@ -299,6 +306,7 @@ export function ImageToPdfSettings() {
 
       xhr.upload.onload = () => {
         if (xhrRef.current !== xhr || storeReset) return;
+        watchdog.onUploadLoad();
         setProgress((prev) => ({ ...prev, phase: "processing", percent: 40 }));
         const step = (95 - 40) / 90;
         processingTimerRef.current = setInterval(() => {
@@ -310,6 +318,7 @@ export function ImageToPdfSettings() {
       };
 
       xhr.onload = () => {
+        watchdog.clear();
         endSubscription();
         if (xhrRef.current !== xhr || storeReset) return;
         stopTimers();
@@ -378,6 +387,7 @@ export function ImageToPdfSettings() {
       };
 
       xhr.onerror = () => {
+        watchdog.clear();
         endSubscription();
         if (xhrRef.current !== xhr || storeReset) return;
         const teardownError = runEndWrites([
@@ -388,6 +398,7 @@ export function ImageToPdfSettings() {
       };
 
       xhr.ontimeout = () => {
+        watchdog.clear();
         endSubscription();
         if (xhrRef.current !== xhr || storeReset) return;
         const teardownError = runEndWrites([
@@ -401,7 +412,7 @@ export function ImageToPdfSettings() {
       formatHeaders().forEach((value, key) => {
         xhr.setRequestHeader(key, value);
       });
-      xhr.send(formData);
+      watchdog.send(formData);
     } catch (err) {
       endSubscription();
       const teardownError = runEndWrites([

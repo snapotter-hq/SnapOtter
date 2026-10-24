@@ -5,6 +5,7 @@ import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { formatFileSize } from "@/lib/download";
 import { format, plural } from "@/lib/format";
+import { createXhrWatchdog } from "@/lib/xhr-watchdog";
 import type {
   DuplicateFileInfo,
   DuplicateGroup,
@@ -152,14 +153,44 @@ export function FindDuplicatesSettings() {
       return now.length === sentFiles.length && now.every((f, i) => f === sentFiles[i]);
     };
     const xhr = new XMLHttpRequest();
+    const watchdog = createXhrWatchdog(
+      xhr,
+      300_000,
+      () => stillLoaded() && useDuplicateStore.getState().scanning,
+    );
+    const unwatchFiles = useFileStore.subscribe(() => {
+      if (!stillLoaded()) cleanup();
+    });
+    const unwatchDuplicates = useDuplicateStore.subscribe((state) => {
+      if (!state.scanning) cleanup();
+    });
+    function cleanup() {
+      unwatchFiles();
+      unwatchDuplicates();
+      watchdog.clear();
+    }
 
     xhr.upload.onprogress = (e) => {
+      if (!stillLoaded()) {
+        cleanup();
+        return;
+      }
+      watchdog.onUploadProgress(e);
       if (e.lengthComputable) {
         setUploadProgress(Math.round((e.loaded / e.total) * 100));
       }
     };
 
+    xhr.upload.onload = () => {
+      if (!stillLoaded()) {
+        cleanup();
+        return;
+      }
+      watchdog.onUploadLoad();
+    };
+
     xhr.onload = () => {
+      cleanup();
       if (!stillLoaded()) return;
       if (xhr.status >= 200 && xhr.status < 300) {
         let data: unknown;
@@ -199,24 +230,30 @@ export function FindDuplicatesSettings() {
     };
 
     xhr.onerror = () => {
+      cleanup();
       if (!stillLoaded()) return;
       setError(t.toolSettings["find-duplicates"].networkErrorUpload);
       setScanning(false);
     };
 
     xhr.ontimeout = () => {
+      cleanup();
       if (!stillLoaded()) return;
       setError(t.toolSettings["find-duplicates"].requestTimedOut);
       setScanning(false);
     };
 
     xhr.open("POST", appUrl("/api/v1/tools/image/find-duplicates"));
-    xhr.timeout = 300_000;
     const headers = formatHeaders();
     headers.forEach((value, key) => {
       xhr.setRequestHeader(key, value);
     });
-    xhr.send(formData);
+    try {
+      watchdog.send(formData);
+    } catch (err) {
+      cleanup();
+      throw err;
+    }
   };
 
   const handleDownloadUnique = useCallback(async () => {
