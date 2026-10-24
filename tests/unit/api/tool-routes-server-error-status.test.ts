@@ -63,6 +63,7 @@ import * as heicConverter from "../../../apps/api/src/lib/heic-converter.js";
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
 import { registerCompare } from "../../../apps/api/src/routes/tools/compare.js";
 import { registerEditMetadata } from "../../../apps/api/src/routes/tools/edit-metadata.js";
+import { registerFindDuplicates } from "../../../apps/api/src/routes/tools/find-duplicates.js";
 import { registerGifTools } from "../../../apps/api/src/routes/tools/gif-tools.js";
 import { registerHtmlToImage } from "../../../apps/api/src/routes/tools/html-to-image.js";
 import { registerPassportPhoto } from "../../../apps/api/src/routes/tools/passport-photo.js";
@@ -879,6 +880,165 @@ describe("gif-tools /info and preValidate (#3772, #3859)", () => {
       metaSpy.mockRestore();
       reportSpy.mockRestore();
       nowSpy.mockRestore();
+      await app.close();
+    }
+  });
+});
+
+describe("find-duplicates post-intake OOM handling (#3790)", () => {
+  it("surfaces 503 ENGINE_UNAVAILABLE when thumbnail generation, per-file hashing, or the outer catch hits a V8 buffer allocation RangeError, and keeps non-OOM thumbnail/hash fallbacks (#3790)", async () => {
+    const oomMessage =
+      "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+    const png = await sharp({
+      create: { width: 16, height: 16, channels: 3, background: { r: 200, g: 50, b: 50 } },
+    })
+      .png()
+      .toBuffer();
+    const app = await buildApp(registerFindDuplicates);
+    try {
+      const sendPair = () =>
+        app.inject({
+          method: "POST",
+          url: "/api/v1/tools/image/find-duplicates",
+          ...multipartBody([
+            { name: "a.png", type: "image/png", data: png },
+            { name: "b.png", type: "image/png", data: png },
+          ]),
+        });
+
+      // 1. Thumbnail generation (sharp.prototype.jpeg) hits V8 buffer allocation RangeError or ENOSPC -> 503
+      const jpegOomSpy = vi
+        .spyOn(sharp.prototype, "jpeg")
+        .mockImplementationOnce(function (this: sharp.Sharp) {
+          return {
+            toBuffer: async () => {
+              throw new RangeError("Array buffer allocation failed");
+            },
+          } as unknown as sharp.Sharp;
+        })
+        .mockImplementationOnce(function (this: sharp.Sharp) {
+          return {
+            toBuffer: async () => {
+              throw Object.assign(new Error("ENOSPC: no space left on device, write"), {
+                code: "ENOSPC",
+              });
+            },
+          } as unknown as sharp.Sharp;
+        });
+      try {
+        const thumbOomRes = await sendPair();
+        expect(thumbOomRes.statusCode).toBe(503);
+        expect(thumbOomRes.json()).toEqual({
+          error: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+        });
+
+        const thumbEnospcRes = await sendPair();
+        expect(thumbEnospcRes.statusCode).toBe(503);
+        expect(thumbEnospcRes.json()).toEqual({
+          error: "The server's storage is full.",
+          code: "storage-full",
+        });
+      } finally {
+        jpegOomSpy.mockRestore();
+      }
+
+      // Non-OOM RangeError in thumbnail generation still degrades to thumbnail: null (200)
+      const jpegNonOomSpy = vi.spyOn(sharp.prototype, "jpeg").mockImplementationOnce(function (
+        this: sharp.Sharp,
+      ) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Invalid quality");
+          },
+        } as unknown as sharp.Sharp;
+      });
+      try {
+        const thumbFallbackRes = await sendPair();
+        expect(thumbFallbackRes.statusCode).toBe(200);
+        expect(thumbFallbackRes.json().duplicateGroups[0].files[0].thumbnail).toBeNull();
+      } finally {
+        jpegNonOomSpy.mockRestore();
+      }
+
+      // 2. Per-file dHash (sharp.prototype.raw) hits V8 buffer allocation RangeError or ENOSPC -> 503
+      const rawOomSpy = vi
+        .spyOn(sharp.prototype, "raw")
+        .mockImplementationOnce(function (this: sharp.Sharp) {
+          return {
+            toBuffer: async () => {
+              throw new RangeError("Array buffer allocation failed");
+            },
+          } as unknown as sharp.Sharp;
+        })
+        .mockImplementationOnce(function (this: sharp.Sharp) {
+          return {
+            toBuffer: async () => {
+              throw Object.assign(new Error("ENOSPC: no space left on device, write"), {
+                code: "ENOSPC",
+              });
+            },
+          } as unknown as sharp.Sharp;
+        });
+      try {
+        const hashOomRes = await sendPair();
+        expect(hashOomRes.statusCode).toBe(503);
+        expect(hashOomRes.json()).toEqual({
+          error: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+        });
+
+        const hashEnospcRes = await sendPair();
+        expect(hashEnospcRes.statusCode).toBe(503);
+        expect(hashEnospcRes.json()).toEqual({
+          error: "The server's storage is full.",
+          code: "storage-full",
+        });
+      } finally {
+        rawOomSpy.mockRestore();
+      }
+
+      // 3. Outer catch: a raw V8 buffer allocation RangeError escaping the hash error classifier -> 503 ENGINE_UNAVAILABLE
+      const imageErrorMod = await import("../../../apps/api/src/lib/image-error.js");
+      const classifySpy = vi
+        .spyOn(imageErrorMod, "asInputErrorIfUndecodable")
+        .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"))
+        .mockRejectedValueOnce(new RangeError("Invalid count"));
+      const rawThrowSpy = vi
+        .spyOn(sharp.prototype, "raw")
+        .mockImplementationOnce(function (this: sharp.Sharp) {
+          return {
+            toBuffer: async () => {
+              throw new Error("hash step failed");
+            },
+          } as unknown as sharp.Sharp;
+        })
+        .mockImplementationOnce(function (this: sharp.Sharp) {
+          return {
+            toBuffer: async () => {
+              throw new Error("hash step failed");
+            },
+          } as unknown as sharp.Sharp;
+        });
+      try {
+        const outerOomRes = await sendPair();
+        expect(outerOomRes.statusCode).toBe(503);
+        expect(outerOomRes.json()).toEqual({
+          error: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+        });
+
+        const outer422Res = await sendPair();
+        expect(outer422Res.statusCode).toBe(422);
+        expect(outer422Res.json()).toEqual({
+          error: "Duplicate detection failed",
+          details: "Invalid count",
+        });
+      } finally {
+        rawThrowSpy.mockRestore();
+        classifySpy.mockRestore();
+      }
+    } finally {
       await app.close();
     }
   });

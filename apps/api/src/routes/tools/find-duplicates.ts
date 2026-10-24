@@ -92,12 +92,14 @@ async function extractFileInfo(file: FileData): Promise<FileInfo> {
       .jpeg({ quality: 70 })
       .toBuffer();
     thumbnail = `data:image/jpeg;base64,${thumbBuffer.toString("base64")}`;
-  } catch (err) {
+  } catch (rawErr) {
+    const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+    if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
     // Non-fatal: the UI shows the entry without a preview. Info rather than
     // debug, since it fires once per file and only on failure, and the default
     // LOG_LEVEL would hide a debug line.
     logger.info(
-      { err, filename: file.filename, format },
+      { err: rawErr, filename: file.filename, format },
       "find-duplicates: thumbnail failed, returning null",
     );
   }
@@ -289,7 +291,13 @@ export function registerFindDuplicates(app: FastifyInstance) {
           // user is told, info line, no Sentry) from a hash failure on an image
           // Sharp can decode (a real fault: error line and a report). It logs
           // the probe result itself; the line here adds the filename.
-          const classified = await asInputErrorIfUndecodable(file.buffer, err);
+          const classified = await asInputErrorIfUndecodable(
+            file.buffer,
+            normalizeOperationalWriteError(asDecoderOutOfMemory(err)),
+          );
+          if (isDecoderUnavailable(classified) || hasServerErrorStatus(classified)) {
+            throw classified;
+          }
           if (isToolInputError(classified)) {
             logger.info(
               { err, filename: file.filename, reason: classified.message },
@@ -416,7 +424,7 @@ export function registerFindDuplicates(app: FastifyInstance) {
     } catch (rawErr) {
       // Let the global handler answer a missing decoder or storage write fault
       // as 503 and report it, the way the other custom routes do (#795, #1428, #2800).
-      const err = normalizeOperationalWriteError(rawErr);
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
       return reply.status(422).send({
         error: "Duplicate detection failed",

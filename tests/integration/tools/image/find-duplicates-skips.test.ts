@@ -322,4 +322,64 @@ describe("find-duplicates skip paths (#1493)", () => {
       warnSpy.mockRestore();
     }
   });
+
+  it("answers 503 ENGINE_UNAVAILABLE instead of skipping into skippedFiles when thumbnail generation or per-file hashing hits V8 buffer allocation OOM (#3790)", async () => {
+    const oomMessage =
+      "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+    const errorSpy = vi.spyOn(logger, "error");
+    try {
+      const jpegSpy = vi.spyOn(sharp.prototype, "jpeg").mockImplementationOnce(function (
+        this: sharp.Sharp,
+      ) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Array buffer allocation failed");
+          },
+        } as unknown as sharp.Sharp;
+      });
+      try {
+        const thumbRes = await post([
+          { filename: "good1.png", contentType: "image/png", content: PNG },
+          { filename: "good2.png", contentType: "image/png", content: PNG },
+        ]);
+        expect(thumbRes.statusCode).toBe(503);
+        expect(JSON.parse(thumbRes.body)).toMatchObject({
+          message: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+        });
+      } finally {
+        jpegSpy.mockRestore();
+      }
+
+      const rawSpy = vi.spyOn(sharp.prototype, "raw").mockImplementationOnce(function (
+        this: sharp.Sharp,
+      ) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Array buffer allocation failed");
+          },
+        } as unknown as sharp.Sharp;
+      });
+      try {
+        const hashRes = await post([
+          { filename: "good1.png", contentType: "image/png", content: PNG },
+          { filename: "good2.png", contentType: "image/png", content: PNG },
+        ]);
+        expect(hashRes.statusCode).toBe(503);
+        expect(JSON.parse(hashRes.body)).toMatchObject({
+          message: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+        });
+      } finally {
+        rawSpy.mockRestore();
+      }
+
+      const routeErrors = errorSpy.mock.calls.filter(
+        (call) => typeof call[1] === "string" && String(call[1]).startsWith("find-duplicates:"),
+      );
+      expect(routeErrors).toHaveLength(0);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
 });
