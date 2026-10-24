@@ -480,7 +480,9 @@ export async function registerBatchRoutes(app: FastifyInstance): Promise<void> {
             } else {
               let processBuffer: Buffer;
               try {
-                processBuffer = await readFile(file.path);
+                processBuffer = await readFile(file.path).catch((err: unknown) => {
+                  throw asDecoderOutOfMemory(err);
+                });
               } finally {
                 await rm(file.path, { force: true }).catch(() => {});
               }
