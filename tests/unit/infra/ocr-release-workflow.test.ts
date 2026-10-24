@@ -715,6 +715,11 @@ describe("OCR v3 bundle release workflow", () => {
       /^urllib3==2\.8\.0 \\\n {4}--hash=sha256:0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3 \\\n {4}--hash=sha256:63bf2ead4c879426ebf22ef2a781eeb4aa3b4ae798a0435506f8687fd5bb9b63$/m,
     );
     expect(requirements).not.toMatch(/^urllib3==2\.7\.0\b/m);
+    // filelock 3.29.7 carries CVE-2026-112940, CVE-2026-112913, and CVE-2026-112907 (#3863).
+    expect(requirements).toMatch(
+      /^filelock==4\.2\.1 \\\n {4}--hash=sha256:7be2662e9e826b9bba28afc0f843a123280d799a2ea44bb5d35ccec67905ae44 \\\n {4}--hash=sha256:c4c937ccac2a813cee448e662a56366cfb374c0f8702e75f295c412cc1c5d5a3$/m,
+    );
+    expect(requirements).not.toMatch(/^filelock==3\.29\.7\b/m);
   });
 
   it("audits the hf CLI lock at release time, off the token-bearing runner (#1838)", () => {
