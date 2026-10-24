@@ -1308,6 +1308,162 @@ describe("self-posting tool panels: failed entry status and scoped error banners
       unmount();
     }
 
+    // StripMetadataSettings ignores skipped, underscore-prefixed, and blank entries when computing hasExif/hasGps/hasIcc/hasXmp and field count badges, while preserving the GPS warning banner when valid _latitude/_longitude coordinates are present (#3782).
+    {
+      useFileStore.getState().reset();
+      useFileStore
+        .getState()
+        .setFiles([image("a.jpg"), image("b.jpg"), image("c.jpg"), image("d.jpg")]);
+      let inspectCall = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          inspectCall++;
+          if (inspectCall === 1) {
+            return new Response(
+              JSON.stringify({
+                filename: "a.jpg",
+                fileSize: 1024,
+                exif: {
+                  ExifByteOrder: "II",
+                  MakerNote: "<binary 512 bytes>",
+                  ThumbnailOffset: 512,
+                  _internal: "skip",
+                  Artist: "",
+                  Copyright: null,
+                },
+                gps: {
+                  _latitude: 37.7749,
+                  _altitude: 42,
+                  GPSMapDatum: "",
+                  ExifByteOrder: "II",
+                },
+                icc: {
+                  Description: "",
+                },
+                xmp: {
+                  Title: "",
+                },
+              }),
+              { status: 200 },
+            );
+          }
+          if (inspectCall === 2) {
+            return new Response(
+              JSON.stringify({
+                filename: "b.jpg",
+                fileSize: 1024,
+                exif: {
+                  Make: "Canon",
+                  Model: "EOS R5",
+                  ExifByteOrder: "II",
+                  MakerNote: "<binary>",
+                  _private: "hidden",
+                  Artist: "",
+                },
+                gps: {
+                  GPSLatitudeRef: "N",
+                  GPSLongitudeRef: "W",
+                  _latitude: 37.7749,
+                  _longitude: -122.4194,
+                  GPSMapDatum: "",
+                },
+                icc: {
+                  "Color Space": "RGB",
+                  Description: "",
+                },
+                xmp: {
+                  Creator: "Ada",
+                  Rights: "",
+                },
+              }),
+              { status: 200 },
+            );
+          }
+          if (inspectCall === 3) {
+            return new Response(
+              JSON.stringify({
+                filename: "c.jpg",
+                fileSize: 1024,
+                gps: {
+                  _latitude: 51.5074,
+                  _longitude: -0.1278,
+                  GPSMapDatum: "",
+                },
+              }),
+              { status: 200 },
+            );
+          }
+          return new Response(
+            JSON.stringify({
+              filename: "d.jpg",
+              fileSize: 1024,
+              gps: {
+                GPSMapDatum: "WGS-84",
+                _latitude: 37.7749,
+              },
+            }),
+            { status: 200 },
+          );
+        }),
+      );
+
+      const { unmount } = render(<StripMetadataSettings />);
+      await waitFor(() =>
+        expect(
+          screen.getByText(en.toolSettings["strip-metadata"].noMetadataFound),
+        ).toBeInTheDocument(),
+      );
+      expect(screen.queryByText("0 fields")).not.toBeInTheDocument();
+      expect(screen.queryByText(en.commonUi.metadataGrid.noData)).not.toBeInTheDocument();
+      expect(screen.queryByText(/metadata section/i)).not.toBeInTheDocument();
+
+      // Uncheck Remove All Metadata to inspect per-section control badges
+      fireEvent.click(screen.getByLabelText(en.toolSettings["strip-metadata"].removeAllMetadata));
+      expect(screen.queryByText(/fields$/)).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(en.toolSettings["strip-metadata"].locationFound),
+      ).not.toBeInTheDocument();
+
+      // File b.jpg: only displayable entries count toward section badges and Strip EXIF fieldsCount
+      act(() => {
+        useFileStore.getState().setSelectedIndex(1);
+      });
+      await waitFor(() =>
+        expect(screen.getByText("4 metadata sections found")).toBeInTheDocument(),
+      );
+      expect(screen.getAllByText("2 fields")).toHaveLength(3); // EXIF section, GPS section, and Strip EXIF checkbox badge
+      expect(screen.getAllByText("1 fields")).toHaveLength(2); // ICC and XMP sections
+      expect(screen.getByText(en.toolSettings["strip-metadata"].locationFound)).toBeInTheDocument();
+      expect(screen.getByText(/37\.774900, -122\.419400/)).toBeInTheDocument();
+
+      // File c.jpg: GPS coordinates alone keep hasGps true (banner + locationFound) without rendering an empty 0-fields GPS table
+      act(() => {
+        useFileStore.getState().setSelectedIndex(2);
+      });
+      await waitFor(() => expect(screen.getByText(/51\.507400, -0\.127800/)).toBeInTheDocument());
+      expect(screen.getByText("1 metadata section found")).toBeInTheDocument();
+      expect(screen.getByText(en.toolSettings["strip-metadata"].locationFound)).toBeInTheDocument();
+      expect(screen.queryByText("0 fields")).not.toBeInTheDocument();
+      expect(screen.queryByText(en.commonUi.metadataGrid.noData)).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(en.toolSettings["strip-metadata"].noMetadataFound),
+      ).not.toBeInTheDocument();
+
+      // File d.jpg: displayable GPS field without a complete _latitude/_longitude pair renders the GPS table (1 fields) and locationFound without the coordinate map banner
+      act(() => {
+        useFileStore.getState().setSelectedIndex(3);
+      });
+      await waitFor(() => expect(screen.getByText("1 fields")).toBeInTheDocument());
+      expect(screen.getByText("1 metadata section found")).toBeInTheDocument();
+      expect(screen.getByText(en.toolSettings["strip-metadata"].locationFound)).toBeInTheDocument();
+      expect(
+        screen.queryByText(en.toolSettings["strip-metadata"].viewOnMap),
+      ).not.toBeInTheDocument();
+
+      unmount();
+    }
+
     // 4. EditMetadataSettings (inspect): rejects malformed 2xx without caching or crashing
     for (const badBody of [
       "<html>gateway</html>",

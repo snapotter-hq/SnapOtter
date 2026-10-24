@@ -1,7 +1,7 @@
 import { Trash2 } from "lucide-react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { format } from "@/lib/format";
-import { formatExifValue, SKIP_KEYS } from "@/lib/metadata-utils";
+import { formatExifValue, isDisplayableMetadataEntry } from "@/lib/metadata-utils";
 
 export function MetadataGrid({
   data,
@@ -15,10 +15,7 @@ export function MetadataGrid({
   removedKeys?: Set<string>;
 }) {
   const { t } = useTranslation();
-  const entries = Object.entries(data).filter(
-    ([k, v]) =>
-      !SKIP_KEYS.has(k) && !k.startsWith("_") && v !== undefined && v !== null && String(v) !== "",
-  );
+  const entries = Object.entries(data).filter(([k, v]) => isDisplayableMetadataEntry(k, v));
 
   if (entries.length === 0) {
     return (

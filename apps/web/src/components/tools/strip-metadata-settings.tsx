@@ -9,7 +9,7 @@ import { useToolProcessor } from "@/hooks/use-tool-processor";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
 import { format, plural } from "@/lib/format";
-import { EXIF_LABELS, SKIP_KEYS } from "@/lib/metadata-utils";
+import { countDisplayableMetadata, EXIF_LABELS } from "@/lib/metadata-utils";
 import { useFileStore } from "@/stores/file-store";
 
 interface MetadataResult {
@@ -143,7 +143,7 @@ export function StripMetadataControls({
           {hasExif && !stripAll && (
             <span className="ms-auto text-[10px] text-muted-foreground">
               {format(t.toolSettings["strip-metadata"].fieldsCount, {
-                count: Object.keys(metadata?.exif ?? {}).filter((k) => !SKIP_KEYS.has(k)).length,
+                count: countDisplayableMetadata(metadata?.exif),
               })}
             </span>
           )}
@@ -318,17 +318,23 @@ export function StripMetadataSettings() {
     if (hasFile && !processing) handleProcess();
   };
 
-  const hasExif = metadata?.exif && Object.keys(metadata.exif).length > 0;
-  const hasGps = metadata?.gps && Object.keys(metadata.gps).length > 0;
-  const hasIcc = metadata?.icc && Object.keys(metadata.icc).length > 0;
-  const hasXmp = metadata?.xmp && Object.keys(metadata.xmp).length > 0;
-  const exifError = metadata?.exifError?.trim() || null;
-  const hasAnyMetadata = hasExif || hasGps || hasIcc || hasXmp;
-  const sectionCount = [hasExif, hasGps, hasIcc, hasXmp].filter(Boolean).length;
+  const exifCount = countDisplayableMetadata(metadata?.exif);
+  const gpsCount = countDisplayableMetadata(metadata?.gps);
+  const iccCount = countDisplayableMetadata(metadata?.icc);
+  const xmpCount = countDisplayableMetadata(metadata?.xmp);
 
   // GPS coordinates for display
   const gpsLat = metadata?.gps?._latitude as number | null | undefined;
   const gpsLon = metadata?.gps?._longitude as number | null | undefined;
+  const hasGpsCoords = gpsLat != null && gpsLon != null;
+
+  const hasExif = exifCount > 0;
+  const hasGps = gpsCount > 0 || hasGpsCoords;
+  const hasIcc = iccCount > 0;
+  const hasXmp = xmpCount > 0;
+  const exifError = metadata?.exifError?.trim() || null;
+  const hasAnyMetadata = hasExif || hasGps || hasIcc || hasXmp;
+  const sectionCount = [hasExif, hasGps, hasIcc, hasXmp].filter(Boolean).length;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -386,23 +392,15 @@ export function StripMetadataSettings() {
               )}
 
               {hasExif && metadata.exif && (
-                <CollapsibleSection
-                  title="EXIF"
-                  badge={`${Object.keys(metadata.exif).filter((k) => !SKIP_KEYS.has(k) && !k.startsWith("_")).length} fields`}
-                  defaultOpen
-                >
+                <CollapsibleSection title="EXIF" badge={`${exifCount} fields`} defaultOpen>
                   <MetadataGrid data={metadata.exif} labelMap={EXIF_LABELS} />
                 </CollapsibleSection>
               )}
 
               {exifError && <p className="text-[11px] text-muted-foreground">EXIF: {exifError}</p>}
 
-              {hasGps && metadata.gps && (
-                <CollapsibleSection
-                  title="GPS"
-                  warning
-                  badge={`${Object.keys(metadata.gps).filter((k) => !k.startsWith("_")).length} fields`}
-                >
+              {gpsCount > 0 && metadata.gps && (
+                <CollapsibleSection title="GPS" warning badge={`${gpsCount} fields`}>
                   <MetadataGrid data={metadata.gps} />
                 </CollapsibleSection>
               )}
@@ -410,17 +408,14 @@ export function StripMetadataSettings() {
               {hasIcc && metadata.icc && (
                 <CollapsibleSection
                   title={t.toolSettings["strip-metadata"].iccProfile}
-                  badge={`${Object.keys(metadata.icc).length} fields`}
+                  badge={`${iccCount} fields`}
                 >
                   <MetadataGrid data={metadata.icc} />
                 </CollapsibleSection>
               )}
 
               {hasXmp && metadata.xmp && (
-                <CollapsibleSection
-                  title="XMP"
-                  badge={`${Object.keys(metadata.xmp).length} fields`}
-                >
+                <CollapsibleSection title="XMP" badge={`${xmpCount} fields`}>
                   <MetadataGrid data={metadata.xmp} />
                 </CollapsibleSection>
               )}
@@ -448,8 +443,8 @@ export function StripMetadataSettings() {
       <StripMetadataControls
         onChange={setStripSettings}
         metadata={metadata}
-        hasExif={!!hasExif}
-        hasGps={!!hasGps}
+        hasExif={hasExif}
+        hasGps={hasGps}
       />
 
       {/* Error */}
