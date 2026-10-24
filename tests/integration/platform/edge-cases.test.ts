@@ -531,8 +531,8 @@ describe("Unicode and special filenames", () => {
     const json = JSON.parse(res.body);
     expect(json.processedSize).toBeGreaterThan(0);
     expect(json.downloadUrl).not.toContain("..");
-    // sanitizeFilename("....png") strips both ".." pairs to "png" (#3917)
-    expect(json.downloadUrl).toMatch(/\/png_resize$/);
+    // sanitizeFilename("....png") preserves .png and falls back the dot-only stem to "upload" (#3917)
+    expect(json.downloadUrl).toMatch(/\/upload_resize\.png$/);
   });
 });
 

@@ -433,4 +433,34 @@ describe("sanitizeFilename", () => {
     expect(new TextEncoder().encode(oversizedExtEmojiAtCut).length).toBe(197);
     expect(isValidObjectKey(`uploads/job/${oversizedExtEmojiAtCut}`)).toBe(true);
   });
+
+  it("preserves the extension dot when an even number of dots precedes the extension (#3917)", () => {
+    expect(sanitizeFilename("photo..png")).toBe("photo.png");
+    expect(sanitizeFilename("photo....png")).toBe("photo.png");
+    expect(sanitizeFilename("report..pdf")).toBe("report.pdf");
+    expect(sanitizeFilename("data..xyz")).toBe("data.xyz");
+    expect(sanitizeFilename("data..xyz.")).toBe("data.xyz.");
+    expect(sanitizeFilename("photo..tga.")).toBe("photo.tga.");
+    expect(sanitizeFilename("README.")).toBe("README.");
+    expect(sanitizeFilename(".hidden..png")).toBe(".hidden.png");
+    expect(sanitizeFilename(".hidden.\0.png")).toBe(".hidden.png");
+    expect(sanitizeFilename("my..file..name..png")).toBe("myfilename.png");
+    expect(sanitizeFilename("....test....png")).toBe("test.png");
+    expect(sanitizeFilename("photo..png.php")).toBe("photo.png");
+
+    for (const dotStem of [
+      "..png",
+      "...png",
+      "....png",
+      "....png.",
+      ".\0.png",
+      "..\0.png",
+      "....png.php",
+      "...p..ng.php",
+    ]) {
+      const sanitized = sanitizeFilename(dotStem);
+      expect(sanitized).toBe("upload.png");
+      expect(isValidObjectKey(`uploads/job/${sanitized}`)).toBe(true);
+    }
+  });
 });

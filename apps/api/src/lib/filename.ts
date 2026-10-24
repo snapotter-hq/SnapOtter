@@ -80,6 +80,22 @@ const SAFE_EXTENSIONS = new Set([
 const RESERVED_STAGING_NAME = /^\.snapotter-(?:st|[\u{fb05}\u{fb06}])aging$/iu;
 
 /**
+ * Guard against double-extension attacks (e.g. "report.csv.php"): keep the
+ * name up to the first safe extension, or up to its last repeat. A stem that
+ * repeats the file's own extension ("my.png.photo.png") is a name, not an
+ * attack (#3380); a different extension after it ("render.jxl.html") still is.
+ */
+function truncateDoubleExtension(name: string): string {
+  const dotIndex = name.indexOf(".");
+  if (dotIndex === -1) return name;
+  const parts = name.split(".");
+  const lower = parts.map((part) => part.toLowerCase());
+  const first = lower.findIndex((part, i) => i > 0 && SAFE_EXTENSIONS.has(`.${part}`));
+  if (first === -1) return name;
+  return parts.slice(0, lower.lastIndexOf(lower[first]) + 1).join(".");
+}
+
+/**
  * Sanitize a filename to prevent path traversal and double-extension attacks.
  *
  * 1. Strips directory separators (basename only).
@@ -91,23 +107,25 @@ const RESERVED_STAGING_NAME = /^\.snapotter-(?:st|[\u{fb05}\u{fb06}])aging$/iu;
 export function sanitizeFilename(raw: string): string {
   let name = basename(raw);
   name = name.replace(/\0/g, "");
-  name = name.replace(/\.\./g, "");
+  const hadLeadingDoubleDot = name.startsWith("..");
+  name = name.replace(/\.{2,}$/, "");
+  name = truncateDoubleExtension(name);
+
+  const searchEnd = name.endsWith(".") ? name.length - 2 : name.length - 1;
+  const dotIdx = searchEnd > 0 ? name.lastIndexOf(".", searchEnd) : -1;
+  if (dotIdx > 0) {
+    const ext = name.slice(dotIdx);
+    const stem = name.slice(0, dotIdx).replace(/\.\./g, "").replace(/\.+$/, "");
+    name = `${stem || "upload"}${ext}`;
+  } else {
+    name = name.replace(/\.\./g, "");
+  }
+  name = truncateDoubleExtension(name);
+  if (hadLeadingDoubleDot && name.startsWith(".") && name.indexOf(".", 1) === -1) {
+    name = `upload${name}`;
+  }
   if (!name || name === "." || name === ".." || RESERVED_STAGING_NAME.test(name)) {
     name = "upload";
-  }
-
-  // Guard against double-extension attacks (e.g. "report.csv.php"): keep the
-  // name up to the first safe extension, or up to its last repeat. A stem that
-  // repeats the file's own extension ("my.png.photo.png") is a name, not an
-  // attack (#3380); a different extension after it ("render.jxl.html") still is.
-  const dotIndex = name.indexOf(".");
-  if (dotIndex !== -1) {
-    const parts = name.split(".");
-    const lower = parts.map((part) => part.toLowerCase());
-    const first = lower.findIndex((part, i) => i > 0 && SAFE_EXTENSIONS.has(`.${part}`));
-    if (first !== -1) {
-      name = parts.slice(0, lower.lastIndexOf(lower[first]) + 1).join(".");
-    }
   }
 
   // Truncate to filesystem-safe length (255 byte NAME_MAX minus margin for _toolId suffix)

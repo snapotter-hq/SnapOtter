@@ -131,9 +131,12 @@ describe("filenameFromUrl", () => {
     expect(filenameFromUrl("https://example.com/.tga")).toMatch(FALLBACK_FILENAME_RE);
     expect(filenameFromUrl("https://example.com/.svgz")).toMatch(FALLBACK_FILENAME_RE);
     expect(filenameFromUrl("https://example.com/README.")).toMatch(FALLBACK_FILENAME_RE);
-    expect(filenameFromUrl("https://example.com/..tga")).toMatch(FALLBACK_FILENAME_RE);
-    expect(filenameFromUrl("https://example.com/.hidden..png")).toMatch(FALLBACK_FILENAME_RE);
-    expect(filenameFromUrl("https://example.com/.hidden.%00.png")).toMatch(FALLBACK_FILENAME_RE);
+    expect(filenameFromUrl("https://example.com/.dng.php")).toMatch(FALLBACK_FILENAME_RE);
+    expect(filenameFromUrl("https://example.com/.png.%00.php")).toMatch(FALLBACK_FILENAME_RE);
+    // Double-dot basenames that retain their extension after sanitizeFilename (#3917)
+    expect(filenameFromUrl("https://example.com/..tga")).toBe("..tga");
+    expect(filenameFromUrl("https://example.com/.hidden..png")).toBe(".hidden..png");
+    expect(filenameFromUrl("https://example.com/.hidden.%00.png")).toBe(".hidden.\0.png");
     expect(filenameFromUrl("https://example.com/.hidden.png")).toBe(".hidden.png");
   });
 });
