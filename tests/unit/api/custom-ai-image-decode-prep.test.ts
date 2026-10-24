@@ -903,6 +903,56 @@ describe("custom AI image routes input decode, fileExt, SVG prep, and error logg
       } finally {
         metaSpy.mockRestore();
       }
+
+      // 7. V8 OOM in Buffer.concat while reading backgroundImage rethrows DecoderOutOfMemoryError via multipartFailure (#3898)
+      const v8ConcatOom = new RangeError("Array buffer allocation failed");
+      const concatSpy = vi.spyOn(Buffer, "concat").mockImplementationOnce(() => {
+        throw v8ConcatOom;
+      });
+      try {
+        mocks.deletePrefix.mockClear();
+        const bgOomReq = makeRequest([
+          { type: "file", fieldname: "file", filename: "anim.gif", file: {} },
+          { type: "file", fieldname: "backgroundImage", filename: "bg.png", content: validPng },
+        ]);
+        const bgOomReply = makeReply();
+        const err = await handlers["/api/v1/tools/image/remove-gif-background"](
+          bgOomReq,
+          bgOomReply,
+        ).catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(formatDecoders.DecoderOutOfMemoryError);
+        expect(err).toMatchObject({
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          cause: v8ConcatOom,
+        });
+        expect(mocks.deletePrefix).toHaveBeenCalledTimes(1);
+      } finally {
+        concatSpy.mockRestore();
+      }
+
+      // 8. V8 OOM in Buffer.concat while reading backgroundImage in remove-background/effects rethrows DecoderOutOfMemoryError via multipartFailure (#3898)
+      const effectsConcatSpy = vi.spyOn(Buffer, "concat").mockImplementationOnce(() => {
+        throw v8ConcatOom;
+      });
+      try {
+        const effectsOomReq = makeRequest([
+          { type: "file", fieldname: "backgroundImage", filename: "bg.png", content: validPng },
+        ]);
+        const effectsOomReply = makeReply();
+        const err = await handlers["/api/v1/tools/image/remove-background/effects"](
+          effectsOomReq,
+          effectsOomReply,
+        ).catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(formatDecoders.DecoderOutOfMemoryError);
+        expect(err).toMatchObject({
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          cause: v8ConcatOom,
+        });
+      } finally {
+        effectsConcatSpy.mockRestore();
+      }
     } finally {
       sanitizeSpy.mockRestore();
       heicSpy.mockRestore();

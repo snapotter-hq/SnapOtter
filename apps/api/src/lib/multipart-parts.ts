@@ -3,6 +3,7 @@ import { Busboy, type BusboyHeaders } from "@fastify/busboy";
 import type { FastifyRequest } from "fastify";
 import { env } from "../config.js";
 import { stripInternalPaths } from "./errors.js";
+import { asDecoderOutOfMemory, DecoderOutOfMemoryError } from "./format-decoders.js";
 
 export interface MultipartFilePart {
   type: "file";
@@ -57,6 +58,8 @@ function fileTooLargeError(limitBytes: number): Error {
  * request's: a storage write fault has no status and must stay a 5xx.
  */
 function requestError(err: unknown): Error {
+  const oom = asDecoderOutOfMemory(err);
+  if (oom instanceof DecoderOutOfMemoryError) return oom;
   const error = err instanceof Error ? err : new Error(String(err));
   if ((error as { statusCode?: unknown }).statusCode === undefined) {
     Object.assign(error, { statusCode: 400 });
@@ -92,6 +95,8 @@ export function multipartFailure(
 ):
   | { status: 413; body: { error: string } }
   | { status: 400; body: { error: string; details: string } } {
+  const oom = asDecoderOutOfMemory(err);
+  if (oom instanceof DecoderOutOfMemoryError) throw oom;
   const e = err as { statusCode?: unknown; limitBytes?: unknown } | null;
   if (typeof e?.statusCode === "number" && e.statusCode >= 500) throw err;
   if (e?.statusCode === 413) {
@@ -289,5 +294,9 @@ export async function readFilePart(file: Readable): Promise<Buffer> {
   } catch (err) {
     throw requestError(err);
   }
-  return Buffer.concat(chunks);
+  try {
+    return Buffer.concat(chunks);
+  } catch (err) {
+    throw asDecoderOutOfMemory(err);
+  }
 }

@@ -14,8 +14,9 @@ import { once } from "node:events";
 import { PassThrough } from "node:stream";
 import { SafeError } from "@snapotter/shared";
 import type { FastifyRequest } from "fastify";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
+import { DecoderOutOfMemoryError } from "../../../apps/api/src/lib/format-decoders.js";
 import {
   formatLimit,
   multipartFailure,
@@ -474,6 +475,48 @@ describe("readFilePart (#1473)", () => {
 
     expect(await next).toMatchObject({ statusCode: 400, code: "ECONNRESET" });
   });
+
+  it("converts a V8 buffer allocation failure in Buffer.concat into DecoderOutOfMemoryError (#3898)", async () => {
+    const body = multipartBody([{ name: "file", filename: "a.bin", content: "hello" }]);
+    const generator = multipartParts(fakeRequest(body));
+    const { value: part } = await generator.next();
+    if (part?.type !== "file") throw new Error("expected a file part");
+
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    const concatSpy = vi.spyOn(Buffer, "concat").mockImplementationOnce(() => {
+      throw v8Oom;
+    });
+    try {
+      const err = await readFilePart(part.file).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(DecoderOutOfMemoryError);
+      expect(err).toMatchObject({
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        cause: v8Oom,
+      });
+    } finally {
+      concatSpy.mockRestore();
+      await generator.return(undefined);
+    }
+  });
+
+  it("converts a V8 buffer allocation failure emitted on the stream into DecoderOutOfMemoryError instead of 400 (#3898)", async () => {
+    const { raw, generator, file } = await halfSentFile();
+    const v8Oom = new RangeError("Array buffer allocation failed");
+
+    const reading = readFilePart(file).catch((e: unknown) => e);
+    await sleep(10);
+    raw.emit("error", v8Oom);
+
+    const err = await reading;
+    expect(err).toBeInstanceOf(DecoderOutOfMemoryError);
+    expect(err).toMatchObject({
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: v8Oom,
+    });
+    await generator.return(undefined);
+  });
 });
 
 describe("multipartFailure (#1341)", () => {
@@ -576,6 +619,31 @@ describe("multipartFailure (#1341)", () => {
 
     const other = Object.assign(new Error("storage exploded"), { statusCode: 500 });
     expect(() => multipartFailure(other)).toThrow(other);
+  });
+
+  it("converts a V8 buffer allocation failure into DecoderOutOfMemoryError and rethrows it (#3898)", () => {
+    const v8Oom = new RangeError("Array buffer allocation failed");
+    let caught: unknown;
+    try {
+      multipartFailure(v8Oom);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(DecoderOutOfMemoryError);
+    expect(caught).toMatchObject({
+      statusCode: 503,
+      code: "ENGINE_UNAVAILABLE",
+      cause: v8Oom,
+    });
+
+    const otherRange = new RangeError("Invalid array length");
+    expect(multipartFailure(otherRange)).toEqual({
+      status: 400,
+      body: {
+        error: "Failed to parse multipart request",
+        details: "Invalid array length",
+      },
+    });
   });
 
   it("formats byte limits in KB below 1 MiB and MB at or above 1 MiB (#2437)", () => {
