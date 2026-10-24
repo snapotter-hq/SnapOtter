@@ -43,12 +43,20 @@ export function EditorRightPanel() {
 
   const [width, setWidth] = useState<number>(() => {
     if (typeof window === "undefined") return DEFAULT_PANEL_WIDTH;
-    const stored = Number(window.localStorage.getItem(PANEL_WIDTH_STORAGE_KEY));
-    return stored > 0 ? clampPanelWidth(stored) : DEFAULT_PANEL_WIDTH;
+    try {
+      const stored = Number(window.localStorage.getItem(PANEL_WIDTH_STORAGE_KEY));
+      return stored > 0 ? clampPanelWidth(stored) : DEFAULT_PANEL_WIDTH;
+    } catch {
+      return DEFAULT_PANEL_WIDTH;
+    }
   });
 
   useEffect(() => {
-    window.localStorage.setItem(PANEL_WIDTH_STORAGE_KEY, String(width));
+    try {
+      window.localStorage.setItem(PANEL_WIDTH_STORAGE_KEY, String(width));
+    } catch {
+      // Storage blocked or full
+    }
   }, [width]);
 
   const handleResizeStart = useCallback(

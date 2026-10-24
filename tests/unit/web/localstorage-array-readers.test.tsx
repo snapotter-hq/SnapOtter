@@ -18,11 +18,13 @@ vi.mock("@/components/layout/app-layout", () => ({
   AppLayout: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
+import { EditorRightPanel } from "@/components/editor/editor-right-panel";
 import { EditMetadataSettings } from "@/components/tools/edit-metadata-settings";
 import { SignPdfSettings } from "@/components/tools/sign-pdf-settings";
 import { I18nProvider } from "@/contexts/i18n-context";
 import { recordRecentTool, useRecentTools } from "@/hooks/use-recent-tools";
 import { HomePage } from "@/pages/home-page";
+import { useEditorStore } from "@/stores/editor-store";
 import { useFileStore } from "@/stores/file-store";
 import { usePinnedToolsStore } from "@/stores/pinned-tools-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -205,6 +207,41 @@ describe("HomePage localStorage array readers (#3421)", () => {
 
     expect(JSON.parse(localStorage.getItem("snapotter-collapsed-sections") ?? "null")).toEqual([]);
   });
+
+  it("collapses and expands sections in-memory without throwing when localStorage.setItem throws QuotaExceededError or SecurityError (#3878)", () => {
+    render(
+      <I18nProvider>
+        <MemoryRouter initialEntries={["/"]}>
+          <HomePage />
+        </MemoryRouter>
+      </I18nProvider>,
+    );
+
+    const imageHeading = screen.getByRole("heading", { level: 2, name: /^Image\d+$/ });
+    const imageSection = imageHeading.closest("section");
+    expect(imageSection).not.toBeNull();
+    expect(
+      within(imageSection as HTMLElement).queryAllByRole("heading", { level: 3 }).length,
+    ).toBeGreaterThan(0);
+
+    localStorageMock.setItem.mockImplementationOnce(() => {
+      throw new DOMException("QuotaExceededError", "QuotaExceededError");
+    });
+
+    expect(() => fireEvent.click(within(imageHeading).getByRole("button"))).not.toThrow();
+    expect(
+      within(imageSection as HTMLElement).queryAllByRole("heading", { level: 3 }),
+    ).toHaveLength(0);
+
+    localStorageMock.setItem.mockImplementationOnce(() => {
+      throw new DOMException("Access is denied", "SecurityError");
+    });
+
+    expect(() => fireEvent.click(within(imageHeading).getByRole("button"))).not.toThrow();
+    expect(
+      within(imageSection as HTMLElement).queryAllByRole("heading", { level: 3 }).length,
+    ).toBeGreaterThan(0);
+  });
 });
 
 describe("EditMetadataSettings metadata-templates reader (#3421)", () => {
@@ -308,6 +345,130 @@ describe("EditMetadataSettings metadata-templates reader (#3421)", () => {
     fireEvent.click(presetBtn);
 
     expect(screen.getByLabelText(/artist/i)).toHaveValue("Ada Lovelace");
+  });
+
+  it("saves and deletes templates in-memory without throwing when localStorage.setItem throws QuotaExceededError or SecurityError (#3878)", async () => {
+    seedOneFile();
+
+    render(
+      <I18nProvider>
+        <EditMetadataSettings />
+      </I18nProvider>,
+    );
+
+    await act(async () => {});
+
+    const nameInput = screen.getByPlaceholderText(
+      en.toolSettings["edit-metadata"].templateNamePlaceholder,
+    );
+    const saveBtn = screen.getByTitle(en.toolSettings["edit-metadata"].saveCurrentValuesAsTemplate);
+
+    fireEvent.change(nameInput, { target: { value: "Offline Preset" } });
+
+    localStorageMock.setItem.mockImplementationOnce(() => {
+      throw new DOMException("QuotaExceededError", "QuotaExceededError");
+    });
+
+    expect(() => fireEvent.click(saveBtn)).not.toThrow();
+    expect(screen.getByRole("button", { name: "Offline Preset" })).toBeInTheDocument();
+    expect(nameInput).toHaveValue("");
+
+    localStorageMock.setItem.mockImplementationOnce(() => {
+      throw new DOMException("Access is denied", "SecurityError");
+    });
+
+    const presetRow = screen.getByRole("button", { name: "Offline Preset" }).parentElement;
+    expect(presetRow).not.toBeNull();
+    const rowButtons = within(presetRow as HTMLElement).getAllByRole("button");
+    expect(() => fireEvent.click(rowButtons[1])).not.toThrow();
+    expect(screen.queryByRole("button", { name: "Offline Preset" })).toBeNull();
+  });
+});
+
+describe("EditorRightPanel panel width storage (#3878)", () => {
+  beforeEach(() => {
+    useEditorStore.setState({ rightPanelVisible: true, rightPanelTab: "layers" });
+  });
+
+  it("falls back to default width and renders without throwing when window.localStorage getter throws SecurityError", () => {
+    Object.defineProperty(window, "localStorage", {
+      get() {
+        throw new DOMException("Access is denied", "SecurityError");
+      },
+      configurable: true,
+    });
+
+    render(
+      <I18nProvider>
+        <EditorRightPanel />
+      </I18nProvider>,
+    );
+
+    const handle = screen.getByTestId("right-panel-resize-handle");
+    expect(handle.parentElement).toHaveStyle({ width: "280px" });
+  });
+
+  it("falls back to default width and resizes in-memory without throwing when getItem or setItem throws", () => {
+    localStorageMock.getItem.mockImplementationOnce(() => {
+      throw new DOMException("Access is denied", "SecurityError");
+    });
+    localStorageMock.setItem.mockImplementation(() => {
+      throw new DOMException("QuotaExceededError", "QuotaExceededError");
+    });
+
+    render(
+      <I18nProvider>
+        <EditorRightPanel />
+      </I18nProvider>,
+    );
+
+    const handle = screen.getByTestId("right-panel-resize-handle");
+    expect(handle.parentElement).toHaveStyle({ width: "280px" });
+
+    fireEvent.mouseDown(handle, { clientX: 500 });
+    fireEvent.mouseMove(document, { clientX: 440 });
+    fireEvent.mouseUp(document);
+
+    expect(handle.parentElement).toHaveStyle({ width: "340px" });
+  });
+
+  it("restores clamped stored panel width and persists resized width when storage is available", () => {
+    localStorage.setItem("snapotter-editor-right-panel-width", "600");
+
+    render(
+      <I18nProvider>
+        <EditorRightPanel />
+      </I18nProvider>,
+    );
+
+    const handle = screen.getByTestId("right-panel-resize-handle");
+    expect(handle.parentElement).toHaveStyle({ width: "480px" });
+    expect(localStorage.getItem("snapotter-editor-right-panel-width")).toBe("480");
+
+    fireEvent.mouseDown(handle, { clientX: 400 });
+    fireEvent.mouseMove(document, { clientX: 500 });
+    fireEvent.mouseUp(document);
+
+    expect(handle.parentElement).toHaveStyle({ width: "380px" });
+    expect(localStorage.getItem("snapotter-editor-right-panel-width")).toBe("380");
+  });
+
+  it.each([
+    ["invalid", "280px"],
+    ["-50", "280px"],
+    ["0", "280px"],
+    ["100", "240px"],
+  ])("resolves stored panel width %s to %s", (raw, expectedWidth) => {
+    localStorage.setItem("snapotter-editor-right-panel-width", raw);
+
+    render(
+      <I18nProvider>
+        <EditorRightPanel />
+      </I18nProvider>,
+    );
+
+    const handle = screen.getByTestId("right-panel-resize-handle");
+    expect(handle.parentElement).toHaveStyle({ width: expectedWidth });
   });
 });
 

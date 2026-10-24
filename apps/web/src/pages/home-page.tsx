@@ -42,7 +42,11 @@ function getCollapsedSections(): Set<string> {
 }
 
 function saveCollapsedSections(collapsed: Set<string>) {
-  localStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify([...collapsed]));
+  try {
+    localStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify([...collapsed]));
+  } catch {
+    // Storage blocked or full
+  }
 }
 
 const SECTION_TABS = new Set<string>(["all", ...SECTIONS.map((s) => s.id)]);

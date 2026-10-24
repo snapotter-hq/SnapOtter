@@ -157,7 +157,11 @@ function loadTemplates(): Template[] {
 }
 
 function saveTemplates(templates: Template[]) {
-  localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
+  try {
+    localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
+  } catch {
+    // Storage blocked or full
+  }
 }
 
 function LabeledInput({
