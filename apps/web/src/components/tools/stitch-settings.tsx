@@ -1,5 +1,5 @@
 import { Loader2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
@@ -10,6 +10,7 @@ import { format as formatMessage } from "@/lib/format";
 import { jobFailureMessage, parseResultBody, reportMalformedResult } from "@/lib/progress-frames";
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { runEndWrites } from "@/lib/run-teardown";
+import { createXhrWatchdog, type XhrWatchdog } from "@/lib/xhr-watchdog";
 import { useFileStore } from "@/stores/file-store";
 
 type Direction = "horizontal" | "vertical" | "grid";
@@ -44,14 +45,23 @@ export function StitchSettings() {
   const [quality, setQuality] = useState(90);
   const [downloadByEntry, setDownloadByEntry] = useState<Record<string, string>>({});
   const [uploadProgress, setUploadProgress] = useState(0);
+  const watchdogRef = useRef<XhrWatchdog | null>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    return () => {
+      watchdogRef.current?.clear();
+    };
+  }, []);
 
   useSettleOnUnmount(
     () => xhrRef.current !== null,
     () => {
       unsubscribeRef.current?.();
       unsubscribeRef.current = null;
+      watchdogRef.current?.clear();
+      watchdogRef.current = null;
       const xhr = xhrRef.current;
       xhrRef.current = null;
       xhr?.abort();
@@ -66,6 +76,8 @@ export function StitchSettings() {
     const entryId = capturedEntry.id;
 
     unsubscribeRef.current?.();
+    watchdogRef.current?.clear();
+    watchdogRef.current = null;
     xhrRef.current?.abort();
     const xhr = new XMLHttpRequest();
     xhrRef.current = xhr;
@@ -104,6 +116,8 @@ export function StitchSettings() {
           : state.entries.length > 0;
       if (!state.processing || !hasRunEntry) {
         storeReset = true;
+        watchdogRef.current?.clear();
+        watchdogRef.current = null;
         if (xhrRef.current === xhr) xhrRef.current = null;
         if (unsubscribeRef.current === unsubscribe) unsubscribeRef.current = null;
         unsubscribe();
@@ -158,6 +172,9 @@ export function StitchSettings() {
         }),
       );
 
+      const watchdog = createXhrWatchdog(xhr, 300_000, () => xhrRef.current === xhr && !storeReset);
+      watchdogRef.current = watchdog;
+
       xhr.open("POST", appUrl("/api/v1/tools/image/stitch"));
 
       const headers = formatHeaders();
@@ -167,12 +184,20 @@ export function StitchSettings() {
 
       xhr.upload.onprogress = (e) => {
         if (xhrRef.current !== xhr || storeReset) return;
+        watchdog.onUploadProgress(e);
         if (e.lengthComputable) {
           setUploadProgress(Math.round((e.loaded / e.total) * 100));
         }
       };
 
+      xhr.upload.onload = () => {
+        if (xhrRef.current !== xhr || storeReset) return;
+        watchdog.onUploadLoad();
+      };
+
       xhr.onload = () => {
+        watchdog.clear();
+        if (watchdogRef.current === watchdog) watchdogRef.current = null;
         endSubscription();
         if (xhrRef.current !== xhr || storeReset) return;
         xhrRef.current = null;
@@ -243,6 +268,8 @@ export function StitchSettings() {
       };
 
       xhr.onerror = () => {
+        watchdog.clear();
+        if (watchdogRef.current === watchdog) watchdogRef.current = null;
         endSubscription();
         if (xhrRef.current !== xhr || storeReset) return;
         xhrRef.current = null;
@@ -250,8 +277,20 @@ export function StitchSettings() {
         if (teardownError) throw teardownError.cause;
       };
 
-      xhr.send(formData);
+      xhr.ontimeout = () => {
+        watchdog.clear();
+        if (watchdogRef.current === watchdog) watchdogRef.current = null;
+        endSubscription();
+        if (xhrRef.current !== xhr || storeReset) return;
+        xhrRef.current = null;
+        const teardownError = failEntry(t.errors.requestTimedOut, "timeout");
+        if (teardownError) throw teardownError.cause;
+      };
+
+      watchdog.send(formData);
     } catch (err) {
+      watchdogRef.current?.clear();
+      watchdogRef.current = null;
       endSubscription();
       if (xhrRef.current === xhr) xhrRef.current = null;
       if (!storeReset) {

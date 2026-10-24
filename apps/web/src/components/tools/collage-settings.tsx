@@ -1,5 +1,5 @@
 import { Download, Loader2 } from "lucide-react";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { CollapsibleSection } from "@/components/common/collapsible-section";
 import { useTranslation } from "@/contexts/i18n-context";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
@@ -16,6 +16,7 @@ import { showIntakeIgnored } from "@/lib/intake-notice";
 import { jobFailureMessage, parseResultBody, reportMalformedResult } from "@/lib/progress-frames";
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { cn } from "@/lib/utils";
+import { createXhrWatchdog, type XhrWatchdog } from "@/lib/xhr-watchdog";
 import {
   type AspectRatio,
   beginCollageRun,
@@ -50,6 +51,9 @@ const BG_PRESETS = [
   { id: "transparent" as const, color: "transparent", border: true },
   { id: "custom" as const, color: null, border: true },
 ];
+
+let activeCollageWatchdog: XhrWatchdog | null = null;
+let collagePanelPaused = false;
 
 export function CollageSettings() {
   const { t } = useTranslation();
@@ -89,6 +93,15 @@ export function CollageSettings() {
       }, 0)
     : 0;
 
+  useEffect(() => {
+    collagePanelPaused = false;
+    activeCollageWatchdog?.resume();
+    return () => {
+      collagePanelPaused = true;
+      activeCollageWatchdog?.pause();
+    };
+  }, []);
+
   const handleProcess = useCallback(async () => {
     if (!hasImages || !template || assignedCount === 0) return;
 
@@ -96,11 +109,22 @@ export function CollageSettings() {
     store.setProgress(0);
     store.setError(null);
 
+    activeCollageWatchdog?.clear();
+    activeCollageWatchdog = null;
+
     let activeXhr: XMLHttpRequest | null = null;
+    let watchdog: XhrWatchdog | null = null;
     let rejectXhr: ((err: Error) => void) | null = null;
     let delayTimer: ReturnType<typeof setTimeout> | null = null;
     let resolveDelay: (() => void) | null = null;
+    const clearWatchdog = () => {
+      watchdog?.clear();
+      if (activeCollageWatchdog === watchdog) {
+        activeCollageWatchdog = null;
+      }
+    };
     const run = beginCollageRun(() => {
+      clearWatchdog();
       activeXhr?.abort();
       rejectXhr?.(new DOMException("Aborted", "AbortError"));
       if (delayTimer !== null) {
@@ -144,6 +168,12 @@ export function CollageSettings() {
         rejectXhr = reject;
         const xhr = new XMLHttpRequest();
         activeXhr = xhr;
+        const xhrWatchdog = createXhrWatchdog(xhr, 300_000, () => run.isCurrent());
+        if (collagePanelPaused) {
+          xhrWatchdog.pause();
+        }
+        watchdog = xhrWatchdog;
+        activeCollageWatchdog = xhrWatchdog;
         xhr.open("POST", appUrl("/api/v1/tools/image/collage"));
 
         const headers = formatHeaders();
@@ -152,13 +182,26 @@ export function CollageSettings() {
         });
 
         xhr.upload.onprogress = (e) => {
-          if (!run.isCurrent()) return;
+          if (!run.isCurrent()) {
+            clearWatchdog();
+            return;
+          }
+          xhrWatchdog.onUploadProgress(e);
           if (e.lengthComputable) {
             store.setProgress(Math.round((e.loaded / e.total) * 80));
           }
         };
 
+        xhr.upload.onload = () => {
+          if (!run.isCurrent()) {
+            clearWatchdog();
+            return;
+          }
+          xhrWatchdog.onUploadLoad();
+        };
+
         xhr.onload = () => {
+          clearWatchdog();
           if (!run.isCurrent()) return;
           if (xhr.status >= 200 && xhr.status < 300) {
             // Only a body that isn't a result is the server's fault, and it
@@ -208,10 +251,18 @@ export function CollageSettings() {
         };
 
         xhr.onerror = () => {
+          clearWatchdog();
           if (!run.isCurrent()) return;
           reject(new Error(t.errors.network));
         };
-        xhr.send(formData);
+
+        xhr.ontimeout = () => {
+          clearWatchdog();
+          if (!run.isCurrent()) return;
+          reject(new Error(t.errors.requestTimedOut));
+        };
+
+        xhrWatchdog.send(formData);
 
         if (run.isCurrent()) {
           store.setProgress(5);
@@ -229,12 +280,14 @@ export function CollageSettings() {
         });
       }
     } catch (err) {
+      clearWatchdog();
       run.end();
       if (!run.isCurrent()) return;
       store.setError(err instanceof Error ? err.message : t.toolSettings.collage.collageFailed);
       return;
     }
 
+    clearWatchdog();
     run.end();
     if (!run.isCurrent()) return;
 

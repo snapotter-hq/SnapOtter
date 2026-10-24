@@ -14,6 +14,7 @@ vi.mock("@/hooks/use-auth", () => ({
 }));
 
 import { BarcodeReadSettings, resetBarcodeResults } from "@/components/tools/barcode-read-settings";
+import { CollageSettings } from "@/components/tools/collage-settings";
 import { EraseObjectSettings } from "@/components/tools/erase-object-settings";
 import type { EraserCanvasRef } from "@/components/tools/eraser-canvas";
 import { FaviconSettings } from "@/components/tools/favicon-settings";
@@ -22,7 +23,9 @@ import { ImageToPdfSettings } from "@/components/tools/image-to-pdf-settings";
 import { OcrSettings, ocrOneFile, resetOcrResult } from "@/components/tools/ocr-settings";
 import type { SignCanvasRef, SignPlacement } from "@/components/tools/sign-canvas";
 import { SignPdfSettings } from "@/components/tools/sign-pdf-settings";
+import { StitchSettings } from "@/components/tools/stitch-settings";
 import { apiUploadUserFiles } from "@/lib/api";
+import { useCollageStore } from "@/stores/collage-store";
 import { useDuplicateStore } from "@/stores/duplicate-store";
 import { useFeaturesStore } from "@/stores/features-store";
 import { useFileStore } from "@/stores/file-store";
@@ -160,6 +163,7 @@ beforeEach(() => {
     "fetch",
     vi.fn(async () => new Response(JSON.stringify({ canceled: true }))),
   );
+  useCollageStore.getState().reset();
   useDuplicateStore.getState().reset();
   useFileStore.getState().reset();
   resetBarcodeResults();
@@ -168,6 +172,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  useCollageStore.getState().reset();
   useDuplicateStore.getState().reset();
   useFileStore.getState().reset();
   resetBarcodeResults();
@@ -755,5 +760,219 @@ describe("custom-XHR upload stall and post-upload response watchdog (#3870)", ()
     });
     await expect(apiUploadUserFiles([image("fail.png")])).rejects.toThrow("sync send failure");
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("StitchSettings keeps advancing uploads alive past 300s, aborts on a 120s upload stall, and enforces a 300s post-upload response timeout (#3876)", () => {
+    useFileStore.getState().setFiles([image("one.png"), image("two.png")]);
+    const view = render(<StitchSettings />);
+
+    fireEvent.click(screen.getByTestId("stitch-submit"));
+    const xhr = FakeXhr.instances[0];
+    expect(xhr.timeout).toBe(0);
+
+    act(() => {
+      for (const loaded of [15, 30, 45, 60, 75, 90]) {
+        vi.advanceTimersByTime(60_000);
+        xhr.fireProgress(loaded, 100);
+      }
+      xhr.fireUploadLoad();
+      vi.advanceTimersByTime(200_000);
+      xhr.respond(200, {
+        jobId: "j-stitch",
+        downloadUrl: "/api/v1/download/j-stitch/stitched.png",
+        originalSize: 200,
+        processedSize: 150,
+      });
+    });
+    expect(xhr.aborted).toBe(false);
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().entries[0].status).toBe("completed");
+    expect(vi.getTimerCount()).toBe(0);
+
+    // Upload stall at 120s (including non-advancing progress events)
+    fireEvent.click(screen.getByTestId("stitch-submit"));
+    const stalledXhr = FakeXhr.instances[1];
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+      stalledXhr.fireProgress(20, 100);
+      vi.advanceTimersByTime(60_000);
+      stalledXhr.fireProgress(20, 100);
+      vi.advanceTimersByTime(59_999);
+    });
+    expect(stalledXhr.aborted).toBe(false);
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(stalledXhr.abort).toHaveBeenCalledOnce();
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: en.errors.requestTimedOut,
+      errorCategory: "timeout",
+    });
+    expect(screen.getByText(en.errors.requestTimedOut)).toBeInTheDocument();
+    expect(vi.getTimerCount()).toBe(0);
+
+    // Post-upload response window (300s)
+    fireEvent.click(screen.getByTestId("stitch-submit"));
+    const respXhr = FakeXhr.instances[2];
+    act(() => {
+      respXhr.fireUploadLoad();
+      vi.advanceTimersByTime(299_999);
+    });
+    expect(respXhr.aborted).toBe(false);
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(respXhr.abort).toHaveBeenCalledOnce();
+    expect(useFileStore.getState().processing).toBe(false);
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: en.errors.requestTimedOut,
+      errorCategory: "timeout",
+    });
+    expect(vi.getTimerCount()).toBe(0);
+
+    // Store reset while in flight disarms the watchdog and ignores a late ontimeout
+    fireEvent.click(screen.getByTestId("stitch-submit"));
+    const resetXhr = FakeXhr.instances[3];
+    expect(vi.getTimerCount()).toBe(1);
+    act(() => {
+      useFileStore.getState().reset();
+      useFileStore.getState().setFiles([image("next1.png"), image("next2.png")]);
+      useFileStore.getState().setProcessing(true);
+    });
+    expect(vi.getTimerCount()).toBe(0);
+    act(() => {
+      resetXhr.ontimeout?.();
+    });
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().entries[0].status).toBe("pending");
+    expect(useFileStore.getState().entries[0].error).toBeNull();
+    act(() => {
+      useFileStore.getState().setProcessing(false);
+    });
+
+    // Synchronous send() throw disarms the watchdog timer
+    vi.spyOn(FakeXhr.prototype, "send").mockImplementationOnce(() => {
+      throw new Error("stitch sync send failure");
+    });
+    fireEvent.click(screen.getByTestId("stitch-submit"));
+    expect(vi.getTimerCount()).toBe(0);
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "stitch sync send failure",
+    });
+
+    // Unmount while in flight disarms the watchdog timer
+    fireEvent.click(screen.getByTestId("stitch-submit"));
+    expect(vi.getTimerCount()).toBe(1);
+    view.unmount();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("CollageSettings keeps advancing uploads alive past 300s, aborts on a 120s upload stall, and enforces a 300s post-upload response timeout (#3876)", async () => {
+    useCollageStore.getState().addImages([image("one.png"), image("two.png")]);
+    const view = render(<CollageSettings />);
+
+    fireEvent.click(screen.getByTestId("collage-submit"));
+    const xhr = FakeXhr.instances[0];
+    expect(xhr.timeout).toBe(0);
+
+    await act(async () => {
+      for (const loaded of [15, 30, 45, 60, 75, 90]) {
+        vi.advanceTimersByTime(60_000);
+        xhr.fireProgress(loaded, 100);
+      }
+      xhr.fireUploadLoad();
+      vi.advanceTimersByTime(200_000);
+      xhr.respond(200, {
+        jobId: "j-collage",
+        downloadUrl: "/api/v1/download/j-collage/collage.png",
+        originalSize: 200,
+        processedSize: 150,
+      });
+    });
+    expect(xhr.aborted).toBe(false);
+    expect(useCollageStore.getState().phase).toBe("result");
+    expect(useCollageStore.getState().resultUrl).toBe("/api/v1/download/j-collage/collage.png");
+    expect(vi.getTimerCount()).toBe(0);
+
+    // Upload stall at 120s
+    fireEvent.click(screen.getByTestId("collage-submit"));
+    const stalledXhr = FakeXhr.instances[1];
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+      stalledXhr.fireProgress(25, 100);
+      vi.advanceTimersByTime(119_999);
+    });
+    expect(stalledXhr.aborted).toBe(false);
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(stalledXhr.abort).toHaveBeenCalledOnce();
+    expect(useCollageStore.getState().phase).toBe("editing");
+    expect(useCollageStore.getState().error).toBe(en.errors.requestTimedOut);
+    expect(screen.getByText(en.errors.requestTimedOut)).toBeInTheDocument();
+    expect(vi.getTimerCount()).toBe(0);
+
+    // Post-upload response window (300s)
+    fireEvent.click(screen.getByTestId("collage-submit"));
+    const respXhr = FakeXhr.instances[2];
+    await act(async () => {
+      respXhr.fireUploadLoad();
+      vi.advanceTimersByTime(299_999);
+    });
+    expect(respXhr.aborted).toBe(false);
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(respXhr.abort).toHaveBeenCalledOnce();
+    expect(useCollageStore.getState().phase).toBe("editing");
+    expect(useCollageStore.getState().error).toBe(en.errors.requestTimedOut);
+    expect(vi.getTimerCount()).toBe(0);
+
+    // Canceling via setting mutation disarms the watchdog and ignores a late ontimeout
+    fireEvent.click(screen.getByTestId("collage-submit"));
+    const canceledXhr = FakeXhr.instances[3];
+    expect(vi.getTimerCount()).toBe(1);
+    await act(async () => {
+      useCollageStore.getState().setGap(16);
+    });
+    expect(vi.getTimerCount()).toBe(0);
+    await act(async () => {
+      canceledXhr.ontimeout?.();
+    });
+    expect(useCollageStore.getState().phase).toBe("editing");
+    expect(useCollageStore.getState().error).toBeNull();
+
+    // Synchronous send() throw disarms the watchdog timer
+    vi.spyOn(FakeXhr.prototype, "send").mockImplementationOnce(() => {
+      throw new Error("collage sync send failure");
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("collage-submit"));
+    });
+    expect(vi.getTimerCount()).toBe(0);
+    expect(useCollageStore.getState().phase).toBe("editing");
+    expect(useCollageStore.getState().error).toBe("collage sync send failure");
+
+    // Unmount while in flight pauses the watchdog timer, and remounting resumes it
+    fireEvent.click(screen.getByTestId("collage-submit"));
+    const remountXhr = FakeXhr.instances[5];
+    expect(vi.getTimerCount()).toBe(1);
+    view.unmount();
+    expect(vi.getTimerCount()).toBe(0);
+
+    const remountedView = render(<CollageSettings />);
+    expect(vi.getTimerCount()).toBe(1);
+    await act(async () => {
+      vi.advanceTimersByTime(120_000);
+    });
+    expect(remountXhr.abort).toHaveBeenCalledOnce();
+    expect(useCollageStore.getState().phase).toBe("editing");
+    expect(useCollageStore.getState().error).toBe(en.errors.requestTimedOut);
+    expect(vi.getTimerCount()).toBe(0);
+    remountedView.unmount();
   });
 });
