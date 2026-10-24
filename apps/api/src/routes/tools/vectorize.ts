@@ -9,9 +9,10 @@ import { z } from "zod";
 import { sendInputValidationError } from "../../lib/engine-unavailable.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { sanitizeFilename } from "../../lib/filename.js";
+import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
-import { putObject } from "../../lib/object-storage.js";
+import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { inputHandlerFor } from "../../modality/input-handler.js";
 import { registerToolProcessFn } from "../tool-factory.js";
@@ -170,11 +171,12 @@ export function registerVectorize(app: FastifyInstance) {
         originalSize: fileBuffer.length,
         processedSize: result.buffer.length,
       });
-    } catch (err) {
-      if (err instanceof InputValidationError) {
-        return sendInputValidationError(reply, err, "vectorize", request.log);
+    } catch (rawErr) {
+      if (rawErr instanceof InputValidationError) {
+        return sendInputValidationError(reply, rawErr, "vectorize", request.log);
       }
-      if (hasServerErrorStatus(err)) throw err;
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
       return reply.status(422).send({
         error: "Vectorization failed",
         details: err instanceof Error ? err.message : "Unknown error",

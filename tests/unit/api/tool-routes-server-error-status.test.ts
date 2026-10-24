@@ -52,6 +52,7 @@ vi.mock("../../../apps/api/src/lib/browser-service.js", () => ({
   capturePage: async () => Buffer.from("png"),
 }));
 
+import * as aiMod from "@snapotter/ai";
 import * as engineUnavailableMod from "../../../apps/api/src/lib/engine-unavailable.js";
 import * as exiftoolMod from "../../../apps/api/src/lib/exiftool.js";
 import {
@@ -70,6 +71,8 @@ import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { registerBeautify } from "../../../apps/api/src/routes/tools/beautify.js";
 import { registerColorPalette } from "../../../apps/api/src/routes/tools/color-palette.js";
 import { registerCompare } from "../../../apps/api/src/routes/tools/compare.js";
+import { registerCompose } from "../../../apps/api/src/routes/tools/compose.js";
+import { registerContentAwareResize } from "../../../apps/api/src/routes/tools/content-aware-resize.js";
 import { registerEditMetadata } from "../../../apps/api/src/routes/tools/edit-metadata.js";
 import { registerFindDuplicates } from "../../../apps/api/src/routes/tools/find-duplicates.js";
 import { registerGifTools } from "../../../apps/api/src/routes/tools/gif-tools.js";
@@ -80,6 +83,7 @@ import { registerQrGenerate } from "../../../apps/api/src/routes/tools/qr-genera
 import { registerSplit } from "../../../apps/api/src/routes/tools/split.js";
 import { registerStitch } from "../../../apps/api/src/routes/tools/stitch.js";
 import { registerSvgToRaster } from "../../../apps/api/src/routes/tools/svg-to-raster.js";
+import { registerVectorize } from "../../../apps/api/src/routes/tools/vectorize.js";
 import { registerWatermarkImage } from "../../../apps/api/src/routes/tools/watermark-image.js";
 
 const SVG = Buffer.from(
@@ -1649,6 +1653,332 @@ describe("outer processing catches in color-palette, split, stitch, beautify, an
         memeMetaSpy.mockRestore();
       }
     } finally {
+      await app.close();
+    }
+  });
+});
+
+describe("outer processing catches in compare, watermark-image, compose, vectorize, and content-aware-resize (#3905)", () => {
+  const oomMessage =
+    "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+
+  beforeEach(() => {
+    putObject.mockReset().mockResolvedValue(undefined);
+  });
+
+  it("compare, watermark-image, compose, vectorize, and content-aware-resize surface 503 ENGINE_UNAVAILABLE on V8 buffer allocation RangeError, SIGKILL, or libheif allocation failure and 503 storage-full/storage-not-writable on operational write errnos in their outer catches, while keeping 422 on non-OOM errors (#3905)", async () => {
+    const png = await sharp({
+      create: { width: 16, height: 16, channels: 3, background: "#f00" },
+    })
+      .png()
+      .toBuffer();
+
+    const app = Fastify();
+    await app.register(multipart);
+    registerErrorHandler(app);
+    registerCompare(app);
+    registerWatermarkImage(app);
+    registerCompose(app);
+    registerVectorize(app);
+    registerContentAwareResize(app);
+    await app.ready();
+
+    const seamCarveSpy = vi
+      .spyOn(aiMod, "seamCarve")
+      .mockResolvedValue({ buffer: png, width: 8, height: 16 });
+
+    try {
+      const routeCases = [
+        {
+          toolId: "compare",
+          url: "/api/v1/tools/image/compare",
+          files: [
+            { name: "a.png", type: "image/png", data: png },
+            { name: "b.png", type: "image/png", data: png },
+          ],
+          settings: undefined,
+          expected422Error: "Comparison failed",
+        },
+        {
+          toolId: "watermark-image",
+          url: "/api/v1/tools/image/watermark-image",
+          files: [
+            { field: "file", name: "main.png", type: "image/png", data: png },
+            { field: "watermark", name: "wm.png", type: "image/png", data: png },
+          ],
+          settings: undefined,
+          expected422Error: "Processing failed",
+        },
+        {
+          toolId: "compose",
+          url: "/api/v1/tools/image/compose",
+          files: [
+            { field: "file", name: "base.png", type: "image/png", data: png },
+            { field: "overlay", name: "over.png", type: "image/png", data: png },
+          ],
+          settings: undefined,
+          expected422Error: "Processing failed",
+        },
+        {
+          toolId: "vectorize",
+          url: "/api/v1/tools/image/vectorize",
+          files: [{ name: "a.png", type: "image/png", data: png }],
+          settings: undefined,
+          expected422Error: "Vectorization failed",
+        },
+        {
+          toolId: "content-aware-resize",
+          url: "/api/v1/tools/image/content-aware-resize",
+          files: [{ name: "a.png", type: "image/png", data: png }],
+          settings: { width: 8 },
+          expected422Error: "Content-aware resize failed",
+        },
+      ] as const;
+
+      for (const route of routeCases) {
+        putObject
+          .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"))
+          .mockRejectedValueOnce(
+            Object.assign(new Error("worker exited SIGKILL"), { signal: "SIGKILL" }),
+          )
+          .mockRejectedValueOnce(
+            new Error(
+              "heif: Memory allocation error: Unspecified: Allocating 4147215 bytes failed",
+            ),
+          )
+          .mockRejectedValueOnce(
+            Object.assign(new Error("ENOSPC: no space left on device, open '/tmp/out'"), {
+              code: "ENOSPC",
+              syscall: "open",
+            }),
+          )
+          .mockRejectedValueOnce(
+            Object.assign(new Error("EACCES: permission denied, open '/tmp/out'"), {
+              code: "EACCES",
+              syscall: "open",
+            }),
+          )
+          .mockRejectedValueOnce(
+            Object.assign(new Error("EROFS: read-only file system, open '/tmp/out'"), {
+              code: "EROFS",
+              syscall: "open",
+            }),
+          )
+          .mockRejectedValueOnce(new RangeError("Invalid output parameter"));
+
+        for (let i = 0; i < 3; i++) {
+          const oomRes = await app.inject({
+            method: "POST",
+            url: route.url,
+            ...multipartBody([...route.files], route.settings),
+          });
+          expect(oomRes.statusCode, `${route.toolId} OOM #${i}: ${oomRes.body}`).toBe(503);
+          expect(oomRes.json()).toEqual({
+            error: oomMessage,
+            code: "ENGINE_UNAVAILABLE",
+          });
+        }
+
+        const enospcRes = await app.inject({
+          method: "POST",
+          url: route.url,
+          ...multipartBody([...route.files], route.settings),
+        });
+        expect(enospcRes.statusCode, `${route.toolId} ENOSPC: ${enospcRes.body}`).toBe(503);
+        expect(enospcRes.json()).toMatchObject({ code: "storage-full" });
+
+        for (const label of ["EACCES", "EROFS"]) {
+          const permRes = await app.inject({
+            method: "POST",
+            url: route.url,
+            ...multipartBody([...route.files], route.settings),
+          });
+          expect(permRes.statusCode, `${route.toolId} ${label}: ${permRes.body}`).toBe(503);
+          expect(permRes.json()).toMatchObject({ code: "storage-not-writable" });
+        }
+
+        const badRes = await app.inject({
+          method: "POST",
+          url: route.url,
+          ...multipartBody([...route.files], route.settings),
+        });
+        expect(badRes.statusCode, `${route.toolId} non-OOM: ${badRes.body}`).toBe(422);
+        expect(badRes.json()).toEqual({
+          error: route.expected422Error,
+          details: "Invalid output parameter",
+        });
+      }
+
+      // Direct post-prepare processing step faults:
+      // 1. compare diff PNG encode (sharp.prototype.png) hits V8 RangeError
+      const pngSpy = vi.spyOn(sharp.prototype, "png").mockImplementationOnce(function (
+        this: sharp.Sharp,
+      ) {
+        return {
+          toBuffer: async () => {
+            throw new RangeError("Array buffer allocation failed");
+          },
+        } as unknown as sharp.Sharp;
+      });
+      try {
+        const compareStepOom = await app.inject({
+          method: "POST",
+          url: "/api/v1/tools/image/compare",
+          ...multipartBody([
+            { name: "a.png", type: "image/png", data: png },
+            { name: "b.png", type: "image/png", data: png },
+          ]),
+        });
+        expect(compareStepOom.statusCode, compareStepOom.body).toBe(503);
+        expect(compareStepOom.json()).toEqual({
+          error: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+        });
+      } finally {
+        pngSpy.mockRestore();
+      }
+
+      // 2. watermark-image and compose composite step (sharp.prototype.composite) hits V8 RangeError
+      const compositeSpy = vi
+        .spyOn(sharp.prototype, "composite")
+        .mockImplementationOnce(function (this: sharp.Sharp) {
+          return {
+            toBuffer: async () => {
+              throw new RangeError("Array buffer allocation failed");
+            },
+            toFormat: () => ({
+              toBuffer: async () => {
+                throw new RangeError("Array buffer allocation failed");
+              },
+            }),
+          } as unknown as sharp.Sharp;
+        })
+        .mockImplementationOnce(function (this: sharp.Sharp) {
+          return {
+            toBuffer: async () => {
+              throw new RangeError("Array buffer allocation failed");
+            },
+            toFormat: () => ({
+              toBuffer: async () => {
+                throw new RangeError("Array buffer allocation failed");
+              },
+            }),
+          } as unknown as sharp.Sharp;
+        });
+      try {
+        const wmStepOom = await app.inject({
+          method: "POST",
+          url: "/api/v1/tools/image/watermark-image",
+          ...multipartBody([
+            { field: "file", name: "main.png", type: "image/png", data: png },
+            { field: "watermark", name: "wm.png", type: "image/png", data: png },
+          ]),
+        });
+        expect(wmStepOom.statusCode, wmStepOom.body).toBe(503);
+        expect(wmStepOom.json()).toEqual({
+          error: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+        });
+
+        const composeStepOom = await app.inject({
+          method: "POST",
+          url: "/api/v1/tools/image/compose",
+          ...multipartBody([
+            { field: "file", name: "base.png", type: "image/png", data: png },
+            { field: "overlay", name: "over.png", type: "image/png", data: png },
+          ]),
+        });
+        expect(composeStepOom.statusCode, composeStepOom.body).toBe(503);
+        expect(composeStepOom.json()).toEqual({
+          error: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+        });
+      } finally {
+        compositeSpy.mockRestore();
+      }
+
+      // 3. vectorize grayscale step (sharp.prototype.grayscale) hits V8 RangeError on HTTP route and registered process fn
+      const grayscaleSpy = vi
+        .spyOn(sharp.prototype, "grayscale")
+        .mockImplementationOnce(function (this: sharp.Sharp) {
+          return {
+            png: () => ({
+              toBuffer: async () => {
+                throw new RangeError("Array buffer allocation failed");
+              },
+            }),
+          } as unknown as sharp.Sharp;
+        })
+        .mockImplementationOnce(function (this: sharp.Sharp) {
+          return {
+            png: () => ({
+              toBuffer: async () => {
+                throw new RangeError("Array buffer allocation failed");
+              },
+            }),
+          } as unknown as sharp.Sharp;
+        });
+      try {
+        const vectorizeStepOom = await app.inject({
+          method: "POST",
+          url: "/api/v1/tools/image/vectorize",
+          ...multipartBody([{ name: "a.png", type: "image/png", data: png }]),
+        });
+        expect(vectorizeStepOom.statusCode, vectorizeStepOom.body).toBe(503);
+        expect(vectorizeStepOom.json()).toEqual({
+          error: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+        });
+
+        const vectorizeCfg = getToolConfig("vectorize");
+        if (!vectorizeCfg) throw new Error("vectorize missing from toolRegistry");
+        await expect(
+          vectorizeCfg.process(png, vectorizeCfg.settingsSchema.parse({}), "a.png"),
+        ).rejects.toMatchObject({
+          name: "DecoderOutOfMemoryError",
+          statusCode: 503,
+          code: "ENGINE_UNAVAILABLE",
+          message: oomMessage,
+        });
+      } finally {
+        grayscaleSpy.mockRestore();
+      }
+
+      // 4. content-aware-resize seamCarve rejects with V8 RangeError, SIGKILL, or ENOSPC
+      seamCarveSpy
+        .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"))
+        .mockRejectedValueOnce(
+          Object.assign(new Error("caire exited SIGKILL"), { signal: "SIGKILL" }),
+        )
+        .mockRejectedValueOnce(
+          Object.assign(new Error("ENOSPC: no space left on device, open '/tmp/caire'"), {
+            code: "ENOSPC",
+            syscall: "open",
+          }),
+        );
+
+      for (let i = 0; i < 2; i++) {
+        const carveOomRes = await app.inject({
+          method: "POST",
+          url: "/api/v1/tools/image/content-aware-resize",
+          ...multipartBody([{ name: "a.png", type: "image/png", data: png }], { width: 8 }),
+        });
+        expect(carveOomRes.statusCode, carveOomRes.body).toBe(503);
+        expect(carveOomRes.json()).toEqual({
+          error: oomMessage,
+          code: "ENGINE_UNAVAILABLE",
+        });
+      }
+
+      const carveEnospcRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/content-aware-resize",
+        ...multipartBody([{ name: "a.png", type: "image/png", data: png }], { width: 8 }),
+      });
+      expect(carveEnospcRes.statusCode, carveEnospcRes.body).toBe(503);
+      expect(carveEnospcRes.json()).toMatchObject({ code: "storage-full" });
+    } finally {
+      seamCarveSpy.mockRestore();
       await app.close();
     }
   });

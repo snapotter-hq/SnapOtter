@@ -188,6 +188,53 @@ describe("content-aware-resize route validation and prepare catch", () => {
     await expect(config.process(onePxPng, { width: 1 }, "a.png")).rejects.toBe(missingCaireErr);
   });
 
+  it("surfaces 503 ENGINE_UNAVAILABLE or storage-full/storage-not-writable when seamCarve rejects with V8 buffer allocation RangeError, SIGKILL, or operational write errnos on HTTP route and pipeline process fn (#3905)", async () => {
+    const oomMessage =
+      "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.";
+    const onePxPng = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      "base64",
+    );
+    for (const rawOom of [
+      new RangeError("Array buffer allocation failed"),
+      Object.assign(new Error("caire exited SIGKILL"), { signal: "SIGKILL" }),
+    ]) {
+      prepare.mockResolvedValueOnce({ buffer: onePxPng, filename: "a.png" });
+      seamCarve.mockRejectedValueOnce(rawOom);
+
+      const res = await send({ width: 50 });
+      expect(res.statusCode).toBe(503);
+      expect(res.json()).toEqual({
+        error: oomMessage,
+        code: "ENGINE_UNAVAILABLE",
+      });
+
+      const config = getToolConfig("content-aware-resize");
+      if (!config) throw new Error("content-aware-resize missing from toolRegistry");
+      seamCarve.mockRejectedValueOnce(rawOom);
+      await expect(config.process(onePxPng, { width: 1 }, "a.png")).rejects.toMatchObject({
+        name: "DecoderOutOfMemoryError",
+        statusCode: 503,
+        code: "ENGINE_UNAVAILABLE",
+        message: oomMessage,
+      });
+    }
+
+    for (const [errno, expectedCode] of [
+      ["ENOSPC", "storage-full"],
+      ["EACCES", "storage-not-writable"],
+      ["EROFS", "storage-not-writable"],
+    ] as const) {
+      prepare.mockResolvedValueOnce({ buffer: onePxPng, filename: "a.png" });
+      seamCarve.mockRejectedValueOnce(
+        Object.assign(new Error(`${errno}: write failed`), { code: errno, syscall: "open" }),
+      );
+      const res = await send({ width: 50 });
+      expect(res.statusCode).toBe(503);
+      expect(res.json()).toMatchObject({ code: expectedCode });
+    }
+  });
+
   it("wraps unexpected seamCarve failure as bug SafeError in pipeline process fn (#2828)", async () => {
     const config = getToolConfig("content-aware-resize");
     if (!config) throw new Error("content-aware-resize missing from toolRegistry");

@@ -5,8 +5,9 @@ import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { sendInputValidationError } from "../../lib/engine-unavailable.js";
 import { sanitizeFilename } from "../../lib/filename.js";
+import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
-import { putObject } from "../../lib/object-storage.js";
+import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { inputHandlerFor } from "../../modality/input-handler.js";
 
@@ -140,11 +141,12 @@ export function registerCompare(app: FastifyInstance) {
         originalSize: bufferA.length + bufferB.length,
         processedSize: diffBuffer.length,
       });
-    } catch (err) {
-      if (err instanceof InputValidationError) {
-        return sendInputValidationError(reply, err, "compare", request.log);
+    } catch (rawErr) {
+      if (rawErr instanceof InputValidationError) {
+        return sendInputValidationError(reply, rawErr, "compare", request.log);
       }
-      if (hasServerErrorStatus(err)) throw err;
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
       return reply.status(422).send({
         error: "Comparison failed",
         details: err instanceof Error ? err.message : "Unknown error",

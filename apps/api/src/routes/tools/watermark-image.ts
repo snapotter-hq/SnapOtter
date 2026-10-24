@@ -7,8 +7,9 @@ import { z } from "zod";
 import { sendInputValidationError } from "../../lib/engine-unavailable.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { sanitizeFilename } from "../../lib/filename.js";
+import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
-import { putObject } from "../../lib/object-storage.js";
+import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 import { resolveOutputFormat } from "../../lib/output-format.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { inputHandlerFor } from "../../modality/input-handler.js";
@@ -196,11 +197,12 @@ export function registerWatermarkImage(app: FastifyInstance) {
         originalSize: mainBuffer.length,
         processedSize: result.length,
       });
-    } catch (err) {
-      if (err instanceof InputValidationError) {
-        return sendInputValidationError(reply, err, "watermark-image", request.log);
+    } catch (rawErr) {
+      if (rawErr instanceof InputValidationError) {
+        return sendInputValidationError(reply, rawErr, "watermark-image", request.log);
       }
-      if (hasServerErrorStatus(err)) throw err;
+      const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
+      if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
       return reply.status(422).send({
         error: "Processing failed",
         details: err instanceof Error ? err.message : "Image processing failed",
