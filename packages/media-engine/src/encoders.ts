@@ -118,19 +118,36 @@ export function parseEncoderNames(stdout: string): Set<string> {
 
 interface Probe {
   /**
+   * The binary path the inventory was read from. Null when the binary could
+   * not be located or when a test pinned the inventory.
+   */
+  bin: string | null;
+  /**
    * Null when the list could not be read. The hardware gate treats that as
    * "absent"; the software check treats it as "unknown" and fails open.
    */
   names: ReadonlySet<string> | null;
   /** Why it could not be read. Null on success. */
   error: string | null;
+  /**
+   * Per-encoder trial-encode outcomes, populated lazily on first check of a
+   * listed hardware encoder and cached for the life of the probe (#1089).
+   */
+  usable: Map<string, boolean>;
 }
 
 let probe: Probe | undefined;
 
 function runProbe(): Probe {
   const bin = resolveFfmpeg();
-  if (!bin) return { names: null, error: "no ffmpeg binary found (set FFMPEG_PATH)" };
+  if (!bin) {
+    return {
+      bin: null,
+      names: null,
+      error: "no ffmpeg binary found (set FFMPEG_PATH)",
+      usable: new Map(),
+    };
+  }
 
   const res = spawnSync(bin, ["-hide_banner", "-encoders"], {
     encoding: "utf8",
@@ -140,16 +157,75 @@ function runProbe(): Probe {
   // Distinguish the failure modes: a missing path, a non-executable binary, a
   // timeout and a crash all need different fixes from the admin, and a bare
   // "could not read" sends them looking in the wrong place.
-  if (res.error) return { names: null, error: `${bin}: ${res.error.message}` };
+  if (res.error) {
+    return { bin, names: null, error: `${bin}: ${res.error.message}`, usable: new Map() };
+  }
   if (res.status !== 0) {
     const detail = (res.stderr ?? "").trim().slice(-200);
     const how = res.status === null ? `signal ${res.signal ?? "unknown"}` : `code ${res.status}`;
-    return { names: null, error: `${bin} -encoders exited ${how}${detail ? `: ${detail}` : ""}` };
+    return {
+      bin,
+      names: null,
+      error: `${bin} -encoders exited ${how}${detail ? `: ${detail}` : ""}`,
+      usable: new Map(),
+    };
   }
   const names = parseEncoderNames(res.stdout ?? "");
   return names.size > 0
-    ? { names, error: null }
-    : { names: null, error: `${bin} -encoders printed no recognisable encoder rows` };
+    ? { bin, names, error: null, usable: new Map() }
+    : {
+        bin,
+        names: null,
+        error: `${bin} -encoders printed no recognisable encoder rows`,
+        usable: new Map(),
+      };
+}
+
+/**
+ * Encode one blank 256x256 frame to the null muxer (#1089).
+ *
+ * Listing an encoder in `ffmpeg -encoders` only proves the binary was compiled
+ * with its wrapper: NVENC dlopens `libnvidia-encode.so.1` at encode time and
+ * VAAPI needs a render node plus `hwupload` filter plumbing, so both appear in
+ * general-purpose builds on hosts that cannot run them.
+ *
+ * 256x256 rather than 64x64: Turing and newer NVIDIA GPUs enforce a 145px
+ * minimum width on h264_nvenc (129px on hevc_nvenc) and reject a 64x64 trial
+ * frame with `Frame Dimension less than the minimum supported value`.
+ */
+function runTrialEncode(bin: string, encoder: string): boolean {
+  const res = spawnSync(
+    bin,
+    [
+      "-hide_banner",
+      "-f",
+      "lavfi",
+      "-i",
+      "nullsrc=s=256x256",
+      "-frames:v",
+      "1",
+      "-c:v",
+      encoder,
+      "-f",
+      "null",
+      "-",
+    ],
+    {
+      encoding: "utf8",
+      timeout: PROBE_TIMEOUT_MS,
+      maxBuffer: PROBE_MAX_BUFFER,
+    },
+  );
+  return !res.error && res.status === 0;
+}
+
+function canRun(p: Probe, encoder: string): boolean {
+  if (!p.names?.has(encoder)) return false;
+  const cached = p.usable.get(encoder);
+  if (cached !== undefined) return cached;
+  const ok = p.bin ? runTrialEncode(p.bin, encoder) : false;
+  p.usable.set(encoder, ok);
+  return ok;
 }
 
 /**
@@ -164,9 +240,32 @@ function encoderProbe(): Probe {
   return probe;
 }
 
-/** Pin the inventory instead of probing. `undefined` restores real probing. */
-export function setEncoderInventoryForTests(names: ReadonlySet<string> | null | undefined): void {
-  probe = names === undefined ? undefined : { names, error: names ? null : "pinned by test" };
+/**
+ * Pin the inventory instead of probing. `undefined` restores real probing.
+ * `usable` defaults to `names` so unit tests that pin an inventory do not
+ * spawn a trial encode; pass a subset to simulate listed encoders whose trial
+ * encode fails (#1089).
+ */
+export function setEncoderInventoryForTests(
+  names: ReadonlySet<string> | null | undefined,
+  usable: ReadonlySet<string> = names ?? new Set(),
+): void {
+  if (names === undefined) {
+    probe = undefined;
+    return;
+  }
+  const usableMap = new Map<string, boolean>();
+  if (names) {
+    for (const name of names) {
+      usableMap.set(name, usable.has(name));
+    }
+  }
+  probe = {
+    bin: null,
+    names,
+    error: names ? null : "pinned by test",
+    usable: usableMap,
+  };
 }
 
 /**
@@ -174,20 +273,20 @@ export function setEncoderInventoryForTests(names: ReadonlySet<string> | null | 
  * family. Unknown values, and families this ffmpeg build cannot actually run,
  * fall back to software.
  *
- * The availability check is not belt-and-braces. The published image's static
- * ffmpeg ships QSV and v4l2m2m only, with no NVENC or VAAPI on either arch or
- * inside the CUDA image, so a documented `SNAPOTTER_HW_ACCEL=nvenc` used to
- * resolve to `h264_nvenc` and kill every re-encoding job with
- * `Unknown encoder 'h264_nvenc'` (#1054).
+ * The availability check has two halves: `ffmpeg -encoders` rejects encoders
+ * the binary was not compiled with (#1054), and a cached 1-frame trial encode
+ * rejects encoders that are compiled in (as NVENC and VAAPI are on most
+ * general-purpose Linux builds) when the driver, device or filter plumbing is
+ * missing (#1089).
  *
  * Throws when the software encoder it would fall back to is not listed by
  * this build either (#1092); see requireSoftware.
  */
 export function resolveEncoder(target: EncoderTarget): string {
   const hardware = requestedFamily().map?.[target];
-  const { names } = encoderProbe();
-  if (hardware && names?.has(hardware)) return hardware;
-  return requireSoftware(target, names);
+  const p = encoderProbe();
+  if (hardware && canRun(p, hardware)) return hardware;
+  return requireSoftware(target, p.names);
 }
 
 /**
@@ -329,10 +428,12 @@ export interface HwAccelStatus {
   requested: string | null;
   /** Whether `requested` names a family this seam knows about. */
   recognized: boolean;
-  /** Hardware encoders this build lists, so they will be used. */
+  /** Hardware encoders this build lists and a trial encode ran, so they will be used. */
   active: string[];
   /** Hardware encoders this family maps to that the build does not list. */
   missing: string[];
+  /** Hardware encoders the build lists that failed a trial encode (#1089). */
+  unusable: string[];
   /** Targets the family has no hardware encoder for; they stay on software. */
   unmapped: EncoderTarget[];
   /**
@@ -347,9 +448,9 @@ export interface HwAccelStatus {
  * this at startup so an admin who sets a family this build cannot run learns
  * it from the boot log rather than from unchanged encode times.
  *
- * "Active" means the build lists the encoder, which is not the same as being
- * able to run it: a general-purpose ffmpeg lists h264_nvenc whether or not an
- * NVIDIA device is present. Word any message accordingly.
+ * Each listed hardware encoder is trial-encoded once (#1089), so `active` only
+ * includes encoders that opened and encoded a frame on this host; listed
+ * encoders that failed the trial land in `unusable`.
  */
 export function hwAccelStatus(): HwAccelStatus {
   const { name, map } = requestedFamily();
@@ -359,26 +460,30 @@ export function hwAccelStatus(): HwAccelStatus {
       recognized: false,
       active: [],
       missing: [],
+      unusable: [],
       unmapped: [],
       probeError: null,
     };
   }
 
-  const { names, error } = encoderProbe();
+  const p = encoderProbe();
   const active: string[] = [];
   const missing: string[] = [];
+  const unusable: string[] = [];
   for (const target of ALL_TARGETS) {
     const hardware = map[target];
     if (!hardware) continue;
-    if (names?.has(hardware)) active.push(hardware);
-    else missing.push(hardware);
+    if (!p.names?.has(hardware)) missing.push(hardware);
+    else if (canRun(p, hardware)) active.push(hardware);
+    else unusable.push(hardware);
   }
   return {
     requested: name,
     recognized: true,
     active,
     missing,
+    unusable,
     unmapped: ALL_TARGETS.filter((t) => !map[t]),
-    probeError: error,
+    probeError: p.error,
   };
 }

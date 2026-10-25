@@ -2,8 +2,10 @@ import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
+import { logHwAccel } from "../../../apps/api/src/jobs/worker.js";
 import { classifyError } from "../../../apps/api/src/lib/error-report.js";
 import { friendlyError } from "../../../apps/api/src/lib/errors.js";
+import { logger } from "../../../apps/api/src/lib/logger.js";
 import {
   HW_ACCEL_FAMILIES,
   hwAccelStatus,
@@ -116,6 +118,22 @@ describe("resolveEncoder", () => {
     expect(resolveEncoder("av1")).toBe("av1_nvenc");
   });
 
+  it("falls back to software when the build lists the hardware encoder and the trial encode fails (#1089)", () => {
+    setEncoderInventoryForTests(WITH_NVENC, QSV_ONLY);
+    process.env.SNAPOTTER_HW_ACCEL = "nvenc";
+    expect(resolveEncoder("h264")).toBe("libx264");
+    expect(resolveEncoder("hevc")).toBe("libx265");
+    expect(resolveEncoder("av1")).toBe("libsvtav1");
+  });
+
+  it("uses only the hardware encoders whose trial encode succeeds on a mixed-capability GPU (#1089)", () => {
+    setEncoderInventoryForTests(WITH_NVENC, new Set([...QSV_ONLY, "h264_nvenc", "hevc_nvenc"]));
+    process.env.SNAPOTTER_HW_ACCEL = "nvenc";
+    expect(resolveEncoder("h264")).toBe("h264_nvenc");
+    expect(resolveEncoder("hevc")).toBe("hevc_nvenc");
+    expect(resolveEncoder("av1")).toBe("libsvtav1");
+  });
+
   it("treats an unreadable inventory as absent", () => {
     setEncoderInventoryForTests(null);
     process.env.SNAPOTTER_HW_ACCEL = "nvenc";
@@ -157,6 +175,12 @@ describe("resolveEncoder on a build that lacks a software encoder (#1092)", () =
     setEncoderInventoryForTests(new Set([...NO_LIBX264, "h264_nvenc"]));
     process.env.SNAPOTTER_HW_ACCEL = "nvenc";
     expect(resolveEncoder("h264")).toBe("h264_nvenc");
+  });
+
+  it("throws when a listed hardware encoder fails the trial encode and the software fallback is missing (#1089)", () => {
+    setEncoderInventoryForTests(new Set([...NO_LIBX264, "h264_nvenc"]), NO_LIBX264);
+    process.env.SNAPOTTER_HW_ACCEL = "nvenc";
+    expect(() => resolveEncoder("h264")).toThrow(/libx264/);
   });
 
   /**
@@ -353,6 +377,28 @@ describe("hwAccelStatus", () => {
     const status = hwAccelStatus();
     expect(status.active).toEqual([]);
     expect(status.missing).toEqual(["h264_nvenc", "hevc_nvenc", "av1_nvenc"]);
+    expect(status.unusable).toEqual([]);
+  });
+
+  it("moves listed encoders that fail the trial encode from active to unusable (#1089)", () => {
+    setEncoderInventoryForTests(WITH_NVENC, QSV_ONLY);
+    process.env.SNAPOTTER_HW_ACCEL = "nvenc";
+    const status = hwAccelStatus();
+    expect(status.active).toEqual([]);
+    expect(status.missing).toEqual([]);
+    expect(status.unusable).toEqual(["h264_nvenc", "hevc_nvenc", "av1_nvenc"]);
+  });
+
+  it("separates active, unusable and missing across a partial inventory (#1089)", () => {
+    setEncoderInventoryForTests(
+      new Set([...QSV_ONLY, "h264_nvenc", "hevc_nvenc"]),
+      new Set([...QSV_ONLY, "h264_nvenc"]),
+    );
+    process.env.SNAPOTTER_HW_ACCEL = "nvenc";
+    const status = hwAccelStatus();
+    expect(status.active).toEqual(["h264_nvenc"]);
+    expect(status.unusable).toEqual(["hevc_nvenc"]);
+    expect(status.missing).toEqual(["av1_nvenc"]);
   });
 
   it("names the targets a family cannot accelerate at all", () => {
@@ -452,9 +498,11 @@ describe("encoder probe against a stub ffmpeg", () => {
   /**
    * resolveEncoder is called up to four times while building one ffmpeg
    * command line, and the probe is a blocking spawn. Without the cache every
-   * call would fork a process on the worker's event loop.
+   * call would fork a process on the worker's event loop. With a family set,
+   * the inventory probe and each listed hardware encoder's trial encode run at
+   * most once per process (#1089).
    */
-  it("probes at most once per process", async () => {
+  it("probes the inventory and each listed hardware encoder at most once per process", async () => {
     const counter = join(dir, "calls.log");
     const mod = await freshEncoders(stub("count.sh", { lines: TABLE, countTo: counter }));
     process.env.SNAPOTTER_HW_ACCEL = "nvenc";
@@ -462,7 +510,74 @@ describe("encoder probe against a stub ffmpeg", () => {
     mod.resolveEncoder("hevc");
     mod.resolveEncoder("h264");
     mod.hwAccelStatus();
-    expect(readFileSync(counter, "utf8").trim().split("\n")).toHaveLength(1);
+    // 1 spawn for `ffmpeg -encoders` + 1 trial encode for the single listed
+    // hardware encoder (`h264_nvenc`); `hevc_nvenc` and `av1_nvenc` are not in
+    // TABLE so they are never trial-encoded.
+    expect(readFileSync(counter, "utf8").trim().split("\n")).toHaveLength(2);
+  });
+
+  it("falls back to software when the stub lists h264_nvenc and the trial encode fails (#1089)", async () => {
+    const counter = join(dir, "calls-no-gpu.log");
+    const bin = join(dir, "nvenc-no-gpu.sh");
+    const noGpuLines = [
+      "#!/bin/sh",
+      `echo x >> ${counter}`,
+      'case "$*" in',
+      "  *-encoders*)",
+      "    cat <<'FFEOF'",
+      ...TABLE,
+      "FFEOF",
+      "    exit 0",
+      "    ;;",
+      "  *)",
+      '    echo "[h264_nvenc @ 0x1] Cannot load libnvidia-encode.so.1" >&2',
+      "    exit 1",
+      "    ;;",
+      "esac",
+    ];
+    writeFileSync(bin, `${noGpuLines.join("\n")}\n`);
+    chmodSync(bin, 0o755);
+
+    const mod = await freshEncoders(bin);
+    process.env.SNAPOTTER_HW_ACCEL = "nvenc";
+    expect(mod.resolveEncoder("h264")).toBe("libx264");
+    expect(mod.resolveEncoder("h264")).toBe("libx264");
+    const status = mod.hwAccelStatus();
+    expect(status.active).toEqual([]);
+    expect(status.unusable).toEqual(["h264_nvenc"]);
+    expect(status.missing).toEqual(["hevc_nvenc", "av1_nvenc"]);
+    expect(status.probeError).toBeNull();
+    // Failed trial encodes must be cached too (1 -encoders probe + 1 failed trial).
+    expect(readFileSync(counter, "utf8").trim().split("\n")).toHaveLength(2);
+  });
+
+  it("trial-encodes at 256x256 so Turing+ NVENC minimum width (145px) does not reject the probe (#1089)", async () => {
+    const bin = join(dir, "nvenc-min-dim.sh");
+    const minDimLines = [
+      "#!/bin/sh",
+      'case "$*" in',
+      "  *-encoders*)",
+      "    cat <<'FFEOF'",
+      ...TABLE,
+      "FFEOF",
+      "    exit 0",
+      "    ;;",
+      "  *nullsrc=s=256x256*)",
+      "    exit 0",
+      "    ;;",
+      "  *)",
+      '    echo "[h264_nvenc @ 0x1] Frame Dimension less than the minimum supported value" >&2',
+      "    exit 1",
+      "    ;;",
+      "esac",
+    ];
+    writeFileSync(bin, `${minDimLines.join("\n")}\n`);
+    chmodSync(bin, 0o755);
+
+    const mod = await freshEncoders(bin);
+    process.env.SNAPOTTER_HW_ACCEL = "nvenc";
+    expect(mod.resolveEncoder("h264")).toBe("h264_nvenc");
+    expect(mod.hwAccelStatus().active).toEqual(["h264_nvenc"]);
   });
 
   /**
@@ -508,5 +623,131 @@ describe("parseEncoderNames", () => {
     expect(names.has("libx264")).toBe(true);
     expect(names.has("=")).toBe(false);
     expect(names.has("Video")).toBe(false);
+  });
+});
+
+describe("logHwAccel (#1089)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("logs nothing when SNAPOTTER_HW_ACCEL is unset", () => {
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const info = vi.spyOn(logger, "info").mockImplementation(() => {});
+    delete process.env.SNAPOTTER_HW_ACCEL;
+
+    logHwAccel();
+
+    expect(warn).not.toHaveBeenCalled();
+    expect(info).not.toHaveBeenCalled();
+  });
+
+  it("warns on an unrecognised encoder family", () => {
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const info = vi.spyOn(logger, "info").mockImplementation(() => {});
+    process.env.SNAPOTTER_HW_ACCEL = "quantum";
+
+    logHwAccel();
+
+    expect(info).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0]?.[1]).toBe(
+      'SNAPOTTER_HW_ACCEL="quantum" is not a recognised encoder family (nvenc, vaapi); using software encoders',
+    );
+  });
+
+  it("warns that the build lists none of them when none are in the inventory", () => {
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const info = vi.spyOn(logger, "info").mockImplementation(() => {});
+    setEncoderInventoryForTests(QSV_ONLY);
+    process.env.SNAPOTTER_HW_ACCEL = "nvenc";
+
+    logHwAccel();
+
+    expect(info).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0]?.[1]).toBe(
+      'SNAPOTTER_HW_ACCEL="nvenc" was requested but this ffmpeg build lists none of them; using software encoders',
+    );
+  });
+
+  it("warns with the probe error when the encoder list could not be read", () => {
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const info = vi.spyOn(logger, "info").mockImplementation(() => {});
+    setEncoderInventoryForTests(null);
+    process.env.SNAPOTTER_HW_ACCEL = "nvenc";
+
+    logHwAccel();
+
+    expect(info).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0]?.[1]).toBe(
+      'SNAPOTTER_HW_ACCEL="nvenc" was requested but pinned by test; using software encoders',
+    );
+  });
+
+  it("warns when the build lists the encoders and their trial encode fails", () => {
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const info = vi.spyOn(logger, "info").mockImplementation(() => {});
+    setEncoderInventoryForTests(WITH_NVENC, QSV_ONLY);
+    process.env.SNAPOTTER_HW_ACCEL = "nvenc";
+
+    logHwAccel();
+
+    expect(info).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0]?.[0]).toEqual({
+      requested: "nvenc",
+      missing: [],
+      unusable: ["h264_nvenc", "hevc_nvenc", "av1_nvenc"],
+      probeError: null,
+    });
+    expect(warn.mock.calls[0]?.[1]).toBe(
+      'SNAPOTTER_HW_ACCEL="nvenc" was requested but trial encode failed for h264_nvenc, hevc_nvenc, av1_nvenc; using software encoders',
+    );
+  });
+
+  it("warns when some encoders pass the trial encode and others are missing or unusable", () => {
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const info = vi.spyOn(logger, "info").mockImplementation(() => {});
+    setEncoderInventoryForTests(
+      new Set([...QSV_ONLY, "h264_nvenc", "hevc_nvenc"]),
+      new Set([...QSV_ONLY, "h264_nvenc"]),
+    );
+    process.env.SNAPOTTER_HW_ACCEL = "nvenc";
+
+    logHwAccel();
+
+    expect(info).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0]?.[0]).toEqual({
+      requested: "nvenc",
+      active: ["h264_nvenc"],
+      missing: ["av1_nvenc"],
+      unusable: ["hevc_nvenc"],
+    });
+    expect(warn.mock.calls[0]?.[1]).toBe(
+      'SNAPOTTER_HW_ACCEL="nvenc" is partly available; av1_nvenc, hevc_nvenc fall back to software; vp9, aac, opus, mp3, vorbis, theora, webp always use software',
+    );
+  });
+
+  it("logs 'Hardware encoders enabled' when every encoder in the family passes the trial encode", () => {
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const info = vi.spyOn(logger, "info").mockImplementation(() => {});
+    setEncoderInventoryForTests(WITH_NVENC);
+    process.env.SNAPOTTER_HW_ACCEL = "nvenc";
+
+    logHwAccel();
+
+    expect(warn).not.toHaveBeenCalled();
+    expect(info).toHaveBeenCalledOnce();
+    expect(info.mock.calls[0]?.[0]).toEqual({
+      requested: "nvenc",
+      active: ["h264_nvenc", "hevc_nvenc", "av1_nvenc"],
+      unmapped: ["vp9", "aac", "opus", "mp3", "vorbis", "theora", "webp"],
+    });
+    expect(info.mock.calls[0]?.[1]).toBe(
+      "Hardware encoders enabled: h264_nvenc, hevc_nvenc, av1_nvenc; vp9, aac, opus, mp3, vorbis, theora, webp always use software",
+    );
   });
 });

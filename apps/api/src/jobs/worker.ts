@@ -2974,12 +2974,10 @@ function logMissingSoftwareEncoders(): void {
  * value is invisible: encoding silently stays on software and the only symptom
  * is that nothing got faster (#1054).
  *
- * Deliberately says "listed by" rather than "enabled": the probe reads
- * `ffmpeg -encoders`, which proves the encoder was compiled in, not that it
- * can run. A general-purpose ffmpeg lists h264_nvenc with or without an
- * NVIDIA device present (#1089).
+ * `hwAccelStatus` trial-encodes a frame per listed hardware encoder (#1089),
+ * so `active` only names encoders that actually ran on this host.
  */
-function logHwAccel(): void {
+export function logHwAccel(): void {
   const status = hwAccelStatus();
   if (!status.requested) return;
 
@@ -2995,25 +2993,40 @@ function logHwAccel(): void {
   }
 
   if (status.active.length === 0) {
-    const why = status.probeError ?? "this ffmpeg build lists none of them";
+    const why =
+      status.probeError ??
+      (status.unusable.length > 0
+        ? `trial encode failed for ${status.unusable.join(", ")}`
+        : "this ffmpeg build lists none of them");
     logger.warn(
-      { requested: status.requested, missing: status.missing, probeError: status.probeError },
+      {
+        requested: status.requested,
+        missing: status.missing,
+        unusable: status.unusable,
+        probeError: status.probeError,
+      },
       `SNAPOTTER_HW_ACCEL="${status.requested}" was requested but ${why}; using software encoders`,
     );
     return;
   }
 
-  if (status.missing.length > 0) {
+  const fallback = [...status.missing, ...status.unusable];
+  if (fallback.length > 0) {
     logger.warn(
-      { requested: status.requested, active: status.active, missing: status.missing },
-      `SNAPOTTER_HW_ACCEL="${status.requested}" is partly available; ${status.missing.join(", ")} fall back to software${softwareNote}`,
+      {
+        requested: status.requested,
+        active: status.active,
+        missing: status.missing,
+        unusable: status.unusable,
+      },
+      `SNAPOTTER_HW_ACCEL="${status.requested}" is partly available; ${fallback.join(", ")} fall back to software${softwareNote}`,
     );
     return;
   }
 
   logger.info(
     { requested: status.requested, active: status.active, unmapped: status.unmapped },
-    `Hardware encoders listed by this ffmpeg build: ${status.active.join(", ")}${softwareNote}`,
+    `Hardware encoders enabled: ${status.active.join(", ")}${softwareNote}`,
   );
 }
 
