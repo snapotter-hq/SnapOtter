@@ -1,4 +1,4 @@
-import { resolveEncoder, videoCodecArgs } from "@snapotter/media-engine";
+import { resolveEncoder, videoCodecArgs, withVaapiEncodeArgs } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { mp4TimescaleArgs, runMediaTool } from "../../lib/media-tool.js";
@@ -51,7 +51,7 @@ export function registerConvertVideo(app: FastifyInstance) {
           ];
         }
         if (settings.format === "avi") {
-          return [
+          return withVaapiEncodeArgs([
             "-i",
             inPath,
             ...videoCodecArgs("h264", CRF[settings.quality].h264),
@@ -62,10 +62,10 @@ export function registerConvertVideo(app: FastifyInstance) {
             "-b:a",
             "192k",
             out,
-          ];
+          ]);
         }
         if (settings.format === "mkv") {
-          return [
+          return withVaapiEncodeArgs([
             "-i",
             inPath,
             ...videoCodecArgs("h264", CRF[settings.quality].h264),
@@ -76,10 +76,10 @@ export function registerConvertVideo(app: FastifyInstance) {
             "-b:a",
             "128k",
             out,
-          ];
+          ]);
         }
         // mp4 and mov
-        return [
+        return withVaapiEncodeArgs([
           "-i",
           inPath,
           ...videoCodecArgs("h264", CRF[settings.quality].h264),
@@ -93,7 +93,7 @@ export function registerConvertVideo(app: FastifyInstance) {
           "-movflags",
           "+faststart",
           out,
-        ];
+        ]);
       });
       return {
         scratchPath: outPath,

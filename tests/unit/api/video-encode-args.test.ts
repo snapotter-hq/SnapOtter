@@ -35,6 +35,8 @@ const WITH_NVENC = new Set([
   "h264_nvenc",
   "hevc_nvenc",
   "av1_nvenc",
+  "h264_vaapi",
+  "hevc_vaapi",
 ]);
 
 describe("videoEncodeArgsForContainer", () => {
@@ -71,6 +73,29 @@ describe("videoEncodeArgsForContainer", () => {
       "p5",
       "-pix_fmt",
       "yuv420p",
+    ]);
+  });
+
+  it("switches to VAAPI rate control and drops -pix_fmt yuv420p when h264_vaapi is resolved (#3977)", () => {
+    setEncoderInventoryForTests(WITH_NVENC);
+    process.env.SNAPOTTER_HW_ACCEL = "vaapi";
+    expect(videoEncodeArgsForContainer(".mp4")).toEqual([
+      "-c:v",
+      "h264_vaapi",
+      "-rc_mode",
+      "CQP",
+      "-qp",
+      "20",
+      "-video_track_timescale",
+      "90000",
+    ]);
+    expect(videoEncodeArgsForContainer(".mkv")).toEqual([
+      "-c:v",
+      "h264_vaapi",
+      "-rc_mode",
+      "CQP",
+      "-qp",
+      "20",
     ]);
   });
 
@@ -141,6 +166,15 @@ describe("no API code resolves a rate-controlled video encoder by hand", () => {
         (/function codecForContainer\b/.test(readFileSync(file, "utf8")) ||
           /resolveEncoder\("theora"\)/.test(readFileSync(file, "utf8"))),
     );
+    expect(offenders.map((file) => file.slice(root.length + 1))).toEqual([]);
+  });
+
+  it("threads every route calling videoCodecArgs through withVaapiEncodeArgs (#3977)", () => {
+    const offenders = files.filter((file) => {
+      if (file.endsWith("media-tool.ts")) return false;
+      const src = readFileSync(file, "utf8");
+      return src.includes("videoCodecArgs(") && !src.includes("withVaapiEncodeArgs(");
+    });
     expect(offenders.map((file) => file.slice(root.length + 1))).toEqual([]);
   });
 });

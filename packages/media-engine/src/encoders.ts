@@ -45,6 +45,12 @@ const VAAPI: Partial<Record<EncoderTarget, string>> = {
   hevc: "hevc_vaapi",
 };
 
+/** Default DRM render node for VAAPI hardware encoding on Linux (#3977). */
+export const VAAPI_DEVICE = "/dev/dri/renderD128";
+
+/** Filter chain that converts software frames to NV12 and uploads them to a VAAPI surface (#3977). */
+export const VAAPI_FILTER = "format=nv12,hwupload";
+
 const FAMILIES: Record<string, Partial<Record<EncoderTarget, string>>> = {
   nvenc: NVENC,
   vaapi: VAAPI,
@@ -194,14 +200,17 @@ function runProbe(): Probe {
  * frame with `Frame Dimension less than the minimum supported value`.
  */
 function runTrialEncode(bin: string, encoder: string): boolean {
+  const vaapi = isVaapiEncoder(encoder);
   const res = spawnSync(
     bin,
     [
       "-hide_banner",
+      ...(vaapi ? ["-vaapi_device", VAAPI_DEVICE] : []),
       "-f",
       "lavfi",
       "-i",
       "nullsrc=s=256x256",
+      ...(vaapi ? ["-vf", VAAPI_FILTER] : []),
       "-frames:v",
       "1",
       "-c:v",
@@ -391,6 +400,64 @@ function rateControlFamily(encoder: string): "software" | "nvenc" | "vaapi" | nu
     if (encoder === VAAPI[target]) return "vaapi";
   }
   return null;
+}
+
+/** Whether `encoder` is a VAAPI hardware encoder (`h264_vaapi`, `hevc_vaapi`). */
+export function isVaapiEncoder(encoder: string): boolean {
+  return rateControlFamily(encoder) === "vaapi";
+}
+
+/**
+ * Threads VAAPI device initialization and surface upload into an ffmpeg
+ * argument list when its video encoder (`-c:v`) is a VAAPI encoder (#3977).
+ *
+ * VAAPI encoders only accept `vaapi` hardware surfaces: ffmpeg needs
+ * `-vaapi_device /dev/dri/renderD128` before `-i`, `format=nv12,hwupload`
+ * at the tail of the video filter chain (appended to an existing `-vf` or
+ * `-filter_complex` `[v]` output pad rather than passed as a second `-vf`
+ * that would overwrite the route's filter), and no `-pix_fmt yuv420p` on
+ * the output stream. Returns `args` unchanged for software and NVENC.
+ */
+export function withVaapiEncodeArgs(args: string[]): string[] {
+  const cvIdx = args.indexOf("-c:v");
+  const encoder = cvIdx !== -1 ? args[cvIdx + 1] : undefined;
+  if (!encoder || !isVaapiEncoder(encoder)) return args;
+
+  const out: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "-pix_fmt" && i + 1 < args.length) {
+      i++;
+      continue;
+    }
+    out.push(args[i]);
+  }
+
+  const vfIdx = out.indexOf("-vf");
+  const fcIdx = out.indexOf("-filter_complex");
+  if (vfIdx !== -1 && vfIdx + 1 < out.length) {
+    const current = out[vfIdx + 1];
+    if (current !== VAAPI_FILTER && !current.endsWith(`,${VAAPI_FILTER}`)) {
+      out[vfIdx + 1] = current ? `${current},${VAAPI_FILTER}` : VAAPI_FILTER;
+    }
+  } else if (fcIdx !== -1 && fcIdx + 1 < out.length) {
+    const current = out[fcIdx + 1];
+    const suffix = `;[v]${VAAPI_FILTER}[v]`;
+    if (!current.endsWith(suffix)) {
+      if (!current.includes("[v]")) {
+        throw new Error("withVaapiEncodeArgs: -filter_complex must label its video output pad [v]");
+      }
+      out[fcIdx + 1] = `${current}${suffix}`;
+    }
+  } else {
+    const outCvIdx = out.indexOf("-c:v");
+    out.splice(outCvIdx, 0, "-vf", VAAPI_FILTER);
+  }
+
+  if (!out.includes("-vaapi_device")) {
+    out.unshift("-vaapi_device", VAAPI_DEVICE);
+  }
+
+  return out;
 }
 
 /**

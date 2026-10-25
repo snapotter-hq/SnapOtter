@@ -1,6 +1,13 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { probeMedia, resolveEncoder, runFfmpeg, videoCodecArgs } from "@snapotter/media-engine";
+import {
+  isVaapiEncoder,
+  probeMedia,
+  resolveEncoder,
+  runFfmpeg,
+  videoCodecArgs,
+  withVaapiEncodeArgs,
+} from "@snapotter/media-engine";
 import type { ToolProcessCtxV2 } from "../routes/tool-factory.js";
 
 const EXT_VIDEO_CONTENT_TYPES: Record<string, string> = {
@@ -61,7 +68,9 @@ export function videoEncodeArgsForContainer(ext: string): string[] {
   if (lower === ".ogv" || lower === ".ogg") {
     return ["-c:v", resolveEncoder("theora"), "-q:v", "7"];
   }
-  return [...videoCodecArgs("h264", 20), "-pix_fmt", "yuv420p", ...mp4TimescaleArgs(lower)];
+  const codecArgs = videoCodecArgs("h264", 20);
+  const pixFmtArgs = isVaapiEncoder(codecArgs[1]) ? [] : ["-pix_fmt", "yuv420p"];
+  return [...codecArgs, ...pixFmtArgs, ...mp4TimescaleArgs(lower)];
 }
 
 /**
@@ -206,7 +215,7 @@ export async function runFfmpegWithProgress(
   opts: { timeoutMs?: number } = {},
 ): Promise<string> {
   ctx.report(5, "Preparing");
-  return runFfmpeg(args, {
+  return runFfmpeg(withVaapiEncodeArgs(args), {
     signal: ctx.signal,
     timeoutMs: opts.timeoutMs ?? 30 * 60_000,
     onProgress: (p) => {

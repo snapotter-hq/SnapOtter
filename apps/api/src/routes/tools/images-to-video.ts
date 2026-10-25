@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { videoCodecArgs } from "@snapotter/media-engine";
+import { videoCodecArgs, withVaapiEncodeArgs } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
@@ -51,7 +51,7 @@ export function registerImagesToVideo(app: FastifyInstance) {
       }
       const filter = `${parts.join(";")};${refs.join("")}concat=n=${paths.length}:v=1:a=0[v]`;
 
-      const args = [
+      const args = withVaapiEncodeArgs([
         ...paths.flatMap((p) => ["-loop", "1", "-t", String(settings.secondsPerImage), "-i", p]),
         "-filter_complex",
         filter,
@@ -64,7 +64,7 @@ export function registerImagesToVideo(app: FastifyInstance) {
         "yuv420p",
         ...mp4TimescaleArgs(".mp4"),
         join(ctx.scratchDir, "media", "slideshow.mp4"),
-      ];
+      ]);
 
       const progressDuration = paths.length * settings.secondsPerImage;
       await runFfmpegWithProgress(ctx, args, progressDuration);

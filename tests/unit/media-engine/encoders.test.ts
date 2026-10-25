@@ -580,6 +580,42 @@ describe("encoder probe against a stub ffmpeg", () => {
     expect(mod.hwAccelStatus().active).toEqual(["h264_nvenc"]);
   });
 
+  it("passes -vaapi_device and format=nv12,hwupload when trial-encoding VAAPI encoders (#3977)", async () => {
+    const bin = join(dir, "vaapi-trial.sh");
+    const vaapiTable = [
+      ...TABLE,
+      " V....D h264_vaapi           H.264/AVC (VAAPI) (codec h264)",
+      " V....D hevc_vaapi           H.265/HEVC (VAAPI) (codec hevc)",
+    ];
+    const vaapiLines = [
+      "#!/bin/sh",
+      'case "$*" in',
+      "  *-encoders*)",
+      "    cat <<'FFEOF'",
+      ...vaapiTable,
+      "FFEOF",
+      "    exit 0",
+      "    ;;",
+      '  *"-vaapi_device /dev/dri/renderD128 -f lavfi -i nullsrc=s=256x256 -vf format=nv12,hwupload"*)',
+      "    exit 0",
+      "    ;;",
+      "  *)",
+      '    echo "[h264_vaapi @ 0x1] Impossible to convert between the formats supported by the filter" >&2',
+      "    exit 1",
+      "    ;;",
+      "esac",
+    ];
+    writeFileSync(bin, `${vaapiLines.join("\n")}\n`);
+    chmodSync(bin, 0o755);
+
+    const mod = await freshEncoders(bin);
+    process.env.SNAPOTTER_HW_ACCEL = "vaapi";
+    expect(mod.resolveEncoder("h264")).toBe("h264_vaapi");
+    expect(mod.resolveEncoder("hevc")).toBe("hevc_vaapi");
+    expect(mod.hwAccelStatus().active).toEqual(["h264_vaapi", "hevc_vaapi"]);
+    expect(mod.hwAccelStatus().unusable).toEqual([]);
+  });
+
   /**
    * The software path probes too since #1092, so it gets the same once-only
    * guarantee the hardware path has.

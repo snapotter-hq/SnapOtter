@@ -1,5 +1,10 @@
 import { join } from "node:path";
-import { probeMedia, resolveEncoder, videoCodecArgs } from "@snapotter/media-engine";
+import {
+  probeMedia,
+  resolveEncoder,
+  videoCodecArgs,
+  withVaapiEncodeArgs,
+} from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { mp4TimescaleArgs, runFfmpegWithProgress, stageMediaInputs } from "../../lib/media-tool.js";
@@ -58,7 +63,7 @@ export function registerMergeVideos(app: FastifyInstance) {
       const filter = `${parts.join(";")};${refs.join("")}concat=n=${paths.length}:v=1:a=1[v][a]`;
       const outPath = join(ctx.scratchDir, "media", "merged.mp4");
 
-      const args = [
+      const args = withVaapiEncodeArgs([
         ...paths.flatMap((p) => ["-i", p]),
         "-filter_complex",
         filter,
@@ -73,7 +78,7 @@ export function registerMergeVideos(app: FastifyInstance) {
         "-c:a",
         resolveEncoder("aac"),
         outPath,
-      ];
+      ]);
 
       await runFfmpegWithProgress(ctx, args, totalS);
 

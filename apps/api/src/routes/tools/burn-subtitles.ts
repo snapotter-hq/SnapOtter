@@ -4,6 +4,7 @@ import {
   resolveEncoder,
   resolveFontFile,
   videoCodecArgs,
+  withVaapiEncodeArgs,
 } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -49,7 +50,7 @@ export function registerBurnSubtitles(app: FastifyInstance) {
       const outPath = join(ctx.scratchDir, "media", outName);
       await runFfmpegWithProgress(
         ctx,
-        [
+        withVaapiEncodeArgs([
           "-i",
           videoPath,
           "-vf",
@@ -61,7 +62,7 @@ export function registerBurnSubtitles(app: FastifyInstance) {
           "-c:a",
           resolveEncoder("aac"),
           outPath,
-        ],
+        ]),
         info.durationS,
       );
 

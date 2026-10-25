@@ -1,5 +1,10 @@
 import { extname, join } from "node:path";
-import { probeMedia, resolveEncoder, runFfmpeg } from "@snapotter/media-engine";
+import {
+  probeMedia,
+  resolveEncoder,
+  runFfmpeg,
+  withVaapiEncodeArgs,
+} from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
@@ -74,7 +79,7 @@ export function registerStabilizeVideo(app: FastifyInstance) {
 
       await runFfmpegWithProgress(
         ctx,
-        [
+        withVaapiEncodeArgs([
           "-i",
           inPath,
           "-vf",
@@ -83,7 +88,7 @@ export function registerStabilizeVideo(app: FastifyInstance) {
           ...audioArgs,
           ...faststartArgs(origExt),
           outPath,
-        ],
+        ]),
         info.durationS,
       );
 

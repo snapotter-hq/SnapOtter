@@ -4,12 +4,16 @@ export {
   HW_ACCEL_FAMILIES,
   type HwAccelStatus,
   hwAccelStatus,
+  isVaapiEncoder,
   type RateControlledTarget,
   resolveEncoder,
   type SoftwareEncoderStatus,
   softwareEncoder,
   softwareEncoderStatus,
+  VAAPI_DEVICE,
+  VAAPI_FILTER,
   videoCodecArgs,
+  withVaapiEncodeArgs,
 } from "./encoders.js";
 export { type RunFfmpegOptions, runFfmpeg } from "./ffmpeg.js";
 export {

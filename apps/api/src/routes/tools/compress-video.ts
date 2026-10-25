@@ -1,4 +1,4 @@
-import { resolveEncoder, videoCodecArgs } from "@snapotter/media-engine";
+import { resolveEncoder, videoCodecArgs, withVaapiEncodeArgs } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { mp4TimescaleArgs, runMediaTool } from "../../lib/media-tool.js";
@@ -45,7 +45,7 @@ export function registerCompressVideo(app: FastifyInstance) {
           args.push("-vf", SCALE[settings.resolution]);
         }
         args.push("-c:a", resolveEncoder("aac"), "-b:a", "96k", "-movflags", "+faststart", out);
-        return args;
+        return withVaapiEncodeArgs(args);
       });
       return { scratchPath: outPath, filename: outName, contentType: "video/mp4" };
     },

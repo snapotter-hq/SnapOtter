@@ -3,9 +3,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ffmpegAvailable, resolveFfmpeg } from "../src/binaries.js";
 import {
   type EncoderTarget,
+  isVaapiEncoder,
   parseEncoderNames,
   resolveEncoder,
   setEncoderInventoryForTests,
+  VAAPI_DEVICE,
+  VAAPI_FILTER,
 } from "../src/encoders.js";
 
 /**
@@ -202,14 +205,17 @@ describe.runIf(ffmpegAvailable())("resolveEncoder against the real ffmpeg binary
         // If a hardware encoder was returned, it must actually encode a frame (#1089).
         if (chosen.endsWith("_nvenc") || chosen.endsWith("_vaapi")) {
           const bin = resolveFfmpeg() as string;
+          const vaapi = isVaapiEncoder(chosen);
           const trial = spawnSync(
             bin,
             [
               "-hide_banner",
+              ...(vaapi ? ["-vaapi_device", VAAPI_DEVICE] : []),
               "-f",
               "lavfi",
               "-i",
               "nullsrc=s=256x256",
+              ...(vaapi ? ["-vf", VAAPI_FILTER] : []),
               "-frames:v",
               "1",
               "-c:v",

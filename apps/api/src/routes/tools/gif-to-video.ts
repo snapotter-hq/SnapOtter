@@ -1,4 +1,4 @@
-import { resolveEncoder, videoCodecArgs } from "@snapotter/media-engine";
+import { resolveEncoder, videoCodecArgs, withVaapiEncodeArgs } from "@snapotter/media-engine";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { mp4TimescaleArgs, runMediaTool } from "../../lib/media-tool.js";
@@ -48,7 +48,7 @@ export function registerGifToVideo(app: FastifyInstance) {
             out,
           ];
         }
-        return [
+        return withVaapiEncodeArgs([
           "-i",
           inPath,
           "-vf",
@@ -61,7 +61,7 @@ export function registerGifToVideo(app: FastifyInstance) {
           "+faststart",
           "-an",
           out,
-        ];
+        ]);
       });
       return { scratchPath: outPath, filename: outName, contentType };
     },
