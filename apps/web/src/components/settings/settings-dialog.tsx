@@ -1765,6 +1765,9 @@ export function PeopleSection() {
   const [editTeam, setEditTeam] = useState("");
   const [resetPasswordUser, setResetPasswordUser] = useState<UserEntry | null>(null);
   const [resetPassword, setResetPassword] = useState("");
+  const [resetting, setResetting] = useState(false);
+  // Drops responses from in-flight reset requests when the form moves (#2066).
+  const resetEpochRef = useRef(0);
   // Why the server refused the password, shown in the reset form until the next
   // edit; the banner's three seconds are too easy to miss (#2025).
   const [resetErrors, setResetErrors] = useState<string[] | null>(null);
@@ -1995,19 +1998,25 @@ export function PeopleSection() {
   const handleResetPassword = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!resetPasswordUser) return;
+      if (!resetPasswordUser || resetting) return;
+      const targetUser = resetPasswordUser;
+      const targetPassword = resetPassword;
+      const epoch = ++resetEpochRef.current;
+      setResetting(true);
       setResetErrors(null);
       setActionMsg(null);
       later.cancel("actionMsg");
       try {
-        await apiPost(`/auth/users/${resetPasswordUser.id}/reset-password`, {
-          newPassword: resetPassword,
+        await apiPost(`/auth/users/${targetUser.id}/reset-password`, {
+          newPassword: targetPassword,
         });
+        if (epoch !== resetEpochRef.current) return;
         setResetPasswordUser(null);
         setResetPassword("");
         setActionMsg({ type: "success", text: t.settings.people.resetSuccess });
         later(() => setActionMsg(null), 3000, "actionMsg");
       } catch (err) {
+        if (epoch !== resetEpochRef.current) return;
         // A password the policy refuses belongs next to the field. Anything
         // else (a denied escalation, a rate limit, a server fault) is about the
         // request, not the value: editing the password can't fix it, so it
@@ -2036,9 +2045,13 @@ export function PeopleSection() {
             ),
           });
         }
+      } finally {
+        if (epoch === resetEpochRef.current) {
+          setResetting(false);
+        }
       }
     },
-    [resetPasswordUser, resetPassword, t, later],
+    [resetPasswordUser, resetPassword, resetting, t, later],
   );
 
   // A picker whose list fell back (built-in roles, Default) may not hold the
@@ -2384,23 +2397,28 @@ export function PeopleSection() {
             <input
               type="password"
               value={resetPassword}
+              disabled={resetting}
               onChange={(e) => {
                 setResetPassword(e.target.value);
                 setResetErrors(null);
               }}
               placeholder={t.settings.people.newPasswordLabel}
               required
-              className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground w-60"
+              className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground w-60 disabled:opacity-50"
             />
             <button
               type="submit"
-              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary-light transition-colors"
+              disabled={resetting}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary-light transition-colors disabled:opacity-50"
             >
+              {resetting && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
               {t.settings.people.resetPasswordButton}
             </button>
             <button
               type="button"
               onClick={() => {
+                resetEpochRef.current += 1;
+                setResetting(false);
                 setResetPasswordUser(null);
                 setResetPassword("");
                 setResetErrors(null);
@@ -2567,6 +2585,8 @@ export function PeopleSection() {
                       <button
                         type="button"
                         onClick={() => {
+                          resetEpochRef.current += 1;
+                          setResetting(false);
                           setResetPasswordUser(u);
                           setResetPassword("");
                           setResetErrors(null);

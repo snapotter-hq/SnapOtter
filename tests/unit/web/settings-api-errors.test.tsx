@@ -569,6 +569,176 @@ describe("People", () => {
       expect(input.closest("form")).not.toContainElement(banner);
       expect(within(input.closest("form") as HTMLFormElement).queryByRole("alert")).toBeNull();
     });
+
+    describe("in-flight request isolation (#2066)", () => {
+      const adaUser = {
+        id: "u1",
+        username: "ada",
+        role: "user",
+        team: "Default",
+        createdAt: "2026-01-01T00:00:00Z",
+      };
+      const graceUser = {
+        id: "u2",
+        username: "grace",
+        role: "user",
+        team: "Default",
+        createdAt: "2026-01-01T00:00:00Z",
+      };
+
+      async function renderTwoUsers() {
+        apiGet.mockImplementation(async (path: string) => {
+          if (path.startsWith("/auth/session"))
+            return { user: { id: 1, username: "ada", role: "admin" } };
+          if (path.startsWith("/v1/preferences")) return { preferences: {} };
+          if (path.startsWith("/auth/users")) return { users: [adaUser, graceUser], maxUsers: 5 };
+          if (path.startsWith("/v1/teams")) return { teams: [team] };
+          if (path.startsWith("/v1/roles")) return { roles: [role] };
+          if (path.startsWith("/v1/settings")) return { settings: {} };
+          throw new Error(`unexpected GET ${path}`);
+        });
+
+        renderDe(<PeopleSection />);
+        expect(await screen.findByText("ada")).toBeInTheDocument();
+        expect(screen.getByText("grace")).toBeInTheDocument();
+
+        const actionButtons = screen.getAllByRole("button", { name: de.common.actions });
+        return { adaActions: actionButtons[0], graceActions: actionButtons[1] };
+      }
+
+      it("disables the submit button while a reset request is in flight", async () => {
+        let resolveRequest!: (value: unknown) => void;
+        const pending = new Promise((resolve) => {
+          resolveRequest = resolve;
+        });
+        apiPost.mockImplementationOnce(() => pending);
+
+        const { adaActions } = await renderTwoUsers();
+        fireEvent.click(adaActions);
+        fireEvent.click(screen.getByText(s.people.resetPasswordAction));
+
+        const input = screen.getByPlaceholderText(s.people.newPasswordLabel);
+        fireEvent.change(input, { target: { value: "ValidPassword1" } });
+
+        const submitBtn = screen.getByRole("button", { name: s.people.resetPasswordButton });
+        expect(submitBtn).not.toBeDisabled();
+
+        fireEvent.click(submitBtn);
+
+        expect(submitBtn).toBeDisabled();
+
+        await act(async () => {
+          resolveRequest({ success: true });
+        });
+
+        await waitFor(() => {
+          expect(screen.queryByPlaceholderText(s.people.newPasswordLabel)).toBeNull();
+        });
+      });
+
+      it("drops a late success response if another user's reset form is opened", async () => {
+        let resolveAda!: (value: unknown) => void;
+        const adaPending = new Promise((resolve) => {
+          resolveAda = resolve;
+        });
+        apiPost.mockImplementationOnce(() => adaPending);
+
+        const { adaActions, graceActions } = await renderTwoUsers();
+
+        // Open Ada's reset form and submit
+        fireEvent.click(adaActions);
+        fireEvent.click(screen.getByText(s.people.resetPasswordAction));
+        const adaInput = screen.getByPlaceholderText(s.people.newPasswordLabel);
+        fireEvent.change(adaInput, { target: { value: "AdaPassword1" } });
+        fireEvent.click(screen.getByRole("button", { name: s.people.resetPasswordButton }));
+
+        // While Ada's request is in flight, open Grace's reset form
+        fireEvent.click(graceActions);
+        fireEvent.click(within(screen.getByRole("menu")).getByText(s.people.resetPasswordAction));
+
+        const graceHeading = format(s.people.resetPasswordHeading, { username: "grace" });
+        expect(screen.getByText(graceHeading)).toBeInTheDocument();
+        const graceInput = screen.getByPlaceholderText(s.people.newPasswordLabel);
+        fireEvent.change(graceInput, { target: { value: "GraceDraft1" } });
+
+        // Resolve Ada's request
+        await act(async () => {
+          resolveAda({ success: true });
+        });
+
+        // Grace's form must remain open, input kept, and no success banner shown
+        expect(screen.getByText(graceHeading)).toBeInTheDocument();
+        expect(graceInput).toHaveValue("GraceDraft1");
+        expect(screen.queryByText(s.people.resetSuccess)).toBeNull();
+      });
+
+      it("drops a late refusal if another user's reset form is opened", async () => {
+        let rejectAda!: (err: unknown) => void;
+        const adaPending = new Promise((_, reject) => {
+          rejectAda = reject;
+        });
+        apiPost.mockImplementationOnce(() => adaPending);
+
+        const { adaActions, graceActions } = await renderTwoUsers();
+
+        // Open Ada's reset form and submit
+        fireEvent.click(adaActions);
+        fireEvent.click(screen.getByText(s.people.resetPasswordAction));
+        const adaInput = screen.getByPlaceholderText(s.people.newPasswordLabel);
+        fireEvent.change(adaInput, { target: { value: "NoDigitsHere" } });
+        fireEvent.click(screen.getByRole("button", { name: s.people.resetPasswordButton }));
+
+        // While Ada's request is in flight, open Grace's reset form
+        fireEvent.click(graceActions);
+        fireEvent.click(within(screen.getByRole("menu")).getByText(s.people.resetPasswordAction));
+
+        const graceHeading = format(s.people.resetPasswordHeading, { username: "grace" });
+        expect(screen.getByText(graceHeading)).toBeInTheDocument();
+        const graceInput = screen.getByPlaceholderText(s.people.newPasswordLabel);
+        const graceForm = graceInput.closest("form");
+        if (!graceForm) throw new Error("Grace form not found");
+
+        // Reject Ada's request with a password refusal
+        await act(async () => {
+          rejectAda(refusal());
+        });
+
+        // Grace's form must not display Ada's refusal alert or an error banner
+        expect(within(graceForm).queryByRole("alert")).toBeNull();
+        expect(screen.queryByText(de.errors.passwordNeedsDigit)).toBeNull();
+        expect(screen.queryByText(s.people.resetFailed)).toBeNull();
+        expect(screen.getByText(graceHeading)).toBeInTheDocument();
+      });
+
+      it("drops a late success response if the reset form was cancelled", async () => {
+        let resolveAda!: (value: unknown) => void;
+        const adaPending = new Promise((resolve) => {
+          resolveAda = resolve;
+        });
+        apiPost.mockImplementationOnce(() => adaPending);
+
+        const { adaActions } = await renderTwoUsers();
+
+        fireEvent.click(adaActions);
+        fireEvent.click(screen.getByText(s.people.resetPasswordAction));
+        const input = screen.getByPlaceholderText(s.people.newPasswordLabel);
+        fireEvent.change(input, { target: { value: "AdaPassword1" } });
+        fireEvent.click(screen.getByRole("button", { name: s.people.resetPasswordButton }));
+
+        // Cancel the form while in flight
+        fireEvent.click(screen.getByRole("button", { name: de.common.cancel }));
+        expect(screen.queryByPlaceholderText(s.people.newPasswordLabel)).toBeNull();
+
+        // Resolve Ada's request
+        await act(async () => {
+          resolveAda({ success: true });
+        });
+
+        // Form remains closed and no success banner shown
+        expect(screen.queryByPlaceholderText(s.people.newPasswordLabel)).toBeNull();
+        expect(screen.queryByText(s.people.resetSuccess)).toBeNull();
+      });
+    });
   });
 
   it("adding a user lists every broken password rule at once (#2090)", async () => {
