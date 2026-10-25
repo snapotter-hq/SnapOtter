@@ -102,8 +102,8 @@ beforeEach(() => {
   storage.clear();
   storage.set("snapotter-locale", "de");
   useAuth.mockReturnValue({
-    permissions: [],
-    hasPermission: () => false,
+    permissions: ["security:manage"],
+    hasPermission: (p: string) => p === "security:manage",
     authEnabled: true,
     role: "admin",
     totpEnabled: false,

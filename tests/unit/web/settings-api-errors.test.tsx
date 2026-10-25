@@ -662,6 +662,18 @@ describe("Teams", () => {
 });
 
 describe("Roles", () => {
+  beforeEach(() => {
+    useAuth.mockReturnValue({
+      loading: false,
+      permissions: ["security:manage"],
+      hasPermission: (p: string) => p === "security:manage",
+      authEnabled: true,
+      role: "admin",
+      hasLocalPassword: true,
+      totpEnabled: false,
+    });
+  });
+
   async function openCreateForm(name: string, permission: string | null = "tools:use") {
     renderDe(<RolesSection />);
     fireEvent.click(await screen.findByRole("button", { name: s.roles.createButton }));

@@ -100,11 +100,11 @@ async function deleteUser(adminToken: string, username: string): Promise<void> {
 //   security       - none (authRequired)
 //   people         - users:manage
 //   teams          - teams:manage
-//   roles          - users:manage
+//   roles          - audit:read
 //   audit-log      - audit:read
 //   usage          - audit:read (Usage analytics dashboard, admin-only)
-//   api-keys       - none
-//   ai-features    - settings:write
+//   api-keys       - apikeys:own | apikeys:all
+//   ai-features    - features:manage
 //   tools          - settings:write
 //   about          - none
 
@@ -548,7 +548,7 @@ base.describe("RBAC Settings Visibility - User", () => {
     expect(token).toBeTruthy();
     const bearerToken = token as string;
 
-    // GET /api/v1/roles requires users:manage
+    // GET /api/v1/roles requires audit:read
     const rolesRes = await fetch(`${API}/api/v1/roles`, {
       headers: { Authorization: `Bearer ${bearerToken}` },
     });
@@ -618,7 +618,7 @@ base.describe("RBAC API Endpoints - Editor (extended)", () => {
     expect(token).toBeTruthy();
     const bearerToken = token as string;
 
-    // GET /api/v1/roles requires users:manage
+    // GET /api/v1/roles requires audit:read
     const rolesRes = await fetch(`${API}/api/v1/roles`, {
       headers: { Authorization: `Bearer ${bearerToken}` },
     });

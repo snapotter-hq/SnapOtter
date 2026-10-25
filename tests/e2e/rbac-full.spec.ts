@@ -294,27 +294,26 @@ base.describe("RBAC Full — Custom Role User", () => {
 
     await openSettings(page);
 
-    // Should see these 4 tabs. The custom role only has settings:read and
-    // tools:use, so it sees the same set as the built-in "user" role.
+    // Should see these 3 tabs. The custom role only has settings:read and
+    // tools:use (no apikeys:own or apikeys:all), so API Keys is hidden too (#1549).
     await expect(page.getByRole("button", { name: /general/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /security/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /api keys/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /about/i })).toBeVisible();
 
-    // Should NOT see admin-only tabs (requires users:manage, teams:manage,
-    // audit:read, or settings:write).
+    // Should NOT see tabs whose permissions the custom role lacks.
+    await expect(page.getByRole("button", { name: /api keys/i })).not.toBeVisible();
     await expect(page.getByRole("button", { name: /system settings/i })).not.toBeVisible();
     await expect(page.getByRole("button", { name: /people/i })).not.toBeVisible();
     await expect(page.getByRole("button", { name: /teams/i })).not.toBeVisible();
     await expect(page.getByRole("button", { name: /^roles$/i })).not.toBeVisible();
     await expect(page.getByRole("button", { name: /audit log/i })).not.toBeVisible();
-    // Usage requires audit:read, AI Features and Tools require settings:write.
+    // Usage requires audit:read, AI Features requires features:manage, Tools requires settings:write.
     await expect(page.getByRole("button", { name: /^usage$/i })).not.toBeVisible();
     await expect(page.getByRole("button", { name: /ai features/i })).not.toBeVisible();
     await expect(page.getByRole("button", { name: /tools/i })).not.toBeVisible();
 
-    // Exactly 4 nav buttons for this custom role.
-    expect(await page.locator(".w-48 button").count()).toBe(4);
+    // Exactly 3 nav buttons for this custom role.
+    expect(await page.locator(".w-48 button").count()).toBe(3);
   });
 
   base.test(
@@ -327,7 +326,7 @@ base.describe("RBAC Full — Custom Role User", () => {
       expect(token).toBeTruthy();
       const bearerToken = token as string;
 
-      // GET /api/v1/settings — requires auth only, should succeed
+      // GET /api/v1/settings — requires settings:read (which CUSTOM_ROLE holds), should succeed
       const readRes = await fetch(`${API}/api/v1/settings`, {
         headers: authOnly(bearerToken),
       });

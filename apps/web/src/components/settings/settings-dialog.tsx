@@ -6,6 +6,7 @@ import {
   isValidRoleName,
   isValidUsername,
   normalizeRoleName,
+  type Permission,
   SUPPORTED_LOCALES,
   TEAM_NAME_MAX_LENGTH,
   TOOLS,
@@ -99,7 +100,7 @@ interface NavItem {
   id: Section;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  requiredPermission?: string;
+  requiredPermission?: Permission | readonly Permission[];
   authRequired?: boolean;
 }
 
@@ -133,7 +134,7 @@ function useNavItems() {
         id: "roles",
         label: t.settings.nav.roles,
         icon: Shield,
-        requiredPermission: "users:manage",
+        requiredPermission: "audit:read",
         authRequired: true,
       },
       {
@@ -148,7 +149,12 @@ function useNavItems() {
         icon: BarChart3,
         requiredPermission: "audit:read",
       },
-      { id: "api-keys", label: t.settings.nav.apiKeys, icon: Key },
+      {
+        id: "api-keys",
+        label: t.settings.nav.apiKeys,
+        icon: Key,
+        requiredPermission: ["apikeys:own", "apikeys:all"],
+      },
       {
         id: "ai-features",
         label: t.settings.nav.aiFeatures,
@@ -178,11 +184,14 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   useFocusTrap(dialogRef, open && !isMobile);
   useFocusTrap(mobileDialogRef, open && isMobile);
 
-  const visibleNavItems = NAV_ITEMS.filter(
-    (item) =>
-      (!item.requiredPermission || hasPermission(item.requiredPermission)) &&
-      (!item.authRequired || authEnabled),
-  );
+  const visibleNavItems = NAV_ITEMS.filter((item) => {
+    const permitted = !item.requiredPermission
+      ? true
+      : typeof item.requiredPermission === "string"
+        ? hasPermission(item.requiredPermission)
+        : item.requiredPermission.some((p) => hasPermission(p));
+    return permitted && (!item.authRequired || authEnabled);
+  });
 
   // Close on Escape
   useEffect(() => {
@@ -1135,9 +1144,9 @@ export function SecuritySection() {
 
       <TwoFactorSettings />
 
-      {hasPermission("settings:write") && hasPermission("security:manage") && (
-        <AdminSecuritySettings />
-      )}
+      {hasPermission("settings:read") &&
+        hasPermission("settings:write") &&
+        hasPermission("security:manage") && <AdminSecuritySettings />}
     </div>
   );
 }
@@ -3176,6 +3185,8 @@ const PERMISSION_GROUPS = [
 
 export function RolesSection() {
   const { t } = useTranslation();
+  const { hasPermission } = useAuth();
+  const canManageRoles = hasPermission("security:manage");
   const later = useTimeouts();
   const [roles, setRoles] = useState<RoleEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -3360,19 +3371,21 @@ export function RolesSection() {
         </div>
       )}
 
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => setShowCreateForm(!showCreateForm)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          {t.settings.roles.createButton}
-        </button>
-      </div>
+      {canManageRoles && (
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            {t.settings.roles.createButton}
+          </button>
+        </div>
+      )}
 
       {/* Create role form */}
-      {showCreateForm && (
+      {canManageRoles && showCreateForm && (
         <form
           onSubmit={handleCreate}
           className="p-4 rounded-lg border border-border bg-muted/20 space-y-3"
@@ -3445,7 +3458,7 @@ export function RolesSection() {
       )}
 
       {/* Edit role form */}
-      {editingRole && (
+      {canManageRoles && editingRole && (
         <form
           onSubmit={handleUpdate}
           className="p-4 rounded-lg border border-primary/30 bg-primary/5 space-y-3"
@@ -3553,7 +3566,7 @@ export function RolesSection() {
                     )}
                   </span>
                 </div>
-                {!role.isBuiltin && (
+                {!role.isBuiltin && canManageRoles && (
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
