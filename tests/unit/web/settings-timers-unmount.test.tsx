@@ -563,6 +563,7 @@ describe("A failed copy says so, and a good copy after it still gets its time (#
     await copyAgain(copy);
     expect(c.failed(copy)).toBe(true);
     expect(c.lit(copy)).toBe(false);
+    expect(screen.getByRole("status")).toHaveTextContent(de.common.copyFailed);
 
     await act(async () => {
       vi.advanceTimersByTime(c.ms - 500);
@@ -570,18 +571,21 @@ describe("A failed copy says so, and a good copy after it still gets its time (#
     await copyAgain(copy);
     expect(c.lit(copy)).toBe(true);
     expect(c.failed(copy)).toBe(false);
+    expect(screen.getByRole("status")).toHaveTextContent(de.common.copied);
 
     // The failure's reset is due now and must leave the good copy up.
     await act(async () => {
       vi.advanceTimersByTime(500);
     });
     expect(c.lit(copy)).toBe(true);
+    expect(screen.getByRole("status")).toHaveTextContent(de.common.copied);
 
     await act(async () => {
       vi.advanceTimersByTime(c.ms);
     });
     expect(c.lit(copy)).toBe(false);
     expect(c.failed(copy)).toBe(false);
+    expect(screen.queryByRole("status")).toBeNull();
     expect(vi.getTimerCount()).toBe(0);
   });
 
@@ -592,11 +596,13 @@ describe("A failed copy says so, and a good copy after it still gets its time (#
       copyToClipboard.mockResolvedValueOnce(false);
       await copyAgain(copy);
       expect(c.failed(copy)).toBe(true);
+      expect(screen.getByRole("status")).toHaveTextContent(de.common.copyFailed);
 
       await act(async () => {
         vi.advanceTimersByTime(c.ms);
       });
       expect(c.failed(copy)).toBe(false);
+      expect(screen.queryByRole("status")).toBeNull();
       expect(vi.getTimerCount()).toBe(0);
     },
   );
@@ -617,12 +623,14 @@ describe("A failed copy says so, and a good copy after it still gets its time (#
     copyToClipboard.mockResolvedValueOnce(false);
     await copyAgain(copy);
     expect(failing[1].failed(copy)).toBe(true);
+    expect(screen.getByRole("status")).toHaveTextContent(de.common.copyFailed);
 
     apiPost.mockResolvedValueOnce({ key: "si_second" });
     fireEvent.click(screen.getByRole("button", { name: s.apiKeys.generateButton }));
     await screen.findByText("si_second");
     const fresh = screen.getByRole("button", { name: de.common.copy });
     expect(fresh.querySelector(".text-destructive")).toBeNull();
+    expect(screen.queryByRole("status")).toBeNull();
   });
 });
 

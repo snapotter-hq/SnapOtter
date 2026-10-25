@@ -1,5 +1,6 @@
 import { Check, ClipboardCopy, X } from "lucide-react";
 import { useState } from "react";
+import { CopyFeedback } from "@/components/common/copy-feedback";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
@@ -290,6 +291,7 @@ function SpriteOutput({
           {copyIcon("json")}
           {t.toolSettings["sprite-sheet"].copyJson}
         </button>
+        <CopyFeedback key={exportCopy?.kind} status={exportCopy} />
       </div>
     </div>
   );

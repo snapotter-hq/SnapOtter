@@ -72,6 +72,7 @@ import { useConnectionStore } from "@/stores/connection-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useThemeStore } from "@/stores/theme-store";
 import { AlertMessages } from "../common/alert-messages";
+import { CopyFeedback } from "../common/copy-feedback";
 import { OtterLogo } from "../common/otter-logo";
 import { AdminInstallFeedbackCard } from "../feedback/admin-install-feedback-card";
 import { FeedbackDialog } from "../feedback/feedback-dialog";
@@ -2189,35 +2190,38 @@ export function PeopleSection() {
                 )}
               />
               {showGeneratedPw && (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const ok = await copyToClipboard(newPassword);
-                    setPwCopy(ok ? "copied" : "failed");
-                    later(() => setPwCopy(null), 2000, "pwCopy");
-                  }}
-                  className={cn(
-                    "shrink-0 p-2 rounded-lg border border-border transition-colors",
-                    pwCopy === "copied"
-                      ? "text-success-ink bg-green-500/10"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  )}
-                  title={
-                    pwCopy === "copied"
-                      ? t.settings.people.passwordCopied
-                      : pwCopy === "failed"
-                        ? t.common.copyFailed
-                        : t.settings.people.copyPasswordButton
-                  }
-                >
-                  {pwCopy === "copied" ? (
-                    <Check className="h-4 w-4" />
-                  ) : pwCopy === "failed" ? (
-                    <X className="h-4 w-4 text-destructive" />
-                  ) : (
-                    <Copy className="h-4 w-4" />
-                  )}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const ok = await copyToClipboard(newPassword);
+                      setPwCopy(ok ? "copied" : "failed");
+                      later(() => setPwCopy(null), 2000, "pwCopy");
+                    }}
+                    className={cn(
+                      "shrink-0 p-2 rounded-lg border border-border transition-colors",
+                      pwCopy === "copied"
+                        ? "text-success-ink bg-green-500/10"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                    title={
+                      pwCopy === "copied"
+                        ? t.settings.people.passwordCopied
+                        : pwCopy === "failed"
+                          ? t.common.copyFailed
+                          : t.settings.people.copyPasswordButton
+                    }
+                  >
+                    {pwCopy === "copied" ? (
+                      <Check className="h-4 w-4" />
+                    ) : pwCopy === "failed" ? (
+                      <X className="h-4 w-4 text-destructive" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </button>
+                  <CopyFeedback status={pwCopy} />
+                </>
               )}
             </div>
             <select
@@ -2829,6 +2833,7 @@ export function ApiKeysSection() {
                 <Copy className="h-4 w-4" />
               )}
             </button>
+            <CopyFeedback status={copyStatus} />
           </div>
           <p className="text-xs text-muted-foreground">{t.settings.apiKeys.keyWarning}</p>
         </div>

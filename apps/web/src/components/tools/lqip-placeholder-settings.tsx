@@ -1,5 +1,6 @@
 import { Check, Copy, X } from "lucide-react";
 import { useState } from "react";
+import { CopyFeedback } from "@/components/common/copy-feedback";
 import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
@@ -281,6 +282,7 @@ function CopyBlock({
           )}
           {t.common.copy}
         </button>
+        <CopyFeedback status={status} />
       </div>
       <div className="p-2 rounded bg-muted text-xs font-mono text-foreground overflow-hidden text-ellipsis whitespace-nowrap">
         {value}

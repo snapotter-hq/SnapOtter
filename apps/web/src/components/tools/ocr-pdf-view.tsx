@@ -1,5 +1,6 @@
 import { Copy, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
+import { CopyFeedback } from "@/components/common/copy-feedback";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useTimeouts } from "@/hooks/use-timeouts";
 import { copyToClipboard } from "@/lib/utils";
@@ -69,18 +70,21 @@ export function OcrPdfView() {
             {t.toolSettings["ocr-pdf-view"].extractedText}
           </span>
           {text != null && (
-            <button
-              type="button"
-              onClick={copy}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <Copy className="h-3.5 w-3.5" />
-              {copyStatus === "copied"
-                ? t.toolSettings["ocr-pdf-view"].copied
-                : copyStatus === "failed"
-                  ? t.common.copyFailed
-                  : t.common.copy}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={copy}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <Copy className="h-3.5 w-3.5" />
+                {copyStatus === "copied"
+                  ? t.toolSettings["ocr-pdf-view"].copied
+                  : copyStatus === "failed"
+                    ? t.common.copyFailed
+                    : t.common.copy}
+              </button>
+              <CopyFeedback status={copyStatus} />
+            </>
           )}
         </div>
         <div className="min-h-0 flex-1 overflow-auto p-3">

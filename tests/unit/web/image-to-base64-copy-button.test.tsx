@@ -65,7 +65,8 @@ describe("image-to-base64 copy button on insecure contexts", () => {
     const copyButtons = screen.getAllByRole("button", { name: /copy/i });
     fireEvent.click(copyButtons[0]);
 
-    expect(await screen.findByText("Copied!")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Copied!" })).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("Copied!");
     expect(execCommand).toHaveBeenCalledWith("copy");
   });
 
@@ -77,7 +78,8 @@ describe("image-to-base64 copy button on insecure contexts", () => {
     const copyButtons = screen.getAllByRole("button", { name: /copy/i });
     fireEvent.click(copyButtons[0]);
 
-    expect(await screen.findByText("Copy failed")).toBeTruthy();
-    expect(screen.queryByText("Copied!")).toBeNull();
+    expect(await screen.findByRole("button", { name: "Copy failed" })).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("Copy failed");
+    expect(screen.queryByRole("button", { name: "Copied!" })).toBeNull();
   });
 });

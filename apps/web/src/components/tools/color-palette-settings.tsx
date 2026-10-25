@@ -1,6 +1,7 @@
 import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import { Check, ClipboardCopy, Copy, Loader2, X } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
+import { CopyFeedback } from "@/components/common/copy-feedback";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useSettleOnUnmount } from "@/hooks/use-settle-on-unmount";
 import { useTimeouts } from "@/hooks/use-timeouts";
@@ -287,6 +288,7 @@ export function ColorPaletteSettings() {
                 )}
                 JSON
               </button>
+              <CopyFeedback key={exportCopy?.kind} status={exportCopy} />
             </div>
           </div>
 
@@ -314,6 +316,7 @@ export function ColorPaletteSettings() {
               </button>
             ))}
           </div>
+          <CopyFeedback key={swatchCopy?.idx} status={swatchCopy} />
         </div>
       )}
     </div>

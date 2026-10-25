@@ -717,21 +717,25 @@ describe("A failed copy then a good one share the slot (#1798)", () => {
     const copy = screen.getByRole("button", { name: en.common.copy });
     await copyAgain(copy);
     expect(copy).not.toHaveTextContent(en.editor.ui.exportDialog.copied);
+    expect(screen.getByRole("status")).toHaveTextContent(en.common.copyFailed);
     await act(async () => {
       vi.advanceTimersByTime(1500);
     });
     await copyAgain(copy);
     expect(copy).toHaveTextContent(en.editor.ui.exportDialog.copied);
+    expect(screen.getByRole("status")).toHaveTextContent(en.common.copied);
 
     await act(async () => {
       vi.advanceTimersByTime(500);
     });
     expect(copy).toHaveTextContent(en.editor.ui.exportDialog.copied);
+    expect(screen.getByRole("status")).toHaveTextContent(en.common.copied);
 
     await act(async () => {
       vi.advanceTimersByTime(2000);
     });
     expect(copy).not.toHaveTextContent(en.editor.ui.exportDialog.copied);
+    expect(screen.queryByRole("status")).toBeNull();
     expect(vi.getTimerCount()).toBe(0);
   });
 });
@@ -751,6 +755,10 @@ describe("A failed copy says so, and a good copy after it still gets its time (#
     await copyAgain(first);
     expect(failed(first)).toBe(true);
     expect(race.lit(first)).toBe(false);
+    const failedStatus = screen.getByRole("status");
+    expect(failedStatus).toHaveTextContent(en.common.copyFailed);
+    expect(failedStatus).toHaveAttribute("aria-live", "polite");
+    expect(failedStatus).toHaveClass("sr-only");
 
     await act(async () => {
       vi.advanceTimersByTime(race.ms - 500);
@@ -759,12 +767,14 @@ describe("A failed copy says so, and a good copy after it still gets its time (#
     expect(race.lit(second)).toBe(true);
     expect(failed(first)).toBe(false);
     expect(failed(second)).toBe(false);
+    expect(screen.getByRole("status")).toHaveTextContent(en.common.copied);
 
     // The failure's reset is due now and must leave the good copy up.
     await act(async () => {
       vi.advanceTimersByTime(500);
     });
     expect(race.lit(second)).toBe(true);
+    expect(screen.getByRole("status")).toHaveTextContent(en.common.copied);
 
     await act(async () => {
       vi.advanceTimersByTime(race.ms);
@@ -772,6 +782,7 @@ describe("A failed copy says so, and a good copy after it still gets its time (#
     expect(race.lit(second)).toBe(false);
     expect(failed(first)).toBe(false);
     expect(failed(second)).toBe(false);
+    expect(screen.queryByRole("status")).toBeNull();
     expect(vi.getTimerCount()).toBe(0);
   });
 
@@ -782,11 +793,13 @@ describe("A failed copy says so, and a good copy after it still gets its time (#
     copyToClipboard.mockResolvedValueOnce(false);
     await copyAgain(first);
     expect(failed(first)).toBe(true);
+    expect(screen.getByRole("status")).toHaveTextContent(en.common.copyFailed);
 
     await act(async () => {
       vi.advanceTimersByTime(race.ms);
     });
     expect(failed(first)).toBe(false);
+    expect(screen.queryByRole("status")).toBeNull();
     expect(vi.getTimerCount()).toBe(0);
   });
 

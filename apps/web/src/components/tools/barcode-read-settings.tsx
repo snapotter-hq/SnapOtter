@@ -1,6 +1,7 @@
 import { ANALYTICS_EVENTS, type TranslationKeys } from "@snapotter/shared";
 import { Check, Copy, Download, Search, X } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { CopyFeedback } from "@/components/common/copy-feedback";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useTimeouts } from "@/hooks/use-timeouts";
@@ -756,6 +757,7 @@ export function BarcodeReadSettings() {
                       ? t.common.copyFailed
                       : t.toolSettings["barcode-read"].copyAll}
                 </button>
+                <CopyFeedback status={allCopy} />
               </div>
             )}
           </div>
@@ -812,6 +814,7 @@ export function BarcodeReadSettings() {
                           <X className="h-3.5 w-3.5 text-destructive" />
                         )}
                       </button>
+                      <CopyFeedback status={rowCopy?.idx === idx ? rowCopy : null} />
                     </div>
                   );
                 })

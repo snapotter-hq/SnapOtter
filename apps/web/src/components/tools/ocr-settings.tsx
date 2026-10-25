@@ -7,6 +7,7 @@ import {
 import { Check, CheckCircle2, ChevronDown, ChevronRight, Copy, Download, Info } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Link } from "react-router";
+import { CopyFeedback } from "@/components/common/copy-feedback";
 import { ProgressCard } from "@/components/common/progress-card";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useTimeouts } from "@/hooks/use-timeouts";
@@ -899,6 +900,7 @@ export function OcrSettings() {
                     ? t.common.copyFailed
                     : t.common.copy}
               </button>
+              <CopyFeedback status={copyStatus} />
             </div>
           </div>
           {text.length > 0 ? (

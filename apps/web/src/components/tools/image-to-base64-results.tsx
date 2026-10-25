@@ -1,5 +1,6 @@
 import { Check, ClipboardCopy, Download, FileJson, FileText, Loader2 } from "lucide-react";
 import { useCallback, useState } from "react";
+import { CopyFeedback } from "@/components/common/copy-feedback";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useTimeouts } from "@/hooks/use-timeouts";
 import { format } from "@/lib/format";
@@ -94,22 +95,25 @@ function CopyButton({
   }, [text, onCopied, later]);
 
   return (
-    <button
-      type="button"
-      onClick={handleCopy}
-      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
-    >
-      {status === "copied" ? (
-        <Check className="h-3.5 w-3.5" />
-      ) : (
-        <ClipboardCopy className="h-3.5 w-3.5" />
-      )}
-      {status === "copied"
-        ? t.common.copied
-        : status === "failed"
-          ? t.toolSettings["image-to-base64-results"].copyFailed
-          : (label ?? t.common.copy)}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={handleCopy}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
+      >
+        {status === "copied" ? (
+          <Check className="h-3.5 w-3.5" />
+        ) : (
+          <ClipboardCopy className="h-3.5 w-3.5" />
+        )}
+        {status === "copied"
+          ? t.common.copied
+          : status === "failed"
+            ? t.toolSettings["image-to-base64-results"].copyFailed
+            : (label ?? t.common.copy)}
+      </button>
+      <CopyFeedback status={status} />
+    </>
   );
 }
 

@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { CopyFeedback } from "@/components/common/copy-feedback";
 import {
   type CurvePoint,
   type CurvesState,
@@ -1251,6 +1252,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
                   ? t.editor.ui.exportDialog.copyFailed
                   : t.common.copy}
             </button>
+            <CopyFeedback status={copyStatus} />
           </div>
 
           {/* Project save/load */}
