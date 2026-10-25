@@ -264,6 +264,7 @@ export function EraseObjectSettings({
   const hqInstalling = useFeaturesStore((s) => s.installing[HQ_BUNDLE_ID]);
   const hqQueued = useFeaturesStore((s) => s.queued.includes(HQ_BUNDLE_ID));
   const hqInstallError = useFeaturesStore((s) => s.errors[HQ_BUNDLE_ID]);
+  const hqDisplayedError = hqInstallError ?? hqBundle?.error;
   const needsHqPack = qualityMode === "hq" && !hqInstalled;
   const isAdmin = hasPermission("features:manage");
   const hqSizeBytes = hqBundle?.missingDownloadBytes ?? hqBundle?.downloadBytes;
@@ -1235,7 +1236,9 @@ export function EraseObjectSettings({
                 {t.features.notEnabledDescription}
               </p>
             )}
-            {hqInstallError && <p className="mt-1 text-xs text-destructive">{hqInstallError}</p>}
+            {hqDisplayedError && (
+              <p className="mt-1 text-xs text-destructive">{hqDisplayedError}</p>
+            )}
           </div>
         )}
       </div>
