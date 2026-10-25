@@ -2,7 +2,7 @@
  * Unit tests for auth route helper functions and validation logic.
  *
  * Tests getAuthUser, requireAuth, requireAdmin, validatePasswordStrength and
- * validateUsername (the real exports of apps/api/src/plugins/auth.ts, #2039),
+ * validateUsername (the real exports of apps/api/src/plugins/auth.ts, #1570, #2039),
  * plus isPublicRoute, which is reproduced here.
  */
 import { PASSWORD_MAX_LENGTH } from "@snapotter/shared";
@@ -321,27 +321,58 @@ describe("validatePasswordStrength, default policy", () => {
   });
 
   it("rejects password shorter than 8 chars", async () => {
-    expect(await rulesOf("Ab1")).toEqual(["minLength"]);
+    const failure = await validatePasswordStrength("Ab1");
+    expect(failure).toEqual({
+      rule: "minLength",
+      rules: ["minLength"],
+      message: "Password must be at least 8 characters",
+      minLength: 8,
+    });
   });
 
   it("rejects password without uppercase", async () => {
-    expect(await rulesOf("lowercase1")).toEqual(["uppercase"]);
+    const failure = await validatePasswordStrength("lowercase1");
+    expect(failure).toEqual({
+      rule: "uppercase",
+      rules: ["uppercase"],
+      message: "Password must contain an uppercase letter",
+    });
   });
 
   it("rejects password without lowercase", async () => {
-    expect(await rulesOf("UPPERCASE1")).toEqual(["lowercase"]);
+    const failure = await validatePasswordStrength("UPPERCASE1");
+    expect(failure).toEqual({
+      rule: "lowercase",
+      rules: ["lowercase"],
+      message: "Password must contain a lowercase letter",
+    });
   });
 
   it("rejects password without number", async () => {
-    expect(await rulesOf("NoNumberHere")).toEqual(["digit"]);
+    const failure = await validatePasswordStrength("NoNumberHere");
+    expect(failure).toEqual({
+      rule: "digit",
+      rules: ["digit"],
+      message: "Password must contain a digit",
+    });
   });
 
   it("accepts password with special characters", async () => {
     expect(await validatePasswordStrength("Sp3c!al@")).toBeNull();
   });
 
+  it("rejects password made of pure whitespace", async () => {
+    const failure = await validatePasswordStrength("        ");
+    expect(failure?.rules).toEqual(["uppercase", "lowercase", "digit"]);
+    expect(failure?.rule).toBe("uppercase");
+    expect(failure?.message).toBe("Password must contain an uppercase letter");
+  });
+
   it("rejects empty string", async () => {
-    expect((await rulesOf("")).length).toBeGreaterThan(0);
+    const failure = await validatePasswordStrength("");
+    expect(failure?.rules).toEqual(["minLength", "uppercase", "lowercase", "digit"]);
+    expect(failure?.rule).toBe("minLength");
+    expect(failure?.message).toBe("Password must be at least 8 characters");
   });
 
   it("lists every broken rule at once, first one as `rule`", async () => {
@@ -350,22 +381,37 @@ describe("validatePasswordStrength, default policy", () => {
     expect(failure?.rules).toEqual(["minLength", "uppercase", "digit"]);
     expect(failure?.rule).toBe("minLength");
     expect(failure?.minLength).toBe(8);
+    expect(failure?.message).toBe("Password must be at least 8 characters");
   });
 
   it("refuses a control character before anything else, even on a password that breaks other rules", async () => {
-    expect((await validatePasswordStrength("MyPass12\t"))?.rule).toBe("controlCharacter");
+    const failure = await validatePasswordStrength("MyPass12\t");
+    expect(failure).toEqual({
+      rule: "controlCharacter",
+      rules: ["controlCharacter"],
+      message: "Password must not contain control characters",
+    });
 
-    const failure = await validatePasswordStrength("ab\t");
-    expect(failure?.rules).toEqual(["controlCharacter"]);
+    const multiFailure = await validatePasswordStrength("ab\t");
+    expect(multiFailure?.rules).toEqual(["controlCharacter"]);
+    expect(multiFailure?.message).toBe("Password must not contain control characters");
   });
 
   it("refuses a lone UTF-16 surrogate before policy rules, while accepting a valid surrogate pair (#2170)", async () => {
-    expect((await validatePasswordStrength("MyPass12\uD800"))?.rule).toBe("invalidCharacter");
+    const failure = await validatePasswordStrength("MyPass12\uD800");
+    expect(failure).toEqual({
+      rule: "invalidCharacter",
+      rules: ["invalidCharacter"],
+      message: "Password must not contain invalid characters (an unpaired UTF-16 surrogate)",
+    });
     expect((await validatePasswordStrength("MyPass12\uDC00"))?.rule).toBe("invalidCharacter");
     expect((await validatePasswordStrength("MyPass12\uDC00\uD800"))?.rule).toBe("invalidCharacter");
 
-    const failure = await validatePasswordStrength("ab\uD800");
-    expect(failure?.rules).toEqual(["invalidCharacter"]);
+    const multiFailure = await validatePasswordStrength("ab\uD800");
+    expect(multiFailure?.rules).toEqual(["invalidCharacter"]);
+    expect(multiFailure?.message).toBe(
+      "Password must not contain invalid characters (an unpaired UTF-16 surrogate)",
+    );
 
     expect(await validatePasswordStrength("MyPass12\u{1F600}")).toBeNull();
   });
@@ -379,8 +425,12 @@ describe("validatePasswordStrength, default policy", () => {
   it("refuses a password over the shared maximum and names the limit", async () => {
     const failure = await validatePasswordStrength(`Aa1${"a".repeat(PASSWORD_MAX_LENGTH)}`);
 
-    expect(failure?.rule).toBe("maxLength");
-    expect(failure?.maxLength).toBe(PASSWORD_MAX_LENGTH);
+    expect(failure).toEqual({
+      rule: "maxLength",
+      rules: ["maxLength"],
+      message: `Password must be at most ${PASSWORD_MAX_LENGTH} characters`,
+      maxLength: PASSWORD_MAX_LENGTH,
+    });
   });
 
   it("accepts a password of exactly the shared maximum", async () => {
@@ -394,8 +444,12 @@ describe("validatePasswordStrength, a changed policy (#2039)", () => {
 
     const failure = await validatePasswordStrength("MyPass12");
 
-    expect(failure?.rules).toEqual(["minLength"]);
-    expect(failure?.minLength).toBe(12);
+    expect(failure).toEqual({
+      rule: "minLength",
+      rules: ["minLength"],
+      message: "Password must be at least 12 characters",
+      minLength: 12,
+    });
   });
 
   it("accepts anything once every rule is off and the minimum is 1", async () => {
@@ -412,7 +466,12 @@ describe("validatePasswordStrength, a changed policy (#2039)", () => {
     expect(await validatePasswordStrength("MyPass12")).toBeNull();
 
     policy.values.set("passwordRequireSpecial", "true");
-    expect(await rulesOf("MyPass12")).toEqual(["special"]);
+    const failure = await validatePasswordStrength("MyPass12");
+    expect(failure).toEqual({
+      rule: "special",
+      rules: ["special"],
+      message: "Password must contain a special character",
+    });
     expect(await validatePasswordStrength("MyPass12!")).toBeNull();
   });
 
