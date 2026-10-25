@@ -1807,13 +1807,13 @@ describe("useToolProcessor ends a failed batch before failing its entries (#1778
         xhrs[0].onload?.();
       });
 
-      // settleFromZip's own entry write throws first; the unzip-failed exit's
+      // settleFromZip's own entry write throws first; the settle-failed exit's
       // failRun then has to end the run even though its write throws too. The
-      // first throw is our own bug, so it's let out, not swallowed (#1805).
+      // first throw is our own bug, so it's let out, not swallowed (#1805, #1929).
       await settled(() => {
         expect(captured.rejections).toEqual([expect.objectContaining({ message: "store broke" })]);
       });
-      expectRunEnded("Batch processing failed", "failed", "unzip-failed");
+      expectRunEnded("Batch processing failed", "failed", "settle-failed");
       unmount();
     } finally {
       captured.restore();
@@ -2063,15 +2063,16 @@ describe("useToolProcessor ends a failed batch whose teardown throws (#1814)", (
   });
 });
 /**
- * #1805: a batch whose result ZIP won't unpack used to fail with its cause
- * thrown away. Bytes that won't unpack are the server's (or the transfer's)
- * fault: logged, reported under a constant message without the cause (#1740),
- * and failed once, never retried as if the network were at fault. A throw from
- * our own code while settling still fails the run, and reaches the global
- * handler instead of disappearing. What batch_processed reports is unchanged
- * here; #1929 is the question of whether it should change.
+ * #1805, #1929: a batch whose result ZIP won't unpack used to fail with its
+ * cause thrown away. Bytes that won't unpack are the server's (or the
+ * transfer's) fault: logged, reported under a constant message without the
+ * cause (#1740), failed once without retrying as if the network were at fault,
+ * and tracked as "unzip-failed" on both the sync and degraded paths. A throw
+ * from our own code while settling fails the run as "settle-failed" and
+ * reaches the global handler instead of disappearing. An unreadable
+ * X-File-Results header tracks status "failed" with reason "bad-file-results".
  */
-describe("useToolProcessor batch ZIP that won't unpack (#1805)", () => {
+describe("useToolProcessor batch ZIP that won't unpack (#1805, #1929)", () => {
   const NOT_A_ZIP = () => new Blob(["not a zip"], { type: "application/zip" });
   let consoleError: ReturnType<typeof vi.spyOn>;
   let captured: ReturnType<typeof captureRejections>;
@@ -2169,7 +2170,7 @@ describe("useToolProcessor batch ZIP that won't unpack (#1805)", () => {
 
     await settled(() => expect(useFileStore.getState().processing).toBe(false));
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expectBatchFailed("Batch processing failed", "download-failed");
+    expectBatchFailed("Batch processing failed", "unzip-failed");
     expectUnpackReported(undefined);
     expect(useFileStore.getState().batchZipBlob).toBeNull();
     expect(captured.rejections).toEqual([]);
@@ -2226,10 +2227,23 @@ describe("useToolProcessor batch ZIP that won't unpack (#1805)", () => {
     });
     expect(error.cause).toBeUndefined();
     expect(tags).toEqual({ error_class: "operational", tool_id: "resize" });
-    // No file can be matched to its result, as before.
+    // No file can be matched to its result, as before, and batch_processed
+    // records the bad header as a failed batch (#1929).
     expect(useFileStore.getState().entries.map((e) => e.error)).toEqual([
       "File not found in batch results",
       "File not found in batch results",
+    ]);
+    expect(vi.mocked(track).mock.calls.filter(([event]) => event === "batch_processed")).toEqual([
+      [
+        "batch_processed",
+        {
+          tool_id: "resize",
+          file_count: 2,
+          status: "failed",
+          reason: "bad-file-results",
+          total_bytes: 32,
+        },
+      ],
     ]);
     unmount();
   });
@@ -2240,6 +2254,17 @@ describe("useToolProcessor batch ZIP that won't unpack (#1805)", () => {
 
     await settled(() => expect(useFileStore.getState().processing).toBe(false));
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    expect(vi.mocked(track).mock.calls.filter(([event]) => event === "batch_processed")).toEqual([
+      [
+        "batch_processed",
+        {
+          tool_id: "resize",
+          file_count: 2,
+          status: "completed",
+          total_bytes: 32,
+        },
+      ],
+    ]);
     unmount();
   });
 
@@ -2251,7 +2276,7 @@ describe("useToolProcessor batch ZIP that won't unpack (#1805)", () => {
     await settled(() =>
       expect(captured.rejections).toEqual([expect.objectContaining({ message: "store broke" })]),
     );
-    expectBatchFailed("Batch processing failed", "unzip-failed");
+    expectBatchFailed("Batch processing failed", "settle-failed");
     // Our own bug, not a bad answer: it isn't reported as one.
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
     // The ZIP itself was fine, so it stays downloadable.
@@ -2272,7 +2297,7 @@ describe("useToolProcessor batch ZIP that won't unpack (#1805)", () => {
       expect(captured.rejections).toEqual([expect.objectContaining({ message: "store broke" })]),
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expectBatchFailed("Batch processing failed", "download-failed");
+    expectBatchFailed("Batch processing failed", "settle-failed");
     unmount();
   });
 
@@ -2385,7 +2410,7 @@ describe("useToolProcessor batch ZIP that won't unpack (#1805)", () => {
           expect.objectContaining({ message: "chunk failed to load" }),
         ]),
       );
-      expectBatchFailed("Batch processing failed", "unzip-failed");
+      expectBatchFailed("Batch processing failed", "settle-failed");
       // Ours, not the server's: the global handler gets it, not a
       // malformed-result report.
       expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
@@ -2393,6 +2418,66 @@ describe("useToolProcessor batch ZIP that won't unpack (#1805)", () => {
     } finally {
       batchZipState.unpackThrows = false;
     }
+  });
+
+  it("fails a degraded run as settle-failed when the unzip code won't load, without reporting a bad answer (#1929)", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({ ok: true, status: 200, blob: () => Promise.resolve(zipBlob()) }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    batchZipState.unpackThrows = true;
+    try {
+      const { unmount } = startBatchRun();
+      degradeAndComplete();
+
+      await settled(() =>
+        expect(captured.rejections).toEqual([
+          expect.objectContaining({ message: "chunk failed to load" }),
+        ]),
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expectBatchFailed("Batch processing failed", "settle-failed");
+      expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+      unmount();
+    } finally {
+      batchZipState.unpackThrows = false;
+    }
+  });
+
+  it("reports batch_processed as canceled when a canceled batch answers with an unreadable file-results header (#1929)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ canceled: true }),
+        }),
+      ),
+    );
+    const { result, unmount } = startBatchRun();
+    await act(async () => {
+      await result.current.cancelCurrentJob();
+    });
+
+    act(() => respond(zipBlob(), "%ZZ"));
+
+    await settled(() => expect(useFileStore.getState().processing).toBe(false));
+    expect(vi.mocked(captureHandledError)).toHaveBeenCalledTimes(1);
+    expect(useFileStore.getState().entries.map((e) => e.error)).toEqual(["Canceled", "Canceled"]);
+    expect(vi.mocked(track).mock.calls.filter(([event]) => event === "batch_processed")).toEqual([
+      [
+        "batch_processed",
+        {
+          tool_id: "resize",
+          file_count: 2,
+          status: "canceled",
+          reason: "canceled",
+          total_bytes: 32,
+        },
+      ],
+    ]);
+    unmount();
   });
 });
 /**

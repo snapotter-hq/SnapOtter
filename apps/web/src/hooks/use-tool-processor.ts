@@ -1959,13 +1959,12 @@ export function useToolProcessor(toolId: string) {
           if (teardownError) throw teardownError.cause;
         };
 
-        // How a ZIP answer settles. `reason` is what batch_processed reports
-        // if settling fails, which depends on the path the ZIP came in by
-        // (#1161); `status` is the HTTP status of a sync answer.
+        // How a ZIP answer settles. A null fileResults means X-File-Results
+        // was present on the response and could not be read (#1805, #1929);
+        // `status` is the HTTP status of a sync answer.
         interface ZipSettle {
-          fileResults: Record<string, string>;
+          fileResults: Record<string, string> | null;
           fileNotes: Record<string, unknown>;
-          reason: string;
           status?: number;
         }
 
@@ -1978,7 +1977,7 @@ export function useToolProcessor(toolId: string) {
         let settling = false;
         const settleFromZip = async (
           zipBlob: Blob,
-          { fileResults, fileNotes, reason, status }: ZipSettle,
+          { fileResults, fileNotes, status }: ZipSettle,
         ) => {
           settling = true;
           const entriesCount = useFileStore.getState().entries.length;
@@ -1994,7 +1993,7 @@ export function useToolProcessor(toolId: string) {
             if (activeJobIdRef.current !== clientJobId) return;
             if (storeWasReset()) return;
             if (!extracted) {
-              failRun(t.errors.batchFailed, reason);
+              failRun(t.errors.batchFailed, "unzip-failed");
               return;
             }
           } else {
@@ -2025,7 +2024,7 @@ export function useToolProcessor(toolId: string) {
               continue;
             }
             const entryId = captured.id;
-            const processedName = fileResults[String(i)];
+            const processedName = fileResults?.[String(i)];
             if (processedName && (skipExtraction || (extracted && extracted[processedName]))) {
               let processedUrl = null;
               let processedSize = null;
@@ -2075,8 +2074,8 @@ export function useToolProcessor(toolId: string) {
 
           const teardownError = finishRun();
           trackBatch(
-            canceledByUser ? "canceled" : "completed",
-            canceledByUser ? "canceled" : undefined,
+            canceledByUser ? "canceled" : fileResults === null ? "failed" : "completed",
+            canceledByUser ? "canceled" : fileResults === null ? "bad-file-results" : undefined,
           );
           // Every entry has settled, so settleOrFail passes this on to the
           // global handler instead of failing the run.
@@ -2087,7 +2086,8 @@ export function useToolProcessor(toolId: string) {
         // chunk), not the answer. It fails the run unless every entry already
         // settled, which means the teardown at the end threw and the outcome
         // on screen is the real one. Then it's rethrown, so it reaches the
-        // console and Sentry's global handler instead of disappearing (#1805).
+        // console and Sentry's global handler instead of disappearing (#1805,
+        // #1929).
         const settleOrFail = async (zipBlob: Blob, settle: ZipSettle) => {
           try {
             await settleFromZip(zipBlob, settle);
@@ -2100,7 +2100,7 @@ export function useToolProcessor(toolId: string) {
               );
             if (activeJobIdRef.current === clientJobId && !storeWasReset() && unsettled) {
               try {
-                failRun(t.errors.batchFailed, settle.reason);
+                failRun(t.errors.batchFailed, "settle-failed");
               } catch (teardownErr) {
                 // Only the root cause is rethrown, so this one is reported
                 // here (#1812).
@@ -2167,9 +2167,7 @@ export function useToolProcessor(toolId: string) {
             failRun(t.errors.processingInterrupted, "download-failed", "processing_error");
             return;
           }
-          // A durable ZIP that won't settle still reports "download-failed",
-          // as it did before #1805; whether it should say what broke is #1929.
-          await settleOrFail(zipBlob, { fileResults, fileNotes, reason: "download-failed" });
+          await settleOrFail(zipBlob, { fileResults, fileNotes });
         };
 
         batchRunRef.current = {
@@ -2368,7 +2366,6 @@ export function useToolProcessor(toolId: string) {
             void settleOrFail(xhr.response as Blob, {
               fileResults,
               fileNotes,
-              reason: "unzip-failed",
               status: xhr.status,
             });
             return;

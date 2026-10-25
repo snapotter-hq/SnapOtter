@@ -1594,7 +1594,7 @@ export function usePipelineProcessor() {
             const fileResults = parseFileResultsHeader(xhr.getResponseHeader("X-File-Results"), {
               status: xhr.status,
             });
-            void settleOrFail(xhr.response as Blob, fileResults, xhr.status);
+            void settleOrFail(xhr.response as Blob, fileResults ?? {}, xhr.status);
             return;
           }
 

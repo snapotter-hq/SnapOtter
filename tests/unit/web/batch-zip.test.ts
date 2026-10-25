@@ -42,11 +42,11 @@ describe("parseFileResultsHeader (#1805)", () => {
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
   });
 
-  it("keeps the header out of the console line and the report", () => {
+  it("returns null and keeps the header out of the console line and the report (#1929)", () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       const header = encodeURIComponent('{"0":"Jane Doe passport.png"');
-      expect(parseFileResultsHeader(header, { status: 200, toolId: "resize" })).toEqual({});
+      expect(parseFileResultsHeader(header, { status: 200, toolId: "resize" })).toBeNull();
 
       expect(consoleError).toHaveBeenCalledWith("Ignoring unreadable X-File-Results", {
         length: header.length,
