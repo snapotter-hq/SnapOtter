@@ -48,7 +48,9 @@ export async function scheduleSystemJobs(): Promise<void> {
   } else {
     // A scheduler registered by a previous boot survives in Redis; remove it
     // so setting CLEANUP_INTERVAL_MINUTES=0 actually disables the sweep.
-    await q.removeJobScheduler(SYSTEM_JOBS.storageTtl).catch(() => {});
+    await q.removeJobScheduler(SYSTEM_JOBS.storageTtl).catch((err) => {
+      logger.warn({ err }, "Failed to remove orphaned storageTtl scheduler from Redis");
+    });
   }
   await q.upsertJobScheduler(SYSTEM_JOBS.sessionPurge, { every: 60 * 60_000 });
   await q.upsertJobScheduler(SYSTEM_JOBS.retention, { every: 6 * 60 * 60_000 });
@@ -137,16 +139,26 @@ function cronMonitorsEnabled(): boolean {
 async function withCronMonitor(name: string, fn: () => Promise<unknown>): Promise<unknown> {
   const cfg = MONITOR_CONFIG[name];
   if (!cfg || !cronMonitorsEnabled()) return fn();
+
+  let jobStarted = false;
   try {
     const Sentry = await import("@sentry/node");
     // Monitor slugs cannot contain ":".
     return await Sentry.withMonitor(
       name.replace(/:/g, "-"),
-      fn,
+      () => {
+        jobStarted = true;
+        return fn();
+      },
       cfg as Parameters<typeof Sentry.withMonitor>[2],
     );
-  } catch {
+  } catch (err) {
+    if (jobStarted) throw err;
     // Monitoring must never break the actual job.
+    logger.error(
+      { err, jobName: name },
+      "Failed to import Sentry for cron monitoring; falling back to unmonitored execution",
+    );
     return fn();
   }
 }
@@ -263,7 +275,12 @@ async function dispatchSystemJob(job: Job): Promise<unknown> {
           )
           .returning({ id: schema.jobs.id });
       } catch (err) {
-        await deletePrefix(`outputs/${exportData.jobId}/`).catch(() => {});
+        await deletePrefix(`outputs/${exportData.jobId}/`).catch((cleanupErr) => {
+          logger.error(
+            { err: cleanupErr, jobId: exportData.jobId },
+            "Failed to clean up gdprExport outputs after DB update error",
+          );
+        });
         throw err;
       }
       if (completed.length === 0) {

@@ -315,6 +315,19 @@ describe("withCronMonitor", () => {
     // underlying sessionPurge DELETE must have executed.
     expect(dbExecuteMock).toHaveBeenCalled();
   });
+
+  it("runs the job exactly once when the job throws and the monitor propagates it", async () => {
+    process.env.SENTRY_CRON_MONITORS = "1";
+    const { SYSTEM_JOBS, runSystemJob } = await loadSystemJobs();
+
+    // Make the job throw
+    dbExecuteMock.mockRejectedValueOnce(new Error("Job failure"));
+
+    await expect(runSystemJob({ name: SYSTEM_JOBS.sessionPurge } as never)).rejects.toThrow(
+      "Job failure",
+    );
+    expect(dbExecuteMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 // -- dispatchSystemJob: retention + auditArchive ------------------------------
