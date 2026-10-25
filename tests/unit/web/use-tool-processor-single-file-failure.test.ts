@@ -1846,6 +1846,7 @@ describe("useToolProcessor ends a run whose start throws (#1821)", () => {
     expect(xhrs).toHaveLength(0);
     // The rethrow is the report; nothing else goes to Sentry.
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    expect(vi.mocked(track)).not.toHaveBeenCalledWith("batch_processed", expect.anything());
     await expectJobReleased(result.current.cancelCurrentJob);
 
     unmount();
@@ -1933,6 +1934,18 @@ describe("useToolProcessor ends a run whose start throws (#1821)", () => {
     expect(vi.getTimerCount()).toBe(0);
     expect(xhrs).toHaveLength(0);
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+    expect(vi.mocked(track).mock.calls.filter(([event]) => event === "batch_processed")).toEqual([
+      [
+        "batch_processed",
+        {
+          tool_id: "trim-video",
+          file_count: 2,
+          status: "failed",
+          reason: "start-failed",
+          total_bytes: 128,
+        },
+      ],
+    ]);
     await expectJobReleased(result.current.cancelCurrentJob);
 
     unmount();
@@ -1959,6 +1972,18 @@ describe("useToolProcessor ends a run whose start throws (#1821)", () => {
     expect(latestSse().close).toHaveBeenCalled();
     expect(vi.getTimerCount()).toBe(0);
     expect(xhrs).toHaveLength(0);
+    expect(vi.mocked(track).mock.calls.filter(([event]) => event === "batch_processed")).toEqual([
+      [
+        "batch_processed",
+        {
+          tool_id: "trim-video",
+          file_count: 2,
+          status: "failed",
+          reason: "start-failed",
+          total_bytes: 128,
+        },
+      ],
+    ]);
     await expectJobReleased(result.current.cancelCurrentJob);
 
     unmount();
@@ -1994,6 +2019,18 @@ describe("useToolProcessor ends a run whose start throws (#1821)", () => {
     expectRunEnded(3);
     // One report for the settle, however many of its writes threw.
     expectReportedOnce(TOOL_SETTLE_REPORT);
+    expect(vi.mocked(track).mock.calls.filter(([event]) => event === "batch_processed")).toEqual([
+      [
+        "batch_processed",
+        {
+          tool_id: "trim-video",
+          file_count: 3,
+          status: "failed",
+          reason: "start-failed",
+          total_bytes: 192,
+        },
+      ],
+    ]);
 
     unmount();
   });
@@ -2245,6 +2282,18 @@ describe("useToolProcessor leaves a live run alone when a later start throws ear
         error: START_FAILURE,
       });
     }
+    expect(vi.mocked(track).mock.calls.filter(([event]) => event === "batch_processed")).toEqual([
+      [
+        "batch_processed",
+        {
+          tool_id: "trim-video",
+          file_count: 3,
+          status: "failed",
+          reason: "start-failed",
+          total_bytes: 192,
+        },
+      ],
+    ]);
     landLiveRunResult();
     unmount();
   });

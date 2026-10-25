@@ -661,6 +661,68 @@ describe("useToolProcessor batch recovery (#750)", () => {
       expect(useFileStore.getState().processing).toBe(false);
       expect(useFileStore.getState().activeJobId).toBeNull();
       expect(useFileStore.getState().entries.map((e) => e.status)).toEqual(["failed", "failed"]);
+      expect(vi.mocked(track).mock.calls.filter(([event]) => event === "batch_processed")).toEqual([
+        [
+          "batch_processed",
+          {
+            tool_id: "resize",
+            file_count: 2,
+            status: "failed",
+            reason: "frame-handling-failed",
+            total_bytes: 32,
+          },
+        ],
+      ]);
+
+      unmount();
+    });
+
+    it("reports batch_processed as canceled when a canceled batch fails in the frame handler (#1913)", async () => {
+      let thrown = false;
+      vi.spyOn(useFileStore.getState(), "setError").mockImplementation((message) => {
+        if (!thrown && message === "All files failed processing") {
+          thrown = true;
+          throw new Error("boom");
+        }
+        realSetError(message);
+      });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() =>
+          Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ canceled: true }),
+          } as Response),
+        ),
+      );
+      const { result, unmount } = startBatchRun();
+      degrade();
+
+      await act(async () => {
+        await result.current.cancelCurrentJob();
+      });
+
+      expect(() =>
+        act(() => {
+          sendBatchFrame(ALL_FAILED_FRAME);
+        }),
+      ).toThrow("boom");
+
+      expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
+      expect(useFileStore.getState().processing).toBe(false);
+      expect(vi.mocked(track).mock.calls.filter(([event]) => event === "batch_processed")).toEqual([
+        [
+          "batch_processed",
+          {
+            tool_id: "resize",
+            file_count: 2,
+            status: "canceled",
+            reason: "canceled",
+            total_bytes: 32,
+          },
+        ],
+      ]);
 
       unmount();
     });
@@ -684,8 +746,62 @@ describe("useToolProcessor batch recovery (#750)", () => {
       // The entries settle before the outcome report, so a throw there can't
       // leave them pulsing behind a settled run (#1778).
       expect(useFileStore.getState().entries.map((e) => e.status)).toEqual(["failed", "failed"]);
+      expect(vi.mocked(track).mock.calls.filter(([event]) => event === "batch_processed")).toEqual([
+        [
+          "batch_processed",
+          {
+            tool_id: "resize",
+            file_count: 2,
+            status: "failed",
+            reason: "all-files-failed",
+            total_bytes: 32,
+          },
+        ],
+      ]);
 
       unmount();
+    });
+
+    it("does not report batch_processed when a superseded batch's hook fails on a single-run frame (#1913)", () => {
+      const realUpdateEntry = useFileStore.getState().updateEntry;
+      try {
+        const { result, unmount } = startBatchRun();
+        vi.mocked(generateId).mockReturnValueOnce("44444444-4444-4444-8444-444444444444");
+        act(() => {
+          result.current.processFiles([useFileStore.getState().entries[0].file], { width: 100 });
+        });
+        vi.spyOn(useFileStore.getState(), "updateEntry")
+          .mockImplementationOnce(() => {
+            throw new Error("boom");
+          })
+          .mockImplementation(realUpdateEntry);
+
+        expect(() =>
+          act(() => {
+            sendSingleFrame({
+              jobId: "44444444-4444-4444-8444-444444444444",
+              phase: "complete",
+              percent: 100,
+              result: {
+                jobId: "44444444-4444-4444-8444-444444444444",
+                downloadUrl: "/api/v1/download/44444444/first_resize.png",
+                originalSize: 16,
+                processedSize: 8,
+              },
+            });
+          }),
+        ).toThrow("boom");
+
+        expect(useFileStore.getState().error).toBe(HANDLER_FAILURE);
+        expect(useFileStore.getState().processing).toBe(false);
+        expect(
+          vi.mocked(track).mock.calls.filter(([event]) => event === "batch_processed"),
+        ).toEqual([]);
+
+        unmount();
+      } finally {
+        useFileStore.setState({ updateEntry: realUpdateEntry });
+      }
     });
   });
 

@@ -193,6 +193,7 @@ export function useToolProcessor(toolId: string) {
     // cancelLocally: a stale closure refuses and the timer's caller falls
     // through to the single-run settle.
     abandon: (message: string, reason?: string, category?: FeedbackErrorCategory) => boolean;
+    onHandlerError: () => void;
   } | null>(null);
 
   const isAiTool = AI_PYTHON_TOOLS.has(toolId);
@@ -626,6 +627,8 @@ export function useToolProcessor(toolId: string) {
       } catch (_e) {
         console.debug("Ignored xhr.abort error:", _e);
       }
+      const batchRun =
+        batchRunRef.current?.jobId === activeJobIdRef.current ? batchRunRef.current : null;
       batchRunRef.current = null;
       setProgress(IDLE_PROGRESS);
       // The store write that threw may throw again, so each write gets its
@@ -646,6 +649,7 @@ export function useToolProcessor(toolId: string) {
       }
       // Last, and it never throws.
       settleProcessingEntries(trackingFailed);
+      batchRun?.onHandlerError();
     },
     [
       toolId,
@@ -2192,6 +2196,12 @@ export function useToolProcessor(toolId: string) {
             failRun(message, reason, category);
             return true;
           },
+          onHandlerError: () => {
+            trackBatch(
+              canceledByUser ? "canceled" : "failed",
+              canceledByUser ? "canceled" : "frame-handling-failed",
+            );
+          },
           onTerminal: (frame) => {
             if (activeJobIdRef.current !== clientJobId) return;
             if (storeWasReset()) return;
@@ -2473,6 +2483,10 @@ export function useToolProcessor(toolId: string) {
       } catch (cause) {
         if (claimed) endRunAtStart(runEntryIds, runEntryFiles);
         else endStartBeforeClaim(runEntryIds, runEntryFiles);
+        trackBatch(
+          canceledByUser ? "canceled" : "failed",
+          canceledByUser ? "canceled" : "start-failed",
+        );
         throw cause;
       }
     },
