@@ -2032,7 +2032,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
 // ── Token extraction ───────────────────────────────────────────────
 
-function extractToken(request: FastifyRequest): string | null {
+export function extractToken(request: FastifyRequest): string | null {
   const authHeader = request.headers.authorization;
   if (authHeader?.startsWith("Bearer ")) {
     return authHeader.slice(7);
@@ -2046,7 +2046,7 @@ function extractToken(request: FastifyRequest): string | null {
 
 // ── Auth middleware ────────────────────────────────────────────────
 
-const PUBLIC_PATHS = [
+export const PUBLIC_PATHS = [
   "/api/v1/health",
   "/api/v1/readyz",
   "/api/v1/config/",
@@ -2059,7 +2059,7 @@ const PUBLIC_PATHS = [
   "/api/v1/scim/",
 ];
 
-function isPublicRoute(url: string): boolean {
+export function isPublicRoute(url: string): boolean {
   // Non-API routes are public (SPA static files — auth is handled client-side)
   if (!url.startsWith("/api/")) return true;
   // Download URLs use unguessable UUIDs as capability tokens — no auth needed

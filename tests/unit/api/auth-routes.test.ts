@@ -3,7 +3,7 @@
  *
  * Tests getAuthUser, requireAuth, requireAdmin, validatePasswordStrength and
  * validateUsername (the real exports of apps/api/src/plugins/auth.ts, #1570, #2039),
- * plus isPublicRoute, which is reproduced here.
+ * plus isPublicRoute, PUBLIC_PATHS, and extractToken (#2337).
  */
 import { PASSWORD_MAX_LENGTH } from "@snapotter/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -141,8 +141,11 @@ vi.mock("../../../apps/api/src/lib/audit.js", () => ({
 import {
   authRoutes,
   computeKeyPrefix,
+  extractToken,
   getAuthUser,
   hashPassword,
+  isPublicRoute,
+  PUBLIC_PATHS,
   requireAdmin,
   requireAuth,
   validatePasswordStrength,
@@ -567,24 +570,6 @@ describe("validateUsername", () => {
   });
 });
 
-// ── isPublicRoute (reproduced logic) ────────────────────────────────────
-
-const PUBLIC_PATHS = [
-  "/api/v1/health",
-  "/api/v1/config/",
-  "/api/auth/",
-  "/api/v1/download/",
-  "/api/v1/jobs/",
-  "/api/docs",
-  "/api/v1/openapi.yaml",
-  "/api/v1/meme-templates/",
-];
-
-function isPublicRoute(url: string): boolean {
-  if (!url.startsWith("/api/")) return true;
-  return PUBLIC_PATHS.some((path) => url.startsWith(path));
-}
-
 describe("isPublicRoute", () => {
   it("treats non-API routes as public", () => {
     expect(isPublicRoute("/")).toBe(true);
@@ -600,6 +585,14 @@ describe("isPublicRoute", () => {
 
   it("treats health endpoint as public", () => {
     expect(isPublicRoute("/api/v1/health")).toBe(true);
+  });
+
+  it("treats readiness probe as public (#2337)", () => {
+    expect(isPublicRoute("/api/v1/readyz")).toBe(true);
+  });
+
+  it("treats config routes as public (#2337)", () => {
+    expect(isPublicRoute("/api/v1/config/features")).toBe(true);
   });
 
   it("treats download routes as public", () => {
@@ -627,6 +620,84 @@ describe("isPublicRoute", () => {
 
   it("treats meme templates as public", () => {
     expect(isPublicRoute("/api/v1/meme-templates/list")).toBe(true);
+  });
+
+  it("treats SCIM routes as public (#2337)", () => {
+    expect(isPublicRoute("/api/v1/scim/v2/Users")).toBe(true);
+  });
+
+  it("matches the exact canonical public paths list (#2337)", () => {
+    expect(PUBLIC_PATHS).toEqual([
+      "/api/v1/health",
+      "/api/v1/readyz",
+      "/api/v1/config/",
+      "/api/auth/",
+      "/api/v1/download/",
+      "/api/v1/jobs/",
+      "/api/docs",
+      "/api/v1/openapi.yaml",
+      "/api/v1/meme-templates/",
+      "/api/v1/scim/",
+    ]);
+  });
+
+  it.each(PUBLIC_PATHS)("treats %s as public (#2337)", (path) => {
+    expect(isPublicRoute(path)).toBe(true);
+    expect(isPublicRoute(`${path}subpath`)).toBe(true);
+  });
+});
+
+describe("extractToken (#2337)", () => {
+  it("extracts token from Bearer authorization header", () => {
+    const req = {
+      headers: { authorization: "Bearer my-secret-token-123" },
+    } as never;
+    expect(extractToken(req)).toBe("my-secret-token-123");
+  });
+
+  it("extracts token from snapotter-session cookie when no auth header", () => {
+    const req = {
+      headers: {},
+      cookies: { "snapotter-session": "session-cookie-token" },
+    } as never;
+    expect(extractToken(req)).toBe("session-cookie-token");
+  });
+
+  it("prioritizes Bearer authorization header over session cookie", () => {
+    const req = {
+      headers: { authorization: "Bearer bearer-wins" },
+      cookies: { "snapotter-session": "cookie-loses" },
+    } as never;
+    expect(extractToken(req)).toBe("bearer-wins");
+  });
+
+  it("returns null when authorization header is not Bearer", () => {
+    const req = {
+      headers: { authorization: "Basic dXNlcjpwYXNz" },
+    } as never;
+    expect(extractToken(req)).toBeNull();
+  });
+
+  it("returns null when authorization header and cookie are absent", () => {
+    const req = {
+      headers: {},
+    } as never;
+    expect(extractToken(req)).toBeNull();
+  });
+
+  it("returns null when cookies are undefined", () => {
+    const req = {
+      headers: {},
+      cookies: undefined,
+    } as never;
+    expect(extractToken(req)).toBeNull();
+  });
+
+  it("returns empty string when Bearer token is empty", () => {
+    const req = {
+      headers: { authorization: "Bearer " },
+    } as never;
+    expect(extractToken(req)).toBe("");
   });
 });
 
