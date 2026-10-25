@@ -1,13 +1,20 @@
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
+import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
+import { sharedRedis } from "../../../apps/api/src/jobs/connection.js";
+import { loginThrottleKey } from "../../../apps/api/src/lib/login-throttle.js";
+import { hashPassword, verifyPassword } from "../../../apps/api/src/plugins/auth.js";
 import {
+  createAdminUser,
   disableUserMfa,
   mfaStatus,
   resetMfaPolicy,
+  resetUserPassword,
   runRecoveryCli,
-} from "../../../apps/api/src/scripts/mfa-recover.js";
+  unlockUser,
+} from "../../../apps/api/src/scripts/admin-recovery.js";
 
 async function readPolicy(): Promise<string | undefined> {
   const [row] = await db
@@ -43,6 +50,9 @@ describe("resetMfaPolicy", () => {
 
 async function insertUser(
   opts: {
+    role?: string;
+    passwordHash?: string | null;
+    mustChangePassword?: boolean;
     totpEnabled?: boolean;
     totpSecret?: string | null;
     recoveryCodesHash?: string | null;
@@ -53,6 +63,9 @@ async function insertUser(
   await db.insert(schema.users).values({
     id,
     username,
+    role: opts.role ?? "user",
+    passwordHash: opts.passwordHash ?? null,
+    mustChangePassword: opts.mustChangePassword ?? false,
     totpEnabled: opts.totpEnabled ?? false,
     totpSecret: opts.totpSecret ?? null,
     recoveryCodesHash: opts.recoveryCodesHash ?? null,
@@ -345,6 +358,309 @@ describe("mfaStatus with an unrecognized stored policy (#873)", () => {
     } finally {
       errSpy.mockRestore();
       logSpy.mockRestore();
+    }
+  });
+});
+
+describe("resetUserPassword (#812)", () => {
+  it("resets password with an explicit value, revokes sessions and API keys, clears login throttle, and writes PASSWORD_RESET", async () => {
+    const oldHash = await hashPassword("OldValidPass1");
+    const { id, username } = await insertUser({
+      role: "admin",
+      passwordHash: oldHash,
+      mustChangePassword: false,
+    });
+    const sessionId = randomUUID();
+    await db.insert(schema.sessions).values({
+      id: sessionId,
+      userId: id,
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    const keyId = randomUUID();
+    await db.insert(schema.apiKeys).values({
+      id: keyId,
+      userId: id,
+      keyHash: "hash",
+      keyPrefix: "prefix1234567890",
+      name: "Test Key",
+    });
+    await sharedRedis().zadd(loginThrottleKey(username), Date.now(), `${Date.now()}:1`);
+
+    const result = await resetUserPassword(username, "NewValidPass1");
+
+    expect(result).toEqual({ status: "reset", generatedPassword: undefined });
+    const [updated] = await db.select().from(schema.users).where(eq(schema.users.id, id));
+    expect(updated.passwordHash).toBeTruthy();
+    expect(updated.passwordHash).not.toBe(oldHash);
+    expect(await verifyPassword("NewValidPass1", updated.passwordHash ?? "")).toBe(true);
+    expect(updated.mustChangePassword).toBe(true);
+
+    const remainingSessions = await db
+      .select()
+      .from(schema.sessions)
+      .where(eq(schema.sessions.userId, id));
+    expect(remainingSessions).toHaveLength(0);
+
+    const remainingKeys = await db
+      .select()
+      .from(schema.apiKeys)
+      .where(eq(schema.apiKeys.userId, id));
+    expect(remainingKeys).toHaveLength(0);
+
+    expect(await sharedRedis().exists(loginThrottleKey(username))).toBe(0);
+
+    const [auditRow] = await db
+      .select()
+      .from(schema.auditLog)
+      .where(and(eq(schema.auditLog.action, "PASSWORD_RESET"), eq(schema.auditLog.targetId, id)));
+    expect(auditRow).toBeDefined();
+    expect(auditRow.details).toMatchObject({
+      targetUserId: id,
+      targetUsername: username,
+      via: "cli",
+    });
+  });
+
+  it("generates a strong temporary password when newPassword is omitted", async () => {
+    const { id, username } = await insertUser({ role: "admin" });
+
+    const result = await resetUserPassword(username);
+
+    expect(result.status).toBe("reset");
+    if (result.status !== "reset") throw new Error("expected reset");
+    expect(result.generatedPassword).toBeDefined();
+    expect(result.generatedPassword?.length).toBeGreaterThanOrEqual(20);
+
+    const [updated] = await db.select().from(schema.users).where(eq(schema.users.id, id));
+    expect(await verifyPassword(result.generatedPassword ?? "", updated.passwordHash ?? "")).toBe(
+      true,
+    );
+    expect(updated.mustChangePassword).toBe(true);
+  });
+
+  it("rejects a weak explicit password without mutating the user or writing an audit row", async () => {
+    const oldHash = await hashPassword("OldValidPass1");
+    const { id, username } = await insertUser({
+      passwordHash: oldHash,
+      mustChangePassword: false,
+    });
+    const beforeAudit = await countAudit("PASSWORD_RESET");
+
+    const result = await resetUserPassword(username, "short");
+
+    expect(result.status).toBe("weak-password");
+    const [row] = await db.select().from(schema.users).where(eq(schema.users.id, id));
+    expect(row.passwordHash).toBe(oldHash);
+    expect(row.mustChangePassword).toBe(false);
+    expect(await countAudit("PASSWORD_RESET")).toBe(beforeAudit);
+  });
+
+  it("returns not-found for an unknown username or the reserved anonymous user", async () => {
+    expect(await resetUserPassword("no-such-user-xyz", "ValidPass1")).toEqual({
+      status: "not-found",
+    });
+    expect(await resetUserPassword("anonymous", "ValidPass1")).toEqual({
+      status: "not-found",
+    });
+  });
+});
+
+describe("createAdminUser (#812)", () => {
+  it("creates an admin user with an explicit password and writes USER_CREATED", async () => {
+    const username = `cli_admin_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+
+    const result = await createAdminUser(username, "AdminBootstrap1");
+
+    expect(result).toEqual({
+      status: "created",
+      username,
+      generatedPassword: undefined,
+    });
+
+    const [created] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.username, username));
+    expect(created).toBeDefined();
+    expect(created.role).toBe("admin");
+    expect(created.mustChangePassword).toBe(true);
+    expect(await verifyPassword("AdminBootstrap1", created.passwordHash ?? "")).toBe(true);
+
+    const [auditRow] = await db
+      .select()
+      .from(schema.auditLog)
+      .where(
+        and(eq(schema.auditLog.action, "USER_CREATED"), eq(schema.auditLog.targetId, created.id)),
+      );
+    expect(auditRow).toBeDefined();
+    expect(auditRow.details).toMatchObject({
+      newUserId: created.id,
+      newUsername: username,
+      role: "admin",
+      via: "cli",
+    });
+  });
+
+  it("generates a strong password when password is omitted, and defaults username to env.DEFAULT_USERNAME", async () => {
+    const customDefault = `def_admin_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const prevDefault = env.DEFAULT_USERNAME;
+    env.DEFAULT_USERNAME = customDefault;
+    try {
+      const result = await createAdminUser();
+      expect(result.status).toBe("created");
+      if (result.status !== "created") throw new Error("expected created");
+      expect(result.username).toBe(customDefault);
+      expect(result.generatedPassword).toBeDefined();
+      expect(result.generatedPassword?.length).toBeGreaterThanOrEqual(20);
+
+      const [created] = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.username, customDefault));
+      expect(created.role).toBe("admin");
+      expect(await verifyPassword(result.generatedPassword ?? "", created.passwordHash ?? "")).toBe(
+        true,
+      );
+    } finally {
+      env.DEFAULT_USERNAME = prevDefault;
+    }
+  });
+
+  it("returns already-exists when the username is already taken", async () => {
+    const { username } = await insertUser({ role: "user" });
+    const beforeAudit = await countAudit("USER_CREATED");
+
+    const result = await createAdminUser(username, "AdminBootstrap1");
+
+    expect(result).toEqual({ status: "already-exists", username });
+    expect(await countAudit("USER_CREATED")).toBe(beforeAudit);
+  });
+
+  it("returns invalid-username for invalid or reserved usernames", async () => {
+    const shortRes = await createAdminUser("ab", "AdminBootstrap1");
+    expect(shortRes.status).toBe("invalid-username");
+
+    const anonRes = await createAdminUser("anonymous", "AdminBootstrap1");
+    expect(anonRes.status).toBe("invalid-username");
+
+    const badCharRes = await createAdminUser("bad user!", "AdminBootstrap1");
+    expect(badCharRes.status).toBe("invalid-username");
+  });
+
+  it("returns weak-password when an explicit password violates the policy", async () => {
+    const username = `weak_admin_${Date.now()}`;
+    const result = await createAdminUser(username, "weak");
+    expect(result.status).toBe("weak-password");
+
+    const [row] = await db.select().from(schema.users).where(eq(schema.users.username, username));
+    expect(row).toBeUndefined();
+  });
+});
+
+describe("unlockUser (#812)", () => {
+  it("clears the Redis login-throttle key for a throttled user and writes USER_UPDATED", async () => {
+    const { id, username } = await insertUser({ role: "admin" });
+    await sharedRedis().zadd(loginThrottleKey(username), Date.now(), `${Date.now()}:1`);
+
+    const result = await unlockUser(username);
+
+    expect(result).toBe("unlocked");
+    expect(await sharedRedis().exists(loginThrottleKey(username))).toBe(0);
+
+    const [auditRow] = await db
+      .select()
+      .from(schema.auditLog)
+      .where(and(eq(schema.auditLog.action, "USER_UPDATED"), eq(schema.auditLog.targetId, id)));
+    expect(auditRow).toBeDefined();
+    expect(auditRow.details).toMatchObject({
+      targetUserId: id,
+      targetUsername: username,
+      via: "cli",
+    });
+  });
+
+  it("restores a disabled user role and writes USER_UPDATED", async () => {
+    const { id, username } = await insertUser({ role: "disabled:admin" });
+
+    const result = await unlockUser(username);
+
+    expect(result).toBe("unlocked");
+    const [row] = await db.select().from(schema.users).where(eq(schema.users.id, id));
+    expect(row.role).toBe("admin");
+
+    const [auditRow] = await db
+      .select()
+      .from(schema.auditLog)
+      .where(and(eq(schema.auditLog.action, "USER_UPDATED"), eq(schema.auditLog.targetId, id)));
+    expect(auditRow).toBeDefined();
+  });
+
+  it("returns already-clear and writes no audit row when the user is neither throttled nor disabled", async () => {
+    const { username } = await insertUser({ role: "admin" });
+    const beforeAudit = await countAudit("USER_UPDATED");
+
+    const result = await unlockUser(username);
+
+    expect(result).toBe("already-clear");
+    expect(await countAudit("USER_UPDATED")).toBe(beforeAudit);
+  });
+
+  it("returns not-found for an unknown username without touching its throttle key", async () => {
+    const ghost = `ghost_${Date.now()}`;
+    await sharedRedis().zadd(loginThrottleKey(ghost), Date.now(), `${Date.now()}:1`);
+    try {
+      expect(await unlockUser(ghost)).toBe("not-found");
+      expect(await sharedRedis().exists(loginThrottleKey(ghost))).toBe(1);
+    } finally {
+      await sharedRedis().del(loginThrottleKey(ghost));
+    }
+  });
+});
+
+describe("runRecoveryCli for reset-password, create-admin, and unlock-user (#812)", () => {
+  it("dispatches reset-password with explicit and generated passwords, and rejects missing/unknown/weak args", async () => {
+    const { username } = await insertUser({ role: "admin" });
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect(await runRecoveryCli(["reset-password"])).toBe(1);
+      expect(await runRecoveryCli(["reset-password", "no-such-user"])).toBe(1);
+      expect(await runRecoveryCli(["reset-password", username, "weak"])).toBe(1);
+      expect(await runRecoveryCli(["reset-password", username, "NewValidPass1"])).toBe(0);
+      expect(await runRecoveryCli(["reset-password", username])).toBe(0);
+    } finally {
+      logSpy.mockRestore();
+      errSpy.mockRestore();
+    }
+  });
+
+  it("dispatches create-admin and rejects duplicate/invalid/weak args", async () => {
+    const username = `cli_create_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect(await runRecoveryCli(["create-admin", "ab"])).toBe(1);
+      expect(await runRecoveryCli(["create-admin", username, "weak"])).toBe(1);
+      expect(await runRecoveryCli(["create-admin", username, "ValidPass1"])).toBe(0);
+      expect(await runRecoveryCli(["create-admin", username, "ValidPass1"])).toBe(1);
+    } finally {
+      logSpy.mockRestore();
+      errSpy.mockRestore();
+    }
+  });
+
+  it("dispatches unlock-user for unlocked, already-clear, not-found, and missing username", async () => {
+    const { username } = await insertUser({ role: "disabled:admin" });
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect(await runRecoveryCli(["unlock-user"])).toBe(1);
+      expect(await runRecoveryCli(["unlock-user", "no-such-user"])).toBe(1);
+      expect(await runRecoveryCli(["unlock-user", username])).toBe(0);
+      expect(await runRecoveryCli(["unlock-user", username])).toBe(0);
+    } finally {
+      logSpy.mockRestore();
+      errSpy.mockRestore();
     }
   });
 });

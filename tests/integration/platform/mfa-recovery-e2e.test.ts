@@ -9,7 +9,12 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
-import { resetMfaPolicy } from "../../../apps/api/src/scripts/mfa-recover.js";
+import {
+  createAdminUser,
+  resetMfaPolicy,
+  resetUserPassword,
+  unlockUser,
+} from "../../../apps/api/src/scripts/admin-recovery.js";
 import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
 
 let testApp: TestApp;
@@ -50,6 +55,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await db.delete(schema.settings).where(eq(schema.settings.key, "mfaPolicy"));
+  await db.delete(schema.settings).where(eq(schema.settings.key, "loginThrottleMaxFailures"));
   await testApp.cleanup();
 });
 
@@ -78,5 +84,78 @@ describe("MFA lockout recovery (issue #515)", () => {
     });
     expect(allowed.statusCode).toBe(200);
     expect(JSON.parse(allowed.body).token).toBeTruthy();
+  });
+});
+
+describe("Account recovery CLI commands (issue #812)", () => {
+  it("unlock-user clears a 429 LOGIN_THROTTLED lockout so the user can log in immediately", async () => {
+    const { username, password } = await createUser();
+    await setSetting("loginThrottleMaxFailures", "2");
+    try {
+      for (let i = 0; i < 2; i++) {
+        const bad = await testApp.app.inject({
+          method: "POST",
+          url: "/api/auth/login",
+          payload: { username, password: "WrongPassword1" },
+        });
+        expect(bad.statusCode).toBe(401);
+      }
+
+      const throttled = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username, password },
+      });
+      expect(throttled.statusCode).toBe(429);
+      expect(JSON.parse(throttled.body).code).toBe("LOGIN_THROTTLED");
+
+      expect(await unlockUser(username)).toBe("unlocked");
+
+      const allowed = await testApp.app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { username, password },
+      });
+      expect(allowed.statusCode).toBe(200);
+      expect(JSON.parse(allowed.body).token).toBeTruthy();
+    } finally {
+      await db.delete(schema.settings).where(eq(schema.settings.key, "loginThrottleMaxFailures"));
+    }
+  });
+
+  it("reset-password replaces a forgotten password and clears any login throttle so login succeeds", async () => {
+    const { username } = await createUser();
+
+    const reset = await resetUserPassword(username);
+    expect(reset.status).toBe("reset");
+    if (reset.status !== "reset") throw new Error("expected reset");
+
+    const loginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username, password: reset.generatedPassword },
+    });
+    expect(loginRes.statusCode).toBe(200);
+    const body = JSON.parse(loginRes.body);
+    expect(body.token).toBeTruthy();
+    expect(body.user.mustChangePassword).toBe(true);
+  });
+
+  it("create-admin bootstraps a new admin account that can log in immediately", async () => {
+    const username = uid();
+    const created = await createAdminUser(username);
+    expect(created.status).toBe("created");
+    if (created.status !== "created") throw new Error("expected created");
+
+    const loginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { username, password: created.generatedPassword },
+    });
+    expect(loginRes.statusCode).toBe(200);
+    const body = JSON.parse(loginRes.body);
+    expect(body.token).toBeTruthy();
+    expect(body.user.role).toBe("admin");
+    expect(body.user.mustChangePassword).toBe(true);
   });
 });

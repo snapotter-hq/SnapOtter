@@ -686,7 +686,7 @@ RUN apt-get purge -y --auto-remove \
 
 # Copy source code for API (tsx runs TS directly - no build step needed)
 COPY apps/api/src ./apps/api/src
-# Offline recovery CLI (see apps/api/src/scripts/mfa-recover.ts). pnpm is not in
+# Offline recovery CLI (see apps/api/src/scripts/admin-recovery.ts). pnpm is not in
 # the runtime image, so this wraps the direct tsx invocation.
 COPY docker/snapotter-admin /usr/local/bin/snapotter-admin
 RUN chmod +x /usr/local/bin/snapotter-admin
