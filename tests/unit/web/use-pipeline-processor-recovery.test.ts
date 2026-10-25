@@ -30,10 +30,17 @@ vi.mock("@/lib/analytics", () => ({
   captureHandledError: vi.fn(async () => null),
 }));
 
-vi.mock("@/lib/api", () => ({
-  formatHeaders: () => new Map<string, string>(),
-  parseApiError: () => "error",
-}));
+vi.mock("@/lib/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api")>();
+  return {
+    formatHeaders: () => new Map<string, string>(),
+    parseApiError: (body: Record<string, unknown>, status: number, fallback?: string) => {
+      const parsed = actual.parseApiError(body, status, fallback);
+      if (typeof parsed === "object" || parsed === fallback) return parsed;
+      return "error";
+    },
+  };
+});
 
 vi.mock("@/lib/utils", async (importOriginal) => {
   const actual: Record<string, unknown> = await importOriginal();
@@ -861,6 +868,42 @@ describe("usePipelineProcessor batch recovery (#766)", () => {
 
     unmount();
   });
+
+  it.each([
+    ["null", "null", en.errors.batchFailedWithStatus],
+    ["a primitive", "true", en.errors.batchFailedWithStatus],
+    ["an array", "[1, 2]", en.errors.batchFailedWithStatus],
+    [
+      "an errors array whose first entry is null",
+      JSON.stringify({ errors: [null] }),
+      en.errors.processingFailedWithStatus,
+    ],
+    [
+      "an errors array whose first entry has a non-string error",
+      JSON.stringify({ errors: [{ filename: "first.png", error: 123 }], error: "Step 1 failed" }),
+      "error",
+    ],
+  ])(
+    "fails immediately without degrading when a batch 500 body is valid JSON with %s (#3985)",
+    async (_label, jsonBody, expectedError) => {
+      const { unmount } = startBatchRun();
+
+      act(() => {
+        xhrs[0].upload.onload?.();
+        xhrs[0].status = 500;
+        xhrs[0].response = new Blob([jsonBody], { type: "application/json" });
+        xhrs[0].onload?.();
+      });
+
+      await settled(() => {
+        expect(useFileStore.getState().processing).toBe(false);
+      });
+      expect(useFileStore.getState().error).toBe(expectedError);
+      expect(vi.mocked(track)).not.toHaveBeenCalledWith("tool_run_degraded", expect.anything());
+
+      unmount();
+    },
+  );
 
   it("keeps original-index alignment when fileResults has a hole", async () => {
     const fetchMock = vi.fn(() =>

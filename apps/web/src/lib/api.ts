@@ -21,22 +21,28 @@ export interface FeatureNotInstalledError {
  * that names no reason reads as.
  */
 export function parseApiError(
-  body: Record<string, unknown>,
+  body: unknown,
   fallbackStatus: number,
   fallback = `Processing failed: ${fallbackStatus}`,
 ): string | FeatureNotInstalledError {
-  if (body.code === "FEATURE_NOT_INSTALLED") {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return fallback;
+  }
+  const record = body as Record<string, unknown>;
+  const feature = typeof record.feature === "string" ? record.feature : "";
+  const featureName = typeof record.featureName === "string" ? record.featureName : "";
+  if (record.code === "FEATURE_NOT_INSTALLED" && (feature.length > 0 || featureName.length > 0)) {
     return {
       type: "feature_not_installed",
-      feature: body.feature as string,
-      featureName: body.featureName as string,
-      estimatedSize: body.estimatedSize as string,
+      feature,
+      featureName,
+      estimatedSize: typeof record.estimatedSize === "string" ? record.estimatedSize : "",
     };
   }
 
-  const error = typeof body.error === "string" ? body.error : "";
-  const message = typeof body.message === "string" ? body.message : "";
-  const details = body.details;
+  const error = typeof record.error === "string" ? record.error : "";
+  const message = typeof record.message === "string" ? record.message : "";
+  const details = record.details;
   let detailsStr = "";
   if (typeof details === "string") {
     detailsStr = details;

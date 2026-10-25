@@ -143,6 +143,27 @@ describe("parseApiError", () => {
     const result = parseApiError({ error: 123, details: "some detail" }, 400);
     expect(result).toBe("some detail");
   });
+
+  it.each([
+    ["null", null],
+    ["a primitive", "oops"],
+    ["an array", ["oops"]],
+  ])("returns fallback without throwing when body is %s (#3985)", (_label, body) => {
+    expect(parseApiError(body, 500, "Fallback: 500")).toBe("Fallback: 500");
+  });
+
+  it("falls through to error or fallback when FEATURE_NOT_INSTALLED lacks string feature identifiers (#3985)", () => {
+    expect(parseApiError({ code: "FEATURE_NOT_INSTALLED" }, 501, "Fallback: 501")).toBe(
+      "Fallback: 501",
+    );
+    expect(
+      parseApiError(
+        { code: "FEATURE_NOT_INSTALLED", feature: null, featureName: { bad: true }, error: "No" },
+        501,
+        "Fallback: 501",
+      ),
+    ).toBe("No");
+  });
 });
 
 // ==========================================================================

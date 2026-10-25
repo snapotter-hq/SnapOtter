@@ -1610,40 +1610,61 @@ export function usePipelineProcessor() {
             let errorMsg: string;
             // Only the parse sits in this try: failRun runs after it, so a
             // throw from its teardown can't land in the catch and fail the
-            // run a second time (#1890).
+            // run a second time (#1890), and post-parse formatting cannot
+            // misread a JSON 5xx as an intermediary HTML error page (#3985).
+            let body: unknown;
+            let parsedJson = true;
             try {
-              const body = JSON.parse(text);
+              body = JSON.parse(text);
+            } catch {
+              parsedJson = false;
+            }
+            if (!parsedJson) {
+              // An unparseable 5xx body is an intermediary answering for a
+              // dead sync wait, not the app.
+              if (xhr.status >= 500 && degradeToAsync(`http-${xhr.status}`)) {
+                return;
+              }
+              errorMsg = format(t.errors.batchFailedWithStatus, { status: xhr.status });
+            } else if (!body || typeof body !== "object" || Array.isArray(body)) {
+              errorMsg = format(t.errors.batchFailedWithStatus, { status: xhr.status });
+            } else {
+              const record = body as Record<string, unknown>;
               // The route marks a canceled batch structurally (#771); the
               // per-file error list would otherwise read as a failure report.
               // A body with its own code (ENGINE_UNAVAILABLE when every file
               // failed on a missing engine) carries the batch's reason and hint;
               // the per-file list would hide the hint behind a count (#1432).
-              const coded = typeof body.code === "string" && body.code.length > 0;
-              if ((body as { canceled?: boolean } | null)?.canceled === true) {
+              const coded = typeof record.code === "string" && record.code.length > 0;
+              const errors = Array.isArray(record.errors) ? record.errors : null;
+              const firstError =
+                errors && errors.length > 0
+                  ? (errors[0] as { error?: unknown } | null)?.error
+                  : undefined;
+              if (record.canceled === true) {
                 errorMsg = "Canceled";
               } else if (
                 !coded &&
-                body.errors &&
-                Array.isArray(body.errors) &&
-                body.errors.length > 0
+                errors &&
+                typeof firstError === "string" &&
+                firstError.length > 0
               ) {
                 // Show the first file's step-level error (all files typically fail at the same step)
-                const first = body.errors[0];
                 errorMsg =
-                  first.error === "Internal server error" ? t.errors.batchFailed : first.error;
-                if (body.errors.length > 1) {
+                  firstError === "Internal server error" ? t.errors.batchFailed : firstError;
+                if (errors.length > 1) {
                   errorMsg += format(
                     plural(
-                      body.errors.length,
+                      errors.length,
                       t.errors.filesFailedSuffix_one,
                       t.errors.filesFailedSuffix_other,
                     ),
-                    { count: body.errors.length },
+                    { count: errors.length },
                   );
                 }
               } else {
                 const parsed = parseApiError(
-                  body,
+                  record,
                   xhr.status,
                   format(t.errors.processingFailedWithStatus, { status: xhr.status }),
                 );
@@ -1653,13 +1674,6 @@ export function usePipelineProcessor() {
                   errorMsg = parsed as string;
                 }
               }
-            } catch {
-              // An unparseable 5xx body is an intermediary answering for a
-              // dead sync wait, not the app.
-              if (xhr.status >= 500 && degradeToAsync(`http-${xhr.status}`)) {
-                return;
-              }
-              errorMsg = format(t.errors.batchFailedWithStatus, { status: xhr.status });
             }
             if (xhr.status === 413) errorMsg = t.errors.fileTooLarge;
             failRun(errorMsg);

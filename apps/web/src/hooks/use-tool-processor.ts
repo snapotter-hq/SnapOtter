@@ -2372,26 +2372,14 @@ export function useToolProcessor(toolId: string) {
             // the bare status as the failure reason: the cap and the disk floor
             // are both 503s, and telling them apart is what the reason is for.
             let reason = `http-${xhr.status}`;
+            let body: unknown;
+            let parsedJson = true;
             try {
-              const body = JSON.parse(text);
-              // The route marks a fully canceled batch structurally; only that
-              // settles as a cancellation. A real failure after a cancel click
-              // (the cancel lost the race, a 500) keeps its own message
-              // instead of being repainted as "Canceled".
-              serverCanceled = (body as { canceled?: boolean } | null)?.canceled === true;
-              const code = (body as { code?: unknown } | null)?.code;
-              if (typeof code === "string" && code.length > 0) reason = code;
-              const parsed = parseApiError(
-                body,
-                xhr.status,
-                format(t.errors.processingFailedWithStatus, { status: xhr.status }),
-              );
-              if (typeof parsed === "object" && parsed.type === "feature_not_installed") {
-                errorMsg = featureNotInstalledMessage(t, parsed, toolName);
-              } else {
-                errorMsg = parsed as string;
-              }
+              body = JSON.parse(text);
             } catch {
+              parsedJson = false;
+            }
+            if (!parsedJson) {
               // An unparseable 5xx body is an intermediary answering for a
               // dead sync wait, not the app (app 5xx always carries JSON):
               // nginx's 502/504 at its 60 s default, Cloudflare's 524 at its
@@ -2401,6 +2389,27 @@ export function useToolProcessor(toolId: string) {
                 return;
               }
               errorMsg = format(t.errors.batchFailedWithStatus, { status: xhr.status });
+            } else if (!body || typeof body !== "object" || Array.isArray(body)) {
+              errorMsg = format(t.errors.batchFailedWithStatus, { status: xhr.status });
+            } else {
+              const record = body as Record<string, unknown>;
+              // The route marks a fully canceled batch structurally; only that
+              // settles as a cancellation. A real failure after a cancel click
+              // (the cancel lost the race, a 500) keeps its own message
+              // instead of being repainted as "Canceled".
+              serverCanceled = record.canceled === true;
+              const code = record.code;
+              if (typeof code === "string" && code.length > 0) reason = code;
+              const parsed = parseApiError(
+                record,
+                xhr.status,
+                format(t.errors.processingFailedWithStatus, { status: xhr.status }),
+              );
+              if (typeof parsed === "object" && parsed.type === "feature_not_installed") {
+                errorMsg = featureNotInstalledMessage(t, parsed, toolName);
+              } else {
+                errorMsg = parsed as string;
+              }
             }
             // Our API's 413 and a reverse proxy's mean the same thing (#1341).
             if (xhr.status === 413) errorMsg = t.errors.fileTooLarge;

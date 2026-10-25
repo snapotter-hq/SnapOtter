@@ -30,10 +30,17 @@ vi.mock("@/lib/analytics", () => ({
   captureHandledError: vi.fn(async () => null),
 }));
 
-vi.mock("@/lib/api", () => ({
-  formatHeaders: () => new Map<string, string>(),
-  parseApiError: () => "error",
-}));
+vi.mock("@/lib/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api")>();
+  return {
+    formatHeaders: () => new Map<string, string>(),
+    parseApiError: (body: Record<string, unknown>, status: number, fallback?: string) => {
+      const parsed = actual.parseApiError(body, status, fallback);
+      if (typeof parsed === "object" || parsed === fallback) return parsed;
+      return "error";
+    },
+  };
+});
 
 vi.mock("@/lib/utils", async (importOriginal) => {
   const actual: Record<string, unknown> = await importOriginal();
@@ -887,6 +894,39 @@ describe("useToolProcessor batch recovery (#750)", () => {
 
     unmount();
   });
+
+  it.each([
+    ["null", "null"],
+    ["a primitive", "true"],
+    ["an array", "[1, 2]"],
+  ])(
+    "fails immediately without degrading when a batch 500 body is valid JSON that parses to %s (#3985)",
+    async (_label, jsonBody) => {
+      const { unmount } = startBatchRun();
+
+      act(() => {
+        xhrs[0].upload.onload?.();
+        xhrs[0].status = 500;
+        xhrs[0].response = new Blob([jsonBody], { type: "application/json" });
+        xhrs[0].onload?.();
+      });
+
+      await settled(() => {
+        expect(useFileStore.getState().processing).toBe(false);
+      });
+      expect(useFileStore.getState().error).toBe(en.errors.batchFailedWithStatus);
+      expect(vi.mocked(track)).not.toHaveBeenCalledWith("tool_run_degraded", expect.anything());
+      expect(vi.mocked(track)).toHaveBeenCalledWith("batch_processed", {
+        tool_id: "resize",
+        file_count: 2,
+        status: "failed",
+        reason: "http-500",
+        total_bytes: 32,
+      });
+
+      unmount();
+    },
+  );
 
   it("recovers through the stall timer when the terminal frame was missed", async () => {
     vi.useFakeTimers();
