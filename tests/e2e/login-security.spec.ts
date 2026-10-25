@@ -22,11 +22,13 @@ test.describe("Login rate limiting", () => {
     const adminToken = (await loginRes.json()).token as string;
     expect(adminToken).toBeTruthy();
 
-    const setLimit = (value: string) =>
-      page.request.put(`${API}/api/v1/settings`, {
+    const setLimit = async (value: string) => {
+      const res = await page.request.put(`${API}/api/v1/settings`, {
         headers: { authorization: `Bearer ${adminToken}` },
         data: { loginAttemptLimit: value },
       });
+      expect(res.ok()).toBeTruthy();
+    };
 
     await setLimit("5");
 
@@ -34,20 +36,19 @@ test.describe("Login rate limiting", () => {
       // Hammer the login endpoint with bad credentials; once the per-minute cap
       // is exceeded the API must respond 429 instead of a normal 401.
       let got429 = false;
-      let saw401 = false;
       for (let i = 0; i < 12; i++) {
         const res = await page.request.post(`${API}/api/auth/login`, {
           data: { username: `wrong-user-${i}`, password: `wrong-pass-${i}` },
         });
-        if (res.status() === 429) {
+        const status = res.status();
+        if (status === 429) {
           got429 = true;
           break;
         }
-        if (res.status() === 401) saw401 = true;
+        expect(status).toBe(401);
       }
 
-      // Bad credentials are rejected (401) and the rate limit eventually trips (429).
-      expect(saw401).toBe(true);
+      // The rate limit eventually trips (429).
       expect(got429).toBe(true);
     } finally {
       // Restore a high limit so later tests in the serial run can sign in.
