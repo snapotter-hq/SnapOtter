@@ -74,6 +74,7 @@ export function OcrQualityControl({
   const needsPack = accurateSelected && !accurateAvailable;
   const isAdmin = hasPermission("features:manage");
   const incompatible = bundle?.compatibility === "incompatible";
+  const displayedError = installError ?? (!incompatible ? bundle?.error : null);
   const bytes = bundle?.missingDownloadBytes ?? bundle?.downloadBytes;
   const size = bytes
     ? formatFileSize(bytes)
@@ -150,7 +151,7 @@ export function OcrQualityControl({
           {!incompatible && !isAdmin && (
             <p className="mt-1 text-xs text-muted-foreground">{t.features.notEnabledDescription}</p>
           )}
-          {installError && <p className="mt-1 text-xs text-destructive">{installError}</p>}
+          {displayedError && <p className="mt-1 text-xs text-destructive">{displayedError}</p>}
         </div>
       )}
     </div>

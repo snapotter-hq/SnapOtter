@@ -268,4 +268,64 @@ describe("OCR optional accurate pack control", () => {
     expect(installButton).toBeDisabled();
     expect(screen.getByText("Disk full")).toBeInTheDocument();
   });
+
+  it("surfaces server bundle.error when compatibility is invalid or compatible (#3997)", () => {
+    useFeaturesStore.setState({
+      bundles: [
+        ocrBundle({
+          status: "error",
+          compatibility: "invalid",
+          compatibilityReason: "descriptor-invalid",
+          missingDownloadBytes: null,
+          error: "OCR runtime descriptor is invalid",
+        }),
+      ],
+    });
+
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Balanced" }));
+
+    expect(screen.getByText("OCR runtime descriptor is invalid")).toBeInTheDocument();
+  });
+
+  it("prefers local installError over server bundle.error and avoids duplicating bundle.error when incompatible (#3997)", () => {
+    useFeaturesStore.setState({
+      bundles: [
+        ocrBundle({
+          status: "error",
+          compatibility: "compatible",
+          compatibilityReason: "artifact-incompatible",
+          error: "OCR runtime artifact is incompatible with this host or SnapOtter version",
+        }),
+      ],
+    });
+
+    const { unmount } = render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Best" }));
+    expect(
+      screen.getByText("OCR runtime artifact is incompatible with this host or SnapOtter version"),
+    ).toBeInTheDocument();
+
+    unmount();
+    useFeaturesStore.setState({
+      bundles: [
+        ocrBundle({
+          status: "error",
+          compatibility: "compatible",
+          compatibilityReason: "artifact-incompatible",
+          error: "OCR runtime artifact is incompatible with this host or SnapOtter version",
+        }),
+      ],
+      errors: { ocr: "Network timeout" },
+    });
+
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Best" }));
+    expect(screen.getByText("Network timeout")).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "OCR runtime artifact is incompatible with this host or SnapOtter version",
+      ),
+    ).toBeNull();
+  });
 });
