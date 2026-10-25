@@ -6,6 +6,11 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { qoiEncode } from "@snapotter/image-engine";
 import sharp from "sharp";
+import {
+  asDecoderOutOfMemory,
+  asDecoderUnavailable,
+  DecoderUnavailableError,
+} from "./format-decoders.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -13,16 +18,19 @@ let cachedMagickCmd: string | null = null;
 
 async function findMagickCmd(): Promise<string> {
   if (cachedMagickCmd) return cachedMagickCmd;
+  const probeFailures: unknown[] = [];
   for (const cmd of ["magick", "convert"]) {
     try {
       await execFileAsync(cmd, ["--version"], { timeout: 5_000 });
       cachedMagickCmd = cmd;
       return cmd;
-    } catch {
-      /* try next */
+    } catch (err) {
+      const outOfMemory = asDecoderOutOfMemory(err);
+      if (outOfMemory !== err) throw outOfMemory;
+      probeFailures.push(err);
     }
   }
-  throw new Error("No ImageMagick found.");
+  throw new DecoderUnavailableError("No ImageMagick found.", probeFailures[0]);
 }
 
 function magickArgs(cmd: string, args: string[]): string[] {
@@ -204,17 +212,28 @@ export async function encodeJxl(inputBuffer: Buffer, quality?: number): Promise<
       const q = String(cjxlQuality(quality));
       await execFileAsync("cjxl", [inputPath, outputPath, "-q", q], {
         timeout: 120_000,
+      }).catch((err: unknown) => {
+        throw asDecoderUnavailable(asDecoderOutOfMemory(err));
       });
-      return await readFile(outputPath);
-    } catch {
+      return await readFile(outputPath).catch((err: unknown) => {
+        throw asDecoderOutOfMemory(err);
+      });
+    } catch (err: unknown) {
+      if (err instanceof DecoderUnavailableError === false) {
+        throw err;
+      }
       /* cjxl not available, fall back to ImageMagick */
     }
     const cmd = await findMagickCmd();
-    const q = quality ? ["-quality", String(quality)] : [];
-    await execFileAsync(cmd, magickArgs(cmd, [inputPath, ...q, `jxl:${outputPath}`]), {
+    const fallbackQ = quality ? ["-quality", String(quality)] : [];
+    await execFileAsync(cmd, magickArgs(cmd, [inputPath, ...fallbackQ, `jxl:${outputPath}`]), {
       timeout: 120_000,
+    }).catch((err: unknown) => {
+      throw asDecoderUnavailable(asDecoderOutOfMemory(err));
     });
-    return await readFile(outputPath);
+    return await readFile(outputPath).catch((err: unknown) => {
+      throw asDecoderOutOfMemory(err);
+    });
   } finally {
     await rm(inputPath, { force: true }).catch(() => {});
     await rm(outputPath, { force: true }).catch(() => {});
