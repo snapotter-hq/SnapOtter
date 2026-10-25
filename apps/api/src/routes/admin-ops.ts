@@ -141,7 +141,7 @@ export async function adminOpsRoutes(app: FastifyInstance): Promise<void> {
       .select({
         teamName,
         totalBytes: sql<string>`coalesce(sum(${schema.users.storageUsed}), 0)::text`,
-        userCount: sql<number>`count(*)::int`,
+        userCount: sql<number>`count(*) filter (where ${schema.users.id} <> 'anonymous')::int`,
       })
       .from(schema.users)
       .leftJoin(schema.teams, eq(schema.teams.id, schema.users.team))

@@ -67,6 +67,7 @@ describe("GET /api/v1/teams", () => {
     const defaultTeam = body.teams.find((t: { name: string }) => t.name === "Default");
     expect(defaultTeam).toBeDefined();
     expect(typeof defaultTeam.memberCount).toBe("number");
+    expect(defaultTeam.memberCount).toBeGreaterThanOrEqual(1);
     expect(typeof defaultTeam.createdAt).toBe("string");
     expect(defaultTeam.id).toBeDefined();
   });

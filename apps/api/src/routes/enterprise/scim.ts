@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { isSafeMessageError } from "@snapotter/shared";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import type { FastifyBaseLogger, FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { env } from "../../config.js";
 import { db, schema } from "../../db/index.js";
@@ -759,6 +759,9 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
       if (!(await requireScimFeature(reply))) return;
 
       const { id } = request.params;
+      if (id === "anonymous") {
+        return reply.status(404).send(scimError(404, "User not found"));
+      }
       const [user] = await db.select().from(schema.users).where(eq(schema.users.id, id));
 
       if (!user) {
@@ -809,19 +812,21 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
           users = await db
             .select()
             .from(schema.users)
-            .where(eq(schema.users.username, parsed.value));
+            .where(and(eq(schema.users.username, parsed.value), ne(schema.users.id, "anonymous")));
         } else if (parsed.attribute === "externalId") {
           users = await db
             .select()
             .from(schema.users)
-            .where(eq(schema.users.scimExternalId, parsed.value));
+            .where(
+              and(eq(schema.users.scimExternalId, parsed.value), ne(schema.users.id, "anonymous")),
+            );
         } else {
           return reply
             .status(400)
             .send(scimError(400, `Unsupported filter attribute: ${parsed.attribute}`));
         }
       } else {
-        users = await db.select().from(schema.users);
+        users = await db.select().from(schema.users).where(ne(schema.users.id, "anonymous"));
       }
 
       const totalResults = users.length;
@@ -855,6 +860,9 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
       if (!(await requireScimFeature(reply))) return;
 
       const { id } = request.params;
+      if (id === "anonymous") {
+        return reply.status(404).send(scimError(404, "User not found"));
+      }
       const [existing] = await db.select().from(schema.users).where(eq(schema.users.id, id));
 
       if (!existing) {
@@ -960,6 +968,9 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
       if (!(await requireScimFeature(reply))) return;
 
       const { id } = request.params;
+      if (id === "anonymous") {
+        return reply.status(404).send(scimError(404, "User not found"));
+      }
       const [existing] = await db.select().from(schema.users).where(eq(schema.users.id, id));
 
       if (!existing) {
@@ -1106,6 +1117,9 @@ async function registerScimProtocolRoutes(app: FastifyInstance): Promise<void> {
       if (!(await requireScimFeature(reply))) return;
 
       const { id } = request.params;
+      if (id === "anonymous") {
+        return reply.status(404).send(scimError(404, "User not found"));
+      }
       const [user] = await db.select().from(schema.users).where(eq(schema.users.id, id));
 
       if (!user) {

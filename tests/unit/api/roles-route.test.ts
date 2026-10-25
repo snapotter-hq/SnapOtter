@@ -9,6 +9,8 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   selectRows: [] as unknown[],
+  selectWhereCalls: [] as unknown[],
+  userCountRows: [] as Array<{ role: string; count: number }>,
   insertedValues: undefined as Record<string, unknown> | undefined,
   insertRowCount: 1,
   updateCalls: [] as Array<{ table: unknown; values: unknown; where: unknown }>,
@@ -25,6 +27,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("drizzle-orm", () => ({
   eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+  ne: (col: unknown, val: unknown) => ({ op: "ne", col, val }),
   sql: (strings: TemplateStringsArray, ...vals: unknown[]) => ({
     sql: strings.join("?"),
     vals,
@@ -34,13 +37,15 @@ vi.mock("drizzle-orm", () => ({
 vi.mock("../../../apps/api/src/db/index.js", () => {
   const makeSelectChain = () => ({
     from: () => ({
-      where: () => {
+      where: (whereArg: unknown) => {
+        mocks.selectWhereCalls.push(whereArg);
         const res = Promise.resolve(mocks.selectRows);
         return Object.assign(res, {
           for: () => Promise.resolve(mocks.selectRows),
+          groupBy: () => Promise.resolve(mocks.userCountRows),
         });
       },
-      groupBy: () => Promise.resolve([]),
+      groupBy: () => Promise.resolve(mocks.userCountRows),
       // biome-ignore lint/suspicious/noThenProperty: mock Drizzle query builder promise chain
       then: (resolve: (v: unknown) => unknown) => Promise.resolve(mocks.selectRows).then(resolve),
     }),
@@ -109,6 +114,8 @@ describe("roles route logic", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.selectRows = [];
+    mocks.selectWhereCalls = [];
+    mocks.userCountRows = [];
     mocks.insertedValues = undefined;
     mocks.insertRowCount = 1;
     mocks.updateCalls = [];
@@ -357,13 +364,16 @@ describe("roles route logic", () => {
 
   describe("route handler behavior (rolesRoutes)", () => {
     type RouteHandler = (request: unknown, reply: unknown) => Promise<unknown>;
+    let getHandler: RouteHandler;
     let postHandler: RouteHandler;
     let putHandler: RouteHandler;
     let deleteHandler: RouteHandler;
 
     beforeAll(async () => {
       const fakeApp = {
-        get: vi.fn(),
+        get: vi.fn((path: string, handler: RouteHandler) => {
+          if (path === "/api/v1/roles") getHandler = handler;
+        }),
         post: vi.fn((path: string, handler: RouteHandler) => {
           if (path === "/api/v1/roles") postHandler = handler;
         }),
@@ -501,6 +511,47 @@ describe("roles route logic", () => {
         username: "admin-user",
         roleId: "role-1",
         roleName: "reviewer",
+      });
+    });
+
+    it("excludes the synthetic anonymous user from GET /api/v1/roles userCount (#2473)", async () => {
+      const now = new Date("2026-10-26T00:00:00.000Z");
+      mocks.selectRows = [
+        {
+          id: "builtin-admin",
+          name: "admin",
+          description: "Administrator",
+          permissions: ["tools:use"],
+          toolPermissions: null,
+          isBuiltin: true,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ];
+      mocks.userCountRows = [{ role: "admin", count: 1 }];
+
+      const reply = makeReply();
+      await getHandler({}, reply);
+      expect(reply.statusCode).toBe(200);
+      expect(mocks.selectWhereCalls).toContainEqual({
+        op: "ne",
+        col: "users.id",
+        val: "anonymous",
+      });
+      expect(reply.payload).toEqual({
+        roles: [
+          {
+            id: "builtin-admin",
+            name: "admin",
+            description: "Administrator",
+            permissions: ["tools:use"],
+            toolPermissions: null,
+            isBuiltin: true,
+            userCount: 1,
+            createdAt: now.toISOString(),
+            updatedAt: now.toISOString(),
+          },
+        ],
       });
     });
   });

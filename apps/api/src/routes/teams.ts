@@ -9,7 +9,7 @@
 
 import { randomUUID } from "node:crypto";
 import { TEAM_NAME_MAX_LENGTH } from "@snapotter/shared";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../db/index.js";
@@ -65,7 +65,7 @@ export async function teamsRoutes(app: FastifyInstance): Promise<void> {
         name: schema.teams.name,
         storageQuota: schema.teams.storageQuota,
         retentionHours: schema.teams.retentionHours,
-        memberCount: sql<number>`(SELECT COUNT(*)::int FROM users WHERE users.team = ${schema.teams.id})`,
+        memberCount: sql<number>`(SELECT COUNT(*)::int FROM users WHERE users.team = teams.id AND users.id <> 'anonymous')`,
         createdAt: schema.teams.createdAt,
       })
       .from(schema.teams);
@@ -233,7 +233,7 @@ export async function teamsRoutes(app: FastifyInstance): Promise<void> {
         const [memberCount] = await tx
           .select({ count: sql<number>`COUNT(*)::int` })
           .from(schema.users)
-          .where(eq(schema.users.team, id));
+          .where(and(eq(schema.users.team, id), ne(schema.users.id, "anonymous")));
 
         if (memberCount && memberCount.count > 0) {
           return "has-members" as const;

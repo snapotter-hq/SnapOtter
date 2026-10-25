@@ -6,7 +6,7 @@ import {
   ROLE_NAME_MIN_LENGTH,
   ROLE_NAME_PATTERN,
 } from "@snapotter/shared";
-import { eq, sql } from "drizzle-orm";
+import { eq, ne, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { db, schema } from "../db/index.js";
@@ -112,6 +112,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
         count: sql<number>`COUNT(*)::int`,
       })
       .from(schema.users)
+      .where(ne(schema.users.id, "anonymous"))
       .groupBy(schema.users.role);
     const countMap = new Map(userCounts.map((r) => [r.role, r.count]));
 

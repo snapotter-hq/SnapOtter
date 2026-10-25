@@ -9,6 +9,8 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   selectQueue: [] as unknown[][],
+  selectFields: [] as unknown[],
+  selectWhereCalls: [] as unknown[],
   insertedValues: undefined as Record<string, unknown> | undefined,
   insertRowCount: 1,
   updatedValues: undefined as Record<string, unknown> | undefined,
@@ -18,7 +20,9 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("drizzle-orm", () => ({
+  and: (...args: unknown[]) => ({ op: "and", args }),
   eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+  ne: (col: unknown, val: unknown) => ({ op: "ne", col, val }),
   sql: (strings: TemplateStringsArray, ...vals: unknown[]) => ({
     sql: strings.join("?"),
     vals,
@@ -28,17 +32,26 @@ vi.mock("drizzle-orm", () => ({
 vi.mock("../../../apps/api/src/db/index.js", () => {
   const nextRows = () => mocks.selectQueue.shift() ?? [];
   const dbObj = {
-    select: () => ({
-      from: () => ({
-        where: () => {
-          const rows = nextRows();
-          const p = Promise.resolve(rows);
-          return Object.assign(p, {
-            for: () => Promise.resolve(rows),
-          });
+    select: (fields?: unknown) => {
+      if (fields) mocks.selectFields.push(fields);
+      return {
+        from: () => {
+          const chain = {
+            where: (whereArg: unknown) => {
+              mocks.selectWhereCalls.push(whereArg);
+              const rows = nextRows();
+              const p = Promise.resolve(rows);
+              return Object.assign(p, {
+                for: () => Promise.resolve(rows),
+              });
+            },
+            // biome-ignore lint/suspicious/noThenProperty: mock Drizzle query builder promise chain
+            then: (resolve: (v: unknown) => unknown) => Promise.resolve(nextRows()).then(resolve),
+          };
+          return chain;
         },
-      }),
-    }),
+      };
+    },
     insert: () => ({
       values: (vals: Record<string, unknown>) => {
         mocks.insertedValues = vals;
@@ -73,6 +86,7 @@ vi.mock("../../../apps/api/src/db/index.js", () => {
         createdAt: "teams.created_at",
       },
       users: {
+        id: "users.id",
         team: "users.team",
       },
     },
@@ -95,6 +109,8 @@ describe("teams route logic", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.selectQueue = [];
+    mocks.selectFields = [];
+    mocks.selectWhereCalls = [];
     mocks.insertedValues = undefined;
     mocks.insertRowCount = 1;
     mocks.updatedValues = undefined;
@@ -198,13 +214,16 @@ describe("teams route logic", () => {
 
   describe("route handler behavior (teamsRoutes)", () => {
     type RouteHandler = (request: unknown, reply: unknown) => Promise<unknown>;
+    let getHandler: RouteHandler;
     let postHandler: RouteHandler;
     let putHandler: RouteHandler;
     let deleteHandler: RouteHandler;
 
     beforeAll(async () => {
       const fakeApp = {
-        get: vi.fn(),
+        get: vi.fn((path: string, handler: RouteHandler) => {
+          if (path === "/api/v1/teams") getHandler = handler;
+        }),
         post: vi.fn((path: string, handler: RouteHandler) => {
           if (path === "/api/v1/teams") postHandler = handler;
         }),
@@ -264,6 +283,35 @@ describe("teams route logic", () => {
       expect(okReply.statusCode).toBe(200);
       expect(okReply.payload).toEqual({ ok: true });
       expect(mocks.deleteWhere).toHaveBeenCalledTimes(1);
+      expect(mocks.selectWhereCalls).toContainEqual({
+        op: "and",
+        args: [
+          { op: "eq", col: "users.team", val: "eng-id" },
+          { op: "ne", col: "users.id", val: "anonymous" },
+        ],
+      });
+    });
+
+    it("excludes the synthetic anonymous user in GET /api/v1/teams memberCount subquery (#2473)", async () => {
+      const now = new Date("2026-10-26T00:00:00.000Z");
+      mocks.selectQueue = [
+        [
+          {
+            id: "default-team-00000000",
+            name: "Default",
+            storageQuota: null,
+            retentionHours: null,
+            memberCount: 1,
+            createdAt: now,
+          },
+        ],
+      ];
+      const reply = makeReply();
+      await getHandler({}, reply);
+      expect(reply.statusCode).toBe(200);
+      const selected = mocks.selectFields[0] as { memberCount: { sql: string } };
+      expect(selected.memberCount.sql).toContain("users.team = teams.id");
+      expect(selected.memberCount.sql).toContain("users.id <> 'anonymous'");
     });
 
     it("rejects duplicate team names on create and rename with 409", async () => {
