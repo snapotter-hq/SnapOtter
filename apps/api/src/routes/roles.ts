@@ -184,6 +184,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
 
     await auditFromRequest(request)("ROLE_CREATED", {
       adminId: user.id,
+      username: user.username,
       roleId: id,
       roleName: name,
     });
@@ -370,7 +371,11 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
         throw err;
       }
 
-      await auditFromRequest(request)("ROLE_UPDATED", { adminId: user.id, roleId: id });
+      await auditFromRequest(request)("ROLE_UPDATED", {
+        adminId: user.id,
+        username: user.username,
+        roleId: id,
+      });
 
       return reply.send({ ok: true });
     },
@@ -472,6 +477,7 @@ export async function rolesRoutes(app: FastifyInstance): Promise<void> {
       }
       await auditFromRequest(request)("ROLE_DELETED", {
         adminId: user.id,
+        username: user.username,
         roleId: id,
         roleName: removed.name,
       });

@@ -105,6 +105,9 @@ describe("tool operation audit logging", () => {
 
     const entry = body.entries[0];
     expect(entry.action).toBe("TOOL_EXECUTED");
+    expect(entry.targetType).toBe("tool");
+    expect(entry.targetId).toBe("resize");
+    expect(entry.actorUsername).toBe("admin");
     expect(entry.details.toolId).toBe("resize");
     expect(entry.details.status).toBe("success");
     expect(typeof entry.details.durationMs).toBe("number");

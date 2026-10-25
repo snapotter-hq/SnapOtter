@@ -13,7 +13,9 @@ const mocks = vi.hoisted(() => ({
   insertRowCount: 1,
   updateCalls: [] as Array<{ table: unknown; values: unknown; where: unknown }>,
   deleteCalls: [] as Array<{ table: unknown; where: unknown }>,
-  requirePermission: vi.fn(() => () => Promise.resolve({ id: "admin-1", role: "admin" })),
+  requirePermission: vi.fn(
+    () => () => Promise.resolve({ id: "admin-1", username: "admin-user", role: "admin" }),
+  ),
   hasEffectivePermission: vi.fn(() => Promise.resolve(true)),
   canAssignRole: vi.fn(() => Promise.resolve(true)),
   canGrantRoleDefinition: vi.fn(() => Promise.resolve(true)),
@@ -112,7 +114,7 @@ describe("roles route logic", () => {
     mocks.updateCalls = [];
     mocks.deleteCalls = [];
     mocks.requirePermission.mockImplementation(
-      () => () => Promise.resolve({ id: "admin-1", role: "admin" }),
+      () => () => Promise.resolve({ id: "admin-1", username: "admin-user", role: "admin" }),
     );
     mocks.hasEffectivePermission.mockResolvedValue(true);
     mocks.canAssignRole.mockResolvedValue(true);
@@ -355,13 +357,16 @@ describe("roles route logic", () => {
 
   describe("route handler behavior (rolesRoutes)", () => {
     type RouteHandler = (request: unknown, reply: unknown) => Promise<unknown>;
+    let postHandler: RouteHandler;
     let putHandler: RouteHandler;
     let deleteHandler: RouteHandler;
 
     beforeAll(async () => {
       const fakeApp = {
         get: vi.fn(),
-        post: vi.fn(),
+        post: vi.fn((path: string, handler: RouteHandler) => {
+          if (path === "/api/v1/roles") postHandler = handler;
+        }),
         put: vi.fn((path: string, handler: RouteHandler) => {
           if (path === "/api/v1/roles/:id") putHandler = handler;
         }),
@@ -424,6 +429,30 @@ describe("roles route logic", () => {
       });
     });
 
+    it("audits ROLE_CREATED with acting adminId, username, roleId, and roleName (#3978)", async () => {
+      mocks.selectRows = [];
+
+      const reply = makeReply();
+      await postHandler(
+        {
+          body: {
+            name: "reviewer",
+            description: "Can review files",
+            permissions: ["tools:use"],
+          },
+          log: { info: vi.fn() },
+        },
+        reply,
+      );
+      expect(reply.statusCode).toBe(201);
+      expect(mocks.auditFn).toHaveBeenCalledWith("ROLE_CREATED", {
+        adminId: "admin-1",
+        username: "admin-user",
+        roleId: expect.any(String),
+        roleName: "reviewer",
+      });
+    });
+
     it("cascades role rename to users and updates role row", async () => {
       mocks.selectRows = [
         {
@@ -443,6 +472,11 @@ describe("roles route logic", () => {
       expect(reply.statusCode).toBe(200);
       expect(reply.payload).toEqual({ ok: true });
       expect(mocks.updateCalls).toHaveLength(2);
+      expect(mocks.auditFn).toHaveBeenCalledWith("ROLE_UPDATED", {
+        adminId: "admin-1",
+        username: "admin-user",
+        roleId: "role-1",
+      });
     });
 
     it("reassigns users on deleted custom role to 'user' before deleting the role", async () => {
@@ -462,6 +496,12 @@ describe("roles route logic", () => {
       expect(reply.payload).toEqual({ ok: true });
       expect(mocks.updateCalls).toHaveLength(1);
       expect(mocks.deleteCalls).toHaveLength(1);
+      expect(mocks.auditFn).toHaveBeenCalledWith("ROLE_DELETED", {
+        adminId: "admin-1",
+        username: "admin-user",
+        roleId: "role-1",
+        roleName: "reviewer",
+      });
     });
   });
 });

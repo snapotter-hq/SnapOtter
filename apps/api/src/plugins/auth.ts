@@ -1507,6 +1507,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
     await auditFromRequest(request)("USER_CREATED", {
       adminId: admin.id,
+      username: admin.username,
       newUserId: id,
       newUsername: body.username,
       role,
@@ -1742,6 +1743,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       await auditFromRequest(request)("USER_UPDATED", {
         adminId: admin.id,
+        username: admin.username,
         targetUserId: id,
         changes: { role: updates.role, team: updates.team },
       });
@@ -1861,6 +1863,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       await auditFromRequest(request)("PASSWORD_RESET", {
         adminId: admin.id,
+        username: admin.username,
         targetUserId: id,
         targetUsername: user.username,
       });
@@ -2014,6 +2017,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       await auditFromRequest(request)("USER_DELETED", {
         adminId: admin.id,
+        username: admin.username,
         deletedUserId: id,
         deletedUsername: user.username,
       });

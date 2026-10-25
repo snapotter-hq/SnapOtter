@@ -47,10 +47,13 @@ export function extractActorUsername(details: Record<string, unknown>): string {
 export function extractTargetId(details: Record<string, unknown>): string | null {
   return (
     (details.targetUserId as string) ??
+    (details.newUserId as string) ??
+    (details.deletedUserId as string) ??
     (details.keyId as string) ??
     (details.roleId as string) ??
     (details.targetTeamId as string) ??
     (details.teamId as string) ??
+    (details.toolId as string) ??
     (details.targetId as string) ??
     null
   );

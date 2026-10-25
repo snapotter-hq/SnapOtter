@@ -8,32 +8,67 @@
 import { PASSWORD_MAX_LENGTH } from "@snapotter/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const dbMockState = vi.hoisted(() => ({
+  selectQueue: [] as unknown[][],
+  insertRowCount: 1,
+}));
+
 // Mock DB to avoid SQLite connection
-vi.mock("../../../apps/api/src/db/index.js", () => ({
-  db: {
-    select: () => ({
-      from: () => ({
-        where: () => ({ get: () => null, all: () => [] }),
-        all: () => [],
+vi.mock("../../../apps/api/src/db/index.js", () => {
+  const makeSelect = () => ({
+    from: () => ({
+      where: () => {
+        const rows = dbMockState.selectQueue.shift() ?? [];
+        const res = Promise.resolve(rows);
+        return Object.assign(res, {
+          get: () => rows[0] ?? null,
+          all: () => rows,
+          for: () => Promise.resolve(rows),
+        });
+      },
+      all: () => [],
+    }),
+  });
+  const dbObj = {
+    select: makeSelect,
+    insert: () => ({
+      values: () => ({
+        onConflictDoNothing: () => Promise.resolve({ rowCount: dbMockState.insertRowCount }),
+        run: vi.fn(),
       }),
     }),
-    insert: () => ({
-      values: () => ({ onConflictDoNothing: () => ({ run: vi.fn() }), run: vi.fn() }),
-    }),
-    delete: () => ({ where: () => ({ run: vi.fn() }) }),
-    update: () => ({ set: () => ({ where: () => ({ run: vi.fn() }) }) }),
-  },
-  pool: {},
-  closeDb: async () => {},
-  schema: {
-    users: { id: {}, username: {}, role: {} },
-    sessions: { id: {}, userId: {} },
-    settings: { key: {} },
-    apiKeys: { id: {}, userId: {}, keyPrefix: {} },
-    teams: { id: {}, name: {} },
-    roles: { name: {} },
-    auditLog: {},
-  },
+    delete: () => ({ where: () => Promise.resolve({ run: vi.fn() }) }),
+    update: () => ({ set: () => ({ where: () => Promise.resolve({ run: vi.fn() }) }) }),
+    transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(dbObj),
+  };
+  return {
+    db: dbObj,
+    pool: {},
+    closeDb: async () => {},
+    schema: {
+      users: { id: {}, username: {}, role: {}, passwordHash: {} },
+      sessions: { id: {}, userId: {} },
+      settings: { key: {} },
+      apiKeys: { id: {}, userId: {}, keyPrefix: {} },
+      teams: { id: {}, name: {} },
+      roles: { id: {}, name: {} },
+      userFiles: { id: {}, storedName: {}, userId: {} },
+      auditLog: {},
+    },
+  };
+});
+
+vi.mock("../../../apps/api/src/lib/user-limit.js", () => ({
+  userLimitReached: vi.fn(() => Promise.resolve(false)),
+}));
+
+vi.mock("../../../apps/api/src/lib/last-admin.js", () => ({
+  assertNotLastAdmin: vi.fn(() => Promise.resolve()),
+  LastAdminError: class LastAdminError extends Error {},
+}));
+
+vi.mock("../../../apps/api/src/lib/library-cleanup.js", () => ({
+  deleteLibraryFileStorage: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("../../../apps/api/src/config.js", () => ({
@@ -85,11 +120,16 @@ vi.mock("../../../apps/api/src/lib/settings-helpers.js", async (importOriginal) 
   };
 });
 
+const auditFn = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+
 vi.mock("../../../apps/api/src/lib/audit.js", () => ({
   auditLog: vi.fn(),
+  auditFromRequest: () => auditFn,
+  sanitizeAuditInput: (raw: string) => raw,
 }));
 
 import {
+  authRoutes,
   computeKeyPrefix,
   getAuthUser,
   hashPassword,
@@ -104,6 +144,9 @@ beforeEach(() => {
   policy.values.clear();
   policy.failKey = null;
   loggerWarn.mockReset();
+  auditFn.mockClear();
+  dbMockState.selectQueue = [];
+  dbMockState.insertRowCount = 1;
 });
 
 // ── getAuthUser ─────────────────────────────────────────────────────────
@@ -512,5 +555,157 @@ describe("isPublicRoute", () => {
 
   it("treats meme templates as public", () => {
     expect(isPublicRoute("/api/v1/meme-templates/list")).toBe(true);
+  });
+});
+
+// ── Admin user route audit payloads (#3978) ───────────────────────────
+
+describe("admin user route audit payloads (#3978)", () => {
+  type RouteHandler = (request: unknown, reply: unknown) => Promise<unknown>;
+  const postHandlers = new Map<string, RouteHandler>();
+  const putHandlers = new Map<string, RouteHandler>();
+  const deleteHandlers = new Map<string, RouteHandler>();
+
+  beforeEach(async () => {
+    postHandlers.clear();
+    putHandlers.clear();
+    deleteHandlers.clear();
+    const fakeApp = {
+      get: vi.fn(),
+      post: vi.fn((path: string, optsOrHandler: unknown, maybeHandler?: RouteHandler) => {
+        const handler = (
+          typeof optsOrHandler === "function" ? optsOrHandler : maybeHandler
+        ) as RouteHandler;
+        postHandlers.set(path, handler);
+      }),
+      put: vi.fn((path: string, handler: RouteHandler) => {
+        putHandlers.set(path, handler);
+      }),
+      delete: vi.fn((path: string, handler: RouteHandler) => {
+        deleteHandlers.set(path, handler);
+      }),
+      log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    };
+    await authRoutes(fakeApp as never);
+  });
+
+  function makeReply() {
+    const reply = {
+      statusCode: 200,
+      payload: undefined as unknown,
+      status: vi.fn((code: number) => {
+        reply.statusCode = code;
+        return reply;
+      }),
+      send: vi.fn((body: unknown) => {
+        reply.payload = body;
+        return reply;
+      }),
+    };
+    return reply;
+  }
+
+  const adminActor = { id: "admin-1", username: "admin-user", role: "admin" };
+
+  it("POST /api/auth/register emits USER_CREATED with acting admin username", async () => {
+    dbMockState.selectQueue = [[{ id: "team-1", name: "Default" }], [], [{ role: "admin" }]];
+    const reply = makeReply();
+    await postHandlers.get("/api/auth/register")?.(
+      {
+        user: adminActor,
+        body: { username: "newbie", password: "ValidPassword1", role: "editor" },
+        log: { info: vi.fn() },
+      },
+      reply,
+    );
+
+    expect(reply.statusCode).toBe(201);
+    expect(auditFn).toHaveBeenCalledWith("USER_CREATED", {
+      adminId: "admin-1",
+      username: "admin-user",
+      newUserId: expect.any(String),
+      newUsername: "newbie",
+      role: "editor",
+    });
+  });
+
+  it("PUT /api/auth/users/:id emits USER_UPDATED with acting admin username", async () => {
+    dbMockState.selectQueue = [
+      [{ id: "user-2", username: "target", role: "user" }],
+      [{ role: "user" }],
+      [{ role: "admin" }],
+    ];
+    const reply = makeReply();
+    await putHandlers.get("/api/auth/users/:id")?.(
+      {
+        user: adminActor,
+        params: { id: "user-2" },
+        body: { role: "editor" },
+        log: { info: vi.fn() },
+      },
+      reply,
+    );
+
+    expect(reply.statusCode).toBe(200);
+    expect(auditFn).toHaveBeenCalledWith("USER_UPDATED", {
+      adminId: "admin-1",
+      username: "admin-user",
+      targetUserId: "user-2",
+      changes: { role: "editor", team: undefined },
+    });
+  });
+
+  it("POST /api/auth/users/:id/reset-password emits PASSWORD_RESET with acting admin username", async () => {
+    dbMockState.selectQueue = [
+      [{ id: "user-2", username: "target", role: "user", passwordHash: "salt:hash" }],
+      [{ role: "user", passwordHash: "salt:hash" }],
+      [{ role: "admin" }],
+    ];
+    const reply = makeReply();
+    await postHandlers.get("/api/auth/users/:id/reset-password")?.(
+      {
+        user: adminActor,
+        params: { id: "user-2" },
+        body: { newPassword: "NewPassword1" },
+        log: { info: vi.fn() },
+      },
+      reply,
+    );
+
+    expect(reply.statusCode).toBe(200);
+    expect(auditFn).toHaveBeenCalledWith("PASSWORD_RESET", {
+      adminId: "admin-1",
+      username: "admin-user",
+      targetUserId: "user-2",
+      targetUsername: "target",
+    });
+  });
+
+  it("DELETE /api/auth/users/:id emits USER_DELETED with acting admin username", async () => {
+    dbMockState.selectQueue = [
+      [{ id: "user-2", username: "target", role: "user" }],
+      [{ role: "admin" }],
+      [{ role: "user" }],
+      [],
+      [{ role: "admin" }],
+      [{ role: "user" }],
+    ];
+    const reply = makeReply();
+    await deleteHandlers.get("/api/auth/users/:id")?.(
+      {
+        user: adminActor,
+        params: { id: "user-2" },
+        log: { info: vi.fn() },
+      },
+      reply,
+    );
+
+    expect(reply.statusCode).toBe(200);
+    expect(auditFn).toHaveBeenCalledWith("USER_DELETED", {
+      adminId: "admin-1",
+      username: "admin-user",
+      deletedUserId: "user-2",
+      deletedUsername: "target",
+    });
   });
 });

@@ -116,32 +116,62 @@ describe("audit helpers", () => {
   describe("extractTargetId", () => {
     it.each([
       [{ targetUserId: "u-1" }, "u-1"],
+      [{ newUserId: "nu-1" }, "nu-1"],
+      [{ deletedUserId: "du-1" }, "du-1"],
       [{ keyId: "k-2" }, "k-2"],
       [{ roleId: "r-3" }, "r-3"],
       [{ targetTeamId: "tt-4" }, "tt-4"],
       [{ teamId: "t-5" }, "t-5"],
+      [{ toolId: "resize" }, "resize"],
       [{ targetId: "lh-6" }, "lh-6"],
     ])("extracts %o -> %s", (details, expected) => {
       expect(extractTargetId(details)).toBe(expected);
     });
 
-    it("follows precedence targetUserId > keyId > roleId > targetTeamId > teamId > targetId", () => {
+    it("follows precedence targetUserId > newUserId > deletedUserId > keyId > roleId > targetTeamId > teamId > toolId > targetId", () => {
       expect(
         extractTargetId({
           targetUserId: "u-1",
+          newUserId: "nu-1",
+          deletedUserId: "du-1",
           keyId: "k-2",
           roleId: "r-3",
           targetTeamId: "tt-4",
           teamId: "t-5",
+          toolId: "resize",
           targetId: "lh-6",
         }),
       ).toBe("u-1");
       expect(
         extractTargetId({
+          newUserId: "nu-1",
+          deletedUserId: "du-1",
           keyId: "k-2",
           roleId: "r-3",
           targetTeamId: "tt-4",
           teamId: "t-5",
+          toolId: "resize",
+          targetId: "lh-6",
+        }),
+      ).toBe("nu-1");
+      expect(
+        extractTargetId({
+          deletedUserId: "du-1",
+          keyId: "k-2",
+          roleId: "r-3",
+          targetTeamId: "tt-4",
+          teamId: "t-5",
+          toolId: "resize",
+          targetId: "lh-6",
+        }),
+      ).toBe("du-1");
+      expect(
+        extractTargetId({
+          keyId: "k-2",
+          roleId: "r-3",
+          targetTeamId: "tt-4",
+          teamId: "t-5",
+          toolId: "resize",
           targetId: "lh-6",
         }),
       ).toBe("k-2");
@@ -150,6 +180,7 @@ describe("audit helpers", () => {
           roleId: "r-3",
           targetTeamId: "tt-4",
           teamId: "t-5",
+          toolId: "resize",
           targetId: "lh-6",
         }),
       ).toBe("r-3");
@@ -157,15 +188,23 @@ describe("audit helpers", () => {
         extractTargetId({
           targetTeamId: "tt-4",
           teamId: "t-5",
+          toolId: "resize",
           targetId: "lh-6",
         }),
       ).toBe("tt-4");
       expect(
         extractTargetId({
           teamId: "t-5",
+          toolId: "resize",
           targetId: "lh-6",
         }),
       ).toBe("t-5");
+      expect(
+        extractTargetId({
+          toolId: "resize",
+          targetId: "lh-6",
+        }),
+      ).toBe("resize");
     });
 
     it("returns null when no target identifier is present", () => {

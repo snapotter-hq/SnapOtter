@@ -17,9 +17,18 @@ afterAll(async () => {
 /*  Helper                                                             */
 /* ------------------------------------------------------------------ */
 
+interface AuditLogItem {
+  id: string;
+  actorUsername: string;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  createdAt: string;
+}
+
 async function fetchAuditLog(
   qs = "",
-): Promise<{ entries: any[]; total: number; page: number; limit: number }> {
+): Promise<{ entries: AuditLogItem[]; total: number; page: number; limit: number }> {
   const res = await testApp.app.inject({
     method: "GET",
     url: `/api/v1/audit-log${qs ? `?${qs}` : ""}`,
@@ -40,8 +49,8 @@ describe("audit log event recording", () => {
     expect(body.entries[0].action).toBe("LOGIN_SUCCESS");
   });
 
-  it("USER_CREATED recorded after register", async () => {
-    await testApp.app.inject({
+  it("USER_CREATED, USER_UPDATED, PASSWORD_RESET, and USER_DELETED record actorUsername and targetId (#3978)", async () => {
+    const regRes = await testApp.app.inject({
       method: "POST",
       url: "/api/auth/register",
       headers: { authorization: `Bearer ${adminToken}` },
@@ -51,10 +60,57 @@ describe("audit log event recording", () => {
         role: "user",
       },
     });
+    expect(regRes.statusCode).toBe(201);
+    const createdUser = JSON.parse(regRes.body);
 
-    const body = await fetchAuditLog("action=USER_CREATED");
-    expect(body.entries.length).toBeGreaterThan(0);
-    expect(body.entries.some((e: any) => e.action === "USER_CREATED")).toBe(true);
+    const createdBody = await fetchAuditLog("action=USER_CREATED");
+    const createdEntry = createdBody.entries.find((e) => e.targetId === createdUser.id);
+    expect(createdEntry).toBeDefined();
+    expect(createdEntry?.actorUsername).toBe("admin");
+    expect(createdEntry?.targetType).toBe("user");
+    expect(createdEntry?.targetId).toBe(createdUser.id);
+
+    const updateRes = await testApp.app.inject({
+      method: "PUT",
+      url: `/api/auth/users/${createdUser.id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { role: "editor" },
+    });
+    expect(updateRes.statusCode).toBe(200);
+
+    const updatedBody = await fetchAuditLog("action=USER_UPDATED");
+    const updatedEntry = updatedBody.entries.find((e) => e.targetId === createdUser.id);
+    expect(updatedEntry).toBeDefined();
+    expect(updatedEntry?.actorUsername).toBe("admin");
+    expect(updatedEntry?.targetType).toBe("user");
+
+    const resetRes = await testApp.app.inject({
+      method: "POST",
+      url: `/api/auth/users/${createdUser.id}/reset-password`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { newPassword: "AuditEdge2" },
+    });
+    expect(resetRes.statusCode).toBe(200);
+
+    const resetBody = await fetchAuditLog("action=PASSWORD_RESET");
+    const resetEntry = resetBody.entries.find((e) => e.targetId === createdUser.id);
+    expect(resetEntry).toBeDefined();
+    expect(resetEntry?.actorUsername).toBe("admin");
+    expect(resetEntry?.targetType).toBe("user");
+
+    const deleteRes = await testApp.app.inject({
+      method: "DELETE",
+      url: `/api/auth/users/${createdUser.id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(deleteRes.statusCode).toBe(200);
+
+    const deletedBody = await fetchAuditLog("action=USER_DELETED");
+    const deletedEntry = deletedBody.entries.find((e) => e.targetId === createdUser.id);
+    expect(deletedEntry).toBeDefined();
+    expect(deletedEntry?.actorUsername).toBe("admin");
+    expect(deletedEntry?.targetType).toBe("user");
+    expect(deletedEntry?.targetId).toBe(createdUser.id);
   });
 
   it("API_KEY_CREATED recorded after key creation", async () => {
@@ -67,11 +123,11 @@ describe("audit log event recording", () => {
 
     const body = await fetchAuditLog("action=API_KEY_CREATED");
     expect(body.entries.length).toBeGreaterThan(0);
-    expect(body.entries.some((e: any) => e.action === "API_KEY_CREATED")).toBe(true);
+    expect(body.entries.some((e) => e.action === "API_KEY_CREATED")).toBe(true);
   });
 
-  it("ROLE_CREATED recorded after role creation", async () => {
-    await testApp.app.inject({
+  it("ROLE_CREATED, ROLE_UPDATED, and ROLE_DELETED record actorUsername and targetId (#3978)", async () => {
+    const createRes = await testApp.app.inject({
       method: "POST",
       url: "/api/v1/roles",
       headers: { authorization: `Bearer ${adminToken}` },
@@ -81,10 +137,41 @@ describe("audit log event recording", () => {
         permissions: ["tools:use"],
       },
     });
+    expect(createRes.statusCode).toBe(201);
+    const createdRole = JSON.parse(createRes.body);
 
     const body = await fetchAuditLog("action=ROLE_CREATED");
-    expect(body.entries.length).toBeGreaterThan(0);
-    expect(body.entries.some((e: any) => e.action === "ROLE_CREATED")).toBe(true);
+    const createdEntry = body.entries.find((e) => e.targetId === createdRole.id);
+    expect(createdEntry).toBeDefined();
+    expect(createdEntry?.actorUsername).toBe("admin");
+    expect(createdEntry?.targetType).toBe("role");
+
+    const updateRes = await testApp.app.inject({
+      method: "PUT",
+      url: `/api/v1/roles/${createdRole.id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { description: "updated role for audit edge test" },
+    });
+    expect(updateRes.statusCode).toBe(200);
+
+    const updatedBody = await fetchAuditLog("action=ROLE_UPDATED");
+    const updatedEntry = updatedBody.entries.find((e) => e.targetId === createdRole.id);
+    expect(updatedEntry).toBeDefined();
+    expect(updatedEntry?.actorUsername).toBe("admin");
+    expect(updatedEntry?.targetType).toBe("role");
+
+    const deleteRes = await testApp.app.inject({
+      method: "DELETE",
+      url: `/api/v1/roles/${createdRole.id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(deleteRes.statusCode).toBe(200);
+
+    const deletedBody = await fetchAuditLog("action=ROLE_DELETED");
+    const deletedEntry = deletedBody.entries.find((e) => e.targetId === createdRole.id);
+    expect(deletedEntry).toBeDefined();
+    expect(deletedEntry?.actorUsername).toBe("admin");
+    expect(deletedEntry?.targetType).toBe("role");
   });
 });
 

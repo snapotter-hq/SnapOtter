@@ -318,12 +318,50 @@ describe("auditLog DB write values", () => {
     expect(state.insertValues[0].actorUsername).toBe("system");
   });
 
-  it("prefers targetUserId over keyId for targetId", async () => {
-    await auditLog(makeLogger() as never, "USER_DELETED", {
+  it("prefers targetUserId over newUserId for targetId", async () => {
+    await auditLog(makeLogger() as never, "USER_CREATED", {
       targetUserId: "target-7",
-      keyId: "key-3",
+      newUserId: "new-8",
     });
     expect(state.insertValues[0].targetId).toBe("target-7");
+  });
+
+  it("falls back to newUserId for targetId", async () => {
+    await auditLog(makeLogger() as never, "USER_CREATED", {
+      adminId: "admin-1",
+      username: "admin",
+      newUserId: "new-8",
+      newUsername: "bob",
+    });
+    expect(state.insertValues[0].targetId).toBe("new-8");
+    expect(state.insertValues[0].actorUsername).toBe("admin");
+  });
+
+  it("prefers newUserId over deletedUserId for targetId", async () => {
+    await auditLog(makeLogger() as never, "USER_CREATED", {
+      newUserId: "new-8",
+      deletedUserId: "del-9",
+    });
+    expect(state.insertValues[0].targetId).toBe("new-8");
+  });
+
+  it("falls back to deletedUserId for targetId", async () => {
+    await auditLog(makeLogger() as never, "USER_DELETED", {
+      adminId: "admin-1",
+      username: "admin",
+      deletedUserId: "del-9",
+      deletedUsername: "bob",
+    });
+    expect(state.insertValues[0].targetId).toBe("del-9");
+    expect(state.insertValues[0].actorUsername).toBe("admin");
+  });
+
+  it("prefers deletedUserId over keyId for targetId", async () => {
+    await auditLog(makeLogger() as never, "USER_DELETED", {
+      deletedUserId: "del-9",
+      keyId: "key-3",
+    });
+    expect(state.insertValues[0].targetId).toBe("del-9");
   });
 
   it("falls back to keyId for targetId", async () => {
@@ -379,12 +417,29 @@ describe("auditLog DB write values", () => {
     expect(state.insertValues[0].targetId).toBe("team-6");
   });
 
-  it("prefers teamId over targetId for targetId", async () => {
+  it("prefers teamId over toolId for targetId", async () => {
     await auditLog(makeLogger() as never, "SCIM_GROUP_SYNCED", {
       teamId: "team-6",
-      targetId: "hold-7",
+      toolId: "resize",
     });
     expect(state.insertValues[0].targetId).toBe("team-6");
+  });
+
+  it("falls back to toolId for targetId", async () => {
+    await auditLog(makeLogger() as never, "TOOL_EXECUTED", {
+      userId: "user-1",
+      username: "alice",
+      toolId: "resize",
+    });
+    expect(state.insertValues[0].targetId).toBe("resize");
+  });
+
+  it("prefers toolId over targetId for targetId", async () => {
+    await auditLog(makeLogger() as never, "TOOL_EXECUTED", {
+      toolId: "resize",
+      targetId: "hold-7",
+    });
+    expect(state.insertValues[0].targetId).toBe("resize");
   });
 
   it("falls back to targetId for targetId", async () => {
