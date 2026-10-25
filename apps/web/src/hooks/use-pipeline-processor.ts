@@ -827,6 +827,7 @@ export function usePipelineProcessor() {
         batchRunRef.current = null;
 
         const startTime = Date.now();
+        if (elapsedRef.current) clearInterval(elapsedRef.current);
         elapsedRef.current = setInterval(() => {
           if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
           setProgress((prev) => ({
@@ -1230,6 +1231,7 @@ export function usePipelineProcessor() {
         canceledByUserRef.current = false;
 
         const startTime = Date.now();
+        if (elapsedRef.current) clearInterval(elapsedRef.current);
         elapsedRef.current = setInterval(() => {
           if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
           setProgress((prev) => ({

@@ -3529,6 +3529,7 @@ describe("usePipelineProcessor leaves a live run alone when a later start throws
   // earlier run is superseded and a throw ends the start the #1821 way, so
   // the earlier run's late answer finds no run to land on.
   it("ends the run it took over when a start throws after its claim", () => {
+    vi.useFakeTimers();
     const files = photoFiles(1);
     const { result, unmount } = startLiveRun(files);
 
@@ -3558,6 +3559,7 @@ describe("usePipelineProcessor leaves a live run alone when a later start throws
       status: "failed",
       error: START_FAILURE,
     });
+    expect(vi.getTimerCount()).toBe(0);
     unmount();
   });
 

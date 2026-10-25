@@ -1278,6 +1278,7 @@ export function useToolProcessor(toolId: string) {
         stoppedJobIdsRef.current.delete(clientJobId);
 
         const startTime = Date.now();
+        if (elapsedRef.current) clearInterval(elapsedRef.current);
         elapsedRef.current = setInterval(() => {
           if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
           setProgress((prev) => ({
@@ -1850,6 +1851,7 @@ export function useToolProcessor(toolId: string) {
         stoppedJobIdsRef.current.delete(clientJobId);
 
         const startTime = Date.now();
+        if (elapsedRef.current) clearInterval(elapsedRef.current);
         elapsedRef.current = setInterval(() => {
           if (activeJobIdRef.current !== clientJobId || storeWasReset()) return;
           setProgress((prev) => ({

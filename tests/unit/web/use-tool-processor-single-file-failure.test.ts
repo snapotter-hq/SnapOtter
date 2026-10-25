@@ -768,7 +768,7 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
     useFileStore.getState().setSelectedIndex(1);
     const hook = renderHook(() => useToolProcessor("trim-video"));
     act(() => {
-      hook.result.current.processFiles(files, { startS: 0, endS: 2 });
+      hook.result.current.processFiles([file], { startS: 0, endS: 2 });
     });
 
     act(() => {
@@ -2237,11 +2237,11 @@ describe("useToolProcessor leaves a live run alone when a later start throws ear
 
   it("fails only its own entry when a start on another entry throws", () => {
     const files = [clipFile("a.mp4"), clipFile("b.mp4")];
-    const { result, unmount } = startLiveRun(files);
+    const { result, unmount } = startLiveRun([file]);
     act(() => useFileStore.getState().setSelectedIndex(1));
     breakNextWrite((state) => state.entries[1]?.status === "processing");
 
-    expect(() => act(() => result.current.processFiles(files, { startS: 0, endS: 2 }))).toThrow(
+    expect(() => act(() => result.current.processFiles([file], { startS: 0, endS: 2 }))).toThrow(
       "second start broke",
     );
     unsubscribe?.();
@@ -2259,7 +2259,7 @@ describe("useToolProcessor leaves a live run alone when a later start throws ear
 
   it("fails only the entries a batch start marked before it threw", async () => {
     const files = [clipFile("a.mp4"), clipFile("b.mp4"), clipFile("c.mp4")];
-    const { result, unmount } = startLiveRun(files);
+    const { result, unmount } = startLiveRun([file]);
     // The batch reset walks the entries in order; this throws on the third.
     breakNextWrite((state) => state.entries[2]?.status === "processing");
 
@@ -2310,7 +2310,7 @@ describe("useToolProcessor leaves a live run alone when a later start throws ear
     giveNextStartItsOwnId();
     breakNextWrite();
 
-    expect(() => act(() => result.current.processFiles(files, { startS: 0, endS: 2 }))).toThrow(
+    expect(() => act(() => result.current.processFiles([file], { startS: 0, endS: 2 }))).toThrow(
       "second start broke",
     );
     unsubscribe?.();
@@ -2377,7 +2377,7 @@ describe("useToolProcessor leaves a live run alone when a later start throws ear
       error: START_FAILURE,
       processedUrl: null,
     });
-    unmount();
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
 
@@ -2443,6 +2443,38 @@ describe("useToolProcessor entry-identity settle and stale onload guard (#944)",
     expect(useFileStore.getState().lastSavedLibraryFileId).toBeNull();
     expect(result.current.resultPayload).toBeNull();
     expect(result.current.warning).toBeNull();
+    unmount();
+  });
+
+  it("starts the elapsed clock from the takeover when a second run succeeds", () => {
+    vi.useFakeTimers();
+    const file = clipFile();
+    const { result, unmount } = startLiveRun([file]);
+
+    act(() => {
+      vi.advanceTimersByTime(3_000);
+    });
+    expect(result.current.progress.elapsed).toBe(3);
+
+    act(() => {
+      result.current.processFiles([file], { startS: 0, endS: 2 });
+    });
+    act(() => {
+      xhrs[1].upload.onload?.();
+      xhrs[1].status = 200;
+      xhrs[1].responseText = JSON.stringify(RESULT_200);
+      xhrs[1].onload?.();
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+    expect(result.current.progress.elapsed).toBe(1);
+
+    act(() => {
+      vi.runAllTimers();
+    });
+    expect(vi.getTimerCount()).toBe(0);
     unmount();
   });
 
