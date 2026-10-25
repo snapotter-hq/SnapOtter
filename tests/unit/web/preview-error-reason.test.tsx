@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
-import { loadTranslations, SUPPORTED_LOCALES } from "@snapotter/shared";
+import { en, loadTranslations, SUPPORTED_LOCALES } from "@snapotter/shared";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NonNativePreview } from "@/components/common/non-native-preview";
@@ -165,12 +165,16 @@ describe("toolPage.previewEncoderMissing translations (#1290)", () => {
     expect(SUPPORTED_LOCALES).toHaveLength(21);
   });
 
-  it.each(SUPPORTED_LOCALES)(
+  it.each(SUPPORTED_LOCALES.map((l) => l.code))(
     "%s keeps the {encoder} placeholder and the ffmpeg name",
-    async (locale) => {
-      const message = (await loadTranslations(locale)).toolPage.previewEncoderMissing;
-      expect(message).toContain("{encoder}");
-      expect(message).toContain("ffmpeg");
+    async (code) => {
+      const t = await loadTranslations(code);
+      // loadTranslations falls back to en for a code it doesn't know, which
+      // would check en 21 times over.
+      if (code !== "en") expect(t).not.toBe(en);
+      const message = t.toolPage.previewEncoderMissing;
+      expect(message, code).toContain("{encoder}");
+      expect(message, code).toContain("ffmpeg");
     },
   );
 });

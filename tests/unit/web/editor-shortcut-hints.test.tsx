@@ -215,12 +215,18 @@ describe("shortcut placeholders in every locale", () => {
     newLayerTitle: t.editor.panels.layers.newLayerTitle,
   });
 
-  it.each([...SUPPORTED_LOCALES])("%s fills each hint through one {shortcut}", async (locale) => {
-    const t = (await loadTranslations(locale)) as typeof en;
-    for (const [key, value] of Object.entries(pick(t))) {
-      // A literal modifier left in a string would show Ctrl on a Mac again.
-      expect(value.match(/\{shortcut\}/g), `${locale} ${key}`).toHaveLength(1);
-      expect(value, `${locale} ${key}`).not.toMatch(/\{(?!shortcut\})\w+\}|Ctrl|Strg|⌘/);
-    }
-  });
+  it.each(SUPPORTED_LOCALES.map((l) => l.code))(
+    "%s fills each hint through one {shortcut}",
+    async (code) => {
+      const t = (await loadTranslations(code)) as typeof en;
+      // loadTranslations falls back to en for a code it doesn't know, which
+      // would check en 21 times over.
+      if (code !== "en") expect(t).not.toBe(en);
+      for (const [key, value] of Object.entries(pick(t))) {
+        // A literal modifier left in a string would show Ctrl on a Mac again.
+        expect(value.match(/\{shortcut\}/g), `${code} ${key}`).toHaveLength(1);
+        expect(value, `${code} ${key}`).not.toMatch(/\{(?!shortcut\})\w+\}|Ctrl|Strg|⌘/);
+      }
+    },
+  );
 });
