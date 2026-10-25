@@ -1093,7 +1093,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       cookieReply.clearCookie("snapotter-session", { path: `${env.BASE_PATH}/` });
     }
 
-    await auditFromRequest(request)("LOGOUT", { userId: user?.id });
+    await auditFromRequest(request)("LOGOUT", {
+      userId: user?.id,
+      username: user?.username,
+    });
     return reply.send({
       ok: true,
       ...(logoutUrl && { logoutUrl }),

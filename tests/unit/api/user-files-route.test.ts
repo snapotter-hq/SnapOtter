@@ -46,8 +46,11 @@ const mocks = vi.hoisted(() => ({
     Promise.resolve(Buffer.from("png-page")),
   ),
   quotaRefusal: vi.fn(() => Promise.resolve(null)),
-  requireFileAccess: vi.fn(() => Promise.resolve({ id: "user-1", role: "admin" })),
+  requireFileAccess: vi.fn(() =>
+    Promise.resolve({ id: "user-1", username: "alice", role: "admin" }),
+  ),
   hasEffectivePermission: vi.fn(() => Promise.resolve(true)),
+  auditFn: vi.fn(() => Promise.resolve()),
   validateImageBuffer: vi.fn<
     (
       _buf: Buffer,
@@ -199,7 +202,7 @@ vi.mock("../../../apps/api/src/lib/library-cleanup.js", () => ({
 }));
 
 vi.mock("../../../apps/api/src/lib/audit.js", () => ({
-  auditFromRequest: () => vi.fn(() => Promise.resolve()),
+  auditFromRequest: () => mocks.auditFn,
 }));
 
 vi.mock("../../../apps/api/src/lib/file-validation.js", async (importOriginal) => {
@@ -588,7 +591,11 @@ describe("user files route logic", () => {
       mocks.txParentRows = null;
       mocks.deleteParentDuringSave = false;
       mocks.insertedValues = undefined;
-      mocks.requireFileAccess.mockResolvedValue({ id: "user-1", role: "admin" });
+      mocks.requireFileAccess.mockResolvedValue({
+        id: "user-1",
+        username: "alice",
+        role: "admin",
+      });
       mocks.hasEffectivePermission.mockResolvedValue(true);
       mocks.quotaRefusal.mockResolvedValue(null);
       mocks.deleteStoredFile.mockResolvedValue();
@@ -740,11 +747,32 @@ describe("user files route logic", () => {
 
         expect(reply.statusCode).toBe(200);
         expect(reply.payload).toEqual({ deleted: 1 });
+        expect(mocks.auditFn).toHaveBeenCalledWith("FILE_DELETED", {
+          userId: "user-1",
+          username: "alice",
+          count: 1,
+          ids: ["orphan-v2"],
+        });
         expect(mocks.executeSpy).toHaveBeenCalledTimes(1);
         const queryText = String(mocks.executeSpy.mock.calls[0]?.[0] ?? "");
         expect(queryText).toMatch(
           /NOT EXISTS\s*\(\s*SELECT 1 FROM user_files p WHERE p\.id = a\.parent_id\s*\)/i,
         );
+      });
+
+      it("audits FILE_DELETED with userId and username when no requested ids match (#3981)", async () => {
+        mocks.parentRows = [];
+        const reply = makeReply();
+        await deleteHandler({ body: { ids: ["missing-id"] } }, reply);
+
+        expect(reply.statusCode).toBe(200);
+        expect(reply.payload).toEqual({ deleted: 0 });
+        expect(mocks.auditFn).toHaveBeenCalledWith("FILE_DELETED", {
+          userId: "user-1",
+          username: "alice",
+          count: 0,
+          ids: ["missing-id"],
+        });
       });
     });
 
@@ -1066,6 +1094,12 @@ describe("user files route logic", () => {
           originalName: ".svgz",
           mimeType: "application/octet-stream",
           size: corruptGzipDotfile.length,
+        });
+        expect(mocks.auditFn).toHaveBeenCalledWith("FILE_UPLOADED", {
+          userId: "user-1",
+          username: "alice",
+          count: 1,
+          files: [".svgz"],
         });
       });
 

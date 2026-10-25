@@ -367,6 +367,12 @@ describe("API keys route logic", () => {
       expect(body.key).toMatch(/^si_[0-9a-f]{96}$/);
       expect(body.key).toHaveLength(99);
       expect(mocks.insertedValues?.keyPrefix).toBe(computeKeyPrefix(body.key));
+      expect(mocks.auditFn).toHaveBeenCalledWith("API_KEY_CREATED", {
+        userId: testUser.id,
+        username: testUser.username,
+        keyId: expect.any(String),
+        keyName: "Default API Key",
+      });
     });
 
     it("serializes GET /api/v1/api-keys rows from jsonb permissions without JSON.parse", async () => {
@@ -422,6 +428,11 @@ describe("API keys route logic", () => {
       expect(okReply.statusCode).toBe(200);
       expect(okReply.payload).toEqual({ ok: true });
       expect(mocks.deleteWhere).toHaveBeenCalledTimes(1);
+      expect(mocks.auditFn).toHaveBeenCalledWith("API_KEY_DELETED", {
+        userId: testUser.id,
+        username: testUser.username,
+        keyId: "key-1",
+      });
     });
   });
 });

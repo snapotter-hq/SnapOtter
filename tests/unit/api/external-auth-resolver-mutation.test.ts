@@ -187,7 +187,7 @@ describe("resolveExternalUser: match by externalId", () => {
     expect(result).toEqual({ user: null, action: "denied", deniedReason: "user_disabled" });
     expect(state.auditCalls[0]).toEqual({
       event: "OIDC_LOGIN_FAILED",
-      details: { reason: "user_disabled", userId: "u-existing" },
+      details: { reason: "user_disabled", userId: "u-existing", username: "existing" },
     });
   });
 
@@ -244,12 +244,19 @@ describe("resolveExternalUser: auto-link by email", () => {
   });
 
   it("denies linking when the email-matched user is disabled", async () => {
-    state.selectRows = [[], [dbUser({ id: "u-dis", role: "disabled:pending" })]];
+    state.selectRows = [
+      [],
+      [dbUser({ id: "u-dis", username: "dis-email", role: "disabled:pending" })],
+    ];
     const result = await resolveExternalUser(
       baseParams({ autoLink: true, email: "known@example.com", emailVerified: true }),
     );
     expect(result).toEqual({ user: null, action: "denied", deniedReason: "user_disabled" });
     expect(state.updates).toHaveLength(0);
+    expect(state.auditCalls.at(-1)).toEqual({
+      event: "OIDC_LOGIN_FAILED",
+      details: { reason: "user_disabled", userId: "u-dis", username: "dis-email" },
+    });
   });
 
   it("does not auto-link when emailVerified is false (falls through to denied)", async () => {
@@ -465,11 +472,14 @@ describe("resolveExternalUser: auto-create username race", () => {
       [], // extId miss
       [], // base free
       [{ id: "team-default" }],
-      [dbUser({ id: "u-winner", role: "disabled" })], // winner re-check
+      [dbUser({ id: "u-winner", username: "dis-winner", role: "disabled" })], // winner re-check
     ];
     const result = await resolveExternalUser(baseParams({ autoCreate: true }));
     expect(result).toEqual({ user: null, action: "denied", deniedReason: "user_disabled" });
-    expect(state.auditCalls.at(-1)?.event).toBe("OIDC_LOGIN_FAILED");
+    expect(state.auditCalls.at(-1)).toEqual({
+      event: "OIDC_LOGIN_FAILED",
+      details: { reason: "user_disabled", userId: "u-winner", username: "dis-winner" },
+    });
   });
 
   it("joins the winner when the scan picked a suffixed name and the identity index refused the insert", async () => {

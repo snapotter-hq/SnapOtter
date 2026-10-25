@@ -1484,6 +1484,7 @@ export async function registerMfa(app: FastifyInstance): Promise<void> {
       const audit = auditFromRequest(request);
       await audit("MFA_RESET", {
         adminId: admin.id,
+        username: admin.username,
         targetUserId: id,
         targetUsername: targetUser.username,
       });

@@ -684,6 +684,16 @@ describe("SCIM global token administration", () => {
     });
     expect(listRes.statusCode, listRes.body).toBe(200);
     expect(JSON.parse(listRes.body).Resources).toBeInstanceOf(Array);
+
+    const [auditRow] = await db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "SETTINGS_UPDATED"))
+      .orderBy(desc(schema.auditLog.createdAt))
+      .limit(1);
+    expect(auditRow?.actorUsername).toBe("admin");
+    expect(auditRow?.actorId).toBeTruthy();
+    expect(auditRow?.details).toMatchObject({ setting: "scim_token" });
   });
 
   it("allows the full built-in admin to revoke a token", async () => {
@@ -708,6 +718,16 @@ describe("SCIM global token administration", () => {
 
     expect(res.statusCode).toBe(204);
     expect(storedToken).toBeUndefined();
+
+    const [auditRow] = await db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "SETTINGS_UPDATED"))
+      .orderBy(desc(schema.auditLog.createdAt))
+      .limit(1);
+    expect(auditRow?.actorUsername).toBe("admin");
+    expect(auditRow?.actorId).toBeTruthy();
+    expect(auditRow?.details).toMatchObject({ setting: "scim_token", action: "revoked" });
   });
 
   it("keeps repeated user deprovisioning idempotent and recoverable", async () => {

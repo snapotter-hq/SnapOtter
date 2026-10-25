@@ -1,5 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { buildTestApp, loginAsAdmin, type TestApp } from "../test-server.js";
+import { fixtures, readFixture } from "../../fixtures/index.js";
+import {
+  buildTestApp,
+  createMultipartPayload,
+  loginAsAdmin,
+  type TestApp,
+} from "../test-server.js";
+
+const TINY_PNG = readFixture(fixtures.image.edge.px1);
 
 let testApp: TestApp;
 let adminToken: string;
@@ -113,17 +121,109 @@ describe("audit log event recording", () => {
     expect(deletedEntry?.targetId).toBe(createdUser.id);
   });
 
-  it("API_KEY_CREATED recorded after key creation", async () => {
-    await testApp.app.inject({
+  it("API_KEY_CREATED and API_KEY_DELETED record actorUsername and targetId (#3981)", async () => {
+    const createRes = await testApp.app.inject({
       method: "POST",
       url: "/api/v1/api-keys",
       headers: { authorization: `Bearer ${adminToken}` },
       payload: { name: "audit-edge-key" },
     });
+    expect(createRes.statusCode).toBe(201);
+    const createdKey = JSON.parse(createRes.body) as { id: string };
 
-    const body = await fetchAuditLog("action=API_KEY_CREATED");
-    expect(body.entries.length).toBeGreaterThan(0);
-    expect(body.entries.some((e) => e.action === "API_KEY_CREATED")).toBe(true);
+    const createdBody = await fetchAuditLog("action=API_KEY_CREATED");
+    const createdEntry = createdBody.entries.find((e) => e.targetId === createdKey.id);
+    expect(createdEntry).toBeDefined();
+    expect(createdEntry?.actorUsername).toBe("admin");
+    expect(createdEntry?.targetType).toBe("api_key");
+
+    const deleteRes = await testApp.app.inject({
+      method: "DELETE",
+      url: `/api/v1/api-keys/${createdKey.id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(deleteRes.statusCode).toBe(200);
+
+    const deletedBody = await fetchAuditLog("action=API_KEY_DELETED");
+    const deletedEntry = deletedBody.entries.find((e) => e.targetId === createdKey.id);
+    expect(deletedEntry).toBeDefined();
+    expect(deletedEntry?.actorUsername).toBe("admin");
+    expect(deletedEntry?.targetType).toBe("api_key");
+  });
+
+  it("FILE_UPLOADED, FILE_DELETED, and LOGOUT record actorUsername (#3981)", async () => {
+    const { body: uploadBody, contentType } = createMultipartPayload([
+      { name: "file", filename: "audit-edge.png", contentType: "image/png", content: TINY_PNG },
+    ]);
+    const uploadRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/files/upload",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": contentType,
+      },
+      body: uploadBody,
+    });
+    expect(uploadRes.statusCode).toBe(201);
+    const uploadedFiles = JSON.parse(uploadRes.body).files as Array<{ id: string }>;
+    const fileId = uploadedFiles[0].id;
+
+    const uploadedAudit = await fetchAuditLog("action=FILE_UPLOADED");
+    expect(uploadedAudit.entries[0]?.actorUsername).toBe("admin");
+    expect(uploadedAudit.entries[0]?.targetType).toBe("file");
+
+    const deleteRes = await testApp.app.inject({
+      method: "DELETE",
+      url: "/api/v1/files",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { ids: [fileId] },
+    });
+    expect(deleteRes.statusCode).toBe(200);
+
+    const deletedAudit = await fetchAuditLog("action=FILE_DELETED");
+    expect(deletedAudit.entries[0]?.actorUsername).toBe("admin");
+    expect(deletedAudit.entries[0]?.targetType).toBe("file");
+
+    const regRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/register",
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        username: "audit_logout_user",
+        password: "AuditLogout1",
+        role: "user",
+      },
+    });
+    expect(regRes.statusCode).toBe(201);
+    const logoutUser = JSON.parse(regRes.body) as { id: string; username: string };
+
+    const loginRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: {
+        username: "audit_logout_user",
+        password: "AuditLogout1",
+      },
+    });
+    expect(loginRes.statusCode).toBe(200);
+    const { token: logoutUserToken } = JSON.parse(loginRes.body) as { token: string };
+
+    const logoutRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/auth/logout",
+      headers: { authorization: `Bearer ${logoutUserToken}` },
+    });
+    expect(logoutRes.statusCode).toBe(200);
+
+    const logoutAudit = await fetchAuditLog("action=LOGOUT");
+    expect(logoutAudit.entries[0]?.actorUsername).toBe("audit_logout_user");
+    expect(logoutAudit.entries[0]?.targetType).toBe("user");
+
+    await testApp.app.inject({
+      method: "DELETE",
+      url: `/api/auth/users/${logoutUser.id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
   });
 
   it("ROLE_CREATED, ROLE_UPDATED, and ROLE_DELETED record actorUsername and targetId (#3978)", async () => {

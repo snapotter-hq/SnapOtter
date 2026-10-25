@@ -128,6 +128,7 @@ export async function resolveExternalUser(params: ExternalAuthParams): Promise<E
       await audit(`${providerUpper}_LOGIN_FAILED`, {
         reason: "user_disabled",
         userId: existingByExtId.id,
+        username: existingByExtId.username,
       });
       return { user: null, action: "denied", deniedReason: "user_disabled" };
     }
@@ -167,6 +168,7 @@ export async function resolveExternalUser(params: ExternalAuthParams): Promise<E
         await audit(`${providerUpper}_LOGIN_FAILED`, {
           reason: "user_disabled",
           userId: existingByEmail.id,
+          username: existingByEmail.username,
         });
         return { user: null, action: "denied", deniedReason: "user_disabled" };
       }
@@ -296,6 +298,7 @@ export async function resolveExternalUser(params: ExternalAuthParams): Promise<E
           await audit(`${providerUpper}_LOGIN_FAILED`, {
             reason: "user_disabled",
             userId: winner.id,
+            username: winner.username,
           });
           return { user: null, action: "denied", deniedReason: "user_disabled" };
         }

@@ -161,6 +161,7 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
 
       await auditFromRequest(request)("API_KEY_CREATED", {
         userId: user.id,
+        username: user.username,
         keyId: id,
         keyName: name,
       });
@@ -232,7 +233,11 @@ export async function apiKeyRoutes(app: FastifyInstance): Promise<void> {
 
       await db.delete(schema.apiKeys).where(eq(schema.apiKeys.id, id));
 
-      await auditFromRequest(request)("API_KEY_DELETED", { userId: user.id, keyId: id });
+      await auditFromRequest(request)("API_KEY_DELETED", {
+        userId: user.id,
+        username: user.username,
+        keyId: id,
+      });
 
       return reply.send({ ok: true });
     },

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import * as OTPAuth from "otpauth";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -694,6 +694,14 @@ describe("POST /api/auth/users/:id/mfa/reset", () => {
     expect(dbUser.totpEnabled).toBe(false);
     expect(dbUser.totpSecret).toBeNull();
     expect(dbUser.recoveryCodesHash).toBeNull();
+
+    const [auditRow] = await db
+      .select()
+      .from(schema.auditLog)
+      .where(and(eq(schema.auditLog.action, "MFA_RESET"), eq(schema.auditLog.targetId, userId)));
+    expect(auditRow?.actorUsername).toBe("admin");
+    expect(auditRow?.targetType).toBe("user");
+    expect(auditRow?.targetId).toBe(userId);
 
     await db.delete(schema.users).where(eq(schema.users.id, userId));
   });

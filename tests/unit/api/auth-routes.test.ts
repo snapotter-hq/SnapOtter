@@ -71,6 +71,14 @@ vi.mock("../../../apps/api/src/lib/library-cleanup.js", () => ({
   deleteLibraryFileStorage: vi.fn(() => Promise.resolve()),
 }));
 
+vi.mock("../../../apps/api/src/lib/user-mfa.js", () => ({
+  clearUserMfa: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock("../../../apps/api/src/lib/enterprise-feature.js", () => ({
+  isEnterpriseFeatureEnabled: vi.fn(() => Promise.resolve(true)),
+}));
+
 vi.mock("../../../apps/api/src/config.js", () => ({
   env: {
     AUTH_ENABLED: true,
@@ -117,13 +125,15 @@ vi.mock("../../../apps/api/src/lib/settings-helpers.js", async (importOriginal) 
       return policy.values.get(key);
     },
     setSettingIfAbsent: async () => {},
+    upsertSetting: async () => {},
   };
 });
 
 const auditFn = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const auditLogSpy = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 
 vi.mock("../../../apps/api/src/lib/audit.js", () => ({
-  auditLog: vi.fn(),
+  auditLog: auditLogSpy,
   auditFromRequest: () => auditFn,
   sanitizeAuditInput: (raw: string) => raw,
 }));
@@ -139,12 +149,15 @@ import {
   validateUsername,
   verifyPassword,
 } from "../../../apps/api/src/plugins/auth.js";
+import { registerMfa } from "../../../apps/api/src/plugins/mfa.js";
+import { registerScimRoutes } from "../../../apps/api/src/routes/enterprise/scim.js";
 
 beforeEach(() => {
   policy.values.clear();
   policy.failKey = null;
   loggerWarn.mockReset();
   auditFn.mockClear();
+  auditLogSpy.mockClear();
   dbMockState.selectQueue = [];
   dbMockState.insertRowCount = 1;
 });
@@ -584,9 +597,12 @@ describe("admin user route audit payloads (#3978)", () => {
       delete: vi.fn((path: string, handler: RouteHandler) => {
         deleteHandlers.set(path, handler);
       }),
+      register: vi.fn(),
       log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     };
     await authRoutes(fakeApp as never);
+    await registerMfa(fakeApp as never);
+    await registerScimRoutes(fakeApp as never);
   });
 
   function makeReply() {
@@ -707,5 +723,103 @@ describe("admin user route audit payloads (#3978)", () => {
       deletedUserId: "user-2",
       deletedUsername: "target",
     });
+  });
+
+  it("POST /api/auth/logout emits LOGOUT with userId and username (#3981)", async () => {
+    const reply = makeReply();
+    await postHandlers.get("/api/auth/logout")?.(
+      {
+        user: adminActor,
+        headers: {},
+        cookies: {},
+        log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      },
+      reply,
+    );
+
+    expect(reply.statusCode).toBe(200);
+    expect(auditFn).toHaveBeenCalledWith("LOGOUT", {
+      userId: "admin-1",
+      username: "admin-user",
+    });
+  });
+
+  it("POST /api/auth/users/:id/mfa/reset emits MFA_RESET with acting admin username (#3981)", async () => {
+    dbMockState.selectQueue = [
+      [{ id: "user-2", username: "target", role: "user", totpEnabled: true }],
+      [{ role: "admin" }],
+      [{ role: "user" }],
+    ];
+    const reply = makeReply();
+    await postHandlers.get("/api/auth/users/:id/mfa/reset")?.(
+      {
+        user: adminActor,
+        params: { id: "user-2" },
+        log: { info: vi.fn() },
+      },
+      reply,
+    );
+
+    expect(reply.statusCode).toBe(200);
+    expect(auditFn).toHaveBeenCalledWith("MFA_RESET", {
+      adminId: "admin-1",
+      username: "admin-user",
+      targetUserId: "user-2",
+      targetUsername: "target",
+    });
+  });
+
+  it("POST and DELETE /api/v1/enterprise/scim/token emit SETTINGS_UPDATED with acting adminId and username (#3981)", async () => {
+    dbMockState.selectQueue = [[{ role: "admin" }], [{ role: "admin" }]];
+    const reqLog = { info: vi.fn() };
+    const postReply = makeReply();
+    await postHandlers.get("/api/v1/enterprise/scim/token")?.(
+      {
+        user: adminActor,
+        log: reqLog,
+        ip: "127.0.0.1",
+        id: "req-scim-post",
+      },
+      postReply,
+    );
+
+    expect(postReply.statusCode).toBe(201);
+    expect(auditLogSpy).toHaveBeenCalledWith(
+      reqLog,
+      "SETTINGS_UPDATED",
+      {
+        adminId: "admin-1",
+        username: "admin-user",
+        setting: "scim_token",
+      },
+      "127.0.0.1",
+      "req-scim-post",
+    );
+
+    auditLogSpy.mockClear();
+    const deleteReply = makeReply();
+    await deleteHandlers.get("/api/v1/enterprise/scim/token")?.(
+      {
+        user: adminActor,
+        log: reqLog,
+        ip: "127.0.0.1",
+        id: "req-scim-del",
+      },
+      deleteReply,
+    );
+
+    expect(deleteReply.statusCode).toBe(204);
+    expect(auditLogSpy).toHaveBeenCalledWith(
+      reqLog,
+      "SETTINGS_UPDATED",
+      {
+        adminId: "admin-1",
+        username: "admin-user",
+        setting: "scim_token",
+        action: "revoked",
+      },
+      "127.0.0.1",
+      "req-scim-del",
+    );
   });
 });

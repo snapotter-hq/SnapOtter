@@ -500,7 +500,8 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     "/api/v1/enterprise/scim/token",
     async (request: FastifyRequest, reply: FastifyReply) => {
-      if (!(await requireFullAdmin(request, reply))) return;
+      const user = await requireFullAdmin(request, reply);
+      if (!user) return;
       if (!(await requireScimFeature(reply))) return;
 
       const token = `${SCIM_TOKEN_PREFIX}${randomBytes(32).toString("hex")}`;
@@ -510,7 +511,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       await auditLog(
         request.log,
         "SETTINGS_UPDATED",
-        { setting: "scim_token" },
+        { adminId: user.id, username: user.username, setting: "scim_token" },
         request.ip,
         request.id,
       );
@@ -526,7 +527,8 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
   app.delete(
     "/api/v1/enterprise/scim/token",
     async (request: FastifyRequest, reply: FastifyReply) => {
-      if (!(await requireFullAdmin(request, reply))) return;
+      const user = await requireFullAdmin(request, reply);
+      if (!user) return;
       if (!(await requireScimFeature(reply))) return;
 
       await db.delete(schema.settings).where(eq(schema.settings.key, "scim_token_hash"));
@@ -534,7 +536,7 @@ export async function registerScimRoutes(app: FastifyInstance): Promise<void> {
       await auditLog(
         request.log,
         "SETTINGS_UPDATED",
-        { setting: "scim_token", action: "revoked" },
+        { adminId: user.id, username: user.username, setting: "scim_token", action: "revoked" },
         request.ip,
         request.id,
       );
