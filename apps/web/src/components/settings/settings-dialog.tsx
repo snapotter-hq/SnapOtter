@@ -1,6 +1,7 @@
 import {
   APP_VERSION,
   CATEGORIES,
+  CORE_AUDIT_EVENTS,
   isPasswordRuleEnabled,
   isValidRoleName,
   isValidUsername,
@@ -3605,33 +3606,6 @@ export function RolesSection() {
 
 /* ────────────────────── Audit Log ────────────────────── */
 
-const AUDIT_ACTIONS = [
-  "LOGIN_SUCCESS",
-  "LOGIN_FAILED",
-  "LOGOUT",
-  "PASSWORD_CHANGED",
-  "PASSWORD_RESET",
-  "USER_CREATED",
-  "USER_DELETED",
-  "USER_UPDATED",
-  "FILE_UPLOADED",
-  "FILE_DELETED",
-  "API_KEY_CREATED",
-  "API_KEY_DELETED",
-  "API_KEY_AUTH_FAILED",
-  "ROLE_CREATED",
-  "ROLE_UPDATED",
-  "ROLE_DELETED",
-  "SETTINGS_UPDATED",
-  "OIDC_LOGIN_SUCCESS",
-  "OIDC_USER_CREATED",
-  "OIDC_USER_LINKED",
-  "OIDC_LOGIN_FAILED",
-  "TOOL_EXECUTED",
-  "BATCH_EXECUTED",
-  "PIPELINE_EXECUTED",
-] as const;
-
 interface AuditEntry {
   id: string;
   actorId: string | null;
@@ -3716,7 +3690,7 @@ export function AuditLogSection() {
           className="text-sm border border-border rounded-lg px-2 py-1.5 bg-background text-foreground"
         >
           <option value="">{t.settings.auditLog.allActionsFilter}</option>
-          {AUDIT_ACTIONS.map((a) => (
+          {CORE_AUDIT_EVENTS.map((a) => (
             <option key={a} value={a}>
               {a.replaceAll("_", " ")}
             </option>
