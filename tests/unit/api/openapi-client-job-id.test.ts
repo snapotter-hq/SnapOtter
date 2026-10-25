@@ -17,12 +17,7 @@ const SPEC_FILES = readdirSync(SPEC_DIR).filter((f) => /^openapi(\.[\w-]+)?\.yam
 
 // Non-registry conversion presets whose single-file route still documents
 // clientJobId in openapi.yaml without reading it. Drop an entry with its fix.
-const DOCUMENTED_WITHOUT_CLIENT_JOB_ID_READ: Record<string, string> = {
-  "/api/v1/tools/image/svg-to-jpg":
-    "#4018: single-file svg-to-raster route does not read clientJobId",
-  "/api/v1/tools/image/svg-to-png":
-    "#4018: single-file svg-to-raster route does not read clientJobId",
-};
+const DOCUMENTED_WITHOUT_CLIENT_JOB_ID_READ: Record<string, string> = {};
 
 interface OpenApiDoc {
   paths?: Record<
@@ -82,17 +77,23 @@ describe("OpenAPI clientJobId contract", () => {
       }
     });
 
-    it(`${file} omits clientJobId on image-to-pdf and single-file pdf-to-image routes (#1735)`, () => {
+    it(`${file} omits clientJobId on image-to-pdf, pdf-to-image, and svg-to-raster single-file routes (#1735, #4018)`, () => {
       const spec = yaml.load(readFileSync(join(SPEC_DIR, file), "utf8")) as OpenApiDoc;
-      const inlinePdfRoutes = [
+      const inlineSingleFileRoutes = [
         apiToolPath("image-to-pdf"),
         apiToolPath("pdf-to-image"),
+        apiToolPath("svg-to-raster"),
         ...CONVERSION_PRESETS.filter(
-          (preset) => preset.base === "image-to-pdf" || preset.base === "pdf-to-image",
+          (preset) =>
+            preset.base === "image-to-pdf" ||
+            preset.base === "pdf-to-image" ||
+            preset.base === "svg-to-raster",
         ).map((preset) => apiToolPath(preset.id)),
       ];
 
-      const documented = inlinePdfRoutes.filter((path) => hasMultipartClientJobId(spec, path));
+      const documented = inlineSingleFileRoutes.filter((path) =>
+        hasMultipartClientJobId(spec, path),
+      );
       expect(documented).toEqual([]);
     });
   }

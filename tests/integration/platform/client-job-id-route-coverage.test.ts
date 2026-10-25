@@ -74,12 +74,7 @@ const FORMERLY_SILENT_ROUTES = [
 
 // Documented clientJobId paths whose route handler still ignores the field.
 // Drop an entry when its fix lands.
-const DOCUMENTED_WITHOUT_CLIENT_JOB_ID_READ: Record<string, string> = {
-  "/api/v1/tools/image/svg-to-jpg":
-    "#4018: single-file svg-to-raster route does not read clientJobId",
-  "/api/v1/tools/image/svg-to-png":
-    "#4018: single-file svg-to-raster route does not read clientJobId",
-};
+const DOCUMENTED_WITHOUT_CLIENT_JOB_ID_READ: Record<string, string> = {};
 
 interface OpenApiSpec {
   paths: Record<
@@ -257,14 +252,23 @@ describe("every OpenAPI-documented clientJobId POST path enforces the 400 gate (
     expect(failing).toEqual(Object.keys(DOCUMENTED_WITHOUT_CLIENT_JOB_ID_READ).sort());
   });
 
-  it("omits clientJobId on conversion presets whose route handler does not read it", async () => {
+  it("omits clientJobId on single-file routes and conversion presets whose handler does not read it", async () => {
     const documentedSet = new Set(OPENAPI_CLIENT_JOB_ID_POST_PATHS);
+    const omittedBasePaths = [
+      apiToolPath("image-to-pdf"),
+      apiToolPath("pdf-to-image"),
+      apiToolPath("svg-to-raster"),
+    ];
+    for (const url of omittedBasePaths) {
+      expect(documentedSet.has(url), url).toBe(false);
+    }
+
     const omittedPresetPaths = CONVERSION_PRESETS.map((preset) => apiToolPath(preset.id)).filter(
       (url) => !documentedSet.has(url),
     );
-    expect(omittedPresetPaths.length).toBe(10);
+    expect(omittedPresetPaths.length).toBe(12);
 
-    for (const url of omittedPresetPaths) {
+    for (const url of [...omittedBasePaths, ...omittedPresetPaths]) {
       const res = await postClientJobId(url, "my job");
       expect(res.statusCode, url).toBe(400);
       expect(readErrorField(url, res.statusCode, res.body), url).not.toBe(

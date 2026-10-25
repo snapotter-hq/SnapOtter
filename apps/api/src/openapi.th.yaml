@@ -15901,11 +15901,6 @@ paths:
                   description: |
                     Dedicated SVG to PNG converter using the svg-to-raster pipeline.
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
-                clientJobId:
-                  type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
-                  maxLength: 128
-                  description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
           description: Processed file
@@ -15962,11 +15957,6 @@ paths:
                   description: |
                     Dedicated SVG to JPG converter using the svg-to-raster pipeline.
                     Optional settings: quality (number 1-100). The output format is locked by the endpoint.
-                clientJobId:
-                  type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
-                  maxLength: 128
-                  description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
           description: Processed file
