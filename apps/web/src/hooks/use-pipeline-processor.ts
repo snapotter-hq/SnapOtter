@@ -1,4 +1,4 @@
-import { ANALYTICS_EVENTS } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, type ToolRunDegradedProperties } from "@snapotter/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { track } from "@/lib/analytics";
@@ -57,6 +57,7 @@ const IDLE_PROGRESS: PipelineProgress = {
 const UPLOAD_WEIGHT = 15;
 const UPLOAD_STALL_TIMEOUT_MS = 120_000;
 const SSE_STALL_TIMEOUT_MS = 300_000;
+type DegradeTrigger = ToolRunDegradedProperties["trigger"];
 // After degrading a dead POST to the async path, how long to wait for any SSE
 // frame proving the flow reached the server. Only armed when no frame arrived
 // before the degrade; the progress route replays live rows on connect (#722),
@@ -113,17 +114,14 @@ export function usePipelineProcessor() {
   // Operator-visible record of a sync wait falling back to the async path
   // (#750). Static import: the analytics module is light (posthog-js loads
   // lazily inside it).
-  const trackDegrade = useCallback(
-    (trigger: "socket" | "timeout" | "http-502" | "http-504", isBatch: boolean) => {
-      track(ANALYTICS_EVENTS.TOOL_RUN_DEGRADED, {
-        tool_id: "pipeline",
-        is_batch: isBatch,
-        trigger,
-        had_evidence: sawJobEvidenceRef.current,
-      });
-    },
-    [],
-  );
+  const trackDegrade = useCallback((trigger: DegradeTrigger, isBatch: boolean) => {
+    track(ANALYTICS_EVENTS.TOOL_RUN_DEGRADED, {
+      tool_id: "pipeline",
+      is_batch: isBatch,
+      trigger,
+      had_evidence: sawJobEvidenceRef.current,
+    });
+  }, []);
 
   const clearActiveJob = useCallback(() => {
     activeJobIdRef.current = null;
@@ -932,7 +930,7 @@ export function usePipelineProcessor() {
         // A dead response after a finished upload does not mean a dead flow:
         // the pipeline keeps running under clientJobId and the terminal single
         // frame carries the full result (#766, mirroring #722).
-        const degradeToAsync = (trigger: "socket" | "timeout" | "http-502" | "http-504") => {
+        const degradeToAsync = (trigger: DegradeTrigger) => {
           if (!uploadedFully || activeJobIdRef.current !== clientJobId) return false;
           clearRequestTimer();
           asyncModeRef.current = true;
@@ -978,16 +976,16 @@ export function usePipelineProcessor() {
             return;
           }
 
-          // An unparseable 502/504 body is an intermediary answering for a
-          // dead sync wait, not the app (app 5xx always carries JSON).
-          if (xhr.status === 502 || xhr.status === 504) {
+          // An unparseable 5xx body is an intermediary answering for a dead
+          // sync wait, not the app (app 5xx always carries JSON).
+          if (xhr.status >= 500) {
             let appSpoke = true;
             try {
               JSON.parse(xhr.responseText);
             } catch {
               appSpoke = false;
             }
-            if (!appSpoke && degradeToAsync(xhr.status === 502 ? "http-502" : "http-504")) {
+            if (!appSpoke && degradeToAsync(`http-${xhr.status}`)) {
               return;
             }
           }
@@ -1565,7 +1563,7 @@ export function usePipelineProcessor() {
           );
         };
 
-        const degradeToAsync = (trigger: "socket" | "timeout" | "http-502" | "http-504") => {
+        const degradeToAsync = (trigger: DegradeTrigger) => {
           if (!uploadedFully || activeJobIdRef.current !== clientJobId) return false;
           clearRequestTimer();
           asyncModeRef.current = true;
@@ -1656,12 +1654,9 @@ export function usePipelineProcessor() {
                 }
               }
             } catch {
-              // An unparseable 502/504 body is an intermediary answering for a
+              // An unparseable 5xx body is an intermediary answering for a
               // dead sync wait, not the app.
-              if (
-                (xhr.status === 502 || xhr.status === 504) &&
-                degradeToAsync(xhr.status === 502 ? "http-502" : "http-504")
-              ) {
+              if (xhr.status >= 500 && degradeToAsync(`http-${xhr.status}`)) {
                 return;
               }
               errorMsg = format(t.errors.batchFailedWithStatus, { status: xhr.status });

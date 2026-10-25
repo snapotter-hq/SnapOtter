@@ -72,7 +72,7 @@ Emitted from `apps/web` through `track()`; properties are filtered by the `ALLOW
 | `sponsor_clicked` | The sponsor link is clicked | none |
 | `feedback_prompt_shown` | A feedback surface becomes visible (usage survey, per-job prompt, admin install card, nav dialog, search miss) | `source`, `survey_id`, `prompt_variant` |
 | `feedback_prompt_dismissed` | A feedback surface is dismissed without submitting | `source`, `survey_id`, `prompt_variant`, `dismiss_kind` (`close`, `dont_ask_again`, or `snooze`) |
-| `tool_run_degraded` | A run's sync HTTP response died after the upload finished and the client fell back to the async SSE path instead of failing the job (#750, #766). High volume on one instance means a reverse proxy is killing sync waits; the fallback hides that from users, so this event is the only operator-visible signal | `tool_id` (pipeline runs report `pipeline`), `is_batch`, `trigger` (`socket`, `timeout`, or `http-<status>` for an intermediary's 5xx with a non-JSON body: `http-502` and `http-504` from nginx, `http-524` from Cloudflare's 100 s origin limit; single-file runs only degrade on 502 and 504), `had_evidence` |
+| `tool_run_degraded` | A run's sync HTTP response died after the upload finished and the client fell back to the async SSE path instead of failing the job (#750, #766). High volume on one instance means a reverse proxy is killing sync waits; the fallback hides that from users, so this event is the only operator-visible signal | `tool_id` (pipeline runs report `pipeline`), `is_batch`, `trigger` (`socket`, `timeout`, or `http-<status>` for an intermediary's 5xx with a non-JSON body: `http-502` and `http-504` from nginx, `http-524` from Cloudflare's 100 s origin limit), `had_evidence` |
 
 ### SDK-generated events
 

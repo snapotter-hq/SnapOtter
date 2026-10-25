@@ -32,7 +32,7 @@ vi.mock("@/lib/utils", async (importOriginal) => {
 });
 
 import { useToolProcessor } from "@/hooks/use-tool-processor";
-import { captureHandledError } from "@/lib/analytics";
+import { captureHandledError, track } from "@/lib/analytics";
 import { format } from "@/lib/format";
 import { generateId } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
@@ -103,6 +103,7 @@ function sendSingleFrame(frame: Record<string, unknown>) {
 beforeEach(() => {
   vi.useFakeTimers();
   vi.mocked(captureHandledError).mockClear();
+  vi.mocked(track).mockClear();
   vi.stubGlobal("URL", {
     ...globalThis.URL,
     createObjectURL: vi.fn(() => "blob:fake-url"),
@@ -494,6 +495,49 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
     expect(useFileStore.getState().entries[0].status).toBe("processing");
     expect(useFileStore.getState().error).toBeNull();
     expect(useFileStore.getState().processing).toBe(true);
+
+    unmount();
+  });
+
+  it("degrades a post-upload 524 with an HTML body to async and settles from the terminal frame (#1242)", () => {
+    const { unmount } = startRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 524;
+      xhrs[0].responseText = "<html><body>524 A timeout occurred</body></html>";
+      xhrs[0].onload?.();
+    });
+
+    expect(useFileStore.getState().entries[0].status).toBe("processing");
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().processing).toBe(true);
+    expect(useFileStore.getState().activeJobId).toBe(JOB_ID);
+    expect(vi.mocked(track)).toHaveBeenCalledWith("tool_run_degraded", {
+      tool_id: "trim-video",
+      is_batch: false,
+      trigger: "http-524",
+      had_evidence: false,
+    });
+
+    act(() => {
+      sendSingleFrame({
+        phase: "complete",
+        percent: 100,
+        result: {
+          jobId: JOB_ID,
+          downloadUrl: "/api/v1/download/server-job/clip_trimmed.mp4",
+          originalSize: 64,
+          processedSize: 32,
+        },
+      });
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "completed",
+      processedUrl: "/api/v1/download/server-job/clip_trimmed.mp4",
+    });
+    expect(useFileStore.getState().processing).toBe(false);
 
     unmount();
   });

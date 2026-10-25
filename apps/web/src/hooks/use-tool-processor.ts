@@ -1401,7 +1401,7 @@ export function useToolProcessor(toolId: string) {
         // 202 would, instead of abandoning a live job (#722). A proxy idle
         // timeout on the sync wait otherwise reproduces the failure on every
         // retry while every "failed" job actually completes.
-        const degradeToAsync = (trigger: "socket" | "timeout" | "http-502" | "http-504") => {
+        const degradeToAsync = (trigger: DegradeTrigger) => {
           if (!uploadedFully || activeJobIdRef.current !== clientJobId) return false;
           clearRequestTimer();
           asyncModeRef.current = true;
@@ -1543,19 +1543,19 @@ export function useToolProcessor(toolId: string) {
             return;
           }
 
-          // A 502/504 whose body is not JSON is an intermediary answering for
-          // a dead sync wait, not the app: app-emitted 5xx always carries a
+          // A 5xx whose body is not JSON is an intermediary answering for a
+          // dead sync wait, not the app: app-emitted 5xx always carries a
           // JSON error body (html-to-image's own 504 stays precise below).
           // Post-upload the job is live server-side, so degrade instead of
-          // erroring (#750).
-          if (xhr.status === 502 || xhr.status === 504) {
+          // erroring (#750, #1242).
+          if (xhr.status >= 500) {
             let appSpoke = true;
             try {
               JSON.parse(xhr.responseText);
             } catch {
               appSpoke = false;
             }
-            if (!appSpoke && degradeToAsync(xhr.status === 502 ? "http-502" : "http-504")) {
+            if (!appSpoke && degradeToAsync(`http-${xhr.status}`)) {
               return;
             }
           }

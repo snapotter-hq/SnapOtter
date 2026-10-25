@@ -326,6 +326,37 @@ describe("usePipelineProcessor single-run recovery (#766)", () => {
     unmount();
   });
 
+  it("degrades a post-upload 524 with an HTML body and settles from the terminal single frame (#1242)", async () => {
+    const { unmount } = startSingleRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 524;
+      xhrs[0].responseText = "<html><body>524 A timeout occurred</body></html>";
+      xhrs[0].onload?.();
+    });
+
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().processing).toBe(true);
+
+    await settled(() => {
+      expect(vi.mocked(track)).toHaveBeenCalledWith("tool_run_degraded", {
+        tool_id: "pipeline",
+        is_batch: false,
+        trigger: "http-524",
+        had_evidence: false,
+      });
+    });
+
+    act(() => {
+      sendSingleFrame({ phase: "complete", percent: 100, result: SINGLE_RESULT });
+    });
+    expect(useFileStore.getState().entries[0].status).toBe("completed");
+    expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+
   it("keeps the precise error for a 504 with a JSON body", () => {
     const { unmount } = startSingleRun();
 
@@ -791,6 +822,46 @@ describe("usePipelineProcessor batch recovery (#766)", () => {
     unmount();
   });
 
+  it("degrades a batch 524 whose blob body is not JSON and settles from the durable ZIP (#1242)", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve({ ok: true, status: 200, blob: () => Promise.resolve(zipBlob()) }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { unmount } = startBatchRun();
+
+    act(() => {
+      xhrs[0].upload.onload?.();
+      xhrs[0].status = 524;
+      xhrs[0].response = new Blob(["<html><body>524 A timeout occurred</body></html>"], {
+        type: "text/html",
+      });
+      xhrs[0].onload?.();
+    });
+
+    await settled(() => {
+      expect(vi.mocked(track)).toHaveBeenCalledWith("tool_run_degraded", {
+        tool_id: "pipeline",
+        is_batch: true,
+        trigger: "http-524",
+        had_evidence: false,
+      });
+    });
+    expect(useFileStore.getState().error).toBeNull();
+    expect(useFileStore.getState().processing).toBe(true);
+
+    act(() => {
+      sendBatchFrame(completedBatchTerminal());
+    });
+
+    await settled(() => {
+      expect(useFileStore.getState().entries[0].status).toBe("completed");
+      expect(useFileStore.getState().entries[1].status).toBe("completed");
+    });
+    expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+
   it("keeps original-index alignment when fileResults has a hole", async () => {
     const fetchMock = vi.fn(() =>
       Promise.resolve({ ok: true, status: 200, blob: () => Promise.resolve(zipBlob()) }),
@@ -1137,12 +1208,15 @@ describe("usePipelineProcessor single-run entry settle (#1352)", () => {
     unmount();
   });
 
-  it("fails the entry on an error response whose body is not JSON", () => {
+  it.each([
+    ["a pre-upload 5xx with an HTML body", false, 500, "<html>Internal Server Error</html>"],
+    ["a post-upload 4xx with an HTML body", true, 403, "<html>403 Forbidden</html>"],
+  ])("fails the entry on %s whose body is not JSON", (_label, uploaded, status, responseText) => {
     const { unmount } = startSingleRun();
     act(() => {
-      xhrs[0].upload.onload?.();
-      xhrs[0].status = 500;
-      xhrs[0].responseText = "<html>Internal Server Error</html>";
+      if (uploaded) xhrs[0].upload.onload?.();
+      xhrs[0].status = status;
+      xhrs[0].responseText = responseText;
       xhrs[0].onload?.();
     });
 
