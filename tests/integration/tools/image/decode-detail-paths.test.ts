@@ -108,6 +108,11 @@ const ROUTES: { name: string; url: string; parts: (s: Sample) => Part[] }[] = [
     parts: (s) => [{ name: "file", ...s }, settings({ format: "webp", quality: 60 })],
   },
   {
+    name: "image-to-pdf",
+    url: "/api/v1/tools/image/image-to-pdf",
+    parts: (s) => [{ name: "file", ...s }],
+  },
+  {
     name: "pipeline execute",
     url: "/api/v1/pipeline/execute",
     parts: (s) => [
@@ -142,6 +147,7 @@ const ICO_DETAIL_FROM_SHARP = new Set([
   "meme-generator upload",
   "image-enhancement analyze",
   "optimize-for-web preview",
+  "image-to-pdf",
 ]);
 
 // Routes whose HEIC decode catch delegates to asInputErrorIfUndecodable,

@@ -4,6 +4,7 @@ import { hasServerErrorStatus } from "@snapotter/shared";
 import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { sendInputValidationError } from "../../lib/engine-unavailable.js";
+import { stripInternalPaths } from "../../lib/errors.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
@@ -147,9 +148,10 @@ export function registerCompare(app: FastifyInstance) {
       }
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+      request.log?.warn({ err, toolId: "compare" }, "Comparison failed");
       return reply.status(422).send({
         error: "Comparison failed",
-        details: err instanceof Error ? err.message : "Unknown error",
+        details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
       });
     }
   });

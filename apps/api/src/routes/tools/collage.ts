@@ -835,9 +835,10 @@ export function registerCollage(app: FastifyInstance) {
         // Genuine bad input (e.g. an image whose dimensions or pixels won't
         // decode). The 422 here is the documented worker-error convention, not
         // the factory's 400 (see #718); keep it.
+        request.log?.warn({ err, toolId: "collage" }, "Collage creation failed");
         return reply.status(422).send({
           error: "Collage creation failed",
-          details: err.message,
+          details: stripInternalPaths(err.message),
         });
       }
       // Everything else is infrastructure, not the user's images: a storage

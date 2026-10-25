@@ -4,6 +4,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp, { type Metadata } from "sharp";
 import { z } from "zod";
 import { openAnimated, readAnimationFor } from "../../lib/animated-image.js";
+import { stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
@@ -164,9 +165,10 @@ export function registerStripMetadata(app: FastifyInstance) {
       } catch (err) {
         const oomErr = asDecoderOutOfMemory(err);
         if (isDecoderUnavailable(oomErr)) throw oomErr;
+        request.log?.warn({ err, toolId: "strip-metadata" }, "Failed to read image metadata");
         return reply.status(422).send({
           error: "Failed to read image metadata",
-          details: err instanceof Error ? err.message : "Unknown error",
+          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
         });
       }
 
@@ -248,9 +250,10 @@ export function registerStripMetadata(app: FastifyInstance) {
       } catch (err) {
         const oomErr = asDecoderOutOfMemory(err);
         if (isDecoderUnavailable(oomErr)) throw oomErr;
+        request.log?.warn({ err, toolId: "strip-metadata" }, "Failed to read image metadata");
         return reply.status(422).send({
           error: "Failed to read image metadata",
-          details: err instanceof Error ? err.message : "Unknown error",
+          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
         });
       }
     },

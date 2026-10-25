@@ -5,7 +5,7 @@ import type { FastifyInstance } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { sendInputValidationError } from "../../lib/engine-unavailable.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
@@ -203,9 +203,10 @@ export function registerWatermarkImage(app: FastifyInstance) {
       }
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+      request.log?.warn({ err, toolId: "watermark-image" }, "Image watermarking failed");
       return reply.status(422).send({
         error: "Processing failed",
-        details: err instanceof Error ? err.message : "Image processing failed",
+        details: stripInternalPaths(err instanceof Error ? err.message : "Image processing failed"),
       });
     }
   });

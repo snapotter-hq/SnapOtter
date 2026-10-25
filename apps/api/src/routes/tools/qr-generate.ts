@@ -4,7 +4,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import QRCode from "qrcode";
 import sharp from "sharp";
 import { z } from "zod";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { putObject } from "../../lib/object-storage.js";
 
 const QR_MARGIN_MODULES = 2;
@@ -154,9 +154,10 @@ export function registerQrGenerate(app: FastifyInstance) {
         });
       } catch (err) {
         if (hasServerErrorStatus(err)) throw err;
+        request.log?.warn({ err, toolId: "qr-generate" }, "QR code generation failed");
         return reply.status(422).send({
           error: "QR code generation failed",
-          details: err instanceof Error ? err.message : "Unknown error",
+          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
         });
       }
     },

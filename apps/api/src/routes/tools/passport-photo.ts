@@ -696,7 +696,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
         }
         return reply.status(422).send({
           error: "Passport photo generation failed",
-          details: err instanceof Error ? err.message : "Unknown error",
+          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
         });
       }
     },

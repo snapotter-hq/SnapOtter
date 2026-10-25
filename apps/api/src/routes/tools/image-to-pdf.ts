@@ -7,7 +7,7 @@ import PDFDocument from "pdfkit";
 import sharp from "sharp";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
 import {
@@ -229,9 +229,13 @@ export function registerImageToPdfRoute(
         } catch (rawErr) {
           const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
           if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+          request.log?.warn(
+            { err, filename: file.filename, toolId: opts.toolId },
+            "HEIC decode failed",
+          );
           return reply.status(422).send({
             error: `Failed to decode HEIC file "${file.filename}"`,
-            details: err instanceof Error ? err.message : String(err),
+            details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
           });
         }
       } else if (needsCliDecode(validation.format)) {
@@ -260,9 +264,20 @@ export function registerImageToPdfRoute(
             if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
               throw decodeErr;
             }
+            request.log?.warn(
+              {
+                err: rawProbeErr,
+                decodeErr: decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
+                filename: file.filename,
+                toolId: opts.toolId,
+              },
+              "CLI decode failed",
+            );
             return reply.status(422).send({
               error: `Failed to decode ${validation.format.toUpperCase()} file "${file.filename}"`,
-              details: rawProbeErr instanceof Error ? rawProbeErr.message : String(rawProbeErr),
+              details: stripInternalPaths(
+                rawProbeErr instanceof Error ? rawProbeErr.message : String(rawProbeErr),
+              ),
             });
           }
         }
@@ -436,7 +451,7 @@ export function registerImageToPdfRoute(
       request.log.error({ err, toolId: opts.toolId }, "PDF creation failed");
       return reply.status(422).send({
         error: "PDF creation failed",
-        details: err instanceof Error ? err.message : "Unknown error",
+        details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
       });
     }
   });

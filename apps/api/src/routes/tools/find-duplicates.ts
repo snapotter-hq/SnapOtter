@@ -5,7 +5,7 @@ import sharp from "sharp";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { reportError, safeFormatTag } from "../../lib/error-report.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import {
@@ -426,9 +426,10 @@ export function registerFindDuplicates(app: FastifyInstance) {
       // as 503 and report it, the way the other custom routes do (#795, #1428, #2800).
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+      request.log?.warn({ err, toolId: "find-duplicates" }, "Duplicate detection failed");
       return reply.status(422).send({
         error: "Duplicate detection failed",
-        details: err instanceof Error ? err.message : "Unknown error",
+        details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
       });
     }
   });

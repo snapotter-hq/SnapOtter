@@ -9,7 +9,7 @@ import sharp from "sharp";
 import { z } from "zod";
 import { autoOrient } from "../../lib/auto-orient.js";
 import { getSecurityHeaders } from "../../lib/csp.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { validateImageBuffer } from "../../lib/file-validation.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import {
@@ -353,9 +353,10 @@ export function registerFavicon(app: FastifyInstance) {
       );
     } catch (err) {
       if (!reply.raw.headersSent) {
+        request.log?.warn({ err, toolId: "favicon" }, "Favicon generation failed");
         return reply.status(422).send({
           error: "Favicon generation failed",
-          details: err instanceof Error ? err.message : "Unknown error",
+          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
         });
       }
       // The ZIP stream already started; end the connection so clients see a

@@ -17,6 +17,7 @@ import { auditFromRequest } from "../../lib/audit.js";
 import { decryptSettingWithRotation, encrypt, isEncrypted } from "../../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
 import { reportError } from "../../lib/error-report.js";
+import { stripInternalPaths } from "../../lib/errors.js";
 import { logger } from "../../lib/logger.js";
 import { validateFetchUrl } from "../../lib/ssrf.js";
 import { deliverWebhook } from "../../lib/webhook-delivery.js";
@@ -114,7 +115,7 @@ async function validateWebhookDestinationUrl(url: string, reply: FastifyReply): 
   } catch (err) {
     reply.status(400).send({
       error: "Webhook URL must resolve to a public HTTP(S) destination",
-      details: err instanceof Error ? err.message : String(err),
+      details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
     });
     return false;
   }

@@ -198,7 +198,7 @@ export function registerColorPalette(app: FastifyInstance) {
     } catch (err) {
       return reply.status(400).send({
         error: "Invalid settings",
-        details: err instanceof Error ? err.message : String(err),
+        details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
       });
     }
 
@@ -283,9 +283,10 @@ export function registerColorPalette(app: FastifyInstance) {
     } catch (rawErr) {
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+      request.log?.warn({ err, toolId: "color-palette" }, "Color extraction failed");
       return reply.status(422).send({
         error: "Color extraction failed",
-        details: err instanceof Error ? err.message : "Unknown error",
+        details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
       });
     }
   });

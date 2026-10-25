@@ -5,7 +5,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { z } from "zod";
 import { reportEngineUnavailable } from "../../lib/engine-unavailable.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import {
   buildTagArgs,
   type EditMetadataSettings,
@@ -216,9 +216,10 @@ export function registerEditMetadata(app: FastifyInstance) {
       } catch (rawErr) {
         const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
         if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+        request.log?.warn({ err, toolId: "edit-metadata" }, "Failed to read image metadata");
         return reply.status(422).send({
           error: "Failed to read image metadata",
-          details: err instanceof Error ? err.message : "Unknown error",
+          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
         });
       }
     },
@@ -400,7 +401,7 @@ export function registerEditMetadata(app: FastifyInstance) {
         request.log.error({ err, toolId: "edit-metadata" }, "Metadata edit failed");
         return reply.status(422).send({
           error: "Metadata edit failed",
-          details: err instanceof Error ? err.message : "Unknown error",
+          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
         });
       }
     },

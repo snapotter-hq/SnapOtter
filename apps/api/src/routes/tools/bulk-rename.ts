@@ -4,7 +4,7 @@ import archiver from "archiver";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { getSecurityHeaders } from "../../lib/csp.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { emitInlineRequestAuditIfNeeded } from "../../lib/tool-audit.js";
@@ -109,9 +109,10 @@ export function registerBulkRename(app: FastifyInstance) {
       );
     } catch (err) {
       if (!reply.raw.headersSent) {
+        request.log?.warn({ err, toolId: "bulk-rename" }, "Bulk rename failed");
         return reply.status(422).send({
           error: "Rename failed",
-          details: err instanceof Error ? err.message : "Unknown error",
+          details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
         });
       }
       // The ZIP stream already started; end the connection so clients see a

@@ -16,7 +16,7 @@ import {
   reportEngineUnavailable,
 } from "../../lib/engine-unavailable.js";
 import { resolveConcurrency } from "../../lib/env.js";
-import { formatZodErrors, friendlyError } from "../../lib/errors.js";
+import { formatZodErrors, friendlyError, stripInternalPaths } from "../../lib/errors.js";
 import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
 import {
   asDecoderOutOfMemory,
@@ -395,7 +395,13 @@ export function registerSvgToRasterRoute(
               ...(unavailable.code && { code: unavailable.code }),
             });
           } else {
-            const error = err instanceof Error ? err.message : "Conversion failed";
+            request.log?.warn(
+              { err, filename: file.filename, toolId: opts.toolId },
+              "SVG batch file conversion failed",
+            );
+            const error = stripInternalPaths(
+              err instanceof Error ? err.message : "Conversion failed",
+            );
             faults.push({ filename: file.filename, error });
             errors.push({
               filename: file.filename,
@@ -792,9 +798,10 @@ export function registerSvgToRasterRoute(
     } catch (rawErr) {
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+      request.log?.warn({ err, toolId: opts.toolId }, "SVG conversion failed");
       return reply.status(422).send({
         error: "SVG conversion failed",
-        details: err instanceof Error ? err.message : "Unknown error",
+        details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
       });
     }
   });

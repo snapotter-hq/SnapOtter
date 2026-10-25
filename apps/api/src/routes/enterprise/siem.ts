@@ -6,6 +6,7 @@ import { db, schema } from "../../db/index.js";
 import { auditFromRequest } from "../../lib/audit.js";
 import { decryptSettingWithRotation, encrypt, isEncrypted } from "../../lib/encryption.js";
 import { isEnterpriseFeatureEnabled } from "../../lib/enterprise-feature.js";
+import { stripInternalPaths } from "../../lib/errors.js";
 import { logger } from "../../lib/logger.js";
 import { validateFetchUrl } from "../../lib/ssrf.js";
 import { requirePermission } from "../../permissions.js";
@@ -42,7 +43,7 @@ async function validateSiemWebhookUrl(url: string, reply: FastifyReply): Promise
   } catch (err) {
     reply.status(400).send({
       error: "SIEM webhook URL must resolve to a public HTTP(S) destination",
-      details: err instanceof Error ? err.message : String(err),
+      details: stripInternalPaths(err instanceof Error ? err.message : String(err)),
     });
     return false;
   }

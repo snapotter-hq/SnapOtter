@@ -5,7 +5,7 @@ import type { FastifyInstance } from "fastify";
 import sharp, { type Blend } from "sharp";
 import { z } from "zod";
 import { sendInputValidationError } from "../../lib/engine-unavailable.js";
-import { formatZodErrors } from "../../lib/errors.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
 import { sanitizeFilename } from "../../lib/filename.js";
 import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
@@ -183,9 +183,10 @@ export function registerCompose(app: FastifyInstance) {
       }
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+      request.log?.warn({ err, toolId: "compose" }, "Image composition failed");
       return reply.status(422).send({
         error: "Processing failed",
-        details: err instanceof Error ? err.message : "Image processing failed",
+        details: stripInternalPaths(err instanceof Error ? err.message : "Image processing failed"),
       });
     }
   });

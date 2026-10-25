@@ -11,7 +11,7 @@ import { db, schema } from "../../db/index.js";
 import { INVALID_CLIENT_JOB_ID_ERROR, parseClientJobIdField } from "../../jobs/types.js";
 import { getSecurityHeaders } from "../../lib/csp.js";
 import { reportEngineUnavailable } from "../../lib/engine-unavailable.js";
-import { formatZodErrors, friendlyError } from "../../lib/errors.js";
+import { formatZodErrors, friendlyError, stripInternalPaths } from "../../lib/errors.js";
 import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
 import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
@@ -975,7 +975,7 @@ export function registerPdfToImageRoute(
       request.log.error({ err, toolId: opts.toolId }, "PDF conversion failed");
       return reply.status(422).send({
         error: "PDF conversion failed",
-        details: err instanceof Error ? err.message : "Unknown error",
+        details: stripInternalPaths(err instanceof Error ? err.message : "Unknown error"),
       });
     }
   });
