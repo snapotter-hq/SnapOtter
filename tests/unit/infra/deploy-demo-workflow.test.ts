@@ -156,4 +156,12 @@ describe("demo deployment workflow", () => {
       expect(step["continue-on-error"], step.name ?? step.uses).toBeUndefined();
     }
   });
+
+  it("defines a typecheck script in apps/demo/package.json so turbo typecheck covers the demo workspace (#4010)", () => {
+    const demoPackageJson = JSON.parse(
+      readFileSync(path.resolve(process.cwd(), "apps/demo/package.json"), "utf8"),
+    ) as { scripts?: Record<string, string> };
+
+    expect(demoPackageJson.scripts?.typecheck).toBe("tsc --noEmit");
+  });
 });
