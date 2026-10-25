@@ -24,6 +24,7 @@ import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/ima
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
 import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { emitInlineRequestAuditIfNeeded } from "../../lib/tool-audit.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
@@ -300,6 +301,11 @@ export function registerSplit(app: FastifyInstance) {
       }
 
       await archive.finalize();
+      await emitInlineRequestAuditIfNeeded(
+        request,
+        200,
+        JSON.stringify({ inputFileCount: 1, originalSize: fileBuffer.length }),
+      );
     } catch (rawErr) {
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (!reply.raw.headersSent) {

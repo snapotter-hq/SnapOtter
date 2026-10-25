@@ -641,6 +641,9 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
           jobId,
           toolId: config.toolId,
           userId,
+          username: authUser.username,
+          requestIp: request.ip,
+          requestId: request.id,
           pool,
           inputRefs,
           filename,
@@ -668,29 +671,36 @@ export function createToolRoute<T>(app: FastifyInstance, config: ToolRouteConfig
         try {
           const result = await waitForJob(pool, jobId);
           if (result) {
-            // Fire-and-forget: audit log must never block the response
-            import("../lib/audit.js")
-              .then(({ isToolAuditEnabled, auditFromRequest }) =>
-                isToolAuditEnabled().then((enabled) => {
-                  if (!enabled) return;
-                  return auditFromRequest(request)("TOOL_EXECUTED", {
-                    userId: authUser.id,
-                    username: authUser.username,
-                    toolId: config.toolId,
-                    inputFileCount: received.length,
-                    totalInputSize: received.reduce((sum, r) => sum + r.size, 0),
-                    outputFormat: (settings as Record<string, unknown>)?.format ?? null,
-                    status: "success",
-                    durationMs: Date.now() - startTime,
-                  });
-                }),
-              )
-              .catch((err) => {
-                request.log.warn(
-                  { err, toolId: config.toolId },
-                  "Failed to emit TOOL_EXECUTED audit log",
-                );
-              });
+            if (!result.audited) {
+              // Fire-and-forget: audit log must never block the response
+              import("../lib/audit.js")
+                .then(({ isToolAuditEnabled, auditFromRequest }) =>
+                  isToolAuditEnabled().then((enabled) => {
+                    if (!enabled) return;
+                    return auditFromRequest(request)("TOOL_EXECUTED", {
+                      userId: authUser.id,
+                      username: authUser.username,
+                      toolId: config.toolId,
+                      inputFileCount: received.length,
+                      totalInputSize: received.reduce((sum, r) => sum + r.size, 0),
+                      outputFormat:
+                        ((settings as Record<string, unknown>)?.format as string | undefined) ??
+                        ((settings as Record<string, unknown>)?.outputFormat as
+                          | string
+                          | undefined) ??
+                        null,
+                      status: "success",
+                      durationMs: Date.now() - startTime,
+                    });
+                  }),
+                )
+                .catch((err) => {
+                  request.log.warn(
+                    { err, toolId: config.toolId },
+                    "Failed to emit TOOL_EXECUTED audit log",
+                  );
+                });
+            }
 
             return reply.send({
               jobId,

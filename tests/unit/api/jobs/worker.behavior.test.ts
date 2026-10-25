@@ -136,6 +136,12 @@ async function loadWorker(basePath = "", extraMocks?: () => void) {
     ...objectStorageMocks,
   }));
 
+  vi.doMock("../../../../apps/api/src/lib/tool-audit.js", () => ({
+    emitWorkerBatchAudit: vi.fn().mockResolvedValue(undefined),
+    emitWorkerPipelineAudit: vi.fn().mockResolvedValue(undefined),
+    emitWorkerToolAudit: vi.fn().mockResolvedValue(true),
+  }));
+
   vi.doMock("../../../../apps/api/src/routes/progress.js", () => ({
     publishEphemeral: vi.fn(),
     updateSingleFileProgress: vi.fn(),

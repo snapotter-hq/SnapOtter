@@ -27,6 +27,7 @@ import {
   putObject,
 } from "../../lib/object-storage.js";
 import { isUniqueViolation } from "../../lib/pg-errors.js";
+import { emitInlineBatchAudit } from "../../lib/tool-audit.js";
 import { engineUnavailable } from "../../modality/image-input.js";
 import { requireToolAccess } from "../../permissions.js";
 import { failBatchJob, updateJobProgress } from "../progress.js";
@@ -858,6 +859,11 @@ export function registerPdfToImageRoute(
           }).catch((err) =>
             request.log.error({ err, jobId }, "failed to persist a PDF batch's terminal progress"),
           );
+          await emitInlineBatchAudit(request, {
+            totalFiles: files.length,
+            completedFiles: files.length - errors.length,
+            failedFiles: errors.length,
+          });
         }
       } finally {
         reply.raw.removeListener("close", onReplyClose);

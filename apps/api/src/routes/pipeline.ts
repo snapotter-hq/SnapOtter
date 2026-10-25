@@ -217,6 +217,9 @@ function injectTraceContextIntoFlow(node: FlowJob): void {
 function buildPipelineFlowTree(opts: {
   jobId: string;
   userId: string | null;
+  username?: string;
+  requestIp?: string;
+  requestId?: string;
   parsedSteps: ParsedStep[];
   uploadKey: string;
   filename: string;
@@ -229,6 +232,9 @@ function buildPipelineFlowTree(opts: {
   const {
     jobId,
     userId,
+    username,
+    requestIp,
+    requestId,
     parsedSteps,
     uploadKey,
     filename,
@@ -310,6 +316,9 @@ function buildPipelineFlowTree(opts: {
       jobId,
       toolId: "pipeline",
       userId,
+      username,
+      requestIp,
+      requestId,
       pool: pipelinePool,
       totalSteps,
       clientJobId,
@@ -843,6 +852,9 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
           const { tree, stepJobIds } = buildPipelineFlowTree({
             jobId,
             userId,
+            username: authUser.username,
+            requestIp: request.ip,
+            requestId: request.id,
             parsedSteps,
             uploadKey,
             filename,
@@ -1906,6 +1918,9 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
               jobId: parentId,
               toolId: "pipeline-batch",
               userId,
+              username: authUser.username,
+              requestIp: request.ip,
+              requestId: request.id,
               pool: "system" as Pool,
               totalFiles: files.length,
               inputRefs: [],

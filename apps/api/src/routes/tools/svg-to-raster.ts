@@ -35,6 +35,7 @@ import {
   isSvgClientError,
   sanitizeSvg,
 } from "../../lib/svg-sanitize.js";
+import { emitInlineBatchAudit } from "../../lib/tool-audit.js";
 import { engineUnavailable } from "../../modality/image-input.js";
 import { requireToolAccess } from "../../permissions.js";
 import { failBatchJob, updateJobProgress } from "../progress.js";
@@ -626,6 +627,11 @@ export function registerSvgToRasterRoute(
         }).catch((err) =>
           request.log.error({ err, jobId }, "failed to persist an SVG batch's terminal progress"),
         );
+        await emitInlineBatchAudit(request, {
+          totalFiles: files.length,
+          completedFiles: files.length - errors.length,
+          failedFiles: errors.length,
+        });
       }
     } finally {
       reply.raw.removeListener("close", onReplyClose);

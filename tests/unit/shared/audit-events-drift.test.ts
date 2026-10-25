@@ -18,10 +18,6 @@ const EXTERNAL_AUTH_PROVIDERS = ["OIDC", "SAML"] as const;
 const EXTERNAL_AUTH_PROVIDER_IDS = new Set(["oidc", "saml"]);
 const PASS_THROUGH_AUDIT_WRAPPERS = new Set(["lib/audit.ts", "lib/external-auth-resolver.ts"]);
 
-// Declared in CORE_AUDIT_EVENTS for tool/batch/pipeline audit logging, but not
-// yet emitted by batch.ts or pipeline.ts (#3973).
-const UNEMITTED_CORE_AUDIT_EVENTS = ["BATCH_EXECUTED", "PIPELINE_EXECUTED"] as const;
-
 interface ExtractedAuditEvents {
   emitted: Map<string, string[]>;
   unresolved: string[];
@@ -184,15 +180,9 @@ describe("CORE_AUDIT_EVENTS drift guard (#1013)", () => {
     expect(missing).toEqual([]);
   });
 
-  it("has no dead entries in CORE_AUDIT_EVENTS outside the tracked unemitted list (#3973)", () => {
-    const unemittedAllowlist = new Set<string>(UNEMITTED_CORE_AUDIT_EVENTS);
-    const dead = CORE_AUDIT_EVENTS.filter(
-      (event) => !extracted.emitted.has(event) && !unemittedAllowlist.has(event),
-    );
+  it("has no dead entries in CORE_AUDIT_EVENTS (#3973)", () => {
+    const dead = CORE_AUDIT_EVENTS.filter((event) => !extracted.emitted.has(event));
     expect(dead).toEqual([]);
-
-    const nowEmitted = UNEMITTED_CORE_AUDIT_EVENTS.filter((event) => extracted.emitted.has(event));
-    expect(nowEmitted).toEqual([]);
   });
 
   it("AuditLogSection in settings-dialog.tsx consumes CORE_AUDIT_EVENTS instead of a local list", () => {

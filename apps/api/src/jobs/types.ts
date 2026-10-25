@@ -25,6 +25,9 @@ export interface ToolJobData {
   jobId: string;
   toolId: string;
   userId: string | null;
+  username?: string;
+  requestIp?: string;
+  requestId?: string;
   pool: Pool;
   inputRefs: string[];
   filename: string;
@@ -100,6 +103,7 @@ export interface ToolJobResult {
   savedFileId?: string;
   autoSaveError?: string;
   resultPayload?: Record<string, unknown>;
+  audited?: boolean;
 }
 
 /**

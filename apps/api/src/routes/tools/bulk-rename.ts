@@ -7,6 +7,7 @@ import { getSecurityHeaders } from "../../lib/csp.js";
 import { formatZodErrors } from "../../lib/errors.js";
 import { createUniqueNamer, sanitizeFilename } from "../../lib/filename.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
+import { emitInlineRequestAuditIfNeeded } from "../../lib/tool-audit.js";
 
 const settingsSchema = z.object({
   pattern: z.string().min(1).max(1000).default("image-{{index}}"),
@@ -98,6 +99,14 @@ export function registerBulkRename(app: FastifyInstance) {
       }
 
       await archive.finalize();
+      await emitInlineRequestAuditIfNeeded(
+        request,
+        200,
+        JSON.stringify({
+          inputFileCount: files.length,
+          originalSize: files.reduce((sum, f) => sum + f.buffer.length, 0),
+        }),
+      );
     } catch (err) {
       if (!reply.raw.headersSent) {
         return reply.status(422).send({

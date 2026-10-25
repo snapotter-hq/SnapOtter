@@ -24,6 +24,7 @@ import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError } from "../../lib/object-storage.js";
 import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
+import { emitInlineRequestAuditIfNeeded } from "../../lib/tool-audit.js";
 
 const settingsSchema = z.object({
   background: z
@@ -342,6 +343,14 @@ export function registerFavicon(app: FastifyInstance) {
       }
 
       await archive.finalize();
+      await emitInlineRequestAuditIfNeeded(
+        request,
+        200,
+        JSON.stringify({
+          inputFileCount: decodedFiles.length,
+          originalSize: decodedFiles.reduce((sum, f) => sum + f.buffer.length, 0),
+        }),
+      );
     } catch (err) {
       if (!reply.raw.headersSent) {
         return reply.status(422).send({

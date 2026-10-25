@@ -14,6 +14,7 @@ import { assertAiJobQuota } from "../lib/ai-quota.js";
 import { isEnterpriseFeatureEnabled } from "../lib/enterprise-feature.js";
 import { markQueueEventsJobFailure, markUpstreamError } from "../lib/error-report.js";
 import { toStorableJson } from "../lib/storable-json.js";
+import { bindJobAuditMetadata } from "../lib/tool-audit.js";
 import { clearTerminalReplayKey } from "../routes/progress.js";
 import { createBullMQConnection } from "./connection.js";
 import { getQueue } from "./queues.js";
@@ -106,6 +107,7 @@ export function getFlowProducer(): FlowProducer {
     });
     const rawAdd = fp.add.bind(fp);
     fp.add = async (...args: Parameters<FlowProducer["add"]>) => {
+      bindJobAuditMetadata(args[0]?.data as ToolJobData | undefined);
       try {
         return await rawAdd(...args);
       } catch (err: unknown) {
@@ -267,6 +269,8 @@ export async function upsertToolJobAlias(args: {
  * Returns the BullMQ Job instance.
  */
 export async function enqueueToolJob(data: ToolJobData): Promise<Job<ToolJobData, ToolJobResult>> {
+  bindJobAuditMetadata(data);
+
   // Per-user concurrency cap for single-file AI jobs (kind "ai-tool"). Checked
   // before the row insert so a rejected request leaves no job behind. Batch and
   // pipeline AI use other kinds and are intentionally not capped here.

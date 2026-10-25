@@ -739,6 +739,37 @@ describe("createToolRoute", () => {
       );
     });
 
+    it("does not double-emit TOOL_EXECUTED in the sync-200 branch when the worker already audited the job (#3973)", async () => {
+      vi.mocked(isToolAuditEnabled).mockResolvedValueOnce(true);
+      vi.mocked(waitForJob).mockResolvedValueOnce({
+        outputRefs: ["outputs/mock-job/result.png"],
+        filename: "result.png",
+        contentType: "image/png",
+        originalSize: 100,
+        processedSize: 80,
+        audited: true,
+      });
+      const app = createMockApp();
+      const id = "resize";
+      createToolRoute(app as never, makeMockConfig(id));
+      const handler = app.routes[apiToolPath(id)];
+      const reply = createMockReply();
+      const req = createMockRequest({
+        fileBuffer: Buffer.from("png-data"),
+        settings: JSON.stringify({ format: "webp" }),
+      });
+
+      await handler(req, reply);
+
+      expect(enqueueToolJob).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "user-1",
+          username: "test",
+        }),
+      );
+      expect(auditDispatch).not.toHaveBeenCalled();
+    });
+
     it("keeps the upload when enqueue fails after the jobs row was written", async () => {
       vi.mocked(enqueueToolJob).mockRejectedValueOnce(new Error("queue add failed"));
       const restore = answerJobRowLookup([{ id: "row" }]);

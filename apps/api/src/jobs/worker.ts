@@ -89,6 +89,11 @@ import { SCRUB_PDF_PRODUCER_TOOLS, scrubPdfProducer } from "../lib/pdf-producer.
 import { resolveCanonicalToolId } from "../lib/pool.js";
 import { setSettingIfAbsent } from "../lib/settings-helpers.js";
 import { timeoutMessage } from "../lib/timeout.js";
+import {
+  emitWorkerBatchAudit,
+  emitWorkerPipelineAudit,
+  emitWorkerToolAudit,
+} from "../lib/tool-audit.js";
 import { InputValidationError } from "../modality/contract.js";
 import {
   cancelBatchJob,
@@ -878,6 +883,29 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
       // Record Prometheus metrics
       jobsTotal.inc({ pool: data.pool, status: "completed" });
       jobDuration.observe({ pool: data.pool }, durationMs / 1000);
+
+      if (data.kind === "tool" || data.kind === "ai-tool") {
+        const inputFileCount = inputs.length > 0 ? inputs.length : data.inputRefs.length;
+        const totalInputSize =
+          inputs.length > 0
+            ? inputs.reduce((sum, item) => sum + item.buffer.length, 0)
+            : originalSize;
+        const settingsObj =
+          typeof data.settings === "object" && data.settings !== null
+            ? (data.settings as Record<string, unknown>)
+            : null;
+        const outputFormat =
+          (settingsObj?.format as string | undefined) ??
+          (settingsObj?.outputFormat as string | undefined) ??
+          null;
+        jobResult.audited = await emitWorkerToolAudit({
+          data,
+          inputFileCount,
+          totalInputSize,
+          outputFormat,
+          durationMs,
+        });
+      }
 
       // Analytics: emit tool_used on success
       if (analyticsEnabled()) {
@@ -1902,6 +1930,17 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
     );
   }
 
+  if (!data.parentId) {
+    await emitWorkerPipelineAudit({
+      data,
+      totalSteps,
+      steps: steps.map((s) => s.toolId),
+      totalInputSize: firstBytesIn,
+      processedSize: lastBytesOut,
+      durationMs: Date.now() - startTime,
+    });
+  }
+
   return result;
 }
 
@@ -2226,6 +2265,7 @@ async function fallbackPipelineChildError(
  */
 async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResult> {
   const data = job.data;
+  const startTime = Date.now();
   const settings = (data.settings ?? {}) as {
     flowChildCount?: number;
     fileIndexMap?: number[];
@@ -2562,6 +2602,14 @@ async function processBatchFinalize(job: Job<ToolJobData>): Promise<ToolJobResul
       outputRefs: [zipKey],
       bytesOut: zipSize,
       result,
+    });
+    await emitWorkerBatchAudit({
+      data,
+      totalFiles,
+      completedFiles: successEntries.length,
+      failedFiles,
+      processedSize: zipSize,
+      durationMs: Date.now() - startTime,
     });
   }
 
