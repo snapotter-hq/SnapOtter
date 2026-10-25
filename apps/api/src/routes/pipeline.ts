@@ -2130,7 +2130,11 @@ export async function registerPipelineRoutes(app: FastifyInstance): Promise<void
         } finally {
           request.raw.removeListener("aborted", abortIngress);
           await Promise.all(
-            [...uncommittedOcrKeys].map((key) => deleteObject(key).catch(() => {})),
+            [...uncommittedOcrKeys].map((key) =>
+              deleteObject(key).catch((cleanupErr) => {
+                request.log.warn({ err: cleanupErr, key }, "pipeline batch ingress cleanup failed");
+              }),
+            ),
           );
         }
       });

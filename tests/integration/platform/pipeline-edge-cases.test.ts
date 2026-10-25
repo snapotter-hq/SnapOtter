@@ -11,6 +11,7 @@ import { ffmpegAvailable } from "@snapotter/media-engine";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
+import * as objectStorage from "../../../apps/api/src/lib/object-storage.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
   buildTestApp,
@@ -1245,6 +1246,52 @@ describe("Pipeline OCR step ingress gating", () => {
     expect(json.error).toMatch(/all files failed/i);
     expect(json.errors).toHaveLength(1);
     expect(json.errors[0].filename).toBe("junk.jpg");
+  });
+
+  it("logs a warning when OCR ingress cleanup fails (#1723)", async () => {
+    const deleteSpy = vi
+      .spyOn(objectStorage, "deleteObject")
+      .mockRejectedValue(new Error("Cleanup failed"));
+    const putSpy = vi
+      .spyOn(objectStorage, "putObject")
+      .mockRejectedValue(new Error("Storage failed"));
+
+    try {
+      const res = await executeBatch([{ filename: "good.png", content: PNG_200x150 }], {
+        steps: [{ toolId: "ocr", settings: { quality: "fast" } }],
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(deleteSpy).toHaveBeenCalled();
+    } finally {
+      putSpy.mockRestore();
+      deleteSpy.mockRestore();
+    }
+  });
+
+  it("logs a warning when OCR ingress cleanup fails (#1723)", async () => {
+    // We mock deleteObject to reject to trigger the warning logic
+    const deleteSpy = vi
+      .spyOn(objectStorage, "deleteObject")
+      .mockRejectedValue(new Error("Cleanup failed"));
+    const putSpy = vi
+      .spyOn(objectStorage, "putObject")
+      .mockRejectedValue(new Error("Storage failed"));
+
+    try {
+      const res = await executeBatch([{ filename: "good.png", content: PNG_200x150 }], {
+        steps: [{ toolId: "ocr", settings: { quality: "fast" } }],
+      });
+
+      // The route should answer 500 because putObject throws and it's an unhandled storage failure
+      expect(res.statusCode).toBe(500);
+
+      // deleteObject should have been called in the finally block
+      expect(deleteSpy).toHaveBeenCalled();
+    } finally {
+      putSpy.mockRestore();
+      deleteSpy.mockRestore();
+    }
   });
 });
 
