@@ -20,15 +20,25 @@ import { useFeaturesStore } from "@/stores/features-store";
 export function formatTimeRemaining(ms: number, t: TranslationKeys, locale: string): string {
   if (ms < 60000) return t.features.lessThanMinute;
   const mins = Math.round(ms / 60000);
-  const rule = new Intl.PluralRules(locale).select(mins);
-  if (rule === "one") return format(t.features.oneMinuteLeft, { mins });
-  if (rule === "two") return format(t.features.minutesLeftTwo, { mins });
-  if (rule === "few") return format(t.features.minutesLeftFew, { mins });
+
+  let rule = "other";
+  try {
+    rule = new Intl.PluralRules(locale).select(mins);
+  } catch (err) {
+    // If the locale is invalid or unsupported, fallback to default 'other' behavior
+    console.error(`Invalid locale for PluralRules: ${locale}`, err);
+  }
+
+  if (rule === "one" && t.features.oneMinuteLeft) return format(t.features.oneMinuteLeft, { mins });
+  if (rule === "two" && t.features.minutesLeftTwo)
+    return format(t.features.minutesLeftTwo, { mins });
+  if (rule === "few" && t.features.minutesLeftFew)
+    return format(t.features.minutesLeftFew, { mins });
   return format(t.features.minutesLeft, { mins });
 }
 
 export function AiFeaturesSection() {
-  const { t, locale } = useTranslation();
+  const { t } = useTranslation();
   const {
     bundles,
     fetch,
@@ -143,7 +153,7 @@ function ResetEnvironmentSection({
   venvKept: boolean;
   onResetDone: () => void;
 }) {
-  const { t, locale } = useTranslation();
+  const { t } = useTranslation();
   const [confirming, setConfirming] = useState(false);
   const [resetting, setResetting] = useState(false);
 
@@ -227,7 +237,7 @@ function ResetEnvironmentSection({
 }
 
 function ImportBundleSection({ onImported }: { onImported: () => void }) {
-  const { t, locale } = useTranslation();
+  const { t } = useTranslation();
   const [mode, setMode] = useState<"ocr" | "legacy">("ocr");
   const [importing, setImporting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(
