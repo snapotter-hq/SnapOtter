@@ -105,7 +105,9 @@ export function failedAnswerMessage(
 ): string {
   if (status === 413) return t.errors.fileTooLarge;
   if (!body || typeof body !== "object" || Array.isArray(body)) return fallback;
-  const parsed = parseApiError(body as Record<string, unknown>, status, fallback);
+  const record = body as Record<string, unknown>;
+  if (record.canceled === true) return t.errors.canceled;
+  const parsed = parseApiError(record, status, fallback);
   if (typeof parsed === "string") return parsed;
   return parsed.type === "feature_incompatible"
     ? featureIncompatibleMessage(t, parsed)

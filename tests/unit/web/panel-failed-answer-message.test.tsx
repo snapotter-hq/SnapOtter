@@ -172,6 +172,18 @@ describe("parseApiError and failedAnswerMessage", () => {
       ),
     ).toBe(de.toolSettings.ocr.fastKoreanUnsupported);
   });
+
+  it("turns a structural canceled: true response into the translated canceled message (#4009)", () => {
+    expect(failedAnswerMessage(de, { error: "Canceled", canceled: true }, STATUS, FALLBACK)).toBe(
+      de.errors.canceled,
+    );
+    expect(
+      failedAnswerMessage(de, { error: "Batch canceled", canceled: true }, STATUS, FALLBACK),
+    ).toBe(de.errors.canceled);
+    expect(failedAnswerMessage(de, { error: "Bad file", canceled: false }, STATUS, FALLBACK)).toBe(
+      "Bad file",
+    );
+  });
 });
 
 // ── Panels ──────────────────────────────────────────────────────
@@ -721,6 +733,35 @@ describe.each(PANELS)("$panel: a 413", (row) => {
   });
 });
 
+describe.each(
+  PANELS.filter(
+    (row) =>
+      row.panel === "sign-pdf" ||
+      row.panel === "erase-object (one file)" ||
+      row.panel === "erase-object (several files)",
+  ),
+)("$panel: a canceled sync 422 (#4009)", (row) => {
+  it.each([
+    ["the standard Canceled message", { error: "Canceled", canceled: true }],
+    ["a non-Canceled server string", { error: "Batch canceled", canceled: true }],
+  ])("shows %s as the translated canceled message", async (_label, body) => {
+    answer = { status: STATUS, body };
+    await row.start();
+    await waitFor(() => expect(FakeXhr.instances.length).toBeGreaterThan(0));
+    FakeXhr.instances[0].respond(STATUS, body);
+
+    if (row.shown) {
+      await waitFor(() => expect(row.shown?.()).toBe(de.errors.canceled), { timeout: 3000 });
+    } else {
+      await waitFor(() => expect(screen.getByText(de.errors.canceled)).toBeInTheDocument(), {
+        timeout: 3000,
+      });
+    }
+    expect(document.body.textContent).not.toContain("Canceled");
+    expect(document.body.textContent).not.toContain("Batch canceled");
+  });
+});
+
 describe("ocr: a failed answer", () => {
   it.each([
     ...answers(`Failed: ${STATUS}`),
@@ -779,6 +820,19 @@ describe("ocr: a failed answer", () => {
     await expect(run).rejects.toThrow(
       format(de.errors.featureIncompatible, { feature: de.featureBundles.ocr.name }),
     );
+  });
+
+  it("rejects a canceled sync 422 with the canceled message in the locale it was given (#4009)", async () => {
+    const run = ocrOneFile(
+      image("scan.png"),
+      { quality: "fast", language: "en", enhance: false },
+      { onUploadProgress: vi.fn(), onProcessingProgress: vi.fn() },
+      { t: de },
+    );
+    await waitFor(() => expect(FakeXhr.instances.length).toBeGreaterThan(0));
+    FakeXhr.instances[0].respond(422, { error: "Canceled", canceled: true });
+
+    await expect(run).rejects.toThrow(de.errors.canceled);
   });
 
   it.each([

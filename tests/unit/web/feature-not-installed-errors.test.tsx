@@ -512,6 +512,22 @@ describe("processing hook errors are translated (#1436, #1923)", () => {
     });
     expect(useFileStore.getState().error).toBe(deErrors.noFilesSelected);
 
+    // #4009: a canceled sync 422 normalizes body.canceled === true to the
+    // "Canceled" store sentinel so the hook exposes t.tools.processing.canceled.
+    act(() => {
+      view.result.current.value.processFiles([file], {});
+    });
+    act(() => {
+      const latestXhr = xhrs.at(-1);
+      if (!latestXhr) throw new Error("expected XHR instance");
+      latestXhr.status = 422;
+      latestXhr.responseText = JSON.stringify({ error: "Batch canceled", canceled: true });
+      latestXhr.onload?.();
+    });
+    expect(useFileStore.getState().error).toBe("Canceled");
+    expect(useFileStore.getState().entries[0]?.error).toBe("Canceled");
+    expect(view.result.current.value.error).toBe(de.tools.processing.canceled);
+
     view.unmount();
   });
 

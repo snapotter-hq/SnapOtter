@@ -176,6 +176,26 @@ describe("useToolProcessor single-file failure settle (#799)", () => {
     unmount();
   });
 
+  it("settles a canceled sync 422 structurally to the Canceled sentinel (#4009)", () => {
+    const { unmount } = startRun();
+
+    act(() => {
+      xhrs[0].status = 422;
+      xhrs[0].responseText = JSON.stringify({ error: "Batch canceled", canceled: true });
+      xhrs[0].onload?.();
+    });
+
+    expect(useFileStore.getState().entries[0]).toMatchObject({
+      status: "failed",
+      error: "Canceled",
+      processedUrl: null,
+    });
+    expect(useFileStore.getState().error).toBe("Canceled");
+    expect(useFileStore.getState().processing).toBe(false);
+
+    unmount();
+  });
+
   // #1341: a 413 reads the same to the user whether our API or a reverse
   // proxy sent it, and in their language, not "error" or "Processing failed".
   it.each([

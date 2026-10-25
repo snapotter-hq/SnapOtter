@@ -1592,17 +1592,24 @@ export function useToolProcessor(toolId: string) {
             let message: string;
             try {
               const body = JSON.parse(xhr.responseText);
-              const parsed = parseApiError(
-                body,
-                xhr.status,
-                format(t.errors.processingFailedWithStatus, { status: xhr.status }),
-              );
-              if (typeof parsed === "object" && parsed.type === "feature_not_installed") {
-                message = featureNotInstalledMessage(t, parsed, toolName);
-              } else if (typeof parsed === "object" && parsed.type === "feature_incompatible") {
-                message = featureIncompatibleMessage(t, parsed);
+              // Store the canonical "Canceled" sentinel so displayStoredError
+              // translates it in the active locale, matching the batch and
+              // pipeline paths (#1436, #4009).
+              if ((body as { canceled?: boolean } | null)?.canceled === true) {
+                message = "Canceled";
               } else {
-                message = parsed as string;
+                const parsed = parseApiError(
+                  body,
+                  xhr.status,
+                  format(t.errors.processingFailedWithStatus, { status: xhr.status }),
+                );
+                if (typeof parsed === "object" && parsed.type === "feature_not_installed") {
+                  message = featureNotInstalledMessage(t, parsed, toolName);
+                } else if (typeof parsed === "object" && parsed.type === "feature_incompatible") {
+                  message = featureIncompatibleMessage(t, parsed);
+                } else {
+                  message = parsed as string;
+                }
               }
             } catch {
               message = format(t.errors.processingFailedWithStatus, { status: xhr.status });
