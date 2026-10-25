@@ -13,7 +13,7 @@ import { jobFailureMessage, parseResultBody, reportMalformedResult } from "@/lib
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { runEndWrites } from "@/lib/run-teardown";
 import { createXhrWatchdog, type XhrWatchdog } from "@/lib/xhr-watchdog";
-import { useFileStore } from "@/stores/file-store";
+import { displayStoredError, useFileStore } from "@/stores/file-store";
 
 type Direction = "horizontal" | "vertical" | "grid";
 type ResizeMode = "fit" | "original" | "stretch" | "crop";
@@ -312,7 +312,10 @@ export function StitchSettings() {
   };
 
   const hasEnoughFiles = files.length >= 2;
-  const displayError = currentEntry?.error ?? error;
+  const displayError = displayStoredError(
+    currentEntry?.error ?? error,
+    t.tools.processing.canceled,
+  );
   const downloadUrl =
     currentEntry && currentEntry.processedUrl !== null
       ? (downloadByEntry[currentEntry.id] ?? null)

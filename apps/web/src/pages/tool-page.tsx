@@ -69,7 +69,7 @@ import { useBase64Store } from "@/stores/base64-store";
 import { useCollageStore } from "@/stores/collage-store";
 import { useDuplicateStore } from "@/stores/duplicate-store";
 import { useFeaturesStore } from "@/stores/features-store";
-import { type FileEntry, useFileStore } from "@/stores/file-store";
+import { displayStoredError, type FileEntry, useFileStore } from "@/stores/file-store";
 import { useHtmlToImageStore } from "@/stores/html-to-image-store";
 import { useMemeStore } from "@/stores/meme-store";
 import { useMultiToolStore } from "@/stores/multi-tool-store";
@@ -1188,7 +1188,8 @@ function ToolPageContent({
           <div className="m-auto text-center max-w-sm">
             <AlertCircle className="mx-auto h-10 w-10 text-destructive mb-3" />
             <p className="font-medium text-foreground mb-1">
-              {currentEntry.error || t.toolPage.processingFailed}
+              {displayStoredError(currentEntry.error, t.tools.processing.canceled) ||
+                t.toolPage.processingFailed}
             </p>
             <p className="text-sm text-muted-foreground mb-4">{t.toolPage.settingsSaved}</p>
             <div className="flex flex-col gap-2">

@@ -29,7 +29,7 @@ import { runEndWrites } from "@/lib/run-teardown";
 import { MULTI_FILE_TOOLS } from "@/lib/tool-display-modes";
 import { getToolName } from "@/lib/tool-i18n";
 import { generateId } from "@/lib/utils";
-import { useFileStore } from "@/stores/file-store";
+import { displayStoredError, useFileStore } from "@/stores/file-store";
 
 interface ProcessResult {
   jobId: string;
@@ -2506,7 +2506,7 @@ export function useToolProcessor(toolId: string) {
     processAllFiles,
     cancelCurrentJob,
     processing,
-    error: error === "Canceled" ? t.tools.processing.canceled : error,
+    error: displayStoredError(error, t.tools.processing.canceled),
     warning: hasResultEntry ? warning : null,
     downloadUrl: processedUrl,
     originalSize,

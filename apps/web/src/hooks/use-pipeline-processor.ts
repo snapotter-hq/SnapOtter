@@ -18,7 +18,7 @@ import {
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { runEndWrites } from "@/lib/run-teardown";
 import { generateId } from "@/lib/utils";
-import { useFileStore } from "@/stores/file-store";
+import { displayStoredError, useFileStore } from "@/stores/file-store";
 import type { PipelineStep } from "@/stores/pipeline-store";
 
 interface ProcessResult {
@@ -1739,7 +1739,7 @@ export function usePipelineProcessor() {
     processAll,
     cancelCurrentJob,
     processing,
-    error,
+    error: displayStoredError(error, t.tools.processing.canceled),
     downloadUrl: processedUrl,
     originalSize,
     processedSize,

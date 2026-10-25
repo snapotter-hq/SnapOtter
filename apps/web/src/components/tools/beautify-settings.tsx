@@ -13,7 +13,7 @@ import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { FeedbackCategoryError, feedbackCategoryOf } from "@/lib/feedback";
 import { format } from "@/lib/format";
-import { useFileStore } from "@/stores/file-store";
+import { displayStoredError, useFileStore } from "@/stores/file-store";
 
 // -- Preset types -----------------------------------------------------------
 
@@ -1416,7 +1416,10 @@ export function BeautifySettings({
   const hasFile = files.length > 0;
   const isImageBg = settings.backgroundType === "image";
   const isProcessing = processing || manualProcessing;
-  const displayError = currentEntry?.error ?? error;
+  const displayError = displayStoredError(
+    currentEntry?.error ?? error,
+    t.tools.processing.canceled,
+  );
   const manualDownloadUrl =
     currentEntry && currentEntry.processedUrl !== null
       ? (manualDownloadByEntry[currentEntry.id] ?? null)

@@ -9,7 +9,7 @@ import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { FeedbackCategoryError, feedbackCategoryOf } from "@/lib/feedback";
 import { format } from "@/lib/format";
-import { useFileStore } from "@/stores/file-store";
+import { displayStoredError, useFileStore } from "@/stores/file-store";
 
 interface ComposeEntryResult {
   downloadUrl: string;
@@ -216,7 +216,10 @@ export function ComposeSettings() {
   };
 
   const hasFile = files.length > 0;
-  const displayError = currentEntry?.error ?? error;
+  const displayError = displayStoredError(
+    currentEntry?.error ?? error,
+    t.tools.processing.canceled,
+  );
   const activeEntryResult =
     currentEntry && currentEntry.processedUrl !== null
       ? resultsByEntry[currentEntry.id]

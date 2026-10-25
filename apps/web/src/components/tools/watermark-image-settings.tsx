@@ -11,7 +11,7 @@ import { FeedbackCategoryError, feedbackCategoryOf } from "@/lib/feedback";
 import { format } from "@/lib/format";
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { runEndWrites } from "@/lib/run-teardown";
-import { useFileStore } from "@/stores/file-store";
+import { displayStoredError, useFileStore } from "@/stores/file-store";
 
 type Position = "center" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
@@ -419,7 +419,10 @@ export function WatermarkImageSettings() {
   };
 
   const hasFile = files.length > 0;
-  const displayError = currentEntry?.error ?? error;
+  const displayError = displayStoredError(
+    currentEntry?.error ?? error,
+    t.tools.processing.canceled,
+  );
   const activeEntryResult =
     currentEntry && currentEntry.processedUrl !== null
       ? resultsByEntry[currentEntry.id]

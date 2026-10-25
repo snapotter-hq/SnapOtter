@@ -28,7 +28,7 @@ import {
 import { generateId } from "@/lib/utils";
 import { safeRandomUUID } from "@/lib/uuid";
 import { createXhrWatchdog, type XhrWatchdog } from "@/lib/xhr-watchdog";
-import { useFileStore } from "@/stores/file-store";
+import { displayStoredError, useFileStore } from "@/stores/file-store";
 import type { SignCanvasRef } from "./sign-canvas";
 import { SignaturePad } from "./signature-pad";
 
@@ -720,7 +720,10 @@ export function SignPdfSettings({ signProps }: { signProps?: SignProps }) {
   const error = localError && localError.entryId === currentEntry?.id ? localError.message : null;
   const isStale = staleEntryId !== null && staleEntryId === currentEntry?.id;
   const effectiveDownloadUrl = isStale ? null : (downloadUrl ?? currentEntry?.processedUrl ?? null);
-  const shownError = error ?? currentEntry?.error ?? storeError;
+  const shownError = displayStoredError(
+    error ?? currentEntry?.error ?? storeError,
+    t.tools.processing.canceled,
+  );
 
   return (
     <div className="space-y-4">

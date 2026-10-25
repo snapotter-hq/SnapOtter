@@ -40,6 +40,19 @@ export function previewKindFor(modality: Modality): PreviewKind {
 }
 
 /**
+ * `useToolProcessor` and `usePipelineProcessor` write `"Canceled"` to
+ * `error` and `entry.error` as a cancellation sentinel. Translate that
+ * sentinel at the display boundary while keeping the raw store value intact.
+ */
+export function displayStoredError(
+  error: string | null | undefined,
+  canceledLabel: string,
+): string | null {
+  if (error == null) return null;
+  return error === "Canceled" ? canceledLabel : error;
+}
+
+/**
  * What the server said about one result beyond the file itself (#1292): compress
  * scaled the image down to fit (resizedTo), and the target-size verdict from
  * compress and compress-pdf (targetKb, targetMet). Set per file by single runs

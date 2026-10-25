@@ -50,7 +50,7 @@ import { format, plural } from "@/lib/format";
 import { reportRunEndFailure } from "@/lib/run-end-report";
 import { runEndWrites } from "@/lib/run-teardown";
 import { cn } from "@/lib/utils";
-import { useFileStore } from "@/stores/file-store";
+import { displayStoredError, useFileStore } from "@/stores/file-store";
 import { type SavedPipeline, usePipelineStore } from "@/stores/pipeline-store";
 
 const MediaPlayerView = lazy(() =>
@@ -1004,7 +1004,8 @@ function AutomatePageContent({
             {hasFile && !hasProcessed && currentEntry?.status === "failed" && (
               <div className="mb-3 rounded-lg border border-border p-3 text-center">
                 <p className="text-sm text-destructive-ink">
-                  {currentEntry.error ?? t.toolPage.processingFailed}
+                  {displayStoredError(currentEntry.error, t.tools.processing.canceled) ??
+                    t.toolPage.processingFailed}
                 </p>
               </div>
             )}
@@ -1614,7 +1615,8 @@ function AutomatePageContent({
                     {hasFile && !hasProcessed && currentEntry?.status === "failed" && (
                       <div className="flex flex-col items-center justify-center gap-2 h-full text-center px-4">
                         <p className="text-sm text-destructive-ink">
-                          {currentEntry.error ?? t.toolPage.processingFailed}
+                          {displayStoredError(currentEntry.error, t.tools.processing.canceled) ??
+                            t.toolPage.processingFailed}
                         </p>
                       </div>
                     )}
