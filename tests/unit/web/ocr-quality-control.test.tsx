@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
-import type { FeatureBundleState } from "@snapotter/shared";
+import { en, type FeatureBundleState } from "@snapotter/shared";
+import { de } from "@snapotter/shared/i18n/de.js";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,7 +10,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const useAuth = vi.hoisted(() => vi.fn());
 vi.mock("@/hooks/use-auth", () => ({ useAuth }));
 
+const storage = vi.hoisted(() => new Map<string, string>());
+vi.stubGlobal("localStorage", {
+  getItem: (k: string) => storage.get(k) ?? null,
+  setItem: (k: string, v: string) => void storage.set(k, v),
+  removeItem: (k: string) => void storage.delete(k),
+  clear: () => storage.clear(),
+});
+
 import { OcrQualityControl, useOcrQuality } from "@/components/tools/ocr-quality-control";
+import { I18nProvider } from "@/contexts/i18n-context";
+import { format } from "@/lib/format";
 import { useFeaturesStore } from "@/stores/features-store";
 
 function ocrBundle(overrides: Partial<FeatureBundleState> = {}): FeatureBundleState {
@@ -51,6 +62,7 @@ function Harness({ initialLanguage = "auto" }: { initialLanguage?: string }) {
 }
 
 beforeEach(() => {
+  storage.clear();
   useAuth.mockReturnValue({ hasPermission: () => true });
   useFeaturesStore.setState({
     bundles: [ocrBundle()],
@@ -168,5 +180,92 @@ describe("OCR optional accurate pack control", () => {
     fireEvent.click(screen.getByRole("button", { name: "Toggle Korean" }));
     expect(screen.getByTestId("quality")).toHaveTextContent("fast");
     expect(screen.getByRole("button", { name: "Fast" })).toBeEnabled();
+  });
+
+  it("renders the localized incompatible message instead of raw compatibilityReason slug on incompatible hosts (#3995)", async () => {
+    useFeaturesStore.setState({
+      bundles: [
+        ocrBundle({
+          compatibility: "incompatible",
+          compatibilityReason: "unsupported-host",
+          missingDownloadBytes: null,
+          error: null,
+        }),
+      ],
+    });
+    storage.set("snapotter-locale", "de");
+
+    render(
+      <I18nProvider>
+        <Harness />
+      </I18nProvider>,
+    );
+
+    const balancedButton = await screen.findByRole("button", {
+      name: de.toolSettings["remove-gif-background"].qualityBalanced,
+    });
+    fireEvent.click(balancedButton);
+
+    const expected = format(de.errors.featureIncompatible, {
+      feature: de.featureBundles.ocr.name,
+    });
+    expect(screen.getByText(expected)).toBeInTheDocument();
+    expect(screen.queryByText("unsupported-host")).toBeNull();
+    expect(
+      screen.queryByRole("button", {
+        name: format(de.features.enableButton, { name: de.featureBundles.ocr.name }),
+      }),
+    ).toBeNull();
+  });
+
+  it("preserves explicit bundle.error when an incompatible bundle carries one", () => {
+    const explicitError =
+      "Accurate OCR requires 4 GiB configured memory, but this container has 3 GiB; Fast OCR remains available";
+    useFeaturesStore.setState({
+      bundles: [
+        ocrBundle({
+          compatibility: "incompatible",
+          compatibilityReason: "insufficient-memory",
+          missingDownloadBytes: null,
+          error: explicitError,
+        }),
+      ],
+    });
+
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Best" }));
+
+    expect(screen.getByText(explicitError)).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        format(en.errors.featureIncompatible, { feature: en.featureBundles.ocr.name }),
+      ),
+    ).toBeNull();
+  });
+
+  it("shows non-admin guidance instead of the install button when the user lacks features:manage", () => {
+    useAuth.mockReturnValue({ hasPermission: () => false });
+
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Balanced" }));
+
+    expect(screen.getByText(en.features.notEnabledDescription)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Enable OCR/ })).toBeNull();
+  });
+
+  it("disables the install button while installing or queued and renders installError", () => {
+    useFeaturesStore.setState({
+      installing: { ocr: { percent: 45, stage: "downloading" } },
+      errors: { ocr: "Disk full" },
+    });
+
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Balanced" }));
+
+    const installButton = screen.getByRole("button", {
+      name: en.settings.aiFeatures.installing,
+    });
+    expect(installButton).toBeDisabled();
+    expect(screen.getByText("Disk full")).toBeInTheDocument();
   });
 });

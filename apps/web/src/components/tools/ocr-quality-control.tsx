@@ -3,7 +3,7 @@ import { Download, Loader2 } from "lucide-react";
 import { useCallback, useId, useState } from "react";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
-import { bundleName } from "@/lib/bundle-i18n";
+import { bundleName, featureIncompatibleMessage } from "@/lib/bundle-i18n";
 import { format, formatFileSize } from "@/lib/format";
 import { useFeaturesStore } from "@/stores/features-store";
 
@@ -120,7 +120,12 @@ export function OcrQualityControl({
         <div className="rounded-lg border border-border bg-muted/40 p-3 text-start">
           <p className="text-xs text-muted-foreground">
             {incompatible
-              ? (bundle?.error ?? bundle?.compatibilityReason ?? t.features.notEnabledDescription)
+              ? (bundle?.error ??
+                featureIncompatibleMessage(t, {
+                  feature: bundle?.id ?? "ocr",
+                  featureName: bundle?.name ?? t.tools.ocr.name,
+                  compatibilityReason: bundle?.compatibilityReason ?? undefined,
+                }))
               : format(t.features.requiresDownload, { size })}
           </p>
           {!incompatible && isAdmin && (
