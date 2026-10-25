@@ -68,6 +68,7 @@ import {
 } from "../../../apps/api/src/modality/image-input.js";
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
+import { registerBarcodeGenerate } from "../../../apps/api/src/routes/tools/barcode-generate.js";
 import { registerBeautify } from "../../../apps/api/src/routes/tools/beautify.js";
 import { registerColorPalette } from "../../../apps/api/src/routes/tools/color-palette.js";
 import { registerCompare } from "../../../apps/api/src/routes/tools/compare.js";
@@ -639,6 +640,15 @@ describe("json-bodied routes", () => {
 
   const cases = [
     {
+      name: "barcode-generate",
+      register: registerBarcodeGenerate,
+      url: "/api/v1/tools/image/barcode-generate",
+      payload: { text: "12345678", type: "code128" },
+      fail: putObject,
+      status: 400,
+      error: "Invalid text for this barcode type: bad input",
+    },
+    {
       name: "qr-generate",
       register: registerQrGenerate,
       url: "/api/v1/tools/image/qr-generate",
@@ -666,7 +676,8 @@ describe("json-bodied routes", () => {
   ];
 
   for (const c of cases) {
-    it(`${c.name} surfaces a storage 503 with its code instead of answering 422`, async () => {
+    const fallbackStatus = c.status ?? 422;
+    it(`${c.name} surfaces a storage 503 with its code instead of answering ${fallbackStatus}`, async () => {
       c.setup?.();
       c.fail.mockImplementation(async () => {
         throw storageDown();
@@ -678,14 +689,14 @@ describe("json-bodied routes", () => {
       expect(c.fail).toHaveBeenCalled();
     });
 
-    it(`${c.name} still answers 422 for an ordinary failure`, async () => {
+    it(`${c.name} still answers ${fallbackStatus} for an ordinary failure`, async () => {
       c.setup?.();
       c.fail.mockImplementation(async () => {
         throw new Error("bad input");
       });
       app = await buildApp(c.register);
       const res = await app.inject({ method: "POST", url: c.url, payload: c.payload });
-      expect(res.statusCode).toBe(422);
+      expect(res.statusCode).toBe(fallbackStatus);
       expect(res.json().error).toBe(c.error);
       expect(c.fail).toHaveBeenCalled();
     });
@@ -875,6 +886,68 @@ describe("json-bodied routes", () => {
     });
     expect(res.statusCode).toBe(503);
     expect(res.json().code).toBe("STORAGE_UNAVAILABLE");
+  });
+
+  it("barcode-generate surfaces 507/503 storage and OOM faults and strips internal paths from 400 error messages (#4050)", async () => {
+    putObject
+      .mockRejectedValueOnce(storageFull())
+      .mockRejectedValueOnce(
+        Object.assign(new Error("ENOSPC: no space left on device, open '/tmp/barcode.png'"), {
+          code: "ENOSPC",
+          syscall: "open",
+        }),
+      )
+      .mockRejectedValueOnce(
+        Object.assign(new Error("EACCES: permission denied, open '/tmp/barcode.png'"), {
+          code: "EACCES",
+          syscall: "open",
+        }),
+      )
+      .mockRejectedValueOnce(new RangeError("Array buffer allocation failed"))
+      .mockRejectedValueOnce(new DecoderUnavailableError("No barcode engine found."))
+      .mockRejectedValueOnce(new Error("bwip-js failed on /tmp/secret/in.png\nsecond line"));
+
+    const builtApp = await buildApp(registerBarcodeGenerate);
+    app = builtApp;
+    const send = () =>
+      builtApp.inject({
+        method: "POST",
+        url: "/api/v1/tools/image/barcode-generate",
+        payload: { text: "12345678", type: "code128" },
+      });
+
+    const fullRes = await send();
+    expect(fullRes.statusCode).toBe(507);
+    expect(fullRes.json().code).toBe("WORKSPACE_FULL");
+
+    const enospcRes = await send();
+    expect(enospcRes.statusCode).toBe(503);
+    expect(enospcRes.json().code).toBe("storage-full");
+
+    const eaccesRes = await send();
+    expect(eaccesRes.statusCode).toBe(503);
+    expect(eaccesRes.json().code).toBe("storage-not-writable");
+
+    const oomRes = await send();
+    expect(oomRes.statusCode).toBe(503);
+    expect(oomRes.json()).toEqual({
+      error:
+        "The image decoder ran out of memory decoding this image, or was killed. The image may need more memory than this server has.",
+      code: "ENGINE_UNAVAILABLE",
+    });
+
+    const unavailRes = await send();
+    expect(unavailRes.statusCode).toBe(503);
+    expect(unavailRes.json()).toEqual({
+      error: "No barcode engine found.",
+      code: "ENGINE_UNAVAILABLE",
+    });
+
+    const clientRes = await send();
+    expect(clientRes.statusCode).toBe(400);
+    expect(clientRes.json()).toEqual({
+      error: "Invalid text for this barcode type: bwip-js failed on [internal]",
+    });
   });
 });
 

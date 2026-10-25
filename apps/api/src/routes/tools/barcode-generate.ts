@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { hasServerErrorStatus } from "@snapotter/shared";
 import bwipjs from "bwip-js/node";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { formatZodErrors } from "../../lib/errors.js";
-import { putObject } from "../../lib/object-storage.js";
+import { formatZodErrors, stripInternalPaths } from "../../lib/errors.js";
+import { asDecoderOutOfMemory, isDecoderUnavailable } from "../../lib/format-decoders.js";
+import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 
 const settingsSchema = z.object({
   text: z.string().min(1).max(256),
@@ -57,7 +59,11 @@ export function registerBarcodeGenerate(app: FastifyInstance) {
           processedSize: buffer.length,
         });
       } catch (err) {
-        const msg = err instanceof Error ? err.message.split("\n")[0] : "Unknown error";
+        const normalized = normalizeOperationalWriteError(asDecoderOutOfMemory(err));
+        if (isDecoderUnavailable(normalized) || hasServerErrorStatus(normalized)) throw normalized;
+        const msg = stripInternalPaths(
+          normalized instanceof Error ? normalized.message.split("\n")[0] : "Unknown error",
+        );
         return reply.status(400).send({
           error: `Invalid text for this barcode type: ${msg}`,
         });
