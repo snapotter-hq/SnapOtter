@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: 377cf113e7d8
+i18n_source_hash: f75ca08bcb71
 i18n_provenance: machine
-i18n_output_hash: 20bca441456c
+i18n_output_hash: 4107869b35fd
 i18n_hash_version: 2
 ---
 # Hesap Kurtarma {#account-recovery}
@@ -44,6 +44,30 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 Politika o kullanıcı için hâlâ MFA gerektiriyorsa, sonraki adımda kayıt duvarına toslar;
 bu yüzden `reset-mfa-policy` komutunu da çalıştırın, oturum açıp Ayarlar'dan yeniden kayıt olun.
 
+## Unutulan bir parolayı sıfırlayın {#reset-a-forgotten-password}
+
+```bash
+docker exec -it snapotter snapotter-admin reset-password <username> [password]
+```
+
+`[password]` değerini atlarsanız CLI oluşturulmuş geçici bir parola yazdırır. Her iki durumda da kullanıcının etkin oturumları, API anahtarları ve başarısız oturum açma kısıtlama penceresi temizlenir ve SnapOtter bir sonraki oturum açmada parola değişikliği ister.
+
+## Yeni bir yönetici hesabı oluşturun {#bootstrap-an-admin-account}
+
+```bash
+docker exec -it snapotter snapotter-admin create-admin [username] [password]
+```
+
+Mevcut hiçbir yönetici hesabı oturum açamadığında bunu kullanın. `[username]` varsayılan olarak `DEFAULT_USERNAME` (`admin`) değerini alır ve `[password]` değerini atlamak ilk oturum açmada değiştirilmesi gereken geçici bir parola yazdırır.
+
+## Kısıtlanmış veya devre dışı bırakılmış bir kullanıcının kilidini açın {#unlock-a-throttled-or-disabled-user}
+
+```bash
+docker exec -it snapotter snapotter-admin unlock-user <username>
+```
+
+Bu, Redis'teki `LOGIN_THROTTLED` penceresini temizler ve kullanıcı devre dışı bırakılmışsa hesabın rolünü geri yükler.
+
 ## Eski görüntüler ve yedek yöntemler {#older-images-and-fallbacks}
 
 `snapotter-admin` sarmalayıcısı var olmadan önce derlenmiş bir görüntüde betiği doğrudan
@@ -51,7 +75,7 @@ bu yüzden `reset-mfa-policy` komutunu da çalıştırın, oturum açıp Ayarlar
 
 ```bash
 docker exec -w /app/apps/api snapotter ./node_modules/.bin/tsx \
-  src/scripts/mfa-recover.ts reset-mfa-policy
+  src/scripts/admin-recovery.ts reset-mfa-policy
 ```
 
 Herhangi bir sürümde son çare olarak, politikayı veritabanında ayarlayın.

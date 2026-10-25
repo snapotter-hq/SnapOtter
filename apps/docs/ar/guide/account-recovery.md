@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: 377cf113e7d8
+i18n_source_hash: f75ca08bcb71
 i18n_provenance: machine
-i18n_output_hash: b9d87cca3805
+i18n_output_hash: ca1569b6566f
 i18n_hash_version: 2
 ---
 # استعادة الحساب {#account-recovery}
@@ -44,6 +44,30 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 إذا كانت السياسة لا تزال تتطلب MFA لذلك المستخدم، فسيصطدم بحاجز
 التسجيل بعد ذلك، لذا شغّل أيضًا `reset-mfa-policy`، وسجّل الدخول، وأعد التسجيل من الإعدادات.
 
+## إعادة تعيين كلمة مرور منسية {#reset-a-forgotten-password}
+
+```bash
+docker exec -it snapotter snapotter-admin reset-password <username> [password]
+```
+
+احذف `[password]` وسيطبع CLI كلمة مرور مؤقتة مُولَّدة. وفي كلتا الحالتين، تُمسح الجلسات النشطة للمستخدم ومفاتيح API ونافذة تقييد محاولات الدخول الفاشلة، ويطلب SnapOtter تغيير كلمة المرور عند تسجيل الدخول التالي.
+
+## إنشاء حساب مسؤول جديد {#bootstrap-an-admin-account}
+
+```bash
+docker exec -it snapotter snapotter-admin create-admin [username] [password]
+```
+
+استخدم هذا عندما يتعذر على أي حساب مسؤول حالي تسجيل الدخول. القيمة الافتراضية لـ `[username]` هي `DEFAULT_USERNAME` (`admin`)، وعند حذف `[password]` تُطبع كلمة مرور مؤقتة يجب تغييرها عند أول تسجيل دخول.
+
+## إلغاء قفل مستخدم مقيّد أو معطّل {#unlock-a-throttled-or-disabled-user}
+
+```bash
+docker exec -it snapotter snapotter-admin unlock-user <username>
+```
+
+يمسح هذا نافذة `LOGIN_THROTTLED` في Redis ويستعيد دور الحساب إذا كان المستخدم معطّلًا.
+
 ## الصور الأقدم والبدائل الاحتياطية {#older-images-and-fallbacks}
 
 على صورة بُنيت قبل وجود غلاف `snapotter-admin`، استدعِ السكربت
@@ -51,7 +75,7 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 
 ```bash
 docker exec -w /app/apps/api snapotter ./node_modules/.bin/tsx \
-  src/scripts/mfa-recover.ts reset-mfa-policy
+  src/scripts/admin-recovery.ts reset-mfa-policy
 ```
 
 كملاذ أخير على أي إصدار، اضبط السياسة في قاعدة البيانات. على

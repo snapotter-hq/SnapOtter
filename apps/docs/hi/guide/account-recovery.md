@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: 377cf113e7d8
+i18n_source_hash: f75ca08bcb71
 i18n_provenance: machine
-i18n_output_hash: 9f26790cedb2
+i18n_output_hash: 7a862c87bac1
 i18n_hash_version: 2
 ---
 # खाता पुनर्प्राप्ति {#account-recovery}
@@ -44,6 +44,30 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 अगर नीति में अब भी उस उपयोगकर्ता के लिए MFA आवश्यक है, तो वे आगे नामांकन
 दीवार से टकराएँगे, इसलिए `reset-mfa-policy` भी चलाएँ, लॉग इन करें और सेटिंग्स से फिर से नामांकन करें.
 
+## भूला हुआ पासवर्ड रीसेट करें {#reset-a-forgotten-password}
+
+```bash
+docker exec -it snapotter snapotter-admin reset-password <username> [password]
+```
+
+`[password]` छोड़ दें तो CLI एक जनरेट किया गया अस्थायी पासवर्ड प्रिंट करता है. दोनों ही स्थितियों में उपयोगकर्ता के सक्रिय सेशन, API कुंजियाँ और विफल लॉगिन थ्रॉटल विंडो साफ़ हो जाते हैं, और SnapOtter उनके अगले लॉगिन पर पासवर्ड बदलने की माँग करता है.
+
+## एडमिन खाता बूटस्ट्रैप करें {#bootstrap-an-admin-account}
+
+```bash
+docker exec -it snapotter snapotter-admin create-admin [username] [password]
+```
+
+जब कोई भी मौजूदा एडमिन खाता साइन इन न कर सके तब इसका उपयोग करें. `[username]` डिफ़ॉल्ट रूप से `DEFAULT_USERNAME` (`admin`) होता है, और `[password]` छोड़ने पर एक अस्थायी पासवर्ड प्रिंट होता है जिसे पहले लॉगिन पर बदलना आवश्यक है.
+
+## थ्रॉटल या निष्क्रिय किए गए उपयोगकर्ता को अनलॉक करें {#unlock-a-throttled-or-disabled-user}
+
+```bash
+docker exec -it snapotter snapotter-admin unlock-user <username>
+```
+
+यह Redis में `LOGIN_THROTTLED` विंडो को साफ़ करता है और यदि उपयोगकर्ता निष्क्रिय था तो खाते की भूमिका बहाल करता है.
+
 ## पुरानी इमेज और फ़ॉलबैक {#older-images-and-fallbacks}
 
 `snapotter-admin` रैपर के अस्तित्व में आने से पहले बनी किसी इमेज पर, स्क्रिप्ट को सीधे
@@ -51,7 +75,7 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 
 ```bash
 docker exec -w /app/apps/api snapotter ./node_modules/.bin/tsx \
-  src/scripts/mfa-recover.ts reset-mfa-policy
+  src/scripts/admin-recovery.ts reset-mfa-policy
 ```
 
 किसी भी संस्करण पर अंतिम उपाय के रूप में, नीति को डेटाबेस में सेट करें. ऑल-इन-वन

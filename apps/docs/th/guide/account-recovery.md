@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: 377cf113e7d8
+i18n_source_hash: f75ca08bcb71
 i18n_provenance: machine
-i18n_output_hash: effc484c9f1a
+i18n_output_hash: b92c407a2d1f
 i18n_hash_version: 2
 ---
 # การกู้คืนบัญชี {#account-recovery}
@@ -44,6 +44,30 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 หากนโยบายยังคงกำหนดให้ผู้ใช้รายนั้นต้องใช้ MFA พวกเขาจะไปติดกำแพงการลงทะเบียน
 ในครั้งถัดไป ดังนั้นให้รัน `reset-mfa-policy` ด้วย จากนั้นเข้าสู่ระบบและลงทะเบียนใหม่จากการตั้งค่า
 
+## รีเซ็ตรหัสผ่านที่ลืม {#reset-a-forgotten-password}
+
+```bash
+docker exec -it snapotter snapotter-admin reset-password <username> [password]
+```
+
+หากละ `[password]` ไว้ CLI จะพิมพ์รหัสผ่านชั่วคราวที่สร้างขึ้น ไม่ว่าจะระบุหรือไม่ เซสชันที่ใช้งานอยู่ คีย์ API และช่วงเวลาจำกัดการเข้าสู่ระบบที่ล้มเหลวของผู้ใช้จะถูกล้าง และ SnapOtter จะบังคับให้เปลี่ยนรหัสผ่านในการเข้าสู่ระบบครั้งถัดไป
+
+## สร้างบัญชีผู้ดูแลระบบเริ่มต้น {#bootstrap-an-admin-account}
+
+```bash
+docker exec -it snapotter snapotter-admin create-admin [username] [password]
+```
+
+ใช้คำสั่งนี้เมื่อไม่มีบัญชีผู้ดูแลระบบที่มีอยู่สามารถเข้าสู่ระบบได้ `[username]` มีค่าเริ่มต้นเป็น `DEFAULT_USERNAME` (`admin`) และการละ `[password]` จะพิมพ์รหัสผ่านชั่วคราวที่ต้องเปลี่ยนเมื่อเข้าสู่ระบบครั้งแรก
+
+## ปลดล็อกผู้ใช้ที่ถูกจำกัดหรือถูกปิดใช้งาน {#unlock-a-throttled-or-disabled-user}
+
+```bash
+docker exec -it snapotter snapotter-admin unlock-user <username>
+```
+
+คำสั่งนี้จะล้างช่วงเวลา `LOGIN_THROTTLED` ใน Redis และคืนค่าบทบาทของบัญชีหากผู้ใช้ถูกปิดใช้งาน
+
 ## อิมเมจรุ่นเก่าและทางเลือกสำรอง {#older-images-and-fallbacks}
 
 บนอิมเมจที่สร้างขึ้นก่อนที่ตัวห่อ `snapotter-admin` จะมีอยู่ ให้เรียกสคริปต์
@@ -51,7 +75,7 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 
 ```bash
 docker exec -w /app/apps/api snapotter ./node_modules/.bin/tsx \
-  src/scripts/mfa-recover.ts reset-mfa-policy
+  src/scripts/admin-recovery.ts reset-mfa-policy
 ```
 
 ในทางเลือกสุดท้ายบนทุกเวอร์ชัน ให้ตั้งค่านโยบายในฐานข้อมูล บนอิมเมจ

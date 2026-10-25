@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: 377cf113e7d8
+i18n_source_hash: f75ca08bcb71
 i18n_provenance: machine
-i18n_output_hash: 063e9c12b39e
+i18n_output_hash: 84cad1747158
 i18n_hash_version: 2
 ---
 # Kontowiederherstellung {#account-recovery}
@@ -44,6 +44,30 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 Wenn die Richtlinie für diesen Benutzer weiterhin MFA erfordert, läuft er als Nächstes gegen die
 Einrichtungswand. Führe also auch `reset-mfa-policy` aus, melde dich an und richte es in den Einstellungen neu ein.
 
+## Ein vergessenes Passwort zurücksetzen {#reset-a-forgotten-password}
+
+```bash
+docker exec -it snapotter snapotter-admin reset-password <username> [password]
+```
+
+Lässt du `[password]` weg, gibt die CLI ein generiertes temporäres Passwort aus. In beiden Fällen werden die aktiven Sitzungen, API-Schlüssel und das Sperrfenster nach fehlgeschlagenen Anmeldungen des Benutzers gelöscht, und SnapOtter verlangt bei der nächsten Anmeldung eine Passwortänderung.
+
+## Ein Admin-Konto neu anlegen {#bootstrap-an-admin-account}
+
+```bash
+docker exec -it snapotter snapotter-admin create-admin [username] [password]
+```
+
+Nutze dies, wenn sich kein bestehendes Admin-Konto mehr anmelden kann. `[username]` nutzt standardmäßig `DEFAULT_USERNAME` (`admin`), und das Weglassen von `[password]` gibt ein temporäres Passwort aus, das bei der ersten Anmeldung geändert werden muss.
+
+## Einen gedrosselten oder deaktivierten Benutzer entsperren {#unlock-a-throttled-or-disabled-user}
+
+```bash
+docker exec -it snapotter snapotter-admin unlock-user <username>
+```
+
+Dies löscht das `LOGIN_THROTTLED`-Fenster in Redis und stellt die Rolle des Kontos wieder her, falls der Benutzer deaktiviert war.
+
 ## Ältere Images und Fallbacks {#older-images-and-fallbacks}
 
 Auf einem Image, das erstellt wurde, bevor der `snapotter-admin`-Wrapper existierte, rufe das Skript
@@ -51,7 +75,7 @@ direkt auf:
 
 ```bash
 docker exec -w /app/apps/api snapotter ./node_modules/.bin/tsx \
-  src/scripts/mfa-recover.ts reset-mfa-policy
+  src/scripts/admin-recovery.ts reset-mfa-policy
 ```
 
 Als letzten Ausweg auf jeder Version setzt du die Richtlinie in der Datenbank. Auf dem

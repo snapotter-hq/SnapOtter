@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: 377cf113e7d8
+i18n_source_hash: f75ca08bcb71
 i18n_provenance: machine
-i18n_output_hash: a69b406a38fb
+i18n_output_hash: 1d54fbc78343
 i18n_hash_version: 2
 ---
 # Recuperação de conta {#account-recovery}
@@ -44,6 +44,30 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 Se a política ainda exigir MFA para esse usuário, ele vai esbarrar na barreira de
 inscrição a seguir, então rode também `reset-mfa-policy`, faça login e reinscreva-se nas Configurações.
 
+## Redefina uma senha esquecida {#reset-a-forgotten-password}
+
+```bash
+docker exec -it snapotter snapotter-admin reset-password <username> [password]
+```
+
+Omita `[password]` e a CLI imprime uma senha temporária gerada. De qualquer forma, as sessões ativas, as chaves de API e a janela de bloqueio por falhas de login do usuário são limpas, e o SnapOtter exige a troca da senha no próximo login.
+
+## Crie uma conta de administrador inicial {#bootstrap-an-admin-account}
+
+```bash
+docker exec -it snapotter snapotter-admin create-admin [username] [password]
+```
+
+Use isso quando nenhuma conta de administrador existente conseguir entrar. `[username]` assume por padrão `DEFAULT_USERNAME` (`admin`), e omitir `[password]` imprime uma senha temporária que deve ser alterada no primeiro login.
+
+## Desbloqueie um usuário limitado ou desativado {#unlock-a-throttled-or-disabled-user}
+
+```bash
+docker exec -it snapotter snapotter-admin unlock-user <username>
+```
+
+Isso limpa a janela `LOGIN_THROTTLED` no Redis e restaura a função da conta caso o usuário tenha sido desativado.
+
 ## Imagens mais antigas e alternativas {#older-images-and-fallbacks}
 
 Numa imagem criada antes de o wrapper `snapotter-admin` existir, chame o script
@@ -51,7 +75,7 @@ diretamente:
 
 ```bash
 docker exec -w /app/apps/api snapotter ./node_modules/.bin/tsx \
-  src/scripts/mfa-recover.ts reset-mfa-policy
+  src/scripts/admin-recovery.ts reset-mfa-policy
 ```
 
 Como último recurso em qualquer versão, defina a política no banco de dados. Na

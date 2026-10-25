@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: 377cf113e7d8
+i18n_source_hash: f75ca08bcb71
 i18n_provenance: machine
-i18n_output_hash: 420e8ef3e4fd
+i18n_output_hash: c49281c499a8
 i18n_hash_version: 2
 ---
 # Восстановление доступа к аккаунту {#account-recovery}
@@ -44,6 +44,30 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 Если политика по-прежнему требует MFA для этого пользователя, при следующем входе
 он упрётся в стену настройки, поэтому также выполните `reset-mfa-policy`, войдите и настройте заново в Настройках.
 
+## Сбросьте забытый пароль {#reset-a-forgotten-password}
+
+```bash
+docker exec -it snapotter snapotter-admin reset-password <username> [password]
+```
+
+Если не указывать `[password]`, CLI выведет сгенерированный временный пароль. В обоих случаях активные сессии пользователя, API-ключи и окно ограничения после неудачных попыток входа сбрасываются, а SnapOtter потребует сменить пароль при следующем входе.
+
+## Создайте учётную запись администратора {#bootstrap-an-admin-account}
+
+```bash
+docker exec -it snapotter snapotter-admin create-admin [username] [password]
+```
+
+Используйте эту команду, когда ни один существующий администратор не может войти. По умолчанию `[username]` равен `DEFAULT_USERNAME` (`admin`), а при пропуске `[password]` выводится временный пароль, который необходимо сменить при первом входе.
+
+## Разблокируйте ограниченного или отключённого пользователя {#unlock-a-throttled-or-disabled-user}
+
+```bash
+docker exec -it snapotter snapotter-admin unlock-user <username>
+```
+
+Это очищает окно `LOGIN_THROTTLED` в Redis и восстанавливает роль аккаунта, если пользователь был отключён.
+
 ## Старые образы и запасные варианты {#older-images-and-fallbacks}
 
 На образе, собранном до появления обёртки `snapotter-admin`, вызовите скрипт
@@ -51,7 +75,7 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 
 ```bash
 docker exec -w /app/apps/api snapotter ./node_modules/.bin/tsx \
-  src/scripts/mfa-recover.ts reset-mfa-policy
+  src/scripts/admin-recovery.ts reset-mfa-policy
 ```
 
 В крайнем случае на любой версии задайте политику в базе данных. В образе

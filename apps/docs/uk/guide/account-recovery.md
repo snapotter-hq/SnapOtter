@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: 377cf113e7d8
+i18n_source_hash: f75ca08bcb71
 i18n_provenance: machine
-i18n_output_hash: bcd1b9988ae0
+i18n_output_hash: 1f3c6ede213b
 i18n_hash_version: 2
 ---
 # Відновлення доступу до облікового запису {#account-recovery}
@@ -44,6 +44,30 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 Якщо політика все ще вимагає MFA для цього користувача, він наштовхнеться на бар'єр
 реєстрації наступним, тож також виконайте `reset-mfa-policy`, увійдіть і зареєструйтеся заново в Налаштуваннях.
 
+## Скидання забутого пароля {#reset-a-forgotten-password}
+
+```bash
+docker exec -it snapotter snapotter-admin reset-password <username> [password]
+```
+
+Якщо пропустити `[password]`, CLI виведе згенерований тимчасовий пароль. У будь-якому разі активні сесії користувача, ключі API та вікно обмеження після невдалих спроб входу очищуються, а SnapOtter вимагатиме змінити пароль під час наступного входу.
+
+## Створення початкового облікового запису адміністратора {#bootstrap-an-admin-account}
+
+```bash
+docker exec -it snapotter snapotter-admin create-admin [username] [password]
+```
+
+Використовуйте це, коли жоден наявний обліковий запис адміністратора не може увійти. За замовчуванням `[username]` дорівнює `DEFAULT_USERNAME` (`admin`), а якщо пропустити `[password]`, буде виведено тимчасовий пароль, який потрібно змінити під час першого входу.
+
+## Розблокування обмеженого або вимкненого користувача {#unlock-a-throttled-or-disabled-user}
+
+```bash
+docker exec -it snapotter snapotter-admin unlock-user <username>
+```
+
+Це очищує вікно `LOGIN_THROTTLED` у Redis і відновлює роль облікового запису, якщо користувача було вимкнено.
+
 ## Старіші образи та резервні варіанти {#older-images-and-fallbacks}
 
 На образі, зібраному до того, як з'явилася обгортка `snapotter-admin`, викликайте скрипт
@@ -51,7 +75,7 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 
 ```bash
 docker exec -w /app/apps/api snapotter ./node_modules/.bin/tsx \
-  src/scripts/mfa-recover.ts reset-mfa-policy
+  src/scripts/admin-recovery.ts reset-mfa-policy
 ```
 
 Як крайній захід на будь-якій версії, задайте політику в базі даних. На

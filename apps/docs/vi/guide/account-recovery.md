@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: 377cf113e7d8
+i18n_source_hash: f75ca08bcb71
 i18n_provenance: machine
-i18n_output_hash: 6d35177d9d5a
+i18n_output_hash: f3010aa11a7a
 i18n_hash_version: 2
 ---
 # Khôi phục tài khoản {#account-recovery}
@@ -44,6 +44,30 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 Nếu chính sách vẫn yêu cầu MFA đối với người dùng đó, họ sẽ gặp phải rào cản đăng ký
 ở lần sau, vì vậy hãy chạy thêm `reset-mfa-policy`, đăng nhập và đăng ký lại từ phần Cài đặt.
 
+## Đặt lại mật khẩu đã quên {#reset-a-forgotten-password}
+
+```bash
+docker exec -it snapotter snapotter-admin reset-password <username> [password]
+```
+
+Nếu bỏ qua `[password]`, CLI sẽ in ra một mật khẩu tạm thời được tạo tự động. Dù theo cách nào, các phiên hoạt động, khóa API và khoảng thời gian giới hạn đăng nhập thất bại của người dùng đều được xóa, đồng thời SnapOtter yêu cầu đổi mật khẩu ở lần đăng nhập tiếp theo.
+
+## Khởi tạo tài khoản quản trị viên {#bootstrap-an-admin-account}
+
+```bash
+docker exec -it snapotter snapotter-admin create-admin [username] [password]
+```
+
+Sử dụng lệnh này khi không còn tài khoản quản trị viên hiện có nào đăng nhập được. `[username]` mặc định là `DEFAULT_USERNAME` (`admin`), và việc bỏ qua `[password]` sẽ in ra một mật khẩu tạm thời bắt buộc phải đổi trong lần đăng nhập đầu tiên.
+
+## Mở khóa người dùng bị giới hạn hoặc bị vô hiệu hóa {#unlock-a-throttled-or-disabled-user}
+
+```bash
+docker exec -it snapotter snapotter-admin unlock-user <username>
+```
+
+Lệnh này xóa khoảng thời gian `LOGIN_THROTTLED` trong Redis và khôi phục vai trò của tài khoản nếu người dùng đã bị vô hiệu hóa.
+
 ## Các ảnh cũ hơn và phương án dự phòng {#older-images-and-fallbacks}
 
 Trên một ảnh được dựng trước khi trình bao bọc `snapotter-admin` tồn tại, hãy gọi trực tiếp
@@ -51,7 +75,7 @@ tập lệnh:
 
 ```bash
 docker exec -w /app/apps/api snapotter ./node_modules/.bin/tsx \
-  src/scripts/mfa-recover.ts reset-mfa-policy
+  src/scripts/admin-recovery.ts reset-mfa-policy
 ```
 
 Như một phương án cuối cùng trên bất kỳ phiên bản nào, hãy đặt chính sách trong cơ sở dữ liệu. Trên

@@ -1,7 +1,7 @@
 ---
-i18n_source_hash: 377cf113e7d8
+i18n_source_hash: f75ca08bcb71
 i18n_provenance: machine
-i18n_output_hash: a325dc9c708c
+i18n_output_hash: cfd2a8436281
 i18n_hash_version: 2
 ---
 # Recuperación de la cuenta {#account-recovery}
@@ -44,6 +44,30 @@ docker exec -it snapotter snapotter-admin disable-mfa <username>
 Si la política sigue exigiendo MFA a ese usuario, se topará con el muro del registro
 a continuación, así que ejecuta también `reset-mfa-policy`, inicia sesión y vuelve a registrarte desde Configuración.
 
+## Restablece una contraseña olvidada {#reset-a-forgotten-password}
+
+```bash
+docker exec -it snapotter snapotter-admin reset-password <username> [password]
+```
+
+Si omites `[password]`, la CLI imprime una contraseña temporal generada. En ambos casos, se borran las sesiones activas, las claves de API y la ventana de bloqueo por intentos fallidos del usuario, y SnapOtter exige cambiar la contraseña en el siguiente inicio de sesión.
+
+## Crea una cuenta de administrador inicial {#bootstrap-an-admin-account}
+
+```bash
+docker exec -it snapotter snapotter-admin create-admin [username] [password]
+```
+
+Úsalo cuando ninguna cuenta de administrador existente pueda iniciar sesión. `[username]` toma por defecto `DEFAULT_USERNAME` (`admin`), y omitir `[password]` imprime una contraseña temporal que debe cambiarse en el primer inicio de sesión.
+
+## Desbloquea un usuario limitado o deshabilitado {#unlock-a-throttled-or-disabled-user}
+
+```bash
+docker exec -it snapotter snapotter-admin unlock-user <username>
+```
+
+Esto borra la ventana `LOGIN_THROTTLED` en Redis y restaura el rol de la cuenta si el usuario estaba deshabilitado.
+
 ## Imágenes antiguas y alternativas {#older-images-and-fallbacks}
 
 En una imagen creada antes de que existiera el envoltorio `snapotter-admin`, llama al script
@@ -51,7 +75,7 @@ directamente:
 
 ```bash
 docker exec -w /app/apps/api snapotter ./node_modules/.bin/tsx \
-  src/scripts/mfa-recover.ts reset-mfa-policy
+  src/scripts/admin-recovery.ts reset-mfa-policy
 ```
 
 Como último recurso en cualquier versión, establece la política en la base de datos.
