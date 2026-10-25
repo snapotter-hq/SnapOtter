@@ -1,8 +1,9 @@
+import type { Permission } from "@snapotter/shared";
 import packageJson from "../../../package.json";
 
 const DEMO_APP_VERSION = packageJson.version;
 
-const PERMISSIONS = [
+const PERMISSIONS: readonly Permission[] = [
   "tools:use",
   "files:own",
   "files:all",
@@ -17,6 +18,9 @@ const PERMISSIONS = [
   "features:manage",
   "system:health",
   "audit:read",
+  "compliance:manage",
+  "webhooks:manage",
+  "security:manage",
 ];
 
 const FEATURE_BUNDLES = [
@@ -401,7 +405,7 @@ const db: {
       id: "role_user",
       name: "user",
       description: "Run tools and manage your own files and keys.",
-      permissions: ["tools:use", "files:own", "apikeys:own", "pipelines:own"],
+      permissions: ["tools:use", "files:own", "apikeys:own", "pipelines:own", "settings:read"],
       toolPermissions: null,
       isBuiltin: true,
       userCount: 5,
