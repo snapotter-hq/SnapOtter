@@ -96,7 +96,7 @@ async function deleteUser(adminToken: string, username: string): Promise<void> {
 
 // The NAV_ITEMS and their required permissions from the source:
 //   general        - none
-//   system         - settings:write
+//   system         - settings:read & settings:write
 //   security       - none (authRequired)
 //   people         - users:manage
 //   teams          - teams:manage
@@ -105,7 +105,7 @@ async function deleteUser(adminToken: string, username: string): Promise<void> {
 //   usage          - audit:read (Usage analytics dashboard, admin-only)
 //   api-keys       - apikeys:own | apikeys:all
 //   ai-features    - features:manage
-//   tools          - settings:write
+//   tools          - settings:read & settings:write
 //   about          - none
 
 base.describe("RBAC Settings Visibility - Admin", () => {

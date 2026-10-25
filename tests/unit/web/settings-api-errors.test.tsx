@@ -876,6 +876,18 @@ describe("General: save preferences (#2713)", () => {
 });
 
 describe("System: support bundle download (#2713)", () => {
+  beforeEach(() => {
+    useAuth.mockReturnValue({
+      loading: false,
+      permissions: ["system:health"],
+      hasPermission: (p: string) => p === "system:health",
+      authEnabled: true,
+      role: "admin",
+      hasLocalPassword: true,
+      totpEnabled: false,
+    });
+  });
+
   async function download(status: number, code?: string, contentType = "application/json") {
     const body =
       contentType === "application/json"

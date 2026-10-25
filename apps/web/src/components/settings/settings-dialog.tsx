@@ -100,7 +100,9 @@ interface NavItem {
   id: Section;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  requiredPermission?: Permission | readonly Permission[];
+  requiredPermission?: Permission;
+  requiredPermissions?: readonly Permission[];
+  requiredAnyPermission?: readonly Permission[];
   authRequired?: boolean;
 }
 
@@ -113,7 +115,7 @@ function useNavItems() {
         id: "system",
         label: t.settings.nav.systemSettings,
         icon: Monitor,
-        requiredPermission: "settings:write",
+        requiredPermissions: ["settings:read", "settings:write"],
       },
       { id: "security", label: t.settings.nav.security, icon: Shield, authRequired: true },
       {
@@ -153,7 +155,7 @@ function useNavItems() {
         id: "api-keys",
         label: t.settings.nav.apiKeys,
         icon: Key,
-        requiredPermission: ["apikeys:own", "apikeys:all"],
+        requiredAnyPermission: ["apikeys:own", "apikeys:all"],
       },
       {
         id: "ai-features",
@@ -165,7 +167,7 @@ function useNavItems() {
         id: "tools",
         label: t.settings.nav.tools,
         icon: Wrench,
-        requiredPermission: "settings:write",
+        requiredPermissions: ["settings:read", "settings:write"],
       },
       { id: "about", label: t.settings.nav.about, icon: Info },
     ],
@@ -185,13 +187,22 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   useFocusTrap(mobileDialogRef, open && isMobile);
 
   const visibleNavItems = NAV_ITEMS.filter((item) => {
-    const permitted = !item.requiredPermission
-      ? true
-      : typeof item.requiredPermission === "string"
-        ? hasPermission(item.requiredPermission)
-        : item.requiredPermission.some((p) => hasPermission(p));
+    const permitted =
+      (!item.requiredPermission || hasPermission(item.requiredPermission)) &&
+      (!item.requiredPermissions || item.requiredPermissions.every((p) => hasPermission(p))) &&
+      (!item.requiredAnyPermission || item.requiredAnyPermission.some((p) => hasPermission(p)));
     return permitted && (!item.authRequired || authEnabled);
   });
+
+  const activeSection: Section = visibleNavItems.some((item) => item.id === section)
+    ? section
+    : "general";
+
+  useEffect(() => {
+    if (activeSection !== section) {
+      setSection(activeSection);
+    }
+  }, [activeSection, section]);
 
   // Close on Escape
   useEffect(() => {
@@ -238,7 +249,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
               onClick={() => setSection(item.id)}
               className={cn(
                 "flex items-center gap-1.5 px-3 py-2.5 rounded-full text-xs font-medium whitespace-nowrap shrink-0",
-                section === item.id
+                activeSection === item.id
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground",
               )}
@@ -251,19 +262,19 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
 
         {/* Mobile content */}
         <div className="flex-1 overflow-y-auto p-4">
-          {section === "general" && <GeneralSection />}
-          {section === "system" && <SystemSection />}
-          {section === "security" && <SecuritySection />}
-          {section === "people" && <PeopleSection />}
-          {section === "teams" && <TeamsSection />}
-          {section === "roles" && <RolesSection />}
-          {section === "audit-log" && <AuditLogSection />}
-          {section === "usage" && <UsageSection />}
-          {section === "api-keys" && <ApiKeysSection />}
-          {section === "ai-features" && <AiFeaturesSection />}
-          {section === "tools" && <ToolsSection />}
+          {activeSection === "general" && <GeneralSection />}
+          {activeSection === "system" && <SystemSection />}
+          {activeSection === "security" && <SecuritySection />}
+          {activeSection === "people" && <PeopleSection />}
+          {activeSection === "teams" && <TeamsSection />}
+          {activeSection === "roles" && <RolesSection />}
+          {activeSection === "audit-log" && <AuditLogSection />}
+          {activeSection === "usage" && <UsageSection />}
+          {activeSection === "api-keys" && <ApiKeysSection />}
+          {activeSection === "ai-features" && <AiFeaturesSection />}
+          {activeSection === "tools" && <ToolsSection />}
 
-          {section === "about" && <AboutSection />}
+          {activeSection === "about" && <AboutSection />}
         </div>
       </div>
     );
@@ -300,7 +311,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
               onClick={() => setSection(item.id)}
               className={cn(
                 "flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm transition-colors",
-                section === item.id
+                activeSection === item.id
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
@@ -322,19 +333,19 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
             <X className="h-4 w-4" />
           </button>
 
-          {section === "general" && <GeneralSection />}
-          {section === "system" && <SystemSection />}
-          {section === "security" && <SecuritySection />}
-          {section === "people" && <PeopleSection />}
-          {section === "teams" && <TeamsSection />}
-          {section === "roles" && <RolesSection />}
-          {section === "audit-log" && <AuditLogSection />}
-          {section === "usage" && <UsageSection />}
-          {section === "api-keys" && <ApiKeysSection />}
-          {section === "ai-features" && <AiFeaturesSection />}
-          {section === "tools" && <ToolsSection />}
+          {activeSection === "general" && <GeneralSection />}
+          {activeSection === "system" && <SystemSection />}
+          {activeSection === "security" && <SecuritySection />}
+          {activeSection === "people" && <PeopleSection />}
+          {activeSection === "teams" && <TeamsSection />}
+          {activeSection === "roles" && <RolesSection />}
+          {activeSection === "audit-log" && <AuditLogSection />}
+          {activeSection === "usage" && <UsageSection />}
+          {activeSection === "api-keys" && <ApiKeysSection />}
+          {activeSection === "ai-features" && <AiFeaturesSection />}
+          {activeSection === "tools" && <ToolsSection />}
 
-          {section === "about" && <AboutSection />}
+          {activeSection === "about" && <AboutSection />}
         </div>
       </div>
     </div>
@@ -920,48 +931,52 @@ export function SystemSection() {
         )}
       </div>
 
-      <div className="pt-4 border-t border-border">
-        <SettingRow
-          label={t.settings.system.supportBundleButton}
-          description={t.settings.system.supportBundleDescription}
-        >
-          <button
-            type="button"
-            disabled={bundleLoading}
-            onClick={async () => {
-              setBundleLoading(true);
-              setBundleError(null);
-              try {
-                const res = await fetch(appUrl("/api/v1/admin/support-bundle"), {
-                  headers: formatHeaders(),
-                });
-                if (!res.ok) await throwWithMessage(res);
-                const blob = await res.blob();
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                const cd = res.headers.get("Content-Disposition") || "";
-                const filenameMatch = cd.match(/filename=([^\s;]+)/);
-                a.download = filenameMatch ? filenameMatch[1] : "snapotter-support.zip";
-                a.click();
-                URL.revokeObjectURL(url);
-              } catch (err) {
-                if (err instanceof TypeError) {
-                  useConnectionStore.getState().setDisconnected();
-                }
-                setBundleError(apiErrorMessage(t, err, {}, t.settings.system.supportBundleFailed));
-              } finally {
-                setBundleLoading(false);
-              }
-            }}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+      {hasPermission("system:health") && (
+        <div className="pt-4 border-t border-border">
+          <SettingRow
+            label={t.settings.system.supportBundleButton}
+            description={t.settings.system.supportBundleDescription}
           >
-            {bundleLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
-            {t.settings.system.supportBundleButton}
-          </button>
-        </SettingRow>
-        {bundleError && <p className="text-sm text-destructive mt-2">{bundleError}</p>}
-      </div>
+            <button
+              type="button"
+              disabled={bundleLoading}
+              onClick={async () => {
+                setBundleLoading(true);
+                setBundleError(null);
+                try {
+                  const res = await fetch(appUrl("/api/v1/admin/support-bundle"), {
+                    headers: formatHeaders(),
+                  });
+                  if (!res.ok) await throwWithMessage(res);
+                  const blob = await res.blob();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  const cd = res.headers.get("Content-Disposition") || "";
+                  const filenameMatch = cd.match(/filename=([^\s;]+)/);
+                  a.download = filenameMatch ? filenameMatch[1] : "snapotter-support.zip";
+                  a.click();
+                  URL.revokeObjectURL(url);
+                } catch (err) {
+                  if (err instanceof TypeError) {
+                    useConnectionStore.getState().setDisconnected();
+                  }
+                  setBundleError(
+                    apiErrorMessage(t, err, {}, t.settings.system.supportBundleFailed),
+                  );
+                } finally {
+                  setBundleLoading(false);
+                }
+              }}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              {bundleLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+              {t.settings.system.supportBundleButton}
+            </button>
+          </SettingRow>
+          {bundleError && <p className="text-sm text-destructive mt-2">{bundleError}</p>}
+        </div>
+      )}
 
       <FeedbackDialog
         open={installFeedbackOpen}

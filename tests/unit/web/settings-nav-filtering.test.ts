@@ -23,6 +23,7 @@ import {
   RolesSection,
   SecuritySection,
   SettingsDialog,
+  SystemSection,
 } from "@/components/settings/settings-dialog";
 
 const nav = en.settings.nav;
@@ -128,6 +129,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   apiGet.mockReset();
   useAuth.mockReset();
 });
@@ -273,5 +275,93 @@ describe("settings nav filtering", () => {
       expect(await screen.findByText(en.settings.security.adminHeading)).toBeInTheDocument();
       expect(apiGet).toHaveBeenCalledWith("/v1/settings");
     });
+  });
+
+  describe("System and Tools tab and section permission alignment (#3999)", () => {
+    it("hides System Settings and Tools tabs when a custom role has settings:write without settings:read", async () => {
+      mockAuth(["settings:write"], true);
+      const visible = await renderedNavLabels();
+      expect(visible).not.toContain(nav.systemSettings);
+      expect(visible).not.toContain(nav.tools);
+    });
+
+    it("hides System Settings and Tools tabs when a custom role has settings:read without settings:write", async () => {
+      mockAuth(["settings:read"], true);
+      const visible = await renderedNavLabels();
+      expect(visible).not.toContain(nav.systemSettings);
+      expect(visible).not.toContain(nav.tools);
+    });
+
+    it("shows System Settings and Tools tabs when a custom role has both settings:read and settings:write", async () => {
+      mockAuth(["settings:read", "settings:write"], true);
+      const visible = await renderedNavLabels();
+      expect(visible).toContain(nav.systemSettings);
+      expect(visible).toContain(nav.tools);
+    });
+
+    it("hides Support Bundle row in SystemSection when the user lacks system:health", async () => {
+      mockAuth(["settings:read", "settings:write"], true);
+      render(createElement(SystemSection));
+
+      expect(await screen.findByText(en.settings.system.heading)).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: en.settings.system.supportBundleButton }),
+      ).toBeNull();
+    });
+
+    it("shows Support Bundle row in SystemSection when the user has system:health", async () => {
+      mockAuth(["settings:read", "settings:write", "system:health"], true);
+      render(createElement(SystemSection));
+
+      expect(await screen.findByText(en.settings.system.heading)).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: en.settings.system.supportBundleButton }),
+      ).toBeInTheDocument();
+    });
+
+    it.each(["desktop", "mobile"] as const)(
+      "falls back active section to General when a permission refresh removes the open tab (%s)",
+      async (viewport) => {
+        if (viewport === "mobile") {
+          vi.stubGlobal("matchMedia", (query: string) => ({
+            matches: query === "(max-width: 767px)",
+            media: query,
+            onchange: null,
+            addListener: () => {},
+            removeListener: () => {},
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            dispatchEvent: () => false,
+          }));
+        }
+
+        mockAuth(["settings:read", "settings:write"], true);
+        const view = render(createElement(SettingsDialog, { open: true, onClose: () => {} }));
+
+        await screen.findByText("testuser");
+        fireEvent.click(screen.getByRole("button", { name: nav.tools }));
+        expect(
+          await screen.findByRole("heading", { name: en.settings.tools.heading }),
+        ).toBeInTheDocument();
+
+        mockAuth(["settings:read"], true);
+        view.rerender(createElement(SettingsDialog, { open: true, onClose: () => {} }));
+
+        expect(screen.queryByRole("heading", { name: en.settings.tools.heading })).toBeNull();
+        expect(
+          await screen.findByRole("heading", { name: en.settings.general.heading }),
+        ).toBeInTheDocument();
+        await screen.findByText("testuser");
+
+        // Re-granting settings:write later keeps the dialog on General rather than jumping back.
+        mockAuth(["settings:read", "settings:write"], true);
+        view.rerender(createElement(SettingsDialog, { open: true, onClose: () => {} }));
+
+        expect(screen.queryByRole("heading", { name: en.settings.tools.heading })).toBeNull();
+        expect(
+          screen.getByRole("heading", { name: en.settings.general.heading }),
+        ).toBeInTheDocument();
+      },
+    );
   });
 });
