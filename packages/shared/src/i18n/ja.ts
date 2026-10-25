@@ -5609,6 +5609,7 @@ export const ja: TranslationKeys = {
       "{tool}には「{feature}」機能が必要です。設定 → AI機能で有効にしてください。",
     featureNotInstalled:
       "「{feature}」機能がインストールされていません。設定 → AI機能で有効にしてください。",
+    featureIncompatible: "「{feature}」機能はこのサーバーのハードウェアでは実行できません。",
     passwordTooShort: "パスワードは{minLength}文字以上にしてください。",
     passwordNeedsUppercase: "パスワードには大文字を含める必要があります。",
     passwordNeedsLowercase: "パスワードには小文字を含める必要があります。",

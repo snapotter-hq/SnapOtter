@@ -1,7 +1,7 @@
 import { en, type TranslationKeys } from "@snapotter/shared";
 import { getDistinctId } from "@/lib/analytics";
 import { appUrl } from "@/lib/app-url";
-import { featureNotInstalledMessage } from "@/lib/bundle-i18n";
+import { featureIncompatibleMessage, featureNotInstalledMessage } from "@/lib/bundle-i18n";
 import { createXhrWatchdog } from "@/lib/xhr-watchdog";
 import { useConnectionStore } from "@/stores/connection-store";
 
@@ -14,6 +14,13 @@ export interface FeatureNotInstalledError {
   estimatedSize: string;
 }
 
+export interface FeatureIncompatibleError {
+  type: "feature_incompatible";
+  feature: string;
+  featureName: string;
+  compatibilityReason: string;
+}
+
 /**
  * Reads a failed answer's JSON body: `error`, then `details`, then `message`.
  * Only string `error` and `message` count, so an object-valued one can never
@@ -24,7 +31,7 @@ export function parseApiError(
   body: unknown,
   fallbackStatus: number,
   fallback = `Processing failed: ${fallbackStatus}`,
-): string | FeatureNotInstalledError {
+): string | FeatureNotInstalledError | FeatureIncompatibleError {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return fallback;
   }
@@ -37,6 +44,15 @@ export function parseApiError(
       feature,
       featureName,
       estimatedSize: typeof record.estimatedSize === "string" ? record.estimatedSize : "",
+    };
+  }
+  if (record.code === "FEATURE_INCOMPATIBLE" && (feature.length > 0 || featureName.length > 0)) {
+    return {
+      type: "feature_incompatible",
+      feature,
+      featureName,
+      compatibilityReason:
+        typeof record.compatibilityReason === "string" ? record.compatibilityReason : "",
     };
   }
 
@@ -90,7 +106,10 @@ export function failedAnswerMessage(
   if (status === 413) return t.errors.fileTooLarge;
   if (!body || typeof body !== "object" || Array.isArray(body)) return fallback;
   const parsed = parseApiError(body as Record<string, unknown>, status, fallback);
-  return typeof parsed === "string" ? parsed : featureNotInstalledMessage(t, parsed, toolName);
+  if (typeof parsed === "string") return parsed;
+  return parsed.type === "feature_incompatible"
+    ? featureIncompatibleMessage(t, parsed)
+    : featureNotInstalledMessage(t, parsed, toolName);
 }
 
 // ── Auth Headers ───────────────────────────────────────────────

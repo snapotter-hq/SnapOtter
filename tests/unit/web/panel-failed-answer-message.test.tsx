@@ -150,6 +150,28 @@ describe("parseApiError and failedAnswerMessage", () => {
       format(en.errors.featureNotInstalledForTool, { tool: "Remove Background", feature }),
     );
   });
+
+  it("turns FEATURE_INCOMPATIBLE into the translated incompatible message", () => {
+    const body = {
+      error: "Feature incompatible",
+      code: "FEATURE_INCOMPATIBLE",
+      feature: "ocr",
+      featureName: "OCR",
+      compatibilityReason: "unsupported-host",
+    };
+    const feature = de.featureBundles.ocr.name;
+    expect(failedAnswerMessage(de, body, 501, FALLBACK)).toBe(
+      format(de.errors.featureIncompatible, { feature }),
+    );
+    expect(
+      failedAnswerMessage(
+        de,
+        { ...body, compatibilityReason: "fast-korean-unsupported" },
+        501,
+        FALLBACK,
+      ),
+    ).toBe(de.toolSettings.ocr.fastKoreanUnsupported);
+  });
 });
 
 // ── Panels ──────────────────────────────────────────────────────
@@ -734,6 +756,28 @@ describe("ocr: a failed answer", () => {
 
     await expect(run).rejects.toThrow(
       format(de.errors.featureNotInstalled, { feature: de.featureBundles.ocr.name }),
+    );
+  });
+
+  it("rejects FEATURE_INCOMPATIBLE with the incompatible message in the locale it was given", async () => {
+    const run = ocrOneFile(
+      image("scan.png"),
+      { quality: "best", language: "en", enhance: false },
+      { onUploadProgress: vi.fn(), onProcessingProgress: vi.fn() },
+      { t: de },
+    );
+    await waitFor(() => expect(FakeXhr.instances.length).toBeGreaterThan(0));
+    FakeXhr.instances[0].respond(501, {
+      error: "Feature incompatible",
+      code: "FEATURE_INCOMPATIBLE",
+      feature: "ocr",
+      featureName: "OCR",
+      requestedQuality: "best",
+      compatibilityReason: "unsupported-host",
+    });
+
+    await expect(run).rejects.toThrow(
+      format(de.errors.featureIncompatible, { feature: de.featureBundles.ocr.name }),
     );
   });
 

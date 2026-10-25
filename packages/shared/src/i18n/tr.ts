@@ -5667,6 +5667,7 @@ export const tr: TranslationKeys = {
       '{tool} için "{feature}" özelliği gerekiyor. Ayarlar → AI Özellikleri bölümünden etkinleştirin.',
     featureNotInstalled:
       '"{feature}" özelliği yüklü değil. Ayarlar → AI Özellikleri bölümünden etkinleştirin.',
+    featureIncompatible: '"{feature}" özelliği bu sunucunun donanımında çalıştırılamıyor.',
     passwordTooShort: "Parola en az {minLength} karakter olmalıdır.",
     passwordNeedsUppercase: "Parola bir büyük harf içermelidir.",
     passwordNeedsLowercase: "Parola bir küçük harf içermelidir.",

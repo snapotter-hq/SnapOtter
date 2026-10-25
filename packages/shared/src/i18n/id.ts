@@ -5658,6 +5658,8 @@ export const id: TranslationKeys = {
     featureNotInstalledForTool:
       '{tool} memerlukan fitur "{feature}". Aktifkan di Pengaturan → Fitur AI.',
     featureNotInstalled: 'Fitur "{feature}" belum terpasang. Aktifkan di Pengaturan → Fitur AI.',
+    featureIncompatible:
+      'Fitur "{feature}" tidak dapat dijalankan pada perangkat keras server ini.',
     passwordTooShort: "Kata sandi minimal {minLength} karakter.",
     passwordNeedsUppercase: "Kata sandi harus mengandung huruf besar.",
     passwordNeedsLowercase: "Kata sandi harus mengandung huruf kecil.",

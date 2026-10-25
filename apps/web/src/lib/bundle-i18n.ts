@@ -41,3 +41,19 @@ export function featureNotInstalledMessage(
     ? format(t.errors.featureNotInstalled, { feature })
     : format(t.errors.featureNotInstalledForTool, { tool: toolName, feature });
 }
+
+/**
+ * The message for a 501 FEATURE_INCOMPATIBLE answer (#1438). Fast OCR with
+ * Korean carries its own localized guidance; hardware and runtime
+ * incompatibilities name the bundle in the active locale.
+ */
+export function featureIncompatibleMessage(
+  t: TranslationKeys,
+  error: { feature: string; featureName: string; compatibilityReason?: string },
+): string {
+  if (error.compatibilityReason === "fast-korean-unsupported") {
+    return t.toolSettings.ocr.fastKoreanUnsupported;
+  }
+  const feature = bundleName(t, { id: error.feature, name: error.featureName });
+  return format(t.errors.featureIncompatible, { feature });
+}

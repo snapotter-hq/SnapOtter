@@ -5436,6 +5436,7 @@ export const hi: TranslationKeys = {
     featureNotInstalledForTool:
       '{tool} के लिए "{feature}" फीचर ज़रूरी है। इसे सेटिंग्स → AI फीचर्स में सक्रिय करें।',
     featureNotInstalled: '"{feature}" फीचर इंस्टॉल नहीं है। इसे सेटिंग्स → AI फीचर्स में सक्रिय करें।',
+    featureIncompatible: '"{feature}" फीचर इस सर्वर के हार्डवेयर पर नहीं चल सकता।',
     passwordTooShort: "पासवर्ड कम से कम {minLength} वर्णों का होना चाहिए।",
     passwordNeedsUppercase: "पासवर्ड में एक अपरकेस अक्षर होना चाहिए।",
     passwordNeedsLowercase: "पासवर्ड में एक लोअरकेस अक्षर होना चाहिए।",

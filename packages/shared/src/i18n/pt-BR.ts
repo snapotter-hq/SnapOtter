@@ -5676,6 +5676,7 @@ export const ptBR: TranslationKeys = {
       '{tool} requer o recurso "{feature}". Ative-o em Configurações → Recursos de AI.',
     featureNotInstalled:
       'O recurso "{feature}" não está instalado. Ative-o em Configurações → Recursos de AI.',
+    featureIncompatible: 'O recurso "{feature}" não pode ser executado no hardware deste servidor.',
     passwordTooShort: "A senha deve ter pelo menos {minLength} caracteres.",
     passwordNeedsUppercase: "A senha deve conter uma letra maiúscula.",
     passwordNeedsLowercase: "A senha deve conter uma letra minúscula.",

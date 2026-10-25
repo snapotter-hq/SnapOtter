@@ -5642,6 +5642,7 @@ export const vi: TranslationKeys = {
       '{tool} cần tính năng "{feature}". Hãy bật trong Cài đặt → Tính năng AI.',
     featureNotInstalled:
       'Tính năng "{feature}" chưa được cài đặt. Hãy bật trong Cài đặt → Tính năng AI.',
+    featureIncompatible: 'Tính năng "{feature}" không thể chạy trên phần cứng của máy chủ này.',
     passwordTooShort: "Mật khẩu phải có ít nhất {minLength} ký tự.",
     passwordNeedsUppercase: "Mật khẩu phải chứa một chữ cái viết hoa.",
     passwordNeedsLowercase: "Mật khẩu phải chứa một chữ cái viết thường.",

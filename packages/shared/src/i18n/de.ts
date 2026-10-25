@@ -5710,6 +5710,8 @@ export const de: TranslationKeys = {
       "{tool} benötigt die Funktion „{feature}“. Aktivieren Sie sie unter Einstellungen → AI-Funktionen.",
     featureNotInstalled:
       "Die Funktion „{feature}“ ist nicht installiert. Aktivieren Sie sie unter Einstellungen → AI-Funktionen.",
+    featureIncompatible:
+      "Die Funktion „{feature}“ kann auf der Hardware dieses Servers nicht ausgeführt werden.",
     passwordTooShort: "Das Passwort muss mindestens {minLength} Zeichen lang sein.",
     passwordNeedsUppercase: "Das Passwort muss einen Großbuchstaben enthalten.",
     passwordNeedsLowercase: "Das Passwort muss einen Kleinbuchstaben enthalten.",

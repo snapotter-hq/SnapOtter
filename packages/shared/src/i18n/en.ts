@@ -5583,6 +5583,7 @@ export const en = {
       '{tool} requires the "{feature}" feature. Enable it in Settings → AI Features.',
     featureNotInstalled:
       'The "{feature}" feature is not installed. Enable it in Settings → AI Features.',
+    featureIncompatible: "{feature} can't run on this server's hardware.",
     passwordTooShort: "Password must be at least {minLength} characters.",
     passwordNeedsUppercase: "Password must contain an uppercase letter.",
     passwordNeedsLowercase: "Password must contain a lowercase letter.",

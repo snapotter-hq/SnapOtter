@@ -61,12 +61,41 @@ describe("parseApiError", () => {
       500,
     );
     expect(typeof result).toBe("object");
-    if (typeof result === "object") {
-      expect(result.type).toBe("feature_not_installed");
+    if (typeof result === "object" && result.type === "feature_not_installed") {
       expect(result.feature).toBe("ai-rembg");
       expect(result.featureName).toBe("AI Background Remover");
       expect(result.estimatedSize).toBe("500MB");
     }
+  });
+
+  it("returns FeatureIncompatibleError for FEATURE_INCOMPATIBLE code", () => {
+    const result = parseApiError(
+      {
+        code: "FEATURE_INCOMPATIBLE",
+        feature: "ocr",
+        featureName: "OCR",
+        compatibilityReason: "unsupported-host",
+      },
+      501,
+    );
+    expect(result).toEqual({
+      type: "feature_incompatible",
+      feature: "ocr",
+      featureName: "OCR",
+      compatibilityReason: "unsupported-host",
+    });
+
+    expect(
+      parseApiError(
+        { code: "FEATURE_INCOMPATIBLE", featureName: "OCR", compatibilityReason: 42 },
+        501,
+      ),
+    ).toEqual({
+      type: "feature_incompatible",
+      feature: "",
+      featureName: "OCR",
+      compatibilityReason: "",
+    });
   });
 
   it("returns error string when error field is present", () => {
@@ -152,13 +181,23 @@ describe("parseApiError", () => {
     expect(parseApiError(body, 500, "Fallback: 500")).toBe("Fallback: 500");
   });
 
-  it("falls through to error or fallback when FEATURE_NOT_INSTALLED lacks string feature identifiers (#3985)", () => {
+  it("falls through to error or fallback when FEATURE_NOT_INSTALLED or FEATURE_INCOMPATIBLE lacks string feature identifiers (#3985)", () => {
     expect(parseApiError({ code: "FEATURE_NOT_INSTALLED" }, 501, "Fallback: 501")).toBe(
       "Fallback: 501",
     );
     expect(
       parseApiError(
         { code: "FEATURE_NOT_INSTALLED", feature: null, featureName: { bad: true }, error: "No" },
+        501,
+        "Fallback: 501",
+      ),
+    ).toBe("No");
+    expect(parseApiError({ code: "FEATURE_INCOMPATIBLE" }, 501, "Fallback: 501")).toBe(
+      "Fallback: 501",
+    );
+    expect(
+      parseApiError(
+        { code: "FEATURE_INCOMPATIBLE", feature: null, featureName: { bad: true }, error: "No" },
         501,
         "Fallback: 501",
       ),

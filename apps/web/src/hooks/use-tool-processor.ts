@@ -13,7 +13,7 @@ import { track } from "@/lib/analytics";
 import { formatHeaders, parseApiError } from "@/lib/api";
 import { appUrl, resolveServerUrls, serverUrl } from "@/lib/app-url";
 import { parseFileResultsHeader, unpackBatchZip } from "@/lib/batch-zip";
-import { featureNotInstalledMessage } from "@/lib/bundle-i18n";
+import { featureIncompatibleMessage, featureNotInstalledMessage } from "@/lib/bundle-i18n";
 import { CancelRefusedError, failedCancelRequest, readCancelAnswer } from "@/lib/cancel-refusal";
 import { format } from "@/lib/format";
 import {
@@ -1599,6 +1599,8 @@ export function useToolProcessor(toolId: string) {
               );
               if (typeof parsed === "object" && parsed.type === "feature_not_installed") {
                 message = featureNotInstalledMessage(t, parsed, toolName);
+              } else if (typeof parsed === "object" && parsed.type === "feature_incompatible") {
+                message = featureIncompatibleMessage(t, parsed);
               } else {
                 message = parsed as string;
               }
@@ -2407,6 +2409,8 @@ export function useToolProcessor(toolId: string) {
               );
               if (typeof parsed === "object" && parsed.type === "feature_not_installed") {
                 errorMsg = featureNotInstalledMessage(t, parsed, toolName);
+              } else if (typeof parsed === "object" && parsed.type === "feature_incompatible") {
+                errorMsg = featureIncompatibleMessage(t, parsed);
               } else {
                 errorMsg = parsed as string;
               }

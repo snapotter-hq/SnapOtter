@@ -5682,6 +5682,8 @@ export const nl: TranslationKeys = {
       '{tool} heeft de functie "{feature}" nodig. Schakel deze in via Instellingen → AI-functies.',
     featureNotInstalled:
       'De functie "{feature}" is niet geïnstalleerd. Schakel deze in via Instellingen → AI-functies.',
+    featureIncompatible:
+      'De functie "{feature}" kan niet worden uitgevoerd op de hardware van deze server.',
     passwordTooShort: "Het wachtwoord moet minimaal {minLength} tekens lang zijn.",
     passwordNeedsUppercase: "Het wachtwoord moet een hoofdletter bevatten.",
     passwordNeedsLowercase: "Het wachtwoord moet een kleine letter bevatten.",

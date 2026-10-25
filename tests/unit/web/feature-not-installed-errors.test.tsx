@@ -80,6 +80,16 @@ const NOT_INSTALLED = {
   estimatedSize: "4-5 GB",
 };
 
+const INCOMPATIBLE = {
+  error: "Feature incompatible",
+  code: "FEATURE_INCOMPATIBLE",
+  feature: "ocr",
+  featureName: "OCR",
+  estimatedSize: "250 MB",
+  requestedQuality: "best",
+  compatibilityReason: "unsupported-host",
+};
+
 const deBundles = de.featureBundles as TranslationKeys["featureBundles"];
 const deErrors = de.errors as TranslationKeys["errors"] & Record<string, string>;
 const enErrors = en.errors as TranslationKeys["errors"] & Record<string, string>;
@@ -179,6 +189,7 @@ describe("feature-not-installed errors are translated (#1410)", () => {
       for (const key of [
         "featureNotInstalledForTool",
         "featureNotInstalled",
+        "featureIncompatible",
         "failedWithStatus",
         "processingFailedWithStatus",
         "requestFailedWithStatus",
@@ -288,6 +299,150 @@ describe("feature-not-installed errors are translated (#1410)", () => {
 
     expect(view.result.current.value.error).toBe(
       format(deErrors.featureNotInstalled, { feature: "Future" }),
+    );
+    view.unmount();
+  });
+});
+
+const expectedIncompatibleMessage = () =>
+  format(deErrors.featureIncompatible, { feature: deBundles.ocr.name });
+
+describe("feature-incompatible errors are translated (#1438)", () => {
+  it("has the message key in en, naming the {feature} placeholder", () => {
+    expect(enErrors.featureIncompatible).toContain("{feature}");
+  });
+
+  it("tool run: names the bundle in the active locale instead of raw server English", async () => {
+    const file = new File([new ArrayBuffer(16)], "scan.pdf", { type: "application/pdf" });
+    useFileStore.getState().setFiles([file]);
+    const view = await renderInDe(() => useToolProcessor("ocr-pdf"));
+    act(() => {
+      view.result.current.value.processFiles([file], { quality: "best" });
+    });
+
+    act(() => reply(xhrs[0], INCOMPATIBLE, false));
+
+    const error = useFileStore.getState().error;
+    expect(error).toBe(expectedIncompatibleMessage());
+    expect(error).not.toContain("Feature incompatible");
+    view.unmount();
+  });
+
+  it("tool batch: names the bundle in the active locale", async () => {
+    const files = [
+      new File([new ArrayBuffer(16)], "a.pdf", { type: "application/pdf" }),
+      new File([new ArrayBuffer(16)], "b.pdf", { type: "application/pdf" }),
+    ];
+    useFileStore.getState().setFiles(files);
+    const view = await renderInDe(() => useToolProcessor("ocr-pdf"));
+    act(() => {
+      void view.result.current.value.processAllFiles(files, { quality: "best" });
+    });
+
+    act(() => reply(xhrs[0], INCOMPATIBLE, true));
+
+    await vi.waitFor(
+      () => expect(useFileStore.getState().error).toBe(expectedIncompatibleMessage()),
+      { timeout: 3_000 },
+    );
+    view.unmount();
+  });
+
+  it("pipeline run: names the bundle in the active locale instead of the step error string", async () => {
+    const file = new File([new ArrayBuffer(16)], "photo.png", { type: "image/png" });
+    useFileStore.getState().setFiles([file]);
+    const view = await renderInDe(() => usePipelineProcessor());
+    act(() => {
+      view.result.current.value.processSingle(file, [
+        { id: "s1", toolId: "ocr", settings: { quality: "best" } },
+      ]);
+    });
+
+    act(() =>
+      reply(
+        xhrs[0],
+        { ...INCOMPATIBLE, error: 'Step 1 (ocr): Feature "OCR" is incompatible' },
+        false,
+      ),
+    );
+
+    expect(view.result.current.value.error).toBe(expectedIncompatibleMessage());
+    expect(view.result.current.value.error).not.toContain("is incompatible");
+    view.unmount();
+  });
+
+  it("pipeline batch: names the bundle in the active locale", async () => {
+    const files = [
+      new File([new ArrayBuffer(16)], "a.png", { type: "image/png" }),
+      new File([new ArrayBuffer(16)], "b.png", { type: "image/png" }),
+    ];
+    useFileStore.getState().setFiles(files);
+    const view = await renderInDe(() => usePipelineProcessor());
+    act(() => {
+      void view.result.current.value.processAll(files, [
+        { id: "s1", toolId: "ocr", settings: { quality: "best" } },
+      ]);
+    });
+
+    act(() =>
+      reply(
+        xhrs[0],
+        { ...INCOMPATIBLE, error: 'Step 1 (ocr): Feature "OCR" is incompatible' },
+        true,
+      ),
+    );
+
+    await vi.waitFor(
+      () => expect(view.result.current.value.error).toBe(expectedIncompatibleMessage()),
+      { timeout: 3_000 },
+    );
+    view.unmount();
+  });
+
+  it("uses the localized Fast Korean guidance when compatibilityReason is fast-korean-unsupported", async () => {
+    const file = new File([new ArrayBuffer(16)], "photo.png", { type: "image/png" });
+    useFileStore.getState().setFiles([file]);
+    const view = await renderInDe(() => usePipelineProcessor());
+    act(() => {
+      view.result.current.value.processSingle(file, [
+        { id: "s1", toolId: "ocr", settings: { quality: "fast", language: "ko" } },
+      ]);
+    });
+
+    act(() =>
+      reply(
+        xhrs[0],
+        {
+          ...INCOMPATIBLE,
+          requestedQuality: "fast",
+          compatibilityReason: "fast-korean-unsupported",
+          guidance:
+            "Fast OCR does not support Korean. Install the Accurate OCR pack and choose Balanced or Best.",
+        },
+        false,
+      ),
+    );
+
+    expect(view.result.current.value.error).toBe(de.toolSettings.ocr.fastKoreanUnsupported);
+    view.unmount();
+  });
+
+  it("falls back to the server's name for a bundle id this client doesn't know", async () => {
+    const file = new File([new ArrayBuffer(16)], "photo.png", { type: "image/png" });
+    useFileStore.getState().setFiles([file]);
+    const view = await renderInDe(() => usePipelineProcessor());
+    act(() => {
+      view.result.current.value.processSingle(file, [
+        { id: "s1", toolId: "ocr", settings: { quality: "best" } },
+      ]);
+    });
+
+    act(() =>
+      reply(xhrs[0], { ...INCOMPATIBLE, feature: "future-bundle", featureName: "Future" }, false),
+    );
+
+    expect(view.result.current.value.error).toBe(
+      format(deErrors.featureIncompatible, { feature: "Future" }),
     );
     view.unmount();
   });

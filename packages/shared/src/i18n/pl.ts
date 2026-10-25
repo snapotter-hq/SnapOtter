@@ -5680,6 +5680,7 @@ export const pl: TranslationKeys = {
       '{tool} wymaga funkcji "{feature}". Włącz ją w Ustawienia → Funkcje AI.',
     featureNotInstalled:
       'Funkcja "{feature}" nie jest zainstalowana. Włącz ją w Ustawienia → Funkcje AI.',
+    featureIncompatible: 'Funkcja "{feature}" nie może działać na sprzęcie tego serwera.',
     passwordTooShort: "Hasło jest za krótkie (minimum: {minLength}).",
     passwordNeedsUppercase: "Hasło musi zawierać wielką literę.",
     passwordNeedsLowercase: "Hasło musi zawierać małą literę.",

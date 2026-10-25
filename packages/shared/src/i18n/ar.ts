@@ -5607,6 +5607,7 @@ export const ar: TranslationKeys = {
     featureNotInstalledForTool:
       'تتطلب أداة {tool} ميزة "{feature}". فعّلها من الإعدادات ← ميزات AI.',
     featureNotInstalled: 'ميزة "{feature}" غير مثبتة. فعّلها من الإعدادات ← ميزات AI.',
+    featureIncompatible: 'لا يمكن تشغيل ميزة "{feature}" على عتاد هذا الخادم.',
     passwordTooShort: "يجب ألا يقل عدد أحرف كلمة المرور عن {minLength}.",
     passwordNeedsUppercase: "يجب أن تحتوي كلمة المرور على حرف كبير.",
     passwordNeedsLowercase: "يجب أن تحتوي كلمة المرور على حرف صغير.",

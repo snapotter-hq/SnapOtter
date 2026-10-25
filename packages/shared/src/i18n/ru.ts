@@ -5671,6 +5671,7 @@ export const ru: TranslationKeys = {
       "Для «{tool}» нужна функция «{feature}». Включите её в Настройки → AI-функции.",
     featureNotInstalled:
       "Функция «{feature}» не установлена. Включите её в Настройки → AI-функции.",
+    featureIncompatible: "Функция «{feature}» не может работать на оборудовании этого сервера.",
     passwordTooShort: "Пароль слишком короткий (минимум: {minLength}).",
     passwordNeedsUppercase: "Пароль должен содержать заглавную букву.",
     passwordNeedsLowercase: "Пароль должен содержать строчную букву.",

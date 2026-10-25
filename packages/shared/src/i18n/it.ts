@@ -5678,6 +5678,8 @@ export const it: TranslationKeys = {
       '{tool} richiede la funzionalità "{feature}". Attivala in Impostazioni → Funzionalità AI.',
     featureNotInstalled:
       'La funzionalità "{feature}" non è installata. Attivala in Impostazioni → Funzionalità AI.',
+    featureIncompatible:
+      'La funzionalità "{feature}" non può essere eseguita sull\'hardware di questo server.',
     passwordTooShort: "La password deve contenere almeno {minLength} caratteri.",
     passwordNeedsUppercase: "La password deve contenere una lettera maiuscola.",
     passwordNeedsLowercase: "La password deve contenere una lettera minuscola.",

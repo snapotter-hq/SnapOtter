@@ -5342,6 +5342,7 @@ export const zhCN: TranslationKeys = {
     fileTooLarge: "此文件太大，无法上传。请尝试较小的文件，或联系服务器管理员提高上传大小限制。",
     featureNotInstalledForTool: "{tool}需要「{feature}」功能。请在 设置 → AI 功能 中启用。",
     featureNotInstalled: "「{feature}」功能未安装。请在 设置 → AI 功能 中启用。",
+    featureIncompatible: "「{feature}」功能无法在此服务器的硬件上运行。",
     passwordTooShort: "密码长度至少为 {minLength} 个字符。",
     passwordNeedsUppercase: "密码必须包含一个大写字母。",
     passwordNeedsLowercase: "密码必须包含一个小写字母。",

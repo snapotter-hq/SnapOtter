@@ -5655,6 +5655,7 @@ export const sv: TranslationKeys = {
       '{tool} kräver funktionen "{feature}". Aktivera den under Inställningar → AI-funktioner.',
     featureNotInstalled:
       'Funktionen "{feature}" är inte installerad. Aktivera den under Inställningar → AI-funktioner.',
+    featureIncompatible: 'Funktionen "{feature}" kan inte köras på den här serverns hårdvara.',
     passwordTooShort: "Lösenordet måste vara minst {minLength} tecken långt.",
     passwordNeedsUppercase: "Lösenordet måste innehålla en stor bokstav.",
     passwordNeedsLowercase: "Lösenordet måste innehålla en liten bokstav.",

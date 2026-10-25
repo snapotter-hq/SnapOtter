@@ -5670,6 +5670,7 @@ export const uk: TranslationKeys = {
       "Для «{tool}» потрібна функція «{feature}». Увімкніть її в Налаштування → AI-функції.",
     featureNotInstalled:
       "Функцію «{feature}» не встановлено. Увімкніть її в Налаштування → AI-функції.",
+    featureIncompatible: "Функція «{feature}» не може працювати на обладнанні цього сервера.",
     passwordTooShort: "Пароль закороткий (мінімум: {minLength}).",
     passwordNeedsUppercase: "Пароль має містити велику літеру.",
     passwordNeedsLowercase: "Пароль має містити малу літеру.",

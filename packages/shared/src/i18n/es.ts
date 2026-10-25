@@ -5672,6 +5672,8 @@ export const es: TranslationKeys = {
       '{tool} necesita la función "{feature}". Actívala en Configuración → Funciones de AI.',
     featureNotInstalled:
       'La función "{feature}" no está instalada. Actívala en Configuración → Funciones de AI.',
+    featureIncompatible:
+      'La función "{feature}" no puede ejecutarse en el hardware de este servidor.',
     passwordTooShort: "La contraseña debe tener al menos {minLength} caracteres.",
     passwordNeedsUppercase: "La contraseña debe contener una letra mayúscula.",
     passwordNeedsLowercase: "La contraseña debe contener una letra minúscula.",

@@ -5569,6 +5569,7 @@ export const ko: TranslationKeys = {
     featureNotInstalledForTool:
       '{tool}에는 "{feature}" 기능이 필요합니다. 설정 → AI 기능에서 활성화하세요.',
     featureNotInstalled: '"{feature}" 기능이 설치되지 않았습니다. 설정 → AI 기능에서 활성화하세요.',
+    featureIncompatible: '"{feature}" 기능은 이 서버의 하드웨어에서 실행할 수 없습니다.',
     passwordTooShort: "비밀번호는 {minLength}자 이상이어야 합니다.",
     passwordNeedsUppercase: "비밀번호에 대문자를 포함해야 합니다.",
     passwordNeedsLowercase: "비밀번호에 소문자를 포함해야 합니다.",

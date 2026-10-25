@@ -5343,6 +5343,7 @@ export const zhTW: TranslationKeys = {
     fileTooLarge: "此檔案太大，無法上傳。請嘗試較小的檔案，或聯絡伺服器管理員提高上傳大小限制。",
     featureNotInstalledForTool: "{tool}需要「{feature}」功能。請在 設定 → AI功能 中啟用。",
     featureNotInstalled: "「{feature}」功能未安裝。請在 設定 → AI功能 中啟用。",
+    featureIncompatible: "「{feature}」功能無法在此伺服器的硬體上執行。",
     passwordTooShort: "密碼長度至少需要 {minLength} 個字元。",
     passwordNeedsUppercase: "密碼必須包含一個大寫字母。",
     passwordNeedsLowercase: "密碼必須包含一個小寫字母。",
