@@ -408,6 +408,46 @@ describe("People", () => {
     expect(apiPost).not.toHaveBeenCalled();
   });
 
+  it("marks the add-user inputs invalid and points to the alert when refused (#2067)", async () => {
+    apiPost.mockRejectedValueOnce(apiError(400, "VALIDATION_ERROR", { rule: "uppercase" }));
+    await openAddForm();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveAttribute("id", "add-user-error");
+
+    const pwInput = screen.getByLabelText(de.auth.password);
+    expect(pwInput).toHaveAttribute("aria-invalid", "true");
+    expect(pwInput).toHaveAttribute("aria-describedby", "add-user-error");
+
+    const userInput = screen.getByLabelText(s.people.usernamePlaceholder);
+    expect(userInput).toHaveAttribute("aria-invalid", "true");
+    expect(userInput).toHaveAttribute("aria-describedby", "add-user-error");
+
+    // Editing username clears error state
+    fireEvent.change(userInput, { target: { value: "validuser2" } });
+    expect(userInput).not.toHaveAttribute("aria-invalid");
+    expect(userInput).not.toHaveAttribute("aria-describedby");
+    expect(pwInput).not.toHaveAttribute("aria-invalid");
+    expect(pwInput).not.toHaveAttribute("aria-describedby");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("clears add-user errors when clicking generate password (#2067)", async () => {
+    apiPost.mockRejectedValueOnce(apiError(400, "VALIDATION_ERROR", { rule: "uppercase" }));
+    await openAddForm();
+    await screen.findByRole("alert");
+
+    const generateBtn = screen.getByRole("button", { name: de.changePassword.generateButton });
+    fireEvent.click(generateBtn);
+
+    const pwInput = screen.getByLabelText(de.auth.password);
+    const userInput = screen.getByLabelText(s.people.usernamePlaceholder);
+    expect(userInput).not.toHaveAttribute("aria-invalid");
+    expect(userInput).not.toHaveAttribute("aria-describedby");
+    expect(pwInput).not.toHaveAttribute("aria-invalid");
+    expect(pwInput).not.toHaveAttribute("aria-describedby");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   async function openUserMenu(action: string) {
     renderDe(<PeopleSection />);
     fireEvent.click(await screen.findByRole("button", { name: de.common.actions }));
@@ -470,6 +510,26 @@ describe("People", () => {
       expect(alert).toHaveTextContent(de.errors.passwordNeedsDigit);
       // Not a second copy in the banner above the member list.
       expect(screen.getAllByText(de.errors.passwordNeedsDigit)).toHaveLength(1);
+    });
+
+    it("labels the reset password input for screen readers (#2067)", async () => {
+      await openUserMenu(s.people.resetPasswordAction);
+      const input = screen.getByLabelText(s.people.newPasswordLabel);
+      expect(input).toBeInTheDocument();
+      expect(input).not.toHaveAttribute("aria-invalid");
+      expect(input).not.toHaveAttribute("aria-describedby");
+    });
+
+    it("marks the reset password input invalid and points to the alert (#2067)", async () => {
+      const { form, input } = await submitRefusedPassword();
+      const alert = await within(form).findByRole("alert");
+      expect(input).toHaveAttribute("aria-invalid", "true");
+      expect(input).toHaveAttribute("aria-describedby", "reset-password-error");
+      expect(alert).toHaveAttribute("id", "reset-password-error");
+
+      fireEvent.change(input, { target: { value: "WithDigit1" } });
+      expect(input).not.toHaveAttribute("aria-invalid");
+      expect(input).not.toHaveAttribute("aria-describedby");
     });
 
     it("keeps the rejected value and the reason well past the old banner's three seconds", async () => {

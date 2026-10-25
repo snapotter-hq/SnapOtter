@@ -2176,9 +2176,14 @@ export function PeopleSection() {
                 id="new-user-username"
                 type="text"
                 value={newUsername}
-                onChange={(e) => setNewUsername(e.target.value)}
+                onChange={(e) => {
+                  setNewUsername(e.target.value);
+                  setAddErrors(null);
+                }}
                 placeholder={t.settings.people.usernamePlaceholder}
                 required
+                aria-invalid={Boolean(addErrors) || undefined}
+                aria-describedby={addErrors ? "add-user-error" : undefined}
                 className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground"
               />
             </div>
@@ -2194,9 +2199,12 @@ export function PeopleSection() {
                   setNewPassword(e.target.value);
                   setShowGeneratedPw(false);
                   setPwCopy(null);
+                  setAddErrors(null);
                 }}
                 placeholder={t.auth.password}
                 required
+                aria-invalid={Boolean(addErrors) || undefined}
+                aria-describedby={addErrors ? "add-user-error" : undefined}
                 className={cn(
                   "flex-1 min-w-0 px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground",
                   showGeneratedPw && "font-mono",
@@ -2288,6 +2296,7 @@ export function PeopleSection() {
                 setNewPassword(pw);
                 setShowGeneratedPw(true);
                 setPwCopy(null);
+                setAddErrors(null);
               }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-primary/30 bg-primary/10 text-xs text-primary-ink hover:bg-primary/20 font-medium transition-colors"
             >
@@ -2317,7 +2326,13 @@ export function PeopleSection() {
               {t.settings.people.copyPasswordWarning}
             </p>
           )}
-          {addErrors && <AlertMessages messages={addErrors} className="text-sm text-destructive" />}
+          {addErrors && (
+            <AlertMessages
+              id="add-user-error"
+              messages={addErrors}
+              className="text-sm text-destructive"
+            />
+          )}
         </form>
       )}
 
@@ -2394,7 +2409,11 @@ export function PeopleSection() {
             })}
           </h4>
           <div className="flex flex-wrap gap-3">
+            <label htmlFor="reset-user-password" className="sr-only">
+              {t.settings.people.newPasswordLabel}
+            </label>
             <input
+              id="reset-user-password"
               type="password"
               value={resetPassword}
               disabled={resetting}
@@ -2404,6 +2423,8 @@ export function PeopleSection() {
               }}
               placeholder={t.settings.people.newPasswordLabel}
               required
+              aria-invalid={Boolean(resetErrors) || undefined}
+              aria-describedby={resetErrors ? "reset-password-error" : undefined}
               className="px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground w-60 disabled:opacity-50"
             />
             <button
@@ -2429,7 +2450,11 @@ export function PeopleSection() {
             </button>
           </div>
           {resetErrors && (
-            <AlertMessages messages={resetErrors} className="text-sm text-destructive" />
+            <AlertMessages
+              id="reset-password-error"
+              messages={resetErrors}
+              className="text-sm text-destructive"
+            />
           )}
           <p className="text-xs text-muted-foreground">{t.settings.people.resetPasswordWarning}</p>
         </form>
