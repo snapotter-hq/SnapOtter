@@ -5694,6 +5694,7 @@ export const ru: TranslationKeys = {
     processingFailedWithStatus:
       "Не удалось обработать этот файл. Убедитесь, что файл не повреждён, и попробуйте снова.",
     processingFailedNoDetail: "Ошибка обработки",
+    canceled: "Обработка отменена",
     jobTrackingFailed: "Что-то пошло не так при отслеживании этой задачи. Попробуйте снова.",
     requestTimedOut: "Время ожидания истекло",
     runInterrupted: "Обработка была прервана. Запустите её снова.",

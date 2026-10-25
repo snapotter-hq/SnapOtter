@@ -5706,6 +5706,7 @@ export const nl: TranslationKeys = {
     processingFailedWithStatus:
       "Dit bestand kon niet worden verwerkt. Controleer of het bestand niet beschadigd is en probeer het opnieuw.",
     processingFailedNoDetail: "Verwerking mislukt",
+    canceled: "Verwerking geannuleerd",
     jobTrackingFailed: "Er ging iets mis bij het volgen van deze taak. Probeer het opnieuw.",
     requestTimedOut: "Time-out van verzoek",
     runInterrupted: "De verwerking is onderbroken. Voer het opnieuw uit.",

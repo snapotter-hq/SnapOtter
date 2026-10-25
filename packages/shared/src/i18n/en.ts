@@ -5606,6 +5606,7 @@ export const en = {
     processingFailedWithStatus:
       "We couldn't process this file. Check that the file isn't damaged and try again.",
     processingFailedNoDetail: "Processing failed",
+    canceled: "Canceled",
     jobTrackingFailed: "Something went wrong while tracking this job. Try again.",
     requestTimedOut: "Request timed out",
     runInterrupted: "Processing was interrupted. Run it again.",

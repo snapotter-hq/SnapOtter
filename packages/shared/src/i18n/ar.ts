@@ -5629,6 +5629,7 @@ export const ar: TranslationKeys = {
     failedWithStatus: "تعذّر إكمال هذا الطلب. يرجى المحاولة مرة أخرى.",
     processingFailedWithStatus: "تعذّرت معالجة هذا الملف. تأكد من أن الملف غير تالف وحاول مرة أخرى.",
     processingFailedNoDetail: "فشلت المعالجة",
+    canceled: "تم إلغاء المعالجة",
     jobTrackingFailed: "حدث خطأ أثناء متابعة هذه المهمة. حاول مرة أخرى.",
     requestTimedOut: "انتهت مهلة الطلب",
     runInterrupted: "تمت مقاطعة المعالجة. شغّلها مرة أخرى.",

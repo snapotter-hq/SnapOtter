@@ -5632,6 +5632,7 @@ export const ja: TranslationKeys = {
     processingFailedWithStatus:
       "このファイルを処理できませんでした。ファイルが破損していないか確認して、もう一度お試しください。",
     processingFailedNoDetail: "処理に失敗しました",
+    canceled: "処理がキャンセルされました",
     jobTrackingFailed: "このジョブの追跡中に問題が発生しました。もう一度お試しください。",
     requestTimedOut: "リクエストがタイムアウトしました",
     runInterrupted: "処理が中断されました。もう一度実行してください。",

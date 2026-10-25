@@ -5459,6 +5459,7 @@ export const hi: TranslationKeys = {
     processingFailedWithStatus:
       "हम इस फ़ाइल को प्रोसेस नहीं कर सके। जाँचें कि फ़ाइल खराब नहीं है और फिर से प्रयास करें।",
     processingFailedNoDetail: "प्रोसेसिंग विफल",
+    canceled: "प्रोसेसिंग रद्द हुई",
     jobTrackingFailed: "इस जॉब को ट्रैक करते समय कुछ गलत हो गया। फिर से प्रयास करें।",
     requestTimedOut: "अनुरोध का समय समाप्त हो गया",
     runInterrupted: "प्रोसेसिंग बाधित हो गई। इसे फिर से चलाएं।",

@@ -1118,6 +1118,7 @@ async function processToolJob(job: Job<ToolJobData>): Promise<ToolJobResult> {
               phase: "failed",
               percent: 0,
               error: "Canceled",
+              code: "CANCELED",
             });
           }
         } else {
@@ -1620,6 +1621,7 @@ async function processPipelineFinalize(job: Job<ToolJobData>): Promise<ToolJobRe
         phase: "failed",
         percent: 0,
         error: "Canceled",
+        code: "CANCELED",
       });
     }
 

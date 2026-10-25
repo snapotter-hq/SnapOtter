@@ -5588,6 +5588,7 @@ export const th: TranslationKeys = {
     failedWithStatus: "ไม่สามารถดำเนินการตามคำขอได้ โปรดลองอีกครั้ง",
     processingFailedWithStatus: "ไม่สามารถประมวลผลไฟล์นี้ได้ โปรดตรวจสอบว่าไฟล์ไม่เสียหายแล้วลองอีกครั้ง",
     processingFailedNoDetail: "ประมวลผลล้มเหลว",
+    canceled: "ยกเลิกการประมวลผลแล้ว",
     jobTrackingFailed: "เกิดข้อผิดพลาดขณะติดตามงานนี้ ลองอีกครั้ง",
     requestTimedOut: "คำขอหมดเวลา",
     runInterrupted: "การประมวลผลถูกขัดจังหวะ เรียกใช้อีกครั้ง",

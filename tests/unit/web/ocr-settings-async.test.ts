@@ -299,6 +299,23 @@ describe("OCR async response handling", () => {
       MockEventSource.instances[1].emit({ type: "single", phase: "processing", percent: 40 }),
     ).toThrow("boom");
     await expect(trackingErrorPromise).rejects.toThrow(de.errors.jobTrackingFailed);
+
+    const canceledPromise = ocrOneFile(
+      new File(["image"], "scan.png", { type: "image/png" }),
+      { quality: "fast", language: "en", enhance: false },
+      { onUploadProgress: vi.fn(), onProcessingProgress: vi.fn() },
+      { processingFailed: de.errors.processingFailed, t: de },
+    );
+    xhrs[2].status = 202;
+    xhrs[2].onload?.();
+    MockEventSource.instances[2].emit({
+      type: "single",
+      phase: "failed",
+      percent: 0,
+      error: "Canceled",
+      code: "CANCELED",
+    });
+    await expect(canceledPromise).rejects.toThrow(de.errors.canceled);
   });
 
   it("ignores a malformed frame and still resolves from the next good one", async () => {

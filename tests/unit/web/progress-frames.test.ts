@@ -37,6 +37,26 @@ describe("failedFrameMessage (#1432)", () => {
     expect(failedFrameMessage({ phase: "failed" }, "OCR failed")).toBe("OCR failed");
     expect(failedFrameMessage({ phase: "failed", error: "" }, "OCR failed")).toBe("OCR failed");
   });
+
+  it("maps a canceled frame to the canceled string (#1623)", () => {
+    expect(
+      failedFrameMessage({ phase: "failed", error: "Canceled", code: "CANCELED" }, "OCR failed"),
+    ).toBe("Canceled");
+    expect(
+      failedFrameMessage(
+        { phase: "failed", code: "CANCELED" },
+        "Verarbeitung fehlgeschlagen",
+        "Verarbeitung abgebrochen",
+      ),
+    ).toBe("Verarbeitung abgebrochen");
+    expect(
+      failedFrameMessage(
+        { phase: "failed", error: "Canceled", code: "CANCELED" },
+        "Verarbeitung fehlgeschlagen",
+        "Verarbeitung abgebrochen",
+      ),
+    ).toBe("Verarbeitung abgebrochen");
+  });
 });
 
 describe("frameFailure with a hint (#1432)", () => {

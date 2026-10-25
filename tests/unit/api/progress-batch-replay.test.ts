@@ -325,6 +325,25 @@ describe("buildBatchReplayEvent", () => {
     });
   });
 
+  it("leaves errors empty when a failed row has neither details nor a message (#1623)", () => {
+    expect(
+      buildBatchReplayEvent({
+        jobId: "batch-bare-failed",
+        status: "failed",
+        progress: { percent: 50, totalFiles: 2, completedFiles: 0, failedFiles: 2 },
+        error: null,
+      }),
+    ).toEqual({
+      jobId: "batch-bare-failed",
+      type: "batch",
+      status: "failed",
+      totalFiles: 2,
+      completedFiles: 0,
+      failedFiles: 2,
+      errors: [],
+    });
+  });
+
   it("replays a canceled row as failed with a Canceled marker", () => {
     expect(
       buildBatchReplayEvent({

@@ -5699,6 +5699,7 @@ export const ptBR: TranslationKeys = {
     processingFailedWithStatus:
       "Não foi possível processar este arquivo. Verifique se ele não está corrompido e tente novamente.",
     processingFailedNoDetail: "Falha no processamento",
+    canceled: "Processamento cancelado",
     jobTrackingFailed: "Algo deu errado ao acompanhar esta tarefa. Tente novamente.",
     requestTimedOut: "A requisição expirou",
     runInterrupted: "O processamento foi interrompido. Execute novamente.",

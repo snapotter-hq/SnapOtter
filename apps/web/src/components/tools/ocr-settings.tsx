@@ -169,6 +169,7 @@ export function ocrOneFile(
               failedFrameMessage(
                 data,
                 messages.processingFailed ?? (messages.t ?? en).errors.processingFailedNoDetail,
+                (messages.t ?? en).errors.canceled,
               ),
             ),
           );

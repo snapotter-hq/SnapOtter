@@ -5364,6 +5364,7 @@ export const zhTW: TranslationKeys = {
     failedWithStatus: "無法完成該要求，請再試一次。",
     processingFailedWithStatus: "無法處理此檔案，請確認檔案未損毀後再試一次。",
     processingFailedNoDetail: "處理失敗",
+    canceled: "處理已取消",
     jobTrackingFailed: "追蹤此工作時發生錯誤。請再試一次。",
     requestTimedOut: "要求逾時",
     runInterrupted: "處理已中斷。請重新執行。",

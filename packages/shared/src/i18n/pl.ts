@@ -5703,6 +5703,7 @@ export const pl: TranslationKeys = {
     processingFailedWithStatus:
       "Nie udało się przetworzyć tego pliku. Sprawdź, czy plik nie jest uszkodzony, i spróbuj ponownie.",
     processingFailedNoDetail: "Przetwarzanie nie powiodło się",
+    canceled: "Przetwarzanie anulowane",
     jobTrackingFailed: "Coś poszło nie tak podczas śledzenia tego zadania. Spróbuj ponownie.",
     requestTimedOut: "Upłynął limit czasu żądania",
     runInterrupted: "Przetwarzanie zostało przerwane. Uruchom je ponownie.",

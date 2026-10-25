@@ -200,6 +200,42 @@ describe.each(subscribers)("%s async progress", (_name, subscribe) => {
     expect(onFailed).toHaveBeenCalledWith({ reason: "noDetail" });
   });
 
+  // #1623: a canceled frame carries error: "Canceled" and code: "CANCELED"
+  // (or code: "CANCELED" alone); subscribers must report { reason: "canceled" }
+  // instead of passing English "Canceled" as a server message.
+  it("reports a canceled frame as { reason: 'canceled' }, not English (#1623)", () => {
+    const onFailed = vi.fn();
+    subscribe("job-canceled", { onComplete: vi.fn(), onFailed, onStall: vi.fn() });
+
+    FakeEventSource.instances[0].onmessage?.({
+      data: JSON.stringify({
+        type: "single",
+        phase: "failed",
+        percent: 0,
+        error: "Canceled",
+        code: "CANCELED",
+      }),
+    });
+
+    expect(onFailed).toHaveBeenCalledWith({ reason: "canceled" });
+  });
+
+  it("reports a code-only CANCELED frame as { reason: 'canceled' } (#1623)", () => {
+    const onFailed = vi.fn();
+    subscribe("job-canceled-code", { onComplete: vi.fn(), onFailed, onStall: vi.fn() });
+
+    FakeEventSource.instances[0].onmessage?.({
+      data: JSON.stringify({
+        type: "single",
+        phase: "failed",
+        percent: 0,
+        code: "CANCELED",
+      }),
+    });
+
+    expect(onFailed).toHaveBeenCalledWith({ reason: "canceled" });
+  });
+
   // #1830 split "complete with no result" off the progress branch; a running
   // job's progress frame must still only report progress.
   it("passes a progress frame through without ending the run", () => {

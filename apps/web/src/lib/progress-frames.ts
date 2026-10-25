@@ -160,17 +160,20 @@ export function reportMalformedResult(
  */
 export type JobFailure =
   | { message: string }
-  | { reason: "noDetail" | "trackingFailed" | "invalidResponse" };
+  | { reason: "noDetail" | "canceled" | "trackingFailed" | "invalidResponse" };
 
 /**
  * The JobFailure for a failed progress frame's `error`. A blank or missing
  * error has nothing to show, so it's `noDetail` rather than an empty message:
  * the worker publishes `error: ""` when a handler throws an Error with no text.
+ * A canceled frame carries `code: "CANCELED"` (and `error: "Canceled"`) so
+ * subscribers report `canceled` and let the caller translate it (#1623).
  * The operator hint an engine-unavailable failure carries in `details` follows
  * the error, the same way an HTTP error body reads (#1432): without it, a job
  * that failed because qpdf or ffprobe couldn't start said nothing actionable.
  */
-export function frameFailure(error: unknown, details?: unknown): JobFailure {
+export function frameFailure(error: unknown, details?: unknown, code?: unknown): JobFailure {
+  if (code === "CANCELED" || error === "Canceled") return { reason: "canceled" };
   if (typeof error !== "string" || !error.trim()) return { reason: "noDetail" };
   const hint = typeof details === "string" && details.trim() ? details : "";
   return { message: hint ? `${error}: ${hint}` : error };
@@ -178,21 +181,34 @@ export function frameFailure(error: unknown, details?: unknown): JobFailure {
 
 /**
  * A failed frame's text for callers that show a plain string with their own
- * fallback (the shared tool processor, OCR): frameFailure's message, or the
- * fallback when the frame has no error.
+ * fallback (the shared tool processor, OCR): frameFailure's message,
+ * `canceled` when the job was canceled, or the fallback when the frame has no
+ * error.
  */
-export function failedFrameMessage(frame: ProgressFrame, fallback: string): string {
-  const failure = frameFailure(frame.error, frame.details);
-  return "message" in failure ? failure.message : fallback;
+export function failedFrameMessage(
+  frame: ProgressFrame,
+  fallback: string,
+  canceled = "Canceled",
+): string {
+  const failure = frameFailure(frame.error, frame.details, frame.code);
+  if ("message" in failure) return failure.message;
+  if (failure.reason === "canceled") return canceled;
+  return fallback;
 }
 
 /** The text to show for a JobFailure, in the caller's locale. */
 export function jobFailureMessage(
   failure: JobFailure,
-  errors: { processingFailedNoDetail: string; jobTrackingFailed: string; invalidResponse: string },
+  errors: {
+    processingFailedNoDetail: string;
+    canceled: string;
+    jobTrackingFailed: string;
+    invalidResponse: string;
+  },
 ): string {
   if ("message" in failure) return failure.message;
   if (failure.reason === "noDetail") return errors.processingFailedNoDetail;
+  if (failure.reason === "canceled") return errors.canceled;
   if (failure.reason === "invalidResponse") return errors.invalidResponse;
   return errors.jobTrackingFailed;
 }

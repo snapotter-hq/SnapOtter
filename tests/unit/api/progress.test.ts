@@ -488,7 +488,7 @@ describe("durable single-file terminal progress", () => {
     });
   });
 
-  it("replays a canceled durable row as the failed Canceled terminal (#771)", () => {
+  it("replays a canceled durable row as the failed Canceled terminal (#771, #1623)", () => {
     expect(
       buildSingleFileReplayEvent({
         jobId: "single-canceled",
@@ -502,10 +502,11 @@ describe("durable single-file terminal progress", () => {
       phase: "failed",
       percent: 0,
       error: "Canceled",
+      code: "CANCELED",
     });
   });
 
-  it("falls back to Canceled for a canceled row without a stored message", () => {
+  it("falls back to Canceled for a canceled row without a stored message (#1623)", () => {
     expect(
       buildSingleFileReplayEvent({
         jobId: "single-canceled-bare",
@@ -519,6 +520,39 @@ describe("durable single-file terminal progress", () => {
       phase: "failed",
       percent: 0,
       error: "Canceled",
+      code: "CANCELED",
+    });
+  });
+
+  it("omits error when a failed row has no stored message so clients translate noDetail (#1623)", () => {
+    expect(
+      buildSingleFileReplayEvent({
+        jobId: "single-failed-bare",
+        status: "failed",
+        progress: { percent: 25 },
+        error: null,
+      }),
+    ).toEqual({
+      jobId: "single-failed-bare",
+      type: "single",
+      phase: "failed",
+      percent: 25,
+    });
+
+    expect(
+      buildSingleFileReplayEvent({
+        jobId: "single-failed-blank",
+        status: "failed",
+        progress: {},
+        error: { message: "   ", code: "ENGINE_UNAVAILABLE", details: "Check QPDF_PATH" },
+      }),
+    ).toEqual({
+      jobId: "single-failed-blank",
+      type: "single",
+      phase: "failed",
+      percent: 0,
+      code: "ENGINE_UNAVAILABLE",
+      details: "Check QPDF_PATH",
     });
   });
 });
@@ -687,6 +721,30 @@ describe("expectedPipelineFlowId pointer guard (#2741)", () => {
       code: "storage-unavailable",
       details: "Check S3_ENDPOINT",
       httpStatus: 503,
+    });
+    await Promise.resolve();
+    expect(redisMocks.publish).toHaveBeenCalledTimes(1);
+
+    redisMocks.setex.mockClear();
+    redisMocks.publish.mockClear();
+    await cancelSingleJobGuarded({
+      jobId: "alias-1",
+      expectedPipelineFlowId: "flow-1",
+    });
+    expect(dbMocks.updated.at(-1)).toMatchObject({
+      status: "canceled",
+      progress: { percent: 0 },
+      error: { message: "Canceled" },
+    });
+    expect(redisMocks.setex).toHaveBeenCalledTimes(1);
+    const cancelFrame = JSON.parse((redisMocks.setex.mock.calls[0] as unknown[])[2] as string);
+    expect(cancelFrame).toEqual({
+      jobId: "alias-1",
+      type: "single",
+      phase: "failed",
+      percent: 0,
+      error: "Canceled",
+      code: "CANCELED",
     });
     await Promise.resolve();
     expect(redisMocks.publish).toHaveBeenCalledTimes(1);

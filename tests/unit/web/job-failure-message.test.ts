@@ -20,6 +20,11 @@ describe("jobFailureMessage", () => {
     expect(de.errors.processingFailedNoDetail).not.toBe(en.errors.processingFailedNoDetail);
   });
 
+  it("translates a canceled job (#1623)", () => {
+    expect(jobFailureMessage({ reason: "canceled" }, de.errors)).toBe(de.errors.canceled);
+    expect(de.errors.canceled).not.toBe(en.errors.canceled);
+  });
+
   it("translates a run whose progress handling broke", () => {
     expect(jobFailureMessage({ reason: "trackingFailed" }, de.errors)).toBe(
       de.errors.jobTrackingFailed,
@@ -44,5 +49,11 @@ describe("frameFailure", () => {
     for (const error of [undefined, null, "", "   ", 42, { message: "x" }]) {
       expect(frameFailure(error)).toEqual({ reason: "noDetail" });
     }
+  });
+
+  it("maps a canceled frame by code or Canceled marker to canceled (#1623)", () => {
+    expect(frameFailure("Canceled", undefined, "CANCELED")).toEqual({ reason: "canceled" });
+    expect(frameFailure(undefined, undefined, "CANCELED")).toEqual({ reason: "canceled" });
+    expect(frameFailure("Canceled")).toEqual({ reason: "canceled" });
   });
 });

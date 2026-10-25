@@ -5735,6 +5735,7 @@ export const de: TranslationKeys = {
     processingFailedWithStatus:
       "Diese Datei konnte nicht verarbeitet werden. Prüfen Sie, ob die Datei unbeschädigt ist, und versuchen Sie es erneut.",
     processingFailedNoDetail: "Verarbeitung fehlgeschlagen",
+    canceled: "Verarbeitung abgebrochen",
     jobTrackingFailed:
       "Beim Verfolgen dieses Auftrags ist ein Fehler aufgetreten. Versuchen Sie es erneut.",
     requestTimedOut: "Zeitüberschreitung der Anfrage",

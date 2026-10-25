@@ -5702,6 +5702,7 @@ export const it: TranslationKeys = {
     processingFailedWithStatus:
       "Non è stato possibile elaborare questo file. Verifica che il file non sia danneggiato e riprova.",
     processingFailedNoDetail: "Elaborazione non riuscita",
+    canceled: "Elaborazione annullata",
     jobTrackingFailed:
       "Si è verificato un problema durante il monitoraggio di questa operazione. Riprova.",
     requestTimedOut: "Richiesta scaduta",

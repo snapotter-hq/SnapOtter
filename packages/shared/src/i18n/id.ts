@@ -5682,6 +5682,7 @@ export const id: TranslationKeys = {
     processingFailedWithStatus:
       "Kami tidak dapat memproses file ini. Pastikan file tidak rusak dan coba lagi.",
     processingFailedNoDetail: "Pemrosesan gagal",
+    canceled: "Pemrosesan dibatalkan",
     jobTrackingFailed: "Terjadi kesalahan saat melacak pekerjaan ini. Coba lagi.",
     requestTimedOut: "Permintaan habis waktu",
     runInterrupted: "Pemrosesan terputus. Jalankan lagi.",

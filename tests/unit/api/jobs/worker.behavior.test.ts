@@ -4275,6 +4275,7 @@ describe("processPipelineFinalize (#3167, #2703)", () => {
       phase: "failed",
       percent: 0,
       error: "Canceled",
+      code: "CANCELED",
     });
 
     cancelSingleJobGuardedMock.mockClear();
@@ -5765,6 +5766,7 @@ describe("processToolJob expectedArtifactJobId alias guard (#3408)", () => {
       phase: "failed",
       percent: 0,
       error: "Canceled",
+      code: "CANCELED",
     });
 
     // 3c. Cancel without separate clientJobId: publishEphemeral IS called directly
@@ -5781,6 +5783,7 @@ describe("processToolJob expectedArtifactJobId alias guard (#3408)", () => {
       phase: "failed",
       percent: 0,
       error: "Canceled",
+      code: "CANCELED",
     });
 
     // 4. Non-terminal progress in processToolJob passes expectedArtifactJobId when clientJobId !== jobId and omits it when direct (#3409)

@@ -5696,6 +5696,7 @@ export const es: TranslationKeys = {
     processingFailedWithStatus:
       "No pudimos procesar este archivo. Comprueba que no esté dañado e inténtalo de nuevo.",
     processingFailedNoDetail: "Error en el procesamiento",
+    canceled: "Procesamiento cancelado",
     jobTrackingFailed: "Algo salió mal al seguir esta tarea. Vuelve a intentarlo.",
     requestTimedOut: "La solicitud agotó el tiempo de espera",
     runInterrupted: "Se interrumpió el procesamiento. Ejecútalo de nuevo.",

@@ -136,13 +136,14 @@ export function buildSingleFileReplayEvent(row: SingleFileReplayRow): SingleFile
     };
   }
 
-  const error =
-    isRecord(row.error) && typeof row.error.message === "string"
+  const storedMessage =
+    isRecord(row.error) && typeof row.error.message === "string" && row.error.message.trim()
       ? row.error.message
-      : row.status === "canceled"
-        ? "Canceled"
-        : "Processing failed";
-  const code = isRecord(row.error) && typeof row.error.code === "string" ? row.error.code : "";
+      : "";
+  const error = storedMessage || (row.status === "canceled" ? "Canceled" : "");
+  const storedCode =
+    isRecord(row.error) && typeof row.error.code === "string" ? row.error.code : "";
+  const code = storedCode || (row.status === "canceled" ? "CANCELED" : "");
   const details =
     isRecord(row.error) && typeof row.error.details === "string" ? row.error.details : "";
   return {
@@ -150,7 +151,7 @@ export function buildSingleFileReplayEvent(row: SingleFileReplayRow): SingleFile
     type: "single",
     phase: "failed",
     percent,
-    error,
+    ...(error && { error }),
     ...(code && { code }),
     ...(details && { details }),
   };
@@ -224,12 +225,14 @@ export function buildBatchReplayEvent(row: BatchReplayRow): JobProgress & { type
   const errors = storedBatchErrors(row.error);
   if (errors.length === 0) {
     const message =
-      isRecord(row.error) && typeof row.error.message === "string"
+      isRecord(row.error) && typeof row.error.message === "string" && row.error.message.trim()
         ? row.error.message
         : row.status === "canceled"
           ? "Canceled"
-          : "Processing failed";
-    errors.push({ filename: "", error: message });
+          : "";
+    if (message) {
+      errors.push({ filename: "", error: message });
+    }
   }
   // A shared fault's reason and hint (#2178), as the live frame carried them.
   const code = isRecord(row.error) && typeof row.error.code === "string" ? row.error.code : "";
@@ -827,6 +830,7 @@ export async function cancelSingleJobGuarded(args: CancelSingleJobArgs): Promise
     phase: "failed",
     percent: 0,
     error: "Canceled",
+    code: "CANCELED",
   };
   let applied = false;
   await enqueuePersist(args.jobId, async () => {

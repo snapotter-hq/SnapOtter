@@ -5720,6 +5720,7 @@ export const fr: TranslationKeys = {
     processingFailedWithStatus:
       "Impossible de traiter ce fichier. Vérifiez qu'il n'est pas endommagé et réessayez.",
     processingFailedNoDetail: "Échec du traitement",
+    canceled: "Traitement annulé",
     jobTrackingFailed: "Un problème est survenu lors du suivi de cette tâche. Réessayez.",
     requestTimedOut: "Délai d'attente dépassé",
     runInterrupted: "Le traitement a été interrompu. Relancez-le.",

@@ -531,6 +531,19 @@ describe("processing hook errors are translated (#1436, #1923)", () => {
     });
     expect(useFileStore.getState().error).toBe(deErrors.processingFailedNoDetail);
 
+    // #1623: buildSingleFileReplayEvent omits error when a failed row has no
+    // stored message; the hook must still translate it to processingFailedNoDetail.
+    act(() => {
+      view.result.current.value.processFiles([file], {});
+    });
+    act(() => {
+      const es = MockEventSource.instances.at(-1);
+      es?.onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "failed", percent: 0 }),
+      } as MessageEvent);
+    });
+    expect(useFileStore.getState().error).toBe(deErrors.processingFailedNoDetail);
+
     const origUpdate = useFileStore.getState().updateEntry;
     act(() => {
       view.result.current.value.processFiles([file], {});
@@ -543,14 +556,14 @@ describe("processing hook errors are translated (#1436, #1923)", () => {
     try {
       expect(() =>
         act(() => {
-          xhrs[1].status = 200;
-          xhrs[1].responseText = JSON.stringify({
+          xhrs[2].status = 200;
+          xhrs[2].responseText = JSON.stringify({
             jobId: "j1",
             downloadUrl: "/api/v1/download/j1/out.png",
             originalSize: 16,
             processedSize: 12,
           });
-          xhrs[1].onload?.();
+          xhrs[2].onload?.();
         }),
       ).toThrow("store write failed");
     } finally {
@@ -677,6 +690,43 @@ describe("processing hook errors are translated (#1436, #1923)", () => {
       xhrs[2].ontimeout?.();
     });
     expect(view.result.current.value.error).toBe(deErrors.uploadTimeout);
+
+    // #1623: message-less single and batch replay frames omit error text so
+    // the pipeline hook translates them in the active locale.
+    act(() => {
+      view.result.current.value.processSingle(files[0], [
+        { id: "s1", toolId: "resize", settings: {} },
+      ]);
+    });
+    act(() => {
+      const es = MockEventSource.instances.at(-1);
+      es?.onmessage?.({
+        data: JSON.stringify({ type: "single", phase: "failed", percent: 0 }),
+      } as MessageEvent);
+    });
+    expect(view.result.current.value.error).toBe(deErrors.processingFailedNoDetail);
+
+    act(() => {
+      void view.result.current.value.processAll(files, [
+        { id: "s1", toolId: "resize", settings: {} },
+      ]);
+    });
+    act(() => {
+      xhrs[4].status = 202;
+      xhrs[4].onload?.();
+      const es = MockEventSource.instances.at(-1);
+      es?.onmessage?.({
+        data: JSON.stringify({
+          type: "batch",
+          status: "failed",
+          totalFiles: 2,
+          completedFiles: 0,
+          failedFiles: 2,
+          errors: [],
+        }),
+      } as MessageEvent);
+    });
+    expect(view.result.current.value.error).toBe(deErrors.allFilesFailed);
 
     view.unmount();
   });

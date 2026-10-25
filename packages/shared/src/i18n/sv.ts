@@ -5678,6 +5678,7 @@ export const sv: TranslationKeys = {
     processingFailedWithStatus:
       "Det gick inte att bearbeta den här filen. Kontrollera att filen inte är skadad och försök igen.",
     processingFailedNoDetail: "Bearbetningen misslyckades",
+    canceled: "Bearbetningen avbruten",
     jobTrackingFailed: "Något gick fel vid spårningen av jobbet. Försök igen.",
     requestTimedOut: "Tidsgränsen för begäran överskreds",
     runInterrupted: "Bearbetningen avbröts. Kör den igen.",

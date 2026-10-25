@@ -5693,6 +5693,7 @@ export const uk: TranslationKeys = {
     processingFailedWithStatus:
       "Не вдалося обробити цей файл. Перевірте, чи файл не пошкоджений, і спробуйте ще раз.",
     processingFailedNoDetail: "Обробка не вдалася",
+    canceled: "Обробку скасовано",
     jobTrackingFailed: "Під час відстеження цього завдання сталася помилка. Спробуйте ще раз.",
     requestTimedOut: "Час очікування вичерпано",
     runInterrupted: "Обробку було перервано. Запустіть її знову.",

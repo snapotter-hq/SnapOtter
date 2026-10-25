@@ -5690,6 +5690,7 @@ export const tr: TranslationKeys = {
     processingFailedWithStatus:
       "Bu dosyayı işleyemedik. Dosyanın bozuk olmadığından emin olup tekrar deneyin.",
     processingFailedNoDetail: "İşlem başarısız oldu",
+    canceled: "İşlem iptal edildi",
     jobTrackingFailed: "Bu iş takip edilirken bir sorun oluştu. Tekrar deneyin.",
     requestTimedOut: "İstek zaman aşımına uğradı",
     runInterrupted: "İşlem kesintiye uğradı. Yeniden çalıştırın.",

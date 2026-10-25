@@ -5665,6 +5665,7 @@ export const vi: TranslationKeys = {
     processingFailedWithStatus:
       "Không thể xử lý tệp này. Hãy kiểm tra xem tệp có bị hỏng không rồi thử lại.",
     processingFailedNoDetail: "Xử lý thất bại",
+    canceled: "Đã hủy xử lý",
     jobTrackingFailed: "Đã xảy ra lỗi khi theo dõi tác vụ này. Vui lòng thử lại.",
     requestTimedOut: "Yêu cầu đã hết thời gian",
     runInterrupted: "Quá trình xử lý bị gián đoạn. Hãy chạy lại.",

@@ -5363,6 +5363,7 @@ export const zhCN: TranslationKeys = {
     failedWithStatus: "无法完成该请求，请重试。",
     processingFailedWithStatus: "无法处理此文件，请检查文件是否损坏后重试。",
     processingFailedNoDetail: "处理失败",
+    canceled: "处理已取消",
     jobTrackingFailed: "跟踪此任务时出错。请重试。",
     requestTimedOut: "请求超时",
     runInterrupted: "处理已中断。请重新运行。",

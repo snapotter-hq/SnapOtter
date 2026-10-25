@@ -166,7 +166,7 @@ export function subscribeEraseObjectJobProgress(
         }
         if (data.phase === "failed") {
           cleanup();
-          handlers.onFailed(frameFailure(data.error, data.details));
+          handlers.onFailed(frameFailure(data.error, data.details, data.code));
           return;
         }
         if (typeof data.percent === "number") handlers.onProgress?.(data.percent);
