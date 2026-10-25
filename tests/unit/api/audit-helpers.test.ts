@@ -14,7 +14,9 @@ import {
   deriveTargetType,
   extractActorId,
   extractActorUsername,
+  extractTargetId,
 } from "../../../apps/api/src/lib/audit.js";
+import { CORE_AUDIT_EVENTS } from "../../../packages/shared/src/audit-events.js";
 
 describe("audit helpers", () => {
   describe("deriveTargetType", () => {
@@ -31,9 +33,16 @@ describe("audit helpers", () => {
       ["OIDC_LOGIN_SUCCESS", "user"],
       ["SAML_LOGIN_SUCCESS", "user"],
       ["SCIM_USER_CREATED", "user"],
+      ["SCIM_USER_PROVISIONED", "user"],
+      ["SCIM_USER_UPDATED", "user"],
+      ["SCIM_USER_DEPROVISIONED", "user"],
       ["MFA_ENABLED", "user"],
     ])("%s -> %s", (event, expected) => {
       expect(deriveTargetType(event)).toBe(expected);
+    });
+
+    it("SCIM_GROUP_SYNCED -> team", () => {
+      expect(deriveTargetType("SCIM_GROUP_SYNCED")).toBe("team");
     });
 
     it.each([
@@ -62,6 +71,8 @@ describe("audit helpers", () => {
     it.each([
       ["SETTINGS_UPDATED", "setting"],
       ["IP_ALLOWLIST_UPDATED", "setting"],
+      ["CONFIG_EXPORTED", "setting"],
+      ["CONFIG_IMPORTED", "setting"],
     ])("%s -> %s", (event, expected) => {
       expect(deriveTargetType(event)).toBe(expected);
     });
@@ -74,8 +85,15 @@ describe("audit helpers", () => {
       expect(deriveTargetType(event)).toBe(expected);
     });
 
-    it("LEGAL_HOLD_CREATED -> compliance", () => {
-      expect(deriveTargetType("LEGAL_HOLD_CREATED")).toBe("compliance");
+    it.each([
+      ["LEGAL_HOLD_CREATED", "compliance"],
+      ["LEGAL_HOLD_APPLIED", "compliance"],
+      ["LEGAL_HOLD_RELEASED", "compliance"],
+      ["GDPR_EXPORT_INITIATED", "compliance"],
+      ["GDPR_USER_PURGED", "compliance"],
+      ["GDPR_TEAM_PURGED", "compliance"],
+    ])("%s -> %s", (event, expected) => {
+      expect(deriveTargetType(event)).toBe(expected);
     });
 
     it.each([
@@ -85,8 +103,74 @@ describe("audit helpers", () => {
       expect(deriveTargetType(event)).toBe(expected);
     });
 
+    it("maps every event in CORE_AUDIT_EVENTS to a non-null targetType", () => {
+      const unmapped = CORE_AUDIT_EVENTS.filter((event) => deriveTargetType(event) === null);
+      expect(unmapped).toEqual([]);
+    });
+
     it("returns null for unmapped event prefixes", () => {
       expect(deriveTargetType("UNKNOWN_EVENT")).toBeNull();
+    });
+  });
+
+  describe("extractTargetId", () => {
+    it.each([
+      [{ targetUserId: "u-1" }, "u-1"],
+      [{ keyId: "k-2" }, "k-2"],
+      [{ roleId: "r-3" }, "r-3"],
+      [{ targetTeamId: "tt-4" }, "tt-4"],
+      [{ teamId: "t-5" }, "t-5"],
+      [{ targetId: "lh-6" }, "lh-6"],
+    ])("extracts %o -> %s", (details, expected) => {
+      expect(extractTargetId(details)).toBe(expected);
+    });
+
+    it("follows precedence targetUserId > keyId > roleId > targetTeamId > teamId > targetId", () => {
+      expect(
+        extractTargetId({
+          targetUserId: "u-1",
+          keyId: "k-2",
+          roleId: "r-3",
+          targetTeamId: "tt-4",
+          teamId: "t-5",
+          targetId: "lh-6",
+        }),
+      ).toBe("u-1");
+      expect(
+        extractTargetId({
+          keyId: "k-2",
+          roleId: "r-3",
+          targetTeamId: "tt-4",
+          teamId: "t-5",
+          targetId: "lh-6",
+        }),
+      ).toBe("k-2");
+      expect(
+        extractTargetId({
+          roleId: "r-3",
+          targetTeamId: "tt-4",
+          teamId: "t-5",
+          targetId: "lh-6",
+        }),
+      ).toBe("r-3");
+      expect(
+        extractTargetId({
+          targetTeamId: "tt-4",
+          teamId: "t-5",
+          targetId: "lh-6",
+        }),
+      ).toBe("tt-4");
+      expect(
+        extractTargetId({
+          teamId: "t-5",
+          targetId: "lh-6",
+        }),
+      ).toBe("t-5");
+    });
+
+    it("returns null when no target identifier is present", () => {
+      expect(extractTargetId({})).toBeNull();
+      expect(extractTargetId({ userId: "actor-1", adminId: "admin-1" })).toBeNull();
     });
   });
 

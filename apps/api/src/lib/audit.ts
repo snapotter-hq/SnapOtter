@@ -44,6 +44,18 @@ export function extractActorUsername(details: Record<string, unknown>): string {
   return (details.username as string) ?? (details.newUsername as string) ?? "system";
 }
 
+export function extractTargetId(details: Record<string, unknown>): string | null {
+  return (
+    (details.targetUserId as string) ??
+    (details.keyId as string) ??
+    (details.roleId as string) ??
+    (details.targetTeamId as string) ??
+    (details.teamId as string) ??
+    (details.targetId as string) ??
+    null
+  );
+}
+
 /**
  * Emit a structured audit log entry for security-relevant events.
  *
@@ -60,7 +72,7 @@ export async function auditLog(
 
   const actorId = extractActorId(details);
   const actorUsername = extractActorUsername(details);
-  const targetId = (details.targetUserId as string) ?? (details.keyId as string) ?? null;
+  const targetId = extractTargetId(details);
   const targetType = deriveTargetType(event);
 
   const id = randomUUID();
@@ -132,6 +144,7 @@ export function auditFromRequest(request: FastifyRequest) {
 }
 
 export function deriveTargetType(event: string): string | null {
+  if (event.startsWith("SCIM_GROUP")) return "team";
   if (
     event.startsWith("USER_") ||
     event.startsWith("LOGIN") ||
@@ -146,10 +159,15 @@ export function deriveTargetType(event: string): string | null {
   if (event.startsWith("API_KEY")) return "api_key";
   if (event.startsWith("FILE")) return "file";
   if (event.startsWith("ROLE")) return "role";
-  if (event === "SETTINGS_UPDATED" || event === "IP_ALLOWLIST_UPDATED") return "setting";
+  if (
+    event === "SETTINGS_UPDATED" ||
+    event === "IP_ALLOWLIST_UPDATED" ||
+    event.startsWith("CONFIG_")
+  )
+    return "setting";
   if (event.startsWith("TOOL_") || event.startsWith("BATCH_") || event.startsWith("PIPELINE_"))
     return "tool";
-  if (event.startsWith("LEGAL_HOLD")) return "compliance";
+  if (event.startsWith("LEGAL_HOLD") || event.startsWith("GDPR_")) return "compliance";
   if (event.startsWith("SIEM_") || event.startsWith("WEBHOOK_")) return "integration";
   return null;
 }

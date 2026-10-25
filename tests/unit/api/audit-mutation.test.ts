@@ -331,7 +331,72 @@ describe("auditLog DB write values", () => {
     expect(state.insertValues[0].targetId).toBe("key-3");
   });
 
-  it("writes targetId null when neither targetUserId nor keyId is present", async () => {
+  it("prefers keyId over roleId for targetId", async () => {
+    await auditLog(makeLogger() as never, "API_KEY_DELETED", {
+      keyId: "key-3",
+      roleId: "role-4",
+    });
+    expect(state.insertValues[0].targetId).toBe("key-3");
+  });
+
+  it("falls back to roleId for targetId", async () => {
+    await auditLog(makeLogger() as never, "ROLE_CREATED", {
+      adminId: "admin-1",
+      roleId: "role-4",
+    });
+    expect(state.insertValues[0].targetId).toBe("role-4");
+  });
+
+  it("prefers roleId over targetTeamId for targetId", async () => {
+    await auditLog(makeLogger() as never, "ROLE_UPDATED", {
+      roleId: "role-4",
+      targetTeamId: "team-5",
+    });
+    expect(state.insertValues[0].targetId).toBe("role-4");
+  });
+
+  it("falls back to targetTeamId for targetId", async () => {
+    await auditLog(makeLogger() as never, "GDPR_TEAM_PURGED", {
+      adminId: "admin-1",
+      targetTeamId: "team-5",
+    });
+    expect(state.insertValues[0].targetId).toBe("team-5");
+  });
+
+  it("prefers targetTeamId over teamId for targetId", async () => {
+    await auditLog(makeLogger() as never, "GDPR_TEAM_PURGED", {
+      targetTeamId: "team-5",
+      teamId: "team-6",
+    });
+    expect(state.insertValues[0].targetId).toBe("team-5");
+  });
+
+  it("falls back to teamId for targetId", async () => {
+    await auditLog(makeLogger() as never, "SCIM_GROUP_SYNCED", {
+      teamId: "team-6",
+      action: "created",
+    });
+    expect(state.insertValues[0].targetId).toBe("team-6");
+  });
+
+  it("prefers teamId over targetId for targetId", async () => {
+    await auditLog(makeLogger() as never, "SCIM_GROUP_SYNCED", {
+      teamId: "team-6",
+      targetId: "hold-7",
+    });
+    expect(state.insertValues[0].targetId).toBe("team-6");
+  });
+
+  it("falls back to targetId for targetId", async () => {
+    await auditLog(makeLogger() as never, "LEGAL_HOLD_APPLIED", {
+      adminId: "admin-1",
+      targetType: "user",
+      targetId: "hold-7",
+    });
+    expect(state.insertValues[0].targetId).toBe("hold-7");
+  });
+
+  it("writes targetId null when no target identifier is present", async () => {
     await auditLog(makeLogger() as never, "LOGOUT");
     expect(state.insertValues[0].targetId).toBeNull();
   });
@@ -367,6 +432,7 @@ describe("auditLog targetType derivation (real deriveTargetType)", () => {
     ["OIDC_LOGIN_FAILED", "user"],
     ["SAML_USER_LINKED", "user"],
     ["SCIM_USER_CREATED", "user"],
+    ["SCIM_GROUP_SYNCED", "team"],
     ["MFA_ENABLED", "user"],
     ["LOGOUT", "user"],
     ["API_KEY_CREATED", "api_key"],
@@ -374,10 +440,15 @@ describe("auditLog targetType derivation (real deriveTargetType)", () => {
     ["ROLE_UPDATED", "role"],
     ["SETTINGS_UPDATED", "setting"],
     ["IP_ALLOWLIST_UPDATED", "setting"],
+    ["CONFIG_EXPORTED", "setting"],
+    ["CONFIG_IMPORTED", "setting"],
     ["TOOL_EXECUTED", "tool"],
     ["BATCH_STARTED", "tool"],
     ["PIPELINE_RUN", "tool"],
     ["LEGAL_HOLD_PLACED", "compliance"],
+    ["GDPR_EXPORT_INITIATED", "compliance"],
+    ["GDPR_USER_PURGED", "compliance"],
+    ["GDPR_TEAM_PURGED", "compliance"],
     ["SIEM_FORWARD_FAILED", "integration"],
     ["WEBHOOK_DELIVERED", "integration"],
   ])("maps %s to targetType %s", async (event, expected) => {
@@ -388,6 +459,13 @@ describe("auditLog targetType derivation (real deriveTargetType)", () => {
   it("maps an unknown event to a null targetType", async () => {
     await auditLog(makeLogger() as never, "SOMETHING_ELSE", {});
     expect(state.insertValues[0].targetType).toBeNull();
+  });
+
+  it("does not classify CONF_OTHER or GDP_OTHER as setting or compliance", async () => {
+    await auditLog(makeLogger() as never, "CONF_OTHER", {});
+    await auditLog(makeLogger() as never, "GDP_OTHER", {});
+    expect(state.insertValues[0].targetType).toBeNull();
+    expect(state.insertValues[1].targetType).toBeNull();
   });
 
   it("does not classify LOGIC_ONLY (LOGI prefix, not LOGIN/LOGOUT) as a user event", async () => {
