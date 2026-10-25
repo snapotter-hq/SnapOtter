@@ -2,6 +2,7 @@
  * Unit tests for tool, batch, and pipeline audit logging across worker
  * completion handlers and inline custom HTTP routes (#3973).
  */
+import { Readable } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
@@ -84,6 +85,7 @@ import {
   emitWorkerToolAudit,
   enterToolRequestAuditContext,
   markToolRequestEnqueued,
+  recordInlineInputFile,
   resolveAuditUsername,
   subRouteFromRoute,
 } from "../../../apps/api/src/lib/tool-audit.js";
@@ -497,6 +499,189 @@ describe("tool-audit helpers (#3973)", () => {
         },
         ip: "192.0.2.10",
         requestId: "req-inline-1",
+      });
+    });
+
+    it("uses recorded inline input file counts and byte sizes over response JSON (#3990)", async () => {
+      state.auditEnabled = true;
+
+      // 1. Single-file route whose response JSON omits originalSize/fileSize (e.g. color-palette, barcode-read, passport-photo/generate)
+      const paletteReq = makeRequest();
+      enterToolRequestAuditContext(paletteReq as never, {
+        userId: "user-1",
+        username: "admin",
+        ip: paletteReq.ip,
+        requestId: paletteReq.id,
+        toolId: "color-palette",
+        subRoute: null,
+        startTime: Date.now() - 10,
+      });
+      recordInlineInputFile(paletteReq as never, 1234);
+      await emitInlineRequestAuditIfNeeded(
+        paletteReq as never,
+        200,
+        JSON.stringify({ filename: "test.png", colors: ["#ff0000"], hex: ["#ff0000"], count: 1 }),
+      );
+      expect(state.auditCalls[0]?.details).toMatchObject({
+        toolId: "color-palette",
+        inputFileCount: 1,
+        totalInputSize: 1234,
+      });
+
+      // 2. Multi-file route whose response JSON has originalSize without inputFileCount (e.g. collage, stitch, compose, watermark-image, image-to-pdf)
+      state.auditCalls = [];
+      const collageReq = makeRequest();
+      enterToolRequestAuditContext(collageReq as never, {
+        userId: "user-1",
+        username: "admin",
+        ip: collageReq.ip,
+        requestId: collageReq.id,
+        toolId: "collage",
+        subRoute: null,
+        startTime: Date.now() - 10,
+      });
+      recordInlineInputFile(collageReq as never, 600);
+      // Fallback to AsyncLocalStorage store when request is undefined
+      recordInlineInputFile(undefined, 800);
+      // Ignore zero, negative, and non-finite byte counts
+      recordInlineInputFile(collageReq as never, 0);
+      recordInlineInputFile(collageReq as never, -50);
+      recordInlineInputFile(collageReq as never, Number.NaN);
+      await emitInlineRequestAuditIfNeeded(
+        collageReq as never,
+        200,
+        JSON.stringify({
+          jobId: "j-col",
+          downloadUrl: "/api/v1/download/j-col/collage.png",
+          originalSize: 999,
+          processedSize: 2000,
+        }),
+      );
+      expect(state.auditCalls[0]?.details).toMatchObject({
+        toolId: "collage",
+        inputFileCount: 2,
+        totalInputSize: 1400,
+      });
+
+      // 3. Fallback when no inline input files were recorded: sums results[].originalSize / fileSize and counts errors[] (image-to-base64)
+      state.auditCalls = [];
+      const b64Req = makeRequest();
+      enterToolRequestAuditContext(b64Req as never, {
+        userId: "user-1",
+        username: "admin",
+        ip: b64Req.ip,
+        requestId: b64Req.id,
+        toolId: "image-to-base64",
+        subRoute: null,
+        startTime: Date.now() - 10,
+      });
+      await emitInlineRequestAuditIfNeeded(
+        b64Req as never,
+        200,
+        JSON.stringify({
+          results: [
+            { filename: "a.png", originalSize: 320 },
+            { filename: "b.png", fileSize: 480 },
+          ],
+          errors: [{ filename: "bad.png", error: "Invalid image" }],
+        }),
+      );
+      expect(state.auditCalls[0]?.details).toMatchObject({
+        toolId: "image-to-base64",
+        inputFileCount: 3,
+        totalInputSize: 800,
+      });
+
+      // 4. Automatic multipart request.parts() wrapping counts non-empty completed file streams, avoids double-wrapping, and cleans up on early break
+      state.auditCalls = [];
+      let abortedReturned = false;
+      const multipartReq = {
+        ...makeRequest(),
+        parts: async function* () {
+          yield {
+            type: "file" as const,
+            fieldname: "file",
+            filename: "first.png",
+            file: Readable.from([Buffer.from("hello"), Buffer.from("world!")]),
+          };
+          yield {
+            type: "file" as const,
+            fieldname: "file",
+            filename: "empty.png",
+            file: Readable.from([Buffer.alloc(0)]),
+          };
+          yield {
+            type: "file" as const,
+            fieldname: "file",
+            filename: "aborted.png",
+            file: {
+              [Symbol.asyncIterator]() {
+                let step = 0;
+                return {
+                  async next() {
+                    step += 1;
+                    if (step === 1) return { value: Buffer.from("partial"), done: false as const };
+                    return { value: undefined, done: true as const };
+                  },
+                  async return() {
+                    abortedReturned = true;
+                    return { value: undefined, done: true as const };
+                  },
+                };
+              },
+            },
+          };
+          yield {
+            type: "file" as const,
+            fieldname: "file",
+            filename: "second.png",
+            file: (async function* () {
+              yield "12345";
+            })(),
+          };
+          yield {
+            type: "field" as const,
+            fieldname: "settings",
+            value: "{}",
+          };
+        },
+      };
+      enterToolRequestAuditContext(multipartReq as never, {
+        userId: "user-1",
+        username: "admin",
+        ip: multipartReq.ip,
+        requestId: multipartReq.id,
+        toolId: "find-duplicates",
+        subRoute: null,
+        startTime: Date.now() - 10,
+      });
+      // Re-entering on the same request must not wrap request.parts() a second time
+      enterToolRequestAuditContext(multipartReq as never, {
+        userId: "user-1",
+        username: "admin",
+        ip: multipartReq.ip,
+        requestId: multipartReq.id,
+        toolId: "find-duplicates",
+        subRoute: null,
+        startTime: Date.now() - 10,
+      });
+      for await (const part of multipartReq.parts()) {
+        if (part.type === "file") {
+          for await (const _chunk of part.file) {
+            if (part.filename === "aborted.png") break;
+          }
+        }
+      }
+      expect(abortedReturned).toBe(true);
+      await emitInlineRequestAuditIfNeeded(
+        multipartReq as never,
+        200,
+        JSON.stringify({ totalImages: 1, duplicateGroups: [], uniqueImages: 1, spaceSaveable: 0 }),
+      );
+      expect(state.auditCalls[0]?.details).toMatchObject({
+        toolId: "find-duplicates",
+        inputFileCount: 2,
+        totalInputSize: 16,
       });
     });
   });

@@ -34,10 +34,13 @@ export interface ToolRequestAuditContext {
   authorized: boolean;
   enqueued: boolean;
   audited: boolean;
+  inputFileCount: number;
+  totalInputSize: number;
 }
 
 const toolRequestStorage = new AsyncLocalStorage<ToolRequestAuditContext>();
 const requestContextMap = new WeakMap<object, ToolRequestAuditContext>();
+const wrappedPartsRequests = new WeakSet<object>();
 
 /**
  * Extract the optional third path segment after `/api/v1/tools/<section>/<toolId>/`.
@@ -50,6 +53,73 @@ export function subRouteFromRoute(routeUrl: string | undefined): string | null {
 }
 
 /**
+ * Record an input file consumed by an inline tool route on the request's audit
+ * context. Zero-byte and negative sizes are ignored.
+ */
+export function recordInlineInputFile(request: FastifyRequest | undefined, bytes: number): void {
+  if (!Number.isFinite(bytes) || bytes <= 0) return;
+  const ctx =
+    (request ? requestContextMap.get(request) : undefined) ?? toolRequestStorage.getStore();
+  if (!ctx) return;
+  ctx.inputFileCount += 1;
+  ctx.totalInputSize += bytes;
+}
+
+function trackFilePartStream(request: FastifyRequest, file: unknown): void {
+  if (!file || typeof file !== "object") return;
+  const stream = file as {
+    [Symbol.asyncIterator]?: () => AsyncIterator<unknown>;
+  };
+
+  const origIter = stream[Symbol.asyncIterator];
+  if (typeof origIter !== "function") return;
+
+  stream[Symbol.asyncIterator] = async function* () {
+    let bytes = 0;
+    const iter = origIter.call(stream);
+    try {
+      while (true) {
+        const next = await iter.next();
+        if (next.done) break;
+        const chunk = next.value;
+        if (Buffer.isBuffer(chunk) || chunk instanceof Uint8Array) {
+          bytes += chunk.byteLength;
+        } else if (typeof chunk === "string") {
+          bytes += Buffer.byteLength(chunk);
+        }
+        yield chunk;
+      }
+      recordInlineInputFile(request, bytes);
+    } finally {
+      await iter.return?.();
+    }
+  };
+}
+
+function wrapRequestPartsForAudit(request: FastifyRequest): void {
+  if (wrappedPartsRequests.has(request)) return;
+  const reqWithParts = request as FastifyRequest & {
+    parts?: (...args: unknown[]) => AsyncIterable<unknown>;
+  };
+  if (typeof reqWithParts.parts !== "function") return;
+  const origParts = reqWithParts.parts.bind(request);
+  wrappedPartsRequests.add(request);
+  reqWithParts.parts = async function* (...args: unknown[]) {
+    for await (const part of origParts(...args)) {
+      if (
+        part &&
+        typeof part === "object" &&
+        (part as { type?: unknown }).type === "file" &&
+        "file" in part
+      ) {
+        trackFilePartStream(request, (part as { file: unknown }).file);
+      }
+      yield part;
+    }
+  } as typeof reqWithParts.parts;
+}
+
+/**
  * Record the tool request context for the current HTTP request.
  *
  * Must be called synchronously at the start of `toolAccessMiddleware`'s
@@ -58,7 +128,10 @@ export function subRouteFromRoute(routeUrl: string | undefined): string | null {
  */
 export function enterToolRequestAuditContext(
   request: FastifyRequest,
-  init: Omit<ToolRequestAuditContext, "enqueued" | "audited" | "authorized"> & {
+  init: Omit<
+    ToolRequestAuditContext,
+    "enqueued" | "audited" | "authorized" | "inputFileCount" | "totalInputSize"
+  > & {
     authorized?: boolean;
   },
 ): ToolRequestAuditContext {
@@ -67,9 +140,12 @@ export function enterToolRequestAuditContext(
     authorized: init.authorized ?? true,
     enqueued: false,
     audited: false,
+    inputFileCount: 0,
+    totalInputSize: 0,
   };
   requestContextMap.set(request, ctx);
   toolRequestStorage.enterWith(ctx);
+  wrapRequestPartsForAudit(request);
   return ctx;
 }
 
@@ -262,12 +338,22 @@ function parseInlineSizes(payload: unknown): {
                 parsed.results.length + (Array.isArray(parsed.errors) ? parsed.errors.length : 0),
               )
             : 1;
+    const resultsSize = Array.isArray(parsed.results)
+      ? parsed.results.reduce((sum: number, item: unknown) => {
+          const itemSize =
+            item && typeof item === "object"
+              ? ((item as { originalSize?: unknown; fileSize?: unknown }).originalSize ??
+                (item as { fileSize?: unknown }).fileSize)
+              : undefined;
+          return sum + (typeof itemSize === "number" && itemSize > 0 ? itemSize : 0);
+        }, 0)
+      : 0;
     const size =
       typeof parsed.originalSize === "number"
         ? parsed.originalSize
         : typeof parsed.fileSize === "number"
           ? parsed.fileSize
-          : 0;
+          : resultsSize;
     return { inputFileCount: count, totalInputSize: size };
   } catch {
     return { inputFileCount: 1, totalInputSize: 0 };
@@ -291,7 +377,9 @@ export async function emitInlineRequestAuditIfNeeded(
   try {
     if (!(await isToolAuditEnabled())) return;
     const durationMs = Date.now() - ctx.startTime;
-    const { inputFileCount, totalInputSize } = parseInlineSizes(payload);
+    const parsedSizes = parseInlineSizes(payload);
+    const inputFileCount = ctx.inputFileCount > 0 ? ctx.inputFileCount : parsedSizes.inputFileCount;
+    const totalInputSize = ctx.totalInputSize > 0 ? ctx.totalInputSize : parsedSizes.totalInputSize;
     await auditFromRequest(request)("TOOL_EXECUTED", {
       userId: ctx.userId,
       username: ctx.username,

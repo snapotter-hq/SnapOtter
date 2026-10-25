@@ -41,6 +41,7 @@ import {
 } from "../../lib/object-storage.js";
 import { isUniqueViolation } from "../../lib/pg-errors.js";
 import { withRouteScratch } from "../../lib/route-scratch.js";
+import { recordInlineInputFile } from "../../lib/tool-audit.js";
 import { InputValidationError } from "../../modality/contract.js";
 import { hasEffectivePermission } from "../../permissions.js";
 import { getAuthUser } from "../../plugins/auth.js";
@@ -518,6 +519,7 @@ export function registerPassportPhoto(app: FastifyInstance) {
           code: "ANALYSIS_EXPIRED",
         });
       }
+      recordInlineInputFile(request, bgRemovedBuffer.length);
 
       try {
         // Use actual bg-removed image dimensions for crop (may differ from

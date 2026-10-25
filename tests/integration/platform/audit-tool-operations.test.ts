@@ -5,11 +5,14 @@
  * `auditToolOperations` admin setting is enabled and stays silent when it
  * is disabled (the default).
  */
+import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { waitForJob } from "../../../apps/api/src/jobs/enqueue.js";
 import { isToolAuditEnabled } from "../../../apps/api/src/lib/audit.js";
+import { recordCompletedToolJob } from "../../../apps/api/src/lib/completed-job.js";
 import { logger } from "../../../apps/api/src/lib/logger.js";
+import { putObject } from "../../../apps/api/src/lib/object-storage.js";
 import { getToolConfig } from "../../../apps/api/src/routes/tool-factory.js";
 import { fixtures, readFixture } from "../../fixtures/index.js";
 import {
@@ -256,6 +259,162 @@ describe("tool operation audit logging", () => {
       expect(entry.actorUsername).toBe("admin");
       expect(entry.details.status).toBe("success");
     }
+  });
+
+  it("logs accurate inputFileCount and totalInputSize for inline custom routes omitting originalSize or inputFileCount (#3990)", async () => {
+    await setSetting("auditToolOperations", "true");
+
+    // 1. color-palette (returns { filename, colors, hex, count } without originalSize)
+    const palettePayload = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+    ]);
+    const paletteRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/color-palette",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": palettePayload.contentType,
+      },
+      body: palettePayload.body,
+    });
+    expect(paletteRes.statusCode).toBe(200);
+
+    // 2. barcode-read (returns { filename, barcodes, annotatedUrl, previewUrl } without originalSize)
+    const barcodePayload = createMultipartPayload([
+      { name: "file", filename: "test.png", contentType: "image/png", content: PNG },
+    ]);
+    const barcodeRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/barcode-read",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": barcodePayload.contentType,
+      },
+      body: barcodePayload.body,
+    });
+    expect(barcodeRes.statusCode).toBe(200);
+
+    // 3. find-duplicates (multi-file upload, returns { totalImages, duplicateGroups, ... } without originalSize)
+    const dupPayload = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
+    ]);
+    const dupRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/find-duplicates",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": dupPayload.contentType,
+      },
+      body: dupPayload.body,
+    });
+    expect(dupRes.statusCode).toBe(200);
+
+    // 4. image-to-base64 (multi-file upload, returns { results, errors } without top-level originalSize)
+    const b64Payload = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
+    ]);
+    const b64Res = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/image-to-base64",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": b64Payload.contentType,
+      },
+      body: b64Payload.body,
+    });
+    expect(b64Res.statusCode).toBe(200);
+
+    // 5. collage (multi-file upload, returns { jobId, downloadUrl, originalSize, processedSize } without inputFileCount)
+    const collagePayload = createMultipartPayload([
+      { name: "file", filename: "a.png", contentType: "image/png", content: PNG },
+      { name: "file", filename: "b.png", contentType: "image/png", content: PNG },
+      { name: "settings", content: JSON.stringify({ templateId: "2-h-equal" }) },
+    ]);
+    const collageRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/collage",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": collagePayload.contentType,
+      },
+      body: collagePayload.body,
+    });
+    expect(collageRes.statusCode).toBe(200);
+
+    // 6. passport-photo/generate (Phase 2 JSON route reading outputs/<jobId>/<stem>_nobg.png)
+    const analyzeJobId = randomUUID();
+    const [adminRow] = await db.select().from(schema.users).limit(1);
+    const nobgKey = `outputs/${analyzeJobId}/photo_nobg.png`;
+    await recordCompletedToolJob({
+      jobId: analyzeJobId,
+      userId: adminRow?.id ?? null,
+      toolId: "passport-photo",
+      outputRefs: [nobgKey],
+    });
+    await putObject(nobgKey, PNG);
+
+    const passportRes = await testApp.app.inject({
+      method: "POST",
+      url: "/api/v1/tools/image/passport-photo/generate",
+      headers: {
+        authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      payload: {
+        jobId: analyzeJobId,
+        filename: "photo.png",
+        countryCode: "US",
+        imageWidth: 200,
+        imageHeight: 200,
+        landmarks: {
+          leftEye: { x: 0.4, y: 0.4 },
+          rightEye: { x: 0.6, y: 0.4 },
+          eyeCenter: { x: 0.5, y: 0.4 },
+          chin: { x: 0.5, y: 0.7 },
+          forehead: { x: 0.5, y: 0.25 },
+          crown: { x: 0.5, y: 0.2 },
+          nose: { x: 0.5, y: 0.5 },
+          faceCenterX: 0.5,
+        },
+      },
+    });
+    expect(passportRes.statusCode).toBe(200);
+
+    const body = await fetchAuditLog("TOOL_EXECUTED");
+    const byTool = new Map(body.entries.map((e) => [e.targetId, e]));
+
+    expect(byTool.get("color-palette")?.details).toMatchObject({
+      toolId: "color-palette",
+      inputFileCount: 1,
+      totalInputSize: PNG.length,
+    });
+    expect(byTool.get("barcode-read")?.details).toMatchObject({
+      toolId: "barcode-read",
+      inputFileCount: 1,
+      totalInputSize: PNG.length,
+    });
+    expect(byTool.get("find-duplicates")?.details).toMatchObject({
+      toolId: "find-duplicates",
+      inputFileCount: 2,
+      totalInputSize: PNG.length * 2,
+    });
+    expect(byTool.get("image-to-base64")?.details).toMatchObject({
+      toolId: "image-to-base64",
+      inputFileCount: 2,
+      totalInputSize: PNG.length * 2,
+    });
+    expect(byTool.get("collage")?.details).toMatchObject({
+      toolId: "collage",
+      inputFileCount: 2,
+      totalInputSize: PNG.length * 2,
+    });
+    expect(byTool.get("passport-photo")?.details).toMatchObject({
+      toolId: "passport-photo",
+      inputFileCount: 1,
+      totalInputSize: PNG.length,
+    });
   });
 
   it("logs BATCH_EXECUTED for both generic and custom batch runs without per-child TOOL_EXECUTED (#3973)", async () => {
