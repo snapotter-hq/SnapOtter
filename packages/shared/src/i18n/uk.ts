@@ -5553,8 +5553,10 @@ export const uk: TranslationKeys = {
       "Деякі файли моделей відсутні або пошкоджені. Відновлення завантажить їх повторно.",
     repairButton: "Відновити {name}",
     lessThanMinute: "Залишилось менше хвилини",
-    oneMinuteLeft: "Залишилась ~1 хвилина",
+    oneMinuteLeft: "Залишилось ~{mins} хвилина",
     minutesLeft: "Залишилось ~{mins} хвилин",
+    minutesLeftFew: "Залишилось ~{mins} хвилини",
+    minutesLeftTwo: "Залишилось ~{mins} хвилин",
     progressMessages: [
       "Майже готово... мабуть...",
       "Гарні речі потребують часу...",

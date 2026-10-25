@@ -5455,6 +5455,8 @@ export const ko: TranslationKeys = {
     lessThanMinute: "1분 미만",
     oneMinuteLeft: "약 1분",
     minutesLeft: "약 {mins}분",
+    minutesLeftFew: "약 {mins}분",
+    minutesLeftTwo: "약 {mins}분",
     progressMessages: [
       "거의 다 됐어요... 아마도...",
       "좋은 건 기다림이 필요한 법이에요...",

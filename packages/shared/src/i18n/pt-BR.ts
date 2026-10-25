@@ -5561,6 +5561,8 @@ export const ptBR: TranslationKeys = {
     lessThanMinute: "Menos de um minuto restante",
     oneMinuteLeft: "~1 minuto restante",
     minutesLeft: "~{mins} minutos restantes",
+    minutesLeftFew: "~{mins} minutos restantes",
+    minutesLeftTwo: "~{mins} minutos restantes",
     progressMessages: [
       "Quase lá... provavelmente...",
       "Coisas boas levam tempo...",

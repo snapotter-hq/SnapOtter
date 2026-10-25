@@ -5567,6 +5567,8 @@ export const nl: TranslationKeys = {
     lessThanMinute: "Minder dan een minuut resterend",
     oneMinuteLeft: "~1 minuut resterend",
     minutesLeft: "~{mins} minuten resterend",
+    minutesLeftFew: "~{mins} minuten resterend",
+    minutesLeftTwo: "~{mins} minuten resterend",
     progressMessages: [
       "Bijna klaar... waarschijnlijk...",
       "Goede dingen kosten tijd...",

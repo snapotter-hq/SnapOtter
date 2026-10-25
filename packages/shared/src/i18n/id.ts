@@ -5544,6 +5544,8 @@ export const id: TranslationKeys = {
     lessThanMinute: "Kurang dari semenit lagi",
     oneMinuteLeft: "Sekitar 1 menit lagi",
     minutesLeft: "Sekitar {mins} menit lagi",
+    minutesLeftFew: "Sekitar {mins} menit lagi",
+    minutesLeftTwo: "Sekitar {mins} menit lagi",
     progressMessages: [
       "Sebentar lagi... mungkin...",
       "Hal baik butuh waktu...",

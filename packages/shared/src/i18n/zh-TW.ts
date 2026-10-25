@@ -5231,6 +5231,8 @@ export const zhTW: TranslationKeys = {
     lessThanMinute: "不到一分鐘",
     oneMinuteLeft: "約1分鐘",
     minutesLeft: "約{mins}分鐘",
+    minutesLeftFew: "約{mins}分鐘",
+    minutesLeftTwo: "約{mins}分鐘",
     progressMessages: [
       "快好了...大概吧...",
       "好東西值得等待...",

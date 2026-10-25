@@ -5563,8 +5563,10 @@ export const pl: TranslationKeys = {
       "Niektóre pliki modeli są brakujące lub uszkodzone. Naprawa pobierze je ponownie.",
     repairButton: "Napraw {name}",
     lessThanMinute: "Mniej niż minuta do końca",
-    oneMinuteLeft: "Pozostała ~1 minuta",
+    oneMinuteLeft: "Pozostała ~{mins} minuta",
     minutesLeft: "Pozostało ~{mins} minut",
+    minutesLeftFew: "Pozostały ~{mins} minuty",
+    minutesLeftTwo: "Pozostało ~{mins} minut",
     progressMessages: [
       "Prawie gotowe... chyba...",
       "Dobre rzeczy wymagają czasu...",

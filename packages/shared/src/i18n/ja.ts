@@ -5493,6 +5493,8 @@ export const ja: TranslationKeys = {
     lessThanMinute: "残り1分未満",
     oneMinuteLeft: "約1分",
     minutesLeft: "約{mins}分",
+    minutesLeftFew: "約{mins}分",
+    minutesLeftTwo: "約{mins}分",
     progressMessages: [
       "もうすぐです...たぶん...",
       "良いものには時間がかかります...",

@@ -5552,6 +5552,8 @@ export const tr: TranslationKeys = {
     lessThanMinute: "Bir dakikadan az kaldı",
     oneMinuteLeft: "~1 dakika kaldı",
     minutesLeft: "~{mins} dakika kaldı",
+    minutesLeftFew: "~{mins} dakika kaldı",
+    minutesLeftTwo: "~{mins} dakika kaldı",
     progressMessages: [
       "Neredeyse bitti... muhtemelen...",
       "Güzel şeyler zaman alır...",

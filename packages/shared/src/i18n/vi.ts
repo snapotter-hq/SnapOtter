@@ -5527,6 +5527,8 @@ export const vi: TranslationKeys = {
     lessThanMinute: "Còn chưa đầy một phút",
     oneMinuteLeft: "Còn khoảng 1 phút",
     minutesLeft: "Còn khoảng {mins} phút",
+    minutesLeftFew: "Còn khoảng {mins} phút",
+    minutesLeftTwo: "Còn khoảng {mins} phút",
     progressMessages: [
       "Sắp xong rồi... có lẽ thế...",
       "Của ngon phải chờ...",

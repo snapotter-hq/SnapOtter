@@ -5231,6 +5231,8 @@ export const zhCN: TranslationKeys = {
     lessThanMinute: "不到一分钟",
     oneMinuteLeft: "约 1 分钟",
     minutesLeft: "约 {mins} 分钟",
+    minutesLeftFew: "约 {mins} 分钟",
+    minutesLeftTwo: "约 {mins} 分钟",
     progressMessages: [
       "快好了... 大概吧...",
       "好东西需要等一等...",

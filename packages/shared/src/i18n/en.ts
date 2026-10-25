@@ -5468,6 +5468,8 @@ export const en = {
     lessThanMinute: "Less than a minute left",
     oneMinuteLeft: "~1 minute left",
     minutesLeft: "~{mins} minutes left",
+    minutesLeftFew: "~{mins} minutes left",
+    minutesLeftTwo: "~{mins} minutes left",
     progressMessages: [
       "Almost there... probably...",
       "Good things take time...",

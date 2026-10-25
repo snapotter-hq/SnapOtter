@@ -5322,6 +5322,8 @@ export const hi: TranslationKeys = {
     lessThanMinute: "एक मिनट से कम बचा है",
     oneMinuteLeft: "~1 मिनट शेष",
     minutesLeft: "~{mins} मिनट शेष",
+    minutesLeftFew: "~{mins} मिनट शेष",
+    minutesLeftTwo: "~{mins} मिनट शेष",
     progressMessages: [
       "लगभग हो गया... शायद...",
       "अच्छी चीज़ों में वक्त लगता है...",

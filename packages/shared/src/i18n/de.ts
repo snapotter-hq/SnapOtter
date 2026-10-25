@@ -5594,6 +5594,8 @@ export const de: TranslationKeys = {
     lessThanMinute: "Weniger als eine Minute verbleibend",
     oneMinuteLeft: "~1 Minute verbleibend",
     minutesLeft: "~{mins} Minuten verbleibend",
+    minutesLeftFew: "~{mins} Minuten verbleibend",
+    minutesLeftTwo: "~{mins} Minuten verbleibend",
     progressMessages: [
       "Fast geschafft... wahrscheinlich...",
       "Gute Dinge brauchen ihre Zeit...",

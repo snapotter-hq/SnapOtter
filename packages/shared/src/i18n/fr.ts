@@ -5581,6 +5581,8 @@ export const fr: TranslationKeys = {
     lessThanMinute: "Moins d'une minute restante",
     oneMinuteLeft: "~1 minute restante",
     minutesLeft: "~{mins} minutes restantes",
+    minutesLeftFew: "~{mins} minutes restantes",
+    minutesLeftTwo: "~{mins} minutes restantes",
     progressMessages: [
       "Presque fini... sans doute...",
       "Les bonnes choses prennent du temps...",

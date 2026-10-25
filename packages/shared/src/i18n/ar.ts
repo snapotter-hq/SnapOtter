@@ -5492,7 +5492,9 @@ export const ar: TranslationKeys = {
     repairButton: "إصلاح {name}",
     lessThanMinute: "أقل من دقيقة",
     oneMinuteLeft: "~دقيقة واحدة متبقية",
-    minutesLeft: "~{mins} دقائق متبقية",
+    minutesLeft: "~{mins} دقيقة متبقية",
+    minutesLeftFew: "~{mins} دقائق متبقية",
+    minutesLeftTwo: "~دقيقتان متبقيتان",
     progressMessages: [
       "أوشكنا على الانتهاء... على الأرجح...",
       "الصبر مفتاح الفرج...",

@@ -5454,6 +5454,8 @@ export const th: TranslationKeys = {
     lessThanMinute: "เหลือไม่ถึงนาที",
     oneMinuteLeft: "เหลือประมาณ 1 นาที",
     minutesLeft: "เหลือประมาณ {mins} นาที",
+    minutesLeftFew: "เหลือประมาณ {mins} นาที",
+    minutesLeftTwo: "เหลือประมาณ {mins} นาที",
     progressMessages: [
       "อีกนิดเดียว... น่าจะนะ...",
       "ของดีต้องรอหน่อย...",

@@ -5540,6 +5540,8 @@ export const sv: TranslationKeys = {
     lessThanMinute: "Mindre än en minut kvar",
     oneMinuteLeft: "~1 minut kvar",
     minutesLeft: "~{mins} minuter kvar",
+    minutesLeftFew: "~{mins} minuter kvar",
+    minutesLeftTwo: "~{mins} minuter kvar",
     progressMessages: [
       "Nästan klart... förmodligen...",
       "Bra saker tar tid...",

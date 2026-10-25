@@ -5554,8 +5554,10 @@ export const ru: TranslationKeys = {
       "Некоторые файлы моделей отсутствуют или повреждены. Восстановление загрузит их заново.",
     repairButton: "Восстановить {name}",
     lessThanMinute: "Осталось менее минуты",
-    oneMinuteLeft: "Осталось ~1 минута",
+    oneMinuteLeft: "Осталось ~{mins} минута",
     minutesLeft: "Осталось ~{mins} минут",
+    minutesLeftFew: "Осталось ~{mins} минуты",
+    minutesLeftTwo: "Осталось ~{mins} минут",
     progressMessages: [
       "Почти готово... наверное...",
       "Хорошие вещи требуют времени...",

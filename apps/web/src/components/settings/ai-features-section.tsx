@@ -17,15 +17,18 @@ import { bundleDescription, bundleName } from "@/lib/bundle-i18n";
 import { format, formatFileSize } from "@/lib/format";
 import { useFeaturesStore } from "@/stores/features-store";
 
-function formatTimeRemaining(ms: number, t: TranslationKeys): string {
+export function formatTimeRemaining(ms: number, t: TranslationKeys, locale: string): string {
   if (ms < 60000) return t.features.lessThanMinute;
   const mins = Math.round(ms / 60000);
-  if (mins === 1) return t.features.oneMinuteLeft;
+  const rule = new Intl.PluralRules(locale).select(mins);
+  if (rule === "one") return format(t.features.oneMinuteLeft, { mins });
+  if (rule === "two") return format(t.features.minutesLeftTwo, { mins });
+  if (rule === "few") return format(t.features.minutesLeftFew, { mins });
   return format(t.features.minutesLeft, { mins });
 }
 
 export function AiFeaturesSection() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const {
     bundles,
     fetch,
@@ -140,7 +143,7 @@ function ResetEnvironmentSection({
   venvKept: boolean;
   onResetDone: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [confirming, setConfirming] = useState(false);
   const [resetting, setResetting] = useState(false);
 
@@ -224,7 +227,7 @@ function ResetEnvironmentSection({
 }
 
 function ImportBundleSection({ onImported }: { onImported: () => void }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [mode, setMode] = useState<"ocr" | "legacy">("ocr");
   const [importing, setImporting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(
@@ -434,7 +437,7 @@ function BundleCard({
   isQueued: boolean;
   startTime: number | null;
 }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [confirming, setConfirming] = useState(false);
   const incompatible = bundle.compatibility === "incompatible";
   const displayedError = error ?? bundle.error;
@@ -459,7 +462,7 @@ function BundleCard({
     const rate = progress.percent / elapsed;
     if (rate <= 0) return null;
     const remaining = (100 - progress.percent) / rate;
-    return formatTimeRemaining(remaining, t);
+    return formatTimeRemaining(remaining, t, locale);
   })();
 
   return (
