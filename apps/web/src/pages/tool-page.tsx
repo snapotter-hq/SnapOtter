@@ -1086,9 +1086,10 @@ function ToolPageContent({
                   <WaveformPlayer
                     src={audioSrc}
                     // audioSrc falls back to the original, and only a result claims.
-                    onDownload={playerDownloadClaim(processedUrl, () =>
-                      useFileStore.getState().claimSelected(),
-                    )}
+                    onDownload={playerDownloadClaim(processedUrl, () => {
+                      track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: tool.id });
+                      useFileStore.getState().claimSelected();
+                    })}
                   />
                 </div>
               </div>

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { en } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, en } from "@snapotter/shared";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { createMemoryRouter, Navigate, RouterProvider } from "react-router";
@@ -16,6 +16,7 @@ vi.mock("@/lib/analytics", async () => {
 });
 
 import { NavigationGuard } from "@/components/common/navigation-guard";
+import { track } from "@/lib/analytics";
 import { useEditorStore } from "@/stores/editor-store";
 import { useFileStore } from "@/stores/file-store";
 import { useSplitStore } from "@/stores/split-store";
@@ -190,6 +191,7 @@ let removeSpy: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   mintedObjectUrls = 0;
+  vi.mocked(track).mockClear();
   MockURL.createObjectURL.mockReset().mockImplementation(() => `blob:mock-${++mintedObjectUrls}`);
   MockURL.revokeObjectURL.mockReset();
   vi.stubGlobal("URL", MockURL);
@@ -928,6 +930,50 @@ describe("NavigationGuard download then leave", () => {
     expect(MockURL.revokeObjectURL.mock.calls.flat()).not.toContain("blob:result");
     expect(useFileStore.getState().entries[0].processedUrl).toBe("blob:result");
     expect(router.state.location.pathname).toBe("/files");
+  });
+
+  it("emits RESULT_DOWNLOADED for the active tool on Download & Leave and skips non-tool routes (#3970)", async () => {
+    leaveAResult();
+    vi.mocked(track).mockClear();
+    recordDownloads();
+    const { router, unmount } = renderGuard("/image/compress-image");
+
+    await navigateTo(router, "/files");
+    await clickButton(en.navigationGuard.downloadAndLeave);
+    await flushDeferredWork();
+
+    expect(track).toHaveBeenCalledTimes(1);
+    expect(track).toHaveBeenCalledWith(ANALYTICS_EVENTS.RESULT_DOWNLOADED, {
+      tool_id: "compress-image",
+    });
+    unmount();
+
+    // Batch ZIP on a tool route also emits RESULT_DOWNLOADED once.
+    useFileStore.getState().reset();
+    leaveABatchZip();
+    vi.mocked(track).mockClear();
+    const zipView = renderGuard("/image/resize");
+    await navigateTo(zipView.router, "/files");
+    await clickButton(en.navigationGuard.downloadAndLeave);
+    await flushDeferredWork();
+
+    expect(track).toHaveBeenCalledTimes(1);
+    expect(track).toHaveBeenCalledWith(ANALYTICS_EVENTS.RESULT_DOWNLOADED, {
+      tool_id: "resize",
+    });
+    zipView.unmount();
+
+    // Pipeline route (/automate) has no single tool_id and must not emit RESULT_DOWNLOADED.
+    useFileStore.getState().reset();
+    leaveAResult();
+    vi.mocked(track).mockClear();
+    const automateView = renderGuard("/automate");
+    await navigateTo(automateView.router, "/files");
+    await clickButton(en.navigationGuard.downloadAndLeave);
+    await flushDeferredWork();
+
+    expect(track).not.toHaveBeenCalled();
+    automateView.unmount();
   });
 });
 

@@ -1,4 +1,4 @@
-import { HEX_COLOR_PATTERN, normalizeHexColor } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, HEX_COLOR_PATTERN, normalizeHexColor } from "@snapotter/shared";
 import {
   ChevronDown,
   ChevronRight,
@@ -13,6 +13,7 @@ import { ProgressCard } from "@/components/common/progress-card";
 import { ResultDownloadLink } from "@/components/common/result-download-link";
 import { useTranslation } from "@/contexts/i18n-context";
 import { useToolProcessor } from "@/hooks/use-tool-processor";
+import { track } from "@/lib/analytics";
 import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { format } from "@/lib/format";
@@ -1507,6 +1508,7 @@ export function RemoveBgSettings({ onBgPreview }: RemoveBgSettingsProps = {}) {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      track(ANALYTICS_EVENTS.RESULT_DOWNLOADED, { tool_id: "remove-background" });
       if (sameSettings(removeBgSession.settings, settingsAtStart)) {
         useFileStore.getState().markClaimedById(capturedEntry.id, expectedProcessedUrl);
       }

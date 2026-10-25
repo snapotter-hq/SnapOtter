@@ -139,7 +139,7 @@ export function normalizePath(pathname: string): string {
  * The tool id from a "/:section/:toolId" route, or null anywhere else. The
  * filter drops the empty segment a trailing slash leaves behind.
  */
-function toolIdFromPath(pathname: string): string | null {
+export function toolIdFromPath(pathname: string): string | null {
   const parts = pathname.split("/").filter(Boolean);
   return parts.length === 2 && SECTION_IDS.has(parts[0]) ? parts[1] : null;
 }

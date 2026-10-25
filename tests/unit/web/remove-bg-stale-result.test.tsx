@@ -1,9 +1,14 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
-import { en } from "@snapotter/shared";
+import { ANALYTICS_EVENTS, en } from "@snapotter/shared";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/analytics", async () => {
+  const { analyticsModuleMock } = await import("../../helpers/mock-analytics.js");
+  return analyticsModuleMock();
+});
 
 // The processor's state as the page sees it. By default Phase 1 (background
 // removal) has finished for the loaded file and exposes the mask's URL; a test
@@ -28,12 +33,14 @@ vi.mock("@/hooks/use-tool-processor", () => ({
 }));
 
 import { RemoveBgSettings } from "@/components/tools/remove-bg-settings";
+import { track } from "@/lib/analytics";
 import { useFileStore } from "@/stores/file-store";
 
 const png = (name: string) => new File([new Uint8Array([1, 2, 3])], name, { type: "image/png" });
 const download = () => screen.queryByTestId("remove-background-download");
 
 beforeEach(() => {
+  vi.mocked(track).mockClear();
   URL.createObjectURL = vi.fn(() => "blob:mock");
   URL.revokeObjectURL = vi.fn();
   processor.processFiles.mockClear();
@@ -495,5 +502,53 @@ describe("remove-background result after the files change (#2107)", () => {
     );
     expect(clickSpy).not.toHaveBeenCalled();
     unmount();
+  });
+
+  it("emits RESULT_DOWNLOADED when Phase 2 effects download succeeds and skips it on failed requests (#3970)", async () => {
+    const a = png("a.png");
+    useFileStore.getState().setFiles([a]);
+    useFileStore.getState().updateEntry(0, {
+      serverFileId: "lib-a-v1",
+      processedUrl: "/api/v1/download/JOBA/a_mask.png",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ error: "Boom" }), { status: 500 })),
+    );
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    const { unmount } = render(<RemoveBgSettings />);
+    vi.mocked(track).mockClear();
+    fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+
+    await waitFor(() => expect(screen.getByText("Boom")).toBeInTheDocument());
+    expect(clickSpy).not.toHaveBeenCalled();
+    expect(track).not.toHaveBeenCalledWith(ANALYTICS_EVENTS.RESULT_DOWNLOADED, expect.anything());
+    unmount();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              downloadUrl: "/api/v1/download/JOBA/a_effects.png",
+              savedFileId: "lib-a-v2",
+            }),
+            { status: 200 },
+          ),
+      ),
+    );
+
+    render(<RemoveBgSettings />);
+    vi.mocked(track).mockClear();
+    fireEvent.click(await screen.findByTestId("remove-background-download-effects"));
+
+    await waitFor(() => expect(clickSpy).toHaveBeenCalledTimes(1));
+    expect(useFileStore.getState().entries[0].claimed).toBe(true);
+    expect(track).toHaveBeenCalledTimes(1);
+    expect(track).toHaveBeenCalledWith(ANALYTICS_EVENTS.RESULT_DOWNLOADED, {
+      tool_id: "remove-background",
+    });
   });
 });
