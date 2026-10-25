@@ -639,6 +639,22 @@ export function GeneralSection() {
 
 /* ────────────────────── System ────────────────────── */
 
+/** What the System tab calls each setting it saves, to name one the server refused. */
+function systemSettingLabel(t: TranslationKeys, key: string): string | undefined {
+  const labels: Partial<Record<string, string>> = {
+    fileUploadLimitMb: t.settings.system.fileUploadLimitLabel,
+    defaultTheme: t.settings.system.defaultThemeLabel,
+    defaultLocale: t.settings.system.languageLabel,
+    loginAttemptLimit: t.settings.system.loginAttemptLimitLabel,
+    tempFileMaxAgeHours: t.settings.fileManagement.maxAge,
+    startupCleanup: t.settings.fileManagement.startupCleanup,
+    analyticsEnabled: t.settings.privacy.analyticsLabel,
+    jobsRetentionDays: t.settings.dataRetention.jobsRetentionDays,
+    auditRetentionDays: t.settings.dataRetention.auditRetentionDays,
+  };
+  return labels[key];
+}
+
 const VALID_DEFAULT_THEMES = new Set<string>(["light", "dark", "system"]);
 const SUPPORTED_LOCALE_CODES = new Set<string>(SUPPORTED_LOCALES.map((l) => l.code));
 
@@ -726,6 +742,7 @@ export function SystemSection() {
     try {
       const changed = changedSettings(originalSettingsRef.current, settings);
       await apiPut("/v1/settings", writableSettings(changed));
+      originalSettingsRef.current = { ...settings };
       if ("analyticsEnabled" in changed) {
         const { optIn, optOut } = await import("@/lib/analytics");
         if (settings.analyticsEnabled === "false") optOut();
@@ -739,14 +756,42 @@ export function SystemSection() {
         const theme = settings.defaultTheme as "light" | "dark" | "system";
         useThemeStore.getState().setTheme(theme);
       }
-      originalSettingsRef.current = { ...settings };
       setSaveMsg({ type: "success", text: t.settings.system.saveSuccess });
       later(() => setSaveMsg(null), 3000, "saveMsg");
     } catch (err) {
       later.cancel("saveMsg");
+      // A refused value comes back with the setting's key: name its row and put
+      // the row back where it was, so the tab doesn't keep showing a value the
+      // server never accepted (and doesn't send it again on the next save).
+      const refusedKey =
+        err instanceof ApiError && typeof err.body.setting === "string"
+          ? err.body.setting
+          : undefined;
+      if (refusedKey) {
+        const saved = originalSettingsRef.current[refusedKey];
+        setSettings((prev) => {
+          if (saved === undefined) {
+            const { [refusedKey]: _, ...rest } = prev;
+            return rest;
+          }
+          return { ...prev, [refusedKey]: saved };
+        });
+      }
+      const refused = refusedKey ? systemSettingLabel(t, refusedKey) : undefined;
       setSaveMsg({
         type: "error",
-        text: apiErrorMessage(t, err, {}, t.settings.system.saveFailed),
+        text: apiErrorMessage(
+          t,
+          err,
+          {
+            FEATURE_NOT_LICENSED: t.errors.featureNotLicensed,
+            ESCALATION_DENIED: t.errors.escalationDenied,
+            ...(refused && {
+              VALIDATION_ERROR: format(t.errors.invalidSetting, { setting: refused }),
+            }),
+          },
+          t.settings.system.saveFailed,
+        ),
       });
     } finally {
       setSaving(false);
