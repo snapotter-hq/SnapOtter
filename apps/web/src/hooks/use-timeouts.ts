@@ -1,7 +1,11 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 type Timer = ReturnType<typeof setTimeout>;
-type Schedule = (callback: () => void, ms: number, key?: string) => void;
+
+export interface Schedule {
+  (callback: () => void, ms: number, key?: string): void;
+  cancel: (key: string) => void;
+}
 
 /**
  * A setTimeout tied to the component's lifetime: every timer still pending
@@ -15,6 +19,9 @@ type Schedule = (callback: () => void, ms: number, key?: string) => void;
  * 3000, "saveMsg")`): scheduling the same key again cancels the pending timer
  * first, so a second message shown inside the fade window gets its full time
  * instead of being cleared by the first one's timer (#1798).
+ *
+ * Call `later.cancel(key)` to cancel a pending keyed timer explicitly when an
+ * error occurs or when starting the next action (#1583).
  */
 export function useTimeouts(): Schedule {
   const pending = useRef(new Set<Timer>());
@@ -33,21 +40,35 @@ export function useTimeouts(): Schedule {
     };
   }, []);
 
-  return useCallback<Schedule>((callback, ms, key) => {
-    if (!mounted.current) return;
-    if (key !== undefined) {
+  return useMemo(() => {
+    const cancel = (key: string) => {
       const previous = byKey.current.get(key);
       if (previous !== undefined) {
         clearTimeout(previous);
         pending.current.delete(previous);
+        byKey.current.delete(key);
       }
-    }
-    const id = setTimeout(() => {
-      pending.current.delete(id);
-      if (key !== undefined && byKey.current.get(key) === id) byKey.current.delete(key);
-      callback();
-    }, ms);
-    pending.current.add(id);
-    if (key !== undefined) byKey.current.set(key, id);
+    };
+
+    const schedule = ((callback: () => void, ms: number, key?: string) => {
+      if (!mounted.current) return;
+      if (key !== undefined) {
+        const previous = byKey.current.get(key);
+        if (previous !== undefined) {
+          clearTimeout(previous);
+          pending.current.delete(previous);
+        }
+      }
+      const id = setTimeout(() => {
+        pending.current.delete(id);
+        if (key !== undefined && byKey.current.get(key) === id) byKey.current.delete(key);
+        callback();
+      }, ms);
+      pending.current.add(id);
+      if (key !== undefined) byKey.current.set(key, id);
+    }) as Schedule;
+
+    schedule.cancel = cancel;
+    return schedule;
   }, []);
 }

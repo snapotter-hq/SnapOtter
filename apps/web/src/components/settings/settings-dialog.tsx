@@ -473,6 +473,7 @@ export function GeneralSection() {
     if (prefsLoadFailed) return;
     setSaving(true);
     setSaveMsg(null);
+    later.cancel("saveMsg");
     try {
       // The default home view is a per-user preference, not instance config, so
       // it saves to /v1/preferences (writable by any authenticated user) rather
@@ -482,14 +483,15 @@ export function GeneralSection() {
       useSettingsStore.setState({
         defaultToolView,
       });
+      later(() => setSaveMsg(null), 3000, "saveMsg");
     } catch (err) {
+      later.cancel("saveMsg");
       setSaveMsg({
         type: "error",
         text: apiErrorMessage(t, err, {}, t.settings.general.saveFailed),
       });
     } finally {
       setSaving(false);
-      later(() => setSaveMsg(null), 3000, "saveMsg");
     }
   }, [defaultToolView, prefsLoadFailed, t, later]);
 
@@ -608,12 +610,26 @@ export function GeneralSection() {
         </button>
         {saveMsg && (
           <span
+            role={saveMsg.type === "error" ? "alert" : "status"}
             className={cn(
-              "text-sm",
+              "text-sm inline-flex items-center gap-1.5",
               saveMsg.type === "error" ? "text-destructive" : "text-success-ink",
             )}
           >
             {saveMsg.text}
+            {saveMsg.type === "error" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSaveMsg(null);
+                  later.cancel("saveMsg");
+                }}
+                aria-label={t.common.close}
+                className="p-0.5 rounded hover:bg-destructive/10 text-destructive shrink-0"
+              >
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            )}
           </span>
         )}
       </div>
@@ -638,7 +654,7 @@ export function SystemSection() {
   const originalSettingsRef = useRef<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [saveMsg, setSaveMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [installFeedbackOpen, setInstallFeedbackOpen] = useState(false);
   const [bundleLoading, setBundleLoading] = useState(false);
   const [bundleError, setBundleError] = useState<string | null>(null);
@@ -667,6 +683,8 @@ export function SystemSection() {
 
   const updateInstallFeedbackState = useCallback(
     async (key: string, value: string) => {
+      setInstallFeedbackError(null);
+      later.cancel("installFeedbackError");
       try {
         await apiPut("/v1/settings", { [key]: value });
         setSettings((prev) => ({ ...prev, [key]: value }));
@@ -681,8 +699,8 @@ export function SystemSection() {
           }),
           { error_class: "operational" },
         );
+        later.cancel("installFeedbackError");
         setInstallFeedbackError(apiErrorMessage(t, error, {}, t.settings.system.saveFailed));
-        later(() => setInstallFeedbackError(null), 3000, "installFeedbackError");
       }
     },
     [t, later],
@@ -704,6 +722,7 @@ export function SystemSection() {
   const handleSave = useCallback(async () => {
     setSaving(true);
     setSaveMsg(null);
+    later.cancel("saveMsg");
     try {
       const changed = changedSettings(originalSettingsRef.current, settings);
       await apiPut("/v1/settings", writableSettings(changed));
@@ -721,12 +740,16 @@ export function SystemSection() {
         useThemeStore.getState().setTheme(theme);
       }
       originalSettingsRef.current = { ...settings };
-      setSaveMsg(t.settings.system.saveSuccess);
-    } catch {
-      setSaveMsg(t.settings.system.saveFailed);
+      setSaveMsg({ type: "success", text: t.settings.system.saveSuccess });
+      later(() => setSaveMsg(null), 3000, "saveMsg");
+    } catch (err) {
+      later.cancel("saveMsg");
+      setSaveMsg({
+        type: "error",
+        text: apiErrorMessage(t, err, {}, t.settings.system.saveFailed),
+      });
     } finally {
       setSaving(false);
-      later(() => setSaveMsg(null), 3000, "saveMsg");
     }
   }, [settings, t, later]);
 
@@ -915,7 +938,23 @@ export function SystemSection() {
         onDismissForever={handleInstallFeedbackDismiss}
       />
       {installFeedbackError && (
-        <p className="text-sm text-destructive mt-2">{installFeedbackError}</p>
+        <span
+          role="alert"
+          className="text-sm inline-flex items-center gap-1.5 text-destructive mt-2"
+        >
+          {installFeedbackError}
+          <button
+            type="button"
+            onClick={() => {
+              setInstallFeedbackError(null);
+              later.cancel("installFeedbackError");
+            }}
+            aria-label={t.common.close}
+            className="p-0.5 rounded hover:bg-destructive/10 text-destructive shrink-0"
+          >
+            <X className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        </span>
       )}
 
       <div className="pt-4 border-t border-border">
@@ -968,12 +1007,26 @@ export function SystemSection() {
         </button>
         {saveMsg && (
           <span
+            role={saveMsg.type === "error" ? "alert" : "status"}
             className={cn(
-              "text-sm",
-              saveMsg === t.settings.system.saveFailed ? "text-destructive" : "text-success-ink",
+              "text-sm inline-flex items-center gap-1.5",
+              saveMsg.type === "error" ? "text-destructive" : "text-success-ink",
             )}
           >
-            {saveMsg}
+            {saveMsg.text}
+            {saveMsg.type === "error" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSaveMsg(null);
+                  later.cancel("saveMsg");
+                }}
+                aria-label={t.common.close}
+                className="p-0.5 rounded hover:bg-destructive/10 text-destructive shrink-0"
+              >
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            )}
           </span>
         )}
       </div>
@@ -1268,6 +1321,7 @@ export function AdminSecuritySettings() {
   const handleSave = useCallback(async () => {
     setSaving(true);
     setSaveMsg(null);
+    later.cancel("saveMsg");
     try {
       await apiPut(
         "/v1/settings",
@@ -1275,7 +1329,9 @@ export function AdminSecuritySettings() {
       );
       originalSettingsRef.current = { ...settings };
       setSaveMsg({ type: "success", text: t.settings.security.securitySettingsSaved });
+      later(() => setSaveMsg(null), 3000, "saveMsg");
     } catch (err) {
+      later.cancel("saveMsg");
       // A refused value comes back with the setting's key: name its row and put
       // the row back where it was, so the tab doesn't keep showing a value the
       // server never accepted (and doesn't send it again on the next save).
@@ -1306,7 +1362,6 @@ export function AdminSecuritySettings() {
       });
     } finally {
       setSaving(false);
-      later(() => setSaveMsg(null), 3000, "saveMsg");
     }
   }, [settings, t, later]);
 
@@ -1612,12 +1667,26 @@ export function AdminSecuritySettings() {
         </button>
         {saveMsg && (
           <span
+            role={saveMsg.type === "error" ? "alert" : "status"}
             className={cn(
-              "text-sm",
+              "text-sm inline-flex items-center gap-1.5",
               saveMsg.type === "error" ? "text-destructive" : "text-success-ink",
             )}
           >
             {saveMsg.text}
+            {saveMsg.type === "error" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSaveMsg(null);
+                  later.cancel("saveMsg");
+                }}
+                aria-label={t.common.close}
+                className="p-0.5 rounded hover:bg-destructive/10 text-destructive shrink-0"
+              >
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            )}
           </span>
         )}
       </div>
@@ -1745,6 +1814,8 @@ export function PeopleSection() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       setAddErrors(null);
+      setActionMsg(null);
+      later.cancel("actionMsg");
       // The server's refusal names no rule, so check here and say which (#1445).
       if (!isValidUsername(newUsername)) {
         setAddErrors([t.settings.people.usernameInvalid]);
@@ -1766,6 +1837,7 @@ export function PeopleSection() {
         setShowGeneratedPw(false);
         setPwCopy(null);
         setActionMsg({ type: "success", text: t.settings.people.createSuccess });
+        later(() => setActionMsg(null), 3000, "actionMsg");
         await loadUsers();
       } catch (err) {
         // The refusal names the minimum even when the policy read didn't, so
@@ -1798,7 +1870,6 @@ export function PeopleSection() {
         );
       } finally {
         setAdding(false);
-        later(() => setActionMsg(null), 3000, "actionMsg");
       }
     },
     [newUsername, newPassword, newRole, newTeam, maxUsers, loadUsers, t, later],
@@ -1807,14 +1878,18 @@ export function PeopleSection() {
   const handleDeleteUser = useCallback(
     async (id: string, username: string) => {
       if (!confirm(format(t.settings.people.deleteConfirm, { username }))) return;
+      setActionMsg(null);
+      later.cancel("actionMsg");
       try {
         await apiDelete(`/auth/users/${id}`);
         setActionMsg({
           type: "success",
           text: format(t.settings.people.deleteSuccess, { username }),
         });
+        later(() => setActionMsg(null), 3000, "actionMsg");
         await loadUsers();
       } catch (err) {
+        later.cancel("actionMsg");
         setActionMsg({
           type: "error",
           text: apiErrorMessage(
@@ -1830,7 +1905,6 @@ export function PeopleSection() {
         });
       }
       setOpenMenuId(null);
-      later(() => setActionMsg(null), 3000, "actionMsg");
     },
     [loadUsers, t, later],
   );
@@ -1839,6 +1913,8 @@ export function PeopleSection() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!editingUser) return;
+      setActionMsg(null);
+      later.cancel("actionMsg");
       try {
         await apiPut(`/auth/users/${editingUser.id}`, {
           role: editRole,
@@ -1846,8 +1922,10 @@ export function PeopleSection() {
         });
         setEditingUser(null);
         setActionMsg({ type: "success", text: t.settings.people.updateSuccess });
+        later(() => setActionMsg(null), 3000, "actionMsg");
         await loadUsers();
       } catch (err) {
+        later.cancel("actionMsg");
         setActionMsg({
           type: "error",
           text: apiErrorMessage(
@@ -1864,7 +1942,6 @@ export function PeopleSection() {
           ),
         });
       }
-      later(() => setActionMsg(null), 3000, "actionMsg");
     },
     [editingUser, editRole, editTeam, loadUsers, t, later],
   );
@@ -1874,6 +1951,8 @@ export function PeopleSection() {
       e.preventDefault();
       if (!resetPasswordUser) return;
       setResetErrors(null);
+      setActionMsg(null);
+      later.cancel("actionMsg");
       try {
         await apiPost(`/auth/users/${resetPasswordUser.id}/reset-password`, {
           newPassword: resetPassword,
@@ -1881,6 +1960,7 @@ export function PeopleSection() {
         setResetPasswordUser(null);
         setResetPassword("");
         setActionMsg({ type: "success", text: t.settings.people.resetSuccess });
+        later(() => setActionMsg(null), 3000, "actionMsg");
       } catch (err) {
         // A password the policy refuses belongs next to the field. Anything
         // else (a denied escalation, a rate limit, a server fault) is about the
@@ -1894,7 +1974,9 @@ export function PeopleSection() {
           setResetErrors(passwordMessages);
           // The banner may still hold the last submit's outcome.
           setActionMsg(null);
+          later.cancel("actionMsg");
         } else {
+          later.cancel("actionMsg");
           setActionMsg({
             type: "error",
             text: apiErrorMessage(
@@ -1909,7 +1991,6 @@ export function PeopleSection() {
           });
         }
       }
-      later(() => setActionMsg(null), 3000, "actionMsg");
     },
     [resetPasswordUser, resetPassword, t, later],
   );
@@ -1957,14 +2038,28 @@ export function PeopleSection() {
       {/* Action message */}
       {actionMsg && (
         <div
+          role={actionMsg.type === "error" ? "alert" : "status"}
           className={cn(
-            "text-sm px-3 py-2 rounded-lg",
+            "text-sm px-3 py-2 rounded-lg flex items-center justify-between gap-2",
             actionMsg.type === "error"
               ? "bg-destructive/10 text-destructive"
               : "bg-green-500/10 text-success-ink",
           )}
         >
-          {actionMsg.text}
+          <span>{actionMsg.text}</span>
+          {actionMsg.type === "error" && (
+            <button
+              type="button"
+              onClick={() => {
+                setActionMsg(null);
+                later.cancel("actionMsg");
+              }}
+              aria-label={t.common.close}
+              className="p-0.5 rounded hover:bg-destructive/20 text-destructive shrink-0"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
         </div>
       )}
 
@@ -2809,13 +2904,17 @@ export function TeamsSection() {
       e.preventDefault();
       if (!newTeamName.trim()) return;
       setCreating(true);
+      setActionMsg(null);
+      later.cancel("actionMsg");
       try {
         await apiPost("/v1/teams", { name: newTeamName.trim() });
         setNewTeamName("");
         setShowCreateForm(false);
         setActionMsg({ type: "success", text: t.settings.teams.createSuccess });
+        later(() => setActionMsg(null), 3000, "actionMsg");
         await loadTeams();
       } catch (err) {
+        later.cancel("actionMsg");
         setActionMsg({
           type: "error",
           text: apiErrorMessage(
@@ -2831,7 +2930,6 @@ export function TeamsSection() {
         });
       } finally {
         setCreating(false);
-        later(() => setActionMsg(null), 3000, "actionMsg");
       }
     },
     [newTeamName, loadTeams, t, later],
@@ -2840,13 +2938,17 @@ export function TeamsSection() {
   const handleRename = useCallback(
     async (id: string) => {
       if (!editingTeamName.trim()) return;
+      setActionMsg(null);
+      later.cancel("actionMsg");
       try {
         await apiPut(`/v1/teams/${id}`, { name: editingTeamName.trim() });
         setEditingTeamId(null);
         setEditingTeamName("");
         setActionMsg({ type: "success", text: t.settings.teams.renameSuccess });
+        later(() => setActionMsg(null), 3000, "actionMsg");
         await loadTeams();
       } catch (err) {
+        later.cancel("actionMsg");
         setActionMsg({
           type: "error",
           text: apiErrorMessage(
@@ -2860,7 +2962,6 @@ export function TeamsSection() {
           ),
         });
       }
-      later(() => setActionMsg(null), 3000, "actionMsg");
     },
     [editingTeamName, loadTeams, t, later],
   );
@@ -2868,11 +2969,15 @@ export function TeamsSection() {
   const handleDelete = useCallback(
     async (id: string, name: string) => {
       if (!confirm(format(t.settings.teams.deleteConfirm, { name }))) return;
+      setActionMsg(null);
+      later.cancel("actionMsg");
       try {
         await apiDelete(`/v1/teams/${id}`);
         setActionMsg({ type: "success", text: format(t.settings.teams.deleteSuccess, { name }) });
+        later(() => setActionMsg(null), 3000, "actionMsg");
         await loadTeams();
       } catch (err) {
+        later.cancel("actionMsg");
         // Both refusals (the Default team, a team with members) are 400s with
         // VALIDATION_ERROR, and this one line covers both.
         setActionMsg({
@@ -2886,7 +2991,6 @@ export function TeamsSection() {
         });
       }
       setOpenMenuId(null);
-      later(() => setActionMsg(null), 3000, "actionMsg");
     },
     [loadTeams, t, later],
   );
@@ -2907,6 +3011,8 @@ export function TeamsSection() {
   const handleSaveQuota = useCallback(
     async (id: string) => {
       setSavingQuota(true);
+      setActionMsg(null);
+      later.cancel("actionMsg");
       try {
         const body: Record<string, number | null> = {};
         const mbVal = quotaMb.trim() ? Number(quotaMb) : 0;
@@ -2915,16 +3021,17 @@ export function TeamsSection() {
         body.retentionHours = retVal > 0 ? retVal : null;
         await apiPut(`/v1/teams/${id}`, body);
         setActionMsg({ type: "success", text: t.settings.teams.quotaSaved });
+        later(() => setActionMsg(null), 3000, "actionMsg");
         setExpandedTeamId(null);
         await loadTeams();
       } catch (err) {
+        later.cancel("actionMsg");
         setActionMsg({
           type: "error",
           text: apiErrorMessage(t, err, {}, t.settings.teams.quotaSaveFailed),
         });
       } finally {
         setSavingQuota(false);
-        later(() => setActionMsg(null), 3000, "actionMsg");
       }
     },
     [quotaMb, retention, loadTeams, t, later],
@@ -2947,14 +3054,28 @@ export function TeamsSection() {
 
       {actionMsg && (
         <div
+          role={actionMsg.type === "error" ? "alert" : "status"}
           className={cn(
-            "text-sm px-3 py-2 rounded-lg",
+            "text-sm px-3 py-2 rounded-lg flex items-center justify-between gap-2",
             actionMsg.type === "error"
               ? "bg-destructive/10 text-destructive"
               : "bg-green-500/10 text-success-ink",
           )}
         >
-          {actionMsg.text}
+          <span>{actionMsg.text}</span>
+          {actionMsg.type === "error" && (
+            <button
+              type="button"
+              onClick={() => {
+                setActionMsg(null);
+                later.cancel("actionMsg");
+              }}
+              aria-label={t.common.close}
+              className="p-0.5 rounded hover:bg-destructive/20 text-destructive shrink-0"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
         </div>
       )}
 
@@ -3287,6 +3408,8 @@ export function RolesSection() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!newName.trim()) return;
+      setActionMsg(null);
+      later.cancel("actionMsg");
       // The server's refusals for these name no rule, so check here (#1445).
       const invalid = !isValidRoleName(newName)
         ? t.settings.roles.nameInvalid
@@ -3294,8 +3417,8 @@ export function RolesSection() {
           ? t.settings.roles.permissionsRequired
           : null;
       if (invalid) {
+        later.cancel("actionMsg");
         setActionMsg({ type: "error", text: invalid });
-        later(() => setActionMsg(null), 3000, "actionMsg");
         return;
       }
       try {
@@ -3309,8 +3432,10 @@ export function RolesSection() {
         setNewPermissions([]);
         setShowCreateForm(false);
         setActionMsg({ type: "success", text: t.settings.roles.createSuccess });
+        later(() => setActionMsg(null), 3000, "actionMsg");
         await loadRoles();
       } catch (err) {
+        later.cancel("actionMsg");
         setActionMsg({
           type: "error",
           text: apiErrorMessage(
@@ -3324,7 +3449,6 @@ export function RolesSection() {
           ),
         });
       }
-      later(() => setActionMsg(null), 3000, "actionMsg");
     },
     [newName, newDescription, newPermissions, loadRoles, t, later],
   );
@@ -3333,14 +3457,16 @@ export function RolesSection() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!editingRole) return;
+      setActionMsg(null);
+      later.cancel("actionMsg");
       const invalid = !isValidRoleName(editName)
         ? t.settings.roles.nameInvalid
         : editPermissions.length === 0
           ? t.settings.roles.permissionsRequired
           : null;
       if (invalid) {
+        later.cancel("actionMsg");
         setActionMsg({ type: "error", text: invalid });
-        later(() => setActionMsg(null), 3000, "actionMsg");
         return;
       }
       try {
@@ -3351,8 +3477,10 @@ export function RolesSection() {
         });
         setEditingRole(null);
         setActionMsg({ type: "success", text: t.settings.roles.updateSuccess });
+        later(() => setActionMsg(null), 3000, "actionMsg");
         await loadRoles();
       } catch (err) {
+        later.cancel("actionMsg");
         setActionMsg({
           type: "error",
           text: apiErrorMessage(
@@ -3366,7 +3494,6 @@ export function RolesSection() {
           ),
         });
       }
-      later(() => setActionMsg(null), 3000, "actionMsg");
     },
     [editingRole, editName, editDescription, editPermissions, loadRoles, t, later],
   );
@@ -3378,14 +3505,18 @@ export function RolesSection() {
           ? format(t.settings.roles.deleteConfirm, { name: role.name, count: role.userCount })
           : format(t.settings.roles.deleteConfirmSimple, { name: role.name });
       if (!confirm(question)) return;
+      setActionMsg(null);
+      later.cancel("actionMsg");
       try {
         await apiDelete(`/v1/roles/${role.id}`);
         setActionMsg({
           type: "success",
           text: format(t.settings.roles.deleteSuccess, { name: role.name }),
         });
+        later(() => setActionMsg(null), 3000, "actionMsg");
         await loadRoles();
       } catch (err) {
+        later.cancel("actionMsg");
         setActionMsg({
           type: "error",
           text: apiErrorMessage(
@@ -3396,7 +3527,6 @@ export function RolesSection() {
           ),
         });
       }
-      later(() => setActionMsg(null), 3000, "actionMsg");
     },
     [loadRoles, t, later],
   );
@@ -3422,14 +3552,28 @@ export function RolesSection() {
 
       {actionMsg && (
         <div
+          role={actionMsg.type === "error" ? "alert" : "status"}
           className={cn(
-            "text-sm px-3 py-2 rounded-lg",
+            "text-sm px-3 py-2 rounded-lg flex items-center justify-between gap-2",
             actionMsg.type === "error"
               ? "bg-destructive/10 text-destructive"
               : "bg-green-500/10 text-success-ink",
           )}
         >
-          {actionMsg.text}
+          <span>{actionMsg.text}</span>
+          {actionMsg.type === "error" && (
+            <button
+              type="button"
+              onClick={() => {
+                setActionMsg(null);
+                later.cancel("actionMsg");
+              }}
+              aria-label={t.common.close}
+              className="p-0.5 rounded hover:bg-destructive/20 text-destructive shrink-0"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
         </div>
       )}
 

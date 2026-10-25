@@ -147,19 +147,19 @@ const flows: Flow[] = [
   [
     "System: saving settings",
     async () => {
-      apiPut.mockRejectedValueOnce(new Error("down"));
+      apiPut.mockResolvedValueOnce({});
       renderDe(<SystemSection />);
       fireEvent.click(await screen.findByRole("button", { name: s.system.saveButton }));
-      await screen.findByText(s.system.saveFailed);
+      await screen.findByText(s.system.saveSuccess);
     },
   ],
   [
     "Admin security: saving settings",
     async () => {
-      apiPut.mockRejectedValueOnce(new Error("down"));
+      apiPut.mockResolvedValueOnce({});
       renderDe(<AdminSecuritySettings />);
       fireEvent.click(await screen.findByRole("button", { name: s.system.saveButton }));
-      await screen.findByText(s.security.securitySettingsFailed);
+      await screen.findByText(s.security.securitySettingsSaved);
     },
   ],
   [
@@ -280,7 +280,20 @@ describe("Settings timers are cancelled when Settings closes", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it("still clears the message after 3 seconds while Settings stays open", async () => {
+  it("still clears the success message after 3 seconds while Settings stays open", async () => {
+    apiPut.mockResolvedValueOnce({});
+    renderDe(<AdminSecuritySettings />);
+    fireEvent.click(await screen.findByRole("button", { name: s.system.saveButton }));
+    await screen.findByText(s.security.securitySettingsSaved);
+
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(screen.queryByText(s.security.securitySettingsSaved)).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("does not clear error messages on a timer while Settings stays open (#1583)", async () => {
     apiPut.mockRejectedValueOnce(new Error("down"));
     renderDe(<AdminSecuritySettings />);
     fireEvent.click(await screen.findByRole("button", { name: s.system.saveButton }));
@@ -289,7 +302,7 @@ describe("Settings timers are cancelled when Settings closes", () => {
     await act(async () => {
       vi.advanceTimersByTime(3000);
     });
-    expect(screen.queryByText(s.security.securitySettingsFailed)).toBeNull();
+    expect(screen.getByText(s.security.securitySettingsFailed)).toBeInTheDocument();
     expect(vi.getTimerCount()).toBe(0);
   });
 });
