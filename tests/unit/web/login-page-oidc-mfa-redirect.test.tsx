@@ -2,7 +2,7 @@
 
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, useLocation } from "react-router";
+import { MemoryRouter, useLocation, useNavigate } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const useAuth = vi.hoisted(() => vi.fn());
@@ -427,5 +427,78 @@ describe("LoginPage OIDC/SAML MFA redirect handling", () => {
     const form = screen.getByLabelText(/username/i).closest("form");
     expect(errorEl.closest("form")).toBe(form);
     await waitFor(() => expect(screen.getByLabelText(/username/i)).toHaveFocus());
+  });
+
+  it("renders ?error= redirect messages inside a role=alert live region (#1147)", () => {
+    renderLoginPage("/login?error=oidc_auth_failed");
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Authentication failed. Please try again.");
+  });
+
+  it("clears an earlier login error when a later ?mfaToken= redirect opens the MFA prompt (#1147)", async () => {
+    function NavigateTrigger() {
+      const navigate = useNavigate();
+      return (
+        <button type="button" onClick={() => navigate("/login?mfaToken=abc-123")}>
+          sso-mfa-return
+        </button>
+      );
+    }
+
+    useAuth.mockReturnValue({
+      oidcEnabled: true,
+      oidcProviderName: "Test IdP",
+      samlEnabled: false,
+      samlProviderName: null,
+      ssoEnforced: false,
+    });
+    render(
+      <MemoryRouter initialEntries={["/login?error=oidc_auth_failed"]}>
+        <NavigateTrigger />
+        <LoginPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Authentication failed. Please try again.");
+
+    fireEvent.click(screen.getByRole("button", { name: "sso-mfa-return" }));
+
+    await screen.findByPlaceholderText("000000");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("closes an open MFA prompt and renders the redirect alert when a later ?error= redirect arrives (#1147)", async () => {
+    function NavigateTrigger() {
+      const navigate = useNavigate();
+      return (
+        <button type="button" onClick={() => navigate("/login?error=oidc_auth_failed")}>
+          sso-error-return
+        </button>
+      );
+    }
+
+    useAuth.mockReturnValue({
+      oidcEnabled: true,
+      oidcProviderName: "Test IdP",
+      samlEnabled: false,
+      samlProviderName: null,
+      ssoEnforced: false,
+    });
+    render(
+      <MemoryRouter initialEntries={["/login?mfaToken=abc-123"]}>
+        <NavigateTrigger />
+        <LoginPage />
+      </MemoryRouter>,
+    );
+
+    const codeInput = await screen.findByPlaceholderText("000000");
+    fireEvent.change(codeInput, { target: { value: "123456" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "sso-error-return" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Authentication failed. Please try again.");
+    expect(screen.queryByPlaceholderText("000000")).not.toBeInTheDocument();
   });
 });

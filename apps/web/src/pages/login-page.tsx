@@ -335,6 +335,18 @@ export function LoginPage() {
   // focus on first commit; a later() before arming is silently dropped.
   const later = useTimeouts();
 
+  const clearMfaState = useCallback(() => {
+    setShowMfaPrompt(false);
+    setMfaToken("");
+    setMfaCode("");
+    setRejectedMfaCode("");
+    setShowMfaEnrollment(false);
+    setEnrollmentToken("");
+    setEnrollmentUri("");
+    setEnrollmentRecoveryCodes([]);
+    setEnrollmentCode("");
+  }, []);
+
   useEffect(() => {
     // A successful OIDC/SAML login for an already-enrolled user redirects
     // here with a one-time mfaToken instead of completing the session
@@ -342,6 +354,9 @@ export function LoginPage() {
     // login's challenge is.
     const redirectedMfaToken = searchParams.get("mfaToken");
     if (redirectedMfaToken) {
+      clearMfaState();
+      setError("");
+      setNotice(null);
       setMfaToken(redirectedMfaToken);
       setErrorFromRedirect(true);
       setShowMfaPrompt(true);
@@ -368,6 +383,8 @@ export function LoginPage() {
         mfa_enrollment_required: t.auth.mfaEnrollmentRequired,
         mfa_policy_unavailable: t.auth.mfaPolicyUnavailable,
       };
+      clearMfaState();
+      setNotice(null);
       setError(errorMessages[authError] || t.auth.oidcGenericError);
       setErrorFromRedirect(true);
       setSearchParams({}, { replace: true });
@@ -381,7 +398,7 @@ export function LoginPage() {
       }
       setSearchParams({}, { replace: true });
     }
-  }, [searchParams, setSearchParams, t, later]);
+  }, [searchParams, setSearchParams, t, later, clearMfaState]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -470,15 +487,7 @@ export function LoginPage() {
   // A dead challenge token can't be retried, so leave both MFA panels and show
   // the password form with the reason (#1234).
   const restartLogin = (message: string) => {
-    setShowMfaPrompt(false);
-    setMfaToken("");
-    setMfaCode("");
-    setRejectedMfaCode("");
-    setShowMfaEnrollment(false);
-    setEnrollmentToken("");
-    setEnrollmentUri("");
-    setEnrollmentRecoveryCodes([]);
-    setEnrollmentCode("");
+    clearMfaState();
     setError(message);
     // The focused code input is about to unmount; don't let focus fall to <body>.
     // A challenge that started from an SSO redirect points back at the SSO
@@ -586,10 +595,11 @@ export function LoginPage() {
 
   const handleCopyRecoveryCodes = async () => {
     if (enrollmentRecoveryCodes.length === 0) return;
+    // Clear an earlier copy failure before the attempt so a retry that fails
+    // again remounts the alert region and announces to screen readers (#1147).
+    setError((e) => (e === t.settings.security.twoFactorCopyFailed ? "" : e));
     const ok = await copyToClipboard(enrollmentRecoveryCodes.join("\n"));
     if (ok) {
-      // A retry that works takes down the earlier copy failure, not other errors.
-      setError((e) => (e === t.settings.security.twoFactorCopyFailed ? "" : e));
       setEnrollmentCodesCopied(true);
       later(() => setEnrollmentCodesCopied(false), 2000, "enrollmentCodesCopied");
     } else {
@@ -616,7 +626,9 @@ export function LoginPage() {
             </p>
           )}
           {!showMfaEnrollment && !showMfaPrompt && errorFromRedirect && error && (
-            <p className="text-sm text-destructive">{error}</p>
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
           )}
           {ssoEnforced && (oidcEnabled || samlEnabled) && (
             <div className="space-y-3">
@@ -735,7 +747,11 @@ export function LoginPage() {
                   className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground text-center text-2xl font-mono tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              {error && (
+                <p role="alert" className="text-sm text-destructive">
+                  {error}
+                </p>
+              )}
               <button
                 type="button"
                 onClick={handleEnrollComplete}
@@ -797,7 +813,11 @@ export function LoginPage() {
                 }}
                 className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground text-center text-2xl font-mono tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-ring"
               />
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              {error && (
+                <p role="alert" className="text-sm text-destructive">
+                  {error}
+                </p>
+              )}
               <button
                 type="button"
                 onClick={handleMfaComplete}
@@ -810,10 +830,7 @@ export function LoginPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setShowMfaPrompt(false);
-                  setMfaToken("");
-                  setMfaCode("");
-                  setRejectedMfaCode("");
+                  clearMfaState();
                   setErrorFromRedirect(false);
                   setError("");
                 }}
@@ -865,7 +882,11 @@ export function LoginPage() {
                   required
                 />
               </div>
-              {!errorFromRedirect && error && <p className="text-sm text-destructive">{error}</p>}
+              {!errorFromRedirect && error && (
+                <p role="alert" className="text-sm text-destructive">
+                  {error}
+                </p>
+              )}
               <button
                 type="submit"
                 disabled={loading || !username || !password}

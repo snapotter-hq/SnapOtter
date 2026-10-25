@@ -459,4 +459,84 @@ describe("LoginPage error messages", () => {
       expect(codeInput.value).toBe("123456");
     },
   );
+
+  it("renders password-form login errors inside a role=alert live region (#1147)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({ error: "Invalid credentials" }),
+      }),
+    );
+
+    renderLoginPage();
+    await submitLogin();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/invalid username or password/i);
+  });
+
+  it("renders MFA-challenge errors inside a role=alert live region (#1147)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({ requiresMfa: true, mfaToken: "mfa-token-1" }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 401,
+          headers: new Headers(),
+          json: async () => ({ error: "Invalid code", code: "INVALID_CODE" }),
+        }),
+    );
+
+    renderLoginPage();
+    await submitLogin();
+
+    const codeInput = await screen.findByPlaceholderText("000000");
+    fireEvent.change(codeInput, { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /^verify$/i }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/invalid code/i);
+  });
+
+  it("renders MFA-enrollment errors inside a role=alert live region (#1147)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            requiresMfaEnrollment: true,
+            enrollmentToken: "enroll-token-1",
+            uri: ENROLLMENT_URI,
+            recoveryCodes: ["AAAA-1111"],
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 401,
+          headers: new Headers(),
+          json: async () => ({ error: "Invalid code", code: "INVALID_CODE" }),
+        }),
+    );
+
+    renderLoginPage();
+    await submitLogin();
+
+    const codeInput = await screen.findByLabelText(/6-digit code/i);
+    fireEvent.change(codeInput, { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /confirm and enable/i }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/invalid code/i);
+  });
 });
