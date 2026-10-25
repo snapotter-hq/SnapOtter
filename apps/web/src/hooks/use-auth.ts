@@ -1,3 +1,4 @@
+import type { Permission } from "@snapotter/shared";
 import { useEffect, useState } from "react";
 import { clearToken, formatHeaders } from "@/lib/api";
 import { appUrl } from "@/lib/app-url";
@@ -21,7 +22,7 @@ interface AuthState {
   totpEnabled: boolean;
 }
 
-const ANON_ADMIN_PERMISSIONS = [
+const ANON_ADMIN_PERMISSIONS: readonly Permission[] = [
   "tools:use",
   "files:own",
   "files:all",
@@ -36,6 +37,9 @@ const ANON_ADMIN_PERMISSIONS = [
   "features:manage",
   "system:health",
   "audit:read",
+  "compliance:manage",
+  "webhooks:manage",
+  "security:manage",
 ];
 
 interface AuthConfig {
@@ -123,7 +127,7 @@ export function useAuth() {
               mustChangePassword: false,
               username: null,
               role: "admin",
-              permissions: ANON_ADMIN_PERMISSIONS,
+              permissions: [...ANON_ADMIN_PERMISSIONS],
               oidcEnabled: false,
               oidcProviderName: null,
               samlEnabled: false,

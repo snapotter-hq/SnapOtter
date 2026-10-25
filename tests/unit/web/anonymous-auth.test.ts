@@ -1,4 +1,8 @@
 // @vitest-environment jsdom
+import "@testing-library/jest-dom/vitest";
+import type { Permission } from "@snapotter/shared";
+import { en } from "@snapotter/shared";
+import { createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const fetchMock = vi.fn();
@@ -13,6 +17,7 @@ vi.mock("@/stores/connection-store", () => ({
 vi.mock("@/lib/api", () => ({
   formatHeaders: () => new Headers(),
   clearToken: vi.fn(),
+  apiGet: vi.fn(async () => ({ settings: {} })),
 }));
 
 describe("useAuth anonymous happy path", () => {
@@ -57,7 +62,7 @@ describe("useAuth anonymous happy path", () => {
     expect(result.current.hasPermission("settings:read")).toBe(true);
   });
 
-  it("includes all admin permissions in anonymous mode", async () => {
+  it("includes all 17 admin permissions in anonymous mode", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ authEnabled: false }),
@@ -70,24 +75,54 @@ describe("useAuth anonymous happy path", () => {
 
     await act(async () => {});
 
-    const expectedPerms = [
-      "tools:use",
-      "files:own",
-      "files:all",
-      "apikeys:own",
-      "apikeys:all",
-      "pipelines:own",
-      "pipelines:all",
-      "settings:read",
-      "settings:write",
-      "users:manage",
-      "teams:manage",
-      "features:manage",
-      "system:health",
-      "audit:read",
-    ];
+    const allPermissions: Record<Permission, true> = {
+      "tools:use": true,
+      "files:own": true,
+      "files:all": true,
+      "apikeys:own": true,
+      "apikeys:all": true,
+      "pipelines:own": true,
+      "pipelines:all": true,
+      "settings:read": true,
+      "settings:write": true,
+      "users:manage": true,
+      "teams:manage": true,
+      "features:manage": true,
+      "system:health": true,
+      "audit:read": true,
+      "compliance:manage": true,
+      "webhooks:manage": true,
+      "security:manage": true,
+    };
+    const expectedPerms = Object.keys(allPermissions);
+    expect(expectedPerms).toHaveLength(17);
+    expect(result.current.permissions).toEqual(expectedPerms);
     for (const perm of expectedPerms) {
       expect(result.current.hasPermission(perm)).toBe(true);
+    }
+  });
+
+  it("renders Login Attempt Limit and Audit Log Retention in SystemSection when authEnabled is false", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ authEnabled: false }),
+    });
+
+    const { cleanup, render, screen } = await import("@testing-library/react");
+    const { SystemSection } = await import("@/components/settings/settings-dialog");
+
+    try {
+      render(createElement(SystemSection));
+
+      expect(await screen.findByText(en.settings.system.heading)).toBeInTheDocument();
+      expect(
+        await screen.findByRole("spinbutton", { name: en.settings.system.loginAttemptLimitLabel }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("spinbutton", { name: en.settings.dataRetention.auditRetentionDays }),
+      ).toBeInTheDocument();
+    } finally {
+      cleanup();
     }
   });
 
