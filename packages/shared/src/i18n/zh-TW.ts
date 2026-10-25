@@ -1044,7 +1044,6 @@ export const zhTW: TranslationKeys = {
       paintOverObjectsToErase: "在要擦除的物件上塗抹",
     },
     "crop-canvas": {
-      original: "原始：",
       cropPreview: "裁切預覽",
       cropRegionSize: "裁切區域：{width} x {height}",
       originalSize: "原始：{width} x {height}",
@@ -1075,7 +1074,6 @@ export const zhTW: TranslationKeys = {
       infoBar: "{width} x {height}px · {cols}x{rows}格線 · {count}個圖磚",
     },
     "remove-bg": {
-      original: "原始：",
       transparent: "透明",
       color: "彩色",
       gradient: "漸層",
@@ -1102,7 +1100,6 @@ export const zhTW: TranslationKeys = {
       theExtractedTextWillAppear: "執行OCR後，擷取的文字會顯示在這裡。",
     },
     "image-enhancement": {
-      original: "原始：",
       removesNoiseAndArtifactsUsing: "使用AI去除雜訊和偽影",
       analyzingImage: "正在分析影像...",
       imageLooksGoodFineTune: "影像看起來不錯。使用強度滑桿進行微調。",
@@ -1114,8 +1111,6 @@ export const zhTW: TranslationKeys = {
       enhancedSizeKb: "增強後：{size} KB",
     },
     "find-duplicates-results": {
-      all: "全部",
-      group: "群組",
       dimensions: "尺寸",
       format: "格式",
       scanned: "已掃描：",
@@ -1148,7 +1143,6 @@ export const zhTW: TranslationKeys = {
       pageSize: "頁面大小",
     },
     color: {
-      original: "原始：",
       light: "光線",
       brightness: "亮度",
       contrast: "對比度",
@@ -1260,7 +1254,6 @@ export const zhTW: TranslationKeys = {
       progressLabel: "套用中",
     },
     convert: {
-      original: "原始：",
       originalSizeKb: "原始：{size} KB",
       processedSizeKb: "處理後：{size} KB",
       targetFormat: "目標格式",
@@ -1290,7 +1283,6 @@ export const zhTW: TranslationKeys = {
       progressLabel: "最佳化中",
     },
     "strip-metadata": {
-      original: "原始：",
       iccProfile: "有ICC",
       originalSize: "原始：{size} KB",
       processedSize: "處理後：{size} KB",
@@ -1316,7 +1308,6 @@ export const zhTW: TranslationKeys = {
       inspectFailed: "無法檢查中繼資料",
     },
     "edit-metadata": {
-      original: "原始：",
       imageDescription: "影像描述",
       photographerCreatorName: "攝影師/創作者姓名",
       imageTitle: "影像標題",
@@ -1423,8 +1414,6 @@ export const zhTW: TranslationKeys = {
       requestTimedOut: "要求逾時，伺服器可能過載",
     },
     "pdf-to-image": {
-      converting2: "轉檔中",
-      page: "頁",
       custom: "自訂",
       uploadAPdfToGet: "上傳PDF以開始",
       generatingPagePreviews: "正在產生頁面預覽...",
@@ -1517,7 +1506,6 @@ export const zhTW: TranslationKeys = {
       progressLabel: "正在調整色彩",
     },
     sharpening: {
-      original: "原始：",
       originalSize: "原始：{size} KB",
       processedSize: "處理後：{size} KB",
       method: "方法",
@@ -1555,7 +1543,6 @@ export const zhTW: TranslationKeys = {
       },
     },
     "replace-color": {
-      original: "原始：",
       originalKb: "原始：{size} KB",
       processedKb: "處理後：{size} KB",
       sourceColor: "來源色彩（要取代的）",
@@ -1569,7 +1556,6 @@ export const zhTW: TranslationKeys = {
       progressLabel: "正在取代色彩",
     },
     "color-blindness": {
-      original: "原始：",
       originalKb: "原始：{size} KB",
       processedKb: "處理後：{size} KB",
       simulationType: "模擬類型",
@@ -1707,7 +1693,6 @@ export const zhTW: TranslationKeys = {
       download: "下載",
     },
     upscale: {
-      original: "原始：",
       off: "關閉",
       originalKb: "原始：{size} KB",
       upscaledKb: "放大後：{size} KB",
@@ -1727,7 +1712,6 @@ export const zhTW: TranslationKeys = {
       qualityBest: "最佳",
     },
     "erase-object": {
-      original: "原始：",
       originalKb: "原始：{size} KB",
       processedKb: "處理後：{size} KB",
       qualityFast: "快速",
@@ -1784,7 +1768,6 @@ export const zhTW: TranslationKeys = {
       progressLabel: "正在從PDF中擷取文字",
     },
     "blur-faces": {
-      original: "原始：",
       originalKb: "原始：{size} KB",
       processedKb: "處理後：{size} KB",
       blurRadius: "模糊半徑",
@@ -1797,7 +1780,6 @@ export const zhTW: TranslationKeys = {
       progressLabel: "正在模糊臉部",
     },
     "enhance-faces": {
-      original: "原始：",
       subtle: "輕微",
       maximum: "最佳",
       fewerFaces: "偵測更少臉部",
@@ -1920,7 +1902,6 @@ export const zhTW: TranslationKeys = {
       progressLabelBatch: "正在降噪{count}張影像",
     },
     "red-eye-removal": {
-      original: "原始：",
       originalKb: "原始：{size} KB",
       fixedKb: "修復後：{size} KB",
       sensitivity: "靈敏度",
@@ -1937,7 +1918,6 @@ export const zhTW: TranslationKeys = {
       progressLabelBatch: "正在修復{count}張影像的紅眼",
     },
     "restore-photo": {
-      original: "原始：",
       subtle: "輕微",
       strong: "強烈",
       originalKb: "原始：{size} KB",
@@ -1994,7 +1974,6 @@ export const zhTW: TranslationKeys = {
       progressLabel: "正在擴展畫布",
     },
     colorize: {
-      original: "原始：",
       originalKb: "原始：{size} KB",
       colorizedKb: "上色後：{size} KB",
       aiModel: "AI模型",
@@ -2200,7 +2179,6 @@ export const zhTW: TranslationKeys = {
       progressLabel: "正在模糊背景",
     },
     "watermark-text": {
-      original: "原始：",
       applyWatermark: "套用浮水印",
       tiledRepeating: "平鋪（重複）",
       originalKb: "原始：{size} KB",
@@ -2223,7 +2201,6 @@ export const zhTW: TranslationKeys = {
       progressLabel: "正在加入浮水印",
     },
     "watermark-image": {
-      original: "原始：",
       center: "置中",
       topLeft: "左上",
       topRight: "右上",
@@ -2242,7 +2219,6 @@ export const zhTW: TranslationKeys = {
       submitBatch: "套用浮水印（{count}個檔案）",
     },
     "text-overlay": {
-      original: "原始：",
       originalKb: "原始：{size} KB",
       processedKb: "處理後：{size} KB",
       text: "文字",
@@ -2262,7 +2238,6 @@ export const zhTW: TranslationKeys = {
       defaultText: "在此輸入文字",
     },
     compose: {
-      original: "原始：",
       screen: "螢幕",
       processing: "處理中...",
       overlayImage: "覆疊影像",
@@ -2317,9 +2292,6 @@ export const zhTW: TranslationKeys = {
       backToGallery: "返回圖庫",
     },
     info: {
-      min: "最小：",
-      max: "最大：",
-      mean: "平均：",
       minValue: "最小：{value}",
       maxValue: "最大：{value}",
       meanValue: "平均：{value}",
@@ -2550,9 +2522,6 @@ export const zhTW: TranslationKeys = {
       mosaic: "馬賽克",
       uploadingImages: "正在上傳影像...",
       processingCollage: "正在處理拼貼畫...",
-      loaded: "已載入",
-      images: "張影像",
-      collage: "拼貼畫：",
       snapotter: "SnapOtter",
       background: "背景",
       format: "格式",
@@ -2718,7 +2687,6 @@ export const zhTW: TranslationKeys = {
       text: "文字",
       position: "位置",
       newTab: "新分頁",
-      frame: "外框",
       quickPresets: "快速預設",
       linear: "線性",
       radial: "放射",
@@ -2934,7 +2902,6 @@ export const zhTW: TranslationKeys = {
       progressLabel: "正在轉換SVG",
     },
     vectorize: {
-      original: "原始：",
       detail: "細節",
       smoothing: "平滑度",
       blackWhite: "黑白",
@@ -2971,7 +2938,6 @@ export const zhTW: TranslationKeys = {
       progressLabel: "向量化中",
     },
     "gif-tools": {
-      original: "原始：",
       widthPx: "寬度（px）",
       auto: "自動",
       heightPx: "高度（px）",

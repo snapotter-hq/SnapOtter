@@ -1218,7 +1218,6 @@ export const ko: TranslationKeys = {
       paintOverObjectsToErase: "지울 객체 위를 칠하세요",
     },
     "crop-canvas": {
-      original: "원본:",
       cropPreview: "크롭 미리보기",
       cropRegionSize: "크롭 영역: {width} x {height}",
       originalSize: "원본: {width} x {height}",
@@ -1249,7 +1248,6 @@ export const ko: TranslationKeys = {
       infoBar: "{width} x {height}px . {cols}x{rows} 그리드 . 타일 {count}개",
     },
     "remove-bg": {
-      original: "원본:",
       transparent: "투명",
       color: "컬러",
       gradient: "그라데이션",
@@ -1276,7 +1274,6 @@ export const ko: TranslationKeys = {
       theExtractedTextWillAppear: "OCR을 실행하면 추출된 텍스트가 여기에 표시됩니다.",
     },
     "image-enhancement": {
-      original: "원본:",
       removesNoiseAndArtifactsUsing: "AI로 노이즈 및 아티팩트 제거",
       analyzingImage: "이미지 분석 중...",
       imageLooksGoodFineTune: "이미지가 좋아 보입니다. 강도 슬라이더로 미세 조정하세요.",
@@ -1288,8 +1285,6 @@ export const ko: TranslationKeys = {
       enhancedSizeKb: "향상 후: {size} KB",
     },
     "find-duplicates-results": {
-      all: "전체",
-      group: "그룹",
       dimensions: "크기",
       format: "포맷",
       scanned: "스캔:",
@@ -1323,7 +1318,6 @@ export const ko: TranslationKeys = {
       pageSize: "페이지 크기",
     },
     color: {
-      original: "원본:",
       light: "라이트",
       brightness: "밝기",
       contrast: "대비",
@@ -1435,7 +1429,6 @@ export const ko: TranslationKeys = {
       progressLabel: "적용 중",
     },
     convert: {
-      original: "원본:",
       originalSizeKb: "원본: {size} KB",
       processedSizeKb: "처리 후: {size} KB",
       targetFormat: "대상 포맷",
@@ -1465,7 +1458,6 @@ export const ko: TranslationKeys = {
       progressLabel: "최적화 중",
     },
     "strip-metadata": {
-      original: "원본:",
       iccProfile: "ICC",
       originalSize: "원본: {size} KB",
       processedSize: "처리 후: {size} KB",
@@ -1492,7 +1484,6 @@ export const ko: TranslationKeys = {
       inspectFailed: "메타데이터를 검사하지 못했습니다",
     },
     "edit-metadata": {
-      original: "원본:",
       imageDescription: "이미지 설명",
       photographerCreatorName: "사진작가/제작자 이름",
       imageTitle: "이미지 제목",
@@ -1599,8 +1590,6 @@ export const ko: TranslationKeys = {
       requestTimedOut: "요청 시간이 초과되었습니다. 서버가 과부하일 수 있습니다",
     },
     "pdf-to-image": {
-      converting2: "변환 중",
-      page: "페이지",
       custom: "맞춤",
       uploadAPdfToGet: "시작하려면 PDF를 업로드하세요",
       generatingPagePreviews: "페이지 미리보기 생성 중...",
@@ -1694,7 +1683,6 @@ export const ko: TranslationKeys = {
       progressLabel: "색상 조정 중",
     },
     sharpening: {
-      original: "원본:",
       originalSize: "원본: {size} KB",
       processedSize: "처리 후: {size} KB",
       method: "방법",
@@ -1732,7 +1720,6 @@ export const ko: TranslationKeys = {
       },
     },
     "replace-color": {
-      original: "원본:",
       originalKb: "원본: {size} KB",
       processedKb: "처리 후: {size} KB",
       sourceColor: "원본 색상 (교체 대상)",
@@ -1746,7 +1733,6 @@ export const ko: TranslationKeys = {
       progressLabel: "색상 교체 중",
     },
     "color-blindness": {
-      original: "원본:",
       originalKb: "원본: {size} KB",
       processedKb: "처리 후: {size} KB",
       simulationType: "시뮬레이션 유형",
@@ -1887,7 +1873,6 @@ export const ko: TranslationKeys = {
       download: "다운로드",
     },
     upscale: {
-      original: "원본:",
       off: "끄기",
       originalKb: "원본: {size} KB",
       upscaledKb: "업스케일 후: {size} KB",
@@ -1909,7 +1894,6 @@ export const ko: TranslationKeys = {
       qualityBest: "최고",
     },
     "erase-object": {
-      original: "원본:",
       originalKb: "원본: {size} KB",
       processedKb: "처리 후: {size} KB",
       qualityFast: "빠름",
@@ -1967,7 +1951,6 @@ export const ko: TranslationKeys = {
       progressLabel: "PDF에서 텍스트 추출 중",
     },
     "blur-faces": {
-      original: "원본:",
       originalKb: "원본: {size} KB",
       processedKb: "처리 후: {size} KB",
       blurRadius: "블러 반경",
@@ -1980,7 +1963,6 @@ export const ko: TranslationKeys = {
       progressLabel: "얼굴 블러 중",
     },
     "enhance-faces": {
-      original: "원본:",
       subtle: "약하게",
       maximum: "최고",
       fewerFaces: "더 적은 얼굴",
@@ -2114,7 +2096,6 @@ export const ko: TranslationKeys = {
       progressLabelBatch: "{count}개 이미지 노이즈 제거 중",
     },
     "red-eye-removal": {
-      original: "원본:",
       originalKb: "원본: {size} KB",
       fixedKb: "보정 후: {size} KB",
       sensitivity: "감도",
@@ -2131,7 +2112,6 @@ export const ko: TranslationKeys = {
       progressLabelBatch: "{count}개 이미지 적목 보정 중",
     },
     "restore-photo": {
-      original: "원본:",
       subtle: "약하게",
       strong: "강하게",
       originalKb: "원본: {size} KB",
@@ -2188,7 +2168,6 @@ export const ko: TranslationKeys = {
       progressLabel: "캔버스 확장 중",
     },
     colorize: {
-      original: "원본:",
       originalKb: "원본: {size} KB",
       colorizedKb: "컬러화 후: {size} KB",
       aiModel: "AI 모델",
@@ -2394,7 +2373,6 @@ export const ko: TranslationKeys = {
       progressLabel: "배경 흐리게 처리 중",
     },
     "watermark-text": {
-      original: "원본:",
       applyWatermark: "워터마크 적용",
       tiledRepeating: "타일 (반복)",
       originalKb: "원본: {size} KB",
@@ -2417,7 +2395,6 @@ export const ko: TranslationKeys = {
       progressLabel: "워터마크 추가 중",
     },
     "watermark-image": {
-      original: "원본:",
       center: "중앙",
       topLeft: "왼쪽 상단",
       topRight: "오른쪽 상단",
@@ -2436,7 +2413,6 @@ export const ko: TranslationKeys = {
       submitBatch: "워터마크 적용 ({count}개 파일)",
     },
     "text-overlay": {
-      original: "원본:",
       originalKb: "원본: {size} KB",
       processedKb: "처리 후: {size} KB",
       text: "텍스트",
@@ -2456,7 +2432,6 @@ export const ko: TranslationKeys = {
       defaultText: "여기에 텍스트 입력",
     },
     compose: {
-      original: "원본:",
       screen: "화면용",
       processing: "처리 중...",
       overlayImage: "오버레이 이미지",
@@ -2511,9 +2486,6 @@ export const ko: TranslationKeys = {
       backToGallery: "갤러리로 돌아가기",
     },
     info: {
-      min: "최소:",
-      max: "최대:",
-      mean: "평균:",
       minValue: "최소:{value}",
       maxValue: "최대:{value}",
       meanValue: "평균:{value}",
@@ -2746,9 +2718,6 @@ export const ko: TranslationKeys = {
       mosaic: "모자이크",
       uploadingImages: "이미지 업로드 중...",
       processingCollage: "콜라주 처리 중...",
-      loaded: "로드됨",
-      images: "이미지",
-      collage: "콜라주:",
       snapotter: "SnapOtter",
       background: "배경",
       format: "포맷",
@@ -2914,7 +2883,6 @@ export const ko: TranslationKeys = {
       text: "텍스트",
       position: "위치",
       newTab: "새 탭",
-      frame: "프레임",
       quickPresets: "빠른 프리셋",
       linear: "선형",
       radial: "방사형",
@@ -3131,7 +3099,6 @@ export const ko: TranslationKeys = {
       progressLabel: "SVG 변환 중",
     },
     vectorize: {
-      original: "원본:",
       detail: "디테일",
       smoothing: "스무딩",
       blackWhite: "흑백",
@@ -3168,7 +3135,6 @@ export const ko: TranslationKeys = {
       progressLabel: "벡터화 중",
     },
     "gif-tools": {
-      original: "원본:",
       widthPx: "너비 (px)",
       auto: "자동",
       heightPx: "높이 (px)",

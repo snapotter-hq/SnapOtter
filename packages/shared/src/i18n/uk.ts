@@ -1276,7 +1276,6 @@ export const uk: TranslationKeys = {
       paintOverObjectsToErase: "Замалюйте об'єкти, які хочете видалити",
     },
     "crop-canvas": {
-      original: "Оригінал:",
       cropPreview: "Попередній перегляд обрізки",
       cropRegionSize: "Область обрізки: {width} x {height}",
       originalSize: "Оригінал: {width} x {height}",
@@ -1309,7 +1308,6 @@ export const uk: TranslationKeys = {
       infoBar: "{width} x {height}px . сітка {cols}x{rows} . {count} плиток",
     },
     "remove-bg": {
-      original: "Оригінал:",
       transparent: "Прозорий",
       color: "Кольоровий",
       gradient: "Градієнт",
@@ -1336,7 +1334,6 @@ export const uk: TranslationKeys = {
       theExtractedTextWillAppear: "Витягнутий текст з'явиться тут після запуску OCR.",
     },
     "image-enhancement": {
-      original: "Оригінал:",
       removesNoiseAndArtifactsUsing: "Видаляє шум та артефакти за допомогою AI",
       analyzingImage: "Аналіз зображення...",
       imageLooksGoodFineTune:
@@ -1349,8 +1346,6 @@ export const uk: TranslationKeys = {
       enhancedSizeKb: "Поліпшено: {size} KB",
     },
     "find-duplicates-results": {
-      all: "Усі",
-      group: "Група",
       dimensions: "Розміри",
       format: "Формат",
       scanned: "Проскановано:",
@@ -1385,7 +1380,6 @@ export const uk: TranslationKeys = {
       pageSize: "Розмір сторінки",
     },
     color: {
-      original: "Оригінал:",
       light: "Світло",
       brightness: "Яскравість",
       contrast: "Контраст",
@@ -1498,7 +1492,6 @@ export const uk: TranslationKeys = {
       progressLabel: "Застосування",
     },
     convert: {
-      original: "Оригінал:",
       originalSizeKb: "Оригінал: {size} KB",
       processedSizeKb: "Оброблено: {size} KB",
       targetFormat: "Цільовий формат",
@@ -1528,7 +1521,6 @@ export const uk: TranslationKeys = {
       progressLabel: "Оптимізація",
     },
     "strip-metadata": {
-      original: "Оригінал:",
       iccProfile: "ICC",
       originalSize: "Оригінал: {size} KB",
       processedSize: "Оброблено: {size} KB",
@@ -1555,7 +1547,6 @@ export const uk: TranslationKeys = {
       inspectFailed: "Не вдалося прочитати метадані",
     },
     "edit-metadata": {
-      original: "Оригінал:",
       imageDescription: "Опис зображення",
       photographerCreatorName: "Ім'я фотографа / автора",
       imageTitle: "Назва зображення",
@@ -1664,8 +1655,6 @@ export const uk: TranslationKeys = {
       requestTimedOut: "Час очікування вичерпано: сервер може бути перевантажений",
     },
     "pdf-to-image": {
-      converting2: "Конвертація",
-      page: "сторінка",
       custom: "Власне",
       uploadAPdfToGet: "Завантажте PDF, щоб почати",
       generatingPagePreviews: "Створення попередніх переглядів сторінок...",
@@ -1759,7 +1748,6 @@ export const uk: TranslationKeys = {
       progressLabel: "Налаштування кольорів",
     },
     sharpening: {
-      original: "Оригінал:",
       originalSize: "Оригінал: {size} KB",
       processedSize: "Оброблено: {size} KB",
       method: "Метод",
@@ -1797,7 +1785,6 @@ export const uk: TranslationKeys = {
       },
     },
     "replace-color": {
-      original: "Оригінал:",
       originalKb: "Оригінал: {size} KB",
       processedKb: "Оброблено: {size} KB",
       sourceColor: "Вихідний колір (для заміни)",
@@ -1811,7 +1798,6 @@ export const uk: TranslationKeys = {
       progressLabel: "Заміна кольору",
     },
     "color-blindness": {
-      original: "Оригінал:",
       originalKb: "Оригінал: {size} KB",
       processedKb: "Оброблено: {size} KB",
       simulationType: "Тип симуляції",
@@ -1957,7 +1943,6 @@ export const uk: TranslationKeys = {
       download: "Завантажити",
     },
     upscale: {
-      original: "Оригінал:",
       off: "Вимкнено",
       originalKb: "Оригінал: {size} KB",
       upscaledKb: "Збільшено: {size} KB",
@@ -1979,7 +1964,6 @@ export const uk: TranslationKeys = {
       qualityBest: "Найкраще",
     },
     "erase-object": {
-      original: "Оригінал:",
       originalKb: "Оригінал: {size} KB",
       processedKb: "Оброблено: {size} KB",
       qualityFast: "Швидко",
@@ -2039,7 +2023,6 @@ export const uk: TranslationKeys = {
       progressLabel: "Витягування тексту з PDF",
     },
     "blur-faces": {
-      original: "Оригінал:",
       originalKb: "Оригінал: {size} KB",
       processedKb: "Оброблено: {size} KB",
       blurRadius: "Радіус розмиття",
@@ -2052,7 +2035,6 @@ export const uk: TranslationKeys = {
       progressLabel: "Розмиття облич",
     },
     "enhance-faces": {
-      original: "Оригінал:",
       subtle: "Легка",
       maximum: "Максимальний",
       fewerFaces: "Менше облич",
@@ -2187,7 +2169,6 @@ export const uk: TranslationKeys = {
       progressLabelBatch: "Видалення шуму з {count} зображень",
     },
     "red-eye-removal": {
-      original: "Оригінал:",
       originalKb: "Оригінал: {size} KB",
       fixedKb: "Виправлено: {size} KB",
       sensitivity: "Чутливість",
@@ -2204,7 +2185,6 @@ export const uk: TranslationKeys = {
       progressLabelBatch: "Виправлення червоних очей на {count} зображеннях",
     },
     "restore-photo": {
-      original: "Оригінал:",
       subtle: "Легка",
       strong: "Сильне",
       originalKb: "Оригінал: {size} KB",
@@ -2262,7 +2242,6 @@ export const uk: TranslationKeys = {
       progressLabel: "Розширення полотна",
     },
     colorize: {
-      original: "Оригінал:",
       originalKb: "Оригінал: {size} KB",
       colorizedKb: "Колоризовано: {size} KB",
       aiModel: "AI-модель",
@@ -2470,7 +2449,6 @@ export const uk: TranslationKeys = {
       progressLabel: "Розмиття фону",
     },
     "watermark-text": {
-      original: "Оригінал:",
       applyWatermark: "Застосувати водяний знак",
       tiledRepeating: "Плиткою (з повторенням)",
       originalKb: "Оригінал: {size} KB",
@@ -2493,7 +2471,6 @@ export const uk: TranslationKeys = {
       progressLabel: "Додавання водяного знаку",
     },
     "watermark-image": {
-      original: "Оригінал:",
       center: "Центр",
       topLeft: "Зверху ліворуч",
       topRight: "Зверху праворуч",
@@ -2512,7 +2489,6 @@ export const uk: TranslationKeys = {
       submitBatch: "Застосувати водяний знак ({count} файлів)",
     },
     "text-overlay": {
-      original: "Оригінал:",
       originalKb: "Оригінал: {size} KB",
       processedKb: "Оброблено: {size} KB",
       text: "Текст",
@@ -2532,7 +2508,6 @@ export const uk: TranslationKeys = {
       defaultText: "Ваш текст тут",
     },
     compose: {
-      original: "Оригінал:",
       screen: "Екран",
       processing: "Обробка...",
       overlayImage: "Зображення для накладання",
@@ -2587,9 +2562,6 @@ export const uk: TranslationKeys = {
       backToGallery: "Назад до галереї",
     },
     info: {
-      min: "мін:",
-      max: "макс:",
-      mean: "середнє:",
       minValue: "мін:{value}",
       maxValue: "макс:{value}",
       meanValue: "середнє:{value}",
@@ -2822,9 +2794,6 @@ export const uk: TranslationKeys = {
       mosaic: "Мозаїка",
       uploadingImages: "Завантаження зображень...",
       processingCollage: "Обробка колажу...",
-      loaded: "завантажено",
-      images: "зображень",
-      collage: "Колаж:",
       snapotter: "SnapOtter",
       background: "Фон",
       format: "Формат",
@@ -2990,7 +2959,6 @@ export const uk: TranslationKeys = {
       text: "Текст",
       position: "Позиція",
       newTab: "Нова вкладка",
-      frame: "Рамка",
       quickPresets: "Швидкі шаблони",
       linear: "Лінійний",
       radial: "Радіальний",
@@ -3208,7 +3176,6 @@ export const uk: TranslationKeys = {
       progressLabel: "Конвертація SVG",
     },
     vectorize: {
-      original: "Оригінал:",
       detail: "Деталізація",
       smoothing: "Згладжування",
       blackWhite: "Чорно-білий",
@@ -3245,7 +3212,6 @@ export const uk: TranslationKeys = {
       progressLabel: "Векторизація",
     },
     "gif-tools": {
-      original: "Оригінал:",
       widthPx: "Ширина (px)",
       auto: "Авто",
       heightPx: "Висота (px)",

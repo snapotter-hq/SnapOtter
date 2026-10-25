@@ -1276,7 +1276,6 @@ export const id: TranslationKeys = {
       paintOverObjectsToErase: "Sapukan kuas pada objek yang ingin dihapus",
     },
     "crop-canvas": {
-      original: "Asli:",
       cropPreview: "Pratinjau potongan",
       cropRegionSize: "Area potong: {width} x {height}",
       originalSize: "Asli: {width} x {height}",
@@ -1307,7 +1306,6 @@ export const id: TranslationKeys = {
       infoBar: "{width} x {height}px . kisi {cols}x{rows} . {count} ubin",
     },
     "remove-bg": {
-      original: "Asli:",
       transparent: "Transparan",
       color: "Warna",
       gradient: "Gradien",
@@ -1335,7 +1333,6 @@ export const id: TranslationKeys = {
         "Teks hasil ekstraksi akan muncul di sini setelah Anda menjalankan OCR.",
     },
     "image-enhancement": {
-      original: "Asli:",
       removesNoiseAndArtifactsUsing: "Menghapus noise dan artefak menggunakan AI",
       analyzingImage: "Menganalisis gambar...",
       imageLooksGoodFineTune: "Gambar terlihat bagus. Atur halus dengan slider intensitas.",
@@ -1347,8 +1344,6 @@ export const id: TranslationKeys = {
       enhancedSizeKb: "Ditingkatkan: {size} KB",
     },
     "find-duplicates-results": {
-      all: "Semua",
-      group: "Grup",
       dimensions: "Dimensi",
       format: "Format",
       scanned: "Dipindai:",
@@ -1382,7 +1377,6 @@ export const id: TranslationKeys = {
       pageSize: "Ukuran halaman",
     },
     color: {
-      original: "Asli:",
       light: "Cahaya",
       brightness: "Kecerahan",
       contrast: "Kontras",
@@ -1495,7 +1489,6 @@ export const id: TranslationKeys = {
       progressLabel: "Menerapkan",
     },
     convert: {
-      original: "Asli:",
       originalSizeKb: "Asli: {size} KB",
       processedSizeKb: "Diproses: {size} KB",
       targetFormat: "Format Tujuan",
@@ -1525,7 +1518,6 @@ export const id: TranslationKeys = {
       progressLabel: "Mengoptimasi",
     },
     "strip-metadata": {
-      original: "Asli:",
       iccProfile: "Memiliki ICC",
       originalSize: "Asli: {size} KB",
       processedSize: "Diproses: {size} KB",
@@ -1552,7 +1544,6 @@ export const id: TranslationKeys = {
       inspectFailed: "Gagal memeriksa metadata",
     },
     "edit-metadata": {
-      original: "Asli:",
       imageDescription: "Deskripsi gambar",
       photographerCreatorName: "Nama fotografer / pembuat",
       imageTitle: "Judul gambar",
@@ -1659,8 +1650,6 @@ export const id: TranslationKeys = {
       requestTimedOut: "Permintaan habis waktu, server mungkin kelebihan beban",
     },
     "pdf-to-image": {
-      converting2: "Mengonversi",
-      page: "halaman",
       custom: "Kustom",
       uploadAPdfToGet: "Unggah PDF untuk memulai",
       generatingPagePreviews: "Membuat pratinjau halaman...",
@@ -1754,7 +1743,6 @@ export const id: TranslationKeys = {
       progressLabel: "Menyesuaikan warna",
     },
     sharpening: {
-      original: "Asli:",
       originalSize: "Asli: {size} KB",
       processedSize: "Diproses: {size} KB",
       method: "Metode",
@@ -1792,7 +1780,6 @@ export const id: TranslationKeys = {
       },
     },
     "replace-color": {
-      original: "Asli:",
       originalKb: "Asli: {size} KB",
       processedKb: "Diproses: {size} KB",
       sourceColor: "Warna Sumber (yang diganti)",
@@ -1806,7 +1793,6 @@ export const id: TranslationKeys = {
       progressLabel: "Mengganti warna",
     },
     "color-blindness": {
-      original: "Asli:",
       originalKb: "Asli: {size} KB",
       processedKb: "Diproses: {size} KB",
       simulationType: "Jenis Simulasi",
@@ -1948,7 +1934,6 @@ export const id: TranslationKeys = {
       download: "Unduh",
     },
     upscale: {
-      original: "Asli:",
       off: "Mati",
       originalKb: "Asli: {size} KB",
       upscaledKb: "Diperbesar: {size} KB",
@@ -1970,7 +1955,6 @@ export const id: TranslationKeys = {
       qualityBest: "Terbaik",
     },
     "erase-object": {
-      original: "Asli:",
       originalKb: "Asli: {size} KB",
       processedKb: "Diproses: {size} KB",
       qualityFast: "Cepat",
@@ -2029,7 +2013,6 @@ export const id: TranslationKeys = {
       progressLabel: "Mengekstrak teks dari PDF",
     },
     "blur-faces": {
-      original: "Asli:",
       originalKb: "Asli: {size} KB",
       processedKb: "Diproses: {size} KB",
       blurRadius: "Radius Blur",
@@ -2042,7 +2025,6 @@ export const id: TranslationKeys = {
       progressLabel: "Memblur wajah",
     },
     "enhance-faces": {
-      original: "Asli:",
       subtle: "Halus",
       maximum: "Maksimum",
       fewerFaces: "Lebih sedikit wajah",
@@ -2177,7 +2159,6 @@ export const id: TranslationKeys = {
       progressLabelBatch: "Menghapus noise dari {count} gambar",
     },
     "red-eye-removal": {
-      original: "Asli:",
       originalKb: "Asli: {size} KB",
       fixedKb: "Diperbaiki: {size} KB",
       sensitivity: "Sensitivitas",
@@ -2194,7 +2175,6 @@ export const id: TranslationKeys = {
       progressLabelBatch: "Memperbaiki mata merah di {count} gambar",
     },
     "restore-photo": {
-      original: "Asli:",
       subtle: "Halus",
       strong: "Kuat",
       originalKb: "Asli: {size} KB",
@@ -2252,7 +2232,6 @@ export const id: TranslationKeys = {
       progressLabel: "Memperluas kanvas",
     },
     colorize: {
-      original: "Asli:",
       originalKb: "Asli: {size} KB",
       colorizedKb: "Diwarnai: {size} KB",
       aiModel: "Model AI",
@@ -2462,7 +2441,6 @@ export const id: TranslationKeys = {
       progressLabel: "Memburamkan latar belakang",
     },
     "watermark-text": {
-      original: "Asli:",
       applyWatermark: "Terapkan Watermark",
       tiledRepeating: "Ubin (Berulang)",
       originalKb: "Asli: {size} KB",
@@ -2485,7 +2463,6 @@ export const id: TranslationKeys = {
       progressLabel: "Menambahkan watermark",
     },
     "watermark-image": {
-      original: "Asli:",
       center: "Tengah",
       topLeft: "Kiri Atas",
       topRight: "Kanan Atas",
@@ -2504,7 +2481,6 @@ export const id: TranslationKeys = {
       submitBatch: "Terapkan Watermark ({count} file)",
     },
     "text-overlay": {
-      original: "Asli:",
       originalKb: "Asli: {size} KB",
       processedKb: "Diproses: {size} KB",
       text: "Teks",
@@ -2524,7 +2500,6 @@ export const id: TranslationKeys = {
       defaultText: "Teks Anda di Sini",
     },
     compose: {
-      original: "Asli:",
       screen: "Layar",
       processing: "Memproses...",
       overlayImage: "Gambar Overlay",
@@ -2579,9 +2554,6 @@ export const id: TranslationKeys = {
       backToGallery: "Kembali ke Galeri",
     },
     info: {
-      min: "min:",
-      max: "maks:",
-      mean: "rata-rata:",
       minValue: "min:{value}",
       maxValue: "maks:{value}",
       meanValue: "rata-rata:{value}",
@@ -2814,9 +2786,6 @@ export const id: TranslationKeys = {
       mosaic: "Mosaik",
       uploadingImages: "Mengunggah gambar...",
       processingCollage: "Memproses kolase...",
-      loaded: "dimuat",
-      images: "gambar",
-      collage: "Kolase:",
       snapotter: "SnapOtter",
       background: "Latar Belakang",
       format: "Format",
@@ -2982,7 +2951,6 @@ export const id: TranslationKeys = {
       text: "Teks",
       position: "Posisi",
       newTab: "Tab Baru",
-      frame: "Bingkai",
       quickPresets: "Preset Cepat",
       linear: "Linear",
       radial: "Radial",
@@ -3199,7 +3167,6 @@ export const id: TranslationKeys = {
       progressLabel: "Mengonversi SVG",
     },
     vectorize: {
-      original: "Asli:",
       detail: "Detail",
       smoothing: "Penghalusan",
       blackWhite: "Hitam Putih",
@@ -3236,7 +3203,6 @@ export const id: TranslationKeys = {
       progressLabel: "Memvektorisasi",
     },
     "gif-tools": {
-      original: "Asli:",
       widthPx: "Lebar (px)",
       auto: "Otomatis",
       heightPx: "Tinggi (px)",

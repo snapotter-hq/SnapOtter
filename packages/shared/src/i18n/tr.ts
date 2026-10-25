@@ -1277,7 +1277,6 @@ export const tr: TranslationKeys = {
       paintOverObjectsToErase: "Silmek için nesnelerin üzerini boyayın",
     },
     "crop-canvas": {
-      original: "Orijinal:",
       cropPreview: "Kırpma önizlemesi",
       cropRegionSize: "Kırpma bölgesi: {width} x {height}",
       originalSize: "Orijinal: {width} x {height}",
@@ -1310,7 +1309,6 @@ export const tr: TranslationKeys = {
       infoBar: "{width} x {height}px . {cols}x{rows} ızgara . {count} karo",
     },
     "remove-bg": {
-      original: "Orijinal:",
       transparent: "Saydam",
       color: "Renkli",
       gradient: "Gradyan",
@@ -1337,7 +1335,6 @@ export const tr: TranslationKeys = {
       theExtractedTextWillAppear: "OCR'yi çalıştırdıktan sonra çıkarılan metin burada görünecek.",
     },
     "image-enhancement": {
-      original: "Orijinal:",
       removesNoiseAndArtifactsUsing: "AI kullanarak gürültü ve kusurları kaldırır",
       analyzingImage: "Görüntü analiz ediliyor...",
       imageLooksGoodFineTune: "Görüntü iyi görünüyor. Yoğunluk kaydırıcısıyla ince ayar yapın.",
@@ -1349,8 +1346,6 @@ export const tr: TranslationKeys = {
       enhancedSizeKb: "İyileştirilmiş: {size} KB",
     },
     "find-duplicates-results": {
-      all: "Tümü",
-      group: "Grup",
       dimensions: "Boyutlar",
       format: "Biçim",
       scanned: "Taranan:",
@@ -1385,7 +1380,6 @@ export const tr: TranslationKeys = {
       pageSize: "Sayfa boyutu",
     },
     color: {
-      original: "Orijinal:",
       light: "Işık",
       brightness: "Parlaklık",
       contrast: "Kontrast",
@@ -1498,7 +1492,6 @@ export const tr: TranslationKeys = {
       progressLabel: "Uygulanıyor",
     },
     convert: {
-      original: "Orijinal:",
       originalSizeKb: "Orijinal: {size} KB",
       processedSizeKb: "İşlenmiş: {size} KB",
       targetFormat: "Hedef Biçim",
@@ -1528,7 +1521,6 @@ export const tr: TranslationKeys = {
       progressLabel: "Optimize ediliyor",
     },
     "strip-metadata": {
-      original: "Orijinal:",
       iccProfile: "ICC Verisi",
       originalSize: "Orijinal: {size} KB",
       processedSize: "İşlenmiş: {size} KB",
@@ -1555,7 +1547,6 @@ export const tr: TranslationKeys = {
       inspectFailed: "Meta veriler incelenemedi",
     },
     "edit-metadata": {
-      original: "Orijinal:",
       imageDescription: "Görüntü açıklaması",
       photographerCreatorName: "Fotoğrafçı / oluşturan adı",
       imageTitle: "Görüntü başlığı",
@@ -1663,8 +1654,6 @@ export const tr: TranslationKeys = {
       requestTimedOut: "İstek zaman aşımına uğradı, sunucu aşırı yüklü olabilir",
     },
     "pdf-to-image": {
-      converting2: "Dönüştürülüyor",
-      page: "sayfa",
       custom: "Özel",
       uploadAPdfToGet: "Başlamak için bir PDF yükleyin",
       generatingPagePreviews: "Sayfa önizlemeleri oluşturuluyor...",
@@ -1758,7 +1747,6 @@ export const tr: TranslationKeys = {
       progressLabel: "Renkler ayarlanıyor",
     },
     sharpening: {
-      original: "Orijinal:",
       originalSize: "Orijinal: {size} KB",
       processedSize: "İşlenmiş: {size} KB",
       method: "Yöntem",
@@ -1796,7 +1784,6 @@ export const tr: TranslationKeys = {
       },
     },
     "replace-color": {
-      original: "Orijinal:",
       originalKb: "Orijinal: {size} KB",
       processedKb: "İşlenmiş: {size} KB",
       sourceColor: "Kaynak Renk (değiştirilecek)",
@@ -1810,7 +1797,6 @@ export const tr: TranslationKeys = {
       progressLabel: "Renk değiştiriliyor",
     },
     "color-blindness": {
-      original: "Orijinal:",
       originalKb: "Orijinal: {size} KB",
       processedKb: "İşlenmiş: {size} KB",
       simulationType: "Simülasyon Türü",
@@ -1953,7 +1939,6 @@ export const tr: TranslationKeys = {
       download: "İndir",
     },
     upscale: {
-      original: "Orijinal:",
       off: "Kapalı",
       originalKb: "Orijinal: {size} KB",
       upscaledKb: "Büyütülmüş: {size} KB",
@@ -1975,7 +1960,6 @@ export const tr: TranslationKeys = {
       qualityBest: "En İyi",
     },
     "erase-object": {
-      original: "Orijinal:",
       originalKb: "Orijinal: {size} KB",
       processedKb: "İşlenmiş: {size} KB",
       qualityFast: "Hızlı",
@@ -2035,7 +2019,6 @@ export const tr: TranslationKeys = {
       progressLabel: "PDF'den metin çıkarılıyor",
     },
     "blur-faces": {
-      original: "Orijinal:",
       originalKb: "Orijinal: {size} KB",
       processedKb: "İşlenmiş: {size} KB",
       blurRadius: "Bulanıklaştırma Yarıçapı",
@@ -2048,7 +2031,6 @@ export const tr: TranslationKeys = {
       progressLabel: "Yüzler bulanıklaştırılıyor",
     },
     "enhance-faces": {
-      original: "Orijinal:",
       subtle: "Hafif",
       maximum: "Maksimum",
       fewerFaces: "Daha az yüz",
@@ -2183,7 +2165,6 @@ export const tr: TranslationKeys = {
       progressLabelBatch: "{count} görüntüden gürültü gideriliyor",
     },
     "red-eye-removal": {
-      original: "Orijinal:",
       originalKb: "Orijinal: {size} KB",
       fixedKb: "Düzeltilmiş: {size} KB",
       sensitivity: "Hassasiyet",
@@ -2200,7 +2181,6 @@ export const tr: TranslationKeys = {
       progressLabelBatch: "{count} görüntüde kırmızı göz düzeltiliyor",
     },
     "restore-photo": {
-      original: "Orijinal:",
       subtle: "Hafif",
       strong: "Güçlü",
       originalKb: "Orijinal: {size} KB",
@@ -2257,7 +2237,6 @@ export const tr: TranslationKeys = {
       progressLabel: "Tuval genişletiliyor",
     },
     colorize: {
-      original: "Orijinal:",
       originalKb: "Orijinal: {size} KB",
       colorizedKb: "Renklendirilmiş: {size} KB",
       aiModel: "AI Modeli",
@@ -2465,7 +2444,6 @@ export const tr: TranslationKeys = {
       progressLabel: "Arka plan bulanıklaştırılıyor",
     },
     "watermark-text": {
-      original: "Orijinal:",
       applyWatermark: "Filigranı Uygula",
       tiledRepeating: "Döşemeli (Tekrarlayan)",
       originalKb: "Orijinal: {size} KB",
@@ -2488,7 +2466,6 @@ export const tr: TranslationKeys = {
       progressLabel: "Filigran ekleniyor",
     },
     "watermark-image": {
-      original: "Orijinal:",
       center: "Orta",
       topLeft: "Sol Üst",
       topRight: "Sağ Üst",
@@ -2507,7 +2484,6 @@ export const tr: TranslationKeys = {
       submitBatch: "Filigranı Uygula ({count} dosya)",
     },
     "text-overlay": {
-      original: "Orijinal:",
       originalKb: "Orijinal: {size} KB",
       processedKb: "İşlenmiş: {size} KB",
       text: "Metin",
@@ -2527,7 +2503,6 @@ export const tr: TranslationKeys = {
       defaultText: "Metninizi Buraya Yazın",
     },
     compose: {
-      original: "Orijinal:",
       screen: "Ekran",
       processing: "İşleniyor...",
       overlayImage: "Kaplama Görüntüsü",
@@ -2582,9 +2557,6 @@ export const tr: TranslationKeys = {
       backToGallery: "Galeriye Dön",
     },
     info: {
-      min: "min:",
-      max: "maks:",
-      mean: "ort:",
       minValue: "min:{value}",
       maxValue: "maks:{value}",
       meanValue: "ort:{value}",
@@ -2818,9 +2790,6 @@ export const tr: TranslationKeys = {
       mosaic: "Mozaik",
       uploadingImages: "Görüntüler yükleniyor...",
       processingCollage: "Kolaj işleniyor...",
-      loaded: "yüklendi",
-      images: "görüntü",
-      collage: "Kolaj:",
       snapotter: "SnapOtter",
       background: "Arka Plan",
       format: "Biçim",
@@ -2986,7 +2955,6 @@ export const tr: TranslationKeys = {
       text: "Metin",
       position: "Konum",
       newTab: "Yeni Sekme",
-      frame: "Çerçeve",
       quickPresets: "Hızlı Şablonlar",
       linear: "Doğrusal",
       radial: "Dairesel",
@@ -3203,7 +3171,6 @@ export const tr: TranslationKeys = {
       progressLabel: "SVG dönüştürülüyor",
     },
     vectorize: {
-      original: "Orijinal:",
       detail: "Ayrıntı",
       smoothing: "Yumuşatma",
       blackWhite: "Siyah-Beyaz",
@@ -3240,7 +3207,6 @@ export const tr: TranslationKeys = {
       progressLabel: "Vektörleştiriliyor",
     },
     "gif-tools": {
-      original: "Orijinal:",
       widthPx: "Genişlik (px)",
       auto: "Otomatik",
       heightPx: "Yükseklik (px)",

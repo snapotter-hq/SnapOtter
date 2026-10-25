@@ -99,6 +99,46 @@ describe("i18n cross-locale parity", () => {
     expect(enKeys.size).toBeGreaterThan(100);
   });
 
+  it("prunes unreferenced fragment keys left by the #907 tool-settings sweep (#911)", () => {
+    const unreferencedSweepKeys = [
+      "toolSettings.remove-bg.original",
+      "toolSettings.image-enhancement.original",
+      "toolSettings.find-duplicates-results.group",
+      "toolSettings.find-duplicates-results.all",
+      "toolSettings.crop-canvas.original",
+      "toolSettings.color.original",
+      "toolSettings.convert.original",
+      "toolSettings.strip-metadata.original",
+      "toolSettings.edit-metadata.original",
+      "toolSettings.pdf-to-image.page",
+      "toolSettings.pdf-to-image.converting2",
+      "toolSettings.sharpening.original",
+      "toolSettings.replace-color.original",
+      "toolSettings.color-blindness.original",
+      "toolSettings.upscale.original",
+      "toolSettings.erase-object.original",
+      "toolSettings.blur-faces.original",
+      "toolSettings.enhance-faces.original",
+      "toolSettings.red-eye-removal.original",
+      "toolSettings.restore-photo.original",
+      "toolSettings.colorize.original",
+      "toolSettings.watermark-text.original",
+      "toolSettings.watermark-image.original",
+      "toolSettings.text-overlay.original",
+      "toolSettings.compose.original",
+      "toolSettings.info.mean",
+      "toolSettings.info.max",
+      "toolSettings.info.min",
+      "toolSettings.collage.collage",
+      "toolSettings.collage.images",
+      "toolSettings.collage.loaded",
+      "toolSettings.beautify.frame",
+      "toolSettings.vectorize.original",
+      "toolSettings.gif-tools.original",
+    ];
+    expect(unreferencedSweepKeys.filter((k) => enKeys.has(k))).toEqual([]);
+  });
+
   it.each(SUPPORTED_LOCALES.filter((l) => l.code !== "en").map((l) => [l.code, l.name]))(
     "%s (%s) has the same key set as en",
     async (code) => {

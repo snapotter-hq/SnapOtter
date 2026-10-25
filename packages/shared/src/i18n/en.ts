@@ -1222,7 +1222,6 @@ export const en = {
       signaturePreview: "signature preview",
     },
     "remove-bg": {
-      original: "Original:",
       processedKb: "Processed: {size} KB",
       originalKb: "Original: {size} KB",
       transparent: "Transparent",
@@ -1272,7 +1271,6 @@ export const en = {
       downloadTxt: "Download .txt",
     },
     "image-enhancement": {
-      original: "Original:",
       enhancedSizeKb: "Enhanced: {size} KB",
       originalSizeKb: "Original: {size} KB",
       whiteBalanceTemperatureFilter: "White balance temperature filter",
@@ -1287,8 +1285,6 @@ export const en = {
       capturedScreenshot: "Captured screenshot",
     },
     "find-duplicates-results": {
-      group: "Group",
-      all: "All",
       clickToMarkAsBest: "Click to mark as best",
       selectedAsBest: "Selected as best",
       showingAllImagesInGroup:
@@ -1315,7 +1311,6 @@ export const en = {
       paintOverObjectsToErase: "Paint over objects to erase",
     },
     "crop-canvas": {
-      original: "Original:",
       originalSize: "Original: {width} x {height}",
       cropRegionSize: "Crop region: {width} x {height}",
       cropPreview: "Crop preview",
@@ -1331,7 +1326,6 @@ export const en = {
       landscape: "Landscape",
     },
     color: {
-      original: "Original:",
       submitBatch: "Apply ({count} files)",
       processedKb: "Processed: {size} KB",
       originalKb: "Original: {size} KB",
@@ -1444,7 +1438,6 @@ export const en = {
       progressLabel: "Applying",
     },
     convert: {
-      original: "Original:",
       processedSizeKb: "Processed: {size} KB",
       originalSizeKb: "Original: {size} KB",
       targetFormat: "Target Format",
@@ -1474,7 +1467,6 @@ export const en = {
       progressLabel: "Optimizing",
     },
     "strip-metadata": {
-      original: "Original:",
       processedSize: "Processed: {size} KB",
       originalSize: "Original: {size} KB",
       locationCoords: "Location data: {lat}, {lon}",
@@ -1501,7 +1493,6 @@ export const en = {
       inspectFailed: "Failed to inspect metadata",
     },
     "edit-metadata": {
-      original: "Original:",
       processedSizeKb: "Processed: {size} KB",
       originalSizeKb: "Original: {size} KB",
       imageDescription: "Image description",
@@ -1608,8 +1599,6 @@ export const en = {
       requestTimedOut: "Request timed out - the server may be overloaded",
     },
     "pdf-to-image": {
-      page: "page",
-      converting2: "Converting",
       pageAlt: "Page {page}",
       selectedOfPagesPlural: "{selected} of {total} pages selected",
       selectedOfPages: "{selected} of {total} page selected",
@@ -1703,7 +1692,6 @@ export const en = {
       progressLabel: "Adjusting colors",
     },
     sharpening: {
-      original: "Original:",
       processedSize: "Processed: {size} KB",
       originalSize: "Original: {size} KB",
       method: "Method",
@@ -1741,7 +1729,6 @@ export const en = {
       },
     },
     "replace-color": {
-      original: "Original:",
       processedKb: "Processed: {size} KB",
       originalKb: "Original: {size} KB",
       sourceColor: "Source Color (to replace)",
@@ -1755,7 +1742,6 @@ export const en = {
       progressLabel: "Replacing color",
     },
     "color-blindness": {
-      original: "Original:",
       processedKb: "Processed: {size} KB",
       originalKb: "Original: {size} KB",
       simulationType: "Simulation Type",
@@ -1896,7 +1882,6 @@ export const en = {
       download: "Download",
     },
     upscale: {
-      original: "Original:",
       upscaledKb: "Upscaled: {size} KB",
       originalKb: "Original: {size} KB",
       off: "Off",
@@ -1918,7 +1903,6 @@ export const en = {
       qualityBest: "Best",
     },
     "erase-object": {
-      original: "Original:",
       processedKb: "Processed: {size} KB",
       originalKb: "Original: {size} KB",
       qualityFast: "Fast",
@@ -1975,7 +1959,6 @@ export const en = {
       progressLabel: "Extracting text from PDF",
     },
     "blur-faces": {
-      original: "Original:",
       processedKb: "Processed: {size} KB",
       originalKb: "Original: {size} KB",
       blurRadius: "Blur Radius",
@@ -1988,7 +1971,6 @@ export const en = {
       progressLabel: "Blurring faces",
     },
     "enhance-faces": {
-      original: "Original:",
       progressLabelBatch: "Enhancing {count} images",
       enhancedSizeKb: "Enhanced: {size} KB",
       originalSizeKb: "Original: {size} KB",
@@ -2123,7 +2105,6 @@ export const en = {
       progressLabelBatch: "Removing noise from {count} images",
     },
     "red-eye-removal": {
-      original: "Original:",
       fixedKb: "Fixed: {size} KB",
       originalKb: "Original: {size} KB",
       sensitivity: "Sensitivity",
@@ -2140,7 +2121,6 @@ export const en = {
       progressLabelBatch: "Fixing red eye in {count} images",
     },
     "restore-photo": {
-      original: "Original:",
       restoredKb: "Restored: {size} KB",
       originalKb: "Original: {size} KB",
       subtle: "Subtle",
@@ -2197,7 +2177,6 @@ export const en = {
       progressLabel: "Extending canvas",
     },
     colorize: {
-      original: "Original:",
       colorizedKb: "Colorized: {size} KB",
       originalKb: "Original: {size} KB",
       aiModel: "AI Model",
@@ -2404,7 +2383,6 @@ export const en = {
       progressLabel: "Blurring background",
     },
     "watermark-text": {
-      original: "Original:",
       applyWatermarkBatch: "Apply Watermark ({count} files)",
       processedKb: "Processed: {size} KB",
       originalKb: "Original: {size} KB",
@@ -2427,7 +2405,6 @@ export const en = {
       progressLabel: "Adding watermark",
     },
     "watermark-image": {
-      original: "Original:",
       processedKb: "Processed: {size} KB",
       originalKb: "Original: {size} KB",
       watermarkImage: "Watermark Image",
@@ -2446,7 +2423,6 @@ export const en = {
       submitBatch: "Apply Watermark ({count} files)",
     },
     "text-overlay": {
-      original: "Original:",
       processedKb: "Processed: {size} KB",
       originalKb: "Original: {size} KB",
       text: "Text",
@@ -2466,7 +2442,6 @@ export const en = {
       defaultText: "Your Text Here",
     },
     compose: {
-      original: "Original:",
       processedKb: "Processed: {size} KB",
       originalKb: "Original: {size} KB",
       overlayImage: "Overlay Image",
@@ -2521,9 +2496,6 @@ export const en = {
       backToGallery: "Back to Gallery",
     },
     info: {
-      mean: "mean:",
-      max: "max:",
-      min: "min:",
       meanValue: "mean:{value}",
       maxValue: "max:{value}",
       minValue: "min:{value}",
@@ -2755,9 +2727,6 @@ export const en = {
       mosaic: "Mosaic",
       uploadingImages: "Uploading images...",
       processingCollage: "Processing collage...",
-      collage: "Collage:",
-      images: "images",
-      loaded: "loaded",
       templateTitle: "{label} ({count} images)",
       submitWithCount: "Create Collage ({count} images)",
       fillCell: "Fill cell",
@@ -2933,7 +2902,6 @@ export const en = {
       linear: "Linear",
       background: "Background",
       quickPresets: "Quick Presets",
-      frame: "Frame",
       newTab: "New Tab",
       frameLabel: "{label} Frame",
       processing: "Processing...",
@@ -3140,7 +3108,6 @@ export const en = {
       progressLabel: "Converting SVG",
     },
     vectorize: {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       blackWhite: "Black & White",
       fewerColors: "Fewer colors",
@@ -3177,7 +3144,6 @@ export const en = {
       progressLabel: "Vectorizing",
     },
     "gif-tools": {
-      original: "Original:",
       lockAspectRatio: "Lock aspect ratio",
       unlockAspectRatio: "Unlock aspect ratio",
       requiresAnimatedGif: "Requires animated GIF",

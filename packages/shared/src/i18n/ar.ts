@@ -1264,7 +1264,6 @@ export const ar: TranslationKeys = {
       paintOverObjectsToErase: "ارسم فوق الكائنات التي تريد مسحها",
     },
     "crop-canvas": {
-      original: "الأصلي:",
       cropPreview: "معاينة القص",
       cropRegionSize: "منطقة القص: {width} x {height}",
       originalSize: "الأصلي: {width} x {height}",
@@ -1295,7 +1294,6 @@ export const ar: TranslationKeys = {
       infoBar: "{width} x {height}px . شبكة {cols}x{rows} . {count} مربعات",
     },
     "remove-bg": {
-      original: "الأصلي:",
       transparent: "شفاف",
       color: "ملون",
       gradient: "تدرج",
@@ -1322,7 +1320,6 @@ export const ar: TranslationKeys = {
       theExtractedTextWillAppear: "سيظهر النص المستخرج هنا بعد تشغيل OCR.",
     },
     "image-enhancement": {
-      original: "الأصلي:",
       removesNoiseAndArtifactsUsing: "يزيل التشويش والتشوهات باستخدام AI",
       analyzingImage: "جاري تحليل الصورة...",
       imageLooksGoodFineTune: "تبدو الصورة جيدة. اضبط بدقة باستخدام شريط الشدة.",
@@ -1334,8 +1331,6 @@ export const ar: TranslationKeys = {
       enhancedSizeKb: "المحسّن: {size} KB",
     },
     "find-duplicates-results": {
-      all: "الكل",
-      group: "المجموعة",
       dimensions: "الأبعاد",
       format: "الصيغة",
       scanned: "الممسوح:",
@@ -1369,7 +1364,6 @@ export const ar: TranslationKeys = {
       pageSize: "حجم الصفحة",
     },
     color: {
-      original: "الأصلي:",
       light: "الإضاءة",
       brightness: "السطوع",
       contrast: "التباين",
@@ -1482,7 +1476,6 @@ export const ar: TranslationKeys = {
       progressLabel: "جاري التطبيق",
     },
     convert: {
-      original: "الأصلي:",
       originalSizeKb: "الأصلي: {size} KB",
       processedSizeKb: "المعالج: {size} KB",
       targetFormat: "الصيغة المستهدفة",
@@ -1512,7 +1505,6 @@ export const ar: TranslationKeys = {
       progressLabel: "جاري التحسين",
     },
     "strip-metadata": {
-      original: "الأصلي:",
       iccProfile: "بيانات ICC",
       originalSize: "الأصلي: {size} KB",
       processedSize: "المعالج: {size} KB",
@@ -1538,7 +1530,6 @@ export const ar: TranslationKeys = {
       inspectFailed: "فشل فحص البيانات الوصفية",
     },
     "edit-metadata": {
-      original: "الأصلي:",
       imageDescription: "وصف الصورة",
       photographerCreatorName: "اسم المصوّر / المنشئ",
       imageTitle: "عنوان الصورة",
@@ -1645,8 +1636,6 @@ export const ar: TranslationKeys = {
       requestTimedOut: "انتهت مهلة الطلب، قد يكون الخادم محملًا بشكل زائد",
     },
     "pdf-to-image": {
-      converting2: "جاري التحويل",
-      page: "صفحة",
       custom: "مخصص",
       uploadAPdfToGet: "ارفع ملف PDF للبدء",
       generatingPagePreviews: "جاري إنشاء معاينات الصفحات...",
@@ -1740,7 +1729,6 @@ export const ar: TranslationKeys = {
       progressLabel: "جاري تعديل الألوان",
     },
     sharpening: {
-      original: "الأصلي:",
       originalSize: "الأصلي: {size} KB",
       processedSize: "المعالج: {size} KB",
       method: "الطريقة",
@@ -1778,7 +1766,6 @@ export const ar: TranslationKeys = {
       },
     },
     "replace-color": {
-      original: "الأصلي:",
       originalKb: "الأصلي: {size} KB",
       processedKb: "المعالج: {size} KB",
       sourceColor: "اللون المصدر (للاستبدال)",
@@ -1792,7 +1779,6 @@ export const ar: TranslationKeys = {
       progressLabel: "جاري استبدال اللون",
     },
     "color-blindness": {
-      original: "الأصلي:",
       originalKb: "الأصلي: {size} KB",
       processedKb: "المعالج: {size} KB",
       simulationType: "نوع المحاكاة",
@@ -1933,7 +1919,6 @@ export const ar: TranslationKeys = {
       download: "تنزيل",
     },
     upscale: {
-      original: "الأصلي:",
       off: "إيقاف",
       originalKb: "الأصلي: {size} KB",
       upscaledKb: "المكبّر: {size} KB",
@@ -1955,7 +1940,6 @@ export const ar: TranslationKeys = {
       qualityBest: "الأفضل",
     },
     "erase-object": {
-      original: "الأصلي:",
       originalKb: "الأصلي: {size} KB",
       processedKb: "المعالج: {size} KB",
       qualityFast: "سريع",
@@ -2012,7 +1996,6 @@ export const ar: TranslationKeys = {
       progressLabel: "جاري استخراج النص من PDF",
     },
     "blur-faces": {
-      original: "الأصلي:",
       originalKb: "الأصلي: {size} KB",
       processedKb: "المعالج: {size} KB",
       blurRadius: "نصف قطر التمويه",
@@ -2025,7 +2008,6 @@ export const ar: TranslationKeys = {
       progressLabel: "جاري تمويه الوجوه",
     },
     "enhance-faces": {
-      original: "الأصلي:",
       subtle: "خفيف",
       maximum: "أقصى",
       fewerFaces: "وجوه أقل",
@@ -2159,7 +2141,6 @@ export const ar: TranslationKeys = {
       progressLabelBatch: "جاري إزالة التشويش من {count} صورة",
     },
     "red-eye-removal": {
-      original: "الأصلي:",
       originalKb: "الأصلي: {size} KB",
       fixedKb: "المُصلَح: {size} KB",
       sensitivity: "الحساسية",
@@ -2176,7 +2157,6 @@ export const ar: TranslationKeys = {
       progressLabelBatch: "جاري إصلاح العين الحمراء في {count} صورة",
     },
     "restore-photo": {
-      original: "الأصلي:",
       subtle: "خفيف",
       strong: "قوي",
       originalKb: "الأصلي: {size} KB",
@@ -2233,7 +2213,6 @@ export const ar: TranslationKeys = {
       progressLabel: "جاري توسيع اللوحة",
     },
     colorize: {
-      original: "الأصلي:",
       originalKb: "الأصلي: {size} KB",
       colorizedKb: "الملوّن: {size} KB",
       aiModel: "نموذج AI",
@@ -2439,7 +2418,6 @@ export const ar: TranslationKeys = {
       progressLabel: "جاري تمويه الخلفية",
     },
     "watermark-text": {
-      original: "الأصلي:",
       applyWatermark: "تطبيق العلامة المائية",
       tiledRepeating: "متكرر",
       originalKb: "الأصلي: {size} KB",
@@ -2462,7 +2440,6 @@ export const ar: TranslationKeys = {
       progressLabel: "جاري إضافة العلامة المائية",
     },
     "watermark-image": {
-      original: "الأصلي:",
       center: "الوسط",
       topLeft: "أعلى اليسار",
       topRight: "أعلى اليمين",
@@ -2481,7 +2458,6 @@ export const ar: TranslationKeys = {
       submitBatch: "تطبيق العلامة المائية ({count} ملف)",
     },
     "text-overlay": {
-      original: "الأصلي:",
       originalKb: "الأصلي: {size} KB",
       processedKb: "المعالج: {size} KB",
       text: "النص",
@@ -2501,7 +2477,6 @@ export const ar: TranslationKeys = {
       defaultText: "نصك هنا",
     },
     compose: {
-      original: "الأصلي:",
       screen: "شاشة",
       processing: "جاري المعالجة...",
       overlayImage: "صورة التراكب",
@@ -2556,9 +2531,6 @@ export const ar: TranslationKeys = {
       backToGallery: "العودة للمعرض",
     },
     info: {
-      min: "الأدنى:",
-      max: "الأقصى:",
-      mean: "المتوسط:",
       minValue: "الأدنى:{value}",
       maxValue: "الأقصى:{value}",
       meanValue: "المتوسط:{value}",
@@ -2790,9 +2762,6 @@ export const ar: TranslationKeys = {
       mosaic: "فسيفساء",
       uploadingImages: "جاري رفع الصور...",
       processingCollage: "جاري معالجة الصورة المجمّعة...",
-      loaded: "محمّلة",
-      images: "صور",
-      collage: "الصورة المجمّعة:",
       snapotter: "SnapOtter",
       background: "الخلفية",
       format: "الصيغة",
@@ -2958,7 +2927,6 @@ export const ar: TranslationKeys = {
       text: "النص",
       position: "الموضع",
       newTab: "علامة تبويب جديدة",
-      frame: "الإطار",
       quickPresets: "قوالب سريعة",
       linear: "خطي",
       radial: "شعاعي",
@@ -3174,7 +3142,6 @@ export const ar: TranslationKeys = {
       progressLabel: "جاري تحويل SVG",
     },
     vectorize: {
-      original: "الأصلي:",
       detail: "التفاصيل",
       smoothing: "التنعيم",
       blackWhite: "أبيض وأسود",
@@ -3211,7 +3178,6 @@ export const ar: TranslationKeys = {
       progressLabel: "جاري التحويل للمتجهات",
     },
     "gif-tools": {
-      original: "الأصلي:",
       widthPx: "العرض (px)",
       auto: "تلقائي",
       heightPx: "الارتفاع (px)",

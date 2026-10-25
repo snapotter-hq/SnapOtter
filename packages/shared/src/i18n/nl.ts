@@ -1280,7 +1280,6 @@ export const nl: TranslationKeys = {
       paintOverObjectsToErase: "Verf over objecten die je wilt verwijderen",
     },
     "crop-canvas": {
-      original: "Origineel:",
       cropPreview: "Bijsnijvoorbeeld",
       cropRegionSize: "Bijsnijgebied: {width} x {height}",
       originalSize: "Origineel: {width} x {height}",
@@ -1313,7 +1312,6 @@ export const nl: TranslationKeys = {
       infoBar: "{width} x {height}px . {cols}x{rows} raster . {count} tegels",
     },
     "remove-bg": {
-      original: "Origineel:",
       transparent: "Transparant",
       color: "Kleur",
       gradient: "Verloop",
@@ -1341,7 +1339,6 @@ export const nl: TranslationKeys = {
         "De geëxtraheerde tekst verschijnt hier nadat je OCR hebt uitgevoerd.",
     },
     "image-enhancement": {
-      original: "Origineel:",
       removesNoiseAndArtifactsUsing: "Verwijdert ruis en artefacten met AI",
       analyzingImage: "Afbeelding analyseren...",
       imageLooksGoodFineTune: "De afbeelding ziet er goed uit. Verfijn met de intensiteitsschuif.",
@@ -1353,8 +1350,6 @@ export const nl: TranslationKeys = {
       enhancedSizeKb: "Verbeterd: {size} KB",
     },
     "find-duplicates-results": {
-      all: "Alles",
-      group: "Groep",
       dimensions: "Afmetingen",
       format: "Formaat",
       scanned: "Gescand:",
@@ -1389,7 +1384,6 @@ export const nl: TranslationKeys = {
       pageSize: "Paginaformaat",
     },
     color: {
-      original: "Origineel:",
       light: "Licht",
       brightness: "Helderheid",
       contrast: "Contrast",
@@ -1503,7 +1497,6 @@ export const nl: TranslationKeys = {
       progressLabel: "Toepassen",
     },
     convert: {
-      original: "Origineel:",
       originalSizeKb: "Origineel: {size} KB",
       processedSizeKb: "Verwerkt: {size} KB",
       targetFormat: "Doelformaat",
@@ -1533,7 +1526,6 @@ export const nl: TranslationKeys = {
       progressLabel: "Optimaliseren",
     },
     "strip-metadata": {
-      original: "Origineel:",
       iccProfile: "Heeft ICC",
       originalSize: "Origineel: {size} KB",
       processedSize: "Verwerkt: {size} KB",
@@ -1560,7 +1552,6 @@ export const nl: TranslationKeys = {
       inspectFailed: "Metadata inspecteren mislukt",
     },
     "edit-metadata": {
-      original: "Origineel:",
       imageDescription: "Afbeeldingsbeschrijving",
       photographerCreatorName: "Naam fotograaf/maker",
       imageTitle: "Afbeeldingstitel",
@@ -1668,8 +1659,6 @@ export const nl: TranslationKeys = {
       requestTimedOut: "Time-out van verzoek: de server is mogelijk overbelast",
     },
     "pdf-to-image": {
-      converting2: "Converteren",
-      page: "pagina",
       custom: "Aangepast",
       uploadAPdfToGet: "Upload een PDF om te beginnen",
       generatingPagePreviews: "Paginavoorbeelden genereren...",
@@ -1763,7 +1752,6 @@ export const nl: TranslationKeys = {
       progressLabel: "Kleuren aanpassen",
     },
     sharpening: {
-      original: "Origineel:",
       originalSize: "Origineel: {size} KB",
       processedSize: "Verwerkt: {size} KB",
       method: "Methode",
@@ -1801,7 +1789,6 @@ export const nl: TranslationKeys = {
       },
     },
     "replace-color": {
-      original: "Origineel:",
       originalKb: "Origineel: {size} KB",
       processedKb: "Verwerkt: {size} KB",
       sourceColor: "Bronkleur (te vervangen)",
@@ -1815,7 +1802,6 @@ export const nl: TranslationKeys = {
       progressLabel: "Kleur vervangen",
     },
     "color-blindness": {
-      original: "Origineel:",
       originalKb: "Origineel: {size} KB",
       processedKb: "Verwerkt: {size} KB",
       simulationType: "Simulatietype",
@@ -1957,7 +1943,6 @@ export const nl: TranslationKeys = {
       download: "Downloaden",
     },
     upscale: {
-      original: "Origineel:",
       off: "Uit",
       originalKb: "Origineel: {size} KB",
       upscaledKb: "Opgeschaald: {size} KB",
@@ -1979,7 +1964,6 @@ export const nl: TranslationKeys = {
       qualityBest: "Beste",
     },
     "erase-object": {
-      original: "Origineel:",
       originalKb: "Origineel: {size} KB",
       processedKb: "Verwerkt: {size} KB",
       qualityFast: "Snel",
@@ -2040,7 +2024,6 @@ export const nl: TranslationKeys = {
       progressLabel: "Tekst uit PDF extraheren",
     },
     "blur-faces": {
-      original: "Origineel:",
       originalKb: "Origineel: {size} KB",
       processedKb: "Verwerkt: {size} KB",
       blurRadius: "Vervagingsradius",
@@ -2053,7 +2036,6 @@ export const nl: TranslationKeys = {
       progressLabel: "Gezichten vervagen",
     },
     "enhance-faces": {
-      original: "Origineel:",
       subtle: "Subtiel",
       maximum: "Maximaal",
       fewerFaces: "Minder gezichten",
@@ -2188,7 +2170,6 @@ export const nl: TranslationKeys = {
       progressLabelBatch: "Ruis verwijderen uit {count} afbeeldingen",
     },
     "red-eye-removal": {
-      original: "Origineel:",
       originalKb: "Origineel: {size} KB",
       fixedKb: "Gecorrigeerd: {size} KB",
       sensitivity: "Gevoeligheid",
@@ -2205,7 +2186,6 @@ export const nl: TranslationKeys = {
       progressLabelBatch: "Rode ogen corrigeren in {count} afbeeldingen",
     },
     "restore-photo": {
-      original: "Origineel:",
       subtle: "Subtiel",
       strong: "Sterk",
       originalKb: "Origineel: {size} KB",
@@ -2263,7 +2243,6 @@ export const nl: TranslationKeys = {
       progressLabel: "Canvas uitbreiden",
     },
     colorize: {
-      original: "Origineel:",
       originalKb: "Origineel: {size} KB",
       colorizedKb: "Ingekleurd: {size} KB",
       aiModel: "AI-model",
@@ -2476,7 +2455,6 @@ export const nl: TranslationKeys = {
       progressLabel: "Achtergrond vervagen",
     },
     "watermark-text": {
-      original: "Origineel:",
       applyWatermark: "Watermerk toepassen",
       tiledRepeating: "Betegeld (herhalend)",
       originalKb: "Origineel: {size} KB",
@@ -2499,7 +2477,6 @@ export const nl: TranslationKeys = {
       progressLabel: "Watermerk toevoegen",
     },
     "watermark-image": {
-      original: "Origineel:",
       center: "Midden",
       topLeft: "Linksboven",
       topRight: "Rechtsboven",
@@ -2518,7 +2495,6 @@ export const nl: TranslationKeys = {
       submitBatch: "Watermerk toepassen ({count} bestanden)",
     },
     "text-overlay": {
-      original: "Origineel:",
       originalKb: "Origineel: {size} KB",
       processedKb: "Verwerkt: {size} KB",
       text: "Tekst",
@@ -2538,7 +2514,6 @@ export const nl: TranslationKeys = {
       defaultText: "Jouw tekst hier",
     },
     compose: {
-      original: "Origineel:",
       screen: "Scherm",
       processing: "Verwerken...",
       overlayImage: "Overlay-afbeelding",
@@ -2593,9 +2568,6 @@ export const nl: TranslationKeys = {
       backToGallery: "Terug naar galerij",
     },
     info: {
-      min: "min:",
-      max: "max:",
-      mean: "gem:",
       minValue: "min:{value}",
       maxValue: "max:{value}",
       meanValue: "gem:{value}",
@@ -2829,9 +2801,6 @@ export const nl: TranslationKeys = {
       mosaic: "Mozaïek",
       uploadingImages: "Afbeeldingen uploaden...",
       processingCollage: "Collage verwerken...",
-      loaded: "geladen",
-      images: "afbeeldingen",
-      collage: "Collage:",
       snapotter: "SnapOtter",
       background: "Achtergrond",
       format: "Formaat",
@@ -2997,7 +2966,6 @@ export const nl: TranslationKeys = {
       text: "Tekst",
       position: "Positie",
       newTab: "Nieuw tabblad",
-      frame: "Frame",
       quickPresets: "Snelle voorinstellingen",
       linear: "Lineair",
       radial: "Radiaal",
@@ -3215,7 +3183,6 @@ export const nl: TranslationKeys = {
       progressLabel: "SVG converteren",
     },
     vectorize: {
-      original: "Origineel:",
       detail: "Detail",
       smoothing: "Vloeiendheid",
       blackWhite: "Zwart-wit",
@@ -3252,7 +3219,6 @@ export const nl: TranslationKeys = {
       progressLabel: "Vectoriseren",
     },
     "gif-tools": {
-      original: "Origineel:",
       widthPx: "Breedte (px)",
       auto: "Automatisch",
       heightPx: "Hoogte (px)",

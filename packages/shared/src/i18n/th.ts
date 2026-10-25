@@ -1257,7 +1257,6 @@ export const th: TranslationKeys = {
       paintOverObjectsToErase: "ระบายทับวัตถุที่ต้องการลบ",
     },
     "crop-canvas": {
-      original: "ต้นฉบับ:",
       cropPreview: "ตัวอย่างการครอป",
       cropRegionSize: "บริเวณครอป: {width} x {height}",
       originalSize: "ต้นฉบับ: {width} x {height}",
@@ -1288,7 +1287,6 @@ export const th: TranslationKeys = {
       infoBar: "{width} x {height}px . กริด {cols}x{rows} . {count} กระเบื้อง",
     },
     "remove-bg": {
-      original: "ต้นฉบับ:",
       transparent: "โปร่งใส",
       color: "สี",
       gradient: "ไล่สี",
@@ -1315,7 +1313,6 @@ export const th: TranslationKeys = {
       theExtractedTextWillAppear: "ข้อความที่แยกได้จะปรากฏที่นี่หลังจากคุณทำ OCR",
     },
     "image-enhancement": {
-      original: "ต้นฉบับ:",
       removesNoiseAndArtifactsUsing: "ลดสัญญาณรบกวนและอาร์ติแฟกต์ด้วย AI",
       analyzingImage: "กำลังวิเคราะห์ภาพ...",
       imageLooksGoodFineTune: "ภาพดูดีแล้ว ปรับละเอียดด้วยแถบเลื่อนความเข้ม",
@@ -1327,8 +1324,6 @@ export const th: TranslationKeys = {
       enhancedSizeKb: "ปรับปรุงแล้ว: {size} KB",
     },
     "find-duplicates-results": {
-      all: "ทั้งหมด",
-      group: "กลุ่ม",
       dimensions: "ขนาด",
       format: "รูปแบบ",
       scanned: "สแกนแล้ว:",
@@ -1361,7 +1356,6 @@ export const th: TranslationKeys = {
       pageSize: "ขนาดหน้า",
     },
     color: {
-      original: "ต้นฉบับ:",
       light: "แสง",
       brightness: "ความสว่าง",
       contrast: "คอนทราสต์",
@@ -1473,7 +1467,6 @@ export const th: TranslationKeys = {
       progressLabel: "กำลังใช้งาน",
     },
     convert: {
-      original: "ต้นฉบับ:",
       originalSizeKb: "ต้นฉบับ: {size} KB",
       processedSizeKb: "ประมวลผลแล้ว: {size} KB",
       targetFormat: "รูปแบบปลายทาง",
@@ -1503,7 +1496,6 @@ export const th: TranslationKeys = {
       progressLabel: "กำลังเพิ่มประสิทธิภาพ",
     },
     "strip-metadata": {
-      original: "ต้นฉบับ:",
       iccProfile: "มี ICC",
       originalSize: "ต้นฉบับ: {size} KB",
       processedSize: "ประมวลผลแล้ว: {size} KB",
@@ -1529,7 +1521,6 @@ export const th: TranslationKeys = {
       inspectFailed: "ตรวจสอบเมทาดาทาไม่สำเร็จ",
     },
     "edit-metadata": {
-      original: "ต้นฉบับ:",
       imageDescription: "คำอธิบายภาพ",
       photographerCreatorName: "ชื่อช่างภาพ / ผู้สร้าง",
       imageTitle: "ชื่อภาพ",
@@ -1636,8 +1627,6 @@ export const th: TranslationKeys = {
       requestTimedOut: "คำขอหมดเวลา เซิร์ฟเวอร์อาจทำงานหนัก",
     },
     "pdf-to-image": {
-      converting2: "กำลังแปลง",
-      page: "หน้า",
       custom: "กำหนดเอง",
       uploadAPdfToGet: "อัปโหลด PDF เพื่อเริ่มต้น",
       generatingPagePreviews: "กำลังสร้างตัวอย่างหน้า...",
@@ -1730,7 +1719,6 @@ export const th: TranslationKeys = {
       progressLabel: "กำลังปรับสี",
     },
     sharpening: {
-      original: "ต้นฉบับ:",
       originalSize: "ต้นฉบับ: {size} KB",
       processedSize: "ประมวลผลแล้ว: {size} KB",
       method: "วิธีการ",
@@ -1768,7 +1756,6 @@ export const th: TranslationKeys = {
       },
     },
     "replace-color": {
-      original: "ต้นฉบับ:",
       originalKb: "ต้นฉบับ: {size} KB",
       processedKb: "ประมวลผลแล้ว: {size} KB",
       sourceColor: "สีต้นทาง (ที่จะแทนที่)",
@@ -1782,7 +1769,6 @@ export const th: TranslationKeys = {
       progressLabel: "กำลังแทนที่สี",
     },
     "color-blindness": {
-      original: "ต้นฉบับ:",
       originalKb: "ต้นฉบับ: {size} KB",
       processedKb: "ประมวลผลแล้ว: {size} KB",
       simulationType: "ประเภทการจำลอง",
@@ -1921,7 +1907,6 @@ export const th: TranslationKeys = {
       download: "ดาวน์โหลด",
     },
     upscale: {
-      original: "ต้นฉบับ:",
       off: "ปิด",
       originalKb: "ต้นฉบับ: {size} KB",
       upscaledKb: "ขยายแล้ว: {size} KB",
@@ -1941,7 +1926,6 @@ export const th: TranslationKeys = {
       qualityBest: "ดีที่สุด",
     },
     "erase-object": {
-      original: "ต้นฉบับ:",
       originalKb: "ต้นฉบับ: {size} KB",
       processedKb: "ประมวลผลแล้ว: {size} KB",
       qualityFast: "เร็ว",
@@ -1997,7 +1981,6 @@ export const th: TranslationKeys = {
       progressLabel: "กำลังแยกข้อความจาก PDF",
     },
     "blur-faces": {
-      original: "ต้นฉบับ:",
       originalKb: "ต้นฉบับ: {size} KB",
       processedKb: "ประมวลผลแล้ว: {size} KB",
       blurRadius: "รัศมีเบลอ",
@@ -2010,7 +1993,6 @@ export const th: TranslationKeys = {
       progressLabel: "กำลังเบลอใบหน้า",
     },
     "enhance-faces": {
-      original: "ต้นฉบับ:",
       subtle: "เบาๆ",
       maximum: "สูงสุด",
       fewerFaces: "ใบหน้าน้อยลง",
@@ -2140,7 +2122,6 @@ export const th: TranslationKeys = {
       progressLabelBatch: "กำลังลดสัญญาณรบกวนจาก {count} ภาพ",
     },
     "red-eye-removal": {
-      original: "ต้นฉบับ:",
       originalKb: "ต้นฉบับ: {size} KB",
       fixedKb: "แก้ไขแล้ว: {size} KB",
       sensitivity: "ความไว",
@@ -2157,7 +2138,6 @@ export const th: TranslationKeys = {
       progressLabelBatch: "กำลังแก้ไขตาแดงใน {count} ภาพ",
     },
     "restore-photo": {
-      original: "ต้นฉบับ:",
       subtle: "เบาๆ",
       strong: "เข้ม",
       originalKb: "ต้นฉบับ: {size} KB",
@@ -2214,7 +2194,6 @@ export const th: TranslationKeys = {
       progressLabel: "กำลังขยายแคนวาส",
     },
     colorize: {
-      original: "ต้นฉบับ:",
       originalKb: "ต้นฉบับ: {size} KB",
       colorizedKb: "ลงสีแล้ว: {size} KB",
       aiModel: "โมเดล AI",
@@ -2420,7 +2399,6 @@ export const th: TranslationKeys = {
       progressLabel: "กำลังเบลอพื้นหลัง",
     },
     "watermark-text": {
-      original: "ต้นฉบับ:",
       applyWatermark: "ใช้ลายน้ำ",
       tiledRepeating: "เรียงแบบกระเบื้อง (ทำซ้ำ)",
       originalKb: "ต้นฉบับ: {size} KB",
@@ -2443,7 +2421,6 @@ export const th: TranslationKeys = {
       progressLabel: "กำลังเพิ่มลายน้ำ",
     },
     "watermark-image": {
-      original: "ต้นฉบับ:",
       center: "กลาง",
       topLeft: "บนซ้าย",
       topRight: "บนขวา",
@@ -2462,7 +2439,6 @@ export const th: TranslationKeys = {
       submitBatch: "ใช้ลายน้ำ ({count} ไฟล์)",
     },
     "text-overlay": {
-      original: "ต้นฉบับ:",
       originalKb: "ต้นฉบับ: {size} KB",
       processedKb: "ประมวลผลแล้ว: {size} KB",
       text: "ข้อความ",
@@ -2482,7 +2458,6 @@ export const th: TranslationKeys = {
       defaultText: "ข้อความของคุณ",
     },
     compose: {
-      original: "ต้นฉบับ:",
       screen: "หน้าจอ",
       processing: "กำลังประมวลผล...",
       overlayImage: "ภาพซ้อนทับ",
@@ -2537,9 +2512,6 @@ export const th: TranslationKeys = {
       backToGallery: "กลับไปแกลเลอรี",
     },
     info: {
-      min: "ต่ำสุด:",
-      max: "สูงสุด:",
-      mean: "ค่าเฉลี่ย:",
       minValue: "ต่ำสุด:{value}",
       maxValue: "สูงสุด:{value}",
       meanValue: "ค่าเฉลี่ย:{value}",
@@ -2771,9 +2743,6 @@ export const th: TranslationKeys = {
       mosaic: "โมเสก",
       uploadingImages: "กำลังอัปโหลดภาพ...",
       processingCollage: "กำลังประมวลผลคอลลาจ...",
-      loaded: "โหลดแล้ว",
-      images: "ภาพ",
-      collage: "คอลลาจ:",
       snapotter: "SnapOtter",
       background: "พื้นหลัง",
       format: "รูปแบบ",
@@ -2939,7 +2908,6 @@ export const th: TranslationKeys = {
       text: "ข้อความ",
       position: "ตำแหน่ง",
       newTab: "แท็บใหม่",
-      frame: "กรอบ",
       quickPresets: "พรีเซ็ตด่วน",
       linear: "เส้นตรง",
       radial: "วงกลม",
@@ -3154,7 +3122,6 @@ export const th: TranslationKeys = {
       progressLabel: "กำลังแปลง SVG",
     },
     vectorize: {
-      original: "ต้นฉบับ:",
       detail: "รายละเอียด",
       smoothing: "การปรับเรียบ",
       blackWhite: "ขาวดำ",
@@ -3191,7 +3158,6 @@ export const th: TranslationKeys = {
       progressLabel: "กำลังแปลงเป็นเวกเตอร์",
     },
     "gif-tools": {
-      original: "ต้นฉบับ:",
       widthPx: "ความกว้าง (px)",
       auto: "อัตโนมัติ",
       heightPx: "ความสูง (px)",

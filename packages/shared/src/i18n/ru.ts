@@ -1277,7 +1277,6 @@ export const ru: TranslationKeys = {
       paintOverObjectsToErase: "Закрасьте объекты, которые хотите удалить",
     },
     "crop-canvas": {
-      original: "Оригинал:",
       cropPreview: "Предпросмотр обрезки",
       cropRegionSize: "Область обрезки: {width} x {height}",
       originalSize: "Оригинал: {width} x {height}",
@@ -1310,7 +1309,6 @@ export const ru: TranslationKeys = {
       infoBar: "{width} x {height}px . сетка {cols}x{rows} . {count} плиток",
     },
     "remove-bg": {
-      original: "Оригинал:",
       transparent: "Прозрачный",
       color: "Цветной",
       gradient: "Градиент",
@@ -1337,7 +1335,6 @@ export const ru: TranslationKeys = {
       theExtractedTextWillAppear: "Извлечённый текст появится здесь после запуска OCR.",
     },
     "image-enhancement": {
-      original: "Оригинал:",
       removesNoiseAndArtifactsUsing: "Удаляет шум и артефакты с помощью AI",
       analyzingImage: "Анализ изображения...",
       imageLooksGoodFineTune:
@@ -1350,8 +1347,6 @@ export const ru: TranslationKeys = {
       enhancedSizeKb: "Улучшено: {size} KB",
     },
     "find-duplicates-results": {
-      all: "Все",
-      group: "Группа",
       dimensions: "Размеры",
       format: "Формат",
       scanned: "Просканировано:",
@@ -1386,7 +1381,6 @@ export const ru: TranslationKeys = {
       pageSize: "Размер страницы",
     },
     color: {
-      original: "Оригинал:",
       light: "Свет",
       brightness: "Яркость",
       contrast: "Контраст",
@@ -1499,7 +1493,6 @@ export const ru: TranslationKeys = {
       progressLabel: "Применение",
     },
     convert: {
-      original: "Оригинал:",
       originalSizeKb: "Оригинал: {size} KB",
       processedSizeKb: "Обработано: {size} KB",
       targetFormat: "Целевой формат",
@@ -1529,7 +1522,6 @@ export const ru: TranslationKeys = {
       progressLabel: "Оптимизация",
     },
     "strip-metadata": {
-      original: "Оригинал:",
       iccProfile: "ICC",
       originalSize: "Оригинал: {size} KB",
       processedSize: "Обработано: {size} KB",
@@ -1556,7 +1548,6 @@ export const ru: TranslationKeys = {
       inspectFailed: "Не удалось прочитать метаданные",
     },
     "edit-metadata": {
-      original: "Оригинал:",
       imageDescription: "Описание изображения",
       photographerCreatorName: "Имя фотографа или автора",
       imageTitle: "Заголовок изображения",
@@ -1664,8 +1655,6 @@ export const ru: TranslationKeys = {
       requestTimedOut: "Время ожидания истекло: сервер может быть перегружен",
     },
     "pdf-to-image": {
-      converting2: "Конвертация",
-      page: "страница",
       custom: "Пользовательское",
       uploadAPdfToGet: "Загрузите PDF, чтобы начать",
       generatingPagePreviews: "Создание предпросмотров страниц...",
@@ -1759,7 +1748,6 @@ export const ru: TranslationKeys = {
       progressLabel: "Настройка цветов",
     },
     sharpening: {
-      original: "Оригинал:",
       originalSize: "Оригинал: {size} KB",
       processedSize: "Обработано: {size} KB",
       method: "Метод",
@@ -1797,7 +1785,6 @@ export const ru: TranslationKeys = {
       },
     },
     "replace-color": {
-      original: "Оригинал:",
       originalKb: "Оригинал: {size} KB",
       processedKb: "Обработано: {size} KB",
       sourceColor: "Исходный цвет (для замены)",
@@ -1811,7 +1798,6 @@ export const ru: TranslationKeys = {
       progressLabel: "Замена цвета",
     },
     "color-blindness": {
-      original: "Оригинал:",
       originalKb: "Оригинал: {size} KB",
       processedKb: "Обработано: {size} KB",
       simulationType: "Тип симуляции",
@@ -1956,7 +1942,6 @@ export const ru: TranslationKeys = {
       download: "Скачать",
     },
     upscale: {
-      original: "Оригинал:",
       off: "Выкл.",
       originalKb: "Оригинал: {size} KB",
       upscaledKb: "Увеличено: {size} KB",
@@ -1978,7 +1963,6 @@ export const ru: TranslationKeys = {
       qualityBest: "Наилучшее",
     },
     "erase-object": {
-      original: "Оригинал:",
       originalKb: "Оригинал: {size} KB",
       processedKb: "Обработано: {size} KB",
       qualityFast: "Быстро",
@@ -2036,7 +2020,6 @@ export const ru: TranslationKeys = {
       progressLabel: "Извлечение текста из PDF",
     },
     "blur-faces": {
-      original: "Оригинал:",
       originalKb: "Оригинал: {size} KB",
       processedKb: "Обработано: {size} KB",
       blurRadius: "Радиус размытия",
@@ -2049,7 +2032,6 @@ export const ru: TranslationKeys = {
       progressLabel: "Размытие лиц",
     },
     "enhance-faces": {
-      original: "Оригинал:",
       subtle: "Лёгкая",
       maximum: "Максимальный",
       fewerFaces: "Меньше лиц",
@@ -2184,7 +2166,6 @@ export const ru: TranslationKeys = {
       progressLabelBatch: "Удаление шума из {count} изображений",
     },
     "red-eye-removal": {
-      original: "Оригинал:",
       originalKb: "Оригинал: {size} KB",
       fixedKb: "Исправлено: {size} KB",
       sensitivity: "Чувствительность",
@@ -2201,7 +2182,6 @@ export const ru: TranslationKeys = {
       progressLabelBatch: "Исправление красных глаз на {count} изображениях",
     },
     "restore-photo": {
-      original: "Оригинал:",
       subtle: "Лёгкая",
       strong: "Сильное",
       originalKb: "Оригинал: {size} KB",
@@ -2259,7 +2239,6 @@ export const ru: TranslationKeys = {
       progressLabel: "Расширение холста",
     },
     colorize: {
-      original: "Оригинал:",
       originalKb: "Оригинал: {size} KB",
       colorizedKb: "Колоризировано: {size} KB",
       aiModel: "AI-модель",
@@ -2468,7 +2447,6 @@ export const ru: TranslationKeys = {
       progressLabel: "Размытие фона",
     },
     "watermark-text": {
-      original: "Оригинал:",
       applyWatermark: "Применить водяной знак",
       tiledRepeating: "Плитка (повторение)",
       originalKb: "Оригинал: {size} KB",
@@ -2491,7 +2469,6 @@ export const ru: TranslationKeys = {
       progressLabel: "Добавление водяного знака",
     },
     "watermark-image": {
-      original: "Оригинал:",
       center: "Центр",
       topLeft: "Сверху слева",
       topRight: "Сверху справа",
@@ -2510,7 +2487,6 @@ export const ru: TranslationKeys = {
       submitBatch: "Применить водяной знак ({count} файлов)",
     },
     "text-overlay": {
-      original: "Оригинал:",
       originalKb: "Оригинал: {size} KB",
       processedKb: "Обработано: {size} KB",
       text: "Текст",
@@ -2530,7 +2506,6 @@ export const ru: TranslationKeys = {
       defaultText: "Ваш текст",
     },
     compose: {
-      original: "Оригинал:",
       screen: "Экран",
       processing: "Обработка...",
       overlayImage: "Накладываемое изображение",
@@ -2585,9 +2560,6 @@ export const ru: TranslationKeys = {
       backToGallery: "Назад к галерее",
     },
     info: {
-      min: "мин:",
-      max: "макс:",
-      mean: "среднее:",
       minValue: "мин:{value}",
       maxValue: "макс:{value}",
       meanValue: "среднее:{value}",
@@ -2821,9 +2793,6 @@ export const ru: TranslationKeys = {
       mosaic: "Мозаика",
       uploadingImages: "Загрузка изображений...",
       processingCollage: "Обработка коллажа...",
-      loaded: "загружено",
-      images: "изображений",
-      collage: "Коллаж:",
       snapotter: "SnapOtter",
       background: "Фон",
       format: "Формат",
@@ -2989,7 +2958,6 @@ export const ru: TranslationKeys = {
       text: "Текст",
       position: "Позиция",
       newTab: "Новая вкладка",
-      frame: "Рамка",
       quickPresets: "Быстрые шаблоны",
       linear: "Линейный",
       radial: "Радиальный",
@@ -3207,7 +3175,6 @@ export const ru: TranslationKeys = {
       progressLabel: "Конвертация SVG",
     },
     vectorize: {
-      original: "Оригинал:",
       detail: "Детализация",
       smoothing: "Сглаживание",
       blackWhite: "Чёрно-белый",
@@ -3244,7 +3211,6 @@ export const ru: TranslationKeys = {
       progressLabel: "Векторизация",
     },
     "gif-tools": {
-      original: "Оригинал:",
       widthPx: "Ширина (px)",
       auto: "Авто",
       heightPx: "Высота (px)",

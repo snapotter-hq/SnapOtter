@@ -1277,7 +1277,6 @@ export const vi: TranslationKeys = {
       paintOverObjectsToErase: "Tô lên đối tượng cần xóa",
     },
     "crop-canvas": {
-      original: "Gốc:",
       cropPreview: "Xem trước vùng cắt",
       cropRegionSize: "Vùng cắt: {width} x {height}",
       originalSize: "Gốc: {width} x {height}",
@@ -1308,7 +1307,6 @@ export const vi: TranslationKeys = {
       infoBar: "{width} x {height}px . lưới {cols}x{rows} . {count} ô",
     },
     "remove-bg": {
-      original: "Gốc:",
       transparent: "Trong suốt",
       color: "Màu",
       gradient: "Chuyển sắc",
@@ -1335,7 +1333,6 @@ export const vi: TranslationKeys = {
       theExtractedTextWillAppear: "Văn bản trích xuất sẽ hiển thị tại đây sau khi bạn chạy OCR.",
     },
     "image-enhancement": {
-      original: "Gốc:",
       removesNoiseAndArtifactsUsing: "Khử nhiễu và hiện tượng lỗi bằng AI",
       analyzingImage: "Đang phân tích hình ảnh...",
       imageLooksGoodFineTune: "Hình ảnh trông tốt. Tinh chỉnh bằng thanh trượt cường độ.",
@@ -1347,8 +1344,6 @@ export const vi: TranslationKeys = {
       enhancedSizeKb: "Đã nâng cao: {size} KB",
     },
     "find-duplicates-results": {
-      all: "Tất cả",
-      group: "Nhóm",
       dimensions: "Kích thước",
       format: "Định dạng",
       scanned: "Đã quét:",
@@ -1382,7 +1377,6 @@ export const vi: TranslationKeys = {
       pageSize: "Khổ giấy",
     },
     color: {
-      original: "Gốc:",
       light: "Ánh sáng",
       brightness: "Độ sáng",
       contrast: "Độ tương phản",
@@ -1495,7 +1489,6 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang áp dụng",
     },
     convert: {
-      original: "Gốc:",
       originalSizeKb: "Gốc: {size} KB",
       processedSizeKb: "Đã xử lý: {size} KB",
       targetFormat: "Định dạng đích",
@@ -1525,7 +1518,6 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang tối ưu",
     },
     "strip-metadata": {
-      original: "Gốc:",
       iccProfile: "Có ICC",
       originalSize: "Gốc: {size} KB",
       processedSize: "Đã xử lý: {size} KB",
@@ -1552,7 +1544,6 @@ export const vi: TranslationKeys = {
       inspectFailed: "Không thể kiểm tra siêu dữ liệu",
     },
     "edit-metadata": {
-      original: "Gốc:",
       imageDescription: "Mô tả hình ảnh",
       photographerCreatorName: "Tên nhiếp ảnh gia / người tạo",
       imageTitle: "Tiêu đề hình ảnh",
@@ -1659,8 +1650,6 @@ export const vi: TranslationKeys = {
       requestTimedOut: "Yêu cầu đã hết thời gian, máy chủ có thể đang quá tải",
     },
     "pdf-to-image": {
-      converting2: "Đang chuyển đổi",
-      page: "trang",
       custom: "Tùy chỉnh",
       uploadAPdfToGet: "Tải lên PDF để bắt đầu",
       generatingPagePreviews: "Đang tạo bản xem trước trang...",
@@ -1754,7 +1743,6 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang điều chỉnh màu sắc",
     },
     sharpening: {
-      original: "Gốc:",
       originalSize: "Gốc: {size} KB",
       processedSize: "Đã xử lý: {size} KB",
       method: "Phương pháp",
@@ -1792,7 +1780,6 @@ export const vi: TranslationKeys = {
       },
     },
     "replace-color": {
-      original: "Gốc:",
       originalKb: "Gốc: {size} KB",
       processedKb: "Đã xử lý: {size} KB",
       sourceColor: "Màu nguồn (cần thay thế)",
@@ -1806,7 +1793,6 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang thay thế màu",
     },
     "color-blindness": {
-      original: "Gốc:",
       originalKb: "Gốc: {size} KB",
       processedKb: "Đã xử lý: {size} KB",
       simulationType: "Loại mô phỏng",
@@ -1950,7 +1936,6 @@ export const vi: TranslationKeys = {
       download: "Tải xuống",
     },
     upscale: {
-      original: "Gốc:",
       off: "Tắt",
       originalKb: "Gốc: {size} KB",
       upscaledKb: "Đã phóng to: {size} KB",
@@ -1972,7 +1957,6 @@ export const vi: TranslationKeys = {
       qualityBest: "Tốt nhất",
     },
     "erase-object": {
-      original: "Gốc:",
       originalKb: "Gốc: {size} KB",
       processedKb: "Đã xử lý: {size} KB",
       qualityFast: "Nhanh",
@@ -2029,7 +2013,6 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang trích xuất văn bản từ PDF",
     },
     "blur-faces": {
-      original: "Gốc:",
       originalKb: "Gốc: {size} KB",
       processedKb: "Đã xử lý: {size} KB",
       blurRadius: "Bán kính làm mờ",
@@ -2042,7 +2025,6 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang làm mờ khuôn mặt",
     },
     "enhance-faces": {
-      original: "Gốc:",
       subtle: "Nhẹ nhàng",
       maximum: "Tối đa",
       fewerFaces: "Ít khuôn mặt hơn",
@@ -2177,7 +2159,6 @@ export const vi: TranslationKeys = {
       progressLabelBatch: "Đang khử nhiễu {count} ảnh",
     },
     "red-eye-removal": {
-      original: "Gốc:",
       originalKb: "Gốc: {size} KB",
       fixedKb: "Đã sửa: {size} KB",
       sensitivity: "Độ nhạy",
@@ -2194,7 +2175,6 @@ export const vi: TranslationKeys = {
       progressLabelBatch: "Đang sửa mắt đỏ {count} ảnh",
     },
     "restore-photo": {
-      original: "Gốc:",
       subtle: "Nhẹ nhàng",
       strong: "Mạnh",
       originalKb: "Gốc: {size} KB",
@@ -2252,7 +2232,6 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang mở rộng khung vẽ",
     },
     colorize: {
-      original: "Gốc:",
       originalKb: "Gốc: {size} KB",
       colorizedKb: "Đã tô màu: {size} KB",
       aiModel: "Mô hình AI",
@@ -2459,7 +2438,6 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang làm mờ nền",
     },
     "watermark-text": {
-      original: "Gốc:",
       applyWatermark: "Áp dụng hình mờ",
       tiledRepeating: "Lát gạch (lặp lại)",
       originalKb: "Gốc: {size} KB",
@@ -2482,7 +2460,6 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang thêm hình mờ",
     },
     "watermark-image": {
-      original: "Gốc:",
       center: "Giữa",
       topLeft: "Trên trái",
       topRight: "Trên phải",
@@ -2501,7 +2478,6 @@ export const vi: TranslationKeys = {
       submitBatch: "Áp dụng hình mờ ({count} tệp)",
     },
     "text-overlay": {
-      original: "Gốc:",
       originalKb: "Gốc: {size} KB",
       processedKb: "Đã xử lý: {size} KB",
       text: "Văn bản",
@@ -2521,7 +2497,6 @@ export const vi: TranslationKeys = {
       defaultText: "Nhập văn bản tại đây",
     },
     compose: {
-      original: "Gốc:",
       screen: "Màn hình",
       processing: "Đang xử lý...",
       overlayImage: "Ảnh lớp phủ",
@@ -2576,9 +2551,6 @@ export const vi: TranslationKeys = {
       backToGallery: "Quay lại bộ sưu tập",
     },
     info: {
-      min: "nhỏ nhất:",
-      max: "lớn nhất:",
-      mean: "trung bình:",
       minValue: "nhỏ nhất:{value}",
       maxValue: "lớn nhất:{value}",
       meanValue: "trung bình:{value}",
@@ -2810,9 +2782,6 @@ export const vi: TranslationKeys = {
       mosaic: "Khảm",
       uploadingImages: "Đang tải lên hình ảnh...",
       processingCollage: "Đang xử lý ảnh ghép...",
-      loaded: "đã tải",
-      images: "hình ảnh",
-      collage: "Ảnh ghép:",
       snapotter: "SnapOtter",
       background: "Nền",
       format: "Định dạng",
@@ -2978,7 +2947,6 @@ export const vi: TranslationKeys = {
       text: "Văn bản",
       position: "Vị trí",
       newTab: "Tab mới",
-      frame: "Khung",
       quickPresets: "Mẫu nhanh",
       linear: "Tuyến tính",
       radial: "Tỏa tròn",
@@ -3195,7 +3163,6 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang chuyển đổi SVG",
     },
     vectorize: {
-      original: "Gốc:",
       detail: "Chi tiết",
       smoothing: "Làm mịn",
       blackWhite: "Đen trắng",
@@ -3232,7 +3199,6 @@ export const vi: TranslationKeys = {
       progressLabel: "Đang véc-tơ hóa",
     },
     "gif-tools": {
-      original: "Gốc:",
       widthPx: "Chiều rộng (px)",
       auto: "Tự động",
       heightPx: "Chiều cao (px)",

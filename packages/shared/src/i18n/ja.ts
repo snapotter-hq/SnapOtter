@@ -1235,7 +1235,6 @@ export const ja: TranslationKeys = {
       paintOverObjectsToErase: "消去したいオブジェクトの上を塗ってください",
     },
     "crop-canvas": {
-      original: "元：",
       cropPreview: "クロッププレビュー",
       cropRegionSize: "クロップ領域：{width} x {height}",
       originalSize: "元：{width} x {height}",
@@ -1268,7 +1267,6 @@ export const ja: TranslationKeys = {
       infoBar: "{width} x {height}px ・ {cols}x{rows}グリッド ・ {count}タイル",
     },
     "remove-bg": {
-      original: "元：",
       transparent: "透明",
       color: "カラー",
       gradient: "グラデーション",
@@ -1295,7 +1293,6 @@ export const ja: TranslationKeys = {
       theExtractedTextWillAppear: "OCRを実行すると、抽出されたテキストがここに表示されます。",
     },
     "image-enhancement": {
-      original: "元：",
       removesNoiseAndArtifactsUsing: "AIでノイズとアーティファクトを除去",
       analyzingImage: "画像を解析中...",
       imageLooksGoodFineTune: "画像は良好です。強度スライダーで微調整してください。",
@@ -1307,8 +1304,6 @@ export const ja: TranslationKeys = {
       enhancedSizeKb: "エンハンス後：{size} KB",
     },
     "find-duplicates-results": {
-      all: "すべて",
-      group: "グループ",
       dimensions: "サイズ",
       format: "フォーマット",
       scanned: "スキャン済み：",
@@ -1343,7 +1338,6 @@ export const ja: TranslationKeys = {
       pageSize: "ページサイズ",
     },
     color: {
-      original: "元：",
       light: "ライト",
       brightness: "明るさ",
       contrast: "コントラスト",
@@ -1455,7 +1449,6 @@ export const ja: TranslationKeys = {
       progressLabel: "適用中",
     },
     convert: {
-      original: "元：",
       originalSizeKb: "元：{size} KB",
       processedSizeKb: "処理後：{size} KB",
       targetFormat: "変換先フォーマット",
@@ -1485,7 +1478,6 @@ export const ja: TranslationKeys = {
       progressLabel: "最適化中",
     },
     "strip-metadata": {
-      original: "元：",
       iccProfile: "ICC",
       originalSize: "元：{size} KB",
       processedSize: "処理後：{size} KB",
@@ -1512,7 +1504,6 @@ export const ja: TranslationKeys = {
       inspectFailed: "メタデータの確認に失敗しました",
     },
     "edit-metadata": {
-      original: "元：",
       imageDescription: "画像の説明",
       photographerCreatorName: "撮影者・作成者名",
       imageTitle: "画像タイトル",
@@ -1619,8 +1610,6 @@ export const ja: TranslationKeys = {
       requestTimedOut: "リクエストがタイムアウトしました。サーバーが過負荷の可能性があります",
     },
     "pdf-to-image": {
-      converting2: "変換中",
-      page: "ページ",
       custom: "カスタム",
       uploadAPdfToGet: "PDFをアップロードして開始してください",
       generatingPagePreviews: "ページプレビューを生成中...",
@@ -1714,7 +1703,6 @@ export const ja: TranslationKeys = {
       progressLabel: "色を調整中",
     },
     sharpening: {
-      original: "元：",
       originalSize: "元：{size} KB",
       processedSize: "処理後：{size} KB",
       method: "方式",
@@ -1752,7 +1740,6 @@ export const ja: TranslationKeys = {
       },
     },
     "replace-color": {
-      original: "元：",
       originalKb: "元：{size} KB",
       processedKb: "処理後：{size} KB",
       sourceColor: "元の色（置換対象）",
@@ -1766,7 +1753,6 @@ export const ja: TranslationKeys = {
       progressLabel: "色を置換中",
     },
     "color-blindness": {
-      original: "元：",
       originalKb: "元：{size} KB",
       processedKb: "処理後：{size} KB",
       simulationType: "シミュレーションタイプ",
@@ -1908,7 +1894,6 @@ export const ja: TranslationKeys = {
       download: "ダウンロード",
     },
     upscale: {
-      original: "元：",
       off: "オフ",
       originalKb: "元：{size} KB",
       upscaledKb: "アップスケール後：{size} KB",
@@ -1930,7 +1915,6 @@ export const ja: TranslationKeys = {
       qualityBest: "最高",
     },
     "erase-object": {
-      original: "元：",
       originalKb: "元：{size} KB",
       processedKb: "処理後：{size} KB",
       qualityFast: "高速",
@@ -1988,7 +1972,6 @@ export const ja: TranslationKeys = {
       progressLabel: "PDFからテキストを抽出中",
     },
     "blur-faces": {
-      original: "元：",
       originalKb: "元：{size} KB",
       processedKb: "処理後：{size} KB",
       blurRadius: "ぼかし半径",
@@ -2001,7 +1984,6 @@ export const ja: TranslationKeys = {
       progressLabel: "顔をぼかし中",
     },
     "enhance-faces": {
-      original: "元：",
       subtle: "弱",
       maximum: "最高",
       fewerFaces: "少なく検出",
@@ -2136,7 +2118,6 @@ export const ja: TranslationKeys = {
       progressLabelBatch: "{count}枚の画像のノイズを除去中",
     },
     "red-eye-removal": {
-      original: "元：",
       originalKb: "元：{size} KB",
       fixedKb: "補正後：{size} KB",
       sensitivity: "感度",
@@ -2153,7 +2134,6 @@ export const ja: TranslationKeys = {
       progressLabelBatch: "{count}枚の画像の赤目を補正中",
     },
     "restore-photo": {
-      original: "元：",
       subtle: "弱",
       strong: "強",
       originalKb: "元：{size} KB",
@@ -2210,7 +2190,6 @@ export const ja: TranslationKeys = {
       progressLabel: "キャンバスを拡張中",
     },
     colorize: {
-      original: "元：",
       originalKb: "元：{size} KB",
       colorizedKb: "カラー化後：{size} KB",
       aiModel: "AIモデル",
@@ -2417,7 +2396,6 @@ export const ja: TranslationKeys = {
       progressLabel: "背景をぼかし中",
     },
     "watermark-text": {
-      original: "元：",
       applyWatermark: "ウォーターマーク適用",
       tiledRepeating: "タイル（繰り返し）",
       originalKb: "元：{size} KB",
@@ -2440,7 +2418,6 @@ export const ja: TranslationKeys = {
       progressLabel: "ウォーターマークを追加中",
     },
     "watermark-image": {
-      original: "元：",
       center: "中央",
       topLeft: "左上",
       topRight: "右上",
@@ -2459,7 +2436,6 @@ export const ja: TranslationKeys = {
       submitBatch: "ウォーターマーク適用（{count}ファイル）",
     },
     "text-overlay": {
-      original: "元：",
       originalKb: "元：{size} KB",
       processedKb: "処理後：{size} KB",
       text: "テキスト",
@@ -2479,7 +2455,6 @@ export const ja: TranslationKeys = {
       defaultText: "ここにテキストを入力",
     },
     compose: {
-      original: "元：",
       screen: "スクリーン",
       processing: "処理中...",
       overlayImage: "オーバーレイ画像",
@@ -2535,9 +2510,6 @@ export const ja: TranslationKeys = {
       backToGallery: "ギャラリーに戻る",
     },
     info: {
-      min: "最小：",
-      max: "最大：",
-      mean: "平均：",
       minValue: "最小：{value}",
       maxValue: "最大：{value}",
       meanValue: "平均：{value}",
@@ -2770,9 +2742,6 @@ export const ja: TranslationKeys = {
       mosaic: "モザイク",
       uploadingImages: "画像をアップロード中...",
       processingCollage: "コラージュを処理中...",
-      loaded: "読み込み済み",
-      images: "画像",
-      collage: "コラージュ：",
       snapotter: "SnapOtter",
       background: "背景",
       format: "フォーマット",
@@ -2938,7 +2907,6 @@ export const ja: TranslationKeys = {
       text: "テキスト",
       position: "位置",
       newTab: "新しいタブ",
-      frame: "フレーム",
       quickPresets: "クイックプリセット",
       linear: "線形",
       radial: "放射",
@@ -3154,7 +3122,6 @@ export const ja: TranslationKeys = {
       progressLabel: "SVGを変換中",
     },
     vectorize: {
-      original: "元：",
       detail: "ディテール",
       smoothing: "スムージング",
       blackWhite: "白黒",
@@ -3191,7 +3158,6 @@ export const ja: TranslationKeys = {
       progressLabel: "ベクター化中",
     },
     "gif-tools": {
-      original: "元：",
       widthPx: "幅（px）",
       auto: "自動",
       heightPx: "高さ（px）",

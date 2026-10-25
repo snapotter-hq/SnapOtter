@@ -1278,7 +1278,6 @@ export const ptBR: TranslationKeys = {
       paintOverObjectsToErase: "Pinte sobre os objetos para apagar",
     },
     "crop-canvas": {
-      original: "Original:",
       cropPreview: "Visualização do corte",
       cropRegionSize: "Região de corte: {width} x {height}",
       originalSize: "Original: {width} x {height}",
@@ -1312,7 +1311,6 @@ export const ptBR: TranslationKeys = {
       infoBar: "{width} x {height}px . grade {cols}x{rows} . {count} blocos",
     },
     "remove-bg": {
-      original: "Original:",
       transparent: "Transparente",
       color: "Colorido",
       gradient: "Degradado",
@@ -1339,7 +1337,6 @@ export const ptBR: TranslationKeys = {
       theExtractedTextWillAppear: "O texto extraído aparecerá aqui depois que você executar o OCR.",
     },
     "image-enhancement": {
-      original: "Original:",
       removesNoiseAndArtifactsUsing: "Remove ruído e artefatos usando AI",
       analyzingImage: "Analisando imagem...",
       imageLooksGoodFineTune: "A imagem parece boa. Ajuste com o controle de intensidade.",
@@ -1351,8 +1348,6 @@ export const ptBR: TranslationKeys = {
       enhancedSizeKb: "Melhorado: {size} KB",
     },
     "find-duplicates-results": {
-      all: "Todos",
-      group: "Grupo",
       dimensions: "Dimensões",
       format: "Formato",
       scanned: "Escaneadas:",
@@ -1387,7 +1382,6 @@ export const ptBR: TranslationKeys = {
       pageSize: "Tamanho da página",
     },
     color: {
-      original: "Original:",
       light: "Luz",
       brightness: "Brilho",
       contrast: "Contraste",
@@ -1500,7 +1494,6 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Aplicando",
     },
     convert: {
-      original: "Original:",
       originalSizeKb: "Original: {size} KB",
       processedSizeKb: "Processado: {size} KB",
       targetFormat: "Formato de destino",
@@ -1530,7 +1523,6 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Otimizando",
     },
     "strip-metadata": {
-      original: "Original:",
       iccProfile: "Tem ICC",
       originalSize: "Original: {size} KB",
       processedSize: "Processado: {size} KB",
@@ -1557,7 +1549,6 @@ export const ptBR: TranslationKeys = {
       inspectFailed: "Falha ao inspecionar os metadados",
     },
     "edit-metadata": {
-      original: "Original:",
       imageDescription: "Descrição da imagem",
       photographerCreatorName: "Nome do fotógrafo / criador",
       imageTitle: "Título da imagem",
@@ -1666,8 +1657,6 @@ export const ptBR: TranslationKeys = {
       requestTimedOut: "A requisição expirou, o servidor pode estar sobrecarregado",
     },
     "pdf-to-image": {
-      converting2: "Convertendo",
-      page: "página",
       custom: "Personalizado",
       uploadAPdfToGet: "Envie um PDF para começar",
       generatingPagePreviews: "Gerando visualizações das páginas...",
@@ -1761,7 +1750,6 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Ajustando cores",
     },
     sharpening: {
-      original: "Original:",
       originalSize: "Original: {size} KB",
       processedSize: "Processado: {size} KB",
       method: "Método",
@@ -1799,7 +1787,6 @@ export const ptBR: TranslationKeys = {
       },
     },
     "replace-color": {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       processedKb: "Processado: {size} KB",
       sourceColor: "Cor de origem (a substituir)",
@@ -1813,7 +1800,6 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Substituindo cor",
     },
     "color-blindness": {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       processedKb: "Processado: {size} KB",
       simulationType: "Tipo de simulação",
@@ -1955,7 +1941,6 @@ export const ptBR: TranslationKeys = {
       download: "Baixar",
     },
     upscale: {
-      original: "Original:",
       off: "Desligado",
       originalKb: "Original: {size} KB",
       upscaledKb: "Ampliado: {size} KB",
@@ -1977,7 +1962,6 @@ export const ptBR: TranslationKeys = {
       qualityBest: "Melhor",
     },
     "erase-object": {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       processedKb: "Processado: {size} KB",
       qualityFast: "Rápido",
@@ -2037,7 +2021,6 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Extraindo texto do PDF",
     },
     "blur-faces": {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       processedKb: "Processado: {size} KB",
       blurRadius: "Raio de desfoque",
@@ -2050,7 +2033,6 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Desfocando rostos",
     },
     "enhance-faces": {
-      original: "Original:",
       subtle: "Sutil",
       maximum: "Máximo",
       fewerFaces: "Menos rostos",
@@ -2185,7 +2167,6 @@ export const ptBR: TranslationKeys = {
       progressLabelBatch: "Removendo ruído de {count} imagens",
     },
     "red-eye-removal": {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       fixedKb: "Corrigido: {size} KB",
       sensitivity: "Sensibilidade",
@@ -2202,7 +2183,6 @@ export const ptBR: TranslationKeys = {
       progressLabelBatch: "Corrigindo olhos vermelhos em {count} imagens",
     },
     "restore-photo": {
-      original: "Original:",
       subtle: "Sutil",
       strong: "Forte",
       originalKb: "Original: {size} KB",
@@ -2260,7 +2240,6 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Estendendo canvas",
     },
     colorize: {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       colorizedKb: "Colorizado: {size} KB",
       aiModel: "Modelo AI",
@@ -2469,7 +2448,6 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Desfocando fundo",
     },
     "watermark-text": {
-      original: "Original:",
       applyWatermark: "Aplicar marca d'água",
       tiledRepeating: "Lado a lado (repetição)",
       originalKb: "Original: {size} KB",
@@ -2492,7 +2470,6 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Adicionando marca d'água",
     },
     "watermark-image": {
-      original: "Original:",
       center: "Centro",
       topLeft: "Superior esquerdo",
       topRight: "Superior direito",
@@ -2511,7 +2488,6 @@ export const ptBR: TranslationKeys = {
       submitBatch: "Aplicar marca d'água ({count} arquivos)",
     },
     "text-overlay": {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       processedKb: "Processado: {size} KB",
       text: "Texto",
@@ -2531,7 +2507,6 @@ export const ptBR: TranslationKeys = {
       defaultText: "Seu Texto Aqui",
     },
     compose: {
-      original: "Original:",
       screen: "Tela",
       processing: "Processando...",
       overlayImage: "Imagem de sobreposição",
@@ -2586,9 +2561,6 @@ export const ptBR: TranslationKeys = {
       backToGallery: "Voltar para a galeria",
     },
     info: {
-      min: "mín:",
-      max: "máx:",
-      mean: "média:",
       minValue: "mín:{value}",
       maxValue: "máx:{value}",
       meanValue: "média:{value}",
@@ -2821,9 +2793,6 @@ export const ptBR: TranslationKeys = {
       mosaic: "Mosaico",
       uploadingImages: "Enviando imagens...",
       processingCollage: "Processando collage...",
-      loaded: "carregadas",
-      images: "imagens",
-      collage: "Collage:",
       snapotter: "SnapOtter",
       background: "Fundo",
       format: "Formato",
@@ -2989,7 +2958,6 @@ export const ptBR: TranslationKeys = {
       text: "Texto",
       position: "Posição",
       newTab: "Nova aba",
-      frame: "Moldura",
       quickPresets: "Predefinições rápidas",
       linear: "Linear",
       radial: "Radial",
@@ -3207,7 +3175,6 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Convertendo SVG",
     },
     vectorize: {
-      original: "Original:",
       detail: "Detalhe",
       smoothing: "Suavização",
       blackWhite: "Preto e branco",
@@ -3244,7 +3211,6 @@ export const ptBR: TranslationKeys = {
       progressLabel: "Vetorizando",
     },
     "gif-tools": {
-      original: "Original:",
       widthPx: "Largura (px)",
       auto: "Automático",
       heightPx: "Altura (px)",

@@ -1284,7 +1284,6 @@ export const fr: TranslationKeys = {
       paintOverObjectsToErase: "Peignez sur les objets à effacer",
     },
     "crop-canvas": {
-      original: "Original :",
       cropPreview: "Aperçu du recadrage",
       cropRegionSize: "Zone de recadrage : {width} x {height}",
       originalSize: "Original : {width} x {height}",
@@ -1318,7 +1317,6 @@ export const fr: TranslationKeys = {
       infoBar: "{width} x {height}px . grille {cols}x{rows} . {count} tuiles",
     },
     "remove-bg": {
-      original: "Original :",
       transparent: "Transparent",
       color: "Couleur",
       gradient: "Dégradé",
@@ -1345,7 +1343,6 @@ export const fr: TranslationKeys = {
       theExtractedTextWillAppear: "Le texte extrait apparaîtra ici après l'exécution de l'OCR.",
     },
     "image-enhancement": {
-      original: "Original :",
       removesNoiseAndArtifactsUsing: "Supprime le bruit et les artefacts avec l'AI",
       analyzingImage: "Analyse de l'image...",
       imageLooksGoodFineTune: "L'image semble bonne. Ajustez avec le curseur d'intensité.",
@@ -1357,8 +1354,6 @@ export const fr: TranslationKeys = {
       enhancedSizeKb: "Amélioré : {size} KB",
     },
     "find-duplicates-results": {
-      all: "Tout",
-      group: "Groupe",
       dimensions: "Dimensions",
       format: "Format",
       scanned: "Analysées :",
@@ -1393,7 +1388,6 @@ export const fr: TranslationKeys = {
       pageSize: "Taille de page",
     },
     color: {
-      original: "Original :",
       light: "Lumière",
       brightness: "Luminosité",
       contrast: "Contraste",
@@ -1506,7 +1500,6 @@ export const fr: TranslationKeys = {
       progressLabel: "Application en cours",
     },
     convert: {
-      original: "Original :",
       originalSizeKb: "Original : {size} KB",
       processedSizeKb: "Traité : {size} KB",
       targetFormat: "Format cible",
@@ -1536,7 +1529,6 @@ export const fr: TranslationKeys = {
       progressLabel: "Optimisation en cours",
     },
     "strip-metadata": {
-      original: "Original :",
       iccProfile: "ICC",
       originalSize: "Original : {size} KB",
       processedSize: "Traité : {size} KB",
@@ -1563,7 +1555,6 @@ export const fr: TranslationKeys = {
       inspectFailed: "Impossible d'analyser les métadonnées",
     },
     "edit-metadata": {
-      original: "Original :",
       imageDescription: "Description de l'image",
       photographerCreatorName: "Nom du photographe ou du créateur",
       imageTitle: "Titre de l'image",
@@ -1672,8 +1663,6 @@ export const fr: TranslationKeys = {
       requestTimedOut: "Délai d'attente dépassé : le serveur est peut-être surchargé",
     },
     "pdf-to-image": {
-      converting2: "Conversion en cours",
-      page: "page",
       custom: "Personnalisé",
       uploadAPdfToGet: "Importez un PDF pour commencer",
       generatingPagePreviews: "Génération des aperçus de pages...",
@@ -1767,7 +1756,6 @@ export const fr: TranslationKeys = {
       progressLabel: "Ajustement des couleurs",
     },
     sharpening: {
-      original: "Original :",
       originalSize: "Original : {size} KB",
       processedSize: "Traité : {size} KB",
       method: "Méthode",
@@ -1805,7 +1793,6 @@ export const fr: TranslationKeys = {
       },
     },
     "replace-color": {
-      original: "Original :",
       originalKb: "Original : {size} KB",
       processedKb: "Traité : {size} KB",
       sourceColor: "Couleur source (à remplacer)",
@@ -1819,7 +1806,6 @@ export const fr: TranslationKeys = {
       progressLabel: "Remplacement de la couleur",
     },
     "color-blindness": {
-      original: "Original :",
       originalKb: "Original : {size} KB",
       processedKb: "Traité : {size} KB",
       simulationType: "Type de simulation",
@@ -1962,7 +1948,6 @@ export const fr: TranslationKeys = {
       download: "Télécharger",
     },
     upscale: {
-      original: "Original :",
       off: "Désactivé",
       originalKb: "Original : {size} KB",
       upscaledKb: "Agrandi : {size} KB",
@@ -1984,7 +1969,6 @@ export const fr: TranslationKeys = {
       qualityBest: "Meilleure",
     },
     "erase-object": {
-      original: "Original :",
       originalKb: "Original : {size} KB",
       processedKb: "Traité : {size} KB",
       qualityFast: "Rapide",
@@ -2045,7 +2029,6 @@ export const fr: TranslationKeys = {
       progressLabel: "Extraction du texte du PDF",
     },
     "blur-faces": {
-      original: "Original :",
       originalKb: "Original : {size} KB",
       processedKb: "Traité : {size} KB",
       blurRadius: "Rayon du flou",
@@ -2058,7 +2041,6 @@ export const fr: TranslationKeys = {
       progressLabel: "Floutage des visages",
     },
     "enhance-faces": {
-      original: "Original :",
       subtle: "Subtil",
       maximum: "Maximum",
       fewerFaces: "Moins de visages",
@@ -2193,7 +2175,6 @@ export const fr: TranslationKeys = {
       progressLabelBatch: "Suppression du bruit de {count} images",
     },
     "red-eye-removal": {
-      original: "Original :",
       originalKb: "Original : {size} KB",
       fixedKb: "Corrigé : {size} KB",
       sensitivity: "Sensibilité",
@@ -2210,7 +2191,6 @@ export const fr: TranslationKeys = {
       progressLabelBatch: "Correction des yeux rouges dans {count} images",
     },
     "restore-photo": {
-      original: "Original :",
       subtle: "Subtil",
       strong: "Fort",
       originalKb: "Original : {size} KB",
@@ -2268,7 +2248,6 @@ export const fr: TranslationKeys = {
       progressLabel: "Extension du canevas",
     },
     colorize: {
-      original: "Original :",
       originalKb: "Original : {size} KB",
       colorizedKb: "Colorisé : {size} KB",
       aiModel: "Modèle AI",
@@ -2479,7 +2458,6 @@ export const fr: TranslationKeys = {
       progressLabel: "Floutage du fond",
     },
     "watermark-text": {
-      original: "Original :",
       applyWatermark: "Appliquer le filigrane",
       tiledRepeating: "Mosaïque (répétée)",
       originalKb: "Original : {size} KB",
@@ -2502,7 +2480,6 @@ export const fr: TranslationKeys = {
       progressLabel: "Ajout du filigrane",
     },
     "watermark-image": {
-      original: "Original :",
       center: "Centre",
       topLeft: "Haut gauche",
       topRight: "Haut droite",
@@ -2521,7 +2498,6 @@ export const fr: TranslationKeys = {
       submitBatch: "Appliquer le filigrane ({count} fichiers)",
     },
     "text-overlay": {
-      original: "Original :",
       originalKb: "Original : {size} KB",
       processedKb: "Traité : {size} KB",
       text: "Texte",
@@ -2541,7 +2517,6 @@ export const fr: TranslationKeys = {
       defaultText: "Votre texte ici",
     },
     compose: {
-      original: "Original :",
       screen: "Écran",
       processing: "Traitement en cours...",
       overlayImage: "Image de superposition",
@@ -2597,9 +2572,6 @@ export const fr: TranslationKeys = {
       backToGallery: "Retour à la galerie",
     },
     info: {
-      min: "min :",
-      max: "max :",
-      mean: "moyenne :",
       minValue: "min : {value}",
       maxValue: "max : {value}",
       meanValue: "moyenne : {value}",
@@ -2832,9 +2804,6 @@ export const fr: TranslationKeys = {
       mosaic: "Mosaïque",
       uploadingImages: "Import des images en cours...",
       processingCollage: "Traitement du collage...",
-      loaded: "chargées",
-      images: "images",
-      collage: "Collage :",
       snapotter: "SnapOtter",
       background: "Arrière-plan",
       format: "Format",
@@ -3000,7 +2969,6 @@ export const fr: TranslationKeys = {
       text: "Texte",
       position: "Position",
       newTab: "Nouvel onglet",
-      frame: "Cadre",
       quickPresets: "Préréglages rapides",
       linear: "Linéaire",
       radial: "Radial",
@@ -3218,7 +3186,6 @@ export const fr: TranslationKeys = {
       progressLabel: "Conversion du SVG",
     },
     vectorize: {
-      original: "Original :",
       detail: "Détail",
       smoothing: "Lissage",
       blackWhite: "Noir et blanc",
@@ -3255,7 +3222,6 @@ export const fr: TranslationKeys = {
       progressLabel: "Vectorisation en cours",
     },
     "gif-tools": {
-      original: "Original :",
       widthPx: "Largeur (px)",
       auto: "Automatique",
       heightPx: "Hauteur (px)",

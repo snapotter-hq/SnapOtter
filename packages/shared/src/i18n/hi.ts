@@ -1095,7 +1095,6 @@ export const hi: TranslationKeys = {
       paintOverObjectsToErase: "मिटाने के लिए ऑब्जेक्ट पर पेंट करें",
     },
     "crop-canvas": {
-      original: "मूल:",
       cropPreview: "क्रॉप प्रीव्यू",
       cropRegionSize: "क्रॉप क्षेत्र: {width} x {height}",
       originalSize: "मूल: {width} x {height}",
@@ -1126,7 +1125,6 @@ export const hi: TranslationKeys = {
       infoBar: "{width} x {height}px . {cols}x{rows} ग्रिड . {count} टाइल",
     },
     "remove-bg": {
-      original: "मूल:",
       transparent: "पारदर्शी",
       color: "रंगीन",
       gradient: "ग्रेडिएंट",
@@ -1153,7 +1151,6 @@ export const hi: TranslationKeys = {
       theExtractedTextWillAppear: "OCR चलाने के बाद निकाला गया टेक्स्ट यहां दिखाई देगा।",
     },
     "image-enhancement": {
-      original: "मूल:",
       removesNoiseAndArtifactsUsing: "AI का उपयोग करके नॉइज़ और आर्टिफैक्ट हटाता है",
       analyzingImage: "इमेज का विश्लेषण हो रहा है...",
       imageLooksGoodFineTune: "इमेज अच्छी दिखती है। तीव्रता स्लाइडर से फाइन-ट्यून करें।",
@@ -1165,8 +1162,6 @@ export const hi: TranslationKeys = {
       enhancedSizeKb: "एन्हांस्ड: {size} KB",
     },
     "find-duplicates-results": {
-      all: "सभी",
-      group: "ग्रुप",
       dimensions: "आयाम",
       format: "फॉर्मेट",
       scanned: "स्कैन किए गए:",
@@ -1200,7 +1195,6 @@ export const hi: TranslationKeys = {
       pageSize: "पेज साइज़",
     },
     color: {
-      original: "मूल:",
       light: "प्रकाश",
       brightness: "ब्राइटनेस",
       contrast: "कंट्रास्ट",
@@ -1312,7 +1306,6 @@ export const hi: TranslationKeys = {
       progressLabel: "लागू हो रहा है",
     },
     convert: {
-      original: "मूल:",
       originalSizeKb: "मूल: {size} KB",
       processedSizeKb: "प्रोसेस्ड: {size} KB",
       targetFormat: "टार्गेट फॉर्मेट",
@@ -1342,7 +1335,6 @@ export const hi: TranslationKeys = {
       progressLabel: "ऑप्टिमाइज़ हो रहा है",
     },
     "strip-metadata": {
-      original: "मूल:",
       iccProfile: "ICC डेटा",
       originalSize: "मूल: {size} KB",
       processedSize: "प्रोसेस्ड: {size} KB",
@@ -1368,7 +1360,6 @@ export const hi: TranslationKeys = {
       inspectFailed: "मेटाडेटा जांचने में विफल",
     },
     "edit-metadata": {
-      original: "मूल:",
       imageDescription: "इमेज का विवरण",
       photographerCreatorName: "फोटोग्राफर / निर्माता का नाम",
       imageTitle: "इमेज का शीर्षक",
@@ -1475,8 +1466,6 @@ export const hi: TranslationKeys = {
       requestTimedOut: "अनुरोध का समय समाप्त हो गया, सर्वर ओवरलोडेड हो सकता है",
     },
     "pdf-to-image": {
-      converting2: "कन्वर्ट हो रहा है",
-      page: "पेज",
       custom: "कस्टम",
       uploadAPdfToGet: "शुरू करने के लिए एक PDF अपलोड करें",
       generatingPagePreviews: "पेज प्रीव्यू बन रहे हैं...",
@@ -1570,7 +1559,6 @@ export const hi: TranslationKeys = {
       progressLabel: "रंग समायोजित हो रहे हैं",
     },
     sharpening: {
-      original: "मूल:",
       originalSize: "मूल: {size} KB",
       processedSize: "प्रोसेस्ड: {size} KB",
       method: "विधि",
@@ -1608,7 +1596,6 @@ export const hi: TranslationKeys = {
       },
     },
     "replace-color": {
-      original: "मूल:",
       originalKb: "मूल: {size} KB",
       processedKb: "प्रोसेस्ड: {size} KB",
       sourceColor: "सोर्स कलर (बदलने के लिए)",
@@ -1622,7 +1609,6 @@ export const hi: TranslationKeys = {
       progressLabel: "रंग बदला जा रहा है",
     },
     "color-blindness": {
-      original: "मूल:",
       originalKb: "मूल: {size} KB",
       processedKb: "प्रोसेस्ड: {size} KB",
       simulationType: "सिमुलेशन प्रकार",
@@ -1762,7 +1748,6 @@ export const hi: TranslationKeys = {
       download: "डाउनलोड",
     },
     upscale: {
-      original: "मूल:",
       off: "बंद",
       originalKb: "मूल: {size} KB",
       upscaledKb: "अपस्केल्ड: {size} KB",
@@ -1783,7 +1768,6 @@ export const hi: TranslationKeys = {
       qualityBest: "सर्वोत्तम",
     },
     "erase-object": {
-      original: "मूल:",
       originalKb: "मूल: {size} KB",
       processedKb: "प्रोसेस्ड: {size} KB",
       qualityFast: "तेज़",
@@ -1840,7 +1824,6 @@ export const hi: TranslationKeys = {
       progressLabel: "PDF से टेक्स्ट निकाला जा रहा है",
     },
     "blur-faces": {
-      original: "मूल:",
       originalKb: "मूल: {size} KB",
       processedKb: "प्रोसेस्ड: {size} KB",
       blurRadius: "ब्लर रेडियस",
@@ -1853,7 +1836,6 @@ export const hi: TranslationKeys = {
       progressLabel: "चेहरे ब्लर हो रहे हैं",
     },
     "enhance-faces": {
-      original: "मूल:",
       subtle: "हल्का",
       maximum: "अधिकतम",
       fewerFaces: "कम चेहरे",
@@ -1988,7 +1970,6 @@ export const hi: TranslationKeys = {
       progressLabelBatch: "{count} इमेज से नॉइज़ हटाया जा रहा है",
     },
     "red-eye-removal": {
-      original: "मूल:",
       originalKb: "मूल: {size} KB",
       fixedKb: "ठीक किया गया: {size} KB",
       sensitivity: "सेंसिटिविटी",
@@ -2005,7 +1986,6 @@ export const hi: TranslationKeys = {
       progressLabelBatch: "{count} इमेज में रेड आई ठीक हो रही है",
     },
     "restore-photo": {
-      original: "मूल:",
       subtle: "हल्का",
       strong: "तेज़",
       originalKb: "मूल: {size} KB",
@@ -2062,7 +2042,6 @@ export const hi: TranslationKeys = {
       progressLabel: "कैनवास बढ़ाया जा रहा है",
     },
     colorize: {
-      original: "मूल:",
       originalKb: "मूल: {size} KB",
       colorizedKb: "कलराइज़्ड: {size} KB",
       aiModel: "AI मॉडल",
@@ -2269,7 +2248,6 @@ export const hi: TranslationKeys = {
       progressLabel: "पृष्ठभूमि धुंधला हो रही है",
     },
     "watermark-text": {
-      original: "मूल:",
       applyWatermark: "वॉटरमार्क लगाएं",
       tiledRepeating: "टाइल्ड (दोहराव वाला)",
       originalKb: "मूल: {size} KB",
@@ -2292,7 +2270,6 @@ export const hi: TranslationKeys = {
       progressLabel: "वॉटरमार्क जोड़ा जा रहा है",
     },
     "watermark-image": {
-      original: "मूल:",
       center: "केंद्र",
       topLeft: "ऊपर बाएं",
       topRight: "ऊपर दाएं",
@@ -2311,7 +2288,6 @@ export const hi: TranslationKeys = {
       submitBatch: "वॉटरमार्क लगाएं ({count} फाइलें)",
     },
     "text-overlay": {
-      original: "मूल:",
       originalKb: "मूल: {size} KB",
       processedKb: "प्रोसेस्ड: {size} KB",
       text: "टेक्स्ट",
@@ -2331,7 +2307,6 @@ export const hi: TranslationKeys = {
       defaultText: "यहाँ अपना टेक्स्ट लिखें",
     },
     compose: {
-      original: "मूल:",
       screen: "स्क्रीन",
       processing: "प्रोसेस हो रहा है...",
       overlayImage: "ओवरले इमेज",
@@ -2386,9 +2361,6 @@ export const hi: TranslationKeys = {
       backToGallery: "गैलरी पर वापस",
     },
     info: {
-      min: "न्यूनतम:",
-      max: "अधिकतम:",
-      mean: "माध्य:",
       minValue: "न्यूनतम:{value}",
       maxValue: "अधिकतम:{value}",
       meanValue: "माध्य:{value}",
@@ -2620,9 +2592,6 @@ export const hi: TranslationKeys = {
       mosaic: "मोज़ेक",
       uploadingImages: "इमेज अपलोड हो रही हैं...",
       processingCollage: "कोलाज प्रोसेस हो रहा है...",
-      loaded: "लोड हुईं",
-      images: "इमेज",
-      collage: "कोलाज:",
       snapotter: "SnapOtter",
       background: "बैकग्राउंड",
       format: "फॉर्मेट",
@@ -2788,7 +2757,6 @@ export const hi: TranslationKeys = {
       text: "टेक्स्ट",
       position: "स्थिति",
       newTab: "नया टैब",
-      frame: "फ्रेम",
       quickPresets: "त्वरित प्रीसेट",
       linear: "लीनियर",
       radial: "रेडियल",
@@ -3004,7 +2972,6 @@ export const hi: TranslationKeys = {
       progressLabel: "SVG कन्वर्ट हो रहा है",
     },
     vectorize: {
-      original: "मूल:",
       detail: "डीटेल",
       smoothing: "स्मूदिंग",
       blackWhite: "ब्लैक एंड व्हाइट",
@@ -3041,7 +3008,6 @@ export const hi: TranslationKeys = {
       progressLabel: "वेक्टराइज़ हो रहा है",
     },
     "gif-tools": {
-      original: "मूल:",
       widthPx: "चौड़ाई (px)",
       auto: "ऑटो",
       heightPx: "ऊंचाई (px)",

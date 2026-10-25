@@ -1274,7 +1274,6 @@ export const sv: TranslationKeys = {
       paintOverObjectsToErase: "Måla över objekt som ska raderas",
     },
     "crop-canvas": {
-      original: "Original:",
       cropPreview: "Förhandsvisning av beskärning",
       cropRegionSize: "Beskärningsområde: {width} x {height}",
       originalSize: "Original: {width} x {height}",
@@ -1307,7 +1306,6 @@ export const sv: TranslationKeys = {
       infoBar: "{width} x {height}px . {cols}x{rows} rutnät . {count} plattor",
     },
     "remove-bg": {
-      original: "Original:",
       transparent: "Transparent",
       color: "Färg",
       gradient: "Tonad",
@@ -1334,7 +1332,6 @@ export const sv: TranslationKeys = {
       theExtractedTextWillAppear: "Den extraherade texten visas här när du har kört OCR.",
     },
     "image-enhancement": {
-      original: "Original:",
       removesNoiseAndArtifactsUsing: "Tar bort brus och artefakter med AI",
       analyzingImage: "Analyserar bild...",
       imageLooksGoodFineTune: "Bilden ser bra ut. Finjustera med intensitetsreglaget.",
@@ -1346,8 +1343,6 @@ export const sv: TranslationKeys = {
       enhancedSizeKb: "Förstärkt: {size} KB",
     },
     "find-duplicates-results": {
-      all: "Alla",
-      group: "Grupp",
       dimensions: "Dimensioner",
       format: "Format",
       scanned: "Skannade:",
@@ -1382,7 +1377,6 @@ export const sv: TranslationKeys = {
       pageSize: "Sidstorlek",
     },
     color: {
-      original: "Original:",
       light: "Ljus",
       brightness: "Ljusstyrka",
       contrast: "Kontrast",
@@ -1495,7 +1489,6 @@ export const sv: TranslationKeys = {
       progressLabel: "Tillämpar",
     },
     convert: {
-      original: "Original:",
       originalSizeKb: "Original: {size} KB",
       processedSizeKb: "Bearbetat: {size} KB",
       targetFormat: "Målformat",
@@ -1525,7 +1518,6 @@ export const sv: TranslationKeys = {
       progressLabel: "Optimerar",
     },
     "strip-metadata": {
-      original: "Original:",
       iccProfile: "Har ICC",
       originalSize: "Original: {size} KB",
       processedSize: "Bearbetat: {size} KB",
@@ -1552,7 +1544,6 @@ export const sv: TranslationKeys = {
       inspectFailed: "Kunde inte granska metadata",
     },
     "edit-metadata": {
-      original: "Original:",
       imageDescription: "Bildbeskrivning",
       photographerCreatorName: "Fotografens eller skaparens namn",
       imageTitle: "Bildtitel",
@@ -1660,8 +1651,6 @@ export const sv: TranslationKeys = {
       requestTimedOut: "Tidsgränsen för begäran överskreds: servern kan vara överbelastad",
     },
     "pdf-to-image": {
-      converting2: "Konverterar",
-      page: "sida",
       custom: "Anpassad",
       uploadAPdfToGet: "Ladda upp en PDF för att komma igång",
       generatingPagePreviews: "Genererar sidförhandsvisningar...",
@@ -1755,7 +1744,6 @@ export const sv: TranslationKeys = {
       progressLabel: "Justerar färger",
     },
     sharpening: {
-      original: "Original:",
       originalSize: "Original: {size} KB",
       processedSize: "Bearbetat: {size} KB",
       method: "Metod",
@@ -1793,7 +1781,6 @@ export const sv: TranslationKeys = {
       },
     },
     "replace-color": {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       processedKb: "Bearbetat: {size} KB",
       sourceColor: "Källfärg (att ersätta)",
@@ -1807,7 +1794,6 @@ export const sv: TranslationKeys = {
       progressLabel: "Ersätter färg",
     },
     "color-blindness": {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       processedKb: "Bearbetat: {size} KB",
       simulationType: "Simuleringstyp",
@@ -1949,7 +1935,6 @@ export const sv: TranslationKeys = {
       download: "Ladda ner",
     },
     upscale: {
-      original: "Original:",
       off: "Av",
       originalKb: "Original: {size} KB",
       upscaledKb: "Uppskalad: {size} KB",
@@ -1970,7 +1955,6 @@ export const sv: TranslationKeys = {
       qualityBest: "Bäst",
     },
     "erase-object": {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       processedKb: "Bearbetat: {size} KB",
       qualityFast: "Snabb",
@@ -2029,7 +2013,6 @@ export const sv: TranslationKeys = {
       progressLabel: "Extraherar text från PDF",
     },
     "blur-faces": {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       processedKb: "Bearbetat: {size} KB",
       blurRadius: "Oskärpningsradie",
@@ -2042,7 +2025,6 @@ export const sv: TranslationKeys = {
       progressLabel: "Gör ansikten oskarpa",
     },
     "enhance-faces": {
-      original: "Original:",
       subtle: "Diskret",
       maximum: "Maximal",
       fewerFaces: "Färre ansikten",
@@ -2177,7 +2159,6 @@ export const sv: TranslationKeys = {
       progressLabelBatch: "Tar bort brus från {count} bilder",
     },
     "red-eye-removal": {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       fixedKb: "Korrigerad: {size} KB",
       sensitivity: "Känslighet",
@@ -2194,7 +2175,6 @@ export const sv: TranslationKeys = {
       progressLabelBatch: "Korrigerar röda ögon i {count} bilder",
     },
     "restore-photo": {
-      original: "Original:",
       subtle: "Diskret",
       strong: "Stark",
       originalKb: "Original: {size} KB",
@@ -2252,7 +2232,6 @@ export const sv: TranslationKeys = {
       progressLabel: "Utvidgar duk",
     },
     colorize: {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       colorizedKb: "Färglagd: {size} KB",
       aiModel: "AI-modell",
@@ -2459,7 +2438,6 @@ export const sv: TranslationKeys = {
       progressLabel: "Gör bakgrunden oskarp",
     },
     "watermark-text": {
-      original: "Original:",
       applyWatermark: "Tillämpa vattenstämpel",
       tiledRepeating: "Plattsatt (upprepande)",
       originalKb: "Original: {size} KB",
@@ -2482,7 +2460,6 @@ export const sv: TranslationKeys = {
       progressLabel: "Lägger till vattenstämpel",
     },
     "watermark-image": {
-      original: "Original:",
       center: "Mitten",
       topLeft: "Uppe till vänster",
       topRight: "Uppe till höger",
@@ -2501,7 +2478,6 @@ export const sv: TranslationKeys = {
       submitBatch: "Tillämpa vattenstämpel ({count} filer)",
     },
     "text-overlay": {
-      original: "Original:",
       originalKb: "Original: {size} KB",
       processedKb: "Bearbetat: {size} KB",
       text: "Text",
@@ -2521,7 +2497,6 @@ export const sv: TranslationKeys = {
       defaultText: "Din text här",
     },
     compose: {
-      original: "Original:",
       screen: "Skärm",
       processing: "Bearbetar...",
       overlayImage: "Överlagringsbild",
@@ -2576,9 +2551,6 @@ export const sv: TranslationKeys = {
       backToGallery: "Tillbaka till galleriet",
     },
     info: {
-      min: "min:",
-      max: "max:",
-      mean: "medel:",
       minValue: "min:{value}",
       maxValue: "max:{value}",
       meanValue: "medel:{value}",
@@ -2811,9 +2783,6 @@ export const sv: TranslationKeys = {
       mosaic: "Mosaik",
       uploadingImages: "Laddar upp bilder...",
       processingCollage: "Bearbetar collage...",
-      loaded: "inlästa",
-      images: "bilder",
-      collage: "Collage:",
       snapotter: "SnapOtter",
       background: "Bakgrund",
       format: "Format",
@@ -2979,7 +2948,6 @@ export const sv: TranslationKeys = {
       text: "Text",
       position: "Position",
       newTab: "Ny flik",
-      frame: "Ram",
       quickPresets: "Snabbmallar",
       linear: "Linjär",
       radial: "Radial",
@@ -3196,7 +3164,6 @@ export const sv: TranslationKeys = {
       progressLabel: "Konverterar SVG",
     },
     vectorize: {
-      original: "Original:",
       detail: "Detalj",
       smoothing: "Utjämning",
       blackWhite: "Svartvitt",
@@ -3233,7 +3200,6 @@ export const sv: TranslationKeys = {
       progressLabel: "Vektoriserar",
     },
     "gif-tools": {
-      original: "Original:",
       widthPx: "Bredd (px)",
       auto: "Automatisk",
       heightPx: "Höjd (px)",
