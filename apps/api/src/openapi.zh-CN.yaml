@@ -16023,11 +16023,6 @@ paths:
                   description: |
                     Dedicated JPG to PDF converter using the image-to-pdf pipeline.
                     Optional settings: pageSize (A4, Letter, A3, A5), orientation (portrait or landscape), margin, targetSize, and collate.
-                clientJobId:
-                  type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
-                  maxLength: 128
-                  description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
           description: Processed file
@@ -16086,11 +16081,6 @@ paths:
                   description: |
                     Dedicated PNG to PDF converter using the image-to-pdf pipeline.
                     Optional settings: pageSize (A4, Letter, A3, A5), orientation (portrait or landscape), margin, targetSize, and collate.
-                clientJobId:
-                  type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
-                  maxLength: 128
-                  description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
           description: Processed file
@@ -16149,11 +16139,6 @@ paths:
                   description: |
                     Dedicated HEIC to PDF converter using the image-to-pdf pipeline.
                     Optional settings: pageSize (A4, Letter, A3, A5), orientation (portrait or landscape), margin, targetSize, and collate.
-                clientJobId:
-                  type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
-                  maxLength: 128
-                  description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
           description: Processed file
@@ -16212,11 +16197,6 @@ paths:
                   description: |
                     Dedicated TIFF to PDF converter using the image-to-pdf pipeline.
                     Optional settings: pageSize (A4, Letter, A3, A5), orientation (portrait or landscape), margin, targetSize, and collate.
-                clientJobId:
-                  type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
-                  maxLength: 128
-                  description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
           description: Processed file
@@ -16275,11 +16255,6 @@ paths:
                   description: |
                     Dedicated WebP to PDF converter using the image-to-pdf pipeline.
                     Optional settings: pageSize (A4, Letter, A3, A5), orientation (portrait or landscape), margin, targetSize, and collate.
-                clientJobId:
-                  type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
-                  maxLength: 128
-                  description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
           description: Processed file
@@ -16338,11 +16313,6 @@ paths:
                   description: |
                     Dedicated GIF to PDF converter using the image-to-pdf pipeline.
                     Optional settings: pageSize (A4, Letter, A3, A5), orientation (portrait or landscape), margin, targetSize, and collate.
-                clientJobId:
-                  type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
-                  maxLength: 128
-                  description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
           description: Processed file
@@ -16401,11 +16371,6 @@ paths:
                   description: |
                     Dedicated EPS to PDF converter using the image-to-pdf pipeline.
                     Optional settings: pageSize (A4, Letter, A3, A5), orientation (portrait or landscape), margin, targetSize, and collate.
-                clientJobId:
-                  type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
-                  maxLength: 128
-                  description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
           description: Processed file
@@ -16462,11 +16427,6 @@ paths:
                   description: |
                     Dedicated PDF to JPG converter using the pdf-to-image pipeline.
                     The output format is locked by the endpoint.
-                clientJobId:
-                  type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
-                  maxLength: 128
-                  description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
           description: Processed file
@@ -16523,11 +16483,6 @@ paths:
                   description: |
                     Dedicated PDF to PNG converter using the pdf-to-image pipeline.
                     The output format is locked by the endpoint.
-                clientJobId:
-                  type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
-                  maxLength: 128
-                  description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
           description: Processed file
@@ -16584,11 +16539,6 @@ paths:
                   description: |
                     Dedicated PDF to TIFF converter using the pdf-to-image pipeline.
                     The output format is locked by the endpoint.
-                clientJobId:
-                  type: string
-                  pattern: '^(?!\d+$)(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$'
-                  maxLength: 128
-                  description: Client-provided job ID for SSE progress tracking
       responses:
         '200':
           description: Processed file

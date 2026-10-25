@@ -13,8 +13,11 @@
  * field pins each route's field capture and error contract.
  */
 
-import { apiToolPath } from "@snapotter/shared";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { apiToolPath, CONVERSION_PRESETS } from "@snapotter/shared";
 import { eq } from "drizzle-orm";
+import yaml from "js-yaml";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import {
@@ -68,6 +71,47 @@ const FORMERLY_SILENT_ROUTES = [
   ...ALIAS_ROUTES,
   { name: "pdf-to-image batch", url: `${apiToolPath("pdf-to-image")}/batch` },
 ];
+
+// Documented clientJobId paths whose route handler still ignores the field.
+// Drop an entry when its fix lands.
+const DOCUMENTED_WITHOUT_CLIENT_JOB_ID_READ: Record<string, string> = {
+  "/api/v1/tools/image/svg-to-jpg":
+    "#4018: single-file svg-to-raster route does not read clientJobId",
+  "/api/v1/tools/image/svg-to-png":
+    "#4018: single-file svg-to-raster route does not read clientJobId",
+};
+
+interface OpenApiSpec {
+  paths: Record<
+    string,
+    {
+      post?: {
+        requestBody?: {
+          content?: {
+            "multipart/form-data"?: {
+              schema?: {
+                properties?: Record<string, unknown>;
+              };
+            };
+          };
+        };
+      };
+    }
+  >;
+}
+
+const OPENAPI_SPEC = yaml.load(
+  readFileSync(join(import.meta.dirname, "../../../apps/api/src/openapi.yaml"), "utf8"),
+) as OpenApiSpec;
+
+const OPENAPI_CLIENT_JOB_ID_POST_PATHS = Object.entries(OPENAPI_SPEC.paths)
+  .filter(([, methods]) => {
+    const props =
+      methods.post?.requestBody?.content?.["multipart/form-data"]?.schema?.properties ?? {};
+    return "clientJobId" in props;
+  })
+  .map(([path]) => path)
+  .sort();
 
 // Force the bundle gates open so passport-photo (face-detection +
 // background-removal) reaches its multipart parse without AI bundles.
@@ -187,6 +231,47 @@ describe("clientJobId 400 gate on the routes that used to drop it (#1691)", () =
       );
     });
   }
+});
+
+function readErrorField(url: string, statusCode: number, body: string): string | undefined {
+  try {
+    return (JSON.parse(body) as { error?: string }).error;
+  } catch (err) {
+    throw new Error(
+      `Expected JSON response from ${url} (status ${statusCode}): ${body.slice(0, 120)}`,
+      { cause: err },
+    );
+  }
+}
+
+describe("every OpenAPI-documented clientJobId POST path enforces the 400 gate (#1735)", () => {
+  it("lists only routes that still fail the gate in DOCUMENTED_WITHOUT_CLIENT_JOB_ID_READ", async () => {
+    const failing: string[] = [];
+    for (const url of OPENAPI_CLIENT_JOB_ID_POST_PATHS) {
+      const res = await postClientJobId(url, "my job");
+      const error = readErrorField(url, res.statusCode, res.body);
+      if (res.statusCode !== 400 || error !== INVALID_CLIENT_JOB_ID_ERROR) {
+        failing.push(url);
+      }
+    }
+    expect(failing).toEqual(Object.keys(DOCUMENTED_WITHOUT_CLIENT_JOB_ID_READ).sort());
+  });
+
+  it("omits clientJobId on conversion presets whose route handler does not read it", async () => {
+    const documentedSet = new Set(OPENAPI_CLIENT_JOB_ID_POST_PATHS);
+    const omittedPresetPaths = CONVERSION_PRESETS.map((preset) => apiToolPath(preset.id)).filter(
+      (url) => !documentedSet.has(url),
+    );
+    expect(omittedPresetPaths.length).toBe(10);
+
+    for (const url of omittedPresetPaths) {
+      const res = await postClientJobId(url, "my job");
+      expect(res.statusCode, url).toBe(400);
+      expect(readErrorField(url, res.statusCode, res.body), url).not.toBe(
+        INVALID_CLIENT_JOB_ID_ERROR,
+      );
+    }
+  });
 });
 
 describe("parseClientJobIdField", () => {
