@@ -4869,6 +4869,7 @@ export const it: TranslationKeys = {
       saveButton: "Salva impostazioni",
       saveSuccess: "Impostazioni salvate.",
       saveFailed: "Salvataggio delle impostazioni non riuscito.",
+      loadFailed: "Impossibile caricare le preferenze.",
       roleUnknown: "sconosciuto",
     },
     system: {

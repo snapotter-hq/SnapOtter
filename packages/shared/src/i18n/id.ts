@@ -4856,6 +4856,7 @@ export const id: TranslationKeys = {
       saveButton: "Simpan Pengaturan",
       saveSuccess: "Pengaturan disimpan.",
       saveFailed: "Gagal menyimpan pengaturan.",
+      loadFailed: "Gagal memuat preferensi Anda.",
       roleUnknown: "tidak diketahui",
     },
     system: {

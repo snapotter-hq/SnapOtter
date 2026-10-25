@@ -4861,6 +4861,7 @@ export const tr: TranslationKeys = {
       saveButton: "Ayarları Kaydet",
       saveSuccess: "Ayarlar kaydedildi.",
       saveFailed: "Ayarlar kaydedilemedi.",
+      loadFailed: "Tercihleriniz yüklenemedi.",
       roleUnknown: "bilinmiyor",
     },
     system: {

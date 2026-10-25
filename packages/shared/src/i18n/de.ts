@@ -4888,6 +4888,7 @@ export const de: TranslationKeys = {
       saveButton: "Einstellungen speichern",
       saveSuccess: "Einstellungen gespeichert.",
       saveFailed: "Einstellungen konnten nicht gespeichert werden.",
+      loadFailed: "Benutzereinstellungen konnten nicht geladen werden.",
       roleUnknown: "unbekannt",
     },
     system: {

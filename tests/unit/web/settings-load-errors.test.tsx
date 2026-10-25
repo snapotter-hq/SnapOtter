@@ -15,10 +15,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const apiGet = vi.hoisted(() => vi.fn());
 const apiPost = vi.hoisted(() => vi.fn());
+const apiPut = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual: Record<string, unknown> = await importOriginal();
-  return { ...actual, apiGet, apiPost };
+  return { ...actual, apiGet, apiPost, apiPut };
 });
 
 vi.mock("@/hooks/use-auth", () => ({
@@ -34,18 +35,21 @@ import {
   AdminSecuritySettings,
   ApiKeysSection,
   AuditLogSection,
+  GeneralSection,
   PeopleSection,
   RolesSection,
   SystemSection,
   TeamsSection,
 } from "@/components/settings/settings-dialog";
 import { ApiError } from "@/lib/api";
+import { useSettingsStore } from "@/stores/settings-store";
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   apiGet.mockReset();
   apiPost.mockReset();
+  apiPut.mockReset();
 });
 
 /** Resolve every GET from `data` by path prefix; reject the ones listed in `failing`. */
@@ -364,5 +368,58 @@ describe("settings forms that fail to load (#1447)", () => {
 
     expect(await screen.findByRole("button", { name: f.save })).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
+describe("General preferences (#1559)", () => {
+  const sessionData = {
+    "/auth/session": { user: { id: 1, username: "ada", role: "admin" } },
+  };
+
+  it("shows the failure and disables Save instead of showing Sidebar and overwriting the stored preference", async () => {
+    useSettingsStore.setState({ defaultToolView: "fullscreen" });
+    serve(sessionData, ["/v1/preferences"]);
+
+    render(<GeneralSection />);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(s.general.loadFailed);
+    expect(screen.queryByLabelText(s.general.defaultToolViewLabel)).toBeNull();
+    expect(screen.getByLabelText(s.system.languageLabel)).toBeInTheDocument();
+
+    const save = screen.getByRole("button", { name: s.general.saveButton });
+    expect(save).toBeDisabled();
+    fireEvent.click(save);
+    expect(apiPut).not.toHaveBeenCalled();
+    expect(useSettingsStore.getState().defaultToolView).toBe("fullscreen");
+  });
+
+  it("loads the stored default tool view on Retry and enables Save", async () => {
+    apiPut.mockResolvedValue({ ok: true });
+    serve(sessionData, ["/v1/preferences"]);
+    render(<GeneralSection />);
+    const retry = await screen.findByRole("button", { name: en.common.retry });
+
+    serve(
+      {
+        ...sessionData,
+        "/v1/preferences": { preferences: { defaultToolView: "fullscreen" } },
+      },
+      [],
+    );
+    fireEvent.click(retry);
+
+    const select = (await screen.findByLabelText(
+      s.general.defaultToolViewLabel,
+    )) as HTMLSelectElement;
+    expect(select.value).toBe("fullscreen");
+    expect(screen.queryByRole("alert")).toBeNull();
+
+    const save = screen.getByRole("button", { name: s.general.saveButton });
+    expect(save).toBeEnabled();
+    fireEvent.click(save);
+    expect(await screen.findByText(s.general.saveSuccess)).toBeInTheDocument();
+    expect(apiPut).toHaveBeenCalledWith("/v1/preferences", { defaultToolView: "fullscreen" });
+    expect(useSettingsStore.getState().defaultToolView).toBe("fullscreen");
   });
 });

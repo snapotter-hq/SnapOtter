@@ -4798,6 +4798,7 @@ export const th: TranslationKeys = {
       saveButton: "บันทึกการตั้งค่า",
       saveSuccess: "บันทึกการตั้งค่าแล้ว",
       saveFailed: "บันทึกการตั้งค่าล้มเหลว",
+      loadFailed: "โหลดการตั้งค่าผู้ใช้ไม่สำเร็จ",
       roleUnknown: "ไม่ทราบ",
     },
     system: {

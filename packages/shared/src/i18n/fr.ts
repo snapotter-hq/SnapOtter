@@ -4879,6 +4879,7 @@ export const fr: TranslationKeys = {
       saveButton: "Enregistrer les paramètres",
       saveSuccess: "Paramètres enregistrés.",
       saveFailed: "Échec de l'enregistrement des paramètres.",
+      loadFailed: "Impossible de charger vos préférences.",
       roleUnknown: "inconnu",
     },
     system: {

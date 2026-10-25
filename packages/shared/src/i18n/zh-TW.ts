@@ -4576,6 +4576,7 @@ export const zhTW: TranslationKeys = {
       saveButton: "儲存設定",
       saveSuccess: "設定已儲存。",
       saveFailed: "儲存設定失敗。",
+      loadFailed: "無法載入偏好設定。",
       roleUnknown: "未知",
     },
     system: {

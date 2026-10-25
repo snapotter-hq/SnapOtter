@@ -4784,6 +4784,7 @@ export const ko: TranslationKeys = {
       saveButton: "설정 저장",
       saveSuccess: "설정이 저장되었습니다.",
       saveFailed: "설정 저장에 실패했습니다.",
+      loadFailed: "환경설정을 불러오지 못했습니다.",
       roleUnknown: "알 수 없음",
     },
     system: {

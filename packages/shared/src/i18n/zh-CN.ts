@@ -4577,6 +4577,7 @@ export const zhCN: TranslationKeys = {
       saveButton: "保存设置",
       saveSuccess: "设置已保存。",
       saveFailed: "保存设置失败。",
+      loadFailed: "无法加载偏好设置。",
       roleUnknown: "未知",
     },
     system: {

@@ -4849,6 +4849,7 @@ export const vi: TranslationKeys = {
       saveButton: "Lưu cài đặt",
       saveSuccess: "Đã lưu cài đặt.",
       saveFailed: "Lưu cài đặt thất bại.",
+      loadFailed: "Không thể tải tùy chọn của bạn.",
       roleUnknown: "không rõ",
     },
     system: {

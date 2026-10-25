@@ -4856,6 +4856,7 @@ export const es: TranslationKeys = {
       saveButton: "Guardar configuración",
       saveSuccess: "Configuración guardada.",
       saveFailed: "Error al guardar la configuración.",
+      loadFailed: "No se pudieron cargar tus preferencias.",
       roleUnknown: "desconocido",
     },
     system: {

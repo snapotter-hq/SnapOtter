@@ -4792,6 +4792,7 @@ export const en = {
       saveButton: "Save Settings",
       saveSuccess: "Settings saved.",
       saveFailed: "Failed to save settings.",
+      loadFailed: "Couldn't load your preferences.",
       roleUnknown: "unknown",
     },
     system: {

@@ -4655,6 +4655,7 @@ export const hi: TranslationKeys = {
       saveButton: "सेटिंग्स सहेजें",
       saveSuccess: "सेटिंग्स सहेजी गईं।",
       saveFailed: "सेटिंग्स सहेजने में विफल।",
+      loadFailed: "आपकी प्राथमिकताएं लोड नहीं हो सकीं।",
       roleUnknown: "अज्ञात",
     },
     system: {

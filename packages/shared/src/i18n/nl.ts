@@ -4876,6 +4876,7 @@ export const nl: TranslationKeys = {
       saveButton: "Instellingen opslaan",
       saveSuccess: "Instellingen opgeslagen.",
       saveFailed: "Instellingen opslaan mislukt.",
+      loadFailed: "Voorkeuren laden mislukt.",
       roleUnknown: "onbekend",
     },
     system: {

@@ -416,9 +416,28 @@ export function GeneralSection() {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [defaultToolView, setDefaultToolView] = useState<"sidebar" | "fullscreen">("sidebar");
+  const [prefsLoadFailed, setPrefsLoadFailed] = useState(false);
+  const [prefsRetrying, setPrefsRetrying] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [logoutFailed, setLogoutFailed] = useState(false);
+
+  const loadPreferences = useCallback((retrying = false) => {
+    if (retrying) setPrefsRetrying(true);
+    return apiGet<{ preferences: Record<string, unknown> }>("/v1/preferences")
+      .then((data) => {
+        setDefaultToolView(
+          data.preferences.defaultToolView === "fullscreen" ? "fullscreen" : "sidebar",
+        );
+        setPrefsLoadFailed(false);
+      })
+      .catch(() => {
+        setPrefsLoadFailed(true);
+      })
+      .finally(() => {
+        if (retrying) setPrefsRetrying(false);
+      });
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -434,18 +453,9 @@ export function GeneralSection() {
             role: "",
           });
         }),
-      apiGet<{ preferences: Record<string, unknown> }>("/v1/preferences")
-        .then((data) => {
-          if (
-            data.preferences.defaultToolView === "sidebar" ||
-            data.preferences.defaultToolView === "fullscreen"
-          ) {
-            setDefaultToolView(data.preferences.defaultToolView);
-          }
-        })
-        .catch(() => {}),
+      loadPreferences(),
     ]).finally(() => setLoading(false));
-  }, []);
+  }, [loadPreferences]);
 
   const handleLogout = async () => {
     setLogoutFailed(false);
@@ -458,6 +468,7 @@ export function GeneralSection() {
   };
 
   const handleSave = useCallback(async () => {
+    if (prefsLoadFailed) return;
     setSaving(true);
     setSaveMsg(null);
     try {
@@ -478,7 +489,7 @@ export function GeneralSection() {
       setSaving(false);
       later(() => setSaveMsg(null), 3000, "saveMsg");
     }
-  }, [defaultToolView, t, later]);
+  }, [defaultToolView, prefsLoadFailed, t, later]);
 
   const username = user?.username || "admin";
   const role = user?.role || t.settings.general.roleUnknown;
@@ -529,19 +540,31 @@ export function GeneralSection() {
         label={t.settings.general.defaultToolViewLabel}
         description={t.settings.general.defaultToolViewDescription}
       >
-        <select
-          value={defaultToolView}
-          onChange={(e) => {
-            if (e.target.value === "sidebar" || e.target.value === "fullscreen") {
-              setDefaultToolView(e.target.value);
-            }
-          }}
-          aria-label={t.settings.general.defaultToolViewLabel}
-          className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground"
-        >
-          <option value="sidebar">{t.settings.general.sidebarOption}</option>
-          <option value="fullscreen">{t.settings.general.fullscreenGridOption}</option>
-        </select>
+        {prefsLoadFailed ? (
+          prefsRetrying ? (
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          ) : (
+            <LoadFailed
+              inline
+              message={t.settings.general.loadFailed}
+              onRetry={() => void loadPreferences(true)}
+            />
+          )
+        ) : (
+          <select
+            value={defaultToolView}
+            onChange={(e) => {
+              if (e.target.value === "sidebar" || e.target.value === "fullscreen") {
+                setDefaultToolView(e.target.value);
+              }
+            }}
+            aria-label={t.settings.general.defaultToolViewLabel}
+            className="px-3 py-1.5 rounded-lg border border-border bg-background text-sm text-foreground"
+          >
+            <option value="sidebar">{t.settings.general.sidebarOption}</option>
+            <option value="fullscreen">{t.settings.general.fullscreenGridOption}</option>
+          </select>
+        )}
       </SettingRow>
 
       <SettingRow
@@ -575,7 +598,7 @@ export function GeneralSection() {
         <button
           type="button"
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || prefsLoadFailed}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
         >
           {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
@@ -4127,8 +4150,30 @@ function AboutSection() {
  * only ever means "there are none" (#1447): "No API keys" after a 500 reads
  * as a fact, and an admin may go and create them again.
  */
-function LoadFailed({ message, onRetry }: { message: string; onRetry: () => void }) {
+function LoadFailed({
+  message,
+  onRetry,
+  inline = false,
+}: {
+  message: string;
+  onRetry: () => void;
+  inline?: boolean;
+}) {
   const { t } = useTranslation();
+  if (inline) {
+    return (
+      <div role="alert" className="flex items-center gap-2">
+        <p className="text-xs text-destructive">{message}</p>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="px-2.5 py-1 rounded-lg border border-border text-xs text-foreground hover:bg-muted transition-colors shrink-0"
+        >
+          {t.common.retry}
+        </button>
+      </div>
+    );
+  }
   return (
     <div role="alert" className="px-4 py-8 text-center space-y-3">
       <p className="text-sm text-destructive">{message}</p>

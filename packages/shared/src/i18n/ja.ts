@@ -4811,6 +4811,7 @@ export const ja: TranslationKeys = {
       saveButton: "設定を保存",
       saveSuccess: "設定を保存しました。",
       saveFailed: "設定の保存に失敗しました。",
+      loadFailed: "ユーザー設定を読み込めませんでした。",
       roleUnknown: "不明",
     },
     system: {

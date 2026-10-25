@@ -4867,6 +4867,7 @@ export const pl: TranslationKeys = {
       saveButton: "Zapisz ustawienia",
       saveSuccess: "Ustawienia zapisane.",
       saveFailed: "Nie udało się zapisać ustawień.",
+      loadFailed: "Nie udało się wczytać preferencji.",
       roleUnknown: "nieznana",
     },
     system: {

@@ -4867,6 +4867,7 @@ export const ptBR: TranslationKeys = {
       saveButton: "Salvar configurações",
       saveSuccess: "Configurações salvas.",
       saveFailed: "Falha ao salvar as configurações.",
+      loadFailed: "Não foi possível carregar suas preferências.",
       roleUnknown: "desconhecida",
     },
     system: {

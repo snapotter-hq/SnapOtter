@@ -4866,6 +4866,7 @@ export const ru: TranslationKeys = {
       saveButton: "Сохранить настройки",
       saveSuccess: "Настройки сохранены.",
       saveFailed: "Не удалось сохранить настройки.",
+      loadFailed: "Не удалось загрузить пользовательские настройки.",
       roleUnknown: "неизвестно",
     },
     system: {

@@ -4824,6 +4824,7 @@ export const ar: TranslationKeys = {
       saveButton: "حفظ الإعدادات",
       saveSuccess: "تم حفظ الإعدادات.",
       saveFailed: "فشل حفظ الإعدادات.",
+      loadFailed: "تعذّر تحميل تفضيلاتك.",
       roleUnknown: "غير معروف",
     },
     system: {
