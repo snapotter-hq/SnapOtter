@@ -1,11 +1,11 @@
 import type { SupportedLocale, TranslationKeys } from "@snapotter/shared";
-import { en, SUPPORTED_LOCALES } from "@snapotter/shared";
+import { en, SafeError, SUPPORTED_LOCALES } from "@snapotter/shared";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { appUrl } from "@/lib/app-url";
 
-type LocaleModule = Record<string, TranslationKeys>;
+export type LocaleModule = Record<string, TranslationKeys>;
 
-const localeLoaders: Record<string, () => Promise<LocaleModule>> = {
+export const localeLoaders: Record<string, () => Promise<LocaleModule>> = {
   "zh-CN": () => import("@snapotter/shared/i18n/zh-CN.js") as Promise<LocaleModule>,
   "zh-TW": () => import("@snapotter/shared/i18n/zh-TW.js") as Promise<LocaleModule>,
   ja: () => import("@snapotter/shared/i18n/ja.js") as Promise<LocaleModule>,
@@ -28,7 +28,7 @@ const localeLoaders: Record<string, () => Promise<LocaleModule>> = {
   th: () => import("@snapotter/shared/i18n/th.js") as Promise<LocaleModule>,
 };
 
-async function loadLocale(code: string): Promise<TranslationKeys> {
+export async function loadLocale(code: string): Promise<TranslationKeys> {
   if (code === "en") return en;
   const loader = localeLoaders[code];
   if (!loader) return en;
@@ -36,7 +36,20 @@ async function loadLocale(code: string): Promise<TranslationKeys> {
     const mod = await loader();
     const camelCode = code.replace(/-([a-zA-Z])/g, (_, c: string) => c.toUpperCase());
     return (mod[camelCode] ?? mod[code] ?? en) as TranslationKeys;
-  } catch {
+  } catch (error) {
+    console.error("Failed to load locale chunk", { locale: code, error });
+    try {
+      const { captureHandledError } = await import("@/lib/analytics");
+      await captureHandledError(
+        new SafeError("Locale chunk failed to load", {
+          code: `locale-${code}`,
+          cause: error,
+        }),
+        { locale: code, error_class: "operational" },
+      );
+    } catch {
+      // analytics import or reporting unavailable
+    }
     return en;
   }
 }
@@ -155,11 +168,16 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    // Tag Sentry with the active locale so locale-specific i18n/interpolation
-    // crashes are identifiable as such.
-    import("@/lib/analytics").then(({ setSentryTag }) => setSentryTag("locale", locale));
     loadLocale(locale).then((t) => {
-      if (!cancelled) setTranslations(t);
+      if (cancelled) return;
+      setTranslations(t);
+      // Tag Sentry with the active locale so locale-specific i18n/interpolation
+      // crashes are identifiable as such. When a chunk load fails and falls back
+      // to English, tag as "en" so Sentry reflects what the user actually sees.
+      const activeLocale = t === en && locale !== "en" ? "en" : locale;
+      import("@/lib/analytics")
+        .then(({ setSentryTag }) => setSentryTag("locale", activeLocale))
+        .catch(() => {});
     });
     return () => {
       cancelled = true;

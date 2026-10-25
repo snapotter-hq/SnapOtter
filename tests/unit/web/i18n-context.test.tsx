@@ -1,13 +1,16 @@
 // @vitest-environment jsdom
 
+import { en, SafeError } from "@snapotter/shared";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { I18nProvider, useTranslation } from "@/contexts/i18n-context";
+import { I18nProvider, loadLocale, localeLoaders, useTranslation } from "@/contexts/i18n-context";
 
 const setSentryTag = vi.hoisted(() => vi.fn());
+const captureHandledError = vi.hoisted(() => vi.fn().mockResolvedValue("test-event-id"));
 
 vi.mock("@/lib/analytics", () => ({
   setSentryTag,
+  captureHandledError,
 }));
 
 const storageMap = new Map<string, string>();
@@ -255,5 +258,97 @@ describe("I18nProvider locale validation (#3952)", () => {
     });
     expect(screen.getByTestId("locale").textContent).toBe("en");
     expect(storageMap.get("snapotter-locale")).toBe("en");
+  });
+});
+
+describe("loadLocale error handling and Sentry reporting (#1256)", () => {
+  it("returns English without error logging for 'en' and unknown codes", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    captureHandledError.mockClear();
+
+    const tEn = await loadLocale("en");
+    expect(tEn).toBe(en);
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(captureHandledError).not.toHaveBeenCalled();
+
+    const tUnknown = await loadLocale("unknown-locale");
+    expect(tUnknown).toBe(en);
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(captureHandledError).not.toHaveBeenCalled();
+
+    errorSpy.mockRestore();
+  });
+
+  it("logs console.error and reports handled error to Sentry when chunk import fails", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    captureHandledError.mockClear();
+
+    const originalLoader = localeLoaders.de;
+    const chunkError = new Error("Chunk load failed: /assets/de-123.js 404");
+    try {
+      localeLoaders.de = () => Promise.reject(chunkError);
+
+      const result = await loadLocale("de");
+      expect(result).toBe(en);
+
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(errorSpy).toHaveBeenCalledWith("Failed to load locale chunk", {
+        locale: "de",
+        error: chunkError,
+      });
+
+      expect(captureHandledError).toHaveBeenCalledTimes(1);
+      const [capturedErr, capturedTags] = captureHandledError.mock.calls[0];
+      expect(capturedErr).toBeInstanceOf(SafeError);
+      expect(capturedErr.message).toBe("Locale chunk failed to load");
+      expect(capturedErr.code).toBe("locale-de");
+      expect(capturedErr.cause).toBe(chunkError);
+      expect(capturedTags).toEqual({ locale: "de", error_class: "operational" });
+    } finally {
+      localeLoaders.de = originalLoader;
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("tags Sentry with 'en' fallback instead of requested locale when chunk fails to load", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    setSentryTag.mockClear();
+
+    const originalLoader = localeLoaders.de;
+    try {
+      localeLoaders.de = () => Promise.reject(new Error("NetworkError"));
+      storageMap.set("snapotter-locale", "de");
+
+      render(
+        <I18nProvider>
+          <LocaleProbe />
+        </I18nProvider>,
+      );
+
+      await waitFor(() => {
+        expect(setSentryTag).toHaveBeenCalledWith("locale", "en");
+      });
+      expect(setSentryTag).not.toHaveBeenCalledWith("locale", "de");
+    } finally {
+      localeLoaders.de = originalLoader;
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("handles analytics import rejection gracefully without unhandled rejection (#1256)", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const originalLoader = localeLoaders.de;
+    try {
+      localeLoaders.de = () => Promise.reject(new Error("Chunk failed"));
+      storageMap.set("snapotter-locale", "de");
+
+      captureHandledError.mockRejectedValueOnce(new Error("Analytics failed"));
+
+      const result = await loadLocale("de");
+      expect(result).toBe(en);
+    } finally {
+      localeLoaders.de = originalLoader;
+      errorSpy.mockRestore();
+    }
   });
 });
