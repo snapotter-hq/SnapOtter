@@ -148,3 +148,43 @@ describe("openapi.zh-TW.yaml auth, roles, and features descriptions (#3585, #359
     expect(offending).toEqual([]);
   });
 });
+
+describe("openapi.sv.yaml Swedish diacritics (#2047)", () => {
+  const specDir = resolve(import.meta.dirname, "../../../apps/api/src");
+  const sv = load(readFileSync(join(specDir, "openapi.sv.yaml"), "utf8")) as {
+    tags?: Array<{ name: string; description?: string }>;
+    paths: Record<string, Record<string, { summary?: string; description?: string }>>;
+    "x-i18n": {
+      entries: Record<string, { sourceHash: string; outputHash: string; stale?: boolean }>;
+    };
+  };
+
+  const foldedPattern =
+    /\b(haalsokontroll|haalsokontroller|haamta|installningar|aateranvandbara|arbetsfloden|innehaall|storleksandring|behorigheter|spaarning|aatgarder|haalsodiagnostik)\b/i;
+
+  it("preserves Swedish characters å, ä, and ö in key endpoints and tags", () => {
+    expect(sv.paths["/api/v1/health"]?.get?.summary).toBe("Hälsokontroll");
+    expect(sv.paths["/api/v1/tools/image/content-aware-resize"]?.post?.summary).toBe(
+      "Innehållsmedveten storleksändring",
+    );
+    expect(sv.paths["/api/v1/settings"]?.get?.summary).toBe("Hämta alla inställningar");
+    expect(sv.paths["/api/v1/pipeline/list"]?.get?.description).toContain(
+      "Hämta alla sparade pipeline-definitioner för den aktuella användaren",
+    );
+
+    const systemTag = sv.tags?.find((t) => t.name === "System");
+    expect(systemTag?.description).toBe("Hälsokontroller, konfiguration och jobbframsteg.");
+
+    const pipelinesTag = sv.tags?.find((t) => t.name === "Pipelines");
+    expect(pipelinesTag?.description).toBe(
+      "Kedja ihop flera verktyg till återanvändbara arbetsflöden.",
+    );
+  });
+
+  it("contains no ASCII-folded Swedish placeholder words in openapi.sv.yaml", () => {
+    const offending = proseFields(sv)
+      .filter(([, text]) => foldedPattern.test(text))
+      .map(([id, text]) => ({ id, text }));
+    expect(offending).toEqual([]);
+  });
+});
