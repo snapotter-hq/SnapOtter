@@ -459,6 +459,7 @@ describe("erase-object batch: its own failures apart from a bad response", () =>
 
     expect(entry(0).status).toBe("failed");
     expect(entry(0).error).toBe(en.errors.invalidResponse);
+    expect(entry(0).errorCategory).toBe("processing_error");
     expect(entry(0).processedUrl).toBeNull();
     expectReported("Tool result has no download URL", 200);
   });
@@ -634,14 +635,50 @@ describe("erase-object single file: a store write that throws while the run ends
 });
 
 describe("erase-object single file: every other way the request ends", () => {
-  it("shows the server's error text for a failed request", async () => {
+  it("fails the file with the server's error text", async () => {
     renderPanel();
 
     (await submit()).respond(422, { error: "Object erasing failed" });
 
+    expect(entry().status).toBe("failed");
+    expect(entry().error).toBe("Object erasing failed");
     expect(screen.getByText("Object erasing failed")).toBeInTheDocument();
     expect(useFileStore.getState().processing).toBe(false);
     expect(vi.mocked(captureHandledError)).not.toHaveBeenCalled();
+  });
+
+  it("fails the file as upload_error on 413", async () => {
+    renderPanel();
+
+    (await submit()).respond(413, { error: "Payload too large" });
+
+    expect(entry().status).toBe("failed");
+    expect(entry().errorCategory).toBe("upload_error");
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("fails the file as upload_error on network error", async () => {
+    renderPanel();
+
+    const xhr = await submit();
+    act(() => xhr.onerror?.(new Event("error")));
+
+    expect(entry().status).toBe("failed");
+    expect(entry().error).toBe(en.errors.network);
+    expect(entry().errorCategory).toBe("upload_error");
+    expect(useFileStore.getState().processing).toBe(false);
+  });
+
+  it("fails the file as timeout on request timeout", async () => {
+    renderPanel();
+
+    const xhr = await submit();
+    act(() => xhr.ontimeout?.(new Event("timeout")));
+
+    expect(entry().status).toBe("failed");
+    expect(entry().error).toBe(en.toolSettings["erase-object"].timeoutOverloaded);
+    expect(entry().errorCategory).toBe("timeout");
+    expect(useFileStore.getState().processing).toBe(false);
   });
 
   it("keeps the server's text and ends the run when showing it throws", async () => {
@@ -3290,7 +3327,7 @@ describe("erase-object re-runs clear stale processed fields (#3281)", () => {
     ).toThrow("claim broke");
     await act(async () => {});
 
-    expect(entry().status).toBe("pending");
+    expect(entry().status).toBe("failed");
     expect(entry().processedUrl).toBeNull();
     expect(entry().processedPreviewUrl).toBeNull();
     expect(entry().processedFilename).toBeNull();
@@ -3320,7 +3357,7 @@ describe("erase-object re-runs clear stale processed fields (#3281)", () => {
     ).toThrow("stream claim broke");
     await act(async () => {});
 
-    expect(entry().status).toBe("pending");
+    expect(entry().status).toBe("failed");
     expect(entry().processedUrl).toBeNull();
     expect(entry().processedPreviewUrl).toBeNull();
     expect(entry().processedFilename).toBeNull();

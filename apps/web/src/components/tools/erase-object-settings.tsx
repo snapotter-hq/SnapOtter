@@ -11,7 +11,11 @@ import { failedAnswerMessage, formatHeaders } from "@/lib/api";
 import { appUrl, resolveServerUrls } from "@/lib/app-url";
 import { bundleName } from "@/lib/bundle-i18n";
 import { cancelAbandonedJob, trackAbandonedJob } from "@/lib/cancel-abandoned-job";
-import { FeedbackCategoryError, feedbackCategoryOf } from "@/lib/feedback";
+import {
+  FeedbackCategoryError,
+  type FeedbackErrorCategory,
+  feedbackCategoryOf,
+} from "@/lib/feedback";
 import { format, formatFileSize } from "@/lib/format";
 import {
   checkToolResult,
@@ -399,49 +403,49 @@ export function EraseObjectSettings({
           try {
             result = parseResultBody<Record<string, unknown>>(xhr.responseText);
           } catch (err) {
-            rejectOnce(new Error(t.errors.invalidResponse));
+            rejectOnce(new FeedbackCategoryError(t.errors.invalidResponse, "processing_error"));
             reportMalformedResult(err, { status: xhr.status, toolId: "erase-object" });
             return;
           }
           try {
             applyResult(result);
           } catch (err) {
-            rejectOnce(new Error(jobFailureMessage({ reason: "trackingFailed" }, t.errors)));
+            rejectOnce(
+              new FeedbackCategoryError(
+                jobFailureMessage({ reason: "trackingFailed" }, t.errors),
+                "processing_error",
+              ),
+            );
             throw err;
           }
           resolveOnce();
         } else {
+          let message: string;
           try {
             const body = JSON.parse(xhr.responseText);
-            rejectOnce(
-              new Error(
-                failedAnswerMessage(
-                  t,
-                  body,
-                  xhr.status,
-                  format(t.errors.failedWithStatus, { status: xhr.status }),
-                ),
-              ),
+            message = failedAnswerMessage(
+              t,
+              body,
+              xhr.status,
+              format(t.errors.failedWithStatus, { status: xhr.status }),
             );
           } catch {
-            rejectOnce(
-              new Error(
-                failedAnswerMessage(
-                  t,
-                  null,
-                  xhr.status,
-                  format(t.errors.processingFailedWithStatus, { status: xhr.status }),
-                ),
-              ),
+            message = failedAnswerMessage(
+              t,
+              null,
+              xhr.status,
+              format(t.errors.processingFailedWithStatus, { status: xhr.status }),
             );
           }
+          const category = xhr.status === 413 ? "upload_error" : undefined;
+          rejectOnce(category ? new FeedbackCategoryError(message, category) : new Error(message));
         }
       };
       xhr.onerror = () => {
         watchdog.clear();
         if (abandoned || settled) return;
         stopProgress();
-        rejectOnce(new Error(t.errors.network));
+        rejectOnce(new FeedbackCategoryError(t.errors.network, "upload_error"));
       };
       xhr.ontimeout = () => {
         watchdog.clear();
@@ -459,7 +463,11 @@ export function EraseObjectSettings({
         try {
           stopProgress();
         } finally {
-          rejectOnce(err instanceof Error ? err : new Error(t.errors.network));
+          if (err instanceof Error) {
+            rejectOnce(err);
+          } else {
+            rejectOnce(new FeedbackCategoryError(t.errors.network, "upload_error"));
+          }
         }
       }
     });
@@ -589,7 +597,12 @@ export function EraseObjectSettings({
     // tracking failure when the first call throws, and that retry must neither
     // replace the server's message nor report the same ending a second time.
     let runEndedWithError = false;
-    const endRunWithError = (message: string, before?: () => void, reportedByCaller = false) => {
+    const endRunWithError = (
+      message: string,
+      before?: () => void,
+      reportedByCaller = false,
+      category?: FeedbackErrorCategory | null,
+    ) => {
       if (runEndedWithError) return;
       runEndedWithError = true;
       settled = true;
@@ -599,6 +612,13 @@ export function EraseObjectSettings({
         ...(before ? [before] : []),
         clearStaleProcessed,
         () => setError(message),
+        () => {
+          useFileStore.getState().updateEntryById(capturedEntryId, {
+            status: "failed",
+            error: message,
+            errorCategory: category ?? null,
+          });
+        },
         finishUi,
       ]) {
         try {
@@ -672,13 +692,18 @@ export function EraseObjectSettings({
         // The stream has already let go of the run, so a throw from the abort or
         // the message write must not skip finishUi and leave the run at
         // processing for good (#1830, #1961). It still surfaces, after the teardown.
-        endRunWithError(jobFailureMessage(failure, t.errors), abandonRequest, isTrackingFailure);
+        endRunWithError(
+          jobFailureMessage(failure, t.errors),
+          abandonRequest,
+          isTrackingFailure,
+          "processing_error",
+        );
       },
       onStall: () => {
         if (abandoned || settled || runEndedWithError) return;
         endWatch();
         abandonedJob.cancelOnStall();
-        endRunWithError(t.toolSettings["erase-object"].stall, abandonRequest);
+        endRunWithError(t.toolSettings["erase-object"].stall, abandonRequest, false, "timeout");
       },
     });
     const stopProgress = subscription.stop;
@@ -769,7 +794,7 @@ export function EraseObjectSettings({
         } catch (err) {
           // Reported first: a throw from the store write below must not lose it.
           reportMalformedResult(err, { status: xhr.status, toolId: "erase-object" });
-          endRunWithError(t.errors.invalidResponse);
+          endRunWithError(t.errors.invalidResponse, undefined, false, "processing_error");
           return;
         }
         if (result) {
@@ -782,6 +807,13 @@ export function EraseObjectSettings({
             for (const teardown of [
               clearStaleProcessed,
               () => setError(jobFailureMessage({ reason: "trackingFailed" }, t.errors)),
+              () => {
+                useFileStore.getState().updateEntryById(capturedEntryId, {
+                  status: "failed",
+                  error: jobFailureMessage({ reason: "trackingFailed" }, t.errors),
+                  errorCategory: "processing_error",
+                });
+              },
               finishUi,
             ]) {
               try {
@@ -823,7 +855,8 @@ export function EraseObjectSettings({
             format(t.errors.processingFailedWithStatus, { status: xhr.status }),
           );
         }
-        endRunWithError(message);
+        const category = xhr.status === 413 ? "upload_error" : undefined;
+        endRunWithError(message, undefined, false, category);
         return;
       }
       finishUi();
@@ -833,14 +866,19 @@ export function EraseObjectSettings({
       if (abandoned || settled) return;
       endWatch();
       stopProgress();
-      endRunWithError(t.errors.network);
+      endRunWithError(t.errors.network, undefined, false, "upload_error");
     };
     xhr.ontimeout = () => {
       watchdog?.clear();
       if (abandoned || settled) return;
       endWatch();
       stopProgress();
-      endRunWithError(t.toolSettings["erase-object"].timeoutOverloaded);
+      endRunWithError(
+        t.toolSettings["erase-object"].timeoutOverloaded,
+        undefined,
+        false,
+        "timeout",
+      );
     };
     try {
       xhr.open("POST", appUrl("/api/v1/tools/image/erase-object"));
@@ -855,7 +893,13 @@ export function EraseObjectSettings({
         return;
       }
       endWatch();
-      endRunWithError(err instanceof Error ? err.message : t.errors.network, stopProgress);
+      const category = err instanceof Error ? undefined : "upload_error";
+      endRunWithError(
+        err instanceof Error ? err.message : t.errors.network,
+        stopProgress,
+        false,
+        category,
+      );
     }
   };
 

@@ -1175,11 +1175,13 @@ function ToolPageContent({
     // which also match !hasProcessed and would show the canvas instead of the error).
     // interactive-sign keeps its canvas: its panel shows the error, and swapping
     // the canvas out would throw away the signatures the user placed (#1969).
+    // interactive-eraser also keeps its canvas so painted masks aren't lost (#1639).
     if (
       hasFile &&
       !hasProcessed &&
       currentEntry?.status === "failed" &&
-      displayMode !== "interactive-sign"
+      displayMode !== "interactive-sign" &&
+      displayMode !== "interactive-eraser"
     ) {
       return (
         // Bounded by the image area and scrolling inside it; m-auto centres the card
