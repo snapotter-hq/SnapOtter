@@ -123,7 +123,8 @@ describe("TwoFactorSettings", () => {
     render(<TwoFactorSettings />);
     fireEvent.click(screen.getByRole("button", { name: /enable two-factor authentication/i }));
 
-    expect(await screen.findByText(en.errors.featureNotLicensed)).toBeInTheDocument();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(en.errors.featureNotLicensed);
   });
 
   it("falls back to a generic message when enrollment rejects with a non-Error value", async () => {
@@ -134,7 +135,8 @@ describe("TwoFactorSettings", () => {
     fireEvent.click(screen.getByRole("button", { name: /enable two-factor authentication/i }));
 
     // Must render a real message, not "undefined" or the raw non-Error value.
-    expect(await screen.findByText(/failed to save/i)).toBeInTheDocument();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/failed to save/i);
     expect(screen.queryByText("network exploded")).not.toBeInTheDocument();
     expect(screen.queryByText(/undefined/i)).not.toBeInTheDocument();
   });
@@ -153,7 +155,8 @@ describe("TwoFactorSettings", () => {
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith("/auth/mfa/verify", { code: "123456" });
     });
-    expect(await screen.findByText(/is now enabled/i)).toBeInTheDocument();
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent(/is now enabled/i);
   });
 
   it("says the code is wrong and stays on the verify step", async () => {
@@ -167,7 +170,8 @@ describe("TwoFactorSettings", () => {
     fireEvent.change(codeInput, { target: { value: "000000" } });
     fireEvent.click(screen.getByRole("button", { name: /confirm and enable/i }));
 
-    expect(await screen.findByText(en.auth.mfaInvalidCode)).toBeInTheDocument();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(en.auth.mfaInvalidCode);
     // Still on the verify step, not bounced back to the idle "Enable" button.
     expect(screen.getByPlaceholderText("000000")).toBeInTheDocument();
   });
@@ -188,7 +192,8 @@ describe("TwoFactorSettings", () => {
     // Must not be mislabeled as a wrong code -- a decryption/config failure
     // needs its own diagnosable message, not a generic "invalid code" that
     // sends the user into an unwinnable retry loop.
-    expect(await screen.findByText(en.settings.security.twoFactorUnreadable)).toBeInTheDocument();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(en.settings.security.twoFactorUnreadable);
     expect(screen.queryByText(/invalid code/i)).not.toBeInTheDocument();
   });
 
@@ -225,7 +230,8 @@ describe("TwoFactorSettings", () => {
     await waitFor(() => {
       expect(apiPost).toHaveBeenCalledWith("/auth/mfa/disable", { code: "654321" });
     });
-    expect(await screen.findByText(/has been disabled/i)).toBeInTheDocument();
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent(/has been disabled/i);
   });
 
   it("doesn't blame the code when disable fails on the server's side", async () => {
@@ -241,7 +247,8 @@ describe("TwoFactorSettings", () => {
     fireEvent.change(codeInput, { target: { value: "654321" } });
     fireEvent.click(screen.getByRole("button", { name: /disable two-factor authentication/i }));
 
-    expect(await screen.findByText(en.settings.security.twoFactorUnreadable)).toBeInTheDocument();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(en.settings.security.twoFactorUnreadable);
     expect(screen.queryByText(/invalid code/i)).not.toBeInTheDocument();
   });
 
@@ -271,9 +278,75 @@ describe("TwoFactorSettings", () => {
     fireEvent.click(screen.getByRole("button", { name: /copy codes/i }));
 
     await waitFor(() => expect(copyToClipboard).toHaveBeenCalled());
-    expect(await screen.findByText(/couldn't copy automatically/i)).toBeInTheDocument();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/couldn't copy automatically/i);
     // Button must not claim success it didn't achieve.
     expect(screen.queryByRole("button", { name: /^copied$/i })).not.toBeInTheDocument();
+  });
+
+  it("remounts the copy-failed alert when a second clipboard write also fails (#3988)", async () => {
+    useAuth.mockReturnValue({ totpEnabled: false });
+    respondToEnroll();
+    copyToClipboard.mockResolvedValueOnce(false);
+
+    render(<TwoFactorSettings />);
+    await startEnrollment();
+
+    fireEvent.click(screen.getByRole("button", { name: /copy codes/i }));
+    const firstAlert = await screen.findByRole("alert");
+    expect(firstAlert).toHaveTextContent(en.settings.security.twoFactorCopyFailed);
+
+    let resolveSecondCopy!: (ok: boolean) => void;
+    copyToClipboard.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveSecondCopy = resolve;
+        }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /copy codes/i }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    resolveSecondCopy(false);
+    const secondAlert = await screen.findByRole("alert");
+    expect(secondAlert).toHaveTextContent(en.settings.security.twoFactorCopyFailed);
+    expect(secondAlert).not.toBe(firstAlert);
+  });
+
+  it("keeps a verify error intact when copying recovery codes (#3988)", async () => {
+    useAuth.mockReturnValue({ totpEnabled: false });
+    respondToEnroll();
+    apiPost.mockRejectedValueOnce(apiError(400, "INVALID_CODE", "Invalid TOTP or recovery code"));
+
+    render(<TwoFactorSettings />);
+    const codeInput = await startEnrollment();
+
+    fireEvent.change(codeInput, { target: { value: "000000" } });
+    fireEvent.click(screen.getByRole("button", { name: /confirm and enable/i }));
+    const verifyAlert = await screen.findByRole("alert");
+    expect(verifyAlert).toHaveTextContent(en.auth.mfaInvalidCode);
+
+    fireEvent.click(screen.getByRole("button", { name: /copy codes/i }));
+    expect(await screen.findByRole("button", { name: /^copied$/i })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(en.auth.mfaInvalidCode);
+  });
+
+  it("clears the enabled confirmation status when opening the disable step (#3988)", async () => {
+    useAuth.mockReturnValue({ totpEnabled: false });
+    respondToEnroll();
+    apiPost.mockResolvedValueOnce({ ok: true });
+
+    render(<TwoFactorSettings />);
+    const codeInput = await startEnrollment();
+
+    fireEvent.change(codeInput, { target: { value: "123456" } });
+    fireEvent.click(screen.getByRole("button", { name: /confirm and enable/i }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent(/is now enabled/i);
+
+    fireEvent.click(screen.getByRole("button", { name: /disable two-factor authentication/i }));
+    await screen.findByPlaceholderText("000000");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("drops the copy-failed message once a retry copies the codes (#1827)", async () => {

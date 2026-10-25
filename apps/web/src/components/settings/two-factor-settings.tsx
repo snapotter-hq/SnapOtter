@@ -156,10 +156,11 @@ export function TwoFactorSettings() {
 
   const handleCopyCodes = async () => {
     if (!enrollment) return;
+    // Clear an earlier copy failure before the attempt so a retry that fails
+    // again remounts the alert region and announces to screen readers (#3988).
+    setMessage((m) => (m?.text === t.settings.security.twoFactorCopyFailed ? null : m));
     const ok = await copyToClipboard(enrollment.recoveryCodes.join("\n"));
     if (ok) {
-      // A retry that works takes down the earlier copy failure, not other messages.
-      setMessage((m) => (m?.text === t.settings.security.twoFactorCopyFailed ? null : m));
       setCodesCopied(true);
       later(() => setCodesCopied(false), 2000, "codesCopied");
     } else {
@@ -187,7 +188,14 @@ export function TwoFactorSettings() {
           </p>
           <button
             type="button"
-            onClick={() => (enabled ? setStep("disabling") : handleEnrollStart())}
+            onClick={() => {
+              if (enabled) {
+                setMessage(null);
+                setStep("disabling");
+              } else {
+                handleEnrollStart();
+              }
+            }}
             disabled={submitting}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
@@ -255,6 +263,7 @@ export function TwoFactorSettings() {
 
           {message && (
             <p
+              role={message.type === "error" ? "alert" : "status"}
               className={cn(
                 "text-sm",
                 message.type === "error" ? "text-destructive" : "text-success-ink",
@@ -301,6 +310,7 @@ export function TwoFactorSettings() {
 
           {message && (
             <p
+              role={message.type === "error" ? "alert" : "status"}
               className={cn(
                 "text-sm",
                 message.type === "error" ? "text-destructive" : "text-success-ink",
@@ -333,6 +343,7 @@ export function TwoFactorSettings() {
 
       {step === "idle" && message && (
         <p
+          role={message.type === "error" ? "alert" : "status"}
           className={cn(
             "text-sm",
             message.type === "error" ? "text-destructive" : "text-success-ink",
