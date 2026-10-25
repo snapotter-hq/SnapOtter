@@ -6803,4 +6803,165 @@ describe("pipeline-step and batch-child failure reporting (#951)", () => {
     expect(reportErrorMock).not.toHaveBeenCalled();
     expect(logger.error).not.toHaveBeenCalled();
   });
+
+  it("records the canceled batch child outcome before writing the canceled row or incrementing jobsTotal so a failing skip does not transiently cancel or double-count (#1347)", async () => {
+    const callOrder: string[] = [];
+    const dbUpdateSetMock = vi.fn((vals: Record<string, unknown>) => {
+      callOrder.push(`db.update:${String(vals.status)}`);
+      return {
+        where: vi.fn().mockResolvedValue(undefined),
+      };
+    });
+    const recordChildOutcomeMock = vi.fn(
+      async (_parentId: string, _totalFiles: number, _filename: string, error?: string) => {
+        callOrder.push(`recordChildOutcome:${error ?? "done"}`);
+        if (error === "Canceled" && failSkipRecord) {
+          throw new Error("injected outcome-recording outage");
+        }
+      },
+    );
+    let failSkipRecord = true;
+
+    const workerMod = await loadWorker("", () => {
+      vi.doMock("node:fs/promises", () => ({
+        mkdir: vi.fn().mockResolvedValue(undefined),
+        readFile: vi.fn(),
+        rm: vi.fn().mockResolvedValue(undefined),
+      }));
+      vi.doMock("../../../../apps/api/src/db/index.js", () => ({
+        db: {
+          update: vi.fn(() => ({
+            set: dbUpdateSetMock,
+          })),
+        },
+        schema: {
+          jobs: {
+            id: "jobs.id",
+            status: "jobs.status",
+          },
+        },
+      }));
+      vi.doMock("../../../../apps/api/src/routes/tool-factory.js", () => ({
+        getToolConfig: vi.fn(() => ({
+          processV2: vi.fn().mockResolvedValue({
+            buffer: Buffer.from("out-bytes"),
+            filename: "fallthrough.png",
+            contentType: "image/png",
+          }),
+        })),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/ai-handlers.js", () => ({
+        hasAiJobHandler: vi.fn(() => false),
+        hasAiPathJobHandler: vi.fn(() => false),
+        runAiToolJob: vi.fn(),
+        runAiPathToolJob: vi.fn(),
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/batch-progress.js", () => ({
+        isBatchCanceled: vi.fn(async () => true),
+        recordChildOutcome: recordChildOutcomeMock,
+      }));
+      vi.doMock("../../../../apps/api/src/jobs/postprocess.js", () => ({
+        autoSaveToLibrary: vi.fn(),
+        buildOutputName: vi.fn(() => "fallthrough_resize.png"),
+        generatePreview: vi.fn().mockResolvedValue(undefined),
+        stageAutoSaveToLibrary: vi.fn().mockResolvedValue({}),
+      }));
+      vi.doMock("@snapotter/media-engine", () => ({
+        HW_ACCEL_FAMILIES: [],
+        hwAccelStatus: vi.fn(() => ({ requested: undefined })),
+        softwareEncoderStatus: vi.fn(() => ({ missing: [], probeError: undefined })),
+      }));
+      vi.doMock("../../../../apps/api/src/lib/binary-overrides.js", () => ({
+        binaryOverrideWarning: vi.fn(),
+        checkBinaryOverrides: vi.fn(() => []),
+        isBinarySpawnFailure,
+        probeFailureLevel: vi.fn(() => "warn"),
+      }));
+    });
+
+    objectStorageMocks.getObjectBuffer.mockResolvedValue(Buffer.from("input-bytes"));
+    objectStorageMocks.putObject.mockResolvedValue(undefined);
+
+    const { Worker } = await import("bullmq");
+    const { jobsTotal } = await import("../../../../apps/api/src/lib/metrics.js");
+    const { logger } = await import("../../../../apps/api/src/lib/logger.js");
+    const jobsTotalIncMock = jobsTotal.inc as ReturnType<typeof vi.fn>;
+    workerMod.startWorkers();
+    const workerCalls = (Worker as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    const imageCall = workerCalls.find(([queue]) => String(queue).endsWith("image"));
+    if (!imageCall) throw new Error("image pool worker not registered");
+    const processor = imageCall[1] as (job: unknown) => Promise<unknown>;
+
+    // 1. Skip outcome recording throws: falls through to normal processing
+    // without ever setting status="canceled" or incrementing jobsTotal{status:"canceled"}.
+    const fallthroughResult = await processor({
+      id: "batch-skip-fault-f0",
+      attemptsMade: 0,
+      opts: { attempts: 1 },
+      updateProgress: vi.fn(),
+      data: {
+        kind: "batch-child",
+        jobId: "batch-skip-fault-f0",
+        parentId: "batch-skip-fault",
+        totalFiles: 1,
+        toolId: "resize",
+        userId: null,
+        pool: "image",
+        inputRefs: ["uploads/batch-skip-fault-f0/fallthrough.png"],
+        filename: "fallthrough.png",
+        settings: {},
+      },
+    });
+
+    expect(fallthroughResult).toMatchObject({
+      outputRefs: ["outputs/batch-skip-fault-f0/fallthrough_resize.png"],
+      filename: "fallthrough_resize.png",
+    });
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobId: "batch-skip-fault-f0",
+        parentId: "batch-skip-fault",
+      }),
+      "batch cancel skip failed; processing the child normally",
+    );
+    expect(callOrder).toEqual([
+      "recordChildOutcome:Canceled",
+      "db.update:processing",
+      "db.update:completed",
+      "recordChildOutcome:done",
+    ]);
+    expect(jobsTotalIncMock.mock.calls).toEqual([[{ pool: "image", status: "completed" }]]);
+
+    // 2. Skip outcome recording succeeds: records outcome first, then updates row to canceled.
+    callOrder.length = 0;
+    jobsTotalIncMock.mockClear();
+    failSkipRecord = false;
+
+    const skippedResult = await processor({
+      id: "batch-skip-ok-f0",
+      attemptsMade: 0,
+      opts: { attempts: 1 },
+      updateProgress: vi.fn(),
+      data: {
+        kind: "batch-child",
+        jobId: "batch-skip-ok-f0",
+        parentId: "batch-skip-ok",
+        totalFiles: 1,
+        toolId: "resize",
+        userId: null,
+        pool: "image",
+        inputRefs: ["uploads/batch-skip-ok-f0/skipme.png"],
+        filename: "skipme.png",
+        settings: {},
+      },
+    });
+
+    expect(skippedResult).toMatchObject({
+      outputRefs: [],
+      filename: "skipme.png",
+      resultPayload: { failed: true, canceled: true, error: "Canceled" },
+    });
+    expect(callOrder).toEqual(["recordChildOutcome:Canceled", "db.update:canceled"]);
+    expect(jobsTotalIncMock.mock.calls).toEqual([[{ pool: "image", status: "canceled" }]]);
+  });
 });

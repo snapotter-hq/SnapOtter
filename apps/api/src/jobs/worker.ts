@@ -1966,11 +1966,16 @@ async function processBatchChild(job: Job<ToolJobData>): Promise<ToolJobResult> 
   const totalFiles = job.data.totalFiles ?? 0;
   // Cooperative batch cancel (#767): children queued behind the cancel do no
   // work at all. Active children are aborted through the cancel channel and
-  // land in the catch below via processToolJob's own cancel handling. The
-  // guarded write cannot clobber a row another path already settled.
+  // land in the catch below via processToolJob's own cancel handling. Record
+  // the batch outcome before flipping the durable row or bumping jobsTotal
+  // (#1347): if the outcome write throws and falls through to normal
+  // processing, the row never transiently settles as canceled and the file is
+  // not counted twice. The guarded write cannot clobber a row another path
+  // already settled.
   if (parentId) {
     try {
       if (await isBatchCanceled(parentId)) {
+        await recordChildOutcome(parentId, totalFiles, job.data.filename, "Canceled");
         await db
           .update(schema.jobs)
           .set({ status: "canceled", completedAt: new Date(), error: { message: "Canceled" } })
@@ -1981,7 +1986,6 @@ async function processBatchChild(job: Job<ToolJobData>): Promise<ToolJobResult> 
             ),
           );
         jobsTotal.inc({ pool: job.data.pool, status: "canceled" });
-        await recordChildOutcome(parentId, totalFiles, job.data.filename, "Canceled");
         return {
           outputRefs: [],
           filename: job.data.filename,

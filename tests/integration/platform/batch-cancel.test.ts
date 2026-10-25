@@ -33,6 +33,9 @@ vi.mock("../../../apps/api/src/jobs/batch-progress.js", async (importOriginal) =
       error?: string,
     ) => {
       if (parentId === cancelSkipFault.parentId && error === "Canceled") {
+        // Hold long enough for terminalRow's 150ms poll to observe any
+        // premature terminal row write before the throw falls through (#1347).
+        await delay(300);
         throw new Error("injected outcome-recording outage");
       }
       return actual.recordChildOutcome(parentId, totalFiles, filename, error);
@@ -244,6 +247,15 @@ async function finalizeReturnValue(parentId: string): Promise<Record<string, unk
   return job.returnvalue as Record<string, unknown>;
 }
 
+/** A batch child's BullMQ return value on the image pool (#1347). */
+async function childReturnValue(childId: string): Promise<Record<string, unknown>> {
+  const job = await waitFor(async () => {
+    const j = await getQueue("image").getJob(childId);
+    return j?.returnvalue ? j : undefined;
+  });
+  return job.returnvalue as unknown as Record<string, unknown>;
+}
+
 beforeAll(async () => {
   await startCancelListener();
   startWorkers();
@@ -395,6 +407,12 @@ describe("cooperative child skip and canceled finalize", () => {
     const outcome = await batchOutcome(parentId, "failed");
     expect(outcome.count).toBe("1");
     expect(outcome.errors).toEqual([{ filename: "skipme.png", error: "Canceled" }]);
+    const returned = await childReturnValue(childId);
+    expect(returned.resultPayload).toEqual({
+      failed: true,
+      canceled: true,
+      error: "Canceled",
+    });
     expect(await sharedRedis().get(`${bullPrefix()}:batch:${parentId}:done`)).toBeNull();
   });
 
