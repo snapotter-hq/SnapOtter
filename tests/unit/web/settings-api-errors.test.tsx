@@ -10,7 +10,7 @@
 
 import "@testing-library/jest-dom/vitest";
 import { de } from "@snapotter/shared/i18n/de.js";
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -36,6 +36,11 @@ vi.mock("@/lib/api", async (importOriginal) => {
 });
 
 vi.mock("@/hooks/use-auth", () => ({ useAuth }));
+const captureHandledError = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/analytics", async (importOriginal) => {
+  const actual: Record<string, unknown> = await importOriginal();
+  return { ...actual, captureHandledError };
+});
 
 vi.mock("qr-code-styling", () => ({
   default: class {
@@ -47,6 +52,7 @@ vi.mock("qr-code-styling", () => ({
 import {
   AdminSecuritySettings,
   ApiKeysSection,
+  AuditLogSection,
   GeneralSection,
   PeopleSection,
   RolesSection,
@@ -60,6 +66,7 @@ import { ToolPalette } from "@/components/tools/tool-palette";
 import { I18nProvider } from "@/contexts/i18n-context";
 import { ApiError } from "@/lib/api";
 import { format } from "@/lib/format";
+import { useAnalyticsStore } from "@/stores/analytics-store";
 import { useConnectionStore } from "@/stores/connection-store";
 
 const s = de.settings;
@@ -175,7 +182,8 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
-  for (const mock of [apiGet, apiPost, apiPut, apiDelete, useAuth]) mock.mockReset();
+  for (const mock of [apiGet, apiPost, apiPut, apiDelete, useAuth, captureHandledError])
+    mock.mockReset();
 });
 
 describe("Security: change password", () => {
@@ -1230,5 +1238,168 @@ describe("Tools: save disabled tools (#2713)", () => {
     await act(async () => {});
     expect(await screen.findByText(de.tools.crop.name)).toBeInTheDocument();
     expect(screen.queryByText(de.tools.resize.name)).toBeNull();
+  });
+});
+
+describe("System: install feedback actions (#1560)", () => {
+  beforeEach(() => {
+    useAuth.mockReturnValue({
+      loading: false,
+      permissions: ["system:manage"],
+      hasPermission: () => true,
+      authEnabled: true,
+      role: "admin",
+      hasLocalPassword: true,
+      totpEnabled: false,
+    });
+    // mock the analytics config
+    useAnalyticsStore.setState({
+      config: { enabled: true, posthogApiKey: "test" },
+      configLoaded: true,
+    });
+  });
+
+  async function action(err: ApiError, buttonName: string) {
+    apiPut.mockRejectedValueOnce(err);
+    renderDe(<SystemSection />);
+    fireEvent.click(await screen.findByRole("button", { name: buttonName }));
+  }
+
+  it.each([
+    reject(401, "AUTH_REQUIRED", de.errors.sessionEnded),
+    reject(403, "FORBIDDEN", de.errors.forbidden),
+    reject(403, "IP_NOT_ALLOWED", de.auth.ipNotAllowed),
+    reject(429, undefined, de.errors.tooManyRequests),
+    reject(500, undefined, s.system.saveFailed),
+  ])("snoozing feedback: %s", async (_name, err, expected) => {
+    await action(err, de.feedback.remindLater);
+    await expectShown(expected);
+
+    expect(captureHandledError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "Saving install feedback state failed",
+        cause: err,
+        code: "feedback.install.snoozedUntil",
+      }),
+      { error_class: "operational" },
+    );
+    captureHandledError.mockClear();
+  });
+
+  it.each([
+    reject(401, "AUTH_REQUIRED", de.errors.sessionEnded),
+    reject(403, "FORBIDDEN", de.errors.forbidden),
+    reject(403, "IP_NOT_ALLOWED", de.auth.ipNotAllowed),
+    reject(429, undefined, de.errors.tooManyRequests),
+    reject(500, undefined, s.system.saveFailed),
+  ])("dismissing feedback: %s", async (_name, err, expected) => {
+    await action(err, de.feedback.dontAskAgain);
+    await expectShown(expected);
+    expect(captureHandledError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "Saving install feedback state failed",
+        cause: err,
+        code: "feedback.install.dismissedAt",
+      }),
+      { error_class: "operational" },
+    );
+    captureHandledError.mockClear();
+  });
+});
+
+describe("AuditLogSection race conditions (#1560)", () => {
+  it("drops a slow first response if a second request was fired", async () => {
+    let resolveFirst: (v: unknown) => void = () => {};
+    let resolveSecond: (v: unknown) => void = () => {};
+    const firstPromise = new Promise((resolve) => {
+      resolveFirst = resolve;
+    });
+    const secondPromise = new Promise((resolve) => {
+      resolveSecond = resolve;
+    });
+
+    let callCount = 0;
+    apiGet.mockImplementation(() => {
+      callCount++;
+      return callCount === 1 ? firstPromise : secondPromise;
+    });
+
+    renderDe(<AuditLogSection />);
+
+    // First request is fired on mount.
+    expect(apiGet).toHaveBeenCalledTimes(1);
+
+    // Change filter to trigger second request
+    const select = await screen.findByRole("combobox");
+    fireEvent.change(select, { target: { value: "LOGIN_SUCCESS" } });
+
+    await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(2));
+
+    // Resolve second request first (it completes quickly)
+    await act(async () => {
+      resolveSecond({
+        entries: [{ id: "2", action: "LOGIN_SUCCESS", createdAt: new Date().toISOString() }],
+        total: 1,
+      });
+    });
+
+    // The data from the second request should be visible.
+    expect(await screen.findByText("LOGIN_SUCCESS")).toBeInTheDocument();
+
+    // Now resolve the first request (it was slow)
+    await act(async () => {
+      resolveFirst({
+        entries: [{ id: "1", action: "SETTINGS_UPDATED", createdAt: new Date().toISOString() }],
+        total: 1,
+      });
+    });
+
+    // The slow response should be ignored, "LOGIN_SUCCESS" should still be there, and not "SETTINGS_UPDATED".
+    expect(screen.getByText("LOGIN_SUCCESS")).toBeInTheDocument();
+    expect(screen.queryByText("SETTINGS_UPDATED")).toBeNull();
+  });
+
+  it("drops a slow first rejection if a second request was fired", async () => {
+    let resolveSecond: (v: unknown) => void = () => {};
+    let rejectFirst: (v: unknown) => void = () => {};
+    const firstPromise = new Promise((_, reject) => {
+      rejectFirst = reject;
+    });
+    const secondPromise = new Promise((resolve) => {
+      resolveSecond = resolve;
+    });
+
+    let callCount = 0;
+    apiGet.mockImplementation(() => {
+      callCount++;
+      return callCount === 1 ? firstPromise : secondPromise;
+    });
+
+    renderDe(<AuditLogSection />);
+
+    // Change filter to trigger second request
+    const select = await screen.findByRole("combobox");
+    fireEvent.change(select, { target: { value: "LOGIN_SUCCESS" } });
+
+    await waitFor(() => expect(apiGet).toHaveBeenCalledTimes(2));
+
+    // Resolve second request first (it completes quickly)
+    await act(async () => {
+      resolveSecond({
+        entries: [{ id: "2", action: "LOGIN_SUCCESS", createdAt: new Date().toISOString() }],
+        total: 1,
+      });
+    });
+
+    // The data from the second request should be visible.
+    expect(await screen.findByText("LOGIN_SUCCESS")).toBeInTheDocument();
+
+    // Now reject the first request (it was slow and failed)
+    await act(async () => {
+      rejectFirst(new Error("Network Error"));
+    });
+
+    // The slow rejection should be ignored, "LOGIN_SUCCESS" should still be there, and not empty/error state.
+    expect(screen.getByText("LOGIN_SUCCESS")).toBeInTheDocument();
   });
 });

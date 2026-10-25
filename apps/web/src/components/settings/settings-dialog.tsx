@@ -7,6 +7,7 @@ import {
   isValidUsername,
   normalizeRoleName,
   type Permission,
+  SafeError,
   SUPPORTED_LOCALES,
   TEAM_NAME_MAX_LENGTH,
   TOOLS,
@@ -46,6 +47,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
 import { useMobile } from "@/hooks/use-mobile";
 import { useTimeouts } from "@/hooks/use-timeouts";
+import { captureHandledError } from "@/lib/analytics";
 import {
   ApiError,
   apiDelete,
@@ -640,6 +642,7 @@ export function SystemSection() {
   const [installFeedbackOpen, setInstallFeedbackOpen] = useState(false);
   const [bundleLoading, setBundleLoading] = useState(false);
   const [bundleError, setBundleError] = useState<string | null>(null);
+  const [installFeedbackError, setInstallFeedbackError] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
 
   const loadSettings = useCallback(() => {
@@ -662,10 +665,28 @@ export function SystemSection() {
     setSettings((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  const updateInstallFeedbackState = useCallback(async (key: string, value: string) => {
-    await apiPut("/v1/settings", { [key]: value });
-    setSettings((prev) => ({ ...prev, [key]: value }));
-  }, []);
+  const updateInstallFeedbackState = useCallback(
+    async (key: string, value: string) => {
+      try {
+        await apiPut("/v1/settings", { [key]: value });
+        setSettings((prev) => ({ ...prev, [key]: value }));
+      } catch (error) {
+        const statusCode = error instanceof ApiError ? error.status : undefined;
+        void captureHandledError(
+          new SafeError("Saving install feedback state failed", {
+            kind: "operational",
+            code: key,
+            statusCode,
+            cause: error,
+          }),
+          { error_class: "operational" },
+        );
+        setInstallFeedbackError(apiErrorMessage(t, error, {}, t.settings.system.saveFailed));
+        later(() => setInstallFeedbackError(null), 3000, "installFeedbackError");
+      }
+    },
+    [t, later],
+  );
 
   const handleInstallFeedbackSubmitted = useCallback(() => {
     void updateInstallFeedbackState("feedback.install.submittedAt", new Date().toISOString());
@@ -893,6 +914,9 @@ export function SystemSection() {
         onRemindLater={handleInstallFeedbackSnooze}
         onDismissForever={handleInstallFeedbackDismiss}
       />
+      {installFeedbackError && (
+        <p className="text-sm text-destructive mt-2">{installFeedbackError}</p>
+      )}
 
       <div className="pt-4 border-t border-border">
         <h4 className="text-sm font-semibold text-foreground mb-3">
@@ -3699,8 +3723,10 @@ export function AuditLogSection() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const limit = 25;
+  const fetchIdRef = useRef(0);
 
   const fetchEntries = useCallback(async () => {
+    const fetchId = ++fetchIdRef.current;
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(page), limit: String(limit) });
@@ -3708,15 +3734,19 @@ export function AuditLogSection() {
       const data = await apiGet<{ entries: AuditEntry[]; total: number }>(
         `/v1/audit-log?${params}`,
       );
+      if (fetchId !== fetchIdRef.current) return;
       setEntries(data.entries);
       setTotal(data.total);
       setLoadFailed(false);
     } catch {
+      if (fetchId !== fetchIdRef.current) return;
       setEntries([]);
       setTotal(0);
       setLoadFailed(true);
     } finally {
-      setLoading(false);
+      if (fetchId === fetchIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [page, actionFilter]);
 
