@@ -308,7 +308,14 @@ function LanguageSelector() {
 
 export function LoginPage() {
   const { t } = useTranslation();
-  const { oidcEnabled, oidcProviderName, samlEnabled, samlProviderName, ssoEnforced } = useAuth();
+  const {
+    loading: authLoading = false,
+    oidcEnabled,
+    oidcProviderName,
+    samlEnabled,
+    samlProviderName,
+    ssoEnforced,
+  } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -630,36 +637,6 @@ export function LoginPage() {
               {error}
             </p>
           )}
-          {ssoEnforced && (oidcEnabled || samlEnabled) && (
-            <div className="space-y-3">
-              {oidcEnabled && (
-                <a
-                  href={appUrl("/api/auth/oidc/login")}
-                  className="w-full py-3 px-4 rounded-lg bg-primary text-primary-foreground font-medium shadow-sm hover:bg-primary-light transition-colors flex items-center justify-center gap-2.5"
-                >
-                  <KeyRound className="w-[18px] h-[18px]" aria-hidden="true" />
-                  {format(t.auth.signInWith, { provider: oidcProviderName || "SSO" })}
-                </a>
-              )}
-              {samlEnabled && (
-                <a
-                  href={appUrl("/api/auth/saml/login")}
-                  className="w-full py-3 px-4 rounded-lg bg-primary text-primary-foreground font-medium shadow-sm hover:bg-primary-light transition-colors flex items-center justify-center gap-2.5"
-                >
-                  <KeyRound className="w-[18px] h-[18px]" aria-hidden="true" />
-                  {format(t.auth.signInWith, { provider: samlProviderName || "SSO" })}
-                </a>
-              )}
-              <div className="flex items-center gap-3 my-4">
-                <div className="flex-1 border-t border-border" />
-                <span className="text-sm text-muted-foreground">{t.auth.or}</span>
-                <div className="flex-1 border-t border-border" />
-              </div>
-              <p className="text-sm text-muted-foreground text-center">
-                {t.auth.ssoEnforcedLocalRestricted}
-              </p>
-            </div>
-          )}
           {showMfaEnrollment ? (
             <div className="space-y-4">
               <div className="flex items-center gap-3">
@@ -839,93 +816,136 @@ export function LoginPage() {
                 {t.common.back}
               </button>
             </div>
-          ) : (
-            <form
-              onSubmit={handleSubmit}
-              className={`space-y-4${ssoEnforced ? " opacity-60" : ""}`}
+          ) : authLoading ? (
+            <div
+              role="status"
+              className="flex flex-col items-center justify-center py-12 space-y-3"
             >
-              <div>
-                <label
-                  htmlFor="username"
-                  className="block text-sm font-medium mb-1 text-foreground"
-                >
-                  {t.auth.username}
-                </label>
-                <input
-                  id="username"
-                  type="text"
-                  name="username"
-                  autoComplete="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder={t.auth.enterUsername}
-                  className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  required
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-medium mb-1 text-foreground"
-                >
-                  {t.auth.password}
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  name="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={t.auth.enterPassword}
-                  className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  required
-                />
-              </div>
-              {!errorFromRedirect && error && (
-                <p role="alert" className="text-sm text-destructive">
-                  {error}
-                </p>
-              )}
-              <button
-                type="submit"
-                disabled={loading || !username || !password}
-                className="w-full py-3 rounded-lg bg-primary/80 text-primary-foreground font-medium hover:bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? t.auth.loggingIn : t.auth.loginButton}
-              </button>
-            </form>
-          )}
-          {!ssoEnforced && (oidcEnabled || samlEnabled) && (
+              <div
+                className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin"
+                aria-hidden="true"
+              />
+              <p className="text-sm text-muted-foreground">{t.common.loading}</p>
+            </div>
+          ) : (
             <>
-              <div className="flex items-center gap-3 my-4">
-                <div className="flex-1 border-t border-border" />
-                <span className="text-sm text-muted-foreground">{t.auth.or}</span>
-                <div className="flex-1 border-t border-border" />
-              </div>
-              {oidcEnabled && (
-                <a
-                  href={appUrl("/api/auth/oidc/login")}
-                  className="group w-full py-3 px-4 rounded-lg border border-border bg-card text-foreground font-medium shadow-sm hover:border-primary hover:bg-primary-subtle transition-colors flex items-center justify-center gap-2.5"
-                >
-                  <KeyRound
-                    className="w-[18px] h-[18px] text-muted-foreground group-hover:text-primary-ink transition-colors"
-                    aria-hidden="true"
-                  />
-                  {format(t.auth.signInWith, { provider: oidcProviderName || "SSO" })}
-                </a>
+              {ssoEnforced && (oidcEnabled || samlEnabled) && (
+                <div className="space-y-3">
+                  {oidcEnabled && (
+                    <a
+                      href={appUrl("/api/auth/oidc/login")}
+                      className="w-full py-3 px-4 rounded-lg bg-primary text-primary-foreground font-medium shadow-sm hover:bg-primary-light transition-colors flex items-center justify-center gap-2.5"
+                    >
+                      <KeyRound className="w-[18px] h-[18px]" aria-hidden="true" />
+                      {format(t.auth.signInWith, { provider: oidcProviderName || "SSO" })}
+                    </a>
+                  )}
+                  {samlEnabled && (
+                    <a
+                      href={appUrl("/api/auth/saml/login")}
+                      className="w-full py-3 px-4 rounded-lg bg-primary text-primary-foreground font-medium shadow-sm hover:bg-primary-light transition-colors flex items-center justify-center gap-2.5"
+                    >
+                      <KeyRound className="w-[18px] h-[18px]" aria-hidden="true" />
+                      {format(t.auth.signInWith, { provider: samlProviderName || "SSO" })}
+                    </a>
+                  )}
+                  <div className="flex items-center gap-3 my-4">
+                    <div className="flex-1 border-t border-border" />
+                    <span className="text-sm text-muted-foreground">{t.auth.or}</span>
+                    <div className="flex-1 border-t border-border" />
+                  </div>
+                  <p className="text-sm text-muted-foreground text-center">
+                    {t.auth.ssoEnforcedLocalRestricted}
+                  </p>
+                </div>
               )}
-              {samlEnabled && (
-                <a
-                  href={appUrl("/api/auth/saml/login")}
-                  className="group w-full mt-2 py-3 px-4 rounded-lg border border-border bg-card text-foreground font-medium shadow-sm hover:border-primary hover:bg-primary-subtle transition-colors flex items-center justify-center gap-2.5"
-                >
-                  <KeyRound
-                    className="w-[18px] h-[18px] text-muted-foreground group-hover:text-primary-ink transition-colors"
-                    aria-hidden="true"
+              <form
+                onSubmit={handleSubmit}
+                className={`space-y-4${ssoEnforced ? " opacity-60" : ""}`}
+              >
+                <div>
+                  <label
+                    htmlFor="username"
+                    className="block text-sm font-medium mb-1 text-foreground"
+                  >
+                    {t.auth.username}
+                  </label>
+                  <input
+                    id="username"
+                    type="text"
+                    name="username"
+                    autoComplete="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder={t.auth.enterUsername}
+                    className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    required
                   />
-                  {format(t.auth.signInWith, { provider: samlProviderName || "SSO" })}
-                </a>
+                </div>
+                <div>
+                  <label
+                    htmlFor="password"
+                    className="block text-sm font-medium mb-1 text-foreground"
+                  >
+                    {t.auth.password}
+                  </label>
+                  <input
+                    id="password"
+                    type="password"
+                    name="password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={t.auth.enterPassword}
+                    className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    required
+                  />
+                </div>
+                {!errorFromRedirect && error && (
+                  <p role="alert" className="text-sm text-destructive">
+                    {error}
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  disabled={loading || !username || !password}
+                  className="w-full py-3 rounded-lg bg-primary/80 text-primary-foreground font-medium hover:bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? t.auth.loggingIn : t.auth.loginButton}
+                </button>
+              </form>
+              {!ssoEnforced && (oidcEnabled || samlEnabled) && (
+                <>
+                  <div className="flex items-center gap-3 my-4">
+                    <div className="flex-1 border-t border-border" />
+                    <span className="text-sm text-muted-foreground">{t.auth.or}</span>
+                    <div className="flex-1 border-t border-border" />
+                  </div>
+                  {oidcEnabled && (
+                    <a
+                      href={appUrl("/api/auth/oidc/login")}
+                      className="group w-full py-3 px-4 rounded-lg border border-border bg-card text-foreground font-medium shadow-sm hover:border-primary hover:bg-primary-subtle transition-colors flex items-center justify-center gap-2.5"
+                    >
+                      <KeyRound
+                        className="w-[18px] h-[18px] text-muted-foreground group-hover:text-primary-ink transition-colors"
+                        aria-hidden="true"
+                      />
+                      {format(t.auth.signInWith, { provider: oidcProviderName || "SSO" })}
+                    </a>
+                  )}
+                  {samlEnabled && (
+                    <a
+                      href={appUrl("/api/auth/saml/login")}
+                      className="group w-full mt-2 py-3 px-4 rounded-lg border border-border bg-card text-foreground font-medium shadow-sm hover:border-primary hover:bg-primary-subtle transition-colors flex items-center justify-center gap-2.5"
+                    >
+                      <KeyRound
+                        className="w-[18px] h-[18px] text-muted-foreground group-hover:text-primary-ink transition-colors"
+                        aria-hidden="true"
+                      />
+                      {format(t.auth.signInWith, { provider: samlProviderName || "SSO" })}
+                    </a>
+                  )}
+                </>
               )}
             </>
           )}

@@ -215,4 +215,258 @@ describe("LoginPage throttled logins", () => {
     });
     expect(screen.queryByText(/too many login attempts/i)).not.toBeInTheDocument();
   });
+
+  it("renders a loading status and hides the form and SSO buttons while auth config is loading (#2356)", () => {
+    useAuth.mockReturnValue({
+      loading: true,
+      oidcEnabled: false,
+      oidcProviderName: null,
+      samlEnabled: false,
+      samlProviderName: null,
+      ssoEnforced: false,
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/login"]}>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(/loading/i);
+    expect(screen.queryByLabelText(/username/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/password/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^login$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /sign in with/i })).not.toBeInTheDocument();
+  });
+
+  it("does not render the local form while SSO enforcement is unknown during loading (#2356)", () => {
+    useAuth.mockReturnValue({
+      loading: true,
+      oidcEnabled: true,
+      oidcProviderName: "Corporate SSO",
+      samlEnabled: false,
+      samlProviderName: null,
+      ssoEnforced: true,
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/login"]}>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(/loading/i);
+    expect(screen.queryByText(/local login is restricted/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/username/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /corporate sso/i })).not.toBeInTheDocument();
+  });
+
+  it("reveals SSO buttons and enforcement notice once loading completes (#2356)", () => {
+    useAuth.mockReturnValue({
+      loading: false,
+      oidcEnabled: true,
+      oidcProviderName: "Okta",
+      samlEnabled: false,
+      samlProviderName: null,
+      ssoEnforced: true,
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/login"]}>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /sign in with okta/i })).toBeInTheDocument();
+    expect(
+      screen.getByText(/local login is restricted to authorized administrators/i),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^login$/i })).toBeInTheDocument();
+  });
+
+  it("reveals the standard form and optional SSO button once loading completes without enforcement (#2356)", () => {
+    useAuth.mockReturnValue({
+      loading: false,
+      oidcEnabled: true,
+      oidcProviderName: "Google",
+      samlEnabled: false,
+      samlProviderName: null,
+      ssoEnforced: false,
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/login"]}>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^login$/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /sign in with google/i })).toBeInTheDocument();
+    expect(screen.queryByText(/local login is restricted/i)).not.toBeInTheDocument();
+  });
+
+  it("transitions smoothly from loading to loaded state, revealing SSO buttons and form (#2356)", () => {
+    useAuth.mockReturnValue({
+      loading: true,
+      oidcEnabled: false,
+      oidcProviderName: null,
+      samlEnabled: false,
+      samlProviderName: null,
+      ssoEnforced: false,
+    });
+
+    const { rerender } = render(
+      <MemoryRouter initialEntries={["/login"]}>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(/loading/i);
+    expect(screen.queryByLabelText(/username/i)).not.toBeInTheDocument();
+
+    useAuth.mockReturnValue({
+      loading: false,
+      oidcEnabled: true,
+      oidcProviderName: "Google",
+      samlEnabled: false,
+      samlProviderName: null,
+      ssoEnforced: false,
+    });
+
+    rerender(
+      <MemoryRouter initialEntries={["/login"]}>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /sign in with google/i })).toBeInTheDocument();
+  });
+
+  it("preserves redirect error while auth config is loading and after load completes (#2356)", () => {
+    useAuth.mockReturnValue({
+      loading: true,
+      oidcEnabled: false,
+      oidcProviderName: null,
+      samlEnabled: false,
+      samlProviderName: null,
+      ssoEnforced: false,
+    });
+
+    const { rerender } = render(
+      <MemoryRouter initialEntries={["/login?error=oidc_provider_unreachable"]}>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/could not reach the identity provider/i);
+    expect(screen.getByText(/loading\.\.\./i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/username/i)).not.toBeInTheDocument();
+
+    useAuth.mockReturnValue({
+      loading: false,
+      oidcEnabled: true,
+      oidcProviderName: "Corporate SSO",
+      samlEnabled: false,
+      samlProviderName: null,
+      ssoEnforced: false,
+    });
+
+    rerender(
+      <MemoryRouter initialEntries={["/login"]}>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/could not reach the identity provider/i);
+    expect(screen.queryByText(/loading\.\.\./i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /corporate sso/i })).toBeInTheDocument();
+  });
+
+  it("preserves redirect notice while auth config is loading and after load completes (#2356)", () => {
+    useAuth.mockReturnValue({
+      loading: true,
+      oidcEnabled: false,
+      oidcProviderName: null,
+      samlEnabled: false,
+      samlProviderName: null,
+      ssoEnforced: false,
+    });
+
+    const { rerender } = render(
+      <MemoryRouter initialEntries={["/login?notice=idp_logout_failed"]}>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText(/you're signed out of snapotter/i)).toBeInTheDocument();
+    expect(screen.getByText(/loading\.\.\./i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/username/i)).not.toBeInTheDocument();
+
+    useAuth.mockReturnValue({
+      loading: false,
+      oidcEnabled: true,
+      oidcProviderName: "Corporate SSO",
+      samlEnabled: false,
+      samlProviderName: null,
+      ssoEnforced: false,
+    });
+
+    rerender(
+      <MemoryRouter initialEntries={["/login"]}>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText(/you're signed out of snapotter/i)).toBeInTheDocument();
+    expect(screen.queryByText(/loading\.\.\./i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /corporate sso/i })).toBeInTheDocument();
+  });
+
+  it("reveals SAML SSO button once loading completes (#2356)", () => {
+    useAuth.mockReturnValue({
+      loading: true,
+      oidcEnabled: false,
+      oidcProviderName: null,
+      samlEnabled: true,
+      samlProviderName: "JumpCloud",
+      ssoEnforced: true,
+    });
+
+    const { rerender } = render(
+      <MemoryRouter initialEntries={["/login"]}>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(/loading/i);
+    expect(screen.queryByRole("link", { name: /jumpcloud/i })).not.toBeInTheDocument();
+
+    useAuth.mockReturnValue({
+      loading: false,
+      oidcEnabled: false,
+      oidcProviderName: null,
+      samlEnabled: true,
+      samlProviderName: "JumpCloud",
+      ssoEnforced: true,
+    });
+
+    rerender(
+      <MemoryRouter initialEntries={["/login"]}>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    const link = screen.getByRole("link", { name: /sign in with jumpcloud/i });
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute("href", "/api/auth/saml/login");
+  });
 });
