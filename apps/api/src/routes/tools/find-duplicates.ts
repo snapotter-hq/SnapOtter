@@ -230,7 +230,7 @@ export function registerFindDuplicates(app: FastifyInstance) {
             }
             // pino serializes only the `err` key as an Error, so the fallback
             // failure goes in as its message or it would land as `{}`.
-            request.log.warn(
+            logger.warn(
               {
                 err: decodeErr,
                 probeErr: rawProbeErr instanceof Error ? rawProbeErr.message : String(rawProbeErr),
