@@ -12,6 +12,7 @@ import {
   decodeToSharpCompat,
   isDecoderUnavailable,
   needsCliDecode,
+  noteDecoderFallback,
 } from "../lib/format-decoders.js";
 import { decodeHeic } from "../lib/heic-converter.js";
 import { logger } from "../lib/logger.js";
@@ -123,6 +124,7 @@ export class ImageInputHandler implements InputHandler {
           if (fallbackFormat !== "svg") {
             await boundedSharp(fileBuffer, opts.maxPixels).resize(1).raw().toBuffer();
           }
+          noteDecoderFallback(decodeErr, validation.format, opts.log || logger);
         } catch (err) {
           opts.signal?.throwIfAborted();
           const probeErr = asDecoderOutOfMemory(err);

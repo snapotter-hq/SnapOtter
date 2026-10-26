@@ -224,9 +224,8 @@ describe("find-duplicates skip paths (#1493)", () => {
       expect(lines[0][0]).toMatchObject({
         filename: "layers.psd",
         format: "psd",
-        // a string, not an Error: pino would serialize a second Error key as {}
-        decodeErr: "injected ImageMagick failure",
-        err: expect.any(Error),
+        probeErr: expect.any(String),
+        err: expect.objectContaining({ message: "injected ImageMagick failure" }),
       });
     } finally {
       warnSpy.mockRestore();

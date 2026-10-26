@@ -14,6 +14,7 @@ import {
   decodeToSharpCompat,
   isDecoderUnavailable,
   needsCliDecode,
+  noteDecoderFallback,
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { asInputErrorIfUndecodable } from "../../lib/image-error.js";
@@ -218,6 +219,7 @@ export function registerFindDuplicates(app: FastifyInstance) {
             if (fallbackFormat !== "svg") {
               await sharp(file.buffer).resize(1).raw().toBuffer();
             }
+            noteDecoderFallback(decodeErr, validation.format, request.log);
           } catch (rawProbeErr) {
             const probeErr = asDecoderOutOfMemory(rawProbeErr);
             if (probeErr instanceof DecoderOutOfMemoryError) {
@@ -226,12 +228,12 @@ export function registerFindDuplicates(app: FastifyInstance) {
             if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
               throw decodeErr;
             }
-            // pino serializes only the `err` key as an Error, so the decoder's
+            // pino serializes only the `err` key as an Error, so the fallback
             // failure goes in as its message or it would land as `{}`.
-            logger.warn(
+            request.log.warn(
               {
-                err: rawProbeErr,
-                decodeErr: decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
+                err: decodeErr,
+                probeErr: rawProbeErr instanceof Error ? rawProbeErr.message : String(rawProbeErr),
                 filename: file.filename,
                 format: validation.format,
               },

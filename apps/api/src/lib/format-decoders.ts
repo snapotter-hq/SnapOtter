@@ -10,6 +10,7 @@ import { hasServerErrorStatus, isSafeMessageError, SafeError } from "@snapotter/
 import sharp from "sharp";
 import { isBinarySpawnFailure } from "./binary-overrides.js";
 import { isRawExtension } from "./file-validation.js";
+import { logger } from "./logger.js";
 import { normalizeOperationalWriteError } from "./object-storage.js";
 
 const execFileAsync = promisify(execFile);
@@ -52,6 +53,23 @@ export class DecoderOutOfMemoryError extends DecoderUnavailableError {
  */
 export function isDecoderUnavailable(err: unknown): boolean {
   return isSafeMessageError(err) && err.code === "ENGINE_UNAVAILABLE";
+}
+
+const fallbackReported = new Set<string>();
+export const __test_clearFallbackReported = () => fallbackReported.clear();
+
+export function noteDecoderFallback(
+  err: unknown,
+  format: string,
+  log: { warn: (obj: object, msg: string) => void },
+): void {
+  if (isDecoderUnavailable(err)) {
+    const key = `${format}-fallback`;
+    if (!fallbackReported.has(key) || process.env.NODE_ENV === "test") {
+      (log ?? logger).warn({ err, format }, "CLI decoder unavailable, taking Sharp fallback");
+      fallbackReported.add(key);
+    }
+  }
 }
 
 /**

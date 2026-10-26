@@ -18,6 +18,7 @@ import {
   decodeToSharpCompat,
   isDecoderUnavailable,
   needsCliDecode,
+  noteDecoderFallback,
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
@@ -251,6 +252,7 @@ export function registerBarcodeRead(app: FastifyInstance) {
             if (fallbackFormat !== "svg") {
               await sharp(fileBuffer).resize(1).raw().toBuffer();
             }
+            noteDecoderFallback(decodeErr, validation.format, request.log);
           } catch (rawProbeErr) {
             const probeErr = asDecoderOutOfMemory(rawProbeErr);
             if (probeErr instanceof DecoderOutOfMemoryError) {

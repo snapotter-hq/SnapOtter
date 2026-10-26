@@ -40,6 +40,8 @@ vi.mock("../../../apps/api/src/lib/format-decoders.js", async (importOriginal) =
     DecoderUnavailableError: actual.DecoderUnavailableError,
     DecoderOutOfMemoryError: actual.DecoderOutOfMemoryError,
     isDecoderUnavailable: actual.isDecoderUnavailable,
+    noteDecoderFallback: actual.noteDecoderFallback,
+    __test_clearFallbackReported: actual.__test_clearFallbackReported,
     decodeAnyFormat: mocks.decodeAnyFormat,
     decodeToSharpCompat: mocks.decodeToSharpCompat,
     needsCliDecode: (format: string) => format === "raw",
@@ -78,6 +80,8 @@ const DECODED = Buffer.from("decoded");
 const ORIENTED = Buffer.from("oriented");
 
 beforeEach(() => {
+  if (typeof mocks.__test_clearFallbackReported === "function")
+    mocks.__test_clearFallbackReported();
   vi.clearAllMocks();
   mocks.autoOrient.mockResolvedValue(ORIENTED);
   mocks.decodeAnyFormat.mockResolvedValue(DECODED);
@@ -297,11 +301,20 @@ describe("ImageInputHandler decoder availability (#1428)", () => {
 
   it("uses Sharp's own decode when the CLI decoder is missing but Sharp reads the file", async () => {
     detected("raw");
-    mocks.decodeToSharpCompat.mockRejectedValue(missingMagick());
+    const err = missingMagick();
+    mocks.decodeToSharpCompat.mockRejectedValue(err);
 
-    const result = await prepare("photo.dng");
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
+    const result = await new ImageInputHandler().prepare(RAW, "photo.dng", {
+      scratchDir: "/tmp/in",
+      log: log as never,
+    });
 
     expect(result.buffer).toBe(ORIENTED);
+    expect(log.warn).toHaveBeenCalledWith(
+      { err, format: "raw" },
+      "CLI decoder unavailable, taking Sharp fallback",
+    );
   });
 
   it("skips the 1x1 pixel probe, sanitizes the SVG, and skips autoOrient when the CLI fallback detects an SVG (#3749)", async () => {

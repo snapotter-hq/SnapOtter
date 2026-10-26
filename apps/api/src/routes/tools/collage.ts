@@ -14,6 +14,7 @@ import {
   decodeToSharpCompat,
   isDecoderUnavailable,
   needsCliDecode,
+  noteDecoderFallback,
 } from "../../lib/format-decoders.js";
 import { encodeJxl } from "../../lib/format-encoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
@@ -512,6 +513,7 @@ export function registerCollage(app: FastifyInstance) {
             if (fallbackFormat !== "svg") {
               await sharp(file.buffer).resize(1).raw().toBuffer();
             }
+            noteDecoderFallback(decodeErr, validation.format, request.log);
           } catch (rawProbeErr) {
             const probeErr = asDecoderOutOfMemory(rawProbeErr);
             if (probeErr instanceof DecoderOutOfMemoryError) throw probeErr;
