@@ -120,6 +120,23 @@ describe("classifyError", () => {
       classifyError(Object.assign(new Error("syntax error at or near"), { code: "42601" })),
     ).toBe("bug");
   });
+  it("operational: storage quotas (EDQUOT) and permissions (EPERM on fs syscalls)", () => {
+    expect(classifyError(Object.assign(new Error("quota"), { code: "EDQUOT" }))).toBe(
+      "operational",
+    );
+    expect(
+      classifyError(Object.assign(new Error("perm"), { code: "EPERM", syscall: "open" })),
+    ).toBe("operational");
+    expect(
+      classifyError(Object.assign(new Error("perm"), { code: "EPERM", syscall: "mkdir" })),
+    ).toBe("operational");
+
+    // EPERM without an fs syscall (like process.kill) is our bug
+    expect(
+      classifyError(Object.assign(new Error("kill perm"), { code: "EPERM", syscall: "kill" })),
+    ).toBe("bug");
+    expect(classifyError(Object.assign(new Error("no syscall"), { code: "EPERM" }))).toBe("bug");
+  });
   it("bug: everything else, including bug-kind SafeError and ReplyError", () => {
     expect(classifyError(new Error("undefined is not a function"))).toBe("bug");
     expect(classifyError(new SafeError("Impossible state", { kind: "bug" }))).toBe("bug");

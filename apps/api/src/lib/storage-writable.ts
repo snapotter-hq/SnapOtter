@@ -2,11 +2,11 @@ import { randomUUID } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { env } from "../config.js";
+import { isOperationalErrno, STORAGE_NOT_WRITABLE_CODES } from "./error-report.js";
 
 // Error codes that specifically mean "the running user may not write here".
 // Distinct from capacity (ENOSPC) or other I/O faults, which are handled
 // elsewhere and must not be misreported as a permissions problem.
-const NOT_WRITABLE_CODES = new Set(["EACCES", "EPERM", "EROFS"]);
 
 /**
  * Returns true if `dir` can be created (when missing) and written to by the
@@ -24,7 +24,7 @@ export async function isDirWritable(dir: string): Promise<boolean> {
     return true;
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
-    if (code && NOT_WRITABLE_CODES.has(code)) return false;
+    if (isOperationalErrno(err) && code && STORAGE_NOT_WRITABLE_CODES.has(code)) return false;
     throw err;
   }
 }

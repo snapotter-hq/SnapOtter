@@ -26,7 +26,38 @@ export type ErrorClass = "expected" | "operational" | "bug";
 
 const HOUR_MS = 3600_000;
 const LIMITS: Record<Exclude<ErrorClass, "expected">, number> = { operational: 1, bug: 10 };
-const OPERATIONAL_CODES = new Set(["ENOSPC", "EACCES", "EROFS", "EMFILE", "ENFILE"]);
+export const STORAGE_FULL_CODES = new Set(["ENOSPC", "EDQUOT"]);
+export const STORAGE_NOT_WRITABLE_CODES = new Set(["EACCES", "EPERM", "EROFS"]);
+const OPERATIONAL_CODES = new Set([
+  ...STORAGE_FULL_CODES,
+  ...STORAGE_NOT_WRITABLE_CODES,
+  "EMFILE",
+  "ENFILE",
+]);
+
+// EPERM from process.kill or signals can be a bug; only count it on fs syscalls.
+const FS_SYSCALLS = new Set([
+  "open",
+  "write",
+  "mkdir",
+  "rename",
+  "unlink",
+  "rmdir",
+  "copyFile",
+  "chmod",
+  "chown",
+  "stat",
+  "lstat",
+  "fstat",
+  "utimes",
+  "futimes",
+  "fsync",
+  "opendir",
+  "readdir",
+  "read",
+  "realpath",
+  "mkdtemp",
+]);
 
 /**
  * True for a node errno that means the host's environment is broken (disk
@@ -36,7 +67,12 @@ const OPERATIONAL_CODES = new Set(["ENOSPC", "EACCES", "EROFS", "EMFILE", "ENFIL
  */
 export function isOperationalErrno(err: unknown): boolean {
   const code = (err as { code?: unknown } | null)?.code;
-  return typeof code === "string" && OPERATIONAL_CODES.has(code);
+  if (typeof code !== "string" || !OPERATIONAL_CODES.has(code)) return false;
+  if (code === "EPERM") {
+    const syscall = (err as { syscall?: unknown } | null)?.syscall;
+    if (typeof syscall !== "string" || !FS_SYSCALLS.has(syscall)) return false;
+  }
+  return true;
 }
 
 export interface ReportContext {

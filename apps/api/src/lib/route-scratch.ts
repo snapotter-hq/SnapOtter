@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { env } from "../config.js";
+import { normalizeOperationalWriteError } from "./object-storage.js";
 
 const SAFE_SCRATCH_PREFIX = /^[a-z][a-z0-9-]{0,31}$/;
 
@@ -30,7 +31,7 @@ export async function withRouteScratch<T>(
   } catch (error) {
     const code = error instanceof Error ? (error as NodeJS.ErrnoException).code : undefined;
     if (error instanceof Error && code && ["EACCES", "EDQUOT", "ENOSPC", "EROFS"].includes(code)) {
-      throw Object.assign(error, { statusCode: 503 });
+      throw normalizeOperationalWriteError(error);
     }
     throw error;
   }

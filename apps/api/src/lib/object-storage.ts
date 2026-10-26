@@ -71,6 +71,11 @@ function isS3Enabled(): boolean {
 
 import type { S3StorageModule } from "@snapotter/enterprise";
 import { connectivityClass, isClientAbort, SafeError } from "@snapotter/shared";
+import {
+  isOperationalErrno,
+  STORAGE_FULL_CODES,
+  STORAGE_NOT_WRITABLE_CODES,
+} from "./error-report.js";
 
 let s3Mod: S3StorageModule | null = null;
 // Concurrent first calls may double-configure; configureS3 is idempotent.
@@ -736,12 +741,14 @@ export function normalizeS3ReadFault(error: unknown): unknown {
  */
 export function normalizeOperationalWriteError(error: unknown): unknown {
   if (alreadyClassified(error)) return error;
-  const { code } = (error ?? {}) as NodeJS.ErrnoException;
-  if (code === "ENOSPC" || code === "EDQUOT") {
-    return storageFault(STORAGE_FULL_MESSAGE, "storage-full", error);
-  }
-  if (code === "EACCES" || code === "EPERM" || code === "EROFS") {
-    return storageFault(STORAGE_NOT_WRITABLE_MESSAGE, "storage-not-writable", error);
+  if (isOperationalErrno(error)) {
+    const { code } = (error ?? {}) as NodeJS.ErrnoException;
+    if (code && STORAGE_FULL_CODES.has(code)) {
+      return storageFault(STORAGE_FULL_MESSAGE, "storage-full", error);
+    }
+    if (code && STORAGE_NOT_WRITABLE_CODES.has(code)) {
+      return storageFault(STORAGE_NOT_WRITABLE_MESSAGE, "storage-not-writable", error);
+    }
   }
   const s3Answered = typeof error === "object" && error !== null && "$metadata" in error;
   if ((s3Answered && !isS3MissingShape(error)) || connectivityClass(error) === "net-unavailable") {

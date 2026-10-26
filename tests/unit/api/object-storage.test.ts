@@ -1195,7 +1195,10 @@ describe("object-storage (local backend)", () => {
       ["EPERM", "storage-not-writable"],
       ["EROFS", "storage-not-writable"],
     ] as const) {
-      const cause = Object.assign(new Error(`${errno}: simulated`), { code: errno });
+      const cause = Object.assign(new Error(`${errno}: simulated`), {
+        code: errno,
+        syscall: "open",
+      });
       expect(normalizeOperationalWriteError(cause)).toMatchObject({
         isSafeMessage: true,
         kind: "operational",
