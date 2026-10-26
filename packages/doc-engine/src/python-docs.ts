@@ -1,5 +1,12 @@
 import { runDocsScript } from "@snapotter/ai";
-import { SafeError, type SignPlacement, ToolInputError } from "@snapotter/shared";
+import {
+  isSafeMessageError,
+  SafeError,
+  type SignPlacement,
+  ToolInputError,
+} from "@snapotter/shared";
+
+const MUPDF_DAMAGE_KEYWORDS = "(?:xref|syntax error|format error|repair|corrupt|page tree)";
 
 /**
  * MuPDF's printer reports document damage as prefixed lines on the stream the
@@ -11,8 +18,15 @@ import { SafeError, type SignPlacement, ToolInputError } from "@snapotter/shared
  * The prefix requirement keeps Python tracebacks that merely mention these
  * words classified as bugs.
  */
-const MUPDF_DAMAGE_NOISE =
-  /(?:^|\n)(?:MuPDF error:|error:|warning:).*(?:xref|syntax error|format error|repair|corrupt|page tree)/i;
+const MUPDF_DAMAGE_NOISE = new RegExp(
+  `(?:^|\\n)(?:MuPDF error:|error:|warning:).*${MUPDF_DAMAGE_KEYWORDS}`,
+  "i",
+);
+
+const MUPDF_DAMAGE_ERROR = new RegExp(`(?:^|\\n)code=\\d+:\\s*.*${MUPDF_DAMAGE_KEYWORDS}`, "i");
+
+const DAMAGED_PDF_MESSAGE =
+  "This PDF is damaged (the PDF engine reported broken document structure). Run it through the Repair PDF tool, then try again.";
 
 /**
  * Parse the JSON line the docs dispatcher prints on stdout. Every doc_* script
@@ -54,12 +68,9 @@ function parseDocsJson<T>(script: string, stdout: string): T {
     // Expected-class errors never reach Sentry or the worker's error log, so
     // keep the raw output on the cause: it is the only artifact left to
     // check when the classification itself is in question.
-    throw Object.assign(
-      new ToolInputError(
-        "This PDF is damaged (the PDF engine reported broken document structure). Run it through the Repair PDF tool, then try again.",
-      ),
-      { cause: new Error(`${script} stdout (first 200 chars): ${trimmed.slice(0, 200)}`) },
-    );
+    throw Object.assign(new ToolInputError(DAMAGED_PDF_MESSAGE), {
+      cause: new Error(`${script} stdout (first 200 chars): ${trimmed.slice(0, 200)}`),
+    });
   }
   throw new SafeError("Document tool returned non-JSON output", {
     kind: "bug",
@@ -71,6 +82,13 @@ function parseDocsJson<T>(script: string, stdout: string): T {
 function formatDocsError(error: unknown, stdout: string): string {
   const trimmed = typeof error === "string" ? error.trim() : "";
   return trimmed || stdout.slice(0, 200);
+}
+
+function withDamageClassification(err: unknown): never {
+  if (isSafeMessageError(err) && MUPDF_DAMAGE_ERROR.test(err.message)) {
+    throw Object.assign(new ToolInputError(DAMAGED_PDF_MESSAGE), { cause: err });
+  }
+  throw err;
 }
 
 export interface DocsScriptOptions {
@@ -98,7 +116,7 @@ export async function pdfPageCountPy(absPath: string, opts?: DocsScriptOptions):
     "doc_pagecount",
     { path: absPath },
     ...(runOpts ? [runOpts] : []),
-  );
+  ).catch(withDamageClassification);
   const parsed = parseDocsJson<{ pages?: number; error?: string }>("doc_pagecount", stdout);
   if ("error" in parsed || typeof parsed.pages !== "number") {
     throw new Error(`doc_pagecount failed: ${formatDocsError(parsed.error, stdout)}`);
@@ -117,7 +135,7 @@ export async function pdfFlattenPy(
     "doc_flatten",
     { path: inPath, out: outPath },
     ...(runOpts ? [runOpts] : []),
-  );
+  ).catch(withDamageClassification);
   const parsed = parseDocsJson<{ ok?: boolean; error?: string }>("doc_flatten", stdout);
   if ("error" in parsed) {
     throw new Error(`doc_flatten failed: ${formatDocsError(parsed.error, stdout)}`);
@@ -139,7 +157,7 @@ export async function pdfScrubProducerPy(
     "doc_scrub_meta",
     { path: inPath, out: outPath },
     ...(runOpts ? [runOpts] : []),
-  );
+  ).catch(withDamageClassification);
   const parsed = parseDocsJson<{ ok?: boolean; error?: string }>("doc_scrub_meta", stdout);
   if ("error" in parsed) {
     throw new Error(`doc_scrub_meta failed: ${formatDocsError(parsed.error, stdout)}`);
@@ -164,7 +182,7 @@ export async function pdfRedactPy(
       caseSensitive,
     },
     ...(runOpts ? [runOpts] : []),
-  );
+  ).catch(withDamageClassification);
   const parsed = parseDocsJson<{
     found?: number;
     verified?: boolean;
@@ -190,7 +208,7 @@ export async function pdfTextPy(
     "doc_text",
     { path: inPath, out: outTxtPath },
     ...(runOpts ? [runOpts] : []),
-  );
+  ).catch(withDamageClassification);
   const parsed = parseDocsJson<{ chars?: number; hasText?: boolean; error?: string }>(
     "doc_text",
     stdout,
@@ -216,7 +234,7 @@ export async function pdfToWordPy(
     "doc_to_word",
     { path: inPath, out: outPath },
     buildDocsRunOpts(opts, 300_000),
-  );
+  ).catch(withDamageClassification);
   const parsed = parseDocsJson<{ ok?: boolean; error?: string }>("doc_to_word", stdout);
   if ("error" in parsed) {
     throw new Error(`doc_to_word failed: ${formatDocsError(parsed.error, stdout)}`);
@@ -233,7 +251,7 @@ export async function pdfMetadataGetPy(
     "doc_metadata",
     { path: inPath, mode: "get" },
     ...(runOpts ? [runOpts] : []),
-  );
+  ).catch(withDamageClassification);
   const parsed = parseDocsJson<{ metadata?: Record<string, string>; error?: string }>(
     "doc_metadata",
     stdout,
@@ -264,7 +282,7 @@ export async function pdfMetadataSetPy(
       metadata,
     },
     ...(runOpts ? [runOpts] : []),
-  );
+  ).catch(withDamageClassification);
   const parsed = parseDocsJson<{ ok?: boolean; error?: string }>("doc_metadata", stdout);
   if ("error" in parsed) {
     throw new Error(`doc_metadata set failed: ${formatDocsError(parsed.error, stdout)}`);
@@ -282,7 +300,7 @@ export async function htmlToPdfPy(
     "doc_html_pdf",
     { path: inPath, out: outPath, mode },
     buildDocsRunOpts(opts, 120_000),
-  );
+  ).catch(withDamageClassification);
   const parsed = parseDocsJson<{ ok?: boolean; error?: string }>("doc_html_pdf", stdout);
   if ("error" in parsed) {
     const detail = formatDocsError(parsed.error, stdout);
@@ -311,7 +329,7 @@ export async function pdfSignPy(
       placements,
     },
     ...(runOpts ? [runOpts] : []),
-  );
+  ).catch(withDamageClassification);
   const parsed = parseDocsJson<{
     ok?: boolean;
     placed?: number;

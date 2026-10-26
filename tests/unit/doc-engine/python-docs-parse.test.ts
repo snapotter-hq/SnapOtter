@@ -8,7 +8,7 @@ vi.mock("@snapotter/ai", () => ({
   runDocsScript: (...args: unknown[]) => runDocsScript(...args),
 }));
 
-import { isSafeMessageError, isToolInputError } from "@snapotter/shared";
+import { isSafeMessageError, isToolInputError, SafeError } from "@snapotter/shared";
 import {
   htmlToPdfPy,
   pdfFlattenPy,
@@ -35,6 +35,53 @@ function errorText(err: unknown): string {
   }
   return parts.join(" | ");
 }
+
+describe("withDamageClassification (nonzero exit from sidecar)", () => {
+  beforeEach(() => {
+    runDocsScript.mockReset();
+  });
+
+  it("reclassifies a PyMuPDF error message matching MUPDF_DAMAGE_ERROR to ToolInputError", async () => {
+    const err = new SafeError("code=7: cycle in page tree", { kind: "bug", code: "exit-1" });
+    runDocsScript.mockRejectedValueOnce(err);
+    try {
+      await pdfFlattenPy("/in.pdf", "/out.pdf");
+      expect.fail("Should have thrown");
+    } catch (e: any) {
+      expect(isToolInputError(e)).toBe(true);
+      expect(e.message).toContain("This PDF is damaged");
+      expect(e.cause).toBe(err);
+    }
+  });
+
+  it("does not reclassify a SafeError missing the damage keywords", async () => {
+    const err = new SafeError("code=1: RuntimeError: internal cache violated", {
+      kind: "bug",
+      code: "exit-1",
+    });
+    runDocsScript.mockRejectedValueOnce(err);
+    try {
+      await pdfFlattenPy("/in.pdf", "/out.pdf");
+      expect.fail("Should have thrown");
+    } catch (e: any) {
+      expect(e).toBe(err);
+    }
+  });
+
+  it("does not reclassify genuine SyntaxError unrelated to PyMuPDF damage", async () => {
+    const err = new SafeError("code=1: SyntaxError: invalid syntax", {
+      kind: "bug",
+      code: "exit-1",
+    });
+    runDocsScript.mockRejectedValueOnce(err);
+    try {
+      await pdfFlattenPy("/in.pdf", "/out.pdf");
+      expect.fail("Should have thrown");
+    } catch (e: any) {
+      expect(e).toBe(err);
+    }
+  });
+});
 
 describe("python-docs sidecar JSON parsing", () => {
   beforeEach(() => {
