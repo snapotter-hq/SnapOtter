@@ -129,10 +129,11 @@ export function registerStitch(app: FastifyInstance) {
             const probeErr = asDecoderOutOfMemory(rawProbeErr);
             if (probeErr instanceof DecoderOutOfMemoryError) throw probeErr;
             if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) throw decodeErr;
+            request.log?.warn({ err: decodeErr, toolId: "stitch" }, "Decode failed");
             return reply.status(422).send({
               error: `Failed to decode "${file.filename}" (${validation.format.toUpperCase()})`,
               details: stripInternalPaths(
-                rawProbeErr instanceof Error ? rawProbeErr.message : String(rawProbeErr),
+                decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
               ),
             });
           }

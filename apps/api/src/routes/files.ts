@@ -7,6 +7,7 @@ import sharp from "sharp";
 import { deleteRecordedToolJob, recordCompletedToolJob } from "../lib/completed-job.js";
 import { sendInputValidationError } from "../lib/engine-unavailable.js";
 import { reportError } from "../lib/error-report.js";
+import { stripInternalPaths } from "../lib/errors.js";
 import { readImageDimensions } from "../lib/exiftool.js";
 import { validateImageBuffer } from "../lib/file-validation.js";
 import { sanitizeFilename } from "../lib/filename.js";
@@ -497,8 +498,12 @@ export async function fileRoutes(app: FastifyInstance): Promise<void> {
               request.log,
             );
           }
+          request.log?.warn({ err: decodeErr, toolId: "file-preview" }, "Decode failed");
           return reply.status(422).send({
             error: `Failed to decode ${validation.format.toUpperCase()} file`,
+            details: stripInternalPaths(
+              decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
+            ),
           });
         }
       }

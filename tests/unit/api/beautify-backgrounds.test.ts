@@ -518,7 +518,7 @@ describe("beautify route and processBeautify validation & backgroundImage prepar
         (e: unknown) => e,
       );
       expect(isToolInputError(memeClientErr)).toBe(true);
-      expect((memeClientErr as Error).message).toBe(UNDECODABLE_IMAGE_MESSAGE);
+      expect((memeClientErr as Error).message).toBe("dcraw_emu failed on corrupt CR2");
     } finally {
       unavailSpy.mockRestore();
     }
@@ -893,8 +893,8 @@ describe("beautify route and processBeautify validation & backgroundImage prepar
     expect(resRouteCorruptSvgz.statusCode).toBe(400);
     expect(typeof resRouteCorruptSvgz.json.error).toBe("string");
 
-    // 5. Registry process decodeHeic failure wraps non-server errors with asInputErrorIfUndecodable,
-    // and decodeToSharpCompat receives lowercase fileExt
+    // 5. Registry process decodeHeic failure marks non-server errors with ToolInputError
+    // preserving the decoder's message, and decodeToSharpCompat receives lowercase fileExt
     const heicBuf = readFixture(fixtures.image.base.heic200);
     const heicSpy = vi
       .spyOn(heicConverter, "decodeHeic")
@@ -905,7 +905,7 @@ describe("beautify route and processBeautify validation & backgroundImage prepar
         (e: unknown) => e,
       );
       expect(isToolInputError(heicErr)).toBe(true);
-      expect((heicErr as Error).message).toBe(UNDECODABLE_IMAGE_MESSAGE);
+      expect((heicErr as Error).message).toBe("heif-dec failed on corrupt HEIC");
     } finally {
       heicSpy.mockRestore();
     }

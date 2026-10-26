@@ -266,8 +266,8 @@ export function registerImageToPdfRoute(
             }
             request.log?.warn(
               {
-                err: rawProbeErr,
-                decodeErr: decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
+                err: decodeErr,
+                probeErr: rawProbeErr instanceof Error ? rawProbeErr.message : String(rawProbeErr),
                 filename: file.filename,
                 toolId: opts.toolId,
               },
@@ -276,7 +276,7 @@ export function registerImageToPdfRoute(
             return reply.status(422).send({
               error: `Failed to decode ${validation.format.toUpperCase()} file "${file.filename}"`,
               details: stripInternalPaths(
-                rawProbeErr instanceof Error ? rawProbeErr.message : String(rawProbeErr),
+                decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
               ),
             });
           }

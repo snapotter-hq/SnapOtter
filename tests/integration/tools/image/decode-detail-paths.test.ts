@@ -135,25 +135,6 @@ function post(route: (typeof ROUTES)[number], sample: Sample) {
   });
 }
 
-// These routes retry a failed CLI decode with Sharp and report Sharp's error
-// (or the undecodable-image message), which never carries a path; their ICO
-// row only pins that behaviour.
-const ICO_DETAIL_FROM_SHARP = new Set([
-  "collage",
-  "stitch",
-  "split",
-  "color-palette",
-  "barcode-read",
-  "meme-generator upload",
-  "image-enhancement analyze",
-  "optimize-for-web preview",
-  "image-to-pdf",
-]);
-
-// Routes whose HEIC decode catch delegates to asInputErrorIfUndecodable,
-// returning UNDECODABLE_IMAGE_MESSAGE instead of the raw decoder stderr.
-const HEIC_DETAIL_FROM_SHARP = new Set(["meme-generator upload"]);
-
 describe("decode failures don't expose server temp paths (#1430)", () => {
   for (const route of ROUTES) {
     for (const [format, sample] of Object.entries(SAMPLES)) {
@@ -164,15 +145,8 @@ describe("decode failures don't expose server temp paths (#1430)", () => {
         expect(res.body).not.toContain(tmpdir());
         expect(res.body).not.toMatch(/(heic|ico|jxl|raw|jp2|exr)-(in|out)-/);
         const { details } = res.json();
-        if (
-          (format === "ico" && ICO_DETAIL_FROM_SHARP.has(route.name)) ||
-          (format === "heic" && HEIC_DETAIL_FROM_SHARP.has(route.name))
-        ) {
-          expect(details).toMatch(/unsupported image format|can't be decoded/);
-        } else {
-          // The decoder's own error named its temp files; they're now masked.
-          expect(details).toContain("[internal]");
-        }
+        // The decoder's own error named its temp files; they're now masked.
+        expect(details).toContain("[internal]");
       });
     }
   }

@@ -81,6 +81,8 @@ import * as imageErrorMod from "../../../apps/api/src/lib/image-error.js";
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
 import { registerSiemRoutes } from "../../../apps/api/src/routes/enterprise/siem.js";
 import { registerWebhookRoutes } from "../../../apps/api/src/routes/enterprise/webhooks.js";
+import { fileRoutes } from "../../../apps/api/src/routes/files.js";
+import { registerBarcodeRead } from "../../../apps/api/src/routes/tools/barcode-read.js";
 import { registerBulkRename } from "../../../apps/api/src/routes/tools/bulk-rename.js";
 import { registerCollage } from "../../../apps/api/src/routes/tools/collage.js";
 import { registerColorPalette } from "../../../apps/api/src/routes/tools/color-palette.js";
@@ -90,10 +92,15 @@ import { registerEditMetadata } from "../../../apps/api/src/routes/tools/edit-me
 import { registerFavicon } from "../../../apps/api/src/routes/tools/favicon.js";
 import { registerFindDuplicates } from "../../../apps/api/src/routes/tools/find-duplicates.js";
 import { registerHtmlToImage } from "../../../apps/api/src/routes/tools/html-to-image.js";
+import { registerImageEnhancement } from "../../../apps/api/src/routes/tools/image-enhancement.js";
 import { registerImageToPdf } from "../../../apps/api/src/routes/tools/image-to-pdf.js";
+import { registerMemeGenerator } from "../../../apps/api/src/routes/tools/meme-generator.js";
+import { registerOptimizeForWeb } from "../../../apps/api/src/routes/tools/optimize-for-web.js";
 import { registerPassportPhoto } from "../../../apps/api/src/routes/tools/passport-photo.js";
 import { registerPdfToImage } from "../../../apps/api/src/routes/tools/pdf-to-image.js";
 import { registerQrGenerate } from "../../../apps/api/src/routes/tools/qr-generate.js";
+import { registerSplit } from "../../../apps/api/src/routes/tools/split.js";
+import { registerStitch } from "../../../apps/api/src/routes/tools/stitch.js";
 import { registerStripMetadata } from "../../../apps/api/src/routes/tools/strip-metadata.js";
 import { registerSvgToRaster } from "../../../apps/api/src/routes/tools/svg-to-raster.js";
 import { registerVectorize } from "../../../apps/api/src/routes/tools/vectorize.js";
@@ -483,15 +490,130 @@ describe("route catches strip internal paths from details and log raw errors (#1
       expect(icoRes.statusCode, icoRes.body).toBe(422);
       expect(icoRes.json()).toEqual({
         error: 'Failed to decode ICO file "icon.ico"',
-        details: "vips probe failed at [internal]",
+        details: "Command failed: magick [internal]",
       });
-      expect(logLines.some((l) => l.includes("vips probe failed"))).toBe(true);
       expect(logLines.some((l) => l.includes("Command failed: magick"))).toBe(true);
     } finally {
       metaSpy.mockRestore();
       cliSpy.mockRestore();
       heicSpy.mockRestore();
       await app.close();
+    }
+  });
+
+  it("routes that retry a failed CLI decode with Sharp report the decoder's stripped error and log it (#1465)", async () => {
+    const cliSpy = vi
+      .spyOn(formatDecoders, "decodeToSharpCompat")
+      .mockRejectedValue(
+        new Error(`magick: improper image header \`${sampleTempPath}' @ error/icon.c`),
+      );
+    const corruptIco = Buffer.concat([ICO.subarray(0, 22), Buffer.alloc(2048, 0x5a)]);
+
+    const cases: {
+      name: string;
+      register: (app: ReturnType<typeof Fastify>) => void | Promise<void>;
+      url: string;
+      files: () => { field?: string; name: string; type: string; data: Buffer }[];
+      settings?: Record<string, unknown>;
+    }[] = [
+      {
+        name: "collage",
+        register: registerCollage,
+        url: "/api/v1/tools/image/collage",
+        files: () => [
+          { field: "f1", name: "broken.ico", type: "image/x-icon", data: corruptIco },
+          { field: "f2", name: "b.png", type: "image/png", data: png },
+        ],
+        settings: { templateId: "2-h-equal" },
+      },
+      {
+        name: "stitch",
+        register: registerStitch,
+        url: "/api/v1/tools/image/stitch",
+        files: () => [
+          { field: "file1", name: "broken.ico", type: "image/x-icon", data: corruptIco },
+          { field: "file2", name: "b.png", type: "image/png", data: png },
+        ],
+        settings: { direction: "horizontal", resizeMode: "fit" },
+      },
+      {
+        name: "split",
+        register: registerSplit,
+        url: "/api/v1/tools/image/split",
+        files: () => [{ name: "broken.ico", type: "image/x-icon", data: corruptIco }],
+        settings: { columns: 2, rows: 2 },
+      },
+      {
+        name: "color-palette",
+        register: registerColorPalette,
+        url: "/api/v1/tools/image/color-palette",
+        files: () => [{ name: "broken.ico", type: "image/x-icon", data: corruptIco }],
+      },
+      {
+        name: "barcode-read",
+        register: registerBarcodeRead,
+        url: "/api/v1/tools/image/barcode-read",
+        files: () => [{ name: "broken.ico", type: "image/x-icon", data: corruptIco }],
+      },
+      {
+        name: "meme-generator",
+        register: registerMemeGenerator,
+        url: "/api/v1/tools/image/meme-generator",
+        files: () => [{ name: "broken.ico", type: "image/x-icon", data: corruptIco }],
+        settings: { textLayout: "top-bottom", textBoxes: [{ id: "top", text: "HI" }] },
+      },
+      {
+        name: "image-enhancement analyze",
+        register: registerImageEnhancement,
+        url: "/api/v1/tools/image/image-enhancement/analyze",
+        files: () => [{ name: "broken.ico", type: "image/x-icon", data: corruptIco }],
+        settings: {},
+      },
+      {
+        name: "optimize-for-web preview",
+        register: registerOptimizeForWeb,
+        url: "/api/v1/tools/image/optimize-for-web/preview",
+        files: () => [{ name: "broken.ico", type: "image/x-icon", data: corruptIco }],
+        settings: { format: "webp", quality: 60 },
+      },
+      {
+        name: "image-to-pdf",
+        register: registerImageToPdf,
+        url: apiToolPath("image-to-pdf"),
+        files: () => [{ name: "broken.ico", type: "image/x-icon", data: corruptIco }],
+      },
+      {
+        name: "file-preview",
+        register: fileRoutes,
+        url: "/api/v1/preview",
+        files: () => [{ name: "broken.ico", type: "image/x-icon", data: corruptIco }],
+      },
+    ];
+
+    try {
+      for (const c of cases) {
+        const { app, logLines } = await buildLoggedApp(c.register);
+        try {
+          const res = await app.inject({
+            method: "POST",
+            url: c.url,
+            ...multipartBody(c.files(), c.settings),
+          });
+          expect(res.statusCode, `${c.name}: ${res.body}`).toBe(422);
+          expect(res.body, c.name).not.toContain(tmpdir());
+          expect(res.json().details, c.name).toBe(
+            "magick: improper image header `[internal]' @ error/icon.c",
+          );
+          expect(
+            logLines.some((l) => l.includes(sampleTempPath) && l.includes("improper image header")),
+            `${c.name} should log the unstripped decoder error`,
+          ).toBe(true);
+        } finally {
+          await app.close();
+        }
+      }
+    } finally {
+      cliSpy.mockRestore();
     }
   });
 

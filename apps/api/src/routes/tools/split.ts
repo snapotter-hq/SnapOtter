@@ -177,10 +177,11 @@ export function registerSplit(app: FastifyInstance) {
           const probeErr = asDecoderOutOfMemory(rawProbeErr);
           if (probeErr instanceof DecoderOutOfMemoryError) throw probeErr;
           if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) throw decodeErr;
+          request.log?.warn({ err: decodeErr, toolId: "split" }, "Decode failed");
           return reply.status(422).send({
             error: `Failed to decode ${validation.format.toUpperCase()} file`,
             details: stripInternalPaths(
-              rawProbeErr instanceof Error ? rawProbeErr.message : String(rawProbeErr),
+              decodeErr instanceof Error ? decodeErr.message : String(decodeErr),
             ),
           });
         }

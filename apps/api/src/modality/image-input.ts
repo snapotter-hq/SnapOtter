@@ -137,10 +137,11 @@ export class ImageInputHandler implements InputHandler {
           if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
             throw engineUnavailable(decodeErr);
           }
+          (opts.log ?? logger).warn({ err: decodeErr, format: validation.format }, "Decode failed");
           throw new InputValidationError(
             `Failed to decode ${validation.format.toUpperCase()} file`,
             422,
-            stripInternalPaths(err instanceof Error ? err.message : String(err)),
+            stripInternalPaths(decodeErr instanceof Error ? decodeErr.message : String(decodeErr)),
           );
         }
       }

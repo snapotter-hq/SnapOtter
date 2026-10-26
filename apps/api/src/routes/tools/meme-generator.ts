@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { extname, join } from "node:path";
-import { hasServerErrorStatus, isToolInputError } from "@snapotter/shared";
+import {
+  hasServerErrorStatus,
+  isToolInputError,
+  markToolInputError,
+  ToolInputError,
+} from "@snapotter/shared";
 import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 import sharp, { type Metadata } from "sharp";
 import { z } from "zod";
@@ -17,12 +22,17 @@ import {
   needsCliDecode,
 } from "../../lib/format-decoders.js";
 import { decodeHeic } from "../../lib/heic-converter.js";
-import { asInputErrorIfUndecodable, withImageEncodeContext } from "../../lib/image-error.js";
+import {
+  asInputErrorIfUndecodable,
+  PIXEL_LIMIT_IMAGE_MESSAGE,
+  withImageEncodeContext,
+} from "../../lib/image-error.js";
 import { renderMemeTextSvg } from "../../lib/meme-text-renderer.js";
 import { multipartFailure } from "../../lib/multipart-parts.js";
 import { normalizeOperationalWriteError, putObject } from "../../lib/object-storage.js";
 import { decompressSvgz, isSvgClientError, sanitizeSvg } from "../../lib/svg-sanitize.js";
 import { InputValidationError } from "../../modality/contract.js";
+import { isPixelSafetyError } from "../../modality/image-input.js";
 import { registerToolProcessFn } from "../tool-factory.js";
 
 // ---------------------------------------------------------------------------
@@ -150,7 +160,8 @@ async function prepareMemeImage(
     } catch (rawErr) {
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
-      throw await asInputErrorIfUndecodable(buf, err);
+      log?.warn({ err, toolId: "meme-generator" }, "Decode failed");
+      throw err instanceof Error ? markToolInputError(err) : new ToolInputError(String(err));
     }
   }
   let fallbackFormat: string | undefined;
@@ -176,7 +187,13 @@ async function prepareMemeImage(
         const probeErr = asDecoderOutOfMemory(rawProbeErr);
         if (probeErr instanceof DecoderOutOfMemoryError) throw probeErr;
         if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) throw decodeErr;
-        throw await asInputErrorIfUndecodable(buf, rawProbeErr);
+        if (isPixelSafetyError(rawProbeErr)) {
+          throw new ToolInputError(PIXEL_LIMIT_IMAGE_MESSAGE, { cause: rawProbeErr });
+        }
+        log?.warn({ err: decodeErr, toolId: "meme-generator" }, "Decode failed");
+        throw decodeErr instanceof Error
+          ? markToolInputError(decodeErr)
+          : new ToolInputError(String(decodeErr));
       }
     }
   }

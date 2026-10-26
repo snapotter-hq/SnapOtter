@@ -334,22 +334,48 @@ describe("ImageInputHandler decoder availability (#1428)", () => {
     expect(mocks.metadata).not.toHaveBeenCalled();
   });
 
-  it("keeps 422 for a CLI format the decoder rejected", async () => {
+  it("keeps 422 for a CLI format the decoder rejected, reporting the decoder's stripped error and logging it (#1465)", async () => {
     detected("raw");
-    mocks.decodeToSharpCompat.mockRejectedValue(new Error("Command failed: magick"));
+    const decodeErr = new Error("magick: improper image header `/tmp/ico-in-1.ico' @ error/icon.c");
+    mocks.decodeToSharpCompat.mockRejectedValue(decodeErr);
     mocks.metadata.mockRejectedValue(new Error("Input buffer contains unsupported image format"));
+    const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
 
-    await expect(prepare("photo.nef")).rejects.toMatchObject({ statusCode: 422 });
+    await expect(
+      new ImageInputHandler().prepare(RAW, "photo.nef", {
+        scratchDir: "/tmp/in",
+        log: log as never,
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 422,
+      details: "magick: improper image header `[internal]' @ error/icon.c",
+    });
+    expect(log.warn).toHaveBeenCalledWith({ err: decodeErr, format: "raw" }, "Decode failed");
   });
 
-  it("keeps 422 when the CLI decoder rejected a TIFF-headed RAW whose header Sharp reads but pixels fail (#2801)", async () => {
+  it("keeps 422 when the CLI decoder rejected a TIFF-headed RAW whose header Sharp reads but pixels fail (#2801, #1465)", async () => {
     detected("raw");
-    mocks.decodeToSharpCompat.mockRejectedValue(new Error("Command failed: dcraw_emu"));
+    const decodeErr = new Error("Command failed: dcraw_emu /tmp/raw-in-1.cr2");
+    mocks.decodeToSharpCompat.mockRejectedValue(decodeErr);
     mocks.toBuffer.mockRejectedValue(
       new Error("tiff2vips: Sorry, requested compression method is not configured"),
     );
 
-    await expect(prepare("photo.cr2")).rejects.toMatchObject({ statusCode: 422 });
+    await expect(prepare("photo.cr2")).rejects.toMatchObject({
+      statusCode: 422,
+      details: "Command failed: dcraw_emu [internal]",
+    });
+    expect(mocks.logger.warn).toHaveBeenCalledWith(
+      { err: decodeErr, format: "raw" },
+      "Decode failed",
+    );
+
+    // Non-Error string rejection from decodeToSharpCompat also strips paths
+    mocks.decodeToSharpCompat.mockRejectedValueOnce("dcraw_emu failed on /tmp/raw-in-2.cr2");
+    await expect(prepare("photo.cr2")).rejects.toMatchObject({
+      statusCode: 422,
+      details: "dcraw_emu failed on [internal]",
+    });
   });
 
   it("turns a missing ImageMagick on the AVIF fallback into 503", async () => {

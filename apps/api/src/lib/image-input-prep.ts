@@ -3,6 +3,7 @@ import { hasServerErrorStatus, markToolInputError, ToolInputError } from "@snapo
 import type { FastifyBaseLogger } from "fastify";
 import sharp from "sharp";
 import { InputValidationError } from "../modality/contract.js";
+import { isPixelSafetyError } from "../modality/image-input.js";
 import { autoOrient } from "./auto-orient.js";
 import {
   asDecoderOutOfMemory,
@@ -12,7 +13,7 @@ import {
   needsCliDecode,
 } from "./format-decoders.js";
 import { decodeHeic } from "./heic-converter.js";
-import { asInputErrorIfUndecodable } from "./image-error.js";
+import { asInputErrorIfUndecodable, PIXEL_LIMIT_IMAGE_MESSAGE } from "./image-error.js";
 import { normalizeOperationalWriteError } from "./object-storage.js";
 import { decompressSvgz, isSvgzClientError, sanitizeSvg } from "./svg-sanitize.js";
 
@@ -60,8 +61,7 @@ function replaceExtWithPng(filename: string): string {
  * 2. Decodes CLI-decoded formats (`needsCliDecode`) via `decodeToSharpCompat`
  *    with lowercase `fileExt`, falling back to a Sharp metadata + 1x1 pixel
  *    decode probe for formats Sharp reads natively (such as TIFF-based DNG or
- *    disguised SVGs) and classifying undecodable client inputs via
- *    `asInputErrorIfUndecodable`.
+ *    disguised SVGs) and marking client decode failures as `ToolInputError`.
  * 3. Detects SVG/SVGZ inputs (including comment-padded SVGs disguised with
  *    `.apng` or CLI-decoded extensions), runs `decompressSvgz` and
  *    `sanitizeSvg` (throwing `InputValidationError` on 400 client SVG errors),
@@ -86,6 +86,7 @@ export async function prepareRouteImage(
     } catch (rawErr) {
       const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
       if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
+      opts.log?.warn({ err }, "Decode failed");
       throw err instanceof Error ? markToolInputError(err) : new ToolInputError(String(err));
     }
   }
@@ -118,7 +119,13 @@ export async function prepareRouteImage(
         if (isDecoderUnavailable(decodeErr) || hasServerErrorStatus(decodeErr)) {
           throw decodeErr;
         }
-        throw await asInputErrorIfUndecodable(buf, err);
+        if (isPixelSafetyError(err)) {
+          throw new ToolInputError(PIXEL_LIMIT_IMAGE_MESSAGE, { cause: err });
+        }
+        opts.log?.warn({ err: decodeErr }, "Decode failed");
+        throw decodeErr instanceof Error
+          ? markToolInputError(decodeErr)
+          : new ToolInputError(String(decodeErr));
       }
     }
   }
