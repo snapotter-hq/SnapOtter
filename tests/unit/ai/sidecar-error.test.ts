@@ -47,11 +47,26 @@ describe("toSidecarError", () => {
       const err = toSidecarError(reason, "Upscaling failed") as SafeError;
       expect(err.kind).toBe("operational");
     }
-    for (const nonOomErrno of [
-      "OSError: [Errno 13] Permission denied",
-      "OSError: [Errno 122] Disk quota exceeded",
+  });
+  it("classifies file system limits and quotas as operational (environment, not our bug)", () => {
+    for (const [reason, code] of [
+      ["OSError: [Errno 28] No space left on device", "ENOSPC"],
+      ["[Errno 13] Permission denied", "EACCES"],
+      ["OSError: [Errno 30] Read-only file system", "EROFS"],
+      ["[Errno 24] Too many open files", "EMFILE"],
     ]) {
-      const err = toSidecarError(nonOomErrno, "Upscaling failed") as SafeError;
+      const err = toSidecarError(reason, "Failed") as SafeError;
+      expect(err.kind).toBe("operational");
+      expect(err.code).toBe(code);
+    }
+  });
+
+  it("classifies other IO errors as bugs", () => {
+    for (const nonTargetErrno of [
+      "OSError: [Errno 122] Disk quota exceeded",
+      "OSError: [Errno 2] No such file or directory",
+    ]) {
+      const err = toSidecarError(nonTargetErrno, "Failed") as SafeError;
       expect(err.kind).toBe("bug");
     }
   });

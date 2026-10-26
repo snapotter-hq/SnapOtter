@@ -106,6 +106,20 @@ function getPythonPath(): string {
 const OOM_EXIT_TEXT =
   /out of memory|not enough memory|can't allocate memory|cannot allocate memory|\[errno 12\]|unable to allocate|failed to allocate|cudaerrormemoryallocation|cublas_status_alloc_failed|bad_alloc|memoryerror/i;
 
+const FS_EXIT_MAP: Array<[RegExp, string]> = [
+  [/\[errno 28\]|no space left on device/i, "ENOSPC"],
+  [/\[errno 13\]|permission denied/i, "EACCES"],
+  [/\[errno 30\]|read-only file system/i, "EROFS"],
+  [/\[errno 24\]|too many open files/i, "EMFILE"],
+];
+
+function checkFsError(message: string): string | undefined {
+  for (const [regex, code] of FS_EXIT_MAP) {
+    if (regex.test(message)) return code;
+  }
+  return undefined;
+}
+
 /**
  * Build the error to reject a non-zero Python exit with. The extracted reason is
  * kept as the message (it is already surfaced to callers) but wrapped in a
@@ -135,9 +149,10 @@ function pythonExitError(
     });
   }
   const message = extracted || `Python script exited with code ${code}`;
+  const fsCode = checkFsError(message);
   const err = new SafeError(message, {
-    kind: OOM_EXIT_TEXT.test(message) ? "operational" : "bug",
-    code: `exit-${code ?? "unknown"}`,
+    kind: fsCode ? "operational" : OOM_EXIT_TEXT.test(message) ? "operational" : "bug",
+    code: fsCode || `exit-${code ?? "unknown"}`,
   });
   if (info) {
     Object.assign(err, { pythonType: info.type, pythonFrames: info.frames });
@@ -158,8 +173,10 @@ function pythonExitError(
 export function toSidecarError(reason: unknown, fallback: string): Error {
   if (isSafeMessageError(reason)) return reason;
   const message = (reason instanceof Error ? reason.message : String(reason ?? "")).trim();
+  const fsCode = checkFsError(message);
   return new SafeError(message || fallback, {
-    kind: OOM_EXIT_TEXT.test(message) ? "operational" : "bug",
+    kind: fsCode ? "operational" : OOM_EXIT_TEXT.test(message) ? "operational" : "bug",
+    code: fsCode,
   });
 }
 
