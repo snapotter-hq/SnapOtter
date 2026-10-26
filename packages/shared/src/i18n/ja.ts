@@ -5657,6 +5657,7 @@ export const ja: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "GitHub Sponsors で SnapOtter を支援する",
     skipToContent: "メインコンテンツへスキップ",
     openSidebar: "サイドバーを開く",

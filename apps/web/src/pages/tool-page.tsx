@@ -1709,7 +1709,7 @@ function ToolPageContent({
           {/* Tool header. relative z-20 keeps it, and the Settings button, above any
               preview content that overflows the image area (#2192); the nav arrows
               inside the area are z-10 and the sheet and its backdrop z-40/z-50. */}
-          <div className="relative z-20 flex items-center gap-3 p-4 border-b border-border shrink-0 bg-background">
+          <div className="relative z-20 flex items-center gap-3 p-4 border-b border-border shrink-0 bg-background [@media(max-height:500px)]:hidden">
             <div className="p-2 rounded-lg bg-primary text-primary-foreground">
               <IconComponent className="h-5 w-5" />
             </div>

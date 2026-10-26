@@ -34,9 +34,14 @@ export function SideBySideComparison({
     // Stacked on a phone the two cards are taller than the preview area. Without
     // max-h-full + overflow the result spilled over the "Process" peek bar and
     // swallowed the tap that reopens the settings sheet (#2176).
-    <div className="flex flex-col items-center gap-3 w-full max-w-3xl mx-auto max-h-full overflow-y-auto">
+    <section
+      aria-label={t.a11y.comparisonScroller}
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: Scrollable region needs to be focusable for keyboard users on Safari
+      tabIndex={0}
+      className="flex flex-col items-center gap-3 w-full max-w-3xl mx-auto max-h-full overflow-y-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+    >
       {/* Side-by-side images */}
-      <div className="flex flex-col sm:flex-row gap-4 w-full">
+      <div className="flex flex-col-reverse sm:flex-row gap-4 w-full">
         {/* Original */}
         <div className="flex-1 flex flex-col items-center gap-2">
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -104,6 +109,6 @@ export function SideBySideComparison({
               })}
         </p>
       )}
-    </div>
+    </section>
   );
 }

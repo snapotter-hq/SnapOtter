@@ -5733,6 +5733,7 @@ export const nl: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "Steun SnapOtter op GitHub Sponsors",
     skipToContent: "Ga naar hoofdinhoud",
     openSidebar: "Zijbalk openen",

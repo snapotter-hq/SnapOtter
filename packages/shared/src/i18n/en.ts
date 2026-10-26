@@ -5630,6 +5630,7 @@ export const en = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     skipToContent: "Skip to main content",
     openSidebar: "Open sidebar",
     closeSidebar: "Close sidebar",

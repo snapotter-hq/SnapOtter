@@ -5726,6 +5726,7 @@ export const ptBR: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "Apoie o SnapOtter no GitHub Sponsors",
     skipToContent: "Pular para o conteúdo principal",
     openSidebar: "Abrir barra lateral",

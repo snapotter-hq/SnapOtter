@@ -5386,6 +5386,7 @@ export const zhTW: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "在 GitHub Sponsors 上支持 SnapOtter",
     skipToContent: "跳至主要內容",
     openSidebar: "開啟側邊欄",

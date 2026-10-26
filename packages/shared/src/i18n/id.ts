@@ -5707,6 +5707,7 @@ export const id: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "Dukung SnapOtter di GitHub Sponsors",
     skipToContent: "Lewati ke konten utama",
     openSidebar: "Buka bilah sisi",

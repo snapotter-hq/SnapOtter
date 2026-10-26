@@ -5652,6 +5652,7 @@ export const ar: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "ادعم SnapOtter على GitHub Sponsors",
     skipToContent: "تخطي إلى المحتوى الرئيسي",
     openSidebar: "فتح الشريط الجانبي",

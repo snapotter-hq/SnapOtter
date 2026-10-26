@@ -5482,6 +5482,7 @@ export const hi: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "GitHub Sponsors पर SnapOtter का समर्थन करें",
     skipToContent: "मुख्य सामग्री पर जाएं",
     openSidebar: "साइडबार खोलें",

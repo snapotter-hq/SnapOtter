@@ -5616,6 +5616,7 @@ export const ko: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "GitHub Sponsors에서 SnapOtter 후원하기",
     skipToContent: "본문으로 건너뛰기",
     openSidebar: "사이드바 열기",

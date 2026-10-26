@@ -5714,6 +5714,7 @@ export const tr: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "SnapOtter'ı GitHub Sponsors'ta destekleyin",
     skipToContent: "Ana içeriğe geç",
     openSidebar: "Kenar çubuğunu aç",

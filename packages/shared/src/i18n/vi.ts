@@ -5689,6 +5689,7 @@ export const vi: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "Ủng hộ SnapOtter trên GitHub Sponsors",
     skipToContent: "Chuyển đến nội dung chính",
     openSidebar: "Mở thanh bên",

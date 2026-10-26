@@ -5765,6 +5765,7 @@ export const de: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "SnapOtter auf GitHub Sponsors unterstützen",
     skipToContent: "Zum Hauptinhalt springen",
     openSidebar: "Seitenleiste öffnen",

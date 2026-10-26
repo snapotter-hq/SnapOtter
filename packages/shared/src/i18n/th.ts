@@ -5611,6 +5611,7 @@ export const th: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "สนับสนุน SnapOtter บน GitHub Sponsors",
     skipToContent: "ข้ามไปยังเนื้อหาหลัก",
     openSidebar: "เปิดแถบด้านข้าง",

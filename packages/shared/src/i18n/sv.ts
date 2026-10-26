@@ -5702,6 +5702,7 @@ export const sv: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "Stöd SnapOtter på GitHub Sponsors",
     skipToContent: "Hoppa till huvudinnehåll",
     openSidebar: "Öppna sidopanel",

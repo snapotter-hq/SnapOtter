@@ -5718,6 +5718,7 @@ export const uk: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "Підтримати SnapOtter на GitHub Sponsors",
     skipToContent: "Перейти до основного вмісту",
     openSidebar: "Відкрити бічну панель",

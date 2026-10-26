@@ -5730,6 +5730,7 @@ export const pl: TranslationKeys = {
     },
   },
   a11y: {
+    comparisonScroller: "Comparison scroller",
     sponsorLink: "Wesprzyj SnapOtter na GitHub Sponsors",
     skipToContent: "Przejdź do treści",
     openSidebar: "Otwórz panel boczny",
