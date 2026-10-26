@@ -111,12 +111,14 @@ const hoisted = vi.hoisted(() => {
   );
   // Wraps the real helper, so the tests see what each failure path logged.
   const logErrorWithCausesMock = vi.fn();
+  const reportErrorMock = vi.fn();
   // The progress phase whose update should throw, or null for none.
   const failProgressPhase = { value: null as string | null };
   const failRefreshStream = { value: false };
 
   return {
     logErrorWithCausesMock,
+    reportErrorMock,
     failProgressPhase,
     failRefreshStream,
     spawnCalls,
@@ -182,6 +184,12 @@ vi.mock("../../../apps/api/src/lib/log-error-with-causes.js", async (importOrigi
     await importOriginal<typeof import("../../../apps/api/src/lib/log-error-with-causes.js")>();
   hoisted.logErrorWithCausesMock.mockImplementation(actual.logErrorWithCauses);
   return { logErrorWithCauses: hoisted.logErrorWithCausesMock };
+});
+
+vi.mock("../../../apps/api/src/lib/error-report.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../apps/api/src/lib/error-report.js")>();
+  hoisted.reportErrorMock.mockImplementation(actual.reportError);
+  return { ...actual, reportError: hoisted.reportErrorMock };
 });
 
 vi.mock("../../../apps/api/src/routes/progress.js", async (importOriginal) => {
@@ -306,6 +314,7 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
     hoisted.spawnCalls.length = 0;
     hoisted.spawnMock.mockClear();
     hoisted.logErrorWithCausesMock.mockClear();
+    hoisted.reportErrorMock.mockClear();
     hoisted.failProgressPhase.value = null;
     hoisted.failRefreshStream.value = false;
     hoisted.acquireVenvLockMock.mockClear();
@@ -534,6 +543,12 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
     ).toHaveLength(2);
     expect(hoisted.probeOcrDispatcherMock).not.toHaveBeenCalled();
     expect(hoisted.rotateOcrDispatcherMock).not.toHaveBeenCalled();
+
+    await waitFor(() => hoisted.logErrorWithCausesMock.mock.calls.length > 0);
+    const logCall = hoisted.logErrorWithCausesMock.mock.calls.find(
+      (c) => c[2] === "[ocr-runtime] OCR runtime handoff recovered from a double commit failure",
+    );
+    expect(logCall).toBeDefined();
   });
 
   it("restores and re-probes the prior generation when persistent handoff fails", async () => {
@@ -666,6 +681,10 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
       "no ready published dispatcher",
       "rotation spawn failed",
     ]);
+
+    // (4) Check that the OCR install failure is reported
+    expect(hoisted.reportErrorMock).toHaveBeenCalledTimes(1);
+    expect(hoisted.reportErrorMock.mock.calls[0][1]).toEqual({ source: "ai-install" });
   });
 
   it("returns 500 when the offline OCR installer fails after validation", async () => {
@@ -891,6 +910,28 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
     await waitFor(() => queue.getActiveBundleId() === null);
   });
 
+  it("fails the queued install if lease acquisition throws an error", async () => {
+    const acquireSpy = vi.spyOn(
+      await import("../../../apps/api/src/lib/feature-status.js"),
+      "acquireInstallLock",
+    );
+    acquireSpy.mockImplementationOnce(() => {
+      throw new Error("Simulated lease acquisition failure");
+    });
+
+    const res = await postInstall("transcription");
+    expect(res.statusCode).toBe(500);
+
+    await waitFor(() => hoisted.logErrorWithCausesMock.mock.calls.length > 0);
+    const logCall = hoisted.logErrorWithCausesMock.mock.calls.find(
+      (c) => c[2] === "[feature-install-queue] Install lease acquisition failed",
+    );
+    expect(logCall).toBeDefined();
+    expect(logCall?.[1].err.message).toBe("Simulated lease acquisition failure");
+
+    acquireSpy.mockRestore();
+  });
+
   it("cancels pre-mutation queued work on every replica but allows a new request", async () => {
     // Hold the shared lease as reset/uninstall would on another API replica.
     expect(acquireInstallLock("__reset__")).toBe(true);
@@ -998,6 +1039,14 @@ describe("POST /api/v1/admin/features/:bundleId/install queue", () => {
     const detail = await getFeatureDetail("transcription");
     expect(detail?.status).toBe("error");
     expect(detail?.error).toBe("No matching distribution found for torch");
+
+    // (1) Check that non-OCR bundle installs log the failure
+    await waitFor(() => hoisted.logErrorWithCausesMock.mock.calls.length > 0);
+    const logCall = hoisted.logErrorWithCausesMock.mock.calls.find(
+      (c) => c[2] === "[feature-install] Bundle installation failed",
+    );
+    expect(logCall).toBeDefined();
+    expect(logCall?.[1].err.message).toBe("No matching distribution found for torch");
   });
 
   it("maps exit code 137 to an out-of-memory explanation", async () => {

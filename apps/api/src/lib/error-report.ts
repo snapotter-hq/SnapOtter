@@ -86,7 +86,7 @@ export function isOperationalErrno(err: unknown): boolean {
 }
 
 export interface ReportContext {
-  source: "http" | "worker" | "cron" | "boot";
+  source: "http" | "worker" | "cron" | "boot" | "ai-install";
   toolId?: string;
   pool?: string;
   route?: string;

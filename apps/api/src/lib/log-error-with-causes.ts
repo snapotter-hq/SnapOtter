@@ -17,15 +17,21 @@ export function logErrorWithCauses(
   log: FastifyBaseLogger,
   fields: { err: unknown } & Record<string, unknown>,
   message: string,
+  level: "error" | "warn" | "info" = "error",
 ): void {
   try {
-    log
-      .child({}, { serializers: { err: pino.stdSerializers.errWithCause } })
-      .error(fields, message);
+    const child = log.child({}, { serializers: { err: pino.stdSerializers.errWithCause } });
+    if (level === "warn") child.warn(fields, message);
+    else if (level === "info") child.info(fields, message);
+    else child.error(fields, message);
   } catch (causeChainError) {
     // errWithCause tags each error it visits, so a frozen error in the chain
     // throws, and an AggregateError that lists itself never ends. The default
     // serializer only reads the chain, so fall back to it.
-    log.error({ ...fields, causeChainError: String(causeChainError) }, message);
+    if (level === "warn")
+      log.warn({ ...fields, causeChainError: String(causeChainError) }, message);
+    else if (level === "info")
+      log.info({ ...fields, causeChainError: String(causeChainError) }, message);
+    else log.error({ ...fields, causeChainError: String(causeChainError) }, message);
   }
 }

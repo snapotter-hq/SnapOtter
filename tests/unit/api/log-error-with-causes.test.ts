@@ -100,4 +100,43 @@ describe("logErrorWithCauses (#1504)", () => {
     expect(plain).toBeDefined();
     expect(plain?.cause).toBeUndefined();
   });
+
+  it("uses the provided level instead of defaulting to error", () => {
+    const { log, lines } = capturingLogger();
+
+    logErrorWithCauses(log, { err: new Error("warn error") }, "this is a warning", "warn");
+    logErrorWithCauses(log, { err: new Error("info error") }, "this is info", "info");
+
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatchObject({
+      level: 40, // warn
+      msg: "this is a warning",
+      err: { message: "warn error" },
+    });
+    expect(lines[1]).toMatchObject({
+      level: 30, // info
+      msg: "this is info",
+      err: { message: "info error" },
+    });
+  });
+
+  it("uses the provided level in the fallback path when the cause chain can't be walked", () => {
+    const frozenCause = new Error("top", { cause: Object.freeze(new Error("frozen cause")) });
+    const { log, lines } = capturingLogger();
+
+    logErrorWithCauses(log, { err: frozenCause }, "fallback warn", "warn");
+    logErrorWithCauses(log, { err: frozenCause }, "fallback info", "info");
+
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatchObject({
+      level: 40,
+      msg: "fallback warn",
+      causeChainError: expect.any(String),
+    });
+    expect(lines[1]).toMatchObject({
+      level: 30,
+      msg: "fallback info",
+      causeChainError: expect.any(String),
+    });
+  });
 });

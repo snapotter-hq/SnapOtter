@@ -161,6 +161,12 @@ async function handoffInstalledOcrRuntime(
       }
       // Both commit subprocesses may have atomically committed and then lost
       // their output. Exact committed state is the successful terminal state.
+      logErrorWithCauses(
+        logger,
+        { err: activationError },
+        "[ocr-runtime] OCR runtime handoff recovered from a double commit failure",
+        "warn",
+      );
       return;
     }
 
@@ -280,6 +286,7 @@ function startOcrInstall(bundleId: string, jobId: string, installLockFd: number)
         { err: error, bundleId, jobId },
         "[ocr-runtime] OCR install failed",
       );
+      void reportError(error, { source: "ai-install" });
       const errorMessage = error instanceof Error ? error.message : String(error);
       setInstallProgress(bundleId, null, errorMessage);
       try {
@@ -528,6 +535,11 @@ function startInstall(bundleId: string, jobId: string, installLockFd: number): v
               `Install failed with exit code ${code}`;
           }
         }
+        logErrorWithCauses(
+          logger,
+          { err: new Error(errorMsg), bundleId, jobId },
+          "[feature-install] Bundle installation failed",
+        );
         setInstallProgress(bundleId, null, errorMsg);
         void updateSingleFileProgress({ jobId, phase: "failed", percent: 0, error: errorMsg });
       }
@@ -562,8 +574,7 @@ function schedulePumpRetry(): void {
   if (pumpRetryTimer) return;
   pumpRetryTimer = setTimeout(() => {
     pumpRetryTimer = undefined;
-    const error = pump();
-    if (error) console.error("[feature-install-queue] Unable to acquire install lease:", error);
+    pump();
   }, INSTALL_QUEUE_RETRY_MS);
   pumpRetryTimer.unref();
 }
@@ -606,6 +617,11 @@ function scheduleOcrRuntimeGc(delayMs = OCR_RUNTIME_GC_DELAY_MS): void {
 function failQueuedInstall(head: NonNullable<ReturnType<typeof peekQueue>>, error: unknown): Error {
   const failure = error instanceof Error ? error : new Error(String(error));
   dequeue();
+  logErrorWithCauses(
+    logger,
+    { err: failure, bundleId: head.bundleId, jobId: head.jobId },
+    "[feature-install-queue] Install lease acquisition failed",
+  );
   setInstallProgress(head.bundleId, null, failure.message);
   void updateSingleFileProgress({
     jobId: head.jobId,
@@ -614,10 +630,7 @@ function failQueuedInstall(head: NonNullable<ReturnType<typeof peekQueue>>, erro
     error: failure.message,
   });
   queueMicrotask(() => {
-    const nextError = pump();
-    if (nextError) {
-      console.error("[feature-install-queue] Unable to acquire install lease:", nextError);
-    }
+    pump();
   });
   return failure;
 }
