@@ -58,7 +58,8 @@ const diskState = vi.hoisted(() => ({
 
 vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
-  const errno = (code: string) => Object.assign(new Error(`${code}: simulated`), { code });
+  const errno = (code: string) =>
+    Object.assign(new Error(`${code}: simulated`), { code, syscall: "open" });
   return {
     ...actual,
     statfs: (path: string) => {

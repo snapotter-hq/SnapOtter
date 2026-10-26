@@ -4,10 +4,6 @@ import { join } from "node:path";
 import { env } from "../config.js";
 import { isOperationalErrno, STORAGE_NOT_WRITABLE_CODES } from "./error-report.js";
 
-// Error codes that specifically mean "the running user may not write here".
-// Distinct from capacity (ENOSPC) or other I/O faults, which are handled
-// elsewhere and must not be misreported as a permissions problem.
-
 /**
  * Returns true if `dir` can be created (when missing) and written to by the
  * current process. Creates the directory recursively, writes a short-lived

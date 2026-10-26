@@ -1048,6 +1048,7 @@ describe("gif-tools /info and preValidate (#3772, #3859)", () => {
 
       animatedFault = Object.assign(new Error("EPERM: operation not permitted, write"), {
         code: "EPERM",
+        syscall: "write",
       });
       const epermRes = await sendTool();
       expect(epermRes.statusCode).toBe(503);
