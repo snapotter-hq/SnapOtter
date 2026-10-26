@@ -66,8 +66,12 @@ export function parseApiError(
     detailsStr = details
       .map((d) => {
         if (typeof d === "string") return d;
-        const itemMessage = (d as Record<string, unknown> | null)?.message;
-        return typeof itemMessage === "string" && itemMessage ? itemMessage : JSON.stringify(d);
+        const itemObj = d as Record<string, unknown> | null;
+        const itemMessage = itemObj?.message;
+        const itemPath = itemObj?.path;
+        const msg =
+          typeof itemMessage === "string" && itemMessage ? itemMessage : JSON.stringify(d);
+        return typeof itemPath === "string" && itemPath ? `${itemPath}: ${msg}` : msg;
       })
       .join("; ");
   } else if (details) {
