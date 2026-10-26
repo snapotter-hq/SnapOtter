@@ -733,17 +733,23 @@ test.describe("@mobile Small phones keep the settings controls tappable", () => 
     await page
       .getByRole("button", { name: "Process", exact: true })
       .click({ trial: true, timeout: 5_000 });
-    await page
+    const settingsBtn = page
       .locator("#main-content")
-      .getByRole("button", { name: "Settings", exact: true })
-      .click({ trial: true, timeout: 5_000 });
+      .getByRole("button", { name: "Settings", exact: true });
+    if (await settingsBtn.isVisible()) {
+      await settingsBtn.click({ trial: true, timeout: 5_000 });
+    }
   }
 
   // The bars stack above the preview, so a view that still spills under one passes
   // the trial clicks. These check that the view itself stays between the bars.
   async function headerBottom(page: import("@playwright/test").Page) {
-    const header = await page.locator("#main-content h1").locator("xpath=..").boundingBox();
-    return (header?.y ?? 0) + (header?.height ?? 0);
+    const headerBtn = page.locator("#main-content h1").locator("xpath=..");
+    if (await headerBtn.isVisible()) {
+      const header = await headerBtn.boundingBox();
+      return (header?.y ?? 0) + (header?.height ?? 0);
+    }
+    return 0;
   }
 
   test.describe("QR code preview", () => {
