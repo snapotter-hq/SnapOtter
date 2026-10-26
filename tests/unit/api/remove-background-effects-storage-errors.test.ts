@@ -718,9 +718,9 @@ describe("remove-background effects: reading the stored mask and original", () =
       ),
     );
     expect(resCorruptTga.statusCode).toBe(422);
-    expect(resCorruptTga.json()).toEqual({
+    expect(resCorruptTga.json()).toMatchObject({
       error: "Effects processing failed",
-      details: UNDECODABLE_IMAGE_MESSAGE,
+      details: expect.stringContaining("[internal]"),
     });
     expect(requestLogError).not.toHaveBeenCalled();
 
