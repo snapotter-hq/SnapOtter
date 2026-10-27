@@ -1535,6 +1535,43 @@ describe("System: install feedback actions (#1560)", () => {
     );
     captureHandledError.mockClear();
   });
+
+  async function submitInstallFeedback(accepted: boolean) {
+    apiPost.mockResolvedValueOnce({ ok: true, accepted });
+    apiPut.mockResolvedValueOnce({});
+    renderDe(<SystemSection />);
+    fireEvent.click(await screen.findByRole("button", { name: de.feedback.shareFeedback }));
+
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByRole("textbox"), {
+      target: { value: "The Docker example needed one more volume." },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: de.feedback.submit }));
+    return dialog;
+  }
+
+  it("does not record install feedback as submitted when the server declines it (#2252)", async () => {
+    const dialog = await submitInstallFeedback(false);
+
+    expect(
+      await within(dialog).findByRole("link", { name: de.feedback.offlineGithubButton }),
+    ).toBeInTheDocument();
+    expect(apiPut).not.toHaveBeenCalledWith(
+      "/v1/settings",
+      expect.objectContaining({ "feedback.install.submittedAt": expect.any(String) }),
+    );
+    expect(screen.getByRole("button", { name: de.feedback.shareFeedback })).toBeInTheDocument();
+  });
+
+  it("records install feedback as submitted only when the server accepts it", async () => {
+    await submitInstallFeedback(true);
+
+    await waitFor(() => {
+      expect(apiPut).toHaveBeenCalledWith("/v1/settings", {
+        "feedback.install.submittedAt": expect.any(String),
+      });
+    });
+  });
 });
 
 describe("AuditLogSection race conditions (#1560)", () => {

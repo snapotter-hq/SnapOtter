@@ -29,7 +29,7 @@ vi.mock("@/lib/feedback", async (importOriginal) => {
 beforeEach(() => {
   vi.stubGlobal("localStorage", localStorageMock);
   localStorage.clear();
-  submitFeedback.mockClear();
+  submitFeedback.mockReset();
   submitFeedback.mockResolvedValue({ ok: true, accepted: true });
   localStorageMock.getItem.mockClear();
   localStorageMock.setItem.mockClear();
@@ -137,6 +137,18 @@ describe("ToolFeedbackPrompt", () => {
     // A declined answer is not recorded, so the prompt must not claim it was,
     // and the next result must still be able to ask.
     expect(await screen.findByRole("dialog")).toBeDefined();
+    expect(screen.queryByText("Thanks for the signal.")).toBeNull();
+    expect(localStorage.getItem("snapotter-feedback-last-prompt-at")).toBeNull();
+    expect(localStorage.getItem("snapotter-feedback-tool-prompt:resize")).toBeNull();
+  });
+
+  it("does not thank or arm cooldowns when the quick answer fails to send", async () => {
+    submitFeedback.mockRejectedValueOnce(new Error("network error"));
+    render(<ToolFeedbackPrompt toolId="resize" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Worked well" }));
+
+    await waitFor(() => expect(submitFeedback).toHaveBeenCalledTimes(1));
     expect(screen.queryByText("Thanks for the signal.")).toBeNull();
     expect(localStorage.getItem("snapotter-feedback-last-prompt-at")).toBeNull();
     expect(localStorage.getItem("snapotter-feedback-tool-prompt:resize")).toBeNull();

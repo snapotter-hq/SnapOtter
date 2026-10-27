@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog";
 
 const submitFeedback = vi.hoisted(() => vi.fn().mockResolvedValue({ ok: true, accepted: true }));
@@ -14,9 +14,13 @@ vi.mock("@/lib/feedback", async (importOriginal) => {
   };
 });
 
+beforeEach(() => {
+  submitFeedback.mockReset();
+  submitFeedback.mockResolvedValue({ ok: true, accepted: true });
+});
+
 afterEach(() => {
   cleanup();
-  submitFeedback.mockClear();
 });
 
 describe("FeedbackDialog", () => {

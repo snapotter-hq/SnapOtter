@@ -51,7 +51,8 @@ afterEach(() => {
   analyticsConfig.posthogApiKey = "phc_test";
   analyticsConfig.feedbackSink = true;
   cleanup();
-  submitFeedback.mockClear();
+  submitFeedback.mockReset();
+  submitFeedback.mockResolvedValue({ ok: true, accepted: true });
   trackFeedbackPromptShown.mockClear();
   trackFeedbackPromptDismissed.mockClear();
   // Reset, not clear: answerSettingsLater installs an implementation that a

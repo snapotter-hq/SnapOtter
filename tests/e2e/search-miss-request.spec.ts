@@ -61,4 +61,35 @@ test.describe("search-miss tool request", () => {
     await expect(dialog).toContainText("Request a tool");
     await expect(dialog).toContainText("zzxqwv nonexistent capability");
   });
+
+  test("falls back to Discussions when a baked key has no feedback sink (#2252)", async ({
+    page,
+  }) => {
+    await page.route("**/api/v1/config/analytics", async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      // A key is baked, but the server has no PostHog client to take the
+      // answer, so the in-app dialog would decline it. The affordance must
+      // stay the Discussions link.
+      await route.fulfill({
+        json: {
+          ...body,
+          enabled: true,
+          posthogApiKey: "phc_e2e",
+          feedbackSink: false,
+          posthogHost: "http://127.0.0.1:9",
+        },
+      });
+    });
+
+    await page.goto("/");
+
+    const searchInput = page.locator("[data-search-input]");
+    await expect(searchInput).toBeVisible();
+    await searchInput.fill("zzxqwv nonexistent capability");
+
+    const request = page.getByTestId("request-tool").first();
+    await expect(request).toBeVisible();
+    await expect(request).toHaveAttribute("href", /\/discussions\/new/);
+  });
 });
