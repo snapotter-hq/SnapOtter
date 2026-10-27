@@ -64,6 +64,136 @@ function looksLikePg(links: ErrLike[]): boolean {
   );
 }
 
+// media-engine's runFfmpeg/runFfprobe reject with the whole stderr tail after
+// the exit prefix. ffmpeg writes Input/Output/Stream headers and carriage
+// return progress updates around the failure, then a generic shutdown cascade,
+// so the generic 300-char front truncation in redactMessage keeps only noise
+// (#2455). Select the actionable lines instead.
+const MEDIA_EXIT_RE = /^(ffmpeg|ffprobe) exited (-?\d+|SIG[A-Z0-9]+):[ \t]*([\s\S]*)$/;
+const MEDIA_EXIT_BODY_MAX = 250;
+const MEDIA_EXIT_MAX_LINES = 3;
+// -progress lines and default stderr progress updates. Audio-only runs start
+// their periodic report with `size=`, not `frame=`.
+const MEDIA_PROGRESS_RE =
+  /^(?:frame|fps|q|size|Lsize|time|elapsed|bitrate|total_size|out_time(?:[_a-z]+)?|dup_frames|drop_frames|speed|progress)=/;
+// Stream/container metadata and the version banner ffmpeg prints before work starts.
+const MEDIA_HEADER_RE =
+  /^(?:(?:Input|Output) #\d+|Stream #\d+|Stream mapping:|Duration:|Metadata:|Side data:|cpb:|Chapter #\d+|Program \d+|Press \[q\]|ffmpeg version |built with |configuration:|lib(?:avutil|avcodec|avformat|avdevice|avfilter|swscale|swresample|postproc) )/;
+// Indented `key : value` rows under Input/Output #, e.g. `title : Holiday`,
+// `encoder : Lavf61`. They can carry user metadata, so never surface them.
+const MEDIA_METADATA_ROW_RE = /^[A-Za-z][A-Za-z0-9_.-]{0,31}\s+:\s/;
+// Post-run encoder/output statistics. Only statistic-shaped lines are dropped:
+// an encoder-prefixed line that names an error (e.g. "height not divisible by
+// 2") is still an error and must survive.
+const MEDIA_STAT_RE =
+  /^(?:\[[^\s\]]+ @ [^\]]+\] )?(?:frame [IPB]:|mb [IPB] |8x8 transform |ref [PB] L\d|kb\/s:|Qavg:|SSIM|PSNR|coded y|i(?:16|8c?|4) |p8x8|p16x16|p4x4|Weighted [PB]-Frames:|profile |using |264 - core|video:|audio:|subtitle:)/;
+// Generic shutdown lines ffmpeg prints after the root cause. Dropping them
+// keeps the budget for the actionable line, which comes FIRST in the cascade.
+// Note: "Terminating thread with return code" has no colon before the code.
+const MEDIA_CASCADE_RE =
+  /^(?:\[[^\s\]]+ @ [^\]]+\] ){0,4}(?:Task finished with error code:|Terminating thread with return code\b|Error sending frames to consumers:|Error marking filters as finished|Nothing was written into output file|Could not open encoder before EOF|Last message repeated \d+ times|Conversion failed!$)/;
+const MEDIA_TOOL_STAT_RE =
+  /^(?:x264|x265) \[(?:info|warning)\]: |^\[AVIOContext @ [^\]]+\] Statistics:/;
+// ffmpeg's own failure lines: prefer these over softer "not found"/"missing"
+// notices, which can be harmless warnings from the demuxer.
+const MEDIA_CAUSE_STRONG_RE =
+  /\berror\b|\bunknown (?:encoder|decoder|filter|format|option)\b|\bnot divisible by 2\b|\binvalid\b|\bno such file\b|\bpermission denied\b|\bno space left\b|\bdisc quota\b|\bunsupported\b|\bnot supported\b|\breceived no packets\b|\bmoov atom not found\b|\btoo many bits\b|\bcould not\b|\bunable to\b|\bcannot\b|\bbroken pipe\b|\bno such filter\b|\bunrecognized\b|\bnot known\b|\bnot available\b|\bimpossible to\b/i;
+// Follow-up lines that only say a stage failed. Keep them, but rank them below
+// the line naming what actually failed.
+const MEDIA_CAUSE_GENERIC_RE =
+  /\berror (?:opening output files?|initializing the muxer|splitting the argument list|selecting an encoder|(?:re)?initializing filters|configuring filters)\b/i;
+const MEDIA_CAUSE_WEAK_RE =
+  /\bfailed\b|\bfailure\b|\bnot found\b|\bmissing\b|\bcorrupt\b|\btruncated\b|\bdenied\b|\bunexpected\b/i;
+
+function isMediaNoise(line: string): boolean {
+  return (
+    MEDIA_PROGRESS_RE.test(line) ||
+    MEDIA_HEADER_RE.test(line) ||
+    MEDIA_METADATA_ROW_RE.test(line) ||
+    MEDIA_STAT_RE.test(line) ||
+    MEDIA_CASCADE_RE.test(line) ||
+    MEDIA_TOOL_STAT_RE.test(line)
+  );
+}
+
+interface MediaLine {
+  line: string;
+  index: number;
+}
+
+/** Collapses pointers, thread prefixes and counters so repeated errors don't eat the budget. */
+function mediaLineShape(line: string): string {
+  return line
+    .replace(/^(?:\[[^\s\]]+ @ [^\]]+\] ){0,4}/, "")
+    .replace(/0x[0-9a-f]+/gi, "0x")
+    .replace(/\d+/g, "N");
+}
+
+/**
+ * Rebuilds a safe summary for a media-engine "ffmpeg/ffprobe exited <code>"
+ * message: the exit prefix plus the most actionable stderr lines (the root
+ * cause first; ffmpeg appends boilerplate after it). Falls back to the tail of
+ * whatever survives the noise filter. Returns null for any other message.
+ */
+function mediaExitSummary(message: string): string | null {
+  const match = MEDIA_EXIT_RE.exec(message);
+  if (!match) return null;
+  const [, tool, code, body] = match;
+  const prefix = `${tool} exited ${code}`;
+
+  const lines: MediaLine[] = body
+    .split(/\r\n|\r|\n/)
+    .map((line, index) => ({ line: line.trim(), index }))
+    .filter(({ line }) => line.length > 0 && !isMediaNoise(line));
+
+  const causes = lines.filter(
+    ({ line }) =>
+      MEDIA_CAUSE_STRONG_RE.test(line) ||
+      MEDIA_CAUSE_GENERIC_RE.test(line) ||
+      MEDIA_CAUSE_WEAK_RE.test(line),
+  );
+  const seen = new Set<string>();
+  const specific: MediaLine[] = [];
+  const generic: MediaLine[] = [];
+  const weak: MediaLine[] = [];
+  for (const entry of causes) {
+    const shape = mediaLineShape(entry.line);
+    if (seen.has(shape)) continue;
+    seen.add(shape);
+    if (MEDIA_CAUSE_STRONG_RE.test(entry.line)) specific.push(entry);
+    else if (MEDIA_CAUSE_GENERIC_RE.test(entry.line)) generic.push(entry);
+    else weak.push(entry);
+  }
+  const ranked = [...specific, ...generic, ...weak];
+
+  // No recognisable cause: keep the tail of what is left, where a tool that
+  // does not use ffmpeg's cascade wording puts its final message.
+  const ordered = causes.length > 0 ? ranked : [...lines].reverse();
+
+  const kept: MediaLine[] = [];
+  let used = 0;
+  for (const entry of ordered) {
+    const cost = entry.line.length + (kept.length > 0 ? 3 : 0); // " | "
+    if (used + cost <= MEDIA_EXIT_BODY_MAX) {
+      kept.push(entry);
+      used += cost;
+    } else if (kept.length === 0) {
+      // A single over-long line keeps its tail, where the reason sits.
+      kept.push({ line: entry.line.slice(-MEDIA_EXIT_BODY_MAX), index: entry.index });
+      used = MEDIA_EXIT_BODY_MAX;
+    } else {
+      // Don't skip a stronger cause for a shorter weaker one later in the list.
+      break;
+    }
+    if (kept.length >= MEDIA_EXIT_MAX_LINES) break;
+  }
+  // Causes are emitted in priority order (root cause first); the fallback tail
+  // is selected backwards, so restore its chronology.
+  if (causes.length === 0) kept.sort((a, b) => a.index - b.index);
+  if (kept.length === 0) return prefix;
+  return `${prefix}: ${kept.map(({ line }) => line).join(" | ")}`;
+}
+
 /** "at file.ts:NN" from the first in-app stack frame, mirroring errorSignature. */
 function frameHint(err: unknown): string | null {
   const stack = (err as { stack?: unknown } | null)?.stack;
@@ -129,16 +259,23 @@ export function rebuildErrorValue(err: unknown): string | null {
       return `${name} ${top.status}`;
     }
 
-    // 3. Non-empty message: keep it, redacted (the rich default).
+    // 3. Media-engine exit failures: ffmpeg/ffprobe put the failure last, so
+    //    select the tail of the non-stat lines instead of front-truncating.
+    if (typeof top.message === "string") {
+      const media = mediaExitSummary(top.message);
+      if (media) return redactMessage(media);
+    }
+
+    // 4. Non-empty message: keep it, redacted (the rich default).
     if (typeof top.message === "string" && top.message.trim().length > 0) {
       return redactMessage(top.message);
     }
 
-    // 4. Empty message with a stack: derive a title from the first in-app frame.
+    // 5. Empty message with a stack: derive a title from the first in-app frame.
     const hint = frameHint(err);
     if (hint) return hint;
 
-    // 5. Nothing safe to surface: type-only.
+    // 6. Nothing safe to surface: type-only.
     return null;
   } catch {
     return null;

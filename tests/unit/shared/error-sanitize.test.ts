@@ -139,6 +139,196 @@ describe("rebuildErrorValue ladder", () => {
   });
 });
 
+describe("rebuildErrorValue ffmpeg/ffprobe failures (#2455)", () => {
+  const progress =
+    "frame=  10 fps=0.0 q=28.0 size=1kB time=00:00:01.00 bitrate=8.2kbits/s speed=1x\r";
+
+  it("surfaces the failure line after leading frame progress instead of front-truncating it", () => {
+    const message = `ffmpeg exited 1: ${progress.repeat(20)}\n[out#0/mp4 @ 0x55d0] Error muxing a packet\nConversion failed!`;
+    const out = rebuildErrorValue(new Error(message));
+    expect(out).toContain("Error muxing a packet");
+    expect(out).not.toContain("frame=");
+    expect(out?.startsWith("ffmpeg exited 1: ")).toBe(true);
+  });
+
+  it("surfaces the root cause that precedes ffmpeg's generic shutdown cascade", () => {
+    // Captured from ffmpeg 8.1.2: the actionable line is first, then the
+    // thread/encoder shutdown boilerplate, then progress and "Conversion failed!".
+    const stderr = [
+      "[libx264 @ 0x55d0] width not divisible by 2 (99x99)",
+      "[vost#0:0/libx264 @ 0x55d0] [enc:libx264 @ 0x55d0] Error while opening encoder - maybe incorrect parameters such as bit_rate, rate, width or height.",
+      "[vf#0:0 @ 0x55d0] Error sending frames to consumers: Generic error in an external library",
+      "[vf#0:0 @ 0x55d0] Task finished with error code: -542398533 (Generic error in an external library)",
+      "[vf#0:0 @ 0x55d0] Terminating thread with return code -542398533 (Generic error in an external library)",
+      "[vost#0:0/libx264 @ 0x55d0] [enc:libx264 @ 0x55d0] Could not open encoder before EOF",
+      "[vost#0:0/libx264 @ 0x55d0] Task finished with error code: -22 (Invalid argument)",
+      "[vost#0:0/libx264 @ 0x55d0] Terminating thread with return code -22 (Invalid argument)",
+      "[out#0/mp4 @ 0x55d0] Nothing was written into output file, because at least one of its streams received no packets.",
+      progress.trim(),
+      "Conversion failed!",
+    ].join("\n");
+    const out = rebuildErrorValue(new Error(`ffmpeg exited 187: ${stderr}`));
+    expect(out).toContain("width not divisible by 2");
+    expect(out).toContain("Error while opening encoder");
+    expect(out).not.toContain("Terminating thread");
+    expect(out).not.toContain("Nothing was written");
+    expect(out).not.toContain("frame=");
+  });
+
+  it("drops stream metadata, its user-tag rows, and post-run encoder statistics", () => {
+    const stderr = [
+      "Input #0, mov,mp4,m4a,3gp,3g2,mj2, from '/data/uploads/9f/in.mp4':",
+      "  Metadata:",
+      "    major_brand     : isom",
+      "    title           : Q4 Board Deck",
+      "    comment         : CONFIDENTIAL acquisition memo",
+      "    encoder         : Lavf61.19.101",
+      "  Duration: 00:00:10.00, start: 0.000000, bitrate: 300 kb/s",
+      "  Stream #0:0(und): Video: h264, yuv420p, 1920x1080",
+      "    Side data:",
+      "      cpb: bitrate max/min/avg: 0/0/0 buffer size: 0 vbv_delay: N/A",
+      "[libx264 @ 0x55d0] frame I:1     Avg QP:20.00  size: 1000",
+      "[libx264 @ 0x55d0] frame P:29    Avg QP:22.00  size: 300",
+      "[libx264 @ 0x55d0] mb I  I16..4: 20.0%  0.0% 80.0%",
+      "[libx264 @ 0x55d0] 8x8 transform intra:70.0% inter:75.0%",
+      "[libx264 @ 0x55d0] ref P L0: 70.0% 30.0%",
+      "[libx264 @ 0x55d0] kb/s:300.00",
+      "[aac @ 0x55d0] Qavg: 1234.567",
+      "[out#0/mp4 @ 0x55d0] video:100kB audio:10kB subtitle:0kB other streams:0kB global headers:0kB muxing overhead: 1.0%",
+      "[AVIOContext @ 0x55d0] Statistics: 12345 bytes read, 2 seeks",
+      "[out#0/mp4 @ 0x55d0] Error closing file: Broken pipe",
+      "Conversion failed!",
+    ].join("\n");
+    const out = rebuildErrorValue(new Error(`ffmpeg exited 1: ${stderr}`));
+    expect(out).toContain("Error closing file: Broken pipe");
+    for (const noise of [
+      "Q4 Board Deck",
+      "CONFIDENTIAL",
+      "Lavf61",
+      "Side data",
+      "cpb:",
+      "major_brand",
+      "frame I:",
+      "kb/s:",
+    ]) {
+      expect(out).not.toContain(noise);
+    }
+  });
+
+  it("keeps an early 'Unknown encoder' failure past x264 stats and startup lines", () => {
+    const stderr = [
+      "Unknown encoder 'libbogus'",
+      "[libx264 @ 0x55d0] profile High, level 3.1, 4:2:0, 8-bit",
+      "[libx264 @ 0x55d0] using cpu capabilities: ARMv8 NEON",
+      "[libx264 @ 0x55d0] 264 - core 164 r3108",
+      "[libx264 @ 0x55d0] frame I:1     Avg QP:20.00  size: 1000",
+      "[libx264 @ 0x55d0] i8 v,h,dc,p: 42%  0% 58%  0%",
+      "[libx264 @ 0x55d0] i4 v,h,dc,ddl,ddr,vr,hd,vl,hu: 20% 18% 22% 7% 7% 7% 7% 6% 6%",
+      "[libx264 @ 0x55d0] Weighted P-Frames: Y:0.0% UV:0.0%",
+      "[libx264 @ 0x55d0] kb/s:300.00",
+    ].join("\n");
+    expect(rebuildErrorValue(new Error(`ffmpeg exited 3: ${stderr}`))).toBe(
+      "ffmpeg exited 3: Unknown encoder 'libbogus'",
+    );
+  });
+
+  it("filters audio-only size= progress so the decode error survives", () => {
+    const stderr = [
+      "[aist#0:0/pcm_s16le @ 0x55d0] Invalid PCM packet, data has size 1 but at least a size of 2 was expected",
+      "size=      40KiB time=00:00:05.00 bitrate=  64.9kbits/s speed= 213x elapsed=0:00:00.02",
+      "Conversion failed!",
+    ].join("\n");
+    const out = rebuildErrorValue(new Error(`ffmpeg exited 1: ${stderr}`));
+    expect(out).toContain("Invalid PCM packet");
+    expect(out).not.toContain("size=");
+  });
+
+  it("dedupes repeated decode errors so a later mux failure still fits", () => {
+    const stderr = [
+      ...Array.from(
+        { length: 50 },
+        (_, i) =>
+          `[h264 @ 0x${(i + 1).toString(16)}] Error while decoding stream #0:0: Invalid data found when processing input`,
+      ),
+      "[out#0/mp4 @ 0x55d0] Error muxing a packet",
+      "Conversion failed!",
+    ].join("\n");
+    const out = rebuildErrorValue(new Error(`ffmpeg exited 1: ${stderr}`));
+    expect(out?.match(/Error while decoding/g)).toHaveLength(1);
+    expect(out).toContain("Error muxing a packet");
+  });
+
+  it("drops no-colon thread termination lines before they can win a slot", () => {
+    const stderr = [
+      "[Parsed_extractplanes_1 @ 0x55d0] Requested planes not available.",
+      "[Parsed_extractplanes_1 @ 0x55d0] Failed to configure input pad on Parsed_extractplanes_1",
+      "[vf#0:0 @ 0x55d0] Error reinitializing filters!",
+      "[vf#0:0 @ 0x55d0] Task finished with error code: -22 (Invalid argument)",
+      "[vf#0:0 @ 0x55d0] Terminating thread with return code -22 (Invalid argument)",
+      "[vost#0:0/libx264 @ 0x55d0] Terminating thread with return code -22 (Invalid argument)",
+      "Conversion failed!",
+    ].join("\n");
+    const out = rebuildErrorValue(new Error(`ffmpeg exited 234: ${stderr}`));
+    expect(out).toContain("Requested planes not available");
+    expect(out).not.toContain("Terminating thread");
+    expect(out).not.toContain("Task finished");
+  });
+
+  it("ranks a specific option error above generic follow-ups", () => {
+    const stderr = [
+      "Unrecognized option 'bogusopt'.",
+      "Error splitting the argument list: Option not found",
+      "Conversion failed!",
+    ].join("\n");
+    const out = rebuildErrorValue(new Error(`ffmpeg exited 1: ${stderr}`)) ?? "";
+    expect(out).toContain("Unrecognized option 'bogusopt'.");
+    expect(out.indexOf("Unrecognized option")).toBeLessThan(
+      out.indexOf("Error splitting the argument list"),
+    );
+  });
+
+  it("does not backtrack catastrophically on repeated bracket prefixes", () => {
+    const hostile = `ffmpeg exited 1: ${"[a @ b @ c] ".repeat(1000)}x`;
+    const start = performance.now();
+    const out = rebuildErrorValue(new Error(hostile));
+    expect(performance.now() - start).toBeLessThan(200);
+    expect(out?.startsWith("ffmpeg exited 1:")).toBe(true);
+  });
+
+  it("summarizes ffprobe failures the same way", () => {
+    const stderr = [
+      "[mov,mp4,m4a @ 0x55d0] moov atom not found",
+      "/data/uploads/9f/in.mp4: Invalid data found when processing input",
+    ].join("\n");
+    const out = rebuildErrorValue(new Error(`ffprobe exited 2: ${stderr}`));
+    expect(out).toContain("Invalid data found when processing input");
+    expect(out).toContain("moov atom not found");
+    expect(out?.startsWith("ffprobe exited 2: ")).toBe(true);
+  });
+
+  it("returns the bare exit prefix when stderr is only progress noise", () => {
+    expect(rebuildErrorValue(new Error(`ffmpeg exited 1: ${progress.repeat(100)}`))).toBe(
+      "ffmpeg exited 1",
+    );
+  });
+
+  it("tail-slices a long failure line so its end (the actual error) survives", () => {
+    const stderr = `[out#0/mp4] ${"x".repeat(500)} Error muxing a packet`;
+    const out = rebuildErrorValue(new Error(`ffmpeg exited 1: ${stderr}`));
+    expect(out?.endsWith("Error muxing a packet")).toBe(true);
+  });
+
+  it("redacts paths in the selected failure lines", () => {
+    const out = rebuildErrorValue(
+      new Error(
+        "ffmpeg exited 1: /data/uploads/9f/in.mp4: Invalid data found when processing input",
+      ),
+    );
+    expect(out).toContain("Invalid data found when processing input");
+    expect(out).not.toContain("/data/");
+  });
+});
+
 describe("extractErrorCode", () => {
   it("finds a pg SQLSTATE through a drizzle-style cause chain", () => {
     const pg = Object.assign(new Error("password authentication failed"), {
