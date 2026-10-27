@@ -135,23 +135,53 @@ describe("ToolFeedbackPrompt", () => {
 
     await waitFor(() => expect(submitFeedback).toHaveBeenCalledTimes(1));
     // A declined answer is not recorded, so the prompt must not claim it was,
-    // and the next result must still be able to ask.
-    expect(await screen.findByRole("dialog")).toBeDefined();
+    // and the handled cooldowns must not be armed.
+    const dialog = await screen.findByRole("dialog");
+    const githubLink = await within(dialog).findByRole("link", {
+      name: "Open a GitHub issue",
+    });
+    const details =
+      new URL(githubLink.getAttribute("href") ?? "").searchParams.get("details") ?? "";
+    expect(details).toContain("resize");
+    expect(details).toContain("great");
     expect(screen.queryByText("Thanks for the signal.")).toBeNull();
     expect(localStorage.getItem("snapotter-feedback-last-prompt-at")).toBeNull();
     expect(localStorage.getItem("snapotter-feedback-tool-prompt:resize")).toBeNull();
   });
 
-  it("does not thank or arm cooldowns when the quick answer fails to send", async () => {
+  it("opens the form for a retry when the quick answer fails to send", async () => {
     submitFeedback.mockRejectedValueOnce(new Error("network error"));
     render(<ToolFeedbackPrompt toolId="resize" />);
 
     fireEvent.click(screen.getByRole("button", { name: "Worked well" }));
 
     await waitFor(() => expect(submitFeedback).toHaveBeenCalledTimes(1));
+    const dialog = await screen.findByRole("dialog");
+    // A network failure is not a server decline, so the user gets the form to
+    // retry rather than the offline handoff.
+    expect(within(dialog).getByRole("button", { name: "Send feedback" })).toBeDefined();
     expect(screen.queryByText("Thanks for the signal.")).toBeNull();
     expect(localStorage.getItem("snapotter-feedback-last-prompt-at")).toBeNull();
     expect(localStorage.getItem("snapotter-feedback-tool-prompt:resize")).toBeNull();
+  });
+
+  it("ignores a second quick click while the first is in flight", async () => {
+    let resolveSubmit: ((value: { ok: boolean; accepted: boolean }) => void) | undefined;
+    submitFeedback.mockImplementationOnce(
+      () =>
+        new Promise<{ ok: boolean; accepted: boolean }>((resolve) => {
+          resolveSubmit = resolve;
+        }),
+    );
+    render(<ToolFeedbackPrompt toolId="resize" />);
+
+    const button = screen.getByRole("button", { name: "Worked well" });
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    expect(submitFeedback).toHaveBeenCalledTimes(1);
+    resolveSubmit?.({ ok: true, accepted: true });
+    expect(await screen.findByText("Thanks for the signal.")).toBeDefined();
   });
 
   it("does not show quick thanks when a dialog submission is declined (#2252)", async () => {

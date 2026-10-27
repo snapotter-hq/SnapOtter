@@ -35,6 +35,8 @@ interface FeedbackDialogProps {
   jobStatus?: "completed" | "failed";
   errorCategory?: FeedbackErrorCategory;
   initialSentiment?: FeedbackSentiment;
+  /** Start on the declined handoff, for an answer the server already refused. */
+  initialDeclined?: boolean;
   searchQuery?: string;
   promptVariant?: FeedbackPromptVariant;
   onClose: () => void;
@@ -55,6 +57,7 @@ export function FeedbackDialog({
   jobStatus,
   errorCategory,
   initialSentiment,
+  initialDeclined,
   searchQuery,
   promptVariant: promptVariantProp,
   onClose,
@@ -73,8 +76,8 @@ export function FeedbackDialog({
   const [frictionArea, setFrictionArea] = useState<FeedbackFrictionArea>("smooth");
   const [importantAreas, setImportantAreas] = useState<FeedbackImportantArea[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [accepted, setAccepted] = useState(true);
+  const [submitted, setSubmitted] = useState(initialDeclined ?? false);
+  const [accepted, setAccepted] = useState(!initialDeclined);
   const [error, setError] = useState<string | null>(null);
 
   useFocusTrap(dialogRef, open);
@@ -94,10 +97,10 @@ export function FeedbackDialog({
     setFrictionArea("smooth");
     setImportantAreas([]);
     setSubmitting(false);
-    setSubmitted(false);
-    setAccepted(true);
+    setSubmitted(initialDeclined ?? false);
+    setAccepted(!initialDeclined);
     setError(null);
-  }, [open, initialSentiment, source]);
+  }, [open, initialSentiment, initialDeclined, source]);
 
   useEffect(() => {
     if (!open) return;
@@ -125,7 +128,11 @@ export function FeedbackDialog({
     ? [`Tool: ${toolId ?? "unknown"}`, `Error category: ${errorCategory ?? "unknown"}`, "", message]
         .join("\n")
         .trim()
-    : message;
+    : source === "tool_result"
+      ? [`Tool: ${toolId ?? "unknown"}`, sentiment ? `Rating: ${sentiment}` : "", "", message]
+          .join("\n")
+          .trim()
+      : message;
   const canSubmit = Boolean(
     message.trim() || sentiment || feedbackType !== "other" || isAdminInstall,
   );

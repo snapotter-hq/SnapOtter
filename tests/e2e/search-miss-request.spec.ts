@@ -82,7 +82,12 @@ test.describe("search-miss tool request", () => {
       });
     });
 
+    // Wait for the mocked config to land: the Discussions link is also the
+    // pre-config fallback, so asserting it before the fetch would prove
+    // nothing about the gate.
+    const configLoaded = page.waitForResponse("**/api/v1/config/analytics");
     await page.goto("/");
+    await configLoaded;
 
     const searchInput = page.locator("[data-search-input]");
     await expect(searchInput).toBeVisible();

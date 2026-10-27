@@ -62,6 +62,7 @@ export function UsageSurveyOverlay() {
   const [discoverySource, setDiscoverySource] = useState<FeedbackDiscoverySource | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [dismissing, setDismissing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const busy = submitting || dismissing;
   const submittedAnswerKeyRef = useRef<string | null>(null);
   const shownTrackedRef = useRef(false);
@@ -124,6 +125,7 @@ export function UsageSurveyOverlay() {
   async function handleContinue() {
     if (!usageType || busy) return;
     setSubmitting(true);
+    setError(null);
     const answerKey = JSON.stringify({ usageType, priorTool, selfHostMotivation, discoverySource });
     try {
       if (submittedAnswerKeyRef.current !== answerKey) {
@@ -142,7 +144,10 @@ export function UsageSurveyOverlay() {
         // A declined answer was not recorded. Leave answeredAt unset and the
         // survey visible rather than acknowledging it (#2252); the settings
         // write would otherwise hide the question for good.
-        if (!response.accepted) return;
+        if (!response.accepted) {
+          setError(t.feedback.submitFailed);
+          return;
+        }
         submittedAnswerKeyRef.current = answerKey;
       }
       await recordSettingsKey("onboarding.usageSurvey.answeredAt");
@@ -153,6 +158,7 @@ export function UsageSurveyOverlay() {
       // matches), a retry only retries the settings write, so the same
       // answer never gets submitted twice, but a genuinely different answer
       // always submits fresh.
+      setError(t.feedback.submitFailed);
     } finally {
       setSubmitting(false);
     }
@@ -161,6 +167,7 @@ export function UsageSurveyOverlay() {
   async function handleDismiss(kind: FeedbackDismissKind = "dont_ask_again") {
     if (busy) return;
     setDismissing(true);
+    setError(null);
     trackFeedbackPromptDismissed("onboarding", kind);
     try {
       await recordSettingsKey("onboarding.usageSurvey.dismissedAt");
@@ -344,6 +351,8 @@ export function UsageSurveyOverlay() {
             </div>
           </>
         )}
+
+        {error && <p className="text-sm text-destructive">{error}</p>}
 
         <div className="space-y-3">
           <button

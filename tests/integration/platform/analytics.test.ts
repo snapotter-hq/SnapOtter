@@ -84,7 +84,9 @@ describe("GET /api/v1/config/analytics", () => {
 
   it("default (bake off): effective state is disabled and secrets are blanked", async () => {
     // The committed bake is OFF and no override is set, so the effective gate is
-    // disabled regardless of any opt-out setting.
+    // disabled regardless of any opt-out setting. A live sink must not leak
+    // through the disabled branch.
+    feedbackSink.present = true;
     const res = await testApp.app.inject({ method: "GET", url: "/api/v1/config/analytics" });
     const config = JSON.parse(res.body);
     expect(config.enabled).toBe(false);
@@ -141,7 +143,9 @@ describe("GET /api/v1/config/analytics", () => {
       });
       expect(put.statusCode).toBe(200);
 
-      // Effective state is now disabled, and secrets are blanked.
+      // Effective state is now disabled, and secrets are blanked. Keep the
+      // sink present so the disabled branch is what reports false.
+      feedbackSink.present = true;
       const after = JSON.parse(
         (await testApp.app.inject({ method: "GET", url: "/api/v1/config/analytics" })).body,
       );

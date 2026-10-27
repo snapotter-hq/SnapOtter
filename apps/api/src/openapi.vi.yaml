@@ -7233,6 +7233,12 @@ paths:
                     type: string
                   posthogHost:
                     type: string
+                  feedbackSink:
+                    type: boolean
+                    description: |
+                      Whether the server has a PostHog client that can actually
+                      take feedback. False when analytics is off or when the
+                      client failed to start, even if a PostHog key is baked.
                   sentryDsn:
                     type: string
                   sentryDsnWeb:

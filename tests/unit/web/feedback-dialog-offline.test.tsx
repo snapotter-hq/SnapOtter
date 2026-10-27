@@ -91,7 +91,7 @@ describe("FeedbackDialog off-state handoff", () => {
       const githubLink = await screen.findByRole("link", { name: "Open a GitHub issue" });
       expect(githubLink.getAttribute("href")).toContain("template=feedback.yml");
       const details = new URL(githubLink.getAttribute("href") ?? "").searchParams.get("details");
-      expect(details).toBe("The survey still had something to say");
+      expect(details).toContain("The survey still had something to say");
       expect(screen.getByRole("link", { name: "Email us" })).toBeDefined();
       expect(screen.queryByText("Thanks for the feedback.")).toBeNull();
     },

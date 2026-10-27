@@ -261,6 +261,7 @@ describe("UsageSurveyOverlay", () => {
     // A declined answer was not recorded, so the survey must not claim it was.
     expect(apiPut).not.toHaveBeenCalled();
     expect(screen.getByText("How are you using SnapOtter?")).toBeDefined();
+    expect(screen.getByText("Feedback could not be sent. Please try again.")).toBeInTheDocument();
   });
 
   it("stays visible and re-enables Continue if the feedback submission itself fails", async () => {
@@ -281,6 +282,7 @@ describe("UsageSurveyOverlay", () => {
 
     expect(screen.getByText("How are you using SnapOtter?")).toBeDefined();
     expect(apiPut).not.toHaveBeenCalled();
+    expect(screen.getByText("Feedback could not be sent. Please try again.")).toBeInTheDocument();
   });
 
   it("ignores a second dismiss click while the first write is in flight", async () => {
