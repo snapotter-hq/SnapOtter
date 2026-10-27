@@ -61,6 +61,17 @@ export function isEngineUnavailableFailure(error: unknown): boolean {
   if (/\b(ffmpeg|ffprobe|pdfcpu|soffice|pandoc)\b[^"]*?\bbinary not found\b/i.test(message)) {
     return true;
   }
+  // A job payload carries the worker's fixed sentence, not the cause: it swaps
+  // the spawn failure for a SafeError and keeps the program name in `cause`.
+  // The lean docker image relies on this for pandoc and the other engines it
+  // does not ship (#4099).
+  if (
+    /Processing is unavailable on this server because a required engine binary could not be started/i.test(
+      message,
+    )
+  ) {
+    return true;
+  }
   return /spawn\s+\S*(ffmpeg|ffprobe|pdfcpu|soffice|pandoc)\S*\s+ENOENT/i.test(message);
 }
 

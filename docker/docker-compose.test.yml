@@ -43,6 +43,17 @@ services:
         "**/tests/unit/helpers/run-generated-tool.test.ts",
         "--exclude",
         "**/tests/unit/web/lazy-chunks-stay-lazy.test.ts",
+        # The surface harness audit reads the landing and docs Playwright
+        # configs and starts their previews; the lean image installs neither
+        # workspace's dependencies (no astro, no vitepress), and host CI runs
+        # this spec on every PR.
+        "--exclude",
+        "**/tests/unit/surface-playwright-harness.test.ts",
+        # These run standalone node:test suites that resolve the campaign
+        # commit with git. Dockerfile.test.dockerignore prunes .git, so the
+        # runner fails closed before the suite starts. Host CI runs them too.
+        "--exclude",
+        "**/tests/unit/scripts/node-test-suites.test.ts",
       ]
     environment:
       - NODE_ENV=test
