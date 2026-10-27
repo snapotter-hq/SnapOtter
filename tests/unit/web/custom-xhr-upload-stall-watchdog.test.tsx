@@ -106,6 +106,13 @@ class FakeXhr {
     this.onload?.();
   }
 
+  respondRaw(status: number, body: string) {
+    if (this.aborted) return;
+    this.status = status;
+    this.responseText = body;
+    this.onload?.();
+  }
+
   respondBlob(status: number, blob: Blob) {
     if (this.aborted) return;
     this.status = status;
@@ -1283,5 +1290,47 @@ describe("custom-XHR upload stall and post-upload response watchdog (#3870)", ()
     const remountedBarcodeView2 = render(<BarcodeReadSettings />);
     expect(vi.getTimerCount()).toBe(0);
     remountedBarcodeView2.unmount();
+  });
+
+  it("logs the parse error and response snippet when an upload response is not JSON (#4062)", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const upload = apiUploadUserFiles([image("not-json.png")]);
+    const xhr = FakeXhr.instances[0];
+    const html = `<html><body>502 Bad Gateway</body></html>${"x".repeat(300)}`;
+
+    try {
+      xhr.respondRaw(200, html);
+
+      await expect(upload).rejects.toThrow("Invalid server response");
+      expect(warn).toHaveBeenCalledWith(
+        "Failed to parse upload response:",
+        expect.any(SyntaxError),
+        html.substring(0, 200),
+      );
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("logs the parse error and response snippet when an upload error response is not JSON (#4062)", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const upload = apiUploadUserFiles([image("bad-gateway.png")]);
+    const xhr = FakeXhr.instances[0];
+    const html = "<html><body>502 Bad Gateway</body></html>";
+
+    try {
+      xhr.respondRaw(502, html);
+
+      await expect(upload).rejects.toThrow(en.errors.failedWithStatus);
+      expect(warn).toHaveBeenCalledWith(
+        "Failed to parse upload error response (status: 502):",
+        expect.any(SyntaxError),
+        html,
+      );
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      warn.mockRestore();
+    }
   });
 });

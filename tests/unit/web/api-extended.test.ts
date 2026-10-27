@@ -470,6 +470,7 @@ describe("throwWithMessage error extraction", () => {
 
   it("falls back to status code when JSON parsing fails", async () => {
     const { apiGet } = await import("@/lib/api");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     fetchMock.mockReturnValueOnce(
       Promise.resolve({
         ok: false,
@@ -477,7 +478,34 @@ describe("throwWithMessage error extraction", () => {
         json: () => Promise.reject(new Error("not json")),
       }),
     );
-    await expect(apiGet("/v1/test")).rejects.toThrow("API error: 502");
+    try {
+      await expect(apiGet("/v1/test")).rejects.toThrow("API error: 502");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("logs the parse error and status when a non-2xx response is not JSON", async () => {
+    const { apiGet } = await import("@/lib/api");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const parseError = new SyntaxError('Unexpected token "<", "<!doctype "... is not valid JSON');
+    fetchMock.mockReturnValueOnce(
+      Promise.resolve({
+        ok: false,
+        status: 502,
+        json: () => Promise.reject(parseError),
+      }),
+    );
+
+    try {
+      await expect(apiGet("/v1/test")).rejects.toThrow("API error: 502");
+      expect(warn).toHaveBeenCalledWith(
+        "Failed to parse non-2xx API response (status: 502):",
+        parseError,
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
 

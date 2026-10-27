@@ -218,8 +218,10 @@ export async function throwWithMessage(res: Response): Promise<never> {
     if (parsed && typeof parsed === "object") body = parsed as Record<string, unknown>;
     if (typeof body.error === "string" && body.error) msg = body.error;
     else if (typeof body.message === "string" && body.message) msg = body.message;
-  } catch {
-    // response wasn't JSON — use the default message
+  } catch (error) {
+    // response wasn't JSON — use the default message, but keep the parse
+    // failure visible for proxies and gateways that answer with HTML (#4062)
+    console.warn(`Failed to parse non-2xx API response (status: ${res.status}):`, error);
   }
   throw new ApiError(msg, res.status, typeof body.code === "string" ? body.code : undefined, body);
 }
@@ -412,7 +414,14 @@ export function apiUploadUserFiles(
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           resolve(JSON.parse(xhr.responseText));
-        } catch {
+        } catch (error) {
+          // Keep the parse failure and the raw body visible: a proxy can
+          // answer 2xx with an HTML error page instead of JSON (#4062).
+          console.warn(
+            "Failed to parse upload response:",
+            error,
+            xhr.responseText.substring(0, 200),
+          );
           reject(new Error("Invalid server response"));
         }
       } else {
@@ -422,8 +431,14 @@ export function apiUploadUserFiles(
           if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
             body = parsed as Record<string, unknown>;
           }
-        } catch {
-          // non-JSON response
+        } catch (error) {
+          // Keep the parse failure and the raw body visible: a proxy can
+          // answer with an HTML error page instead of JSON (#4062).
+          console.warn(
+            `Failed to parse upload error response (status: ${xhr.status}):`,
+            error,
+            xhr.responseText.substring(0, 200),
+          );
         }
         if (xhr.status === 413) {
           const quotaMsg =
