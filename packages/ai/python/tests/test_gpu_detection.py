@@ -54,6 +54,139 @@ def test_torch_gpu_available_false_when_torch_is_cpu_only(monkeypatch):
     assert gpu.torch_gpu_available() is False
 
 
+# --- torch wheel/device arch compatibility (issue #1163) -------------------
+#
+# A cu126 torch wheel carries no SASS or PTX for Blackwell (sm_120), yet
+# torch.cuda.is_available() still returns True on an RTX 50-series card. The
+# first kernel launch then fails with "no kernel image is available for
+# execution on the device", and torch tools failed instead of falling back to
+# CPU. The probe compares the device capability with the archs the wheel was
+# built for.
+
+def _install_fake_torch(
+    monkeypatch,
+    capability,
+    arch_list,
+    name="NVIDIA GeForce RTX 5090",
+    arch_error=None,
+    capability_error=None,
+):
+    class FakeCuda:
+        def is_available(self):
+            return True
+
+        def get_device_name(self, index):
+            return name
+
+        def get_device_capability(self, index):
+            if capability_error is not None:
+                raise capability_error
+            return capability
+
+        def get_arch_list(self):
+            if arch_error is not None:
+                raise arch_error
+            return list(arch_list)
+
+    fake = types.SimpleNamespace(
+        cuda=FakeCuda(), version=types.SimpleNamespace(cuda="12.6")
+    )
+    monkeypatch.setitem(sys.modules, "torch", fake)
+
+
+def test_torch_probe_falls_back_on_a_wheel_without_the_device_arch(monkeypatch, capsys):
+    monkeypatch.delenv("SNAPOTTER_GPU", raising=False)
+    _install_fake_torch(monkeypatch, (12, 0), ["sm_80", "sm_86", "sm_90"])
+
+    assert gpu.torch_gpu_available() is False
+
+    err = capsys.readouterr().err
+    assert "sm_120" in err
+    assert "cu128" in err
+
+
+def test_torch_probe_accepts_a_wheel_built_for_the_device(monkeypatch):
+    monkeypatch.delenv("SNAPOTTER_GPU", raising=False)
+    _install_fake_torch(monkeypatch, (12, 0), ["sm_80", "sm_86", "sm_90", "sm_120"])
+
+    assert gpu.torch_gpu_available() is True
+
+
+def test_torch_probe_keeps_the_gpu_when_the_arch_list_is_unavailable(monkeypatch):
+    # An older or custom build that cannot report its archs must not lose GPU
+    # support over a capability check we cannot perform.
+    monkeypatch.delenv("SNAPOTTER_GPU", raising=False)
+    _install_fake_torch(monkeypatch, (12, 0), [])
+
+    assert gpu.torch_gpu_available() is True
+
+
+def test_torch_probe_accepts_sass_from_the_same_major_arch(monkeypatch):
+    # SASS is minor-version compatible within a major arch: sm_86 runs on an
+    # sm_89 card such as the RTX 4090, but sm_90 does not run on sm_120.
+    monkeypatch.delenv("SNAPOTTER_GPU", raising=False)
+    _install_fake_torch(monkeypatch, (8, 9), ["sm_80", "sm_86"])
+    assert gpu.torch_gpu_available() is True
+
+    _install_fake_torch(monkeypatch, (12, 0), ["sm_90"])
+    assert gpu.torch_gpu_available() is False
+
+
+def test_torch_probe_accepts_ptx_for_the_device_or_older(monkeypatch):
+    # PTX is forward compatible: compute_90 JITs onto sm_120, compute_120 does
+    # not run on sm_90.
+    monkeypatch.delenv("SNAPOTTER_GPU", raising=False)
+    _install_fake_torch(monkeypatch, (12, 0), ["compute_90"])
+    assert gpu.torch_gpu_available() is True
+
+    _install_fake_torch(monkeypatch, (9, 0), ["compute_120"])
+    assert gpu.torch_gpu_available() is False
+
+
+def test_torch_probe_handles_arch_specific_targets(monkeypatch):
+    # sm_90a and sm_100f code only runs on that exact capability, and
+    # arch-specific PTX is not forward compatible either.
+    monkeypatch.delenv("SNAPOTTER_GPU", raising=False)
+    _install_fake_torch(monkeypatch, (9, 0), ["sm_90a"])
+    assert gpu.torch_gpu_available() is True
+
+    _install_fake_torch(monkeypatch, (12, 0), ["sm_90a"])
+    assert gpu.torch_gpu_available() is False
+
+    _install_fake_torch(monkeypatch, (10, 0), ["sm_100f"])
+    assert gpu.torch_gpu_available() is True
+
+    _install_fake_torch(monkeypatch, (12, 0), ["sm_100f"])
+    assert gpu.torch_gpu_available() is False
+
+    _install_fake_torch(monkeypatch, (12, 0), ["compute_90a"])
+    assert gpu.torch_gpu_available() is False
+
+
+def test_torch_probe_keeps_the_gpu_when_the_arch_probe_raises(monkeypatch):
+    # A patched or vendor build that cannot produce an arch list must not lose
+    # CUDA support over a capability check we could not perform.
+    monkeypatch.delenv("SNAPOTTER_GPU", raising=False)
+    _install_fake_torch(
+        monkeypatch, (12, 0), [], arch_error=RuntimeError("no arch flags")
+    )
+    assert gpu.torch_gpu_available() is True
+
+
+def test_torch_probe_keeps_the_gpu_when_the_capability_probe_raises(monkeypatch):
+    monkeypatch.delenv("SNAPOTTER_GPU", raising=False)
+    _install_fake_torch(
+        monkeypatch, (12, 0), ["sm_90"], capability_error=RuntimeError("driver gone")
+    )
+    assert gpu.torch_gpu_available() is True
+
+
+def test_torch_probe_keeps_the_gpu_when_no_arch_entry_is_understood(monkeypatch):
+    monkeypatch.delenv("SNAPOTTER_GPU", raising=False)
+    _install_fake_torch(monkeypatch, (12, 0), ["unknown-target"])
+    assert gpu.torch_gpu_available() is True
+
+
 def test_ctranslate2_gpu_available_true_when_cuda_device_present(monkeypatch):
     monkeypatch.delenv("SNAPOTTER_GPU", raising=False)
     fake = types.SimpleNamespace(get_cuda_device_count=lambda: 1)

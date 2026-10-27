@@ -428,3 +428,85 @@ print("SAFE_ONNX_SESSION_3439_OK")
     expect(res.stdout).toContain("SAFE_ONNX_SESSION_3439_OK");
   });
 });
+
+describe.skipIf(!hasPython)("gpu torch arch probe (issue #1163)", () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const pyDir = resolve(here, "../../../packages/ai/python");
+
+  it("falls back to CPU when the torch wheel has no kernels for the device", () => {
+    const res = spawnSync(
+      pythonBin as string,
+      [
+        "-c",
+        `
+import io, json, os, sys, types
+
+os.environ.pop("SNAPOTTER_GPU", None)
+sys.path.insert(0, ${JSON.stringify(pyDir)})
+import gpu
+
+def probe(capability, arch_list, arch_error=None, capability_error=None):
+    class FakeCuda:
+        def is_available(self):
+            return True
+
+        def get_device_name(self, index):
+            return "NVIDIA GeForce RTX 5090"
+
+        def get_device_capability(self, index):
+            if capability_error is not None:
+                raise capability_error
+            return capability
+
+        def get_arch_list(self):
+            if arch_error is not None:
+                raise arch_error
+            return list(arch_list)
+
+    torch = types.ModuleType("torch")
+    torch.cuda = FakeCuda()
+    torch.version = types.SimpleNamespace(cuda="12.6")
+    sys.modules["torch"] = torch
+    capture = io.StringIO()
+    saved_stderr = sys.stderr
+    sys.stderr = capture
+    try:
+        usable = gpu.torch_gpu_available()
+    finally:
+        sys.stderr = saved_stderr
+    return usable, capture.getvalue()
+
+
+usable, stderr = probe((12, 0), ["sm_80", "sm_86", "sm_90"])
+assert usable is False, usable
+messages = [
+    json.loads(line).get("info", "")
+    for line in stderr.splitlines()
+    if line.startswith("{")
+]
+assert any("sm_120" in m and "cu128" in m for m in messages), stderr
+
+assert probe((12, 0), ["sm_80", "sm_120"])[0] is True
+assert probe((12, 0), [])[0] is True
+assert probe((8, 9), ["sm_80", "sm_86"])[0] is True
+assert probe((12, 0), ["sm_90"])[0] is False
+assert probe((12, 0), ["compute_90"])[0] is True
+assert probe((9, 0), ["compute_120"])[0] is False
+assert probe((9, 0), ["sm_90a"])[0] is True
+assert probe((12, 0), ["sm_90a"])[0] is False
+assert probe((10, 0), ["sm_100f"])[0] is True
+assert probe((12, 0), ["sm_100f"])[0] is False
+assert probe((12, 0), ["compute_90a"])[0] is False
+assert probe((12, 0), [], arch_error=RuntimeError("no arch flags"))[0] is True
+assert probe((12, 0), ["sm_90"], capability_error=RuntimeError("driver gone"))[0] is True
+assert probe((12, 0), ["unknown-target"])[0] is True
+
+print("TORCH_ARCH_1163_OK")
+`,
+      ],
+      { encoding: "utf8", timeout: 30_000 },
+    );
+    expect(res.status, res.stderr).toBe(0);
+    expect(res.stdout).toContain("TORCH_ARCH_1163_OK");
+  });
+});

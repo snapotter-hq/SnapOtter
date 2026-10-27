@@ -136,6 +136,76 @@ def gpu_available():
     return False
 
 
+def _parse_cuda_arch(entry):
+    """Parse a torch arch string into (major, minor, is_ptx, arch_specific).
+
+    torch reports SASS targets as ``sm_90`` and PTX targets as ``compute_90``;
+    a ``+PTX`` suffix is tolerated too. Arch-specific targets carry a letter
+    suffix (``sm_90a``, ``sm_100f``) and only run on that exact capability.
+    """
+    text = str(entry).strip().lower()
+    is_ptx = text.endswith("+ptx")
+    if is_ptx:
+        text = text[: -len("+ptx")]
+    prefix, separator, digits = text.partition("_")
+    if prefix not in ("sm", "compute") or not separator:
+        return None
+    arch_specific = digits[-1:].isalpha()
+    digits = digits.rstrip("abcdefghijklmnopqrstuvwxyz")
+    if len(digits) < 2 or not digits.isdigit():
+        return None
+    return int(digits[:-1]), int(digits[-1]), is_ptx or prefix == "compute", arch_specific
+
+
+def _torch_device_supported(torch, capability):
+    """Return (supported, arch_list) for a device compute capability.
+
+    A wheel only runs on a device when it carries SASS for the same major arch
+    at or below the device's minor version, or PTX at or below the device (PTX
+    is forward compatible across majors, never backward). SASS is never
+    compatible across majors: sm_90 code does not run on sm_100 or sm_120.
+    Arch-specific targets cover only their exact capability. When the build
+    cannot report or the list cannot be understood, the device keeps its GPU
+    support rather than being disabled on a guess.
+    """
+    get_arch_list = getattr(torch.cuda, "get_arch_list", None)
+    if not callable(get_arch_list):
+        return True, []
+    try:
+        arch_list = list(get_arch_list() or [])
+    except Exception as e:
+        print(
+            f"[gpu] cannot read torch's compiled arch list ({e}); "
+            "assuming the GPU is usable",
+            file=sys.stderr,
+            flush=True,
+        )
+        return True, []
+    if not arch_list:
+        return True, arch_list
+
+    major, minor = capability
+    understood = False
+    for entry in arch_list:
+        parsed = _parse_cuda_arch(entry)
+        if parsed is None:
+            continue
+        understood = True
+        entry_major, entry_minor, is_ptx, arch_specific = parsed
+        if arch_specific:
+            if (entry_major, entry_minor) == (major, minor):
+                return True, arch_list
+        elif is_ptx:
+            if (entry_major, entry_minor) <= (major, minor):
+                return True, arch_list
+        elif entry_major == major and entry_minor <= minor:
+            return True, arch_list
+
+    if not understood:
+        return True, arch_list
+    return False, arch_list
+
+
 def _try_torch_cuda():
     """Check GPU via torch.cuda. Returns True if CUDA is usable."""
     try:
@@ -145,13 +215,42 @@ def _try_torch_cuda():
         return False
 
     try:
-        if torch.cuda.is_available():
-            name = torch.cuda.get_device_name(0)
-            print(f"[gpu] CUDA available via torch: {name}", file=sys.stderr, flush=True)
-            return True
+        cuda_available = torch.cuda.is_available()
     except Exception as e:
         print(f"[gpu] torch CUDA probe failed: {e}", file=sys.stderr, flush=True)
         return False
+
+    if cuda_available:
+        try:
+            name = torch.cuda.get_device_name(0)
+        except Exception:
+            name = "CUDA device 0"
+        try:
+            capability = torch.cuda.get_device_capability(0)
+            supported, arch_list = _torch_device_supported(torch, capability)
+        except Exception as e:
+            print(
+                f"[gpu] cannot verify torch kernels for {name} ({e}); "
+                "assuming the GPU is usable",
+                file=sys.stderr,
+                flush=True,
+            )
+            return True
+        if not supported:
+            sm = f"sm_{capability[0]}{capability[1]}"
+            hint = (
+                " RTX 50-series and other Blackwell cards need a cu128 torch build."
+                if capability >= (10, 0)
+                else ""
+            )
+            emit_info(
+                f"GPU {name} is {sm}, but this torch build has no kernels for it "
+                f"(built for {', '.join(str(arch) for arch in arch_list)}). "
+                f"Torch-based tools will run on CPU.{hint}"
+            )
+            return False
+        print(f"[gpu] CUDA available via torch: {name}", file=sys.stderr, flush=True)
+        return True
 
     # CUDA not available -- diagnose why.
     cuda_version = getattr(torch.version, "cuda", None)
