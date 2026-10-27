@@ -49,6 +49,7 @@ const ON = {
   posthogApiKey: "phc_test",
   posthogHost: "https://ph.test",
   posthogProxyPath: "",
+  feedbackSink: true,
   sentryDsn: "",
   sentryDsnWeb: "https://sentry.test/web/1",
   posthogSampleRate: 1,

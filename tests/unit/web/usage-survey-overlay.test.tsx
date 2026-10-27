@@ -24,13 +24,17 @@ vi.mock("@/lib/api", async (importOriginal) => {
 
 vi.mock("@/hooks/use-auth", () => ({ useAuth }));
 
-// A PostHog-baked instance by default; the Sentry-only case clears the key.
-const analyticsConfig = vi.hoisted(() => ({ enabled: true, posthogApiKey: "phc_test" }));
+// A PostHog-backed instance by default; the no-sink case flips feedbackSink.
+const analyticsConfig = vi.hoisted(() => ({
+  enabled: true,
+  posthogApiKey: "phc_test",
+  feedbackSink: true,
+}));
 
 vi.mock("@/stores/analytics-store", () => ({
   useAnalyticsStore: (
     selector: (state: {
-      config: { enabled: boolean; posthogApiKey: string };
+      config: { enabled: boolean; posthogApiKey: string; feedbackSink: boolean };
       configLoaded: boolean;
     }) => unknown,
   ) => selector({ config: analyticsConfig, configLoaded: true }),
@@ -45,6 +49,7 @@ const PROCESSED = { "onboarding.firstProcessedAt": "2026-01-01T00:00:00Z" };
 afterEach(() => {
   analyticsConfig.enabled = true;
   analyticsConfig.posthogApiKey = "phc_test";
+  analyticsConfig.feedbackSink = true;
   cleanup();
   submitFeedback.mockClear();
   trackFeedbackPromptShown.mockClear();
@@ -103,8 +108,8 @@ describe("UsageSurveyOverlay", () => {
     expect(trackFeedbackPromptShown).not.toHaveBeenCalled();
   });
 
-  it("isn't offered on a Sentry-only instance, where its answers can't be recorded (#2220)", async () => {
-    analyticsConfig.posthogApiKey = "";
+  it("isn't offered when the server has no feedback sink, even with a baked key (#2220, #2252)", async () => {
+    analyticsConfig.feedbackSink = false;
     useAuth.mockReturnValue({ role: "admin", mustChangePassword: false });
     answerSettingsLater(PROCESSED);
 
@@ -234,6 +239,27 @@ describe("UsageSurveyOverlay", () => {
 
     await waitFor(() => expect(apiPut).toHaveBeenCalledTimes(2));
     expect(submitFeedback).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not mark the survey answered when the server declines the answer (#2252)", async () => {
+    useAuth.mockReturnValue({ role: "admin", mustChangePassword: false });
+    apiGet.mockResolvedValue({ settings: PROCESSED });
+    submitFeedback.mockResolvedValueOnce({ ok: true, accepted: false });
+
+    renderOverlay();
+    await screen.findByText("How are you using SnapOtter?");
+
+    fireEvent.click(screen.getByRole("radio", { name: /Just me/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => expect(submitFeedback).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Continue" })).not.toBeDisabled(),
+    );
+
+    // A declined answer was not recorded, so the survey must not claim it was.
+    expect(apiPut).not.toHaveBeenCalled();
+    expect(screen.getByText("How are you using SnapOtter?")).toBeDefined();
   });
 
   it("stays visible and re-enables Continue if the feedback submission itself fails", async () => {

@@ -127,7 +127,7 @@ export function UsageSurveyOverlay() {
     const answerKey = JSON.stringify({ usageType, priorTool, selfHostMotivation, discoverySource });
     try {
       if (submittedAnswerKeyRef.current !== answerKey) {
-        await withTimeout(
+        const response = await withTimeout(
           submitFeedback({
             source: "onboarding",
             surveyId: surveyIdForSource("onboarding"),
@@ -139,6 +139,10 @@ export function UsageSurveyOverlay() {
           }),
           WRITE_TIMEOUT_MS,
         );
+        // A declined answer was not recorded. Leave answeredAt unset and the
+        // survey visible rather than acknowledging it (#2252); the settings
+        // write would otherwise hide the question for good.
+        if (!response.accepted) return;
         submittedAnswerKeyRef.current = answerKey;
       }
       await recordSettingsKey("onboarding.usageSurvey.answeredAt");

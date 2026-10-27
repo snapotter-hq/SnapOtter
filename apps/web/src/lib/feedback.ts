@@ -88,11 +88,13 @@ interface InstallFeedbackVisibilityOptions {
  * Whether an answer to a feedback prompt or survey has anywhere to be
  * recorded. Feedback lives only in PostHog events, so telemetry being on isn't
  * enough: a Sentry-only instance is on with no PostHog key, and the server
- * declines what it's sent there (#2198). Prompts that can't be recorded aren't
- * shown (#2220).
+ * declines what it's sent there (#2198). A baked key isn't enough either,
+ * because `posthog-node` can fail to start while the key is still in the
+ * config; the server reports that separately as `feedbackSink` (#2252).
+ * Prompts that can't be recorded aren't shown (#2220).
  */
 export function canRecordFeedback(config: AnalyticsConfig | null | undefined): boolean {
-  return Boolean(config?.enabled && config.posthogApiKey);
+  return Boolean(config?.enabled && config.feedbackSink);
 }
 
 export function surveyIdForSource(source: FeedbackSource): FeedbackSurveyId {

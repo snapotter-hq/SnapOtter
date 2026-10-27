@@ -8,6 +8,7 @@ describe("AnalyticsConfig type", () => {
       posthogApiKey: "phc_test123",
       posthogHost: "https://us.i.posthog.com",
       posthogProxyPath: "/ingest",
+      feedbackSink: true,
       sentryDsn: "https://abc@sentry.io/123",
       sentryDsnWeb: "https://abc@sentry.io/456",
       posthogSampleRate: 1.0,
@@ -17,6 +18,7 @@ describe("AnalyticsConfig type", () => {
     expect(config.posthogApiKey).toBe("phc_test123");
     expect(config.posthogHost).toBe("https://us.i.posthog.com");
     expect(config.posthogProxyPath).toBe("/ingest");
+    expect(config.feedbackSink).toBe(true);
     expect(config.sentryDsn).toBe("https://abc@sentry.io/123");
     expect(config.sentryDsnWeb).toBe("https://abc@sentry.io/456");
     expect(config.posthogSampleRate).toBe(1.0);
@@ -29,6 +31,7 @@ describe("AnalyticsConfig type", () => {
       posthogApiKey: "",
       posthogHost: "",
       posthogProxyPath: "",
+      feedbackSink: false,
       sentryDsn: "",
       sentryDsnWeb: "",
       posthogSampleRate: 0,
@@ -44,6 +47,7 @@ describe("AnalyticsConfig type", () => {
       posthogApiKey: "key",
       posthogHost: "https://host.com",
       posthogProxyPath: "/ingest",
+      feedbackSink: true,
       sentryDsn: "https://dsn",
       sentryDsnWeb: "https://dsn-web",
       posthogSampleRate: 0.5,
@@ -58,6 +62,7 @@ describe("AnalyticsConfig type", () => {
       posthogApiKey: "key",
       posthogHost: "host",
       posthogProxyPath: "/ingest",
+      feedbackSink: true,
       sentryDsn: "dsn",
       sentryDsnWeb: "dsn-web",
       posthogSampleRate: 1,
@@ -67,6 +72,7 @@ describe("AnalyticsConfig type", () => {
     expect(keys).toEqual(
       [
         "enabled",
+        "feedbackSink",
         "instanceId",
         "posthogApiKey",
         "posthogHost",

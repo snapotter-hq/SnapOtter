@@ -723,9 +723,15 @@ export function SystemSection() {
     [t, later],
   );
 
-  const handleInstallFeedbackSubmitted = useCallback(() => {
-    void updateInstallFeedbackState("feedback.install.submittedAt", new Date().toISOString());
-  }, [updateInstallFeedbackState]);
+  const handleInstallFeedbackSubmitted = useCallback(
+    (accepted: boolean) => {
+      // A declined answer was not recorded, so keep the card eligible instead
+      // of hiding it as if it had been submitted (#2252).
+      if (!accepted) return;
+      void updateInstallFeedbackState("feedback.install.submittedAt", new Date().toISOString());
+    },
+    [updateInstallFeedbackState],
+  );
 
   const handleInstallFeedbackSnooze = useCallback(() => {
     const snoozedUntil = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();

@@ -55,6 +55,35 @@ describe("FeedbackDialog", () => {
     });
   });
 
+  it("tells the caller when the server declined the answer (#2252)", async () => {
+    submitFeedback.mockResolvedValueOnce({ ok: true, accepted: false });
+    const onSubmitted = vi.fn();
+    render(
+      <FeedbackDialog open source="tool_result" onClose={vi.fn()} onSubmitted={onSubmitted} />,
+    );
+
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "The result looked fine but I want to add a note" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send feedback" }));
+
+    await waitFor(() => expect(onSubmitted).toHaveBeenCalledWith(false));
+  });
+
+  it("tells the caller when the server accepted the answer", async () => {
+    const onSubmitted = vi.fn();
+    render(
+      <FeedbackDialog open source="tool_result" onClose={vi.fn()} onSubmitted={onSubmitted} />,
+    );
+
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "The result looked great" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send feedback" }));
+
+    await waitFor(() => expect(onSubmitted).toHaveBeenCalledWith(true));
+  });
+
   it("does not submit contact fields without contact consent", async () => {
     render(<FeedbackDialog open={true} source="global" onClose={vi.fn()} />);
 

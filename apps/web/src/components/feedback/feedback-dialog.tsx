@@ -38,7 +38,8 @@ interface FeedbackDialogProps {
   searchQuery?: string;
   promptVariant?: FeedbackPromptVariant;
   onClose: () => void;
-  onSubmitted?: () => void;
+  /** Called with the server's answer: false means it was declined, not recorded. */
+  onSubmitted?: (accepted: boolean) => void;
 }
 
 // The dialog's option lists derive from the shared enum arrays so a value added
@@ -117,7 +118,6 @@ export function FeedbackDialog({
 
   const isAdminInstall = source === "admin_installer";
   const isSearchMiss = source === "search_miss";
-  const isGlobal = source === "global";
   const isFailedJob = source === "failed_job";
   // For a failed run, thread the tool and error into the offline handoff so the
   // GitHub issue is actionable even if the message box is left empty.
@@ -170,7 +170,7 @@ export function FeedbackDialog({
       const response = await submitFeedback(payload);
       setAccepted(response.accepted);
       setSubmitted(true);
-      onSubmitted?.();
+      onSubmitted?.(response.accepted);
     } catch {
       setError(t.feedback.submitFailed);
     } finally {
@@ -214,38 +214,42 @@ export function FeedbackDialog({
 
         {submitted ? (
           <div className="p-6 space-y-4">
-            {(isGlobal || isFailedJob) && !accepted ? (
-              <div className="space-y-3">
-                <p className="text-sm text-foreground">{t.feedback.offlineDescription}</p>
-                <p className="text-xs text-muted-foreground">{t.feedback.offlinePublicNote}</p>
-                <div className="flex flex-col gap-2">
+            {!accepted ? (
+              // A declined answer must never be thanked for, whatever the
+              // source. The handoff is the only way it can reach the team.
+              isSearchMiss ? (
+                <p className="text-sm text-foreground">
                   <a
-                    href={buildFeedbackGithubUrl(handoffMessage)}
+                    href={buildToolRequestDiscussionUrl(searchQuery ?? "")}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full text-center py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
+                    className="text-primary-ink hover:underline"
                   >
-                    {t.feedback.offlineGithubButton}
+                    {t.feedback.searchMissDiscussionsFallback}
                   </a>
-                  <a
-                    href={buildFeedbackMailtoUrl(handoffMessage)}
-                    className="w-full text-center py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-                  >
-                    {t.feedback.offlineEmailButton}
-                  </a>
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-foreground">{t.feedback.offlineDescription}</p>
+                  <p className="text-xs text-muted-foreground">{t.feedback.offlinePublicNote}</p>
+                  <div className="flex flex-col gap-2">
+                    <a
+                      href={buildFeedbackGithubUrl(handoffMessage)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full text-center py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
+                    >
+                      {t.feedback.offlineGithubButton}
+                    </a>
+                    <a
+                      href={buildFeedbackMailtoUrl(handoffMessage)}
+                      className="w-full text-center py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
+                      {t.feedback.offlineEmailButton}
+                    </a>
+                  </div>
                 </div>
-              </div>
-            ) : isSearchMiss && !accepted ? (
-              <p className="text-sm text-foreground">
-                <a
-                  href={buildToolRequestDiscussionUrl(searchQuery ?? "")}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary-ink hover:underline"
-                >
-                  {t.feedback.searchMissDiscussionsFallback}
-                </a>
-              </p>
+              )
             ) : (
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="h-5 w-5 text-success-ink shrink-0 mt-0.5" />

@@ -39,6 +39,7 @@ test.describe("search-miss tool request", () => {
           enabled: true,
           posthogApiKey: "phc_e2e",
           posthogHost: "http://127.0.0.1:9",
+          feedbackSink: true,
         },
       });
     });

@@ -1484,7 +1484,7 @@ describe("System: install feedback actions (#1560)", () => {
     });
     // mock the analytics config
     useAnalyticsStore.setState({
-      config: { enabled: true, posthogApiKey: "test" },
+      config: { enabled: true, posthogApiKey: "test", feedbackSink: true },
       configLoaded: true,
     });
   });

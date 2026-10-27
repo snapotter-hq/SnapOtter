@@ -118,11 +118,8 @@ export function ToolFeedbackPrompt({
 
   async function handleQuickSentiment(sentiment: FeedbackSentiment) {
     if (sentiment === "great") {
-      markPromptHandled(toolId);
-      setVisible(false);
-      setThanks(true);
       try {
-        await submitFeedback({
+        const response = await submitFeedback({
           source,
           surveyId: surveyIdForSource(source),
           promptVariant: promptVariantForSource(source),
@@ -132,6 +129,17 @@ export function ToolFeedbackPrompt({
           jobStatus,
           errorCategory,
         });
+        if (!response.accepted) {
+          // Nothing took the answer. Open the dialog so it can show the
+          // GitHub/email handoff instead of thanking for a dropped answer
+          // (#2252).
+          setDialogSentiment(sentiment);
+          setDialogOpen(true);
+          return;
+        }
+        markPromptHandled(toolId);
+        setVisible(false);
+        setThanks(true);
       } catch {
         // Explicit feedback is best-effort; keep the user flow calm.
       }
@@ -154,7 +162,10 @@ export function ToolFeedbackPrompt({
     setVisible(false);
   }
 
-  function handleSubmitted() {
+  function handleSubmitted(accepted: boolean) {
+    // A declined answer is shown with the handoff inside the dialog; do not
+    // thank for it here or start the cooldown (#2252).
+    if (!accepted) return;
     markPromptHandled(toolId);
     setVisible(false);
     setThanks(true);

@@ -3530,6 +3530,7 @@ describe("useAnalyticsStore", () => {
       enabled: true,
       posthogApiKey: "phc_test",
       posthogHost: "https://ph.example.com",
+      feedbackSink: true,
       sentryDsn: "https://sentry.example.com",
       sentryDsnWeb: "https://sentry.example.com/web",
       posthogSampleRate: 0.5,

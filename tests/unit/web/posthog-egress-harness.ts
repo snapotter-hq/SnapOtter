@@ -15,6 +15,7 @@ export const ON = {
   posthogApiKey: "phc_test_key",
   posthogHost: "https://ph.test",
   posthogProxyPath: "",
+  feedbackSink: true,
   sentryDsn: "",
   sentryDsnWeb: "",
   posthogSampleRate: 1,
