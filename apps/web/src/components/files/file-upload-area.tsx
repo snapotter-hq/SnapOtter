@@ -22,12 +22,12 @@ export function FileUploadArea() {
     e.preventDefault();
     setDragging(false);
     const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) uploadFiles(files);
+    if (files.length > 0) uploadFiles(files, t);
   }
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
-    if (files.length > 0) uploadFiles(files);
+    if (files.length > 0) uploadFiles(files, t);
     e.target.value = "";
   }
 

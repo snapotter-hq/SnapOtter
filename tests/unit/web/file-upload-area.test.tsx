@@ -126,7 +126,11 @@ describe("FileUploadArea (#3310)", () => {
       fireEvent.drop(label, { dataTransfer: { files: [file] } });
     });
 
-    expect(apiUploadUserFiles).toHaveBeenCalledWith([file], expect.any(Function));
+    expect(apiUploadUserFiles).toHaveBeenCalledWith(
+      [file],
+      expect.any(Function),
+      expect.any(Object),
+    );
     expect(screen.getByRole("alert")).toHaveTextContent("Server storage error (500)");
   });
 });

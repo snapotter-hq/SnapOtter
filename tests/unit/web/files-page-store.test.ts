@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { de } from "@snapotter/shared/i18n/de.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Bypass zustand persist middleware
@@ -660,9 +661,19 @@ describe("useFilesPageStore", () => {
 
     await useFilesPageStore.getState().uploadFiles([file]);
 
-    expect(mockApiUploadUserFiles).toHaveBeenCalledWith([file], expect.any(Function));
+    expect(mockApiUploadUserFiles).toHaveBeenCalledWith([file], expect.any(Function), undefined);
     expect(mockApiListFiles).toHaveBeenCalled();
     expect(useFilesPageStore.getState().activeTab).toBe("recent");
+  });
+
+  it("uploadFiles forwards the caller's translations to the upload API (#4083)", async () => {
+    const file = new File(["content"], "photo.png", { type: "image/png" });
+    mockApiUploadUserFiles.mockResolvedValueOnce({ files: [] });
+    mockApiListFiles.mockResolvedValueOnce({ files: [], total: 0 });
+
+    await useFilesPageStore.getState().uploadFiles([file], de);
+
+    expect(mockApiUploadUserFiles).toHaveBeenCalledWith([file], expect.any(Function), de);
   });
 
   it("uploadFiles sets error on failure", async () => {

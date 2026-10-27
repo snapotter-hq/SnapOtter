@@ -1,3 +1,4 @@
+import type { TranslationKeys } from "@snapotter/shared";
 import { create } from "zustand";
 import { apiDeleteUserFiles, apiListFiles, apiUploadUserFiles, type UserFile } from "@/lib/api";
 
@@ -15,7 +16,7 @@ interface FilesPageState {
   error: string | null;
 
   fetchFiles: () => Promise<void>;
-  uploadFiles: (files: File[]) => Promise<void>;
+  uploadFiles: (files: File[], t?: TranslationKeys) => Promise<void>;
   deleteChecked: () => Promise<void>;
   selectFile: (id: string | null) => void;
   toggleChecked: (id: string) => void;
@@ -80,7 +81,7 @@ export const useFilesPageStore = create<FilesPageState>((set, get) => ({
     }
   },
 
-  uploadFiles: async (files) => {
+  uploadFiles: async (files, t) => {
     ++fetchRequestId;
     const uploadId = ++uploadRequestId;
     ++uploadInFlight;
@@ -95,10 +96,14 @@ export const useFilesPageStore = create<FilesPageState>((set, get) => ({
     try {
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
-          await apiUploadUserFiles(files, (percent) => {
-            if (uploadId !== uploadRequestId) return;
-            set({ uploadProgress: percent });
-          });
+          await apiUploadUserFiles(
+            files,
+            (percent) => {
+              if (uploadId !== uploadRequestId) return;
+              set({ uploadProgress: percent });
+            },
+            t,
+          );
           succeeded = true;
           break;
         } catch (err) {
