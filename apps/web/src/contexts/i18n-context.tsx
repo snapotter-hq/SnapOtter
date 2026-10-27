@@ -142,11 +142,20 @@ function getDir(code: string): "ltr" | "rtl" {
   return SUPPORTED_LOCALES.find((l) => l.code === code)?.dir ?? "ltr";
 }
 
+// The locale whose copy is actually rendered: `loadLocale` returns the English
+// catalog when a chunk is missing or fails to load, so the document must
+// present itself as English then. Otherwise English text renders inside a
+// flipped RTL layout (#4031).
+function resolveEffectiveLocale(requested: string, translations: TranslationKeys): string {
+  return translations === en && requested !== "en" ? "en" : requested;
+}
+
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState(() => detectLocale());
   const [translations, setTranslations] = useState<TranslationKeys>(en);
   const hasExplicitChoiceRef = useRef(false);
-  const dir = getDir(locale);
+  const effectiveLocale = resolveEffectiveLocale(locale, translations);
+  const dir = getDir(effectiveLocale);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: instance default only checked once on initial mount
   useEffect(() => {
@@ -176,9 +185,8 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
       // Tag Sentry with the active locale so locale-specific i18n/interpolation
       // crashes are identifiable as such. When a chunk load fails and falls back
       // to English, tag as "en" so Sentry reflects what the user actually sees.
-      const activeLocale = t === en && locale !== "en" ? "en" : locale;
       import("@/lib/analytics")
-        .then(({ setSentryTag }) => setSentryTag("locale", activeLocale))
+        .then(({ setSentryTag }) => setSentryTag("locale", resolveEffectiveLocale(locale, t)))
         .catch((error) => {
           // The locale still works; the tag is only diagnostics. Say why it's
           // missing rather than swallowing the failure (#4044).
@@ -191,9 +199,9 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   }, [locale]);
 
   useEffect(() => {
-    document.documentElement.lang = locale;
+    document.documentElement.lang = effectiveLocale;
     document.documentElement.dir = dir;
-  }, [locale, dir]);
+  }, [effectiveLocale, dir]);
 
   const setLocale = useCallback((code: string) => {
     hasExplicitChoiceRef.current = true;

@@ -40,6 +40,9 @@ function LocaleProbe() {
       <button type="button" data-testid="set-en" onClick={() => setLocale("en")}>
         Set en
       </button>
+      <button type="button" data-testid="set-ar" onClick={() => setLocale("ar")}>
+        Set ar
+      </button>
     </div>
   );
 }
@@ -80,7 +83,9 @@ describe("I18nProvider locale validation (#3952)", () => {
     });
 
     expect(screen.getByTestId("locale").textContent).toBe("de");
-    expect(document.documentElement.lang).toBe("de");
+    // Document attributes follow the loaded catalog, so the German chunk has to
+    // land before lang flips away from the English fallback (#4031).
+    await waitFor(() => expect(document.documentElement.lang).toBe("de"));
   });
 
   it("normalizes regional, underscore, and case-variant codes in localStorage to supported codes", async () => {
@@ -156,7 +161,9 @@ describe("I18nProvider locale validation (#3952)", () => {
     });
 
     expect(screen.getByTestId("locale").textContent).toBe("ar");
-    expect(screen.getByTestId("dir").textContent).toBe("rtl");
+    // Direction follows the loaded catalog (#4031), so rtl arrives with the
+    // Arabic chunk rather than with the requested locale.
+    await waitFor(() => expect(screen.getByTestId("dir").textContent).toBe("rtl"));
   });
 
   it("fetches instance default when localStorage holds an unsupported code and validates defaultLocale", async () => {
@@ -258,6 +265,124 @@ describe("I18nProvider locale validation (#3952)", () => {
     });
     expect(screen.getByTestId("locale").textContent).toBe("en");
     expect(storageMap.get("snapotter-locale")).toBe("en");
+  });
+});
+
+describe("I18nProvider document direction when a locale chunk fails (#4031)", () => {
+  it("falls back to ltr and en attributes when the Arabic chunk fails to load", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const originalLoader = localeLoaders.ar;
+    try {
+      localeLoaders.ar = () => Promise.reject(new Error("Chunk load failed: ar.js 404"));
+      storageMap.set("snapotter-locale", "ar");
+
+      render(
+        <I18nProvider>
+          <LocaleProbe />
+        </I18nProvider>,
+      );
+
+      await waitFor(() => expect(setSentryTag).toHaveBeenCalledWith("locale", "en"));
+
+      expect(screen.getByTestId("dir").textContent).toBe("ltr");
+      expect(document.documentElement.dir).toBe("ltr");
+      expect(document.documentElement.lang).toBe("en");
+      // The saved preference survives the fallback so a later load can still
+      // retry Arabic; only what is rendered falls back to English.
+      expect(screen.getByTestId("locale").textContent).toBe("ar");
+      expect(storageMap.get("snapotter-locale")).toBe("ar");
+    } finally {
+      localeLoaders.ar = originalLoader;
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("falls back to ltr when a chunk resolves without the expected catalog", async () => {
+    const originalLoader = localeLoaders.ar;
+    try {
+      localeLoaders.ar = async () => ({});
+      storageMap.set("snapotter-locale", "ar");
+
+      render(
+        <I18nProvider>
+          <LocaleProbe />
+        </I18nProvider>,
+      );
+
+      await waitFor(() => expect(setSentryTag).toHaveBeenCalledWith("locale", "en"));
+
+      expect(screen.getByTestId("dir").textContent).toBe("ltr");
+      expect(document.documentElement.dir).toBe("ltr");
+      expect(document.documentElement.lang).toBe("en");
+    } finally {
+      localeLoaders.ar = originalLoader;
+    }
+  });
+
+  it("returns a loaded rtl locale to en/ltr when a later switch falls back", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const originalLoader = localeLoaders.ar;
+    try {
+      storageMap.set("snapotter-locale", "de");
+
+      render(
+        <I18nProvider>
+          <LocaleProbe />
+        </I18nProvider>,
+      );
+      await waitFor(() => expect(document.documentElement.lang).toBe("de"));
+
+      localeLoaders.ar = () => Promise.reject(new Error("Chunk load failed: ar.js 404"));
+      await act(async () => {
+        screen.getByTestId("set-ar").click();
+      });
+
+      await waitFor(() => expect(document.documentElement.lang).toBe("en"));
+      expect(screen.getByTestId("dir").textContent).toBe("ltr");
+      expect(document.documentElement.dir).toBe("ltr");
+      expect(screen.getByTestId("locale").textContent).toBe("ar");
+    } finally {
+      localeLoaders.ar = originalLoader;
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("falls back to lang=en when an ltr chunk fails to load", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const originalLoader = localeLoaders.de;
+    try {
+      localeLoaders.de = () => Promise.reject(new Error("Chunk load failed: de.js 404"));
+      storageMap.set("snapotter-locale", "de");
+
+      render(
+        <I18nProvider>
+          <LocaleProbe />
+        </I18nProvider>,
+      );
+
+      await waitFor(() => expect(setSentryTag).toHaveBeenCalledWith("locale", "en"));
+
+      expect(screen.getByTestId("locale").textContent).toBe("de");
+      expect(document.documentElement.lang).toBe("en");
+      expect(document.documentElement.dir).toBe("ltr");
+    } finally {
+      localeLoaders.de = originalLoader;
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("keeps rtl and lang=ar when the Arabic chunk loads", async () => {
+    storageMap.set("snapotter-locale", "ar");
+
+    render(
+      <I18nProvider>
+        <LocaleProbe />
+      </I18nProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("dir").textContent).toBe("rtl"));
+    expect(document.documentElement.dir).toBe("rtl");
+    expect(document.documentElement.lang).toBe("ar");
   });
 });
 
