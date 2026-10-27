@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, ne } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, schema } from "../../../apps/api/src/db/index.js";
 import { ensureAnonymousUser } from "../../../apps/api/src/plugins/auth.js";
@@ -242,9 +242,16 @@ describe("legal hold on the synthetic anonymous row (#4047)", () => {
     expect(row?.legalHold).toBe(false);
   });
 
-  it("omits the synthetic anonymous row from the held users list", async () => {
+  it("lists real held users and omits the synthetic anonymous row", async () => {
     // A hold written before this guard existed must not leak into the list.
     await db.update(schema.users).set({ legalHold: true }).where(eq(schema.users.id, "anonymous"));
+    const [real] = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(ne(schema.users.id, "anonymous"))
+      .limit(1);
+    expect(real).toBeDefined();
+    await db.update(schema.users).set({ legalHold: true }).where(eq(schema.users.id, real.id));
 
     try {
       const res = await licensedApp.app.inject({
@@ -256,11 +263,13 @@ describe("legal hold on the synthetic anonymous row (#4047)", () => {
       expect(res.statusCode).toBe(200);
       const body = JSON.parse(res.body) as { users: Array<{ id: string }> };
       expect(body.users.some((u) => u.id === "anonymous")).toBe(false);
+      expect(body.users.some((u) => u.id === real.id)).toBe(true);
     } finally {
       await db
         .update(schema.users)
         .set({ legalHold: false })
         .where(eq(schema.users.id, "anonymous"));
+      await db.update(schema.users).set({ legalHold: false }).where(eq(schema.users.id, real.id));
     }
   });
 });

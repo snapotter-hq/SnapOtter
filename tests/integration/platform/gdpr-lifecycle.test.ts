@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { chmod } from "node:fs/promises";
 import { join } from "node:path";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { env } from "../../../apps/api/src/config.js";
 import { db, schema } from "../../../apps/api/src/db/index.js";
@@ -476,6 +476,11 @@ describe("GDPR purge role hierarchy", () => {
     });
 
     expect(res.statusCode).toBe(404);
+    const [job] = await db
+      .select({ id: schema.jobs.id })
+      .from(schema.jobs)
+      .where(and(eq(schema.jobs.userId, "anonymous"), eq(schema.jobs.toolId, "gdpr-export")));
+    expect(job).toBeUndefined();
   });
 
   it("refuses to purge the synthetic anonymous row (#4047)", async () => {

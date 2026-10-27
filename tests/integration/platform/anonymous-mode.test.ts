@@ -319,21 +319,30 @@ describe("admin mutations of the synthetic anonymous row (#4047)", () => {
 
   it("refuses PUT /api/auth/users/anonymous and leaves the row alone", async () => {
     await ensureAnonymousUser();
+    const before = await anonymousRow();
 
-    const res = await app.inject({
-      method: "PUT",
-      url: "/api/auth/users/anonymous",
-      headers: { authorization: `Bearer ${adminToken}` },
-      payload: { role: "user" },
-    });
+    try {
+      const res = await app.inject({
+        method: "PUT",
+        url: "/api/auth/users/anonymous",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { role: "user" },
+      });
 
-    expect(res.statusCode).toBe(404);
-    expect(JSON.parse(res.body).code).toBe("NOT_FOUND");
-    expect((await anonymousRow())?.role).toBe("admin");
+      expect(res.statusCode).toBe(404);
+      expect(JSON.parse(res.body).code).toBe("NOT_FOUND");
+      expect(await anonymousRow()).toEqual(before);
+    } finally {
+      await db
+        .update(schema.users)
+        .set({ role: before?.role ?? "admin" })
+        .where(eq(schema.users.id, "anonymous"));
+    }
   });
 
   it("refuses a password reset for the synthetic anonymous row", async () => {
     await ensureAnonymousUser();
+    const before = await anonymousRow();
 
     const res = await app.inject({
       method: "POST",
@@ -344,11 +353,12 @@ describe("admin mutations of the synthetic anonymous row (#4047)", () => {
 
     expect(res.statusCode).toBe(404);
     expect(JSON.parse(res.body).code).toBe("NOT_FOUND");
-    expect((await anonymousRow())?.passwordHash).toBeNull();
+    expect(await anonymousRow()).toEqual(before);
   });
 
   it("refuses an admin MFA reset for the synthetic anonymous row", async () => {
     await ensureAnonymousUser();
+    const before = await anonymousRow();
 
     const res = await app.inject({
       method: "POST",
@@ -358,6 +368,7 @@ describe("admin mutations of the synthetic anonymous row (#4047)", () => {
 
     expect(res.statusCode).toBe(404);
     expect(JSON.parse(res.body).code).toBe("NOT_FOUND");
+    expect(await anonymousRow()).toEqual(before);
   });
 
   it("refuses DELETE /api/auth/users/anonymous and keeps its pipelines", async () => {
