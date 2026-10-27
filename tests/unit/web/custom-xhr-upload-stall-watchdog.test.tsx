@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { en } from "@snapotter/shared";
+import { de } from "@snapotter/shared/i18n/de.js";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -1301,12 +1302,26 @@ describe("custom-XHR upload stall and post-upload response watchdog (#3870)", ()
     try {
       xhr.respondRaw(200, html);
 
-      await expect(upload).rejects.toThrow("Invalid server response");
+      await expect(upload).rejects.toThrow(en.errors.invalidResponse);
       expect(warn).toHaveBeenCalledWith(
         "Failed to parse upload response:",
         expect.any(SyntaxError),
         html.substring(0, 200),
       );
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("uses the caller's translation when an upload response is not JSON (#4083)", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const upload = apiUploadUserFiles([image("not-json-de.png")], undefined, de);
+    const xhr = FakeXhr.instances[0];
+
+    try {
+      xhr.respondRaw(200, "<html><body>proxy error</body></html>");
+      await expect(upload).rejects.toThrow(de.errors.invalidResponse);
       expect(vi.getTimerCount()).toBe(0);
     } finally {
       warn.mockRestore();

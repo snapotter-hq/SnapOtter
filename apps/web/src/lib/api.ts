@@ -422,7 +422,7 @@ export function apiUploadUserFiles(
             error,
             xhr.responseText.substring(0, 200),
           );
-          reject(new Error("Invalid server response"));
+          reject(new Error(t.errors.invalidResponse));
         }
       } else {
         let body: Record<string, unknown> | null = null;
