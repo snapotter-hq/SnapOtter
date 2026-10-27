@@ -92,8 +92,10 @@ test.describe("Image Editor - Full GUI Test Suite", () => {
     await expect(page.getByText("Preset")).toBeVisible();
     await snap(page, "new-doc-dialog");
 
-    // Change preset to Instagram
-    await page.locator("select").first().selectOption("1080x1080 (Instagram)");
+    // Change preset to Instagram. The dialog's select is not the first one in
+    // the DOM: the editor chrome behind the welcome screen mounts its own
+    // selects, so target the dialog's element by id (#4103).
+    await page.locator("#new-doc-preset").selectOption("instagram");
     await page.waitForTimeout(300);
     await snap(page, "new-doc-instagram-preset");
 
