@@ -1025,6 +1025,39 @@ describe("compress-pdf route processor (#1373)", () => {
     expect(modes).toEqual(new Set(["quality", "targetSize"]));
   });
 
+  it("keeps every targetSize probe at or above the 150 dpi legibility floor (#1086)", async () => {
+    // Every candidate is far over the 1 KB target, so the search walks the
+    // whole axis down to q=1. Before #1086 that probe asked Ghostscript for
+    // 26 dpi; a 300 dpi scan compressed there is unreadable.
+    vi.mocked(gsCompressPdfTuned).mockImplementation(
+      async (_inPath: string, outPath: string, dpi: number) => {
+        await writeFile(outPath, Buffer.alloc(20_000 - dpi, 0x41));
+      },
+    );
+    vi.mocked(pdfScrubProducerPy).mockImplementation(async (inPath: string, outPath: string) => {
+      await writeFile(outPath, await readFile(inPath));
+    });
+
+    registerCompressPdf(createMockApp());
+    const config = getToolConfig("compress-pdf");
+
+    await withScratch(async (scratchDir) => {
+      const input = Buffer.alloc(200_000, 0x49);
+      const ctx = createCompressCtx(scratchDir, input, {
+        mode: "targetSize",
+        targetSizeKb: 1,
+      });
+      const result = await config?.processV2?.(ctx);
+
+      const dpis = vi.mocked(gsCompressPdfTuned).mock.calls.map((call) => call[2] as number);
+      expect(dpis.length).toBeGreaterThan(1);
+      expect(Math.min(...dpis)).toBeGreaterThanOrEqual(150);
+      // The floor makes small targets unreachable on scans, and the result has
+      // to say so rather than reporting a legibility-destroying success.
+      expect(result?.resultPayload).toEqual({ targetKb: 1, targetMet: false });
+    });
+  });
+
   it("forwards ctx.signal to pdfScrubProducerPy in both quality and targetSize modes (#3254)", async () => {
     vi.mocked(gsCompressPdfTuned).mockImplementation(async (_inPath: string, outPath: string) => {
       await writeFile(outPath, Buffer.alloc(600, 0x41));

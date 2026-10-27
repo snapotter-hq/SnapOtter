@@ -23,7 +23,7 @@ const settingsSchema = z
     path: ["targetSizeKb"],
   });
 
-const MIN_DPI = 20;
+const MIN_DPI = 150;
 const MAX_DPI = 300;
 
 /**
@@ -31,6 +31,12 @@ const MAX_DPI = 300;
  * (dpi, qFactor) pair whose output size increases with q. The top half (q>=50)
  * preserves resolution and trades JPEG quality; the bottom half drops resolution
  * for aggressive targets. Verified monotonic on real scans (see spec).
+ *
+ * MIN_DPI is a legibility floor, not just a clamp: below ~150 dpi the
+ * downsampling plus DCT re-encode turns 10.5pt text on a 300 dpi scan into
+ * blocks (#1086), and target-size mode searched all the way down. 150 dpi is
+ * Ghostscript's own /ebook floor. Targets smaller than a legible output can
+ * reach now report targetMet=false instead of shipping unreadable text.
  */
 export function paramsForQuality(q: number): { dpi: number; qFactor: number } {
   const clamped = Math.max(1, Math.min(100, Math.round(q)));

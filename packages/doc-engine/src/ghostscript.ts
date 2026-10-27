@@ -136,6 +136,11 @@ export async function gsCompressPdfTuned(
       "-dQUIET",
       "-sDEVICE=pdfwrite",
       "-dCompatibilityLevel=1.6",
+      // Explicit font handling: pdfwrite's defaults already embed and subset,
+      // but stating it here keeps a distiller preset or a gs build with
+      // different defaults from substituting glyphs mid-compression (#1086).
+      "-dEmbedAllFonts=true",
+      "-dSubsetFonts=true",
       "-dDownsampleColorImages=true",
       "-dColorImageDownsampleType=/Average",
       `-dColorImageResolution=${res}`,

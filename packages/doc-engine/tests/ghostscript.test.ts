@@ -380,4 +380,13 @@ describe("gsCompressPdfTuned (DPI + QFactor levers)", () => {
     expect(args).toContain("-dDownsampleMonoImages=true");
     expect(args).toContain("-dMonoImageDownsampleType=/Subsample");
   });
+
+  it("asks pdfwrite to embed and subset fonts instead of substituting glyphs (#1086)", async () => {
+    // pdfwrite's own defaults already embed, but the flags make the intent
+    // explicit and survive a distiller preset or a gs build whose defaults
+    // differ, which is how a compress pass turns text into the wrong glyphs.
+    const args = await run(100, 1);
+    expect(args).toContain("-dEmbedAllFonts=true");
+    expect(args).toContain("-dSubsetFonts=true");
+  });
 });
