@@ -178,7 +178,13 @@ export function registerFavicon(app: FastifyInstance) {
       } catch (rawErr) {
         const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
         if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
-        const reason = err instanceof Error ? err.message : "Unknown decode error";
+        request.log?.warn(
+          { err, filename: file.filename, toolId: "favicon" },
+          "Favicon input decode failed",
+        );
+        const reason = stripInternalPaths(
+          err instanceof Error ? err.message : "Unknown decode error",
+        );
         skippedFiles.push({ filename: file.filename, reason });
         continue;
       }
@@ -190,7 +196,13 @@ export function registerFavicon(app: FastifyInstance) {
           buf = sanitizeSvg(buf);
         } catch (err) {
           if (!isSvgClientError(err)) throw asDecoderOutOfMemory(err);
-          const reason = err instanceof Error ? err.message : "Unknown decode error";
+          request.log?.warn(
+            { err, filename: file.filename, toolId: "favicon" },
+            "Favicon SVG sanitize failed",
+          );
+          const reason = stripInternalPaths(
+            err instanceof Error ? err.message : "Unknown decode error",
+          );
           skippedFiles.push({ filename: file.filename, reason });
           continue;
         }
@@ -211,7 +223,13 @@ export function registerFavicon(app: FastifyInstance) {
       } catch (rawErr) {
         const err = normalizeOperationalWriteError(asDecoderOutOfMemory(rawErr));
         if (isDecoderUnavailable(err) || hasServerErrorStatus(err)) throw err;
-        const reason = err instanceof Error ? err.message : "Unknown decode error";
+        request.log?.warn(
+          { err, filename: file.filename, toolId: "favicon" },
+          "Favicon input decode failed",
+        );
+        const reason = stripInternalPaths(
+          err instanceof Error ? err.message : "Unknown decode error",
+        );
         skippedFiles.push({ filename: file.filename, reason });
       }
     }

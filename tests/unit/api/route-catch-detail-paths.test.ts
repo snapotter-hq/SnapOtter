@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import multipart from "@fastify/multipart";
 import { apiToolPath, ToolInputError } from "@snapotter/shared";
+import AdmZip from "adm-zip";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import sharp from "sharp";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -78,6 +79,7 @@ import * as formatDecoders from "../../../apps/api/src/lib/format-decoders.js";
 import * as formatEncoders from "../../../apps/api/src/lib/format-encoders.js";
 import * as heicConverter from "../../../apps/api/src/lib/heic-converter.js";
 import * as imageErrorMod from "../../../apps/api/src/lib/image-error.js";
+import * as svgSanitize from "../../../apps/api/src/lib/svg-sanitize.js";
 import { registerErrorHandler } from "../../../apps/api/src/plugins/error-handler.js";
 import { registerSiemRoutes } from "../../../apps/api/src/routes/enterprise/siem.js";
 import { registerWebhookRoutes } from "../../../apps/api/src/routes/enterprise/webhooks.js";
@@ -799,6 +801,165 @@ describe("route catches strip internal paths from details and log raw errors (#1
       });
       expect(logLines.some((l) => l.includes("capture write failed"))).toBe(true);
     } finally {
+      await app.close();
+    }
+  });
+});
+
+/**
+ * #4049: favicon reports per-file decode failures through `skippedFiles`, which
+ * reaches the client three ways: the 400 `error`, the 400 `skipped` array, and
+ * `skipped-files.txt` in the ZIP. Each one carried the decoder's raw message,
+ * whose heif-convert command line names server temp files.
+ */
+describe("favicon skipped-file reasons strip internal paths (#4049)", () => {
+  const sampleTempPath = join(tmpdir(), "snapotter-scratch", "heic-4049.heic");
+  const decoderFailure = `Command failed: heif-convert ${sampleTempPath} /tmp/heic-out-4049.png`;
+  let png: Buffer;
+
+  beforeEach(async () => {
+    png = await sharp({
+      create: { width: 16, height: 16, channels: 3, background: "#f00" },
+    })
+      .png()
+      .toBuffer();
+  });
+
+  it("masks the sole reason in the 400 error and logs the raw decode error", async () => {
+    const heicSpy = vi
+      .spyOn(heicConverter, "decodeHeic")
+      .mockRejectedValueOnce(new Error(decoderFailure));
+    const { app, logLines } = await buildLoggedApp(registerFavicon);
+    try {
+      const res = await app.inject({
+        method: "POST",
+        url: apiToolPath("favicon"),
+        ...multipartBody([{ name: "broken.heic", type: "image/heic", data: HEIC }]),
+      });
+      expect(res.statusCode, res.body).toBe(400);
+      expect(res.body).not.toContain(tmpdir());
+      expect(res.body).not.toContain("/tmp/");
+      expect(res.json()).toEqual({
+        error: 'Invalid file "broken.heic": Command failed: heif-convert [internal] [internal]',
+      });
+      // The raw error is still recorded for operators.
+      expect(logLines.some((l) => l.includes(sampleTempPath))).toBe(true);
+      expect(logLines.some((l) => l.includes("Favicon input decode failed"))).toBe(true);
+    } finally {
+      heicSpy.mockRestore();
+      await app.close();
+    }
+  });
+
+  it("masks every reason in the 400 skipped array when all files fail", async () => {
+    const heicSpy = vi
+      .spyOn(heicConverter, "decodeHeic")
+      .mockRejectedValueOnce(new Error(decoderFailure))
+      .mockRejectedValueOnce(new Error(`Command failed: heif-convert ${sampleTempPath}`));
+    const { app } = await buildLoggedApp(registerFavicon);
+    try {
+      const res = await app.inject({
+        method: "POST",
+        url: apiToolPath("favicon"),
+        ...multipartBody([
+          { name: "a.heic", type: "image/heic", data: HEIC },
+          { name: "b.heic", type: "image/heic", data: HEIC },
+        ]),
+      });
+      expect(res.statusCode, res.body).toBe(400);
+      expect(res.body).not.toContain(tmpdir());
+      expect(res.body).not.toContain("/tmp/");
+      const { error, skipped } = res.json();
+      expect(error).toBe("No images could be decoded");
+      expect(skipped).toHaveLength(2);
+      for (const entry of skipped) {
+        expect(entry.reason).toContain("[internal]");
+        expect(entry.reason).not.toContain(tmpdir());
+      }
+    } finally {
+      heicSpy.mockRestore();
+      await app.close();
+    }
+  });
+
+  it("masks the reason written to skipped-files.txt in the ZIP", async () => {
+    const heicSpy = vi
+      .spyOn(heicConverter, "decodeHeic")
+      .mockRejectedValueOnce(new Error(decoderFailure));
+    const { app } = await buildLoggedApp(registerFavicon);
+    try {
+      const res = await app.inject({
+        method: "POST",
+        url: apiToolPath("favicon"),
+        ...multipartBody(
+          [
+            { name: "ok.png", type: "image/png", data: png },
+            { name: "broken.heic", type: "image/heic", data: HEIC },
+          ],
+          { padding: 0, radius: 0, themeColor: "#ffffff" },
+        ),
+      });
+      expect(res.statusCode, res.body).toBe(200);
+      const zip = new AdmZip(res.rawPayload);
+      const entry = zip.getEntry("skipped-files.txt");
+      expect(entry, "skipped-files.txt is missing from the ZIP").toBeTruthy();
+      const text = entry?.getData().toString("utf8") ?? "";
+      expect(text).toContain("broken.heic");
+      expect(text).toContain("[internal]");
+      expect(text).not.toContain(tmpdir());
+      expect(text).not.toContain("/tmp/");
+    } finally {
+      heicSpy.mockRestore();
+      await app.close();
+    }
+  });
+
+  it("masks a client SVG rejection that names a temp path", async () => {
+    const svgSpy = vi.spyOn(svgSanitize, "sanitizeSvg").mockImplementationOnce(() => {
+      throw Object.assign(new Error(`SVG sanitize rejected at ${sampleTempPath}`), {
+        statusCode: 400,
+      });
+    });
+    const { app, logLines } = await buildLoggedApp(registerFavicon);
+    try {
+      const res = await app.inject({
+        method: "POST",
+        url: apiToolPath("favicon"),
+        ...multipartBody([{ name: "broken.svg", type: "image/svg+xml", data: SVG }]),
+      });
+      expect(res.statusCode, res.body).toBe(400);
+      expect(res.body).not.toContain(tmpdir());
+      expect(res.json()).toEqual({
+        error: 'Invalid file "broken.svg": SVG sanitize rejected at [internal]',
+      });
+      expect(logLines.some((l) => l.includes(sampleTempPath))).toBe(true);
+      expect(logLines.some((l) => l.includes("Favicon SVG sanitize failed"))).toBe(true);
+    } finally {
+      svgSpy.mockRestore();
+      await app.close();
+    }
+  });
+
+  it("masks an auto-orient/stats failure that names a temp path", async () => {
+    const statsSpy = vi
+      .spyOn(sharp.prototype, "stats")
+      .mockRejectedValueOnce(new Error(`vips stats failed at ${sampleTempPath}`));
+    const { app, logLines } = await buildLoggedApp(registerFavicon);
+    try {
+      const res = await app.inject({
+        method: "POST",
+        url: apiToolPath("favicon"),
+        ...multipartBody([{ name: "ok.png", type: "image/png", data: png }]),
+      });
+      expect(res.statusCode, res.body).toBe(400);
+      expect(res.body).not.toContain(tmpdir());
+      expect(res.json()).toEqual({
+        error: 'Invalid file "ok.png": vips stats failed at [internal]',
+      });
+      expect(logLines.some((l) => l.includes(sampleTempPath))).toBe(true);
+      expect(logLines.some((l) => l.includes("Favicon input decode failed"))).toBe(true);
+    } finally {
+      statsSpy.mockRestore();
       await app.close();
     }
   });
