@@ -24,6 +24,20 @@ let sentryRunning = false;
 // Sentry once per tab (#2217).
 let posthogInitFailure: unknown = null;
 let posthogInitReported = false;
+// The instance has answered on or off at least once. Until then a missing
+// client means "not known yet", not "opted out" (#2196).
+let decided = false;
+// Whether this tab might have a web Sentry DSN. Starts true because an off
+// answer blanks the DSN and tells us nothing, and a Settings opt-in reaches
+// optIn() before the enabled config with the real DSN does. An enabled answer
+// with no DSN rules it out. Keeping this separate is what lets a re-enable
+// buffer during the refetch instead of dropping telemetry (#4032).
+let sentryPossible = true;
+// Handled errors and tags recorded before Sentry is ready (#4032). Bounded so
+// a page that never learns the setting cannot grow them without limit.
+const MAX_PENDING_HANDLED_ERRORS = 25;
+const pendingHandledErrors: Array<{ error: Error; tags?: Record<string, string> }> = [];
+const pendingTags = new Map<string, string>();
 
 // Only these keys may leave the browser per event, and only as primitives.
 const ALLOWED: Record<string, ReadonlySet<string>> = {
@@ -60,15 +74,26 @@ function sanitize(event: string, properties?: Record<string, unknown>): Record<s
 }
 
 export function initAnalytics(config: AnalyticsConfig): Promise<void> {
-  if (!config.enabled) return Promise.resolve();
+  decided = true;
+  if (!config.enabled) {
+    discardPendingSentry();
+    return Promise.resolve();
+  }
   wanted = true;
-  if (initialized) return Promise.resolve();
+  if (initialized) {
+    // A web-DSN-less instance can never replay the boot buffer; drop it.
+    sentryPossible = !!config.sentryDsnWeb;
+    if (!sentryPossible) discardPendingSentry();
+    return Promise.resolve();
+  }
   // The instance allows telemetry, so this tab does: Sentry's beforeSend
   // reads this. Set here, for a new start and for an answer that joins one in
   // flight, since an opt-out in between cleared it. PostHog starting is a
   // separate question; tying the two made a PostHog that failed to load
   // silence Sentry too (#2217). track() checks for a live PostHog itself.
   enabled = true;
+  sentryPossible = !!config.sentryDsnWeb;
+  if (!sentryPossible) discardPendingSentry();
   // One start at a time: refetches build a new config object each time, so
   // without this two starts could both reach posthog.init and Sentry.init.
   starting ??= startAnalytics(config).finally(() => {
@@ -216,9 +241,10 @@ async function startAnalytics(config: AnalyticsConfig): Promise<void> {
     );
   }
 
-  // Replay crashes captured before Sentry was ready. Not after an opt-out:
-  // optOut() already threw the buffer away (#2197).
-  if (enabled && wanted) void flushEarlyErrors();
+  // No web DSN means Sentry will never start, so stop listening and drop the
+  // buffer. startSentry() replays it on success; a failed start keeps it for
+  // the next answer that says on (#2196).
+  if (!sentryConfig) discardEarlyErrors();
 }
 
 /**
@@ -257,31 +283,57 @@ async function startSentry(config: AnalyticsConfig): Promise<void> {
       beforeSend: buildWebBeforeSend(() => enabled) as unknown as SentryOptions["beforeSend"],
     });
     sentryRunning = true;
+    // Everything recorded while the client was missing goes out now, tags
+    // first so the replayed errors carry them (#4032, #2196).
+    flushPendingSentry(Sentry);
+    await flushEarlyErrors();
   } catch (err) {
     console.warn("[analytics] Sentry init failed:", err);
   }
 }
 
+type SentryModule = typeof import("@sentry/react");
+
 /**
  * Set an allowlisted Sentry tag (route / tool_id / locale / error_class /
  * status_code, see sentry-scrub.ts TAG_ALLOWLIST) so web errors become
- * filterable by which tool and route the user was on. No-op until Sentry is
- * initialized; lazy so this module keeps no static @sentry/react import.
+ * filterable by which tool and route the user was on. Tags set before the
+ * client exists wait for it and flush with the rest (#4032); lazy so this
+ * module keeps no static @sentry/react import.
  */
 export function setSentryTag(key: string, value: string): void {
+  if (!decided) {
+    pendingTags.set(key, value);
+    return;
+  }
+  if (!enabled) return;
+  if (!sentryConfig) {
+    if (sentryPossible) pendingTags.set(key, value);
+    return;
+  }
+  if (!sentryRunning) {
+    pendingTags.set(key, value);
+    return;
+  }
   void import("@sentry/react")
     .then((Sentry) => {
       if (Sentry.getClient()) Sentry.setTag(key, value);
     })
-    .catch(() => {});
+    .catch((error) => {
+      // A chunk that won't load is the network or an ad blocker; say so
+      // instead of losing the tag without a trace (#4044).
+      console.warn("[analytics] Could not tag Sentry:", error);
+    });
 }
 
 /**
  * Capture a handled (non-crash) error and return its Sentry event id so UI
  * copy can reference it, or null when telemetry is off (analytics disabled,
- * no web DSN baked, or opted out). Only allowlisted tags survive the scrubber
- * (see sentry-scrub.ts TAG_ALLOWLIST), and the error must carry an authored
- * SafeError message or beforeSend reduces it to its type. A SafeError's
+ * no web DSN baked, or opted out). Errors recorded before the setting is known
+ * or before Sentry finishes starting are buffered and replayed then, so a
+ * boot-time failure is not lost (#4032). Only allowlisted tags survive the
+ * scrubber (see sentry-scrub.ts TAG_ALLOWLIST), and the error must carry an
+ * authored SafeError message or beforeSend reduces it to its type. A SafeError's
  * `statusCode` goes on as the `status_code` tag, so its message can stay
  * constant (#1351); a caller's own valid `status_code` wins. Errors captured
  * any other way (render crashes, early errors) don't get it. Lazy import so this
@@ -291,23 +343,76 @@ export async function captureHandledError(
   error: Error,
   tags?: Record<string, string>,
 ): Promise<string | null> {
+  if (!decided) {
+    bufferHandledError(error, tags);
+    return null;
+  }
   if (!enabled) return null;
+  if (!sentryConfig) {
+    // A re-enable reaches optIn() before the enabled config arrives, so do
+    // not treat "no DSN read yet" as "no Sentry" (#4032).
+    if (sentryPossible) bufferHandledError(error, tags);
+    return null;
+  }
+  if (!sentryRunning) {
+    bufferHandledError(error, tags);
+    return null;
+  }
   try {
     const Sentry = await import("@sentry/react");
     if (!Sentry.getClient()) return null;
-    // A caller's own status wins; one the scrubber would drop doesn't, so it
-    // can't cost the report the SafeError's real status.
-    const status =
-      httpStatusTag(tags?.status_code) ??
-      (isSafeMessageError(error) ? httpStatusTag(error.statusCode) : undefined);
-    const allTags = status ? { ...tags, status_code: status } : tags;
-    return Sentry.withScope((scope) => {
-      if (allTags) scope.setTags(allTags);
-      return Sentry.captureException(error);
-    });
+    return sendHandledError(Sentry, error, tags);
   } catch {
     return null;
   }
+}
+
+function bufferHandledError(error: Error, tags?: Record<string, string>): void {
+  if (pendingHandledErrors.length >= MAX_PENDING_HANDLED_ERRORS) return;
+  pendingHandledErrors.push({ error, tags: tags ? { ...tags } : undefined });
+}
+
+function sendHandledError(
+  Sentry: SentryModule,
+  error: Error,
+  tags?: Record<string, string>,
+): string | null {
+  // A caller's own status wins; one the scrubber would drop doesn't, so it
+  // can't cost the report the SafeError's real status.
+  const status =
+    httpStatusTag(tags?.status_code) ??
+    (isSafeMessageError(error) ? httpStatusTag(error.statusCode) : undefined);
+  const allTags = status ? { ...tags, status_code: status } : tags;
+  return Sentry.withScope((scope) => {
+    if (allTags) scope.setTags(allTags);
+    return Sentry.captureException(error);
+  });
+}
+
+/** Replay tags and handled errors held while Sentry was unavailable. */
+function flushPendingSentry(Sentry: SentryModule): void {
+  // One bad tag or event must not cost the rest of the boot buffer.
+  for (const [key, value] of pendingTags) {
+    try {
+      Sentry.setTag(key, value);
+    } catch (err) {
+      console.warn("[analytics] Could not apply a buffered Sentry tag:", err);
+    }
+  }
+  pendingTags.clear();
+  for (const { error, tags } of pendingHandledErrors.splice(0)) {
+    try {
+      sendHandledError(Sentry, error, tags);
+    } catch (err) {
+      console.warn("[analytics] Could not replay a buffered handled error:", err);
+    }
+  }
+}
+
+/** Opting out, or an instance with no web DSN, must never replay these. */
+function discardPendingSentry(): void {
+  pendingHandledErrors.length = 0;
+  pendingTags.clear();
 }
 
 export function track(event: string, properties?: Record<string, unknown>): void {
@@ -349,7 +454,11 @@ export function isTelemetryEnabled(): boolean {
  * instance stops too (#1115).
  */
 export async function applyInstanceAnalytics(config: AnalyticsConfig | null): Promise<void> {
+  if (config) decided = true;
   if (config?.enabled) {
+    // The enabled answer carries the authoritative DSN state; remember it
+    // before optIn() can run without the config (#4032).
+    sentryPossible = !!config.sentryDsnWeb;
     // A tab that started and was then opted out resumes; any other starts.
     if (initialized && !enabled) optIn();
     // Sentry failed to start earlier (a chunk that didn't load, say): retry.
@@ -362,15 +471,33 @@ export async function applyInstanceAnalytics(config: AnalyticsConfig | null): Pr
   // Off from the start: nothing buffered may ever leave this tab. A null
   // setting is unknown (the first fetch failed), not off, so the buffer stays
   // for a later answer to decide (#2196).
-  else if (config) discardEarlyErrors();
+  else if (config) {
+    discardEarlyErrors();
+    discardPendingSentry();
+  }
+}
+
+/**
+ * Where a render crash should go right now: buffer while the setting or the
+ * DSN state is unknown and while Sentry is starting, send once it is up, or
+ * drop when this tab may not report. `sentryPossible` keeps a re-enable from
+ * treating an unfetched DSN as an opt-out (#2196, #4032).
+ */
+export function getRenderErrorDestination(): "buffer" | "send" | "drop" {
+  if (!decided) return "buffer";
+  if (!enabled) return "drop";
+  if (!sentryConfig) return sentryPossible ? "buffer" : "drop";
+  return sentryRunning ? "send" : "buffer";
 }
 
 /** Hard runtime opt-out: stop PostHog and Sentry in this tab without a reload. */
 export function optOut(): void {
+  decided = true;
   enabled = false;
   wanted = false;
   // Errors buffered so far belong to this opted-out tab; drop them (#2197).
   discardEarlyErrors();
+  discardPendingSentry();
   try {
     posthog?.opt_out_capturing();
   } catch (err) {
@@ -390,6 +517,7 @@ export function optOut(): void {
  * capture, and start Sentry again, since optOut() closed it (#2197).
  */
 export function optIn(): void {
+  decided = true;
   enabled = true;
   wanted = true;
   try {

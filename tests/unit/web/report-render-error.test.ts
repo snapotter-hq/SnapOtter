@@ -19,7 +19,7 @@ const live = { analytics: true, telemetry: true };
 
 vi.mock("@/lib/analytics", () => ({
   isAnalyticsActive: () => live.analytics,
-  isTelemetryEnabled: () => live.telemetry,
+  getRenderErrorDestination: () => (live.telemetry ? "send" : "drop"),
   track: (...args: unknown[]) => track(...args),
 }));
 vi.mock("@sentry/react", () => ({

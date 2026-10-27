@@ -1,7 +1,8 @@
 import { ANALYTICS_EVENTS } from "@snapotter/shared";
 import type { ErrorInfo } from "react";
-import { isAnalyticsActive, isTelemetryEnabled, track } from "@/lib/analytics";
+import { getRenderErrorDestination, isAnalyticsActive, track } from "@/lib/analytics";
 import { isAbortedByLeaving, LEAVING_WINDOW_MS } from "@/lib/chunk-reload";
+import { bufferRenderError } from "@/lib/early-errors";
 
 /**
  * The one place render crashes turn into telemetry. Both boundaries that can
@@ -21,14 +22,23 @@ export function reportRenderError(error: unknown, errorInfo?: ErrorInfo): void {
 }
 
 function sendRenderError(error: unknown, errorInfo?: ErrorInfo): void {
-  if (!isTelemetryEnabled()) return; // respect the runtime opt-out
   // Mirror the crash class only (no PII). track() and Sentry are best-effort,
   // and each needs only its own backend: an instance with a Sentry DSN and no
-  // PostHog key still reports the crash to Sentry (#1115).
+  // PostHog key still reports the crash to Sentry (#1115), and a PostHog-only
+  // instance still gets the event even though there is no Sentry client.
   if (isAnalyticsActive()) {
     track(ANALYTICS_EVENTS.TOOL_CLIENT_ERROR, {
       error_name: error instanceof Error ? error.name : typeof error,
     });
+  }
+  const destination = getRenderErrorDestination();
+  if (destination === "drop") return; // runtime opt-out or no web Sentry DSN
+  if (destination === "buffer") {
+    // First paint beats the analytics config fetch, and React 19 doesn't
+    // re-dispatch boundary errors to window "error"; the early buffer replays
+    // this once Sentry is up, or throws it away on an opt-out (#2196).
+    bufferRenderError(error, errorInfo);
+    return;
   }
   void import("@sentry/react")
     .then((Sentry) => {

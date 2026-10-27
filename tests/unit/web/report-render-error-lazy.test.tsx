@@ -14,7 +14,7 @@ const captureReactException = vi.fn();
 
 vi.mock("@/lib/analytics", () => ({
   isAnalyticsActive: () => true,
-  isTelemetryEnabled: () => true,
+  getRenderErrorDestination: () => "send",
   track: vi.fn(),
 }));
 vi.mock("@sentry/react", () => ({

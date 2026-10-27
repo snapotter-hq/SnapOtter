@@ -6,14 +6,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const sentry = vi.hoisted(() => ({
   init: vi.fn(),
   getClient: vi.fn(),
+  getIsolationScope: () => ({ clearBreadcrumbs: vi.fn() }),
+  getCurrentScope: () => ({ clearBreadcrumbs: vi.fn() }),
   withScope: vi.fn(),
   captureException: vi.fn(),
+  captureReactException: vi.fn(),
   setTag: vi.fn(),
 }));
 vi.mock("@sentry/react", () => sentry);
-vi.mock("@/lib/early-errors", () => ({ flushEarlyErrors: vi.fn() }));
+vi.mock("@/lib/early-errors", () => ({
+  flushEarlyErrors: vi.fn(),
+  discardEarlyErrors: vi.fn(),
+}));
 
 type Analytics = typeof import("@/lib/analytics");
+
+/** Sentry only runs on an instance with a web DSN; give these tests one. */
+const ON = { enabled: true, sentryDsnWeb: "https://sentry.test/web/1" } as AnalyticsConfig;
 
 // analytics.ts keeps module-level enabled/initialized state; a fresh module per
 // test isolates the "before init" case from the "after init" ones.
@@ -38,7 +47,7 @@ describe("captureHandledError", () => {
 
   it("returns null when no Sentry client exists (DSN absent or opt-out)", async () => {
     const a = await freshAnalytics();
-    await a.initAnalytics({ enabled: true } as AnalyticsConfig);
+    await a.initAnalytics(ON);
     sentry.getClient.mockReturnValue(undefined);
     expect(await a.captureHandledError(new Error("x"))).toBeNull();
     expect(sentry.captureException).not.toHaveBeenCalled();
@@ -46,7 +55,7 @@ describe("captureHandledError", () => {
 
   it("captures with the given tags and returns the Sentry event id", async () => {
     const a = await freshAnalytics();
-    await a.initAnalytics({ enabled: true } as AnalyticsConfig);
+    await a.initAnalytics(ON);
     sentry.getClient.mockReturnValue({});
     sentry.captureException.mockReturnValue("evt-1");
     const scope = { setTags: vi.fn(), setTag: vi.fn() };
@@ -74,7 +83,7 @@ describe("captureHandledError", () => {
       tags?: Record<string, string>,
     ): Promise<Record<string, string> | undefined> {
       const a = await freshAnalytics();
-      await a.initAnalytics({ enabled: true } as AnalyticsConfig);
+      await a.initAnalytics(ON);
       sentry.getClient.mockReturnValue({});
       const scope = { setTags: vi.fn(), setTag: vi.fn() };
       sentry.withScope.mockImplementation((cb: (s: unknown) => unknown) => cb(scope));

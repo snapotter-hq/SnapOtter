@@ -47,8 +47,10 @@ export async function loadLocale(code: string): Promise<TranslationKeys> {
         }),
         { locale: code, error_class: "operational" },
       );
-    } catch {
-      // analytics import or reporting unavailable
+    } catch (error) {
+      // The chunk load is already logged above; losing the Sentry report too
+      // leaves no trace of why the crash went unreported (#4044).
+      console.warn("Failed to report a locale load failure to analytics.", error);
     }
     return en;
   }
@@ -177,7 +179,11 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
       const activeLocale = t === en && locale !== "en" ? "en" : locale;
       import("@/lib/analytics")
         .then(({ setSentryTag }) => setSentryTag("locale", activeLocale))
-        .catch(() => {});
+        .catch((error) => {
+          // The locale still works; the tag is only diagnostics. Say why it's
+          // missing rather than swallowing the failure (#4044).
+          console.warn("Failed to tag Sentry with the active locale.", error);
+        });
     });
     return () => {
       cancelled = true;
